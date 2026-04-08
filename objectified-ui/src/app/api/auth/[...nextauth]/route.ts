@@ -59,8 +59,6 @@ export const authOptions: NextAuthOptions = {
         const linkIntent = await checkLinkingIntent();
 
         if (linkIntent && linkIntent.provider === 'github') {
-          console.log('[signIn] Handling GitHub account linking for user:', linkIntent.userId);
-
           // Link the GitHub account to the current user
           const account = payload.account;
           const profile = payload.profile || user;
@@ -68,10 +66,8 @@ export const authOptions: NextAuthOptions = {
           const linked = await linkGithubAccount(linkIntent.userId, account, profile);
 
           if (linked) {
-            console.log('[signIn] Successfully linked GitHub account');
             return '/ade/dashboard/linked-accounts?linked=true';
           } else {
-            console.log('[signIn] Failed to link GitHub account');
             return '/ade/dashboard/linked-accounts?error=Failed to link account. It may already be linked to another user.';
           }
         }
@@ -85,8 +81,6 @@ export const authOptions: NextAuthOptions = {
         const linkIntent = await checkLinkingIntent();
 
         if (linkIntent && linkIntent.provider === 'gitlab') {
-          console.log('[signIn] Handling GitLab account linking for user:', linkIntent.userId);
-
           // Link the GitLab account to the current user
           const account = payload.account;
           const profile = payload.profile || user;
@@ -94,10 +88,8 @@ export const authOptions: NextAuthOptions = {
           const linked = await linkGitlabAccount(linkIntent.userId, account, profile);
 
           if (linked) {
-            console.log('[signIn] Successfully linked GitLab account');
             return '/ade/dashboard/linked-accounts?linked=true';
           } else {
-            console.log('[signIn] Failed to link GitLab account');
             return '/ade/dashboard/linked-accounts?error=Failed to link account. It may already be linked to another user.';
           }
         }
@@ -106,13 +98,9 @@ export const authOptions: NextAuthOptions = {
         return credentialsGitlab(payload);
       }
 
-      console.log('[signIn] unsupported provider:', loginProvider, 'user:', user, 'payload:', payload);
-
       return `/login?error=Your login attempt failed, provider "${loginProvider}" is not yet supported`;
     },
     // async redirect({ url, baseUrl }) {
-    //     console.log(`[next-auth::redirect]: url=${JSON.stringify(url)} baseUrl=${JSON.stringify(baseUrl)}`);
-    //
     //     // Override the login, redirecting to the login page if properly set.
     //     if (url === '/login') {
     //         return baseUrl + '/login';
@@ -143,27 +131,20 @@ export const authOptions: NextAuthOptions = {
     async jwt(payload: any) {
       const token = payload.token;
 
-      console.log('[JWT] JWT: trigger:', payload.trigger, 'payload:', payload);
-
       // If the trigger is "update", this indicates that the session payload has changed,
       // and the token should be updated accordingly.
       if (payload.trigger === 'update') {
-        console.log('[JWT] Updating session');
-
         if (payload.session?.user?.name) {
-          console.log('[JWT] Adjusting name (rename):', payload.session.user.name);
           token.name = payload.session.user.name;
         }
 
         if (payload.session?.current_tenant_id) {
-          console.log('[JWT] Adjusting session:', payload.session);
           token.current_tenant_id = payload.session.current_tenant_id;
         }
       }
 
       if (payload.user) {
         token.user_id = payload.user.id;
-        console.log('[JWT] Setting user_id from payload.user.id:', payload.user.id, 'email:', payload.user.email);
       }
 
       return token;

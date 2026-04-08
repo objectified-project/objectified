@@ -11,8 +11,6 @@ export interface ICredentials {
  */
 export const linkGithubAccount = async (userId: string, account: any, profile: any) => {
   try {
-    console.log('[linkGithubAccount] Linking GitHub account for user:', userId);
-
     const result = await helper.linkExternalAccount(
       userId,
       'github',
@@ -42,8 +40,6 @@ export const linkGithubAccount = async (userId: string, account: any, profile: a
  */
 export const linkGitlabAccount = async (userId: string, account: any, profile: any) => {
   try {
-    console.log('[linkGitlabAccount] Linking GitLab account for user:', userId);
-
     const result = await helper.linkExternalAccount(
       userId,
       'gitlab',
@@ -88,12 +84,15 @@ export const checkLinkingIntent = async () => {
           cookieStore.delete('oauth_link_intent');
           return intent;
         }
-      } catch (parseError) {
-        console.log('[checkLinkingIntent] Error parsing intent:', parseError);
+        // Expired intent cookie; clear it and treat as no intent
+        cookieStore.delete('oauth_link_intent');
+      } catch {
+        // Malformed intent cookie; clear it and treat as no intent
+        cookieStore.delete('oauth_link_intent');
       }
     }
-  } catch (error) {
-    console.log('[checkLinkingIntent] Could not check linking intent:', error);
+  } catch {
+    // Cookie store unavailable; treat as no intent
   }
 
   return null;
@@ -107,9 +106,6 @@ export const checkLinkingIntent = async () => {
  * 4. Failure returns a null, which the next-auth `authorize()` handler will interpret as an invalid account.
  */
 export const credentialsAuthorize = async (credentials: ICredentials) => {
-  console.log('[credentialsAuthorize] credentials login for user', credentials);
-
-  const emailAddress = credentials.email;
   const password = credentials.password;
   const results = await helper.getUserByEmail(credentials.email);
 
@@ -124,15 +120,11 @@ export const credentialsAuthorize = async (credentials: ICredentials) => {
         return userResult;
       }
 
-      console.log(`[credentialsAuthorize] credentials login for user ${emailAddress} failed: password mismatch`);
       return null;
     } else {
-      console.log(`[credentialsAuthorize] credentials login for user ${emailAddress} failed: no password is set`);
       return null;
     }
   }
-
-  console.log(`[credentialsAuthorize] credentials login for user ${emailAddress} not found`);
 
   return null;
 }
@@ -153,8 +145,6 @@ export const credentialsAuthorize = async (credentials: ICredentials) => {
 export const credentialsSignIn = async (payload: any) => {
   const user = payload.user;
 
-  console.log('[credentialsSignIn] Handling credentials provider');
-
   if (!user.enabled) {
     return '/login?error=Your account is currently disabled';
   }
@@ -162,8 +152,6 @@ export const credentialsSignIn = async (payload: any) => {
   if (!user.verified) {
     return '/login?error=You have not yet verified your account e-mail address';
   }
-
-  console.log('[credentialsSignIn] Login successful', user.email);
 
   if (user.id) {
     void helper.updateUserLastLoginAt(user.id).catch((error: any) => {
@@ -190,19 +178,13 @@ export const credentialsGithub = async (payload: any) => {
   const account = payload.account;
   const profile = payload.profile;
 
-  console.log('[credentialsGithub] Handling github provider', user, 'account:', account);
-
   // First, check if this GitHub account is already linked to an existing user
   if (account?.providerAccountId) {
-    console.log('[credentialsGithub] Checking for existing linked account with GitHub ID:', account.providerAccountId);
-
     // Check if this GitHub account is already linked
     const linkedAccountResult = await helper.getLinkedAccountByProvider('github', account.providerAccountId);
     const linkedAccount = JSON.parse(linkedAccountResult);
 
     if (linkedAccount.found && linkedAccount.account) {
-      console.log('[credentialsGithub] Found linked GitHub account for user:', linkedAccount.account.user_id);
-
       // Get the user by ID (not email, since email might not match)
       const userResults = await helper.getUserById(linkedAccount.account.user_id);
 
@@ -228,7 +210,6 @@ export const credentialsGithub = async (payload: any) => {
         payload.user.enabled = userResult.enabled;
         payload.user.verified = userResult.verified;
 
-        console.log('[credentialsGithub] Login successful via linked account, user_id:', userResult.id);
         void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
           console.error('[credentialsGithub] Failed to update last login timestamp:', error);
         });
@@ -243,8 +224,6 @@ export const credentialsGithub = async (payload: any) => {
   if (results.rowCount > 0) {
     const userResult = results.rows[0];
 
-    console.log('[credentialsGithub] Retrieved user record from DB:', userResult);
-
     if (!userResult.enabled) {
       return '/login?error=Your account is currently disabled';
     }
@@ -255,7 +234,6 @@ export const credentialsGithub = async (payload: any) => {
 
     // Auto-link this GitHub account to the user on first successful login
     if (account?.providerAccountId) {
-      console.log('[credentialsGithub] Auto-linking GitHub account on first login');
       await linkGithubAccount(userResult.id, account, profile || user);
     }
 
@@ -267,15 +245,11 @@ export const credentialsGithub = async (payload: any) => {
     payload.user.enabled = userResult.enabled;
     payload.user.verified = userResult.verified;
 
-    console.log('[credentialsGithub] Login successful, user_id:', userResult.id);
-
     void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
       console.error('[credentialsGithub] Failed to update last login timestamp:', error);
     });
     return true;
   }
-
-  console.log('[credentialsGithub] User account not found for e-mail address:', user.email);
 
   return false;
 }
@@ -296,19 +270,13 @@ export const credentialsGitlab = async (payload: any) => {
   const account = payload.account;
   const profile = payload.profile;
 
-  console.log('[credentialsGitlab] Handling gitlab provider', user, 'account:', account);
-
   // First, check if this GitLab account is already linked to an existing user
   if (account?.providerAccountId) {
-    console.log('[credentialsGitlab] Checking for existing linked account with GitLab ID:', account.providerAccountId);
-
     // Check if this GitLab account is already linked
     const linkedAccountResult = await helper.getLinkedAccountByProvider('gitlab', account.providerAccountId);
     const linkedAccount = JSON.parse(linkedAccountResult);
 
     if (linkedAccount.found && linkedAccount.account) {
-      console.log('[credentialsGitlab] Found linked GitLab account for user:', linkedAccount.account.user_id);
-
       // Get the user by ID (not email, since email might not match)
       const userResults = await helper.getUserById(linkedAccount.account.user_id);
 
@@ -334,7 +302,6 @@ export const credentialsGitlab = async (payload: any) => {
         payload.user.enabled = userResult.enabled;
         payload.user.verified = userResult.verified;
 
-        console.log('[credentialsGitlab] Login successful via linked account, user_id:', userResult.id);
         void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
           console.error('[credentialsGitlab] Failed to update last login timestamp:', error);
         });
@@ -349,8 +316,6 @@ export const credentialsGitlab = async (payload: any) => {
   if (results.rowCount > 0) {
     const userResult = results.rows[0];
 
-    console.log('[credentialsGitlab] Retrieved user record from DB:', userResult);
-
     if (!userResult.enabled) {
       return '/login?error=Your account is currently disabled';
     }
@@ -361,7 +326,6 @@ export const credentialsGitlab = async (payload: any) => {
 
     // Auto-link this GitLab account to the user on first successful login
     if (account?.providerAccountId) {
-      console.log('[credentialsGitlab] Auto-linking GitLab account on first login');
       await linkGitlabAccount(userResult.id, account, profile || user);
     }
 
@@ -373,15 +337,11 @@ export const credentialsGitlab = async (payload: any) => {
     payload.user.enabled = userResult.enabled;
     payload.user.verified = userResult.verified;
 
-    console.log('[credentialsGitlab] Login successful, user_id:', userResult.id);
-
     void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
       console.error('[credentialsGitlab] Failed to update last login timestamp:', error);
     });
     return true;
   }
-
-  console.log('[credentialsGitlab] User account not found for e-mail address:', user.email);
 
   return false;
 }

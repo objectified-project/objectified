@@ -25,10 +25,6 @@ export const AuthenticatedLayout: React.FC<AuthenticatedLayoutProps> = ({
   useEffect(() => {
     if (status === 'loading') return; // Wait for session to load
 
-    if (session) {
-      console.log('[AuthenticatedLayout] Session:', session, 'status:', status);
-    }
-
     if (session === null) {
       router.push(redirectTo);
     }
