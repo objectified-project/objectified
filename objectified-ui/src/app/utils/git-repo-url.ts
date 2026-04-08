@@ -6,7 +6,7 @@ export function parseGitHubRepoUrl(input: string): { owner: string; repo: string
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  const sshForm = /^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/i.exec(trimmed);
+  const sshForm = /^git@github\.com:([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)(?:\.git)?$/i.exec(trimmed);
   if (sshForm) {
     const owner = sshForm[1];
     const repo = sshForm[2].replace(/\.git$/i, '');

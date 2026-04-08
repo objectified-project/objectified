@@ -26,6 +26,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Account ID and repo are required' }, { status: 400 });
     }
 
+    const repoParts = repo.split('/');
+    if (repoParts.length !== 2 || !repoParts[0] || !repoParts[1]) {
+      return NextResponse.json({ error: 'repo must be in owner/repo format' }, { status: 400 });
+    }
+    const [repoOwner, repoName] = repoParts;
+
     const accountResult = await getLinkedAccountById(accountId, userId);
     const accountData = JSON.parse(accountResult);
 
@@ -39,7 +45,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No access token found for this account' }, { status: 401 });
     }
 
-    const url = `https://api.github.com/repos/${repo}/branches?per_page=100`;
+    const url = `https://api.github.com/repos/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}/branches?per_page=100`;
 
     const githubResponse = await fetch(url, {
       headers: {

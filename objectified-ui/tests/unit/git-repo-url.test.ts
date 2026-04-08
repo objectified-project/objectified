@@ -41,6 +41,10 @@ describe('parseGitHubRepoUrl', () => {
     });
   });
 
+  it('rejects SSH git@ form with extra path segments', () => {
+    expect(parseGitHubRepoUrl('git@github.com:org/a/b.git')).toBeNull();
+  });
+
   it('returns null for non-GitHub hosts', () => {
     expect(parseGitHubRepoUrl('https://gitlab.com/org/repo')).toBeNull();
   });
