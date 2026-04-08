@@ -1,20 +1,36 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Link2, Eye, EyeOff, CheckCircle2, AlertTriangle, Loader2, FileCode, Globe } from 'lucide-react';
-import { Button } from '../../../components/ui/Button';
+import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { Link2, Eye, EyeOff, CheckCircle2, AlertTriangle, FileCode, Globe } from 'lucide-react';
 import { fetchSpecificationFromUrl, validateImportUrl, UrlImportOptions, UrlImportResult } from '../../../utils/url-import';
 import { extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
+import { ImportSourceTabBar, type ImportSourceTabId } from './ImportSourceTabBar';
+
+export interface UrlImportFooterState {
+  canTestUrl: boolean;
+  isTesting: boolean;
+  urlTestedSuccessfully: boolean;
+}
+
+export interface UrlImportPanelHandle {
+  testUrl: () => Promise<void>;
+}
 
 interface UrlImportPanelProps {
   onSpecificationFetched: (content: string, filename: string, metadata?: FileMetadataPreview) => void;
+  /** Switch import source (same step, different panel). */
+  onSelectSource?: (source: ImportSourceTabId) => void;
+  onFooterStateChange?: (state: UrlImportFooterState) => void;
+  /** Extra tabs to disable (e.g. SwaggerHub in class import). */
+  tabDisabledIds?: ImportSourceTabId[];
 }
 
 type AuthType = 'none' | 'bearer' | 'apiKey' | 'basic';
 
-export const UrlImportPanel: React.FC<UrlImportPanelProps> = ({
-  onSpecificationFetched
-}) => {
+const UrlImportPanel = forwardRef<UrlImportPanelHandle, UrlImportPanelProps>(function UrlImportPanel(
+  { onSpecificationFetched, onSelectSource, onFooterStateChange, tabDisabledIds },
+  ref
+) {
   // Form state
   const [url, setUrl] = useState('');
   const [authType, setAuthType] = useState<AuthType>('none');
@@ -25,6 +41,7 @@ export const UrlImportPanel: React.FC<UrlImportPanelProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [followRedirects, setFollowRedirects] = useState(true);
   const [resolveExternalRefs, setResolveExternalRefs] = useState(true);
+  const [cacheFetched, setCacheFetched] = useState(false);
   const [saveCredentials, setSaveCredentials] = useState(false);
 
   // UI state
@@ -51,21 +68,22 @@ export const UrlImportPanel: React.FC<UrlImportPanelProps> = ({
     }
   }, [url]);
 
-  // Build import options
-  const buildOptions = (): UrlImportOptions => ({
-    url: url.trim(),
-    authType,
-    authToken: authType === 'bearer' || authType === 'apiKey' ? token : undefined,
-    apiKeyHeader: authType === 'apiKey' ? apiKeyHeader : undefined,
-    username: authType === 'basic' ? username : undefined,
-    password: authType === 'basic' ? password : undefined,
-    followRedirects,
-    timeout: 30000
-  });
-
   // Test URL - fetches and validates but doesn't proceed to analysis
-  const handleTestUrl = async () => {
+  const handleTestUrl = useCallback(async () => {
     if (!url.trim() || urlError) return;
+
+    const options: UrlImportOptions = {
+      url: url.trim(),
+      authType,
+      authToken: authType === 'bearer' || authType === 'apiKey' ? token : undefined,
+      apiKeyHeader: authType === 'apiKey' ? apiKeyHeader : undefined,
+      username: authType === 'basic' ? username : undefined,
+      password: authType === 'basic' ? password : undefined,
+      followRedirects,
+      resolveExternalRefs,
+      useCache: cacheFetched,
+      timeout: 30000
+    };
 
     setIsFetching(true);
     setFetchResult(null);
@@ -75,21 +93,17 @@ export const UrlImportPanel: React.FC<UrlImportPanelProps> = ({
     setUrlTested(false);
 
     try {
-      const result = await fetchSpecificationFromUrl(buildOptions());
+      const result = await fetchSpecificationFromUrl(options);
       setFetchResult(result);
 
       if (result.success && result.content) {
-        // Extract metadata for preview
         const metadata = extractFileMetadata(result.content);
         setFileMetadata(metadata);
 
-        // Store content for later use when user clicks Analyze
         setFetchedContent(result.content);
         setFetchedFilename(result.filename || 'openapi-spec.yaml');
         setUrlTested(true);
 
-        // Notify parent that content is ready (for enabling Analyze button)
-        // Pass metadata so parent can check format support
         onSpecificationFetched(result.content, result.filename || 'openapi-spec.yaml', metadata);
       }
     } catch (error) {
@@ -100,7 +114,31 @@ export const UrlImportPanel: React.FC<UrlImportPanelProps> = ({
     } finally {
       setIsFetching(false);
     }
-  };
+  }, [
+    url,
+    urlError,
+    authType,
+    token,
+    apiKeyHeader,
+    username,
+    password,
+    followRedirects,
+    resolveExternalRefs,
+    cacheFetched,
+    onSpecificationFetched
+  ]);
+
+  useImperativeHandle(ref, () => ({
+    testUrl: () => handleTestUrl(),
+  }), [handleTestUrl]);
+
+  useEffect(() => {
+    onFooterStateChange?.({
+      canTestUrl: Boolean(url.trim()) && !urlError,
+      isTesting: isFetching,
+      urlTestedSuccessfully: Boolean(urlTested && fetchResult?.success),
+    });
+  }, [url, urlError, isFetching, urlTested, fetchResult?.success, onFooterStateChange]);
 
   // Reset tested state when URL or auth changes
   useEffect(() => {
@@ -113,48 +151,11 @@ export const UrlImportPanel: React.FC<UrlImportPanelProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Source Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
-        <button
-          disabled
-          className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
-        >
-          📁 File
-        </button>
-        <button
-          className="px-4 py-2 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 dark:text-indigo-400"
-        >
-          🔗 URL
-        </button>
-        <button
-          disabled
-          className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
-          title="Coming soon"
-        >
-          📋 Clipboard
-        </button>
-        <button
-          disabled
-          className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
-          title="Coming soon"
-        >
-          🐙 Git
-        </button>
-        <button
-          disabled
-          className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
-          title="Coming soon"
-        >
-          ☁️ SwaggerHub
-        </button>
-        <button
-          disabled
-          className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
-          title="Coming soon"
-        >
-          📦 Registry
-        </button>
-      </div>
+      <ImportSourceTabBar
+        active="url"
+        onSelect={(id) => onSelectSource?.(id)}
+        disabledIds={tabDisabledIds}
+      />
 
       {/* URL Input */}
       <div className="space-y-2">
@@ -371,6 +372,18 @@ export const UrlImportPanel: React.FC<UrlImportPanelProps> = ({
               Resolve external $ref URLs
             </span>
           </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={cacheFetched}
+              onChange={(e) => setCacheFetched(e.target.checked)}
+              className="rounded text-indigo-600 focus:ring-indigo-500"
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Cache fetched content
+            </span>
+          </label>
         </div>
       </div>
 
@@ -483,33 +496,6 @@ export const UrlImportPanel: React.FC<UrlImportPanelProps> = ({
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <Button
-          onClick={handleTestUrl}
-          disabled={!url.trim() || !!urlError || isFetching}
-          variant={urlTested && fetchResult?.success ? 'outline' : 'default'}
-          className={urlTested && fetchResult?.success
-            ? 'border-green-500 text-green-600 hover:bg-green-50 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-900/20'
-            : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-          }
-        >
-          {isFetching ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Testing...
-            </>
-          ) : urlTested && fetchResult?.success ? (
-            <>
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              URL Tested Successfully
-            </>
-          ) : (
-            'Test URL'
-          )}
-        </Button>
-      </div>
-
       {/* Help text for next steps */}
       {urlTested && fetchResult?.success && fileMetadata?.formatSupported && (
         <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
@@ -520,7 +506,7 @@ export const UrlImportPanel: React.FC<UrlImportPanelProps> = ({
                 URL verified successfully
               </div>
               <div className="text-sm text-green-700 dark:text-green-300 mt-1">
-                Click &quot;Analyze →&quot; below to proceed with the import.
+                Use &quot;Next →&quot; in the dialog footer to continue to analysis.
               </div>
             </div>
           </div>
@@ -528,7 +514,7 @@ export const UrlImportPanel: React.FC<UrlImportPanelProps> = ({
       )}
     </div>
   );
-};
+});
 
 export default UrlImportPanel;
 

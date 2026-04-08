@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { Upload, X, FileCode, AlertTriangle, CheckCircle2, Package, Search, Check, ChevronRight, ArrowUpAZ, ArrowDownAZ, Link2, FileText, Github, ChevronDown } from 'lucide-react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import {
@@ -15,7 +15,8 @@ import { Button } from '../../ui/Button';
 import { analyzeSpecification, AnalysisResult, extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
 import { importClassesToVersion, ImportClassesResult } from '../../../../../lib/db/class-import-actions';
 import { getVersionById, createVersion, bumpPrereleaseVersion } from '../../../../../lib/db/helper';
-import UrlImportPanel from '../dashboard/UrlImportPanel';
+import UrlImportPanel, { type UrlImportPanelHandle, type UrlImportFooterState } from '../dashboard/UrlImportPanel';
+import { ImportSourceTabBar, type ImportSourceTabId } from '../dashboard/ImportSourceTabBar';
 import ClipboardImportPanel from '../dashboard/ClipboardImportPanel';
 import GitImportPanel from '../dashboard/GitImportPanel';
 import { ConflictReport, type ImportConflict } from '../dashboard/ConflictReport';
@@ -164,6 +165,16 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const [importResult, setImportResult] = useState<ImportClassesResult | null>(null);
   const [urlContent, setUrlContent] = useState<string | null>(null);
   const [urlFilename, setUrlFilename] = useState<string | null>(null);
+  const [urlMetadata, setUrlMetadata] = useState<FileMetadataPreview | null>(null);
+  const urlImportRef = useRef<UrlImportPanelHandle>(null);
+  const [urlImportFooter, setUrlImportFooter] = useState<UrlImportFooterState>({
+    canTestUrl: false,
+    isTesting: false,
+    urlTestedSuccessfully: false,
+  });
+  const handleUrlImportFooterState = useCallback((s: UrlImportFooterState) => {
+    setUrlImportFooter(s);
+  }, []);
   const [clipboardContent, setClipboardContent] = useState<string | null>(null);
   const [clipboardFilename, setClipboardFilename] = useState<string | null>(null);
   const [gitContent, setGitContent] = useState<string | null>(null);
@@ -221,6 +232,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       setFileMetadata(null);
       setUrlContent(null);
       setUrlFilename(null);
+      setUrlMetadata(null);
       setClipboardContent(null);
       setClipboardFilename(null);
     }
@@ -244,6 +256,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     setImportResult(null);
     setUrlContent(null);
     setUrlFilename(null);
+    setUrlMetadata(null);
     setClipboardContent(null);
     setClipboardFilename(null);
     setGitContent(null);
@@ -299,37 +312,10 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     }
   };
 
-  const handleUrlSpecificationFetched = async (content: string, filename: string) => {
+  const handleUrlSpecificationFetched = (content: string, filename: string, metadata?: FileMetadataPreview) => {
     setUrlContent(content);
     setUrlFilename(filename);
-
-    // Auto-analyze when URL content is fetched
-    setIsAnalyzing(true);
-    try {
-      const result = await analyzeSpecification(content, filename);
-      setAnalysisResult(result);
-
-      // Initialize schemas list with conflict detection (#580, #582: duplicate = same name + different definition)
-      const schemaObj = result.document?.components?.schemas || result.document?.definitions || {};
-      const schemaList: SchemaInfo[] = Object.keys(schemaObj).map(name => {
-        const raw = schemaObj[name];
-        const exists = isDuplicateSchema(name, raw, existingClassNames, existingClassSchemas);
-        return {
-          name,
-          properties: countSchemaProperties(raw),
-          selected: !exists,
-          exists,
-          schemaType: getSchemaType(raw),
-          tags: getSchemaTags(raw),
-        };
-      });
-      setSchemas(schemaList);
-      setCurrentStep('select');
-    } catch (error) {
-      console.error('URL content analysis error:', error);
-    } finally {
-      setIsAnalyzing(false);
-    }
+    setUrlMetadata(metadata ?? null);
   };
 
   const handleClipboardSpecificationReady = (content: string, filename: string) => {
@@ -850,7 +836,14 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
 
           {currentStep === 'file-upload' && selectedSource === 'url' && (
             <UrlImportPanel
+              ref={urlImportRef}
               onSpecificationFetched={handleUrlSpecificationFetched}
+              onSelectSource={(id: ImportSourceTabId) => {
+                if (id === 'registry' || id === 'swaggerhub') return;
+                handleSourceClick(id);
+              }}
+              onFooterStateChange={handleUrlImportFooterState}
+              tabDisabledIds={['swaggerhub']}
             />
           )}
 
@@ -869,6 +862,16 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
 
           {currentStep === 'file-upload' && selectedSource === 'file' && (
             <>
+              <div className="mb-6">
+                <ImportSourceTabBar
+                  active="file"
+                  onSelect={(id) => {
+                    if (id === 'registry' || id === 'swaggerhub') return;
+                    handleSourceClick(id);
+                  }}
+                  disabledIds={['swaggerhub']}
+                />
+              </div>
               {/* Drop Zone */}
               <div className="mb-6">
                 <div
@@ -1821,10 +1824,37 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                 <Button variant="outline" onClick={handleClose}>
                   Cancel
                 </Button>
+                {currentStep === 'file-upload' && selectedSource === 'url' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => void urlImportRef.current?.testUrl()}
+                    disabled={!urlImportFooter.canTestUrl || urlImportFooter.isTesting}
+                    className={
+                      urlImportFooter.urlTestedSuccessfully
+                        ? 'border-green-500 text-green-600 dark:border-green-500 dark:text-green-400'
+                        : undefined
+                    }
+                  >
+                    {urlImportFooter.isTesting
+                      ? 'Testing...'
+                      : urlImportFooter.urlTestedSuccessfully
+                        ? 'URL tested ✓'
+                        : 'Test URL'}
+                  </Button>
+                )}
                 {currentStep === 'file-upload' && selectedSource === 'file' && (
                   <Button
                     onClick={handleAnalyze}
                     disabled={!selectedFile || isAnalyzing || (fileMetadata !== null && !fileMetadata.formatSupported)}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                  >
+                    {isAnalyzing ? 'Analyzing...' : 'Continue →'}
+                  </Button>
+                )}
+                {currentStep === 'file-upload' && selectedSource === 'url' && (
+                  <Button
+                    onClick={handleAnalyze}
+                    disabled={!urlContent || isAnalyzing || (urlMetadata !== null && !urlMetadata.formatSupported)}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   >
                     {isAnalyzing ? 'Analyzing...' : 'Continue →'}

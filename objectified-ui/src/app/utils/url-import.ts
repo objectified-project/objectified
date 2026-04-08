@@ -10,6 +10,58 @@ import { isProtobuf } from './protobuf-converter';
 import { isAvroSchemaObject } from './avro-converter';
 import { isThrift } from './thrift-converter';
 
+const URL_IMPORT_CACHE_STORAGE_KEY = 'objectified:url-import-cache:v1';
+const URL_IMPORT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+type UrlImportCacheEntry = {
+  content: string;
+  filename: string;
+  storedAt: number;
+};
+
+type UrlImportCacheStore = Record<string, UrlImportCacheEntry>;
+
+function normalizeUrlKey(url: string): string {
+  try {
+    return new URL(url.trim()).href;
+  } catch {
+    return url.trim();
+  }
+}
+
+function readUrlImportCache(url: string): UrlImportCacheEntry | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(URL_IMPORT_CACHE_STORAGE_KEY);
+    if (!raw) return null;
+    const store = JSON.parse(raw) as UrlImportCacheStore;
+    const key = normalizeUrlKey(url);
+    const entry = store[key];
+    if (!entry?.content) return null;
+    if (Date.now() - entry.storedAt > URL_IMPORT_CACHE_TTL_MS) {
+      delete store[key];
+      sessionStorage.setItem(URL_IMPORT_CACHE_STORAGE_KEY, JSON.stringify(store));
+      return null;
+    }
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function writeUrlImportCache(url: string, content: string, filename: string): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    const raw = sessionStorage.getItem(URL_IMPORT_CACHE_STORAGE_KEY);
+    const store = (raw ? JSON.parse(raw) : {}) as UrlImportCacheStore;
+    const key = normalizeUrlKey(url);
+    store[key] = { content, filename, storedAt: Date.now() };
+    sessionStorage.setItem(URL_IMPORT_CACHE_STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 export interface UrlImportOptions {
   /** The URL to fetch the specification from */
   url: string;
@@ -25,6 +77,13 @@ export interface UrlImportOptions {
   password?: string;
   /** Whether to follow redirects */
   followRedirects?: boolean;
+  /** When true, reuse a recent successful fetch from session cache (same normalized URL). */
+  useCache?: boolean;
+  /**
+   * Reserved for analysis/import: whether to attempt resolving external $ref URLs.
+   * The initial GET does not bundle refs; this flag is stored for downstream steps.
+   */
+  resolveExternalRefs?: boolean;
   /** Request timeout in milliseconds */
   timeout?: number;
 }
@@ -227,6 +286,20 @@ export async function fetchSpecificationFromUrl(options: UrlImportOptions): Prom
     };
   }
 
+  if (options.useCache) {
+    const cached = readUrlImportCache(options.url);
+    if (cached) {
+      const contentType = cached.content.trim().startsWith('{') ? 'application/json' : 'application/yaml';
+      return {
+        success: true,
+        content: cached.content,
+        contentType,
+        filename: cached.filename,
+        statusCode: 200,
+      };
+    }
+  }
+
   try {
     // Build request headers
     const headers: Record<string, string> = {
@@ -302,6 +375,10 @@ export async function fetchSpecificationFromUrl(options: UrlImportOptions): Prom
       response.headers.forEach((value, key) => {
         responseHeaders[key] = value;
       });
+
+      if (options.useCache) {
+        writeUrlImportCache(options.url, content, filename);
+      }
 
       return {
         success: true,
