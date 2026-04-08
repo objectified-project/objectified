@@ -554,7 +554,9 @@ describe('URL Import - cache behavior', () => {
     // Expire the cache entry by back-dating storedAt
     const raw = storageMock.getItem(CACHE_KEY);
     const store = JSON.parse(raw);
-    const [key] = Object.keys(store);
+    const keys = Object.keys(store);
+    expect(keys.length).toBeGreaterThan(0);
+    const [key] = keys;
     store[key].storedAt = Date.now() - 25 * 60 * 60 * 1000; // 25 hours ago
     storageMock.setItem(CACHE_KEY, JSON.stringify(store));
 
@@ -573,7 +575,9 @@ describe('URL Import - cache behavior', () => {
     // Corrupt the storedAt field
     const raw = storageMock.getItem(CACHE_KEY);
     const store = JSON.parse(raw);
-    const [key] = Object.keys(store);
+    const keys = Object.keys(store);
+    expect(keys.length).toBeGreaterThan(0);
+    const [key] = keys;
     store[key].storedAt = 'not-a-number';
     storageMock.setItem(CACHE_KEY, JSON.stringify(store));
 

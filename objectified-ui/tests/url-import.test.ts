@@ -18,7 +18,6 @@ function buildSessionStorageMock() {
     getItem: jest.fn((key: string) => store[key] ?? null),
     setItem: jest.fn((key: string, value: string) => { store[key] = String(value); }),
     removeItem: jest.fn((key: string) => { delete store[key]; }),
-    _store: store,
   };
 }
 
@@ -94,7 +93,9 @@ describe('URL Import - cache behavior', () => {
     // Expire the cache by back-dating storedAt
     const raw = storageMock.getItem(CACHE_KEY);
     const cacheStore = JSON.parse(raw as string);
-    const key = Object.keys(cacheStore)[0];
+    const keys = Object.keys(cacheStore);
+    expect(keys.length).toBeGreaterThan(0);
+    const key = keys[0];
     cacheStore[key].storedAt = Date.now() - 25 * 60 * 60 * 1000; // 25 hours ago
     storageMock.setItem(CACHE_KEY, JSON.stringify(cacheStore));
 
@@ -113,7 +114,9 @@ describe('URL Import - cache behavior', () => {
     // Corrupt storedAt
     const raw = storageMock.getItem(CACHE_KEY);
     const cacheStore = JSON.parse(raw as string);
-    const key = Object.keys(cacheStore)[0];
+    const keys = Object.keys(cacheStore);
+    expect(keys.length).toBeGreaterThan(0);
+    const key = keys[0];
     (cacheStore[key] as Record<string, unknown>).storedAt = 'not-a-number';
     storageMock.setItem(CACHE_KEY, JSON.stringify(cacheStore));
 
