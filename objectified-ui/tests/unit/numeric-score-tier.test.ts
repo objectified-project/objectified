@@ -9,12 +9,15 @@ describe('numeric-score-tier', () => {
     it('maps 90–100 to excellent (green)', () => {
       expect(getNumericScoreTier(90).band).toBe('excellent');
       expect(getNumericScoreTier(100).band).toBe('excellent');
-      expect(getNumericScoreTier(89.6).band).toBe('excellent');
     });
 
     it('maps 70–89 to good (yellow)', () => {
       expect(getNumericScoreTier(70).band).toBe('good');
       expect(getNumericScoreTier(89).band).toBe('good');
+    });
+
+    it('rounds near thresholds before mapping bands', () => {
+      expect(getNumericScoreTier(89.6).band).toBe('excellent');
       expect(getNumericScoreTier(69.5).band).toBe('good');
     });
 
