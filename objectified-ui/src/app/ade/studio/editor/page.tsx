@@ -188,7 +188,7 @@ import {
   ghostNodeClassName,
 } from '@/app/utils/canvas-ghost-mode';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
-import { computeOverallSchemaQualityScore } from '@/app/utils/overall-schema-quality';
+import { computeOverallSchemaQualityScore, computeOverallSchemaQualityDetail } from '@/app/utils/overall-schema-quality';
 import {
   buildCanvasLayoutJsonDocument,
   CANVAS_LAYOUT_JSON_FORMAT_VERSION,
@@ -348,6 +348,7 @@ const StudioContent = () => {
     setClearSearchHistoryFn,
     setCanvasPresentationMode,
     setSchemaQualityScore,
+    setSchemaQualityDetail,
   } = useStudio();
 
   // Toggle click-to-focus mode (defined after useStudio to access setContextClickToFocusEnabled)
@@ -876,19 +877,27 @@ const StudioContent = () => {
     return computeOverallSchemaQualityScore(schemaMetrics, layoutQuality);
   }, [schemaMetrics, layoutQuality]);
 
+  const overallSchemaQualityDetail = useMemo(() => {
+    if (!schemaMetrics || !layoutQuality) return null;
+    return computeOverallSchemaQualityDetail(schemaMetrics, layoutQuality);
+  }, [schemaMetrics, layoutQuality]);
+
   useEffect(() => {
     if (!contextProjectId || !contextVersionId) {
       setSchemaQualityScore(null);
+      setSchemaQualityDetail(null);
       return;
     }
     setSchemaQualityScore(overallSchemaQualityScore);
-  }, [contextProjectId, contextVersionId, overallSchemaQualityScore, setSchemaQualityScore]);
+    setSchemaQualityDetail(overallSchemaQualityDetail);
+  }, [contextProjectId, contextVersionId, overallSchemaQualityScore, overallSchemaQualityDetail, setSchemaQualityScore, setSchemaQualityDetail]);
 
   useEffect(() => {
     return () => {
       setSchemaQualityScore(null);
+      setSchemaQualityDetail(null);
     };
-  }, [setSchemaQualityScore]);
+  }, [setSchemaQualityScore, setSchemaQualityDetail]);
 
   // Canvas improvement suggestions (#474)
   const groupMemberIds = useMemo(() => {
@@ -10152,6 +10161,7 @@ const StudioContent = () => {
                 <SchemaMetricsPanel
                   metrics={schemaMetrics}
                   layoutQuality={layoutQuality}
+                  overallSchemaQualityDetail={overallSchemaQualityDetail}
                   suggestions={canvasSuggestions}
                   projectName={selectedProject?.name}
                   versionLabel={selectedVersion?.version_id}

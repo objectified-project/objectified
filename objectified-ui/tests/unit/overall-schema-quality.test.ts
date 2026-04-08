@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
-import { computeOverallSchemaQualityScore } from '@/app/utils/overall-schema-quality';
+import { computeOverallSchemaQualityScore, computeOverallSchemaQualityDetail } from '@/app/utils/overall-schema-quality';
 
 function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): SchemaMetricsResult {
   return {
@@ -78,5 +78,44 @@ describe('computeOverallSchemaQualityScore (#245)', () => {
       },
     });
     expect(computeOverallSchemaQualityScore(m, null)).toBe(100);
+  });
+});
+
+describe('computeOverallSchemaQualityDetail (#2548)', () => {
+  it('matches overall score and includes letter grade', () => {
+    const m = makeMinimalMetrics();
+    const layout = {
+      overallScore: 80,
+      edgeCrossingCount: 0,
+      nodeSpacingUniformityScore: 80,
+      layoutSymmetryScore: 80,
+      visualBalanceScore: 80,
+    };
+    const overall = computeOverallSchemaQualityScore(m, layout);
+    const detail = computeOverallSchemaQualityDetail(m, layout);
+    expect(detail.overall).toBe(overall);
+    expect(detail.letterGrade).toMatch(/^[A-F]$/);
+    expect(detail.layoutIncluded).toBe(true);
+    expect(detail.rows).toHaveLength(4);
+    expect(detail.rows.map((r) => r.id)).toEqual(['documentation', 'naming', 'structuralLoad', 'layout']);
+  });
+
+  it('omits layout row when layout is null and still matches overall', () => {
+    const m = makeMinimalMetrics({
+      complexityScore: 0,
+      documentationCompletionPercentage: 100,
+      namingCompliance: {
+        classes: { pascal: 1, camel: 0, snake: 0, other: 0, total: 1 },
+        properties: { pascal: 0, camel: 0, snake: 0, other: 0, total: 0 },
+        compliancePercentage: 100,
+        classesNonPascal: [],
+        propertiesNonCamel: [],
+      },
+    });
+    const overall = computeOverallSchemaQualityScore(m, null);
+    const detail = computeOverallSchemaQualityDetail(m, null);
+    expect(detail.overall).toBe(overall);
+    expect(detail.layoutIncluded).toBe(false);
+    expect(detail.rows).toHaveLength(3);
   });
 });

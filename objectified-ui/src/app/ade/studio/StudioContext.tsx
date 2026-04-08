@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, Dispatch, SetStateAction } from 'react';
+import type { OverallSchemaQualityDetail } from '@/app/utils/overall-schema-quality';
 
 // Group style options
 export interface GroupStyleOptions {
@@ -166,6 +167,9 @@ interface StudioContextType {
   /** Live overall schema quality 0–100 from Canvas (#245); null when not on editor or no classes yet */
   schemaQualityScore: number | null;
   setSchemaQualityScore: (value: number | null) => void;
+  /** Weighted breakdown for header dialog / metrics card (#2548); null when score is unavailable */
+  schemaQualityDetail: OverallSchemaQualityDetail | null;
+  setSchemaQualityDetail: (value: OverallSchemaQualityDetail | null) => void;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -366,6 +370,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const [canvasPresentationMode, setCanvasPresentationMode] = useState(false);
   const [schemaQualityScore, setSchemaQualityScore] = useState<number | null>(null);
+  const [schemaQualityDetail, setSchemaQualityDetail] = useState<OverallSchemaQualityDetail | null>(null);
 
   // Persist grid settings to localStorage
   useEffect(() => {
@@ -543,7 +548,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasPresentationMode,
       setCanvasPresentationMode,
       schemaQualityScore,
-      setSchemaQualityScore
+      setSchemaQualityScore,
+      schemaQualityDetail,
+      setSchemaQualityDetail
     }}>
       {children}
     </StudioContext.Provider>
