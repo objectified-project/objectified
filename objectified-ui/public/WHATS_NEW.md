@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## UI:
+- **Score bands (#248):** Shared **green / yellow / orange / red** tiers for 0–100 scores (90+ excellent down to 0–49 poor) on import **Quality Score** (overall + per-metric bars and guide), **Schema Metrics** docs/naming bars, and **Version scoring** radial gauges (documentation & naming; complexity still uses its own low/medium/high scale)
 - **Version scoring:** New **Version scoring** panel (gauge icon) — pick a project version to see **per-schema** documentation, naming, and complexity scores with **animated radial gauges** (eased arc and value; respects reduced motion)
 - **Schema timeline:** **Compare schema scores** between any two versions (complexity, documentation, naming compliance, and size metrics with deltas)
 - **Schema metrics & timeline:** Export **score reports as PDF** from the Schema Metrics panel (full breakdown) or the Schema timeline panel (per-version metrics history)

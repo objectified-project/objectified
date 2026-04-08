@@ -9,6 +9,7 @@ import type { LayoutQualityResult } from '@/app/utils/layout-quality';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
 import type { CanvasSuggestion } from '@/app/utils/canvas-suggestions';
 import { downloadSchemaScoreReportPdf } from '@/app/utils/export-schema-score-report-pdf';
+import { getNumericScoreTier } from '@/app/utils/numeric-score-tier';
 
 interface SchemaMetricsPanelProps {
   metrics: SchemaMetricsResult | null;
@@ -74,6 +75,9 @@ export default function SchemaMetricsPanel({
     namingCompliance,
     dependencyMetricsPerClass = [],
   } = metrics;
+
+  const docsScoreTier = getNumericScoreTier(documentationCompletionPercentage);
+  const namingScoreTier = getNumericScoreTier(namingCompliance.compliancePercentage);
 
   const hasHubs = hubNames.length > 0;
   const hasIsolated = isolatedNames.length > 0;
@@ -239,12 +243,7 @@ export default function SchemaMetricsPanel({
                   </div>
                   <div className="mt-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
                     <div
-                      className={cn(
-                        'h-full rounded-full transition-all duration-300',
-                        documentationCompletionPercentage >= 80 && 'bg-emerald-500',
-                        documentationCompletionPercentage >= 50 && documentationCompletionPercentage < 80 && 'bg-amber-500',
-                        documentationCompletionPercentage < 50 && 'bg-rose-500'
-                      )}
+                      className={cn('h-full rounded-full transition-all duration-300', docsScoreTier.barSolidClass)}
                       style={{ width: `${documentationCompletionPercentage}%` }}
                     />
                   </div>
@@ -330,12 +329,7 @@ export default function SchemaMetricsPanel({
                   </div>
                   <div className="mt-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
                     <div
-                      className={cn(
-                        'h-full rounded-full transition-all duration-300',
-                        namingCompliance.compliancePercentage >= 80 && 'bg-emerald-500',
-                        namingCompliance.compliancePercentage >= 50 && namingCompliance.compliancePercentage < 80 && 'bg-amber-500',
-                        namingCompliance.compliancePercentage < 50 && 'bg-rose-500'
-                      )}
+                      className={cn('h-full rounded-full transition-all duration-300', namingScoreTier.barSolidClass)}
                       style={{ width: `${namingCompliance.compliancePercentage}%` }}
                     />
                   </div>
