@@ -22,8 +22,6 @@ export async function GET(
   const { provider } = await params;
   const userId = (session.user as any).user_id;
 
-  console.log(`[link/${provider}] User ${userId} initiating ${provider} account linking`);
-
   // Create response with success status
   const response = NextResponse.json({
     success: true,
@@ -43,8 +41,6 @@ export async function GET(
     path: '/',
     sameSite: 'lax' as const
   });
-
-  console.log(`[link/${provider}] Linking intent cookie set for user ${userId}`);
 
   return response;
 }

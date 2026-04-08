@@ -24,6 +24,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Fixed group tag picker and chips so tag names and colors show correctly (project tags use `name`/`color` from the database)
 
 ## Account:
+- Removed verbose NextAuth debug logging from server and client auth flows (credentials, OAuth linking, JWT/session callbacks)
 - Profile shows your last successful login date and time (stored when you sign in with email/password or OAuth)
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
