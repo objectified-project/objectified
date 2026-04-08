@@ -6,14 +6,12 @@ import { cn } from '../../../../../lib/utils';
 import { getClassesWithPropertiesAndTagsWithSession } from '../../../../../lib/api/rest-client';
 import { computePerSchemaScoresFromClasses } from '@/app/utils/schema-metrics';
 import type { PerSchemaScoreRow } from '@/app/utils/schema-metrics';
+import type { Version } from '../editor/components/types';
 
-export interface SchemaVersionScoringVersion {
-  id: string;
-  version_id: string;
-  description: string;
-  published?: boolean;
-  created_at?: string;
-}
+export type SchemaVersionScoringVersion = Pick<
+  Version,
+  'id' | 'version_id' | 'description' | 'published' | 'created_at'
+>;
 
 export interface SchemaVersionScoringPanelProps {
   versions: SchemaVersionScoringVersion[];
@@ -175,8 +173,9 @@ export default function SchemaVersionScoringPanel({
     return (
       <button
         type="button"
-        onClick={onMinimizeToggle}
-        className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 px-3 py-2 flex items-center gap-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/80"
+        onClick={() => onMinimizeToggle?.()}
+        disabled={!onMinimizeToggle}
+        className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 px-3 py-2 flex items-center gap-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/80 disabled:cursor-default"
         title="Expand version scoring"
       >
         <Gauge className="w-4 h-4 text-indigo-500 shrink-0" />
@@ -187,7 +186,7 @@ export default function SchemaVersionScoringPanel({
   }
 
   return (
-    <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 w-[min(100vw-2rem,24rem)] max-h-[min(90vh,36rem)] flex flex-col overflow-hidden">
+    <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 w-[min(calc(100vw_-_2rem),_24rem)] max-h-[min(90vh,36rem)] flex flex-col overflow-hidden">
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-200/80 dark:border-gray-700/80 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <Gauge className="w-4 h-4 text-indigo-500 shrink-0" />

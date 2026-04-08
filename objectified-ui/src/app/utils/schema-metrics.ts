@@ -741,9 +741,9 @@ function computeNamingScoreForClass(node: Node): number {
   const props = data?.properties;
   if (Array.isArray(props)) {
     for (const p of props) {
-      const propName = typeof p?.name === 'string' ? p.name : 'property';
       total += 1;
-      compliant += detectNamingConvention(propName) === 'camelCase' ? 1 : 0;
+      const propName = typeof p?.name === 'string' ? p.name.trim() : '';
+      compliant += propName !== '' && detectNamingConvention(propName) === 'camelCase' ? 1 : 0;
     }
   }
   return total === 0 ? 100 : Math.round((compliant / total) * 100);
@@ -766,11 +766,36 @@ export function computePerSchemaScores(nodes: Node[], edges: Edge[]): PerSchemaS
     for (const id of scc) inCycle.add(id);
   }
 
+  // Pre-compute longest-path depths for all nodes in a single DFS pass (memoized).
+  // This avoids O(N * (N+E)) repeated calls by sharing memo across all starting nodes.
+  const depthMemo = new Map<string, number>();
+  function longestPathMemo(nodeId: string, visitedInPath: Set<string>): number {
+    if (visitedInPath.has(nodeId)) return 0;
+    if (depthMemo.has(nodeId)) return depthMemo.get(nodeId)!;
+    const next = adj.get(nodeId);
+    if (!next || next.length === 0) {
+      depthMemo.set(nodeId, 0);
+      return 0;
+    }
+    visitedInPath.add(nodeId);
+    let max = 0;
+    for (const t of next) {
+      const d = 1 + longestPathMemo(t, visitedInPath);
+      if (d > max) max = d;
+    }
+    visitedInPath.delete(nodeId);
+    depthMemo.set(nodeId, max);
+    return max;
+  }
+  for (const n of classNodes) {
+    longestPathMemo(n.id, new Set());
+  }
+
   const rows: PerSchemaScoreRow[] = classNodes.map((n) => {
     const className = getNodeName(n);
     const props = getPropertyCount(n);
     const degree = degreeMap.get(n.id) ?? 0;
-    const chainLen = longestPathFrom(n.id, adj, new Set());
+    const chainLen = depthMemo.get(n.id) ?? 0;
     const { complexityScore, complexityLabel } = computeComplexityScoreFromAggregates({
       classCount: 1,
       totalProperties: props,
