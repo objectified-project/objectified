@@ -1,0 +1,91 @@
+import { describe, it, expect } from '@jest/globals';
+import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import {
+  formatScoreDelta,
+  buildSchemaScoreCompareRows,
+} from '@/app/utils/schema-version-score-compare';
+
+function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): SchemaMetricsResult {
+  return {
+    classCount: 3,
+    totalProperties: 9,
+    averagePropertiesPerClass: 3,
+    relationshipCount: 2,
+    hubClassIds: [],
+    hubNames: [],
+    isolatedClassIds: [],
+    isolatedNames: [],
+    deepestChainLength: 2,
+    circularDependencyCount: 0,
+    circularSampleNames: [],
+    circularDependencyNodeIds: [],
+    complexityScore: 30,
+    complexityLabel: 'Low',
+    complexityBreakdown: [{ label: 'Class count', value: 3, weight: 10, contribution: 3 }],
+    documentationCompletionPercentage: 80,
+    classesMissingDocumentation: [],
+    propertiesMissingDocumentation: [],
+    namingCompliance: {
+      classes: { pascal: 3, camel: 0, snake: 0, other: 0, total: 3 },
+      properties: { pascal: 0, camel: 9, snake: 0, other: 0, total: 9 },
+      compliancePercentage: 90,
+      classesNonPascal: [],
+      propertiesNonCamel: [],
+    },
+    dependencyMetricsPerClass: [],
+    ...overrides,
+  };
+}
+
+describe('formatScoreDelta', () => {
+  it('formats zero without sign', () => {
+    expect(formatScoreDelta(0)).toBe('0');
+  });
+
+  it('formats positive integers with plus', () => {
+    expect(formatScoreDelta(5)).toBe('+5');
+  });
+
+  it('formats negative integers', () => {
+    expect(formatScoreDelta(-3)).toBe('-3');
+  });
+});
+
+describe('buildSchemaScoreCompareRows', () => {
+  it('labels complexity decrease as positive tone (simpler)', () => {
+    const older = makeMinimalMetrics({ complexityScore: 60 });
+    const newer = makeMinimalMetrics({ complexityScore: 40 });
+    const rows = buildSchemaScoreCompareRows(older, newer);
+    const row = rows.find((r) => r.label === 'Complexity score');
+    expect(row?.delta).toBe('-20');
+    expect(row?.deltaTone).toBe('positive');
+  });
+
+  it('labels documentation increase as positive tone', () => {
+    const older = makeMinimalMetrics({ documentationCompletionPercentage: 50 });
+    const newer = makeMinimalMetrics({ documentationCompletionPercentage: 75 });
+    const rows = buildSchemaScoreCompareRows(older, newer);
+    const row = rows.find((r) => r.label === 'Documentation');
+    expect(row?.delta).toBe('+25');
+    expect(row?.deltaTone).toBe('positive');
+  });
+
+  it('uses neutral tone for class count deltas', () => {
+    const older = makeMinimalMetrics({ classCount: 2 });
+    const newer = makeMinimalMetrics({ classCount: 5 });
+    const rows = buildSchemaScoreCompareRows(older, newer);
+    const row = rows.find((r) => r.label === 'Classes');
+    expect(row?.delta).toBe('+3');
+    expect(row?.deltaTone).toBe('neutral');
+  });
+
+  it('includes naming compliance row with percent values', () => {
+    const a = makeMinimalMetrics({ namingCompliance: { ...makeMinimalMetrics().namingCompliance, compliancePercentage: 70 } });
+    const b = makeMinimalMetrics({ namingCompliance: { ...makeMinimalMetrics().namingCompliance, compliancePercentage: 85 } });
+    const rows = buildSchemaScoreCompareRows(a, b);
+    const row = rows.find((r) => r.label === 'Naming compliance');
+    expect(row?.valueA).toBe('70%');
+    expect(row?.valueB).toBe('85%');
+    expect(row?.delta).toBe('+15');
+  });
+});

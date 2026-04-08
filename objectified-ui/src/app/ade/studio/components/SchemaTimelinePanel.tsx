@@ -1,12 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { History, ChevronDown, ChevronUp, X, Loader2, FileDown } from 'lucide-react';
+import { History, ChevronDown, ChevronUp, X, Loader2, FileDown, GitCompare } from 'lucide-react';
 import { cn } from '../../../../../lib/utils';
 import { getClassesWithPropertiesAndTagsWithSession } from '../../../../../lib/api/rest-client';
 import { computeSchemaMetricsFromClasses } from '@/app/utils/schema-metrics';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
 import { downloadSchemaTimelineScoreReportPdf } from '@/app/utils/export-schema-score-report-pdf';
+import { buildSchemaScoreCompareRows } from '@/app/utils/schema-version-score-compare';
 
 export interface SchemaTimelineVersion {
   id: string;
@@ -34,6 +35,8 @@ type TimelinePoint = {
   metrics: SchemaMetricsResult | null;
   loadError?: string;
 };
+
+type TimelinePointWithMetrics = TimelinePoint & { metrics: SchemaMetricsResult };
 
 const CHART_W = 320;
 const CHART_H = 120;
@@ -68,6 +71,8 @@ export default function SchemaTimelinePanel({
   const [loading, setLoading] = React.useState(false);
   const [points, setPoints] = React.useState<TimelinePoint[]>([]);
   const [globalError, setGlobalError] = React.useState<string | null>(null);
+  const [compareVersionA, setCompareVersionA] = React.useState<string | null>(null);
+  const [compareVersionB, setCompareVersionB] = React.useState<string | null>(null);
 
   const sortedVersions = React.useMemo(() => {
     const copy = [...versions];
@@ -147,6 +152,33 @@ export default function SchemaTimelinePanel({
       controller.abort();
     };
   }, [sortedVersions]);
+
+  const pointsWithMetrics = React.useMemo(
+    () =>
+      points.filter((p): p is TimelinePointWithMetrics => p.metrics != null && p.loadError == null),
+    [points]
+  );
+
+  React.useEffect(() => {
+    const ok = pointsWithMetrics;
+    if (ok.length < 2) {
+      setCompareVersionA(null);
+      setCompareVersionB(null);
+      return;
+    }
+    setCompareVersionA((prev) => (prev && ok.some((p) => p.versionId === prev) ? prev : ok[0].versionId));
+    setCompareVersionB((prev) =>
+      prev && ok.some((p) => p.versionId === prev) ? prev : ok[ok.length - 1].versionId
+    );
+  }, [pointsWithMetrics]);
+
+  const compareRows = React.useMemo(() => {
+    if (!compareVersionA || !compareVersionB || compareVersionA === compareVersionB) return null;
+    const ma = pointsWithMetrics.find((p) => p.versionId === compareVersionA)?.metrics;
+    const mb = pointsWithMetrics.find((p) => p.versionId === compareVersionB)?.metrics;
+    if (!ma || !mb) return null;
+    return buildSchemaScoreCompareRows(ma, mb);
+  }, [compareVersionA, compareVersionB, pointsWithMetrics]);
 
   const chartData = React.useMemo(() => {
     const ok = points.filter((p) => p.metrics);
@@ -302,6 +334,92 @@ export default function SchemaTimelinePanel({
               </span>
             </div>
           </div>
+        )}
+
+        {!loading && pointsWithMetrics.length >= 2 && (
+          <details className="rounded-lg border border-gray-200/80 dark:border-gray-700/80 bg-gray-50/80 dark:bg-gray-900/40 px-2 py-2">
+            <summary className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-gray-800 dark:text-gray-200 select-none">
+              <GitCompare className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              Compare schema scores
+            </summary>
+            <div className="mt-2 space-y-2 pt-1 border-t border-gray-200/80 dark:border-gray-700/80">
+              <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                Pick two versions. Δ is the change from the first selection to the second (second minus first).
+              </p>
+              <div className="grid grid-cols-1 gap-2">
+                <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-300">
+                  First version
+                  <select
+                    className="mt-0.5 w-full rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs px-2 py-1"
+                    value={compareVersionA ?? ''}
+                    onChange={(e) => setCompareVersionA(e.target.value || null)}
+                  >
+                    {pointsWithMetrics.map((p) => (
+                      <option key={p.versionId} value={p.versionId}>
+                        v{p.label}
+                        {p.createdAt && Number.isFinite(Date.parse(p.createdAt))
+                          ? ` · ${new Date(p.createdAt).toLocaleDateString()}`
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-300">
+                  Second version
+                  <select
+                    className="mt-0.5 w-full rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs px-2 py-1"
+                    value={compareVersionB ?? ''}
+                    onChange={(e) => setCompareVersionB(e.target.value || null)}
+                  >
+                    {pointsWithMetrics.map((p) => (
+                      <option key={`b-${p.versionId}`} value={p.versionId}>
+                        v{p.label}
+                        {p.createdAt && Number.isFinite(Date.parse(p.createdAt))
+                          ? ` · ${new Date(p.createdAt).toLocaleDateString()}`
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {compareVersionA && compareVersionB && compareVersionA === compareVersionB && (
+                <p className="text-[10px] text-amber-700 dark:text-amber-300">Choose two different versions to compare.</p>
+              )}
+              {compareRows && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[10px] text-left border-collapse">
+                    <thead>
+                      <tr className="text-gray-500 dark:text-gray-400 border-b border-gray-200/80 dark:border-gray-700/80">
+                        <th className="py-1 pr-2 font-medium">Metric</th>
+                        <th className="py-1 pr-2 font-medium tabular-nums">First</th>
+                        <th className="py-1 pr-2 font-medium tabular-nums">Second</th>
+                        <th className="py-1 font-medium tabular-nums">Δ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compareRows.map((row) => (
+                        <tr key={row.label} className="border-b border-gray-100/80 dark:border-gray-800/80">
+                          <td className="py-1 pr-2 text-gray-700 dark:text-gray-200">{row.label}</td>
+                          <td className="py-1 pr-2 tabular-nums text-gray-600 dark:text-gray-300">{row.valueA}</td>
+                          <td className="py-1 pr-2 tabular-nums text-gray-600 dark:text-gray-300">{row.valueB}</td>
+                          <td
+                            className={cn(
+                              'py-1 tabular-nums',
+                              row.deltaTone === 'positive' && 'text-emerald-600 dark:text-emerald-400',
+                              row.deltaTone === 'negative' && 'text-rose-600 dark:text-rose-400',
+                              row.deltaTone === 'neutral' && 'text-gray-600 dark:text-gray-400'
+                            )}
+                          >
+                            {row.delta}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </details>
         )}
 
         <ul className="space-y-1.5 text-xs">
