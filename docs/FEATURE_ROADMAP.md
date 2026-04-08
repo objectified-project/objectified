@@ -259,17 +259,13 @@
   - ✅ Deprecation notices with messages
 - **Metadata**: ✅ IMPLEMENTED
   - ✅ Tags
-  - 📋 Owner
+  - ✅ Owner (stored as `x-owner` on the property schema)
   - ✅ Created/modified timestamps
   - 📋 Version history per property
 - **Extension Properties**: ✅ IMPLEMENTED
   - ✅ Custom x- prefixed properties at class level
   - ✅ Custom x- prefixed properties at property level
   - ✅ JSON editor for extension values
-
-| Ticket | Feature Description                 |
-|--------|-------------------------------------|
-| #280   | Adds owner metadata to the property |
 
 **Summary**: Objectified implements **95%+ of OpenAPI 3.1 / JSON Schema 2020-12** features relevant to schema design. Missing features are primarily meta-schema features (`$id`, `$schema`, `$vocabulary`) and content encoding, which are rarely used in typical API development.
 

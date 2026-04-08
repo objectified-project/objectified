@@ -66,6 +66,8 @@ export interface PropertyItem {
   writeOnly?: boolean;
   deprecated?: boolean;
   deprecationMessage?: string;
+  /** OpenAPI extension; prefer editing via the Owner field in the form */
+  'x-owner'?: string;
   examples?: any[];
   additionalProperties?: boolean | any;
   minProperties?: number;
@@ -214,10 +216,10 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         }
       }
 
-      // Extract extensions (x- prefixed properties)
+      // Extract extensions (x- prefixed properties); x-owner uses dedicated Owner field
       const extensions: Record<string, any> = {};
       Object.keys(property as any).forEach(key => {
-        if (key.startsWith('x-')) {
+        if (key.startsWith('x-') && key !== 'x-owner') {
           extensions[key] = (property as any)[key];
         }
       });
@@ -267,6 +269,9 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         writeOnly: property.writeOnly || false,
         deprecated: property.deprecated || false,
         deprecationMessage: property.deprecationMessage || '',
+        owner: (property as any)['x-owner'] != null && String((property as any)['x-owner']).trim() !== ''
+          ? String((property as any)['x-owner'])
+          : '',
         examples: property.examples ? property.examples.map((ex: any) => JSON.stringify(ex)) : [],
         // Object constraints
         additionalProperties: additionalPropsValue,
@@ -577,6 +582,10 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           schema.not = { type: formData.not };
         }
       }
+    }
+
+    if (formData.owner?.trim()) {
+      schema['x-owner'] = formData.owner.trim();
     }
 
     return schema;
@@ -1067,6 +1076,12 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         Object.assign(dataObject, formData.extensions);
       }
 
+      if (formData.owner?.trim()) {
+        dataObject['x-owner'] = formData.owner.trim();
+      } else {
+        delete dataObject['x-owner'];
+      }
+
       // Handle externalDocs
       if (formData.externalDocsUrl?.trim()) {
         dataObject.externalDocs = {
@@ -1349,6 +1364,19 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                         className="text-sm"
                       />
                     )}
+                  </div>
+
+                  {/* Owner */}
+                  <div className="mt-4 space-y-1">
+                    <Label htmlFor="owner" className="text-sm font-medium">Owner</Label>
+                    <Input
+                      id="owner"
+                      value={formData.owner || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, owner: e.target.value }))}
+                      placeholder="e.g. platform-team or @handle"
+                      className="text-sm"
+                    />
+                    <p className="text-xs text-gray-500">Stored as <code>x-owner</code> on this property schema (team or person responsible).</p>
                   </div>
                 </div>
 

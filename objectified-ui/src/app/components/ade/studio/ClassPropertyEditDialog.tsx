@@ -196,10 +196,10 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       }
     }
 
-    // Extract extensions (x- prefixed properties) from the property data
+    // Extract extensions (x- prefixed properties) from the property data (x-owner uses dedicated Owner field)
     const extensions: Record<string, any> = {};
     Object.keys(propData).forEach(key => {
-      if (key.startsWith('x-')) {
+      if (key.startsWith('x-') && key !== 'x-owner') {
         extensions[key] = propData[key];
       }
     });
@@ -211,6 +211,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       nullable: isNullable,
       deprecated: !!propData.deprecated,
       deprecationMessage: propData.deprecationMessage || '',
+      owner: propData['x-owner'] != null && String(propData['x-owner']).trim() !== '' ? String(propData['x-owner']) : '',
       readOnly: !!propData.readOnly,
       writeOnly: !!propData.writeOnly,
       examples: propData.examples ? propData.examples.map((ex: any) => JSON.stringify(ex)) : [],
@@ -821,6 +822,12 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         Object.assign(updatedData, formData.extensions);
       }
 
+      if (formData.owner?.trim()) {
+        updatedData['x-owner'] = formData.owner.trim();
+      } else {
+        delete updatedData['x-owner'];
+      }
+
       // Handle externalDocs
       if (formData.externalDocsUrl?.trim()) {
         updatedData.externalDocs = {
@@ -1203,6 +1210,19 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
                           className="text-sm"
                         />
                       )}
+                    </div>
+
+                    {/* Owner */}
+                    <div className="mt-4 space-y-1">
+                      <Label htmlFor="owner" className="text-sm font-medium">Owner</Label>
+                      <Input
+                        id="owner"
+                        value={formData.owner || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, owner: e.target.value }))}
+                        placeholder="e.g. platform-team or @handle"
+                        className="text-sm"
+                      />
+                      <p className="text-xs text-gray-500">Stored as <code>x-owner</code> on this property schema (team or person responsible).</p>
                     </div>
                   </div>
                 );
