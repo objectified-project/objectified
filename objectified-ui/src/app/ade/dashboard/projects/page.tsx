@@ -33,6 +33,12 @@ import {
   getProjectStartTemplate,
   type ProjectOpenApiMetadata,
 } from '../../../utils/project-templates';
+import {
+  PROJECT_DOMAIN_CATEGORIES,
+  PROJECT_DOMAIN_CATEGORY_NONE,
+  getProjectDomainCategory,
+  getProjectDomainCategoryLabel,
+} from '../../../utils/project-domain-categories';
 import { getProjectQualityHistory } from '../../../utils/project-quality-score-history';
 import { getNumericScoreTier } from '../../../utils/numeric-score-tier';
 import { ProjectQualityTrendSparkline } from '../../../components/ade/dashboard/ProjectQualityTrendSparkline';
@@ -88,6 +94,7 @@ const Projects = () => {
   const [metadataLicenseIdentifier, setMetadataLicenseIdentifier] = useState('');
   const [metadataLicenseUrl, setMetadataLicenseUrl] = useState('');
   const [selectedStartTemplateId, setSelectedStartTemplateId] = useState('blank');
+  const [projectDomainCategoryId, setProjectDomainCategoryId] = useState(PROJECT_DOMAIN_CATEGORY_NONE);
   const [qualityHistoryEpoch, setQualityHistoryEpoch] = useState(0);
   const [qualityTrendProject, setQualityTrendProject] = useState<Project | null>(null);
   const prevImportOpen = useRef(false);
@@ -95,6 +102,10 @@ const Projects = () => {
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
   const selectedStartTemplateHint = getProjectStartTemplate(selectedStartTemplateId)?.hint;
+  const selectedProjectDomainCategory = useMemo(
+    () => getProjectDomainCategory(projectDomainCategoryId),
+    [projectDomainCategoryId]
+  );
 
   const generateSlug = (name: string) => {
     return name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
@@ -167,6 +178,7 @@ const Projects = () => {
     setMetadataLicenseIdentifier('');
     setMetadataLicenseUrl('');
     setSelectedStartTemplateId('blank');
+    setProjectDomainCategoryId(PROJECT_DOMAIN_CATEGORY_NONE);
     setShowCreateDialog(true);
   };
 
@@ -212,6 +224,9 @@ const Projects = () => {
         if (metadataLicenseIdentifier.trim()) metadata.license.identifier = metadataLicenseIdentifier.trim();
         if (metadataLicenseUrl.trim()) metadata.license.url = metadataLicenseUrl.trim();
       }
+      if (projectDomainCategoryId !== PROJECT_DOMAIN_CATEGORY_NONE) {
+        metadata.domainCategory = projectDomainCategoryId;
+      }
 
       const result = await createProject(currentTenantId, currentUserId, projectName, projectDescription, projectSlug, metadata);
       const response = JSON.parse(result);
@@ -240,6 +255,7 @@ const Projects = () => {
     setMetadataLicenseName(metadata.license?.name || '');
     setMetadataLicenseIdentifier(metadata.license?.identifier || '');
     setMetadataLicenseUrl(metadata.license?.url || '');
+    setProjectDomainCategoryId(metadata.domainCategory ?? PROJECT_DOMAIN_CATEGORY_NONE);
     setShowEditDialog(true);
   };
 
@@ -265,6 +281,9 @@ const Projects = () => {
         if (metadataLicenseName.trim()) metadata.license.name = metadataLicenseName.trim();
         if (metadataLicenseIdentifier.trim()) metadata.license.identifier = metadataLicenseIdentifier.trim();
         if (metadataLicenseUrl.trim()) metadata.license.url = metadataLicenseUrl.trim();
+      }
+      if (projectDomainCategoryId !== PROJECT_DOMAIN_CATEGORY_NONE) {
+        metadata.domainCategory = projectDomainCategoryId;
       }
 
       const result = await updateProject(selectedProject.id, projectName, projectDescription, projectSlug, projectEnabled, metadata);
@@ -456,7 +475,9 @@ const Projects = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
-                {projects.map((project) => (
+                {projects.map((project) => {
+                  const domainCategoryLabel = getProjectDomainCategoryLabel(project.metadata?.domainCategory);
+                  return (
                   <tr key={project.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all duration-200">
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
@@ -466,6 +487,14 @@ const Projects = () => {
                         <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate" title={(project as any).slug}>
                           {(project as any).slug || '—'}
                         </div>
+                        {domainCategoryLabel ? (
+                          <span
+                            className="inline-flex mt-1 max-w-xs items-center rounded-md px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300"
+                            title={domainCategoryLabel}
+                          >
+                            {domainCategoryLabel}
+                          </span>
+                        ) : null}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -621,7 +650,8 @@ const Projects = () => {
                       </div>
                     </td>
                 </tr>
-              ))}
+                  );
+                })}
             </tbody>
           </table>
           </div>
@@ -724,6 +754,32 @@ const Projects = () => {
                 <div className="space-y-2">
                   <Label htmlFor="projectDescription">Description</Label>
                   <Textarea id="projectDescription" value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} disabled={isLoading} rows={4} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="projectDomainCategory">Domain category</Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Optional. Classifies the kind of entities and schemas this project models.
+                  </p>
+                  <Select
+                    value={projectDomainCategoryId}
+                    onValueChange={setProjectDomainCategoryId}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger id="projectDomainCategory" className="max-w-xl">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={PROJECT_DOMAIN_CATEGORY_NONE}>None</SelectItem>
+                      {PROJECT_DOMAIN_CATEGORIES.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedProjectDomainCategory?.hint ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-500 max-w-xl">{selectedProjectDomainCategory.hint}</p>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -947,6 +1003,32 @@ const Projects = () => {
                 <div className="space-y-2">
                   <Label htmlFor="editDescription">Description</Label>
                   <Textarea id="editDescription" value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} disabled={isLoading} rows={4} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editDomainCategory">Domain category</Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Optional. Classifies the kind of entities and schemas this project models.
+                  </p>
+                  <Select
+                    value={projectDomainCategoryId}
+                    onValueChange={setProjectDomainCategoryId}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger id="editDomainCategory" className="max-w-xl">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={PROJECT_DOMAIN_CATEGORY_NONE}>None</SelectItem>
+                      {PROJECT_DOMAIN_CATEGORIES.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedProjectDomainCategory?.hint ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-500 max-w-xl">{selectedProjectDomainCategory.hint}</p>
+                  ) : null}
                 </div>
               </div>
             </div>

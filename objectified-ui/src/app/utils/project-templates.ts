@@ -8,6 +8,8 @@ export interface ProjectOpenApiMetadata {
   termsOfService?: string;
   contact?: { name?: string; url?: string; email?: string };
   license?: { name?: string; identifier?: string; url?: string };
+  /** Domain category id; see `project-domain-categories.ts` (#243) */
+  domainCategory?: string;
 }
 
 export interface ProjectStartTemplate {
