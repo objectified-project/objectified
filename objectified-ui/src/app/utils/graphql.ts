@@ -1,7 +1,10 @@
 /**
  * GraphQL SDL Generator
- * Generates GraphQL Schema Definition Language from class definitions
+ * Generates GraphQL Schema Definition Language from class definitions.
+ * Output is rendered from Handlebars templates (see templates/graphql/).
  */
+
+import { renderTemplate } from './template-loader';
 
 interface ClassWithProperties {
   id: string;
@@ -50,114 +53,56 @@ function mapTypeToGraphQL(property: any): string {
   }
 }
 
+function buildGraphQLTemplateData(classes: ClassWithProperties[], options: GraphQLOptions) {
+  const projectName = options.projectName || 'Project';
+  const generatedAt = new Date().toISOString();
+
+  const mappedClasses = classes.map((cls) => {
+    const properties = Array.isArray(cls.properties) ? cls.properties : [];
+    const mappedProps = properties.map((prop: any) => {
+      const isRequired = prop.required || false;
+      const graphQLType = mapTypeToGraphQL(prop);
+      return {
+        name: prop.name,
+        description: prop.description || null,
+        graphQLType,
+        nullable: isRequired ? '!' : '',
+      };
+    });
+
+    const className = cls.name;
+    const camelName = className.charAt(0).toLowerCase() + className.slice(1);
+
+    return {
+      name: className,
+      description: cls.description || null,
+      camelName,
+      properties: mappedProps,
+      createInputProperties: mappedProps,
+      updateInputProperties: mappedProps.map((p) => ({
+        name: p.name,
+        graphQLType: p.graphQLType,
+      })),
+    };
+  });
+
+  return {
+    projectName,
+    version: options.version || null,
+    apiDescription: options.description || null,
+    generatedAt,
+    classes: mappedClasses,
+    hasClasses: mappedClasses.length > 0,
+  };
+}
+
 /**
  * Generate GraphQL SDL from classes
  */
-export function generateGraphQLSchema(
+export async function generateGraphQLSchema(
   classes: ClassWithProperties[],
   options: GraphQLOptions = {}
-): string {
-  let sdl = '# GraphQL Schema Definition Language (SDL)\n';
-  sdl += `# Generated from ${options.projectName || 'Project'}\n`;
-  if (options.version) {
-    sdl += `# Version: ${options.version}\n`;
-  }
-  if (options.description) {
-    sdl += `# ${options.description}\n`;
-  }
-  sdl += `# Generated at ${new Date().toISOString()}\n\n`;
-
-  // Process each class
-  for (const cls of classes) {
-    const className = cls.name;
-    const description = cls.description;
-    const properties = Array.isArray(cls.properties) ? cls.properties : [];
-
-    // Add description as comment if available
-    if (description) {
-      sdl += `"""\n${description}\n"""\n`;
-    }
-
-    sdl += `type ${className} {\n`;
-
-    // Add ID field by default
-    sdl += `  id: ID!\n`;
-
-    // Process properties
-    for (const prop of properties) {
-      const propName = prop.name;
-      const propDescription = prop.description;
-      const isRequired = prop.required || false;
-      const graphQLType = mapTypeToGraphQL(prop);
-      const nullable = isRequired ? '!' : '';
-
-      // Add property description as comment
-      if (propDescription) {
-        sdl += `  """\n  ${propDescription}\n  """\n`;
-      }
-
-      sdl += `  ${propName}: ${graphQLType}${nullable}\n`;
-    }
-
-    sdl += `}\n\n`;
-  }
-
-  // Add Query type
-  if (classes.length > 0) {
-    sdl += `type Query {\n`;
-    for (const cls of classes) {
-      const className = cls.name;
-      const lowerClassName = className.charAt(0).toLowerCase() + className.slice(1);
-
-      sdl += `  ${lowerClassName}(id: ID!): ${className}\n`;
-      sdl += `  ${lowerClassName}s: [${className}!]!\n`;
-    }
-    sdl += `}\n\n`;
-
-    // Add Mutation type
-    sdl += `type Mutation {\n`;
-    for (const cls of classes) {
-      const className = cls.name;
-      const lowerClassName = className.charAt(0).toLowerCase() + className.slice(1);
-
-      sdl += `  create${className}(input: Create${className}Input!): ${className}!\n`;
-      sdl += `  update${className}(id: ID!, input: Update${className}Input!): ${className}!\n`;
-      sdl += `  delete${className}(id: ID!): Boolean!\n`;
-    }
-    sdl += `}\n\n`;
-
-    // Add Input types for mutations
-    for (const cls of classes) {
-      const className = cls.name;
-      const properties = Array.isArray(cls.properties) ? cls.properties : [];
-
-      // Create Input
-      sdl += `input Create${className}Input {\n`;
-      for (const prop of properties) {
-        const propName = prop.name;
-        const isRequired = prop.required || false;
-        const graphQLType = mapTypeToGraphQL(prop);
-        const nullable = isRequired ? '!' : '';
-        sdl += `  ${propName}: ${graphQLType}${nullable}\n`;
-      }
-      sdl += `}\n\n`;
-
-      // Update Input (all fields optional)
-      sdl += `input Update${className}Input {\n`;
-      for (const prop of properties) {
-        const propName = prop.name;
-        const graphQLType = mapTypeToGraphQL(prop);
-        sdl += `  ${propName}: ${graphQLType}\n`;
-      }
-      sdl += `}\n\n`;
-    }
-  }
-
-  // Add scalar definitions for common types
-  sdl += `# Custom scalar types\n`;
-  sdl += `scalar DateTime\n`;
-  sdl += `scalar JSON\n`;
-
-  return sdl;
+): Promise<string> {
+  const templateData = buildGraphQLTemplateData(classes, options);
+  return renderTemplate('graphql/graphql-schema.hbs', templateData);
 }
-

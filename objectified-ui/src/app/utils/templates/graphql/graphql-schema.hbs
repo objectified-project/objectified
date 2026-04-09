@@ -1,0 +1,63 @@
+# GraphQL Schema Definition Language (SDL)
+# Generated from {{projectName}}
+{{#if version}}
+# Version: {{version}}
+{{/if}}
+{{#if apiDescription}}
+# {{apiDescription}}
+{{/if}}
+# Generated at {{generatedAt}}
+
+{{#each classes}}
+{{#if description}}
+"""
+{{{description}}}
+"""
+{{/if}}
+type {{name}} {
+  id: ID!
+{{#each properties}}
+{{#if description}}
+  """
+  {{{description}}}
+  """
+{{/if}}
+  {{name}}: {{graphQLType}}{{nullable}}
+{{/each}}
+}
+
+{{/each}}
+{{#if hasClasses}}
+type Query {
+{{#each classes}}
+  {{camelName}}(id: ID!): {{name}}
+  {{camelName}}s: [{{name}}!]!
+{{/each}}
+}
+
+type Mutation {
+{{#each classes}}
+  create{{name}}(input: Create{{name}}Input!): {{name}}!
+  update{{name}}(id: ID!, input: Update{{name}}Input!): {{name}}!
+  delete{{name}}(id: ID!): Boolean!
+{{/each}}
+}
+
+{{#each classes}}
+input Create{{name}}Input {
+{{#each createInputProperties}}
+  {{name}}: {{graphQLType}}{{nullable}}
+{{/each}}
+}
+
+input Update{{name}}Input {
+{{#each updateInputProperties}}
+  {{name}}: {{graphQLType}}
+{{/each}}
+}
+
+{{/each}}
+{{/if}}
+# Custom scalar types
+scalar DateTime
+scalar JSON

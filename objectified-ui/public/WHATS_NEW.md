@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## UI:
+- **Studio Code / GraphQL (#147):** GraphQL SDL in the Code tab is generated from a **Handlebars template** (`templates/graphql/graphql-schema.hbs`) instead of inlined string building, aligned with OpenAPI and Arazzo; template loader init is synchronous so tooling can import it safely
 - **Schema quality details (#2548):** **Studio header** Schema quality is **clickable** — opens a dialog with **letter grade (A–F)**, weighted **factor table**, and the same **score band guide** as import quality. **Schema Metrics** shows the same **overall schema quality** block (numeric score + letter + guide) above the per-metric controls
 - **Studio schema quality (#245):** **Overall score (0–100)** in the Studio header — weighted blend of documentation, naming, structural load (inverted complexity), and canvas layout quality; updates live on the Canvas
 - **Import quality score (#247):** **Weighted breakdown by category** — Design Quality (30 pts), Documentation (20), API Best Practices (25), Security (15), Performance (10); overall total out of 100 points with per-category progress and issues

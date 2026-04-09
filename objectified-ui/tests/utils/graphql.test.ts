@@ -2,7 +2,7 @@ import { generateGraphQLSchema } from '../../src/app/utils/graphql';
 
 describe('generateGraphQLSchema', () => {
   describe('Basic Type Generation', () => {
-    it('should generate a simple GraphQL type from a class', () => {
+    it('should generate a simple GraphQL type from a class', async () => {
       const classes = [
         {
           id: '1',
@@ -15,7 +15,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('type User {');
       expect(schema).toContain('id: ID!');
@@ -26,7 +26,7 @@ describe('generateGraphQLSchema', () => {
       expect(schema).toContain('The user name');
     });
 
-    it('should generate multiple types', () => {
+    it('should generate multiple types', async () => {
       const classes = [
         {
           id: '1',
@@ -40,13 +40,13 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('type User {');
       expect(schema).toContain('type Product {');
     });
 
-    it('should include project metadata in comments', () => {
+    it('should include project metadata in comments', async () => {
       const classes = [
         {
           id: '1',
@@ -55,7 +55,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes, {
+      const schema = await generateGraphQLSchema(classes, {
         projectName: 'My API',
         version: '1.0.0',
         description: 'A test API',
@@ -68,7 +68,7 @@ describe('generateGraphQLSchema', () => {
   });
 
   describe('Type Mapping', () => {
-    it('should map string types correctly', () => {
+    it('should map string types correctly', async () => {
       const classes = [
         {
           id: '1',
@@ -82,7 +82,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('text: String!');
       expect(schema).toContain('email: String');
@@ -90,7 +90,7 @@ describe('generateGraphQLSchema', () => {
       expect(schema).toContain('date: String');
     });
 
-    it('should map numeric types correctly', () => {
+    it('should map numeric types correctly', async () => {
       const classes = [
         {
           id: '1',
@@ -103,14 +103,14 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('count: Int!');
       expect(schema).toContain('price: Float');
       expect(schema).toContain('quantity: Int');
     });
 
-    it('should map boolean types correctly', () => {
+    it('should map boolean types correctly', async () => {
       const classes = [
         {
           id: '1',
@@ -122,13 +122,13 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('active: Boolean!');
       expect(schema).toContain('verified: Boolean');
     });
 
-    it('should map array types correctly', () => {
+    it('should map array types correctly', async () => {
       const classes = [
         {
           id: '1',
@@ -140,13 +140,13 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('tags: [String!]!');
       expect(schema).toContain('counts: [Integer!]');
     });
 
-    it('should handle object types with JSON scalar', () => {
+    it('should handle object types with JSON scalar', async () => {
       const classes = [
         {
           id: '1',
@@ -157,12 +157,12 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('metadata: JSON');
     });
 
-    it('should handle unknown types as String', () => {
+    it('should handle unknown types as String', async () => {
       const classes = [
         {
           id: '1',
@@ -173,14 +173,14 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('unknown: String');
     });
   });
 
   describe('Query Type Generation', () => {
-    it('should generate Query type with single and list queries', () => {
+    it('should generate Query type with single and list queries', async () => {
       const classes = [
         {
           id: '1',
@@ -189,14 +189,14 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('type Query {');
       expect(schema).toContain('user(id: ID!): User');
       expect(schema).toContain('users: [User!]!');
     });
 
-    it('should generate queries for multiple types', () => {
+    it('should generate queries for multiple types', async () => {
       const classes = [
         {
           id: '1',
@@ -210,7 +210,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('user(id: ID!): User');
       expect(schema).toContain('users: [User!]!');
@@ -218,7 +218,7 @@ describe('generateGraphQLSchema', () => {
       expect(schema).toContain('products: [Product!]!');
     });
 
-    it('should handle PascalCase class names correctly', () => {
+    it('should handle PascalCase class names correctly', async () => {
       const classes = [
         {
           id: '1',
@@ -227,7 +227,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('userProfile(id: ID!): UserProfile');
       expect(schema).toContain('userProfiles: [UserProfile!]!');
@@ -235,7 +235,7 @@ describe('generateGraphQLSchema', () => {
   });
 
   describe('Mutation Type Generation', () => {
-    it('should generate Mutation type with CRUD operations', () => {
+    it('should generate Mutation type with CRUD operations', async () => {
       const classes = [
         {
           id: '1',
@@ -244,7 +244,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('type Mutation {');
       expect(schema).toContain('createUser(input: CreateUserInput!): User!');
@@ -252,7 +252,7 @@ describe('generateGraphQLSchema', () => {
       expect(schema).toContain('deleteUser(id: ID!): Boolean!');
     });
 
-    it('should generate mutations for multiple types', () => {
+    it('should generate mutations for multiple types', async () => {
       const classes = [
         {
           id: '1',
@@ -266,7 +266,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('createUser(input: CreateUserInput!): User!');
       expect(schema).toContain('createProduct(input: CreateProductInput!): Product!');
@@ -274,7 +274,7 @@ describe('generateGraphQLSchema', () => {
   });
 
   describe('Input Type Generation', () => {
-    it('should generate CreateInput types with required fields', () => {
+    it('should generate CreateInput types with required fields', async () => {
       const classes = [
         {
           id: '1',
@@ -286,14 +286,14 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('input CreateUserInput {');
       expect(schema).toContain('name: String!');
       expect(schema).toContain('email: String');
     });
 
-    it('should generate UpdateInput types with all fields optional', () => {
+    it('should generate UpdateInput types with all fields optional', async () => {
       const classes = [
         {
           id: '1',
@@ -305,14 +305,14 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('input UpdateUserInput {');
       expect(schema).toContain('name: String');
       expect(schema).toContain('email: String');
     });
 
-    it('should generate input types for all types', () => {
+    it('should generate input types for all types', async () => {
       const classes = [
         {
           id: '1',
@@ -326,7 +326,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('input CreateUserInput {');
       expect(schema).toContain('input UpdateUserInput {');
@@ -336,7 +336,7 @@ describe('generateGraphQLSchema', () => {
   });
 
   describe('Custom Scalars', () => {
-    it('should include DateTime and JSON scalar definitions', () => {
+    it('should include DateTime and JSON scalar definitions', async () => {
       const classes = [
         {
           id: '1',
@@ -345,7 +345,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('# Custom scalar types');
       expect(schema).toContain('scalar DateTime');
@@ -354,7 +354,7 @@ describe('generateGraphQLSchema', () => {
   });
 
   describe('Property Descriptions', () => {
-    it('should include property descriptions as comments', () => {
+    it('should include property descriptions as comments', async () => {
       const classes = [
         {
           id: '1',
@@ -366,13 +366,13 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('The full name of the user');
       expect(schema).toContain('User email address');
     });
 
-    it('should include class descriptions as comments', () => {
+    it('should include class descriptions as comments', async () => {
       const classes = [
         {
           id: '1',
@@ -382,15 +382,15 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('Represents a user account in the system');
     });
   });
 
   describe('Edge Cases', () => {
-    it('should handle empty class list', () => {
-      const schema = generateGraphQLSchema([]);
+    it('should handle empty class list', async () => {
+      const schema = await generateGraphQLSchema([]);
 
       expect(schema).toContain('# GraphQL Schema Definition Language (SDL)');
       expect(schema).toContain('scalar DateTime');
@@ -399,7 +399,7 @@ describe('generateGraphQLSchema', () => {
       expect(schema).not.toContain('type Mutation');
     });
 
-    it('should handle class with no properties', () => {
+    it('should handle class with no properties', async () => {
       const classes = [
         {
           id: '1',
@@ -408,14 +408,14 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('type User {');
       expect(schema).toContain('id: ID!');
       expect(schema).toContain('}');
     });
 
-    it('should handle properties with missing required field', () => {
+    it('should handle properties with missing required field', async () => {
       const classes = [
         {
           id: '1',
@@ -426,12 +426,12 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('name: String'); // defaults to optional
     });
 
-    it('should handle properties with undefined type', () => {
+    it('should handle properties with undefined type', async () => {
       const classes = [
         {
           id: '1',
@@ -442,12 +442,12 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('data: String'); // defaults to String
     });
 
-    it('should handle non-array properties field gracefully', () => {
+    it('should handle non-array properties field gracefully', async () => {
       const classes = [
         {
           id: '1',
@@ -456,7 +456,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('type User {');
       expect(schema).toContain('id: ID!');
@@ -464,7 +464,7 @@ describe('generateGraphQLSchema', () => {
   });
 
   describe('Complex Schema', () => {
-    it('should generate a complete schema with multiple related types', () => {
+    it('should generate a complete schema with multiple related types', async () => {
       const classes = [
         {
           id: '1',
@@ -498,7 +498,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes, {
+      const schema = await generateGraphQLSchema(classes, {
         projectName: 'Blog API',
         version: '2.0.0',
         description: 'A comprehensive blog platform',
@@ -534,7 +534,7 @@ describe('generateGraphQLSchema', () => {
   });
 
   describe('OpenAPI to GraphQL Conversion', () => {
-    it('should convert OpenAPI schema properties to GraphQL types', () => {
+    it('should convert OpenAPI schema properties to GraphQL types', async () => {
       const classes = [
         {
           id: '1',
@@ -553,7 +553,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('id: ID!');
       expect(schema).toContain('name: String!');
@@ -565,7 +565,7 @@ describe('generateGraphQLSchema', () => {
       expect(schema).toContain('createdAt: String!');
     });
 
-    it('should handle OpenAPI 3.1.0 nullable fields', () => {
+    it('should handle OpenAPI 3.1.0 nullable fields', async () => {
       const classes = [
         {
           id: '1',
@@ -577,7 +577,7 @@ describe('generateGraphQLSchema', () => {
         },
       ];
 
-      const schema = generateGraphQLSchema(classes);
+      const schema = await generateGraphQLSchema(classes);
 
       expect(schema).toContain('name: String');
       expect(schema).toContain('email: String!');
