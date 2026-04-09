@@ -8,6 +8,7 @@ import '@testing-library/jest-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 
 import GroupNode, { type GroupNodeData } from '../../src/app/components/ade/studio/GroupNode';
+import { StudioProvider } from '../../src/app/ade/studio/StudioContext';
 
 jest.mock('../../src/app/components/ade/studio/GroupBulkEditDialog', () => ({
   __esModule: true,
@@ -31,14 +32,16 @@ const baseData: GroupNodeData = {
 function renderGroup(overrides?: Partial<GroupNodeData>, selected = false) {
   const data = { ...baseData, ...overrides };
   return render(
-    <ReactFlowProvider>
-      <GroupNode
-        id="g1"
-        type="groupNode"
-        data={data as unknown as Record<string, unknown>}
-        selected={selected}
-      />
-    </ReactFlowProvider>
+    <StudioProvider>
+      <ReactFlowProvider>
+        <GroupNode
+          id="g1"
+          type="groupNode"
+          data={data as unknown as Record<string, unknown>}
+          selected={selected}
+        />
+      </ReactFlowProvider>
+    </StudioProvider>
   );
 }
 

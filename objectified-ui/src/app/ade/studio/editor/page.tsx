@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState, useEffect, useRef, useMemo, type ChangeEvent, type SetStateAction } from 'react';
+import { flushSync } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -355,6 +356,8 @@ const StudioContent = () => {
     setSearchHistoryCount,
     setClearSearchHistoryFn,
     setClearCanvasSelectionFn,
+    setSuppressGroupFloatingToolbars,
+    setSuppressGroupSidebarDestructive,
     setCanvasPresentationMode,
     setSchemaQualityScore,
     setSchemaQualityDetail,
@@ -764,21 +767,30 @@ const StudioContent = () => {
     return () => setClearSearchHistoryFn(null);
   }, [clearSearchHistory, setClearSearchHistoryFn]);
 
-  const clearCanvasSelection = useCallback(() => {
-    setNodes((nds) => {
-      if (!nds.some((n) => n.selected)) {
-        return nds;
-      }
-
-      return nds.map((n) => (n.selected ? { ...n, selected: false } : n));
+  const prepareCanvasForCodeView = useCallback(() => {
+    flushSync(() => {
+      setSuppressGroupFloatingToolbars(true);
+      setSuppressGroupSidebarDestructive(true);
+      setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+      setSelectedNodeIds([]);
     });
-    setSelectedNodeIds([]);
-  }, [setNodes]);
+  }, [
+    setSuppressGroupFloatingToolbars,
+    setSuppressGroupSidebarDestructive,
+    setNodes,
+  ]);
 
   useEffect(() => {
-    setClearCanvasSelectionFn(() => clearCanvasSelection);
+    setClearCanvasSelectionFn(() => prepareCanvasForCodeView);
     return () => setClearCanvasSelectionFn(null);
-  }, [clearCanvasSelection, setClearCanvasSelectionFn]);
+  }, [prepareCanvasForCodeView, setClearCanvasSelectionFn]);
+
+  useEffect(() => {
+    if (viewMode === 'canvas') {
+      setSuppressGroupFloatingToolbars(false);
+      setSuppressGroupSidebarDestructive(false);
+    }
+  }, [viewMode, setSuppressGroupFloatingToolbars, setSuppressGroupSidebarDestructive]);
 
   // Memory profiler state
   const [memoryProfilerOpen, setMemoryProfilerOpen] = useState(false);
@@ -7871,10 +7883,8 @@ const StudioContent = () => {
                 onValueChange={(value) => {
                   if (!value) return;
                   const next = value as ViewMode;
-                  // #2595: Drop selection before leaving canvas so group toolbars (delete-all, etc.)
-                  // unmount and cannot receive a stray click/focus during the view transition.
                   if (next === 'code') {
-                    clearCanvasSelection();
+                    prepareCanvasForCodeView();
                   }
                   setViewMode(next);
                 }}
