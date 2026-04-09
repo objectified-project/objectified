@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState, useEffect, useRef, useMemo, type ChangeEvent, type SetStateAction } from 'react';
+import { flushSync } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -354,6 +355,9 @@ const StudioContent = () => {
     setDeleteGroupFn,
     setSearchHistoryCount,
     setClearSearchHistoryFn,
+    setClearCanvasSelectionFn,
+    setSuppressGroupFloatingToolbars,
+    setSuppressGroupSidebarDestructive,
     setCanvasPresentationMode,
     setSchemaQualityScore,
     setSchemaQualityDetail,
@@ -762,6 +766,31 @@ const StudioContent = () => {
     setClearSearchHistoryFn(() => clearSearchHistory);
     return () => setClearSearchHistoryFn(null);
   }, [clearSearchHistory, setClearSearchHistoryFn]);
+
+  const prepareCanvasForCodeView = useCallback(() => {
+    flushSync(() => {
+      setSuppressGroupFloatingToolbars(true);
+      setSuppressGroupSidebarDestructive(true);
+      setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+      setSelectedNodeIds([]);
+    });
+  }, [
+    setSuppressGroupFloatingToolbars,
+    setSuppressGroupSidebarDestructive,
+    setNodes,
+  ]);
+
+  useEffect(() => {
+    setClearCanvasSelectionFn(() => prepareCanvasForCodeView);
+    return () => setClearCanvasSelectionFn(null);
+  }, [prepareCanvasForCodeView, setClearCanvasSelectionFn]);
+
+  useEffect(() => {
+    if (viewMode === 'canvas') {
+      setSuppressGroupFloatingToolbars(false);
+      setSuppressGroupSidebarDestructive(false);
+    }
+  }, [viewMode, setSuppressGroupFloatingToolbars, setSuppressGroupSidebarDestructive]);
 
   // Memory profiler state
   const [memoryProfilerOpen, setMemoryProfilerOpen] = useState(false);
@@ -7852,7 +7881,12 @@ const StudioContent = () => {
                 type="single"
                 value={viewMode}
                 onValueChange={(value) => {
-                  if (value) setViewMode(value as ViewMode);
+                  if (!value) return;
+                  const next = value as ViewMode;
+                  if (next === 'code') {
+                    prepareCanvasForCodeView();
+                  }
+                  setViewMode(next);
                 }}
                 className="inline-flex bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1 shadow-inner"
               >

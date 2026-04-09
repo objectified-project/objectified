@@ -20,6 +20,7 @@ import {
   SelectItem,
   SelectTrigger,
 } from '@/app/components/ui/Select';
+import { useStudio } from '@/app/ade/studio/StudioContext';
 
 // Available group icons
 export const GROUP_ICONS = [
@@ -163,9 +164,11 @@ const GroupNode = memo((props: NodeProps) => {
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [isFrameHovered, setIsFrameHovered] = useState(false);
   const [customHexDraft, setCustomHexDraft] = useState('');
+  const { suppressGroupFloatingToolbars } = useStudio();
 
   const showFloatingToolbar = useMemo(
     () =>
+      !suppressGroupFloatingToolbars &&
       !groupData.isReadOnly &&
       !isEditing &&
       (selected ||
@@ -174,6 +177,7 @@ const GroupNode = memo((props: NodeProps) => {
         colorPickerOpen ||
         exportPopoverOpen),
     [
+      suppressGroupFloatingToolbars,
       groupData.isReadOnly,
       isEditing,
       selected,

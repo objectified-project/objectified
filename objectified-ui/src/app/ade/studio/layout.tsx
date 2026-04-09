@@ -53,6 +53,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     deleteGroupFn,
     updateGroup,
     canvasPresentationMode,
+    suppressGroupSidebarDestructive,
   } = useStudio();
 
   // Check if we're on the code or paths view - hide sidebar for these views
@@ -447,7 +448,8 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
           selectedVersionId && (
           <StudioSideNav classes={classes} properties={properties} groups={sidebarGroups} callbacks={callbacks} refreshKey={refreshKey}
                          hiddenClassIds={hiddenClassIds}
-                         selectedProjectId={selectedProjectId} selectedVersionId={selectedVersionId} isReadOnly={isReadOnly} />
+                         selectedProjectId={selectedProjectId} selectedVersionId={selectedVersionId} isReadOnly={isReadOnly}
+                         suppressGroupDestructiveActions={suppressGroupSidebarDestructive} />
         )}
 
         <main style={{ flex: 1, overflow: "hidden", position: "relative", zIndex: 100, display: "flex", flexDirection: "column" }}>
