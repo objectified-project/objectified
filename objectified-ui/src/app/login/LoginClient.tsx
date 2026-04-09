@@ -13,9 +13,11 @@ interface SSOButtonProps {
   icon: React.ReactNode;
   onClick: () => void;
   color?: string;
+  isSignUp?: boolean;
 }
 
-const SSOButton: React.FC<SSOButtonProps> = ({ provider, icon, onClick, color }) => {
+const SSOButton: React.FC<SSOButtonProps> = ({ provider, icon, onClick, color, isSignUp }) => {
+  const label = isSignUp ? `Signup via ${provider}` : `Continue with ${provider}`;
   return (
     <button
       type="button"
@@ -23,7 +25,7 @@ const SSOButton: React.FC<SSOButtonProps> = ({ provider, icon, onClick, color })
       className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-white border border-gray-200 rounded-xl hover:border-gray-300 hover:bg-gray-50 hover:shadow-md transition-all duration-200 cursor-pointer group dark:bg-slate-800/80 dark:border-slate-600 dark:hover:border-slate-500 dark:hover:bg-slate-800"
     >
       <span className="flex-shrink-0 transition-transform duration-200 group-hover:scale-110">{icon}</span>
-      <span className="text-gray-700 font-semibold dark:text-slate-200">Continue with {provider}</span>
+      <span className="text-gray-700 font-semibold dark:text-slate-200">{label}</span>
     </button>
   );
 };
@@ -365,12 +367,14 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
                   provider="GitHub"
                   icon={<SiGithub size={20} className="text-gray-800 dark:text-slate-100" />}
                   onClick={() => handleSSOLogin('github')}
+                  isSignUp={isSignUp}
                 />
 
                 <SSOButton
                   provider="GitLab"
                   icon={<SiGitlab size={20} className="text-orange-600" />}
                   onClick={() => handleSSOLogin('gitlab')}
+                  isSignUp={isSignUp}
                 />
               </div>
             </>
