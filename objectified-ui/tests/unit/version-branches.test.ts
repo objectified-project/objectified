@@ -454,7 +454,7 @@ describe('mergeVersionBranchesServer', () => {
     );
 
     // Verify BEGIN and COMMIT were called
-    const queryCalls = (getDbMock().query.mock.calls as string[][]).map((c) => (c[0] as string).trim());
+    const queryCalls = getDbMock().query.mock.calls.map((c) => String(c[0]).trim());
     expect(queryCalls).toContain('BEGIN');
     expect(queryCalls).toContain('COMMIT');
     expect(result.success).toBe(true);
@@ -497,7 +497,7 @@ describe('mergeVersionBranchesServer', () => {
       })
     );
 
-    const queryCalls = (getDbMock().query.mock.calls as string[][]).map((c) => (c[0] as string).trim());
+    const queryCalls = getDbMock().query.mock.calls.map((c) => String(c[0]).trim());
     expect(queryCalls).toContain('BEGIN');
     expect(queryCalls).toContain('ROLLBACK');
     expect(result.success).toBe(false);
