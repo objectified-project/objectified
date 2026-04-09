@@ -287,9 +287,7 @@ export default function SchemaVersionScoringPanel({
             className="mt-0.5 w-full rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs px-2 py-1.5"
             value={breakdownVersionId}
             onChange={(e) => {
-              const v = e.target.value;
-              setBreakdownVersionId(v);
-              onSelectVersion?.(v);
+              setBreakdownVersionId(e.target.value);
             }}
           >
             <option value="">Select version…</option>

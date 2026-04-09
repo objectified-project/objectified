@@ -833,8 +833,12 @@ const StudioContent = () => {
     return computeSchemaMetrics(nodes, edges);
   }, [nodes, edges]);
 
-  // #244: Version scoring panel — per-schema rows from the live canvas (same graph as metrics)
-  const livePerSchemaScores = useMemo(() => computePerSchemaScores(nodes, edges), [nodes, edges]);
+  // #244: Version scoring panel — per-schema rows from the live canvas (same graph as metrics).
+  // Only computed when the panel is open to avoid graph-traversal overhead during editing.
+  const livePerSchemaScores = useMemo(() => {
+    if (!schemaVersionScoringOpen) return [];
+    return computePerSchemaScores(nodes, edges);
+  }, [schemaVersionScoringOpen, nodes, edges]);
 
   // #548: Circular dependency node/edge sets for canvas warning indicators
   const circularNodeIdsSet = useMemo(
@@ -10226,11 +10230,6 @@ const StudioContent = () => {
               <SchemaVersionScoringPanel
                 versions={versions}
                 selectedVersionId={selectedVersionId}
-                onSelectVersion={(versionId) => {
-                  setSelectedVersionId(versionId);
-                  const v = versions.find((x) => x.id === versionId);
-                  setIsReadOnly(v?.published ?? false);
-                }}
                 onClose={() => setSchemaVersionScoringOpen(false)}
                 isMinimized={schemaVersionScoringMinimized}
                 onMinimizeToggle={() => setSchemaVersionScoringMinimized(!schemaVersionScoringMinimized)}
