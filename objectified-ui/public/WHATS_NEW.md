@@ -5,7 +5,6 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## UI:
-- **Versions (#500):** **Named branches** (tip = version snapshot), **merge preview** and **apply merge** with optimistic `baseRevisionId` / target tip; merge revisions record **two parent** version ids; conflict banner when overlapping schema paths differ (merge-base LCA planned in #2593)
 - **Canvas ↔ Code (#2595):** Switching to **Code** now **synchronously hides group floating toolbars** (including hover/settings/export), **clears flow selection**, and **blocks sidebar group delete row actions** while the Code tab is active so nothing in that stack can take a stray click during the transition
 - **Studio Code / GraphQL (#147):** GraphQL SDL in the Code tab is generated from a **Handlebars template** (`templates/graphql/graphql-schema.hbs`) instead of inlined string building, aligned with OpenAPI and Arazzo; template loader init is synchronous so tooling can import it safely
 - **Schema quality details (#2548):** **Studio header** Schema quality is **clickable** — opens a dialog with **letter grade (A–F)**, weighted **factor table**, and the same **score band guide** as import quality. **Schema Metrics** shows the same **overall schema quality** block (numeric score + letter + guide) above the per-metric controls
@@ -25,6 +24,8 @@ We continue to improve the platform based on your feedback with improvements and
 - **Import classes:** duplicate-schema rows in the conflict report include **Schema diff** — side-by-side property diff (new / modified / removed), summary counts, and resolution choices (merge, replace, keep current, rename) before you apply
 - **OpenAPI import:** one shared rule for “direct” schema properties — specs that mix top-level `properties` with inline `allOf` fragments now pick up both (aligned with the unified class importer)
 
+## Versioning
+- **Versions (#500):** **Named branches** (tip = version snapshot), **merge preview** and **apply merge** with optimistic `baseRevisionId` / target tip; merge revisions record **two parent** version ids; conflict banner when overlapping schema paths differ (merge-base LCA planned in #2593)
 
 ## Projects:
 - **Domain categories (#243):** Optional **domain category** per project (IoT, social, gaming, travel & hospitality, media & entertainment) — stored in project metadata, editable on create/edit, shown as a chip on the projects list
