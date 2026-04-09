@@ -36,8 +36,8 @@ jest.mock('../../src/app/utils/openapi', () => ({
   generateOpenApiSpec: jest.fn(() => '{}'),
 }));
 
+import { isValidVersionBranchName } from '../../lib/version-branch-utils';
 import {
-  isValidVersionBranchName,
   listVersionBranches,
   createVersionBranch,
   deleteVersionBranch,

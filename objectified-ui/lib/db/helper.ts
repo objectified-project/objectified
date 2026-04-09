@@ -2,6 +2,7 @@
 
 import { generateOpenApiSpec } from '@/app/utils/openapi';
 import { mergePreviewFromSpecs } from '../version-merge';
+import { isValidVersionBranchName } from '../version-branch-utils';
 import { getPlanBlockMessageForNewProject, getPlanBlockMessageForNewVersion } from './plan-entitlements';
 import { getAuthSession } from '../auth/server-session';
 import { buildGroupMetadataForSync } from '../utils/group-metadata';
@@ -5342,8 +5343,6 @@ export async function importPrimitivesFromSchema(
   }
 }
 
-const VERSION_BRANCH_NAME_RE = /^[a-zA-Z][a-zA-Z0-9._\-/]{0,254}$/;
-
 export async function buildOpenApiSpecJsonForVersion(
   versionRow: { id: string; version_id: string; description?: string | null; project_id: string },
   projectName: string | null
@@ -5361,10 +5360,6 @@ export async function buildOpenApiSpecJsonForVersion(
     version: versionRow.version_id,
     description: versionRow.description || undefined,
   });
-}
-
-export function isValidVersionBranchName(name: string): boolean {
-  return VERSION_BRANCH_NAME_RE.test(name.trim());
 }
 
 export async function assertProjectInTenant(projectId: string, tenantId: string): Promise<boolean> {
