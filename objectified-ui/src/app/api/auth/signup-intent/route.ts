@@ -20,7 +20,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const body = await request.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+  }
   const provider = body?.provider;
   if (provider !== 'github' && provider !== 'gitlab') {
     return NextResponse.json({ error: 'Invalid provider' }, { status: 400 });
