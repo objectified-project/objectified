@@ -354,6 +354,7 @@ const StudioContent = () => {
     setDeleteGroupFn,
     setSearchHistoryCount,
     setClearSearchHistoryFn,
+    setClearCanvasSelectionFn,
     setCanvasPresentationMode,
     setSchemaQualityScore,
     setSchemaQualityDetail,
@@ -762,6 +763,22 @@ const StudioContent = () => {
     setClearSearchHistoryFn(() => clearSearchHistory);
     return () => setClearSearchHistoryFn(null);
   }, [clearSearchHistory, setClearSearchHistoryFn]);
+
+  const clearCanvasSelection = useCallback(() => {
+    setNodes((nds) => {
+      if (!nds.some((n) => n.selected)) {
+        return nds;
+      }
+
+      return nds.map((n) => (n.selected ? { ...n, selected: false } : n));
+    });
+    setSelectedNodeIds([]);
+  }, [setNodes]);
+
+  useEffect(() => {
+    setClearCanvasSelectionFn(() => clearCanvasSelection);
+    return () => setClearCanvasSelectionFn(null);
+  }, [clearCanvasSelection, setClearCanvasSelectionFn]);
 
   // Memory profiler state
   const [memoryProfilerOpen, setMemoryProfilerOpen] = useState(false);
@@ -7852,7 +7869,14 @@ const StudioContent = () => {
                 type="single"
                 value={viewMode}
                 onValueChange={(value) => {
-                  if (value) setViewMode(value as ViewMode);
+                  if (!value) return;
+                  const next = value as ViewMode;
+                  // #2595: Drop selection before leaving canvas so group toolbars (delete-all, etc.)
+                  // unmount and cannot receive a stray click/focus during the view transition.
+                  if (next === 'code') {
+                    clearCanvasSelection();
+                  }
+                  setViewMode(next);
                 }}
                 className="inline-flex bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1 shadow-inner"
               >
