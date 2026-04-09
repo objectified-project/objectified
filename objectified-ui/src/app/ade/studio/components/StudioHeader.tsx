@@ -71,6 +71,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     setEdgeAnimation,
     searchHistoryCount,
     clearSearchHistoryFn,
+    clearCanvasSelectionFn,
     schemaQualityScore,
     schemaQualityDetail
   } = useStudio();
@@ -252,6 +253,8 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     } else if (value === 'paths') {
       router.push('/ade/studio/paths');
     } else if (value === 'code') {
+      // #2595: Same as inline editor toggle — clear canvas selection before route change.
+      clearCanvasSelectionFn?.();
       router.push('/ade/studio/code');
     }
   };

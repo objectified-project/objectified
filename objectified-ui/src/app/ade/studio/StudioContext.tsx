@@ -161,6 +161,9 @@ interface StudioContextType {
   setSearchHistoryCount: (count: number) => void;
   clearSearchHistoryFn: (() => void) | null;
   setClearSearchHistoryFn: (fn: (() => void) | null) => void;
+  /** Clears React Flow selection on the editor canvas (registered by editor); used before leaving canvas view (#2595). */
+  clearCanvasSelectionFn: (() => void) | null;
+  setClearCanvasSelectionFn: (fn: (() => void) | null) => void;
   /** When true, studio chrome (sidebar, studio header) is hidden for canvas presentation mode (#517). */
   canvasPresentationMode: boolean;
   setCanvasPresentationMode: (value: boolean) => void;
@@ -461,6 +464,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const [deleteAllClassesInGroupFn, setDeleteAllClassesInGroupFn] = useState<((groupId: string, classIds?: string[], groupName?: string) => Promise<void>) | null>(null);
   const [deleteGroupFn, setDeleteGroupFn] = useState<((groupId: string) => Promise<void>) | null>(null);
+  const [clearCanvasSelectionFn, setClearCanvasSelectionFn] = useState<(() => void) | null>(null);
 
   const addNodeToGroup = (groupId: string, nodeId: string) => {
     setGroups(prev => prev.map(g => {
@@ -545,6 +549,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSearchHistoryCount,
       clearSearchHistoryFn,
       setClearSearchHistoryFn,
+      clearCanvasSelectionFn,
+      setClearCanvasSelectionFn,
       canvasPresentationMode,
       setCanvasPresentationMode,
       schemaQualityScore,
