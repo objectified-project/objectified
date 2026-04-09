@@ -18,7 +18,7 @@ const templateCache = new Map<string, HandlebarsTemplateDelegate>();
 /**
  * Register custom Handlebars helpers
  */
-async function registerHelpers() {
+function registerHelpers(): void {
   // Helper to convert objects to JSON strings
   Handlebars.registerHelper('json', function(context) {
     return JSON.stringify(context, null, 2);
@@ -40,8 +40,7 @@ async function registerHelpers() {
   });
 }
 
-// Register helpers on module load
-await registerHelpers();
+registerHelpers();
 
 /**
  * Load and compile a Handlebars template

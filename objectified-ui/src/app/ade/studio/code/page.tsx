@@ -297,7 +297,7 @@ export default function CodePage() {
         });
         setJsonSchemaSpec(jsonSchemaContent);
 
-        const graphqlContent = generateGraphQLSchema(classesWithProperties, {
+        const graphqlContent = await generateGraphQLSchema(classesWithProperties, {
           projectName: currentProject?.name || 'API',
           version: currentVersion?.version_id || '1.0.0',
           description: currentVersion?.description || ''
