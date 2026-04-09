@@ -198,7 +198,15 @@ import {
   filterCanvasLayoutForTargetClasses,
   mergeSavedEdgeHandles,
 } from '@/app/utils/canvas-layout-json';
-import { computeSchemaMetrics, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, getUpstreamClassIds, getDependencyChainNodeAndEdgeIds } from '@/app/utils/schema-metrics';
+import {
+  computeSchemaMetrics,
+  computePerSchemaScores,
+  getCircularDependencyEdgeIds,
+  getDependencyDepthMap,
+  getAffectedClassIds,
+  getUpstreamClassIds,
+  getDependencyChainNodeAndEdgeIds,
+} from '@/app/utils/schema-metrics';
 import { toPng } from 'html-to-image';
 import { QuickSnapshotCaptureDialog } from './components/QuickSnapshotCaptureDialog';
 import { QuickSnapshotCompareDialog } from './components/QuickSnapshotCompareDialog';
@@ -824,6 +832,13 @@ const StudioContent = () => {
     if (classNodes.length === 0) return null;
     return computeSchemaMetrics(nodes, edges);
   }, [nodes, edges]);
+
+  // #244: Version scoring panel — per-schema rows from the live canvas (same graph as metrics).
+  // Only computed when the panel is open to avoid graph-traversal overhead during editing.
+  const livePerSchemaScores = useMemo(() => {
+    if (!schemaVersionScoringOpen) return [];
+    return computePerSchemaScores(nodes, edges);
+  }, [schemaVersionScoringOpen, nodes, edges]);
 
   // #548: Circular dependency node/edge sets for canvas warning indicators
   const circularNodeIdsSet = useMemo(
@@ -10215,14 +10230,11 @@ const StudioContent = () => {
               <SchemaVersionScoringPanel
                 versions={versions}
                 selectedVersionId={selectedVersionId}
-                onSelectVersion={(versionId) => {
-                  setSelectedVersionId(versionId);
-                  const v = versions.find((x) => x.id === versionId);
-                  setIsReadOnly(v?.published ?? false);
-                }}
                 onClose={() => setSchemaVersionScoringOpen(false)}
                 isMinimized={schemaVersionScoringMinimized}
                 onMinimizeToggle={() => setSchemaVersionScoringMinimized(!schemaVersionScoringMinimized)}
+                liveCanvasVersionId={selectedVersionId || null}
+                livePerSchemaRows={livePerSchemaScores}
               />
             </DraggablePanel>
           )}
