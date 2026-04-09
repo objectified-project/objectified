@@ -765,7 +765,13 @@ const StudioContent = () => {
   }, [clearSearchHistory, setClearSearchHistoryFn]);
 
   const clearCanvasSelection = useCallback(() => {
-    setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+    setNodes((nds) => {
+      if (!nds.some((n) => n.selected)) {
+        return nds;
+      }
+
+      return nds.map((n) => (n.selected ? { ...n, selected: false } : n));
+    });
     setSelectedNodeIds([]);
   }, [setNodes]);
 
