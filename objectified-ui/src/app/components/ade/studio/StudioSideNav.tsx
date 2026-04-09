@@ -90,6 +90,8 @@ interface StudioSideNavProps {
   selectedVersionId?: string | null; // Currently selected version from canvas
   isReadOnly?: boolean; // Whether the current version is published (read-only)
   hiddenClassIds?: string[];
+  /** #2595: Data Designer Code tab keeps /editor URL — block group row delete actions during layout/pointer transitions */
+  suppressGroupDestructiveActions?: boolean;
   // classWarnings?: Record<string, boolean>; // removed, computed locally
   [key: string]: any; // allow future, non-breaking props from parent
 }
@@ -104,6 +106,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
   selectedVersionId = null,
   isReadOnly = false,
   hiddenClassIds = [],
+  suppressGroupDestructiveActions = false,
 }) => {
   // Dark mode detection using shared hook
   const isDark = useDarkMode();
@@ -738,7 +741,13 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                                 </div>
                               </button>
                               {!isReadOnly && (
-                                <div className="flex items-center opacity-60 group-hover:opacity-100">
+                                <div
+                                  className={`flex items-center ${
+                                    suppressGroupDestructiveActions
+                                      ? 'pointer-events-none opacity-30'
+                                      : 'opacity-60 group-hover:opacity-100'
+                                  }`}
+                                >
                                   {nodeCount > 0 && (
                                     <button
                                       type="button"
