@@ -264,6 +264,48 @@ class VersionPublishRequest(BaseModel):
         from_attributes = True
 
 
+class VersionTagSchema(BaseModel):
+    """Git-like tag pointing at a schema revision (versions.id)."""
+
+    id: str
+    project_id: str
+    version_id: str
+    name: str
+    message: Optional[str] = None
+    channel: Optional[str] = None
+    immutable: bool = False
+    created_by: Optional[str] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+    target_version_string: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class VersionTagCreateRequest(BaseModel):
+    """Create a named tag at a revision."""
+
+    version_id: str
+    name: str
+    message: Optional[str] = None
+    channel: Optional[str] = None
+    immutable: Optional[bool] = False
+
+    class Config:
+        from_attributes = True
+
+
+class VersionTagUpdateRequest(BaseModel):
+    """Move tag to another revision and/or lock it."""
+
+    version_id: Optional[str] = None
+    immutable: Optional[bool] = None
+
+    class Config:
+        from_attributes = True
+
+
 # ==================== Project Property Models ====================
 
 class ProjectPropertySchema(BaseModel):

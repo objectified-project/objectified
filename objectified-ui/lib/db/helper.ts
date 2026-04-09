@@ -3,6 +3,7 @@
 import { generateOpenApiSpec } from '@/app/utils/openapi';
 import { mergePreviewFromSpecs } from '../version-merge';
 import { isValidVersionBranchName } from '../version-branch-utils';
+import { isValidVersionTagName } from '../version-tag-utils';
 import { getPlanBlockMessageForNewProject, getPlanBlockMessageForNewVersion } from './plan-entitlements';
 import { getAuthSession } from '../auth/server-session';
 import { buildGroupMetadataForSync } from '../utils/group-metadata';
@@ -5460,6 +5461,194 @@ export async function deleteVersionBranch(
     return JSON.stringify({ success: true });
   } catch (error: any) {
     console.error('deleteVersionBranch:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/** List named tags for a project (pointers to version row ids). */
+export async function listVersionTags(projectId: string, tenantId: string) {
+  try {
+    const ok = await assertProjectInTenant(projectId, tenantId);
+    if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
+    const result = await connectionPool.query(
+      `SELECT t.id, t.project_id, t.version_id, t.name, t.message, t.channel, t.immutable,
+              t.created_by, t.created_at, t.updated_at, v.version_id AS target_version_string
+       FROM odb.version_tags t
+       JOIN odb.versions v ON v.id = t.version_id AND v.project_id = t.project_id
+       JOIN odb.projects p ON t.project_id = p.id
+       WHERE t.project_id = $1 AND p.tenant_id = $2 AND v.deleted_at IS NULL
+       ORDER BY t.name ASC`,
+      [projectId, tenantId]
+    );
+    return JSON.stringify({ success: true, tags: result.rows });
+  } catch (error: any) {
+    console.error('listVersionTags:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/** Create a tag pointing at an existing schema revision (version row). */
+export async function createVersionTag(
+  projectId: string,
+  tenantId: string,
+  name: string,
+  targetVersionId: string,
+  userId: string,
+  opts?: { message?: string | null; channel?: string | null; immutable?: boolean }
+) {
+  try {
+    const trimmed = name.trim();
+    if (!isValidVersionTagName(trimmed)) {
+      return JSON.stringify({
+        success: false,
+        error:
+          'Tag name must be 1–255 chars, start with a letter or digit, and contain only letters, digits, . _ - /',
+      });
+    }
+    const ok = await assertProjectInTenant(projectId, tenantId);
+    if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
+    const ver = await connectionPool.query(
+      `SELECT v.id FROM odb.versions v
+       JOIN odb.projects p ON v.project_id = p.id
+       WHERE v.id = $1 AND v.project_id = $2 AND p.tenant_id = $3 AND v.deleted_at IS NULL`,
+      [targetVersionId, projectId, tenantId]
+    );
+    if (ver.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Target version not found in this project' });
+    }
+    const message = opts?.message?.trim() || null;
+    const channel =
+      opts?.channel && String(opts.channel).trim() ? String(opts.channel).trim().slice(0, 64) : null;
+    const immutable = Boolean(opts?.immutable);
+    const ins = await connectionPool.query(
+      `INSERT INTO odb.version_tags (project_id, version_id, name, message, channel, immutable, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, project_id, version_id, name, message, channel, immutable, created_by, created_at, updated_at`,
+      [projectId, targetVersionId, trimmed, message, channel, immutable, userId]
+    );
+    return JSON.stringify({ success: true, tag: ins.rows[0] });
+  } catch (error: any) {
+    if (error.code === '23505') {
+      return JSON.stringify({
+        success: false,
+        error: 'A tag with this name already exists for this project',
+        code: 'TAG_NAME_CONFLICT',
+      });
+    }
+    console.error('createVersionTag:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function updateVersionTag(
+  tagId: string,
+  projectId: string,
+  tenantId: string,
+  userId: string,
+  isTenantAdmin: boolean,
+  body: { versionId?: string; immutable?: boolean }
+) {
+  try {
+    const ok = await assertProjectInTenant(projectId, tenantId);
+    if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
+    const row = await connectionPool.query(
+      `SELECT t.id, t.version_id, t.immutable, t.created_by
+       FROM odb.version_tags t
+       JOIN odb.projects p ON t.project_id = p.id
+       WHERE t.id = $1 AND t.project_id = $2 AND p.tenant_id = $3`,
+      [tagId, projectId, tenantId]
+    );
+    if (row.rowCount === 0) return JSON.stringify({ success: false, error: 'Tag not found' });
+    const tag = row.rows[0] as { id: string; version_id: string; immutable: boolean; created_by: string | null };
+    if (tag.immutable) {
+      return JSON.stringify({
+        success: false,
+        error: 'This tag is immutable and cannot be changed',
+        code: 'TAG_IMMUTABLE',
+      });
+    }
+    if (!isTenantAdmin && tag.created_by !== userId) {
+      return JSON.stringify({
+        success: false,
+        error: 'Only the tag creator or a tenant admin can update this tag',
+      });
+    }
+    const newVersionId = typeof body.versionId === 'string' ? body.versionId.trim() : '';
+    const wantImmutable = body.immutable === true;
+    if (newVersionId) {
+      const ver = await connectionPool.query(
+        `SELECT v.id FROM odb.versions v
+         JOIN odb.projects p ON v.project_id = p.id
+         WHERE v.id = $1 AND v.project_id = $2 AND p.tenant_id = $3 AND v.deleted_at IS NULL`,
+        [newVersionId, projectId, tenantId]
+      );
+      if (ver.rowCount === 0) {
+        return JSON.stringify({ success: false, error: 'Target version not found in this project' });
+      }
+    }
+    if (!newVersionId && !wantImmutable) {
+      return JSON.stringify({ success: false, error: 'Provide versionId and/or immutable: true' });
+    }
+    const sets: string[] = ['updated_at = CURRENT_TIMESTAMP'];
+    const params: unknown[] = [];
+    if (newVersionId) {
+      params.push(newVersionId);
+      sets.push(`version_id = $${params.length}`);
+    }
+    if (wantImmutable) {
+      sets.push('immutable = true');
+    }
+    params.push(tagId, projectId);
+    const idSlot = params.length - 1;
+    const projSlot = params.length;
+    const upd = await connectionPool.query(
+      `UPDATE odb.version_tags SET ${sets.join(', ')}
+       WHERE id = $${idSlot} AND project_id = $${projSlot}
+       RETURNING id, project_id, version_id, name, message, channel, immutable, created_by, created_at, updated_at`,
+      params
+    );
+    return JSON.stringify({ success: true, tag: upd.rows[0] });
+  } catch (error: any) {
+    console.error('updateVersionTag:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function deleteVersionTag(
+  tagId: string,
+  projectId: string,
+  tenantId: string,
+  userId: string,
+  isTenantAdmin: boolean
+) {
+  try {
+    const ok = await assertProjectInTenant(projectId, tenantId);
+    if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
+    const row = await connectionPool.query(
+      `SELECT t.id, t.immutable, t.created_by FROM odb.version_tags t
+       JOIN odb.projects p ON t.project_id = p.id
+       WHERE t.id = $1 AND t.project_id = $2 AND p.tenant_id = $3`,
+      [tagId, projectId, tenantId]
+    );
+    if (row.rowCount === 0) return JSON.stringify({ success: false, error: 'Tag not found' });
+    const tag = row.rows[0] as { immutable: boolean; created_by: string | null };
+    if (tag.immutable) {
+      return JSON.stringify({
+        success: false,
+        error: 'This tag is immutable and cannot be deleted',
+        code: 'TAG_IMMUTABLE',
+      });
+    }
+    if (!isTenantAdmin && tag.created_by !== userId) {
+      return JSON.stringify({
+        success: false,
+        error: 'Only the tag creator or a tenant admin can delete this tag',
+      });
+    }
+    await connectionPool.query(`DELETE FROM odb.version_tags WHERE id = $1`, [tagId]);
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('deleteVersionTag:', error);
     return JSON.stringify({ success: false, error: error.message });
   }
 }

@@ -19,12 +19,13 @@ from .properties_routes import router as properties_router
 from .paths_routes import router as paths_router
 from .data_routes import router as data_router
 from .migration_plans_routes import router as migration_plans_router
+from .version_tags_routes import router as version_tags_router
 
 # Create FastAPI app
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.4"
+    version="1.0.5"
 )
 
 
@@ -82,6 +83,7 @@ app.include_router(versions_router)
 app.include_router(properties_router)
 app.include_router(paths_router)
 app.include_router(migration_plans_router)
+app.include_router(version_tags_router)
 
 
 @app.on_event("startup")
