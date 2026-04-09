@@ -672,7 +672,7 @@ const Versions = () => {
         if (r.status === 409 && d.code === 'MERGE_CONFLICT') {
           toast.error('Merge blocked: overlapping changes. Resolve conflicts using a future merge flow.');
           setMergePreviewData((prev) => ({
-            ...prev,
+            ...(prev ?? {}),
             classification: {
               canAutoMerge: false,
               conflictPaths: d.conflictPaths ?? [],

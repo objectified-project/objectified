@@ -5384,7 +5384,7 @@ export async function listVersionBranches(projectId: string, tenantId: string) {
       `SELECT b.id, b.project_id, b.name, b.tip_version_id, b.created_by, b.created_at, b.updated_at,
               v.version_id AS tip_version_string
        FROM odb.version_branches b
-       JOIN odb.versions v ON v.id = b.tip_version_id
+       JOIN odb.versions v ON v.id = b.tip_version_id AND v.project_id = b.project_id
        JOIN odb.projects p ON b.project_id = p.id
        WHERE b.project_id = $1 AND p.tenant_id = $2 AND v.deleted_at IS NULL
        ORDER BY b.name ASC`,
@@ -5641,56 +5641,64 @@ export async function mergeVersionBranchesServer(input: {
       return JSON.stringify({ success: false, error: planErr, status: 403 });
     }
 
-    const insVer = await connectionPool.query(
-      `INSERT INTO odb.versions (project_id, creator_id, version_id, description, change_log,
-        parent_version_id, merge_parent_version_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [
-        projectId,
-        userId,
-        newVersionString,
-        `Merge ${sourceBranchName} into ${targetBranchName}`,
-        null,
-        targetTipId,
-        sourceTipId,
-      ]
-    );
-    const newVersion = insVer.rows[0];
+    await connectionPool.query(`BEGIN`);
+    try {
+      const insVer = await connectionPool.query(
+        `INSERT INTO odb.versions (project_id, creator_id, version_id, description, change_log,
+          parent_version_id, merge_parent_version_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [
+          projectId,
+          userId,
+          newVersionString,
+          `Merge ${sourceBranchName} into ${targetBranchName}`,
+          null,
+          targetTipId,
+          sourceTipId,
+        ]
+      );
+      const newVersion = insVer.rows[0];
 
-    const copyAll = await copyClassesFromVersion(targetTipId, newVersion.id);
-    const copyAllParsed = JSON.parse(copyAll);
-    if (!copyAllParsed.success) {
-      await connectionPool.query(`DELETE FROM odb.versions WHERE id = $1`, [newVersion.id]);
-      return JSON.stringify({
-        success: false,
-        error: copyAllParsed.error || 'Failed to copy target schema classes',
-        status: 500,
-      });
-    }
-
-    for (const schemaName of [...new Set(classification.addedSchemaNames)]) {
-      const one = await copySingleClassBetweenVersions(sourceTipId, newVersion.id, schemaName);
-      if (!one.success) {
-        await connectionPool.query(`DELETE FROM odb.versions WHERE id = $1`, [newVersion.id]);
+      const copyAll = await copyClassesFromVersion(targetTipId, newVersion.id);
+      const copyAllParsed = JSON.parse(copyAll);
+      if (!copyAllParsed.success) {
+        await connectionPool.query(`ROLLBACK`);
         return JSON.stringify({
           success: false,
-          error: one.error || `Failed to copy added class ${schemaName}`,
+          error: copyAllParsed.error || 'Failed to copy target schema classes',
           status: 500,
         });
       }
+
+      for (const schemaName of [...new Set(classification.addedSchemaNames)]) {
+        const one = await copySingleClassBetweenVersions(sourceTipId, newVersion.id, schemaName);
+        if (!one.success) {
+          await connectionPool.query(`ROLLBACK`);
+          return JSON.stringify({
+            success: false,
+            error: one.error || `Failed to copy added class ${schemaName}`,
+            status: 500,
+          });
+        }
+      }
+
+      await connectionPool.query(
+        `UPDATE odb.version_branches SET tip_version_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [newVersion.id, tgtBranch.rows[0].id]
+      );
+
+      await connectionPool.query(`COMMIT`);
+
+      return JSON.stringify({
+        success: true,
+        version: newVersion,
+        mergedAddedSchemas: classification.addedSchemaNames,
+      });
+    } catch (transactionError) {
+      await connectionPool.query(`ROLLBACK`);
+      throw transactionError;
     }
-
-    await connectionPool.query(
-      `UPDATE odb.version_branches SET tip_version_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-      [newVersion.id, tgtBranch.rows[0].id]
-    );
-
-    return JSON.stringify({
-      success: true,
-      version: newVersion,
-      mergedAddedSchemas: classification.addedSchemaNames,
-    });
   } catch (error: any) {
     console.error('mergeVersionBranchesServer:', error);
     if (error.code === '23505') {

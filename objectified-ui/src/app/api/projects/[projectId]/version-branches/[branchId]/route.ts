@@ -23,9 +23,17 @@ export async function DELETE(
     }
     const { projectId, branchId } = await params;
     const raw = await deleteVersionBranch(branchId, projectId, tenantId, userId, isTenantAdmin);
-    const data = JSON.parse(raw) as { success: boolean; error?: string };
+    const data = JSON.parse(raw) as { success: boolean; error?: string; status?: number };
     if (!data.success) {
-      const st = data.error?.includes('not found') ? 404 : 403;
+      const error = data.error?.toLowerCase() ?? '';
+      const st =
+        typeof data.status === 'number'
+          ? data.status
+          : error.includes('not found')
+            ? 404
+            : error.includes('unauthorized') || error.includes('forbidden')
+              ? 403
+              : 500;
       return NextResponse.json(data, { status: st });
     }
     return NextResponse.json({ success: true });

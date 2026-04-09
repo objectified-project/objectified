@@ -25,9 +25,16 @@ export async function GET(
     }
     const { projectId } = await params;
     const raw = await listVersionBranches(projectId, tenantId);
-    const data = JSON.parse(raw) as { success: boolean; branches?: unknown; error?: string };
+    const data = JSON.parse(raw) as { success: boolean; branches?: unknown; error?: string; status?: number };
     if (!data.success) {
-      return NextResponse.json(data, { status: 404 });
+      const error = data.error?.toLowerCase() ?? '';
+      const st =
+        typeof data.status === 'number'
+          ? data.status
+          : error.includes('not found')
+            ? 404
+            : 500;
+      return NextResponse.json(data, { status: st });
     }
     return NextResponse.json({ success: true, branches: data.branches });
   } catch (e) {
