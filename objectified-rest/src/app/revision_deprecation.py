@@ -15,10 +15,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
-
-if TYPE_CHECKING:
-    from .models import RevisionDeprecationWarningOut
+from typing import Any, Dict, List, Optional, Tuple
 
 MIGRATION_GUIDE_ISSUE_URL = "https://github.com/KenSuenobu/objectified/issues/747"
 
