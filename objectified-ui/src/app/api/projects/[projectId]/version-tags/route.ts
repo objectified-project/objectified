@@ -74,10 +74,20 @@ export async function POST(
       tag?: unknown;
       error?: string;
       code?: string;
+      status?: number;
     };
     if (!data.success) {
-      const status =
-        data.code === 'TAG_NAME_CONFLICT' || data.error?.includes('already exists') ? 409 : 400;
+      let status = 400;
+      if (typeof data.status === 'number') {
+        status = data.status;
+      } else {
+        const error = data.error?.toLowerCase() ?? '';
+        if (data.code === 'TAG_NAME_CONFLICT' || error.includes('already exists')) {
+          status = 409;
+        } else if (error.includes('not found')) {
+          status = 404;
+        }
+      }
       return NextResponse.json(data, { status });
     }
     return NextResponse.json({ success: true, tag: data.tag });

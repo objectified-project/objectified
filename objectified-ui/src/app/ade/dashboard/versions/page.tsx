@@ -536,6 +536,16 @@ const Versions = () => {
     setCompareBaseTagId(''); setCompareToTagId('');
   };
 
+  const tagsByVersionId = useMemo(() => {
+    const map = new Map<string, VersionTagRow[]>();
+    for (const t of versionTags) {
+      const list = map.get(t.version_id) ?? [];
+      list.push(t);
+      map.set(t.version_id, list);
+    }
+    return map;
+  }, [versionTags]);
+
   const displayVersions = useMemo(() => {
     if (!historyTagFilter) return versions;
     const t = versionTags.find((x) => x.id === historyTagFilter);
@@ -1041,7 +1051,7 @@ const Versions = () => {
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="text-sm font-bold text-gray-900 dark:text-white font-mono">v{version.version_id}</div>
                       {version.published && <div title="Published" className="p-1 bg-blue-100 dark:bg-blue-900/30 rounded"><Lock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /></div>}
-                      {versionTags.filter((t) => t.version_id === version.id).map((t) => (
+                      {(tagsByVersionId.get(version.id) ?? []).map((t) => (
                         <span
                           key={t.id}
                           title={t.message || t.name}

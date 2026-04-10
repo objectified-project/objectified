@@ -3,7 +3,7 @@ Version tags API — named pointers to schema revisions (git tag analog).
 """
 
 import re
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import psycopg2
 from fastapi import APIRouter, Depends, HTTPException
