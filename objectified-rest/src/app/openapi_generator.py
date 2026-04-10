@@ -2,6 +2,7 @@ import json
 from typing import Dict, Any, List, Optional, DefaultDict
 from collections import defaultdict
 from .paths_generator import generate_paths_for_openapi
+from .revision_deprecation import deprecation_payload_for_openapi
 
 
 
@@ -214,7 +215,8 @@ def generate_openapi_spec(
     classes: List[Dict[str, Any]],
     all_properties: Dict[str, List[Dict[str, Any]]],
     project_description: Optional[str] = None,
-    version_db_id: Optional[str] = None
+    version_db_id: Optional[str] = None,
+    revision_metadata: Any = None,
 ) -> Dict[str, Any]:
     """Generate a complete OpenAPI 3.1.0 specification for all classes in a version."""
 
@@ -285,15 +287,20 @@ def generate_openapi_spec(
         components["securitySchemes"] = security_schemes
 
     # Build the OpenAPI specification
+    info_block: Dict[str, Any] = {
+        "title": f"{project_slug} API",
+        "version": version_id,
+        "description": description,
+    }
+    dep_info = deprecation_payload_for_openapi(revision_metadata)
+    if dep_info:
+        info_block["x-objectified-revision-deprecation"] = dep_info
+
     openapi_spec: Dict[str, Any] = {
         "openapi": "3.1.0",
-        "info": {
-            "title": f"{project_slug} API",
-            "version": version_id,
-            "description": description
-        },
+        "info": info_block,
         "paths": paths,
-        "components": components
+        "components": components,
     }
     if servers_list:
         openapi_spec["servers"] = servers_list

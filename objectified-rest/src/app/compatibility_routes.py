@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -16,8 +16,10 @@ from .models import (
     CompatibilityCheckRequest,
     CompatibilityCheckResponse,
     CompatibilityFindingOut,
+    RevisionDeprecationWarningOut,
 )
 from .openapi_generator import generate_openapi_spec
+from .revision_deprecation import warnings_for_revision
 from .schema_compatibility import (
     BREAKING_DOC_ISSUE_URL,
     CompatibilityRules,
@@ -44,6 +46,11 @@ def _parse_project_metadata(metadata: Any) -> Dict[str, Any]:
 
 def _tenant_compat_gate(project: Dict[str, Any]) -> bool:
     return bool(_parse_project_metadata(project.get("metadata")).get("compatGateOnMerge"))
+
+
+def _tenant_fail_ci_on_deprecated(project: Dict[str, Any]) -> bool:
+    """When true, consumers should treat deprecated revisions as merge/CI blockers (see ``deprecatedRevisionBlocked``)."""
+    return bool(_parse_project_metadata(project.get("metadata")).get("failCiOnDeprecatedRevision"))
 
 
 def _rules_from_payload(req: CompatibilityCheckRequest) -> CompatibilityRules:
@@ -77,17 +84,27 @@ def _openapi_for_revision(version: Dict[str, Any], tenant_slug: str, tenant_id: 
         all_properties,
         project.get("description"),
         version_db_id=version["id"],
+        revision_metadata=version.get("metadata"),
     )
 
 
-def _fingerprint(overall: str, finding_dicts: list) -> str:
-    payload = {
+def _fingerprint(
+    overall: str,
+    finding_dicts: list,
+    deprecation_dicts: Optional[List[Dict[str, Any]]] = None,
+) -> str:
+    payload: Dict[str, Any] = {
         "overall": overall,
         "findings": sorted(
             finding_dicts,
             key=lambda x: (x.get("path", ""), x.get("rule", ""), x.get("id", "")),
         ),
     }
+    if deprecation_dicts:
+        payload["deprecationWarnings"] = sorted(
+            deprecation_dicts,
+            key=lambda x: (x.get("revisionId", ""), x.get("role", "")),
+        )
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -151,10 +168,43 @@ async def check_revision_compatibility(
         for f in findings
     ]
     finding_dicts = [f.model_dump(by_alias=True) for f in finding_out]
-    fp = _fingerprint(overall, finding_dicts)
+
+    dep_raw: List[Dict[str, Any]] = []
+    dep_raw.extend(
+        warnings_for_revision(
+            revision_id=base_ver["id"],
+            version_label=base_ver["version_id"],
+            role="base",
+            metadata=base_ver.get("metadata"),
+        )
+    )
+    dep_raw.extend(
+        warnings_for_revision(
+            revision_id=head_ver["id"],
+            version_label=head_ver["version_id"],
+            role="head",
+            metadata=head_ver.get("metadata"),
+        )
+    )
+    dep_out = [
+        RevisionDeprecationWarningOut(
+            revision_id=w["revisionId"],
+            role=w["role"],
+            version_id=w["versionId"],
+            message=w["message"],
+            replacement_revision_id=w.get("replacementRevisionId"),
+            sunset_date=w.get("sunsetDate"),
+            migration_guide_url=w["migrationGuideUrl"],
+        )
+        for w in dep_raw
+    ]
+
+    fp = _fingerprint(overall, finding_dicts, dep_raw or None)
 
     tenant_gate = _tenant_compat_gate(project)
     merge_blocked = bool(tenant_gate and overall != "safe")
+    fail_dep = _tenant_fail_ci_on_deprecated(project)
+    deprecated_revision_blocked = bool(fail_dep and dep_out)
 
     doc_url = BREAKING_DOC_ISSUE_URL if overall == "breaking" else None
 
@@ -167,6 +217,8 @@ async def check_revision_compatibility(
         report_fingerprint=fp,
         tenant_compat_gate_active=tenant_gate,
         merge_blocked_by_compat_gate=merge_blocked,
+        deprecation_warnings=dep_out,
+        deprecated_revision_blocked=deprecated_revision_blocked,
     )
 
     policy = body.policy
@@ -176,6 +228,16 @@ async def check_revision_compatibility(
             detail={
                 "code": "COMPATIBILITY_BREAKING",
                 "message": "Head revision introduces breaking changes relative to base",
+                "report": response.model_dump(by_alias=True),
+            },
+        )
+
+    if policy and policy.http409_when_deprecated_revision and dep_out:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "DEPRECATED_REVISION",
+                "message": "One or both revisions in this compatibility check are deprecated",
                 "report": response.model_dump(by_alias=True),
             },
         )

@@ -19,12 +19,11 @@ This represents the different versions of the Objectified specification and thei
 - 📋 Generate migration guides
 - 📋 Data migration scripts
 - ✅ Backward compatibility checker (#506) — REST `POST /v1/versions/{tenant}/{projectId}/compatibility`; merge dialog runs target-tip vs source-tip check; optional `compatGateOnMerge` in project metadata
-- 📋 Deprecation warnings
+- ✅ Deprecation warnings (#507) — `versions.metadata` (`deprecated`, `deprecationMessage`, `successorRevisionId`, `sunsetDate`); compat API `deprecationWarnings` + optional `policy.http409WhenDeprecatedRevision`; project `failCiOnDeprecatedRevision`; OpenAPI `info.x-objectified-revision-deprecation`; Studio & migration banners
 - 📋 Sunset timeline for old versions
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
-| #507   | Implement deprecation warnings                   |
 | #508   | Create sunset timeline feature                   |
 
 ### Version Management 📋 PLANNED

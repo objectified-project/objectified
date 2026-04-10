@@ -8,6 +8,7 @@ from psycopg2.extensions import register_adapter, AsIs, adapt
 from typing import Optional, List, Dict, Any, Tuple
 from .config import settings
 from .jsonschema_generator import generate_class_jsonschema_spec
+from .revision_deprecation import merge_version_metadata
 
 _logger = logging.getLogger(__name__)
 
@@ -79,7 +80,7 @@ class Database:
         """Get version information by tenant, project, and version slugs."""
         query = """
             SELECT v.id, v.version_id, v.visibility, v.published,
-                   p.description as project_description
+                   p.description as project_description, v.metadata
             FROM odb.versions v
             JOIN odb.projects p ON v.project_id = p.id
             JOIN odb.tenants t ON p.tenant_id = t.id
@@ -1216,7 +1217,7 @@ class Database:
                    v.change_log, v.visibility, v.published, v.published_at,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
                    v.forked_from_revision_id, v.upstream_project_id,
-                   v.revision_locked,
+                   v.revision_locked, v.metadata,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1244,7 +1245,7 @@ class Database:
                    v.change_log, v.visibility, v.published, v.published_at,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
                    v.forked_from_revision_id, v.upstream_project_id,
-                   v.revision_locked,
+                   v.revision_locked, v.metadata,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1272,7 +1273,7 @@ class Database:
                    v.change_log, v.visibility, v.published, v.published_at,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
                    v.forked_from_revision_id, v.upstream_project_id,
-                   v.revision_locked,
+                   v.revision_locked, v.metadata,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1463,7 +1464,7 @@ class Database:
             return None
 
         if existing.get("published"):
-            allowed_only = set(updates.keys()) <= {"revision_locked"}
+            allowed_only = set(updates.keys()) <= {"revision_locked", "metadata"}
             if not allowed_only:
                 raise Exception("Cannot edit a published version. Published versions are frozen.")
 
@@ -1482,6 +1483,10 @@ class Database:
         if "revision_locked" in updates:
             update_fields.append("revision_locked = %s")
             params.append(bool(updates["revision_locked"]))
+        if "metadata" in updates and updates["metadata"] is not None:
+            merged_meta = merge_version_metadata(existing.get("metadata"), updates["metadata"])
+            update_fields.append("metadata = %s::jsonb")
+            params.append(json.dumps(merged_meta))
 
         if not update_fields:
             return existing

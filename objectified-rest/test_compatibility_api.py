@@ -36,6 +36,16 @@ _FAKE_HEAD_VER = {
     "version_id": "1.1.0",
 }
 
+_FAKE_BASE_VER_DEPRECATED = {
+    **_FAKE_BASE_VER,
+    "metadata": {
+        "deprecated": True,
+        "deprecationMessage": "Use head instead",
+        "successorRevisionId": "head-rev",
+        "sunsetDate": "2026-12-01",
+    },
+}
+
 _MIN_SPEC = {
     "openapi": "3.1.0",
     "info": {"title": "t", "version": "1"},
@@ -124,3 +134,60 @@ def test_compatibility_409_when_policy(mock_auth):
     assert r.status_code == 409
     body = r.json()
     assert body["detail"]["code"] == "COMPATIBILITY_BREAKING"
+
+
+def test_compatibility_deprecation_warnings(mock_auth):
+    with (
+        patch("src.app.compatibility_routes.db") as mock_db,
+        patch(
+            "src.app.compatibility_routes.generate_openapi_spec",
+            side_effect=[_MIN_SPEC, _MIN_SPEC],
+        ),
+    ):
+        mock_db.get_project_by_id.return_value = _FAKE_PROJECT
+        mock_db.get_version_by_id.side_effect = lambda vid, tid: (
+            _FAKE_BASE_VER_DEPRECATED
+            if vid == "base-rev"
+            else _FAKE_HEAD_VER
+            if vid == "head-rev"
+            else None
+        )
+        r = client.post(
+            "/v1/versions/t/proj-1/compatibility",
+            json={"baseRevisionId": "base-rev", "headRevisionId": "head-rev"},
+            headers={"Authorization": "Bearer x"},
+        )
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data["deprecationWarnings"]) >= 1
+    assert data["deprecationWarnings"][0]["revisionId"] == "base-rev"
+    assert "deprecatedRevisionBlocked" in data
+
+
+def test_compatibility_409_deprecated_policy(mock_auth):
+    with (
+        patch("src.app.compatibility_routes.db") as mock_db,
+        patch(
+            "src.app.compatibility_routes.generate_openapi_spec",
+            side_effect=[_MIN_SPEC, _MIN_SPEC],
+        ),
+    ):
+        mock_db.get_project_by_id.return_value = _FAKE_PROJECT
+        mock_db.get_version_by_id.side_effect = lambda vid, tid: (
+            _FAKE_BASE_VER_DEPRECATED
+            if vid == "base-rev"
+            else _FAKE_HEAD_VER
+            if vid == "head-rev"
+            else None
+        )
+        r = client.post(
+            "/v1/versions/t/proj-1/compatibility",
+            json={
+                "baseRevisionId": "base-rev",
+                "headRevisionId": "head-rev",
+                "policy": {"http409WhenDeprecatedRevision": True},
+            },
+            headers={"Authorization": "Bearer x"},
+        )
+    assert r.status_code == 409
+    assert r.json()["detail"]["code"] == "DEPRECATED_REVISION"

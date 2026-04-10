@@ -418,6 +418,18 @@ async def update_version(
             if "changelog" in request.model_fields_set:
                 updates["change_log"] = merged_cl
 
+        if "metadata" in request.model_fields_set and request.metadata is not None:
+            if existing.get("published"):
+                uid_meta = get_authenticated_user_id(auth_data)
+                if not uid_meta or not db.is_user_tenant_admin(
+                    auth_data["tenant_id"], uid_meta
+                ):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Only tenant administrators can update revision metadata on published versions",
+                    )
+            updates["metadata"] = request.metadata
+
         # Update version
         version = db.update_version(
             version_record_id,
