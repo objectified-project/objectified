@@ -13,11 +13,7 @@ This represents the different versions of the Objectified specification and thei
 - ✅ Version notes and changelogs (#502)
 - ✅ Fork versions for experiments (#503) — cross-project copy from a source revision with `forkedFromRevisionId` / optional `upstreamProjectId`; distinct from **named branches** within the same project (#500)
 - ✅ Protected versions (branch/tag/revision policy; tenant-admin locks; audit trail) — #504
-- 📋 Show branches when creating copies of schemas
-
-| Ticket  | Feature Description                           |
-|---------|-----------------------------------------------|
-| #505    | Show branches when creating copies of schemas |
+- ✅ Show branches when creating copies of schemas (#505)
 
 ### Migration Tools 📋 PLANNED
 - Generate migration guides

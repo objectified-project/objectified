@@ -36,6 +36,7 @@ import { diffLines, Change } from 'diff';
 import { compareSchemas, type DiffSummary, getPathLabel } from '../../../../../lib/schema-diff';
 import { extractBreakingHintsFromChangelog, validateVersionNotesClient } from '../../../../../lib/version-notes';
 import RelationshipGraphDialog from './RelationshipGraphDialog';
+import VersionLineageSnippet from './VersionLineageSnippet';
 import { toast } from 'sonner';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -121,6 +122,10 @@ const Versions = () => {
   const [changeLog, setChangeLog] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [sourceVersionId, setSourceVersionId] = useState<string>('');
+  /** When multiple named branches exist, select by branch id before resolving tip (#505). */
+  const [copySourceBranchKey, setCopySourceBranchKey] = useState<string>('blank');
+  const [branchListLoading, setBranchListLoading] = useState(false);
+  const [branchListError, setBranchListError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -272,13 +277,22 @@ const Versions = () => {
 
   const loadBranches = async () => {
     if (!selectedProjectId) return;
+    setBranchListLoading(true);
+    setBranchListError(null);
     try {
       const r = await fetch(`/api/projects/${selectedProjectId}/version-branches`);
       const d = await r.json();
-      if (d.success && Array.isArray(d.branches)) setVersionBranches(d.branches);
-      else setVersionBranches([]);
+      if (d.success && Array.isArray(d.branches)) {
+        setVersionBranches(d.branches);
+      } else {
+        setVersionBranches([]);
+        setBranchListError(typeof d.error === 'string' ? d.error : 'Could not load branches');
+      }
     } catch {
       setVersionBranches([]);
+      setBranchListError('Could not load branches');
+    } finally {
+      setBranchListLoading(false);
     }
   };
 
@@ -379,7 +393,10 @@ const Versions = () => {
     setVersionId(''); setAutoGenerate(true); setBumpStrategy('patch');
     setNextAutoVersion(calculateNextVersion('patch')); setDescription('');
     setChangeLog(''); setEnabled(true); setSourceVersionId('');
-    setErrorMessage(''); setShowCreateDialog(true);
+    setCopySourceBranchKey('blank');
+    setErrorMessage(''); setBranchListError(null);
+    void loadBranches();
+    setShowCreateDialog(true);
   };
 
   const handleCreateSubmit = async () => {
@@ -1541,24 +1558,95 @@ const Versions = () => {
 
       {/* Create Version Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={(open) => !isLoading && setShowCreateDialog(open)}>
-        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+        <DialogContent className="max-w-xl" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Create New Version</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
+            {branchListError && (
+              <Alert variant="warning" role="status">
+                {branchListError} Branch names may be missing; you can still pick a revision below if your role allows.
+              </Alert>
+            )}
             <div className="space-y-2">
-              <Label>Copy From Version</Label>
-              <Select
-                value={sourceVersionId || '__blank__'}
-                onValueChange={(val) => setSourceVersionId(val === '__blank__' ? '' : val)}
-              >
-                <SelectTrigger><SelectValue placeholder={versions.length === 0 ? 'No versions available' : 'Create blank version'} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__blank__">Create blank version</SelectItem>
-                  {versions.map((v) => <SelectItem key={v.id} value={v.id}>{v.published ? '🔒 ' : ''}v{v.version_id} - {v.shortMessage || 'No description'}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              {versionBranches.length > 1 ? (
+                <>
+                  <Label>Base copy on branch tip</Label>
+                  <p id="create-copy-branch-hint" className="text-xs text-gray-500 dark:text-gray-400">
+                    Multiple branches are defined for this project. Choose which branch tip to copy schema from—like picking which line to extend in git.
+                  </p>
+                  <Select
+                    value={copySourceBranchKey}
+                    onValueChange={(val) => {
+                      setCopySourceBranchKey(val);
+                      if (val === 'blank') setSourceVersionId('');
+                      else if (val.startsWith('branch:')) {
+                        const bid = val.slice(7);
+                        const br = versionBranches.find((b) => b.id === bid);
+                        setSourceVersionId(br?.tip_version_id ?? '');
+                      }
+                    }}
+                    disabled={branchListLoading}
+                  >
+                    <SelectTrigger aria-describedby="create-copy-branch-hint">
+                      <SelectValue placeholder={branchListLoading ? 'Loading branches…' : 'Choose branch tip or blank'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="blank">Create blank version</SelectItem>
+                      {versionBranches.map((b) => (
+                        <SelectItem key={b.id} value={`branch:${b.id}`}>
+                          {b.name} — tip v{b.tip_version_string ?? '?'}
+                          {b.protected ? ' (protected)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              ) : (
+                <>
+                  <Label>Copy from version</Label>
+                  <Select
+                    value={sourceVersionId || '__blank__'}
+                    onValueChange={(val) => {
+                      setSourceVersionId(val === '__blank__' ? '' : val);
+                    }}
+                  >
+                    <SelectTrigger><SelectValue placeholder={versions.length === 0 ? 'No versions available' : 'Create blank version'} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__blank__">Create blank version</SelectItem>
+                      {versions.map((v) => (
+                        <SelectItem key={v.id} value={v.id}>
+                          {v.published ? '🔒 ' : ''}v{v.version_id} - {v.shortMessage || 'No description'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
             </div>
-            {sourceVersionId && <Alert variant="info">Classes and properties will be copied from the selected version.</Alert>}
+            {sourceVersionId && (
+              <>
+                <VersionLineageSnippet
+                  sourceVersionId={sourceVersionId}
+                  versions={versions.map((v) => ({
+                    id: v.id,
+                    version_id: v.version_id,
+                    parent_version_id: v.parent_version_id ?? null,
+                    merge_parent_version_id: v.merge_parent_version_id ?? null,
+                  }))}
+                  versionBranches={versionBranches}
+                  explicitBranchName={
+                    versionBranches.length > 1 && copySourceBranchKey.startsWith('branch:')
+                      ? versionBranches.find((b) => b.id === copySourceBranchKey.slice(7))?.name ?? null
+                      : versionBranches.length === 1 && versionBranches[0].tip_version_id === sourceVersionId
+                        ? versionBranches[0].name
+                        : null
+                  }
+                  isLoading={branchListLoading}
+                  permissionDenied={false}
+                />
+                <Alert variant="info">Classes and properties will be copied from the selected revision.</Alert>
+              </>
+            )}
             <div className="space-y-2">
               <Label>Version Strategy</Label>
               <Select value={autoGenerate ? 'auto' : 'manual'} onValueChange={(v) => { const isAuto = v === 'auto'; setAutoGenerate(isAuto); if (isAuto) setNextAutoVersion(calculateNextVersion(bumpStrategy)); }}>
