@@ -5,6 +5,8 @@ import { useSession } from 'next-auth/react';
 import { Check } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import { useMigration } from '../MigrationContext';
+import RevisionDeprecationBanner from '@/app/components/ade/RevisionDeprecationBanner';
+import { isRevisionDeprecated } from '@/app/utils/revision-deprecation';
 
 interface Project {
   id: string;
@@ -18,6 +20,7 @@ interface Version {
   description: string;
   published: boolean;
   created_at?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export default function MigrationHeader() {
@@ -109,6 +112,9 @@ export default function MigrationHeader() {
 
   const versionOptionLabel = (version: Version) =>
     `${version.published ? '🔒 ' : ''}${version.version_id} - ${version.description}`;
+
+  const fromVer = versions.find((x) => x.id === localFromVersionId);
+  const toVer = versions.find((x) => x.id === localToVersionId);
 
   if (!currentTenantId) return null;
 
@@ -243,6 +249,20 @@ export default function MigrationHeader() {
           </Select.Root>
         </div>
       </div>
+      {fromVer && isRevisionDeprecated(fromVer.metadata) ? (
+        <RevisionDeprecationBanner
+          roleLabel="From"
+          versionLabel={fromVer.version_id}
+          metadata={fromVer.metadata}
+        />
+      ) : null}
+      {toVer && isRevisionDeprecated(toVer.metadata) ? (
+        <RevisionDeprecationBanner
+          roleLabel="To"
+          versionLabel={toVer.version_id}
+          metadata={toVer.metadata}
+        />
+      ) : null}
     </div>
   );
 }

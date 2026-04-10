@@ -268,6 +268,10 @@ class VersionSchema(BaseModel):
         serialization_alias="revisionLocked",
         description="Tenant-admin lock: revision cannot be soft-deleted by non-admins.",
     )
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Revision-level JSON (deprecation, sunset, successor revision id, etc.).",
+    )
     creator_name: Optional[str] = None
     creator_email: Optional[str] = None
     project_name: Optional[str] = None
@@ -349,6 +353,10 @@ class VersionUpdateRequest(BaseModel):
         validation_alias=AliasChoices("revisionLocked", "revision_locked"),
         description="Tenant admins only: lock revision against deletion.",
     )
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Shallow-merge into versions.metadata (deprecation fields, etc.).",
+    )
 
 
 class VersionPublishRequest(BaseModel):
@@ -420,6 +428,13 @@ class CompatibilityPolicyPayload(BaseModel):
         validation_alias=AliasChoices("http409WhenBreaking", "http409_when_breaking"),
         description="Return 409 Conflict when overall classification is breaking.",
     )
+    http409_when_deprecated_revision: bool = Field(
+        False,
+        validation_alias=AliasChoices(
+            "http409WhenDeprecatedRevision", "http409_when_deprecated_revision"
+        ),
+        description="Return 409 when either revision is deprecated (strict CI / CLI).",
+    )
 
 
 class CompatibilityCheckRequest(BaseModel):
@@ -451,6 +466,26 @@ class CompatibilityFindingOut(BaseModel):
     message: str
 
 
+class RevisionDeprecationWarningOut(BaseModel):
+    """Structured warning when a revision in the compat pair is deprecated (#507)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    revision_id: str = Field(serialization_alias="revisionId")
+    role: str
+    version_id: str = Field(serialization_alias="versionId")
+    message: str
+    replacement_revision_id: Optional[str] = Field(
+        default=None,
+        serialization_alias="replacementRevisionId",
+    )
+    sunset_date: Optional[str] = Field(default=None, serialization_alias="sunsetDate")
+    migration_guide_url: str = Field(
+        ...,
+        serialization_alias="migrationGuideUrl",
+    )
+
+
 class CompatibilityCheckResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -472,6 +507,15 @@ class CompatibilityCheckResponse(BaseModel):
         default=False,
         serialization_alias="mergeBlockedByCompatGate",
         description="True when tenant gate is on and the revision pair is not fully safe.",
+    )
+    deprecation_warnings: List[RevisionDeprecationWarningOut] = Field(
+        default_factory=list,
+        serialization_alias="deprecationWarnings",
+    )
+    deprecated_revision_blocked: bool = Field(
+        default=False,
+        serialization_alias="deprecatedRevisionBlocked",
+        description="True when project metadata requests strict deprecation handling and a revision is deprecated.",
     )
 
 

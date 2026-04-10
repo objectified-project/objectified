@@ -16,6 +16,8 @@ import CanvasSettingsDialog from './CanvasSettingsDialog';
 import { cn } from '../../../../../lib/utils';
 import { getNumericScoreTier, NUMERIC_SCORE_TIER_LEGEND } from '@/app/utils/numeric-score-tier';
 import { OVERALL_SCHEMA_QUALITY_WEIGHTS } from '@/app/utils/overall-schema-quality';
+import RevisionDeprecationBanner from '@/app/components/ade/RevisionDeprecationBanner';
+import { isRevisionDeprecated } from '@/app/utils/revision-deprecation';
 
 interface Project {
   id: string;
@@ -28,6 +30,7 @@ interface Version {
   version_id: string;
   description: string;
   published: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 type ViewMode = 'editor' | 'paths' | 'code';
@@ -605,6 +608,17 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           </>
         )}
       </div>
+      {(() => {
+        const v = versions.find((x) => x.id === localVersionId);
+        if (!v || !isRevisionDeprecated(v.metadata)) return null;
+        return (
+          <RevisionDeprecationBanner
+            roleLabel="Studio"
+            versionLabel={v.version_id}
+            metadata={v.metadata}
+          />
+        );
+      })()}
     </div>
   );
 }
