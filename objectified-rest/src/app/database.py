@@ -3499,9 +3499,14 @@ class Database:
 
         # Multiple maximal common ancestors (criss-cross history): pick the one
         # nearest to the branch tips by choosing the most recently created revision.
+        from datetime import datetime, timezone
+
+        _epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
         def created_at_key(vid: str):
             row = self.get_version_by_id(vid, tenant_id)
-            return row["created_at"] if row and row.get("created_at") else None
+            ts = row["created_at"] if row and row.get("created_at") else None
+            return ts if ts is not None else _epoch
 
         return max(bases, key=created_at_key)
 
