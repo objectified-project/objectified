@@ -410,6 +410,10 @@ describe('Database Helper - Project Functions', () => {
     const db = require('../lib/db/db');
     mockQuery = db.query as jest.Mock;
     mockQuery.mockClear();
+    const serverSession = require('../lib/auth/server-session');
+    (serverSession.getAuthSession as jest.Mock).mockResolvedValue({
+      user: { user_id: 'user-1' },
+    });
   });
 
   test('getProjectsForTenant should return projects', async () => {
@@ -541,6 +545,15 @@ describe('Database Helper - Version Functions', () => {
     const db = require('../lib/db/db');
     mockQuery = db.query as jest.Mock;
     mockQuery.mockClear();
+    const serverSession = require('../lib/auth/server-session');
+    (serverSession.getAuthSession as jest.Mock).mockReset();
+    (serverSession.getAuthSession as jest.Mock).mockResolvedValue({
+      user: {
+        user_id: 'user-1',
+        current_tenant_id: 'tenant-1',
+        is_tenant_admin: true,
+      },
+    });
   });
 
   test('getVersionsForProject should return versions', async () => {
@@ -660,10 +673,22 @@ describe('Database Helper - Version Functions', () => {
     );
   });
 
-  test('deleteVersion should soft delete version', async () => {
+  test('deleteVersion should soft delete version when authorized', async () => {
     const { deleteVersion } = await import('../lib/db/helper');
 
-    mockQuery.mockResolvedValue({ rows: [] });
+    mockQuery
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [
+          {
+            id: 'ver-1',
+            creator_id: 'user-1',
+            revision_locked: false,
+            project_id: 'proj-1',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rowCount: 1 });
 
     const result = await deleteVersion('ver-1');
     const parsed = JSON.parse(result);

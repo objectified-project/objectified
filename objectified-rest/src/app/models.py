@@ -262,6 +262,12 @@ class VersionSchema(BaseModel):
         validation_alias=AliasChoices("upstreamProjectName", "upstream_project_name"),
         serialization_alias="upstreamProjectName",
     )
+    revision_locked: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("revisionLocked", "revision_locked"),
+        serialization_alias="revisionLocked",
+        description="Tenant-admin lock: revision cannot be soft-deleted by non-admins.",
+    )
     creator_name: Optional[str] = None
     creator_email: Optional[str] = None
     project_name: Optional[str] = None
@@ -338,6 +344,11 @@ class VersionUpdateRequest(BaseModel):
         validation_alias=AliasChoices("changelog", "change_log"),
     )
     enabled: Optional[bool] = None
+    revision_locked: Optional[bool] = Field(
+        default=None,
+        validation_alias=AliasChoices("revisionLocked", "revision_locked"),
+        description="Tenant admins only: lock revision against deletion.",
+    )
 
 
 class VersionPublishRequest(BaseModel):
@@ -366,6 +377,7 @@ class VersionTagSchema(BaseModel):
     message: Optional[str] = None
     channel: Optional[str] = None
     immutable: bool = False
+    protected: bool = False
     created_by: Optional[str] = None
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
@@ -383,6 +395,7 @@ class VersionTagCreateRequest(BaseModel):
     message: Optional[str] = None
     channel: Optional[str] = None
     immutable: Optional[bool] = False
+    protected: Optional[bool] = False
 
     class Config:
         from_attributes = True
@@ -393,6 +406,7 @@ class VersionTagUpdateRequest(BaseModel):
 
     version_id: Optional[str] = None
     immutable: Optional[bool] = None
+    protected: Optional[bool] = None
 
     class Config:
         from_attributes = True

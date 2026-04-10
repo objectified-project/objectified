@@ -136,7 +136,7 @@ describe('updateVersionTag', () => {
     getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
     getDbMock().query.mockResolvedValueOnce({
       rowCount: 1,
-      rows: [{ id: TAG_ID, immutable: true, created_by: USER_ID }],
+      rows: [{ id: TAG_ID, immutable: true, protected: false, created_by: USER_ID }],
     });
     const result = JSON.parse(
       await updateVersionTag(TAG_ID, PROJECT_ID, TENANT_ID, USER_ID, true, { versionId: VERSION_ID_2 })
@@ -155,7 +155,7 @@ describe('deleteVersionTag', () => {
     getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
     getDbMock().query.mockResolvedValueOnce({
       rowCount: 1,
-      rows: [{ immutable: false, created_by: USER_ID }],
+      rows: [{ immutable: false, protected: false, created_by: USER_ID }],
     });
     getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
     const result = JSON.parse(await deleteVersionTag(TAG_ID, PROJECT_ID, TENANT_ID, USER_ID, false));

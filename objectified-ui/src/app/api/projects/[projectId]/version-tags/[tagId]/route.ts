@@ -4,7 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { deleteVersionTag, updateVersionTag } from '@lib/db/helper';
 
 /**
- * PATCH /api/projects/[projectId]/version-tags/[tagId] — body: { versionId?, immutable? }
+ * PATCH /api/projects/[projectId]/version-tags/[tagId] — body: { versionId?, immutable?, protected? }
  * DELETE /api/projects/[projectId]/version-tags/[tagId]
  */
 export async function PATCH(
@@ -26,9 +26,11 @@ export async function PATCH(
     const body = await request.json();
     const versionId = typeof body.versionId === 'string' ? body.versionId : undefined;
     const immutable = body.immutable === true ? true : undefined;
+    const protectedFlag = typeof body.protected === 'boolean' ? body.protected : undefined;
     const raw = await updateVersionTag(tagId, projectId, tenantId, userId, isTenantAdmin, {
       versionId,
       immutable,
+      protected: protectedFlag,
     });
     const data = JSON.parse(raw) as {
       success: boolean;
@@ -40,9 +42,11 @@ export async function PATCH(
       const st =
         data.code === 'TAG_IMMUTABLE'
           ? 409
-          : data.error?.toLowerCase().includes('not found')
-            ? 404
-            : 400;
+          : data.code === 'TAG_PROTECTED' || data.code === 'TAG_PROTECT_POLICY_ADMIN_ONLY'
+            ? 403
+            : data.error?.toLowerCase().includes('not found')
+              ? 404
+              : 400;
       return NextResponse.json(data, { status: st });
     }
     return NextResponse.json({ success: true, tag: data.tag });
@@ -74,9 +78,11 @@ export async function DELETE(
       const st =
         data.code === 'TAG_IMMUTABLE'
           ? 409
-          : data.error?.toLowerCase().includes('not found')
-            ? 404
-            : 400;
+          : data.code === 'TAG_PROTECTED'
+            ? 403
+            : data.error?.toLowerCase().includes('not found')
+              ? 404
+              : 400;
       return NextResponse.json(data, { status: st });
     }
     return NextResponse.json({ success: true });

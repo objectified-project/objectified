@@ -1194,15 +1194,123 @@ export async function updateVersionVisibility(versionRecordId: string, visibilit
   }
 }
 
+async function insertVersionProtectionAudit(input: {
+  tenantId: string;
+  projectId: string | null;
+  actorId: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  outcome: 'denied' | 'allowed' | 'policy_change';
+  detail?: Record<string, unknown> | null;
+}) {
+  try {
+    await connectionPool.query(
+      `INSERT INTO odb.version_protection_audit
+        (tenant_id, project_id, actor_id, action, resource_type, resource_id, outcome, detail)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+      [
+        input.tenantId,
+        input.projectId,
+        input.actorId,
+        input.action,
+        input.resourceType,
+        input.resourceId,
+        input.outcome,
+        input.detail ? JSON.stringify(input.detail) : null,
+      ]
+    );
+  } catch (e) {
+    console.error('insertVersionProtectionAudit:', e);
+  }
+}
+
 export async function deleteVersion(versionRecordId: string) {
   try {
-    // Soft delete - set deleted_at timestamp
-    await connectionPool.query(
-      `UPDATE odb.versions 
+    const session = await getAuthSession();
+    const userId = (session?.user as { user_id?: string })?.user_id;
+    const tenantId = (session?.user as { current_tenant_id?: string })?.current_tenant_id;
+    const isTenantAdmin = Boolean((session?.user as { is_tenant_admin?: boolean })?.is_tenant_admin);
+    if (!userId || !tenantId) {
+      return JSON.stringify({ success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' });
+    }
+
+    const row = await connectionPool.query(
+      `SELECT v.id, v.creator_id, v.revision_locked, v.project_id
+       FROM odb.versions v
+       JOIN odb.projects p ON v.project_id = p.id
+       WHERE v.id = $1 AND v.deleted_at IS NULL AND p.tenant_id = $2 AND p.deleted_at IS NULL`,
+      [versionRecordId, tenantId]
+    );
+    if (row.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Version not found' });
+    }
+    const v = row.rows[0] as {
+      id: string;
+      creator_id: string | null;
+      revision_locked: boolean;
+      project_id: string;
+    };
+
+    const mayManage = v.creator_id === userId || isTenantAdmin;
+    if (!mayManage) {
+      await insertVersionProtectionAudit({
+        tenantId,
+        projectId: v.project_id,
+        actorId: userId,
+        action: 'version.delete',
+        resourceType: 'version',
+        resourceId: versionRecordId,
+        outcome: 'denied',
+        detail: { reason: 'not_owner_or_admin' },
+      });
+      return JSON.stringify({
+        success: false,
+        error: 'Only the version creator or a tenant admin can delete this version',
+        code: 'FORBIDDEN',
+      });
+    }
+
+    if (v.revision_locked && !isTenantAdmin) {
+      await insertVersionProtectionAudit({
+        tenantId,
+        projectId: v.project_id,
+        actorId: userId,
+        action: 'version.delete',
+        resourceType: 'version',
+        resourceId: versionRecordId,
+        outcome: 'denied',
+        detail: { reason: 'revision_locked' },
+      });
+      return JSON.stringify({
+        success: false,
+        error: 'This revision is locked by policy and cannot be deleted',
+        code: 'REVISION_LOCKED',
+      });
+    }
+
+    const upd = await connectionPool.query(
+      `UPDATE odb.versions
        SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = $1 AND deleted_at IS NULL`,
       [versionRecordId]
     );
+    if ((upd.rowCount ?? 0) === 0) {
+      return JSON.stringify({ success: false, error: 'Version not found or already deleted', code: 'NOT_FOUND' });
+    }
+
+    if (v.revision_locked && isTenantAdmin) {
+      await insertVersionProtectionAudit({
+        tenantId,
+        projectId: v.project_id,
+        actorId: userId,
+        action: 'version.delete',
+        resourceType: 'version',
+        resourceId: versionRecordId,
+        outcome: 'allowed',
+        detail: { reason: 'admin_override_locked_revision' },
+      });
+    }
 
     return JSON.stringify({ success: true });
   } catch (error: any) {
@@ -5377,7 +5485,7 @@ export async function listVersionBranches(projectId: string, tenantId: string) {
     const ok = await assertProjectInTenant(projectId, tenantId);
     if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
     const result = await connectionPool.query(
-      `SELECT b.id, b.project_id, b.name, b.tip_version_id, b.created_by, b.created_at, b.updated_at,
+      `SELECT b.id, b.project_id, b.name, b.tip_version_id, b.protected, b.created_by, b.created_at, b.updated_at,
               v.version_id AS tip_version_string
        FROM odb.version_branches b
        JOIN odb.versions v ON v.id = b.tip_version_id AND v.project_id = b.project_id
@@ -5448,19 +5556,141 @@ export async function deleteVersionBranch(
     const ok = await assertProjectInTenant(projectId, tenantId);
     if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
     const row = await connectionPool.query(
-      `SELECT b.id, b.created_by FROM odb.version_branches b
+      `SELECT b.id, b.created_by, b.protected FROM odb.version_branches b
        JOIN odb.projects p ON b.project_id = p.id
        WHERE b.id = $1 AND b.project_id = $2 AND p.tenant_id = $3`,
       [branchId, projectId, tenantId]
     );
     if (row.rowCount === 0) return JSON.stringify({ success: false, error: 'Branch not found' });
-    if (!isTenantAdmin && row.rows[0].created_by !== userId) {
+    const br = row.rows[0] as { created_by: string | null; protected: boolean };
+    if (br.protected && !isTenantAdmin) {
+      await insertVersionProtectionAudit({
+        tenantId,
+        projectId,
+        actorId: userId,
+        action: 'branch.delete',
+        resourceType: 'version_branch',
+        resourceId: branchId,
+        outcome: 'denied',
+        detail: { reason: 'branch_protected' },
+      });
+      return JSON.stringify({
+        success: false,
+        error: 'This branch is protected and cannot be deleted',
+        code: 'BRANCH_PROTECTED',
+      });
+    }
+    if (!isTenantAdmin && br.created_by !== userId) {
       return JSON.stringify({ success: false, error: 'Only the branch creator or a tenant admin can delete this branch' });
     }
     await connectionPool.query(`DELETE FROM odb.version_branches WHERE id = $1`, [branchId]);
+    if (br.protected && isTenantAdmin) {
+      await insertVersionProtectionAudit({
+        tenantId,
+        projectId,
+        actorId: userId,
+        action: 'branch.delete',
+        resourceType: 'version_branch',
+        resourceId: branchId,
+        outcome: 'allowed',
+        detail: { reason: 'admin_override_branch_protection' },
+      });
+    }
     return JSON.stringify({ success: true });
   } catch (error: any) {
     console.error('deleteVersionBranch:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/** Tenant admins only: set branch protection policy (Git-like branch protection). */
+export async function updateVersionBranchProtection(
+  branchId: string,
+  projectId: string,
+  tenantId: string,
+  userId: string,
+  isTenantAdmin: boolean,
+  branchProtected: boolean
+) {
+  try {
+    if (!isTenantAdmin) {
+      return JSON.stringify({
+        success: false,
+        error: 'Only tenant administrators can change branch protection',
+        code: 'FORBIDDEN',
+      });
+    }
+    const ok = await assertProjectInTenant(projectId, tenantId);
+    if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
+    const upd = await connectionPool.query(
+      `UPDATE odb.version_branches b SET protected = $1, updated_at = CURRENT_TIMESTAMP
+       FROM odb.projects p
+       WHERE b.id = $2 AND b.project_id = $3 AND b.project_id = p.id AND p.tenant_id = $4
+       RETURNING b.id, b.project_id, b.name, b.tip_version_id, b.protected, b.created_by, b.created_at, b.updated_at`,
+      [branchProtected, branchId, projectId, tenantId]
+    );
+    if (upd.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Branch not found' });
+    }
+    await insertVersionProtectionAudit({
+      tenantId,
+      projectId,
+      actorId: userId,
+      action: 'branch.protection_policy',
+      resourceType: 'version_branch',
+      resourceId: branchId,
+      outcome: 'policy_change',
+      detail: { protected: branchProtected },
+    });
+    return JSON.stringify({ success: true, branch: upd.rows[0] });
+  } catch (error: any) {
+    console.error('updateVersionBranchProtection:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/** Tenant admins only: lock or unlock a schema revision against soft-delete. */
+export async function setVersionRevisionLock(
+  versionRecordId: string,
+  projectId: string,
+  tenantId: string,
+  userId: string,
+  isTenantAdmin: boolean,
+  revisionLocked: boolean
+) {
+  try {
+    if (!isTenantAdmin) {
+      return JSON.stringify({
+        success: false,
+        error: 'Only tenant administrators can lock or unlock revisions',
+        code: 'FORBIDDEN',
+      });
+    }
+    const ok = await assertProjectInTenant(projectId, tenantId);
+    if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
+    const upd = await connectionPool.query(
+      `UPDATE odb.versions v SET revision_locked = $1, updated_at = CURRENT_TIMESTAMP
+       FROM odb.projects p
+       WHERE v.id = $2 AND v.project_id = $3 AND v.project_id = p.id AND p.tenant_id = $4 AND v.deleted_at IS NULL
+       RETURNING v.id, v.project_id, v.version_id, v.revision_locked`,
+      [revisionLocked, versionRecordId, projectId, tenantId]
+    );
+    if (upd.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Version not found' });
+    }
+    await insertVersionProtectionAudit({
+      tenantId,
+      projectId,
+      actorId: userId,
+      action: 'version.revision_lock',
+      resourceType: 'version',
+      resourceId: versionRecordId,
+      outcome: 'policy_change',
+      detail: { revision_locked: revisionLocked },
+    });
+    return JSON.stringify({ success: true, version: upd.rows[0] });
+  } catch (error: any) {
+    console.error('setVersionRevisionLock:', error);
     return JSON.stringify({ success: false, error: error.message });
   }
 }
@@ -5471,7 +5701,7 @@ export async function listVersionTags(projectId: string, tenantId: string) {
     const ok = await assertProjectInTenant(projectId, tenantId);
     if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
     const result = await connectionPool.query(
-      `SELECT t.id, t.project_id, t.version_id, t.name, t.message, t.channel, t.immutable,
+      `SELECT t.id, t.project_id, t.version_id, t.name, t.message, t.channel, t.immutable, t.protected,
               t.created_by, t.created_at, t.updated_at, v.version_id AS target_version_string
        FROM odb.version_tags t
        JOIN odb.versions v ON v.id = t.version_id AND v.project_id = t.project_id
@@ -5494,7 +5724,8 @@ export async function createVersionTag(
   name: string,
   targetVersionId: string,
   userId: string,
-  opts?: { message?: string | null; channel?: string | null; immutable?: boolean }
+  opts?: { message?: string | null; channel?: string | null; immutable?: boolean; protected?: boolean },
+  isTenantAdmin = false
 ) {
   try {
     const trimmed = name.trim();
@@ -5503,6 +5734,14 @@ export async function createVersionTag(
         success: false,
         error:
           'Tag name must be 1–255 chars, start with a letter or digit, and contain only letters, digits, . _ - /',
+      });
+    }
+    const wantProtected = Boolean(opts?.protected);
+    if (wantProtected && !isTenantAdmin) {
+      return JSON.stringify({
+        success: false,
+        error: 'Only tenant administrators can create a protected tag',
+        code: 'PROTECTED_TAG_ADMIN_ONLY',
       });
     }
     const ok = await assertProjectInTenant(projectId, tenantId);
@@ -5521,10 +5760,10 @@ export async function createVersionTag(
       opts?.channel && String(opts.channel).trim() ? String(opts.channel).trim().slice(0, 64) : null;
     const immutable = Boolean(opts?.immutable);
     const ins = await connectionPool.query(
-      `INSERT INTO odb.version_tags (project_id, version_id, name, message, channel, immutable, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, project_id, version_id, name, message, channel, immutable, created_by, created_at, updated_at`,
-      [projectId, targetVersionId, trimmed, message, channel, immutable, userId]
+      `INSERT INTO odb.version_tags (project_id, version_id, name, message, channel, immutable, protected, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, project_id, version_id, name, message, channel, immutable, protected, created_by, created_at, updated_at`,
+      [projectId, targetVersionId, trimmed, message, channel, immutable, wantProtected, userId]
     );
     return JSON.stringify({ success: true, tag: ins.rows[0] });
   } catch (error: any) {
@@ -5546,25 +5785,55 @@ export async function updateVersionTag(
   tenantId: string,
   userId: string,
   isTenantAdmin: boolean,
-  body: { versionId?: string; immutable?: boolean }
+  body: { versionId?: string; immutable?: boolean; protected?: boolean }
 ) {
   try {
     const ok = await assertProjectInTenant(projectId, tenantId);
     if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
     const row = await connectionPool.query(
-      `SELECT t.id, t.version_id, t.immutable, t.created_by
+      `SELECT t.id, t.version_id, t.immutable, t.protected, t.created_by
        FROM odb.version_tags t
        JOIN odb.projects p ON t.project_id = p.id
        WHERE t.id = $1 AND t.project_id = $2 AND p.tenant_id = $3`,
       [tagId, projectId, tenantId]
     );
     if (row.rowCount === 0) return JSON.stringify({ success: false, error: 'Tag not found' });
-    const tag = row.rows[0] as { id: string; version_id: string; immutable: boolean; created_by: string | null };
+    const tag = row.rows[0] as {
+      id: string;
+      version_id: string;
+      immutable: boolean;
+      protected: boolean;
+      created_by: string | null;
+    };
     if (tag.immutable) {
       return JSON.stringify({
         success: false,
         error: 'This tag is immutable and cannot be changed',
         code: 'TAG_IMMUTABLE',
+      });
+    }
+    if (body.protected !== undefined && !isTenantAdmin) {
+      return JSON.stringify({
+        success: false,
+        error: 'Only tenant administrators can change tag protection policy',
+        code: 'TAG_PROTECT_POLICY_ADMIN_ONLY',
+      });
+    }
+    if (tag.protected && !isTenantAdmin) {
+      await insertVersionProtectionAudit({
+        tenantId,
+        projectId,
+        actorId: userId,
+        action: 'tag.update',
+        resourceType: 'version_tag',
+        resourceId: tagId,
+        outcome: 'denied',
+        detail: { reason: 'tag_protected' },
+      });
+      return JSON.stringify({
+        success: false,
+        error: 'This tag is protected: only tenant admins may move it or change policy',
+        code: 'TAG_PROTECTED',
       });
     }
     if (!isTenantAdmin && tag.created_by !== userId) {
@@ -5575,6 +5844,8 @@ export async function updateVersionTag(
     }
     const newVersionId = typeof body.versionId === 'string' ? body.versionId.trim() : '';
     const wantImmutable = body.immutable === true;
+    const policyProtected =
+      typeof body.protected === 'boolean' ? body.protected : undefined;
     if (newVersionId) {
       const ver = await connectionPool.query(
         `SELECT v.id FROM odb.versions v
@@ -5586,8 +5857,11 @@ export async function updateVersionTag(
         return JSON.stringify({ success: false, error: 'Target version not found in this project' });
       }
     }
-    if (!newVersionId && !wantImmutable) {
-      return JSON.stringify({ success: false, error: 'Provide versionId and/or immutable: true' });
+    if (!newVersionId && !wantImmutable && policyProtected === undefined) {
+      return JSON.stringify({
+        success: false,
+        error: 'Provide versionId, immutable: true, and/or protected (admin only)',
+      });
     }
     const sets: string[] = ['updated_at = CURRENT_TIMESTAMP'];
     const params: unknown[] = [];
@@ -5598,15 +5872,43 @@ export async function updateVersionTag(
     if (wantImmutable) {
       sets.push('immutable = true');
     }
+    if (policyProtected !== undefined) {
+      params.push(policyProtected);
+      sets.push(`protected = $${params.length}`);
+    }
     params.push(tagId, projectId);
     const idSlot = params.length - 1;
     const projSlot = params.length;
     const upd = await connectionPool.query(
       `UPDATE odb.version_tags SET ${sets.join(', ')}
        WHERE id = $${idSlot} AND project_id = $${projSlot}
-       RETURNING id, project_id, version_id, name, message, channel, immutable, created_by, created_at, updated_at`,
+       RETURNING id, project_id, version_id, name, message, channel, immutable, protected, created_by, created_at, updated_at`,
       params
     );
+    if (tag.protected && isTenantAdmin && (newVersionId || wantImmutable)) {
+      await insertVersionProtectionAudit({
+        tenantId,
+        projectId,
+        actorId: userId,
+        action: 'tag.update',
+        resourceType: 'version_tag',
+        resourceId: tagId,
+        outcome: 'allowed',
+        detail: { reason: 'admin_override_tag_protection' },
+      });
+    }
+    if (policyProtected !== undefined) {
+      await insertVersionProtectionAudit({
+        tenantId,
+        projectId,
+        actorId: userId,
+        action: 'tag.protection_policy',
+        resourceType: 'version_tag',
+        resourceId: tagId,
+        outcome: 'policy_change',
+        detail: { protected: policyProtected },
+      });
+    }
     return JSON.stringify({ success: true, tag: upd.rows[0] });
   } catch (error: any) {
     console.error('updateVersionTag:', error);
@@ -5625,18 +5927,35 @@ export async function deleteVersionTag(
     const ok = await assertProjectInTenant(projectId, tenantId);
     if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
     const row = await connectionPool.query(
-      `SELECT t.id, t.immutable, t.created_by FROM odb.version_tags t
+      `SELECT t.id, t.immutable, t.protected, t.created_by FROM odb.version_tags t
        JOIN odb.projects p ON t.project_id = p.id
        WHERE t.id = $1 AND t.project_id = $2 AND p.tenant_id = $3`,
       [tagId, projectId, tenantId]
     );
     if (row.rowCount === 0) return JSON.stringify({ success: false, error: 'Tag not found' });
-    const tag = row.rows[0] as { immutable: boolean; created_by: string | null };
+    const tag = row.rows[0] as { immutable: boolean; protected: boolean; created_by: string | null };
     if (tag.immutable) {
       return JSON.stringify({
         success: false,
         error: 'This tag is immutable and cannot be deleted',
         code: 'TAG_IMMUTABLE',
+      });
+    }
+    if (tag.protected && !isTenantAdmin) {
+      await insertVersionProtectionAudit({
+        tenantId,
+        projectId,
+        actorId: userId,
+        action: 'tag.delete',
+        resourceType: 'version_tag',
+        resourceId: tagId,
+        outcome: 'denied',
+        detail: { reason: 'tag_protected' },
+      });
+      return JSON.stringify({
+        success: false,
+        error: 'This tag is protected and cannot be deleted',
+        code: 'TAG_PROTECTED',
       });
     }
     if (!isTenantAdmin && tag.created_by !== userId) {
@@ -5646,6 +5965,18 @@ export async function deleteVersionTag(
       });
     }
     await connectionPool.query(`DELETE FROM odb.version_tags WHERE id = $1`, [tagId]);
+    if (tag.protected && isTenantAdmin) {
+      await insertVersionProtectionAudit({
+        tenantId,
+        projectId,
+        actorId: userId,
+        action: 'tag.delete',
+        resourceType: 'version_tag',
+        resourceId: tagId,
+        outcome: 'allowed',
+        detail: { reason: 'admin_override_tag_protection' },
+      });
+    }
     return JSON.stringify({ success: true });
   } catch (error: any) {
     console.error('deleteVersionTag:', error);
