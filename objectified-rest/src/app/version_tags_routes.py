@@ -67,7 +67,12 @@ async def create_version_tag(
         msg = None
     want_protected = bool(body.protected)
     if want_protected:
-        if not uid or not db.is_user_tenant_admin(tenant_id, uid):
+        if not uid:
+            raise HTTPException(
+                status_code=403,
+                detail="Protected tags can only be created from an authenticated user session",
+            )
+        if not db.is_user_tenant_admin(tenant_id, uid):
             raise HTTPException(
                 status_code=403,
                 detail="Only tenant administrators can create protected tags",
@@ -108,10 +113,11 @@ async def patch_version_tag(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     uid = get_authenticated_user_id(auth_data)
-    auth_method = auth_data.get("auth_method")
-    if auth_method == "jwt":
-        if not uid:
-            raise HTTPException(status_code=403, detail="JWT must include a user id to modify tags")
+    if not uid:
+        raise HTTPException(
+            status_code=403,
+            detail="Tag modification requires an authenticated user session (API keys are not supported for this operation)",
+        )
 
     new_vid = body.version_id.strip() if body.version_id else None
     set_immutable = body.immutable is True
@@ -171,10 +177,11 @@ async def delete_version_tag(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     uid = get_authenticated_user_id(auth_data)
-    auth_method = auth_data.get("auth_method")
-    if auth_method == "jwt":
-        if not uid:
-            raise HTTPException(status_code=403, detail="JWT must include a user id to delete tags")
+    if not uid:
+        raise HTTPException(
+            status_code=403,
+            detail="Tag deletion requires an authenticated user session (API keys are not supported for this operation)",
+        )
 
     is_admin = bool(uid and db.is_user_tenant_admin(tenant_id, uid))
     try:

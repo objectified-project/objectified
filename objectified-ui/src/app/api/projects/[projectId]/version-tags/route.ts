@@ -94,6 +94,8 @@ export async function POST(
         const error = data.error?.toLowerCase() ?? '';
         if (data.code === 'TAG_NAME_CONFLICT' || error.includes('already exists')) {
           status = 409;
+        } else if (data.code === 'PROTECTED_TAG_ADMIN_ONLY') {
+          status = 403;
         } else if (error.includes('not found')) {
           status = 404;
         }

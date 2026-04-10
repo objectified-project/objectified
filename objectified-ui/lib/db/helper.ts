@@ -1289,12 +1289,15 @@ export async function deleteVersion(versionRecordId: string) {
       });
     }
 
-    await connectionPool.query(
+    const upd = await connectionPool.query(
       `UPDATE odb.versions
        SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = $1 AND deleted_at IS NULL`,
       [versionRecordId]
     );
+    if ((upd.rowCount ?? 0) === 0) {
+      return JSON.stringify({ success: false, error: 'Version not found or already deleted', code: 'NOT_FOUND' });
+    }
 
     if (v.revision_locked && isTenantAdmin) {
       await insertVersionProtectionAudit({

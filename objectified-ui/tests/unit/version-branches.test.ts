@@ -43,6 +43,8 @@ import {
   deleteVersionBranch,
   mergeVersionBranchesPreviewServer,
   mergeVersionBranchesServer,
+  updateVersionBranchProtection,
+  setVersionRevisionLock,
 } from '../../lib/db/helper';
 import { mergePreviewFromSpecs } from '../../lib/version-merge';
 
@@ -524,5 +526,152 @@ describe('mergeVersionBranchesServer', () => {
     expect(queryCalls).toContain('BEGIN');
     expect(queryCalls).toContain('ROLLBACK');
     expect(result.success).toBe(false);
+  });
+});
+
+// ─── updateVersionBranchProtection ───────────────────────────────────────────
+
+describe('updateVersionBranchProtection', () => {
+  beforeEach(() => {
+    getDbMock().query.mockClear();
+  });
+
+  it('returns FORBIDDEN when caller is not a tenant admin', async () => {
+    const result = JSON.parse(
+      await updateVersionBranchProtection(BRANCH_ID, PROJECT_ID, TENANT_ID, USER_ID, false, true)
+    );
+    expect(result.success).toBe(false);
+    expect(result.code).toBe('FORBIDDEN');
+  });
+
+  it('returns success:false when project not in tenant', async () => {
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // assertProjectInTenant → not found
+    const result = JSON.parse(
+      await updateVersionBranchProtection(BRANCH_ID, PROJECT_ID, TENANT_ID, USER_ID, true, true)
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not found/i);
+  });
+
+  it('returns success:false when branch not found', async () => {
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // assertProjectInTenant → OK
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] });   // UPDATE → 0 rows
+    const result = JSON.parse(
+      await updateVersionBranchProtection(BRANCH_ID, PROJECT_ID, TENANT_ID, USER_ID, true, true)
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not found/i);
+  });
+
+  it('updates protection and returns success when admin', async () => {
+    const fakeBranch = {
+      id: BRANCH_ID,
+      project_id: PROJECT_ID,
+      name: 'main',
+      tip_version_id: VERSION_ID,
+      protected: true,
+      created_by: USER_ID,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });          // assertProjectInTenant
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [fakeBranch] });  // UPDATE
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [] });            // audit INSERT
+    const result = JSON.parse(
+      await updateVersionBranchProtection(BRANCH_ID, PROJECT_ID, TENANT_ID, USER_ID, true, true)
+    );
+    expect(result.success).toBe(true);
+    expect(result.branch.protected).toBe(true);
+  });
+
+  it('writes an audit row on successful policy change', async () => {
+    const fakeBranch = { id: BRANCH_ID, protected: false };
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [fakeBranch] });
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [] }); // audit
+    await updateVersionBranchProtection(BRANCH_ID, PROJECT_ID, TENANT_ID, USER_ID, true, false);
+    // Three queries expected: assertProjectInTenant, UPDATE, audit INSERT
+    expect(getDbMock().query).toHaveBeenCalledTimes(3);
+  });
+});
+
+// ─── setVersionRevisionLock ───────────────────────────────────────────────────
+
+const VERSION_RECORD_ID = 'ver-record-uuid-1';
+
+describe('setVersionRevisionLock', () => {
+  beforeEach(() => {
+    getDbMock().query.mockClear();
+  });
+
+  it('returns FORBIDDEN when caller is not a tenant admin', async () => {
+    const result = JSON.parse(
+      await setVersionRevisionLock(VERSION_RECORD_ID, PROJECT_ID, TENANT_ID, USER_ID, false, true)
+    );
+    expect(result.success).toBe(false);
+    expect(result.code).toBe('FORBIDDEN');
+  });
+
+  it('returns success:false when project not in tenant', async () => {
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // assertProjectInTenant → not found
+    const result = JSON.parse(
+      await setVersionRevisionLock(VERSION_RECORD_ID, PROJECT_ID, TENANT_ID, USER_ID, true, true)
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not found/i);
+  });
+
+  it('returns success:false when version not found', async () => {
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // assertProjectInTenant → OK
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] });   // UPDATE → 0 rows
+    const result = JSON.parse(
+      await setVersionRevisionLock(VERSION_RECORD_ID, PROJECT_ID, TENANT_ID, USER_ID, true, true)
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not found/i);
+  });
+
+  it('locks a revision and returns success when admin', async () => {
+    const fakeVersion = {
+      id: VERSION_RECORD_ID,
+      project_id: PROJECT_ID,
+      version_id: '1.0.0',
+      revision_locked: true,
+    };
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });            // assertProjectInTenant
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [fakeVersion] });   // UPDATE
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [] });              // audit INSERT
+    const result = JSON.parse(
+      await setVersionRevisionLock(VERSION_RECORD_ID, PROJECT_ID, TENANT_ID, USER_ID, true, true)
+    );
+    expect(result.success).toBe(true);
+    expect(result.version.revision_locked).toBe(true);
+  });
+
+  it('unlocks a revision and returns success when admin', async () => {
+    const fakeVersion = {
+      id: VERSION_RECORD_ID,
+      project_id: PROJECT_ID,
+      version_id: '1.0.0',
+      revision_locked: false,
+    };
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [fakeVersion] });
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
+    const result = JSON.parse(
+      await setVersionRevisionLock(VERSION_RECORD_ID, PROJECT_ID, TENANT_ID, USER_ID, true, false)
+    );
+    expect(result.success).toBe(true);
+    expect(result.version.revision_locked).toBe(false);
+  });
+
+  it('writes an audit row on successful lock change', async () => {
+    const fakeVersion = { id: VERSION_RECORD_ID, revision_locked: true };
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [fakeVersion] });
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [] }); // audit
+    await setVersionRevisionLock(VERSION_RECORD_ID, PROJECT_ID, TENANT_ID, USER_ID, true, true);
+    // Three queries expected: assertProjectInTenant, UPDATE, audit INSERT
+    expect(getDbMock().query).toHaveBeenCalledTimes(3);
   });
 });
