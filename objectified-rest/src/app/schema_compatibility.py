@@ -227,7 +227,7 @@ def _compare_json_schema(
 ) -> List[CompatibilityFinding]:
     findings: List[CompatibilityFinding] = []
 
-    if _stable_json(base) == _stable_json(head):
+    if base == head:
         return findings
 
     if type(base) is not type(head):

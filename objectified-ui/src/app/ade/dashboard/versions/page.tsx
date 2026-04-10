@@ -209,7 +209,7 @@ const Versions = () => {
   const [mergeCompatLoading, setMergeCompatLoading] = useState(false);
   const [mergeCompat, setMergeCompat] = useState<{
     overall: string;
-    findings: Array<{ category: string; rule: string; path: string; message: string }>;
+    findings: Array<{ id?: string; category: string; rule: string; path: string; message: string }>;
     breakingChangeDocumentationIssueUrl?: string | null;
     tenantCompatGateActive?: boolean;
     mergeBlockedByCompatGate?: boolean;
@@ -2613,7 +2613,7 @@ const Versions = () => {
                 {mergeCompat.findings.length > 0 && (
                   <ul className="mt-2 text-xs list-disc pl-4 max-h-36 overflow-y-auto space-y-0.5">
                     {mergeCompat.findings.slice(0, 14).map((f) => (
-                      <li key={`${f.path}-${f.rule}-${f.message.slice(0, 40)}`}>
+                      <li key={f.id ?? `${f.path}-${f.rule}-${f.message}`}>
                         <span className="font-mono text-[11px]">{f.path}</span>
                         {' — '}
                         {f.message}

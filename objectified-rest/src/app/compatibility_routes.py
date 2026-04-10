@@ -9,7 +9,6 @@ import json
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import JSONResponse
 
 from .auth import validate_authentication
 from .database import db
@@ -94,13 +93,13 @@ def _fingerprint(overall: str, finding_dicts: list) -> str:
     ).hexdigest()
 
 
-@router.post("/{tenant_slug}/{project_id}/compatibility")
+@router.post("/{tenant_slug}/{project_id}/compatibility", response_model=CompatibilityCheckResponse)
 async def check_revision_compatibility(
     tenant_slug: str,
     project_id: str,
     body: CompatibilityCheckRequest,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
-) -> JSONResponse:
+) -> CompatibilityCheckResponse:
     """
     Compare **baseRevisionId** (older / consumer expectation) to **headRevisionId** (newer).
     Returns structured safe / breaking / unknown findings for CI-style merge gates.
@@ -181,4 +180,4 @@ async def check_revision_compatibility(
             },
         )
 
-    return JSONResponse(content=response.model_dump(by_alias=True))
+    return response

@@ -372,8 +372,14 @@ class CompatibilityRulesPayload(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    check_paths: bool = True
-    check_schemas: bool = True
+    check_paths: bool = Field(
+        True,
+        validation_alias=AliasChoices("checkPaths", "check_paths"),
+    )
+    check_schemas: bool = Field(
+        True,
+        validation_alias=AliasChoices("checkSchemas", "check_schemas"),
+    )
     treat_removed_schema_as_breaking: bool = Field(
         True,
         validation_alias=AliasChoices(
