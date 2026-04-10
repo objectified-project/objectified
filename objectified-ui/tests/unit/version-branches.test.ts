@@ -1,7 +1,6 @@
 /**
- * Unit tests for version branch and merge helper functions in lib/db/helper.ts.
- * Covers: isValidVersionBranchName, listVersionBranches, createVersionBranch,
- * deleteVersionBranch, mergeVersionBranchesPreviewServer, and mergeVersionBranchesServer.
+ * Unit tests for version branch helper functions in lib/db/helper.ts.
+ * Merge preview/apply is covered by objectified-rest (#738).
  */
 
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
@@ -26,11 +25,6 @@ jest.mock('../../lib/db/plan-entitlements', () => ({
   getPlanBlockMessageForNewVersion: jest.fn(async () => null),
 }));
 
-// Mock version-merge so we can control classification without real spec diffing
-jest.mock('../../lib/version-merge', () => ({
-  mergePreviewFromSpecs: jest.fn(),
-}));
-
 // Mock OpenAPI generation used by buildOpenApiSpecJsonForVersion
 jest.mock('../../src/app/utils/openapi', () => ({
   generateOpenApiSpec: jest.fn(() => '{}'),
@@ -41,12 +35,9 @@ import {
   listVersionBranches,
   createVersionBranch,
   deleteVersionBranch,
-  mergeVersionBranchesPreviewServer,
-  mergeVersionBranchesServer,
   updateVersionBranchProtection,
   setVersionRevisionLock,
 } from '../../lib/db/helper';
-import { mergePreviewFromSpecs } from '../../lib/version-merge';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -280,252 +271,6 @@ describe('deleteVersionBranch', () => {
       await deleteVersionBranch(BRANCH_ID, PROJECT_ID, TENANT_ID, USER_ID, false)
     );
     expect(result.success).toBe(true);
-  });
-});
-
-// ─── mergeVersionBranchesPreviewServer ───────────────────────────────────────
-
-describe('mergeVersionBranchesPreviewServer', () => {
-  beforeEach(() => {
-    getDbMock().query.mockClear();
-    (mergePreviewFromSpecs as jest.Mock).mockClear();
-  });
-
-  it('returns error when project not found', async () => {
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
-    const result = JSON.parse(
-      await mergeVersionBranchesPreviewServer({
-        projectId: PROJECT_ID,
-        tenantId: TENANT_ID,
-        sourceBranchName: 'src',
-        targetBranchName: 'tgt',
-      })
-    );
-    expect(result.success).toBe(false);
-    expect(result.status).toBe(404);
-  });
-
-  it('returns error when branches not found', async () => {
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // project
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] });    // src branch
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] });    // tgt branch
-    const result = JSON.parse(
-      await mergeVersionBranchesPreviewServer({
-        projectId: PROJECT_ID,
-        tenantId: TENANT_ID,
-        sourceBranchName: 'src',
-        targetBranchName: 'tgt',
-      })
-    );
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/branch not found/i);
-  });
-
-  it('returns preview classification on success', async () => {
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // project
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ tip_version_id: VERSION_ID }] }); // src
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ tip_version_id: VERSION_ID_2 }] }); // tgt
-    // tips query
-    getDbMock().query.mockResolvedValueOnce({
-      rowCount: 2,
-      rows: [
-        { id: VERSION_ID, project_id: PROJECT_ID, version_id: '1.0.0', description: null, project_name: 'P' },
-        { id: VERSION_ID_2, project_id: PROJECT_ID, version_id: '1.1.0', description: null, project_name: 'P' },
-      ],
-    });
-    // getClassesForVersion called for each tip (mock returns empty list)
-    getDbMock().query.mockResolvedValue({ rowCount: 0, rows: [] });
-
-    (mergePreviewFromSpecs as jest.Mock).mockResolvedValueOnce({
-      summary: { added: [], modified: [], removed: [] },
-      classification: { canAutoMerge: true, conflictPaths: [], addedSchemaNames: [] },
-    });
-
-    const result = JSON.parse(
-      await mergeVersionBranchesPreviewServer({
-        projectId: PROJECT_ID,
-        tenantId: TENANT_ID,
-        sourceBranchName: 'src',
-        targetBranchName: 'tgt',
-      })
-    );
-    expect(result.success).toBe(true);
-    expect(result.classification.canAutoMerge).toBe(true);
-  });
-});
-
-// ─── mergeVersionBranchesServer ──────────────────────────────────────────────
-
-describe('mergeVersionBranchesServer', () => {
-  beforeEach(() => {
-    getDbMock().query.mockClear();
-    (mergePreviewFromSpecs as jest.Mock).mockClear();
-  });
-
-  it('returns error when project not found', async () => {
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
-    const result = JSON.parse(
-      await mergeVersionBranchesServer({
-        projectId: PROJECT_ID,
-        tenantId: TENANT_ID,
-        userId: USER_ID,
-        sourceBranchName: 'src',
-        targetBranchName: 'tgt',
-        baseRevisionId: VERSION_ID_2,
-      })
-    );
-    expect(result.success).toBe(false);
-    expect(result.status).toBe(404);
-  });
-
-  it('returns STALE_HEAD when baseRevisionId does not match target tip', async () => {
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // project
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: BRANCH_ID, tip_version_id: VERSION_ID, name: 'src' }] }); // src branch
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: BRANCH_ID, tip_version_id: 'different-id', name: 'tgt' }] }); // tgt branch
-    const result = JSON.parse(
-      await mergeVersionBranchesServer({
-        projectId: PROJECT_ID,
-        tenantId: TENANT_ID,
-        userId: USER_ID,
-        sourceBranchName: 'src',
-        targetBranchName: 'tgt',
-        baseRevisionId: VERSION_ID_2,
-      })
-    );
-    expect(result.success).toBe(false);
-    expect(result.code).toBe('STALE_HEAD');
-  });
-
-  it('returns MERGE_CONFLICT when classification has overlapping paths', async () => {
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // project
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: BRANCH_ID, tip_version_id: VERSION_ID, name: 'src' }] });
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: BRANCH_ID, tip_version_id: VERSION_ID_2, name: 'tgt' }] });
-    // tips
-    getDbMock().query.mockResolvedValueOnce({
-      rowCount: 2,
-      rows: [
-        { id: VERSION_ID, project_id: PROJECT_ID, version_id: '1.0.0', description: null, project_name: 'P', published: false },
-        { id: VERSION_ID_2, project_id: PROJECT_ID, version_id: '1.1.0', description: null, project_name: 'P', published: false },
-      ],
-    });
-    // getClassesForVersion calls
-    getDbMock().query.mockResolvedValue({ rowCount: 0, rows: [] });
-
-    (mergePreviewFromSpecs as jest.Mock).mockResolvedValueOnce({
-      summary: { added: [], modified: [{ path: 'schemas.User' }], removed: [] },
-      classification: { canAutoMerge: false, conflictPaths: ['schemas.User'], addedSchemaNames: [] },
-    });
-
-    const result = JSON.parse(
-      await mergeVersionBranchesServer({
-        projectId: PROJECT_ID,
-        tenantId: TENANT_ID,
-        userId: USER_ID,
-        sourceBranchName: 'src',
-        targetBranchName: 'tgt',
-        baseRevisionId: VERSION_ID_2,
-      })
-    );
-    expect(result.success).toBe(false);
-    expect(result.code).toBe('MERGE_CONFLICT');
-    expect(result.conflictPaths).toContain('schemas.User');
-  });
-
-  it('wraps apply in a transaction and commits on success', async () => {
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // project
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: BRANCH_ID, tip_version_id: VERSION_ID, name: 'src' }] });
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: BRANCH_ID, tip_version_id: VERSION_ID_2, name: 'tgt' }] });
-    // tips
-    getDbMock().query.mockResolvedValueOnce({
-      rowCount: 2,
-      rows: [
-        { id: VERSION_ID, project_id: PROJECT_ID, version_id: '1.0.0', description: null, project_name: 'P', published: false },
-        { id: VERSION_ID_2, project_id: PROJECT_ID, version_id: '1.1.0', description: null, project_name: 'P', published: false },
-      ],
-    });
-    // getClassesForVersion x2 (for buildOpenApiSpec)
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
-
-    (mergePreviewFromSpecs as jest.Mock).mockResolvedValueOnce({
-      summary: { added: [], modified: [], removed: [] },
-      classification: { canAutoMerge: true, conflictPaths: [], addedSchemaNames: [] },
-    });
-
-    // getLatestVersionForProject
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ version_id: '1.1.0' }] });
-    // getPlanBlockMessageForNewVersion (mocked above to null, no DB call needed)
-    // BEGIN
-    getDbMock().query.mockResolvedValueOnce({});
-    // INSERT INTO versions
-    const newVer = { id: 'new-ver-id', version_id: '1.1.1', project_id: PROJECT_ID };
-    getDbMock().query.mockResolvedValueOnce({ rows: [newVer] });
-    // copyClassesFromVersion inner query (SELECT+INSERT classes)
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // list classes
-    // COMMIT
-    getDbMock().query.mockResolvedValueOnce({});
-    // UPDATE version_branches
-    getDbMock().query.mockResolvedValueOnce({});
-
-    const result = JSON.parse(
-      await mergeVersionBranchesServer({
-        projectId: PROJECT_ID,
-        tenantId: TENANT_ID,
-        userId: USER_ID,
-        sourceBranchName: 'src',
-        targetBranchName: 'tgt',
-        baseRevisionId: VERSION_ID_2,
-      })
-    );
-
-    // Verify BEGIN and COMMIT were called
-    const queryCalls = getDbMock().query.mock.calls.map((c) => String(c[0]).trim());
-    expect(queryCalls).toContain('BEGIN');
-    expect(queryCalls).toContain('COMMIT');
-    expect(result.success).toBe(true);
-  });
-
-  it('rolls back transaction on copy failure', async () => {
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // project
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: BRANCH_ID, tip_version_id: VERSION_ID, name: 'src' }] });
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: BRANCH_ID, tip_version_id: VERSION_ID_2, name: 'tgt' }] });
-    getDbMock().query.mockResolvedValueOnce({
-      rowCount: 2,
-      rows: [
-        { id: VERSION_ID, project_id: PROJECT_ID, version_id: '1.0.0', description: null, project_name: 'P', published: false },
-        { id: VERSION_ID_2, project_id: PROJECT_ID, version_id: '1.1.0', description: null, project_name: 'P', published: false },
-      ],
-    });
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
-
-    (mergePreviewFromSpecs as jest.Mock).mockResolvedValueOnce({
-      summary: { added: [], modified: [], removed: [] },
-      classification: { canAutoMerge: true, conflictPaths: [], addedSchemaNames: [] },
-    });
-
-    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{ version_id: '1.1.0' }] }); // latest
-    getDbMock().query.mockResolvedValueOnce({}); // BEGIN
-    getDbMock().query.mockResolvedValueOnce({ rows: [{ id: 'new-ver-id', version_id: '1.1.1' }] }); // INSERT version
-    // copyClassesFromVersion throws
-    getDbMock().query.mockRejectedValueOnce(new Error('copy failed'));
-    getDbMock().query.mockResolvedValueOnce({}); // ROLLBACK
-
-    const result = JSON.parse(
-      await mergeVersionBranchesServer({
-        projectId: PROJECT_ID,
-        tenantId: TENANT_ID,
-        userId: USER_ID,
-        sourceBranchName: 'src',
-        targetBranchName: 'tgt',
-        baseRevisionId: VERSION_ID_2,
-      })
-    );
-
-    const queryCalls = getDbMock().query.mock.calls.map((c) => String(c[0]).trim());
-    expect(queryCalls).toContain('BEGIN');
-    expect(queryCalls).toContain('ROLLBACK');
-    expect(result.success).toBe(false);
   });
 });
 

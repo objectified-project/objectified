@@ -5,7 +5,7 @@ import bcrypt
 import numpy as np
 from psycopg2.extras import RealDictCursor
 from psycopg2.extensions import register_adapter, AsIs, adapt
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, Set
 from .config import settings
 from .jsonschema_generator import generate_class_jsonschema_spec
 from .revision_deprecation import merge_version_metadata
@@ -3440,6 +3440,232 @@ class Database:
             LIMIT 1
         """
         return bool(self.execute_query(q, (tenant_id, user_id)))
+
+    # ==================== Version merge (Git-like three-way) ====================
+
+    def collect_revision_ancestors(self, version_id: str, tenant_id: str) -> Set[str]:
+        """All revision ids reachable from ``version_id`` following parent links (including self)."""
+        result: Set[str] = set()
+        stack = [version_id]
+        steps = 0
+        while stack:
+            if steps > 100000:
+                raise RuntimeError("Revision ancestor walk exceeded safety limit")
+            steps += 1
+            vid = stack.pop()
+            if vid in result:
+                continue
+            result.add(vid)
+            row = self.get_version_by_id(vid, tenant_id)
+            if not row:
+                continue
+            for p in (row.get("parent_version_id"), row.get("merge_parent_version_id")):
+                if p and str(p) not in result:
+                    stack.append(str(p))
+        return result
+
+    def compute_merge_base_revision_id(
+        self, rev_a: str, rev_b: str, tenant_id: str
+    ) -> Optional[str]:
+        """Best common ancestor (nearest to tips by creation time) for two revision ids in the same project."""
+        a = self.collect_revision_ancestors(rev_a, tenant_id)
+        b = self.collect_revision_ancestors(rev_b, tenant_id)
+        common = a & b
+        if not common:
+            return None
+
+        # Cache ancestor sets to avoid O(n²) repeated full graph walks.
+        ancestor_cache: Dict[str, Set[str]] = {rev_a: a, rev_b: b}
+
+        def get_cached_ancestors(vid: str) -> Set[str]:
+            if vid not in ancestor_cache:
+                ancestor_cache[vid] = self.collect_revision_ancestors(vid, tenant_id)
+            return ancestor_cache[vid]
+
+        def is_strict_ancestor(anc: str, desc: str) -> bool:
+            if anc == desc:
+                return False
+            return anc in get_cached_ancestors(desc)
+
+        bases = [
+            c
+            for c in common
+            if not any(c != d and is_strict_ancestor(c, d) for d in common)
+        ]
+        if not bases:
+            return None
+        if len(bases) == 1:
+            return bases[0]
+
+        # Multiple maximal common ancestors (criss-cross history): pick the one
+        # nearest to the branch tips by choosing the most recently created revision.
+        from datetime import datetime, timezone
+
+        _epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+        def created_at_key(vid: str):
+            row = self.get_version_by_id(vid, tenant_id)
+            ts = row["created_at"] if row and row.get("created_at") else None
+            return ts if ts is not None else _epoch
+
+        return max(bases, key=created_at_key)
+
+    def get_version_branch_by_name(
+        self, project_id: str, tenant_id: str, name: str
+    ) -> Optional[Dict[str, Any]]:
+        q = """
+            SELECT b.id, b.project_id, b.name, b.tip_version_id, b.protected, b.created_by
+            FROM odb.version_branches b
+            JOIN odb.projects p ON b.project_id = p.id
+            WHERE b.project_id = %s AND p.tenant_id = %s AND b.name = %s
+        """
+        rows = self.execute_query(q, (project_id, tenant_id, name.strip()))
+        return rows[0] if rows else None
+
+    def delete_class_by_name_for_version(
+        self,
+        version_id: str,
+        class_name: str,
+        tenant_id: str,
+        cursor: Optional[Any] = None,
+    ) -> bool:
+        """Soft-delete a class by name within a version (tenant-scoped)."""
+        query = """
+            UPDATE odb.classes c
+            SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            FROM odb.versions v
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE c.version_id = v.id
+              AND c.version_id = %s
+              AND c.name = %s
+              AND p.tenant_id = %s
+              AND c.deleted_at IS NULL
+        """
+        if cursor is not None:
+            cursor.execute(query, (version_id, class_name, tenant_id))
+            return cursor.rowcount > 0
+        conn = self.connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(query, (version_id, class_name, tenant_id))
+                conn.commit()
+                return cur.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def _copy_class_properties_recursive(
+        self, cursor: Any, source_class_id: str, target_class_id: str
+    ) -> None:
+        cursor.execute(
+            """
+            SELECT id, property_id, name, description, data, parent_id
+            FROM odb.class_properties
+            WHERE class_id = %s
+            """,
+            (source_class_id,),
+        )
+        rows = cursor.fetchall()
+        old_to_new: Dict[str, str] = {}
+        processed: Set[str] = set()
+
+        def copy_level(parent_id: Optional[str]) -> None:
+            props: List[Dict[str, Any]] = []
+            for r in rows:
+                if str(r["id"]) in processed:
+                    continue
+                pid = r.get("parent_id")
+                if parent_id is None:
+                    if pid is not None:
+                        continue
+                else:
+                    if pid is None or str(pid) != str(parent_id):
+                        continue
+                props.append(r)
+            for prop in props:
+                new_parent = None
+                if prop["parent_id"]:
+                    new_parent = old_to_new.get(str(prop["parent_id"]))
+                cursor.execute(
+                    """
+                    INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (
+                        target_class_id,
+                        prop["property_id"],
+                        prop["name"],
+                        prop["description"],
+                        prop["data"],
+                        new_parent,
+                    ),
+                )
+                new_id = cursor.fetchone()["id"]
+                old_to_new[str(prop["id"])] = str(new_id)
+                processed.add(str(prop["id"]))
+                copy_level(str(prop["id"]))
+
+        copy_level(None)
+
+    def copy_classes_from_version_for_merge(
+        self, cursor: Any, source_version_id: str, target_version_id: str
+    ) -> int:
+        """Copy all classes and nested properties (used inside an open transaction)."""
+        cursor.execute(
+            """
+            INSERT INTO odb.classes (version_id, name, description, schema, enabled, canvas_metadata)
+            SELECT %s, name, description, schema, enabled, canvas_metadata
+            FROM odb.classes
+            WHERE version_id = %s AND deleted_at IS NULL
+            RETURNING id, name
+            """,
+            (target_version_id, source_version_id),
+        )
+        copied = cursor.fetchall()
+        for row in copied:
+            cursor.execute(
+                """
+                SELECT id FROM odb.classes
+                WHERE version_id = %s AND name = %s AND deleted_at IS NULL
+                """,
+                (source_version_id, row["name"]),
+            )
+            orig = cursor.fetchone()
+            if not orig:
+                continue
+            self._copy_class_properties_recursive(cursor, str(orig["id"]), str(row["id"]))
+        return len(copied)
+
+    def copy_single_class_between_versions_for_merge(
+        self, cursor: Any, source_version_id: str, target_version_id: str, class_name: str
+    ) -> Dict[str, Any]:
+        """Copy one class by name from source version to target (open transaction)."""
+        cursor.execute(
+            """
+            INSERT INTO odb.classes (version_id, name, description, schema, enabled, canvas_metadata)
+            SELECT %s, name, description, schema, enabled, canvas_metadata
+            FROM odb.classes
+            WHERE version_id = %s AND name = %s AND deleted_at IS NULL
+            RETURNING id, name
+            """,
+            (target_version_id, source_version_id, class_name),
+        )
+        ins = cursor.fetchone()
+        if not ins:
+            return {"success": False, "error": f"Class {class_name} not found on source version"}
+        cursor.execute(
+            """
+            SELECT id FROM odb.classes
+            WHERE version_id = %s AND name = %s AND deleted_at IS NULL
+            """,
+            (source_version_id, class_name),
+        )
+        orig = cursor.fetchone()
+        if not orig:
+            return {"success": False, "error": "Original class missing"}
+        self._copy_class_properties_recursive(cursor, str(orig["id"]), str(ins["id"]))
+        return {"success": True}
 
 
 # Global database instance
