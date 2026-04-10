@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## UI:
+- **Version merge (#738):** Branch merge **preview** and **apply** run through **objectified-rest** — **merge-base (LCA)** plus **three-way** `components.schemas` merge, structured conflict paths, **two parents** on the merge revision, **`baseRevisionId`** optimistic lock on the target tip; Studio API routes proxy to REST
 - **Canvas ↔ Code (#2595):** Switching to **Code** now **synchronously hides group floating toolbars** (including hover/settings/export), **clears flow selection**, and **blocks sidebar group delete row actions** while the Code tab is active so nothing in that stack can take a stray click during the transition
 - **Studio Code / GraphQL (#147):** GraphQL SDL in the Code tab is generated from a **Handlebars template** (`templates/graphql/graphql-schema.hbs`) instead of inlined string building, aligned with OpenAPI and Arazzo; template loader init is synchronous so tooling can import it safely
 - **Schema quality details (#2548):** **Studio header** Schema quality is **clickable** — opens a dialog with **letter grade (A–F)**, weighted **factor table**, and the same **score band guide** as import quality. **Schema Metrics** shows the same **overall schema quality** block (numeric score + letter + guide) above the per-metric controls

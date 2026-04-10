@@ -8,7 +8,7 @@ This represents the different versions of the Objectified specification and thei
 - ✅ Full version history
 - ✅ Compare any two versions
 - ✅ Visual diff with highlights
-- ✅ Branch and merge workflows (named branch tips, merge preview, merge apply with two parents when auto-mergeable; merge-base #2593 follow-up)
+- ✅ Branch and merge workflows (named branch tips; merge preview/apply with **merge-base (LCA)** and three-way OpenAPI merge in REST — #738)
 - ✅ Tag versions (v1.0, stable, beta) — #501
 - ✅ Version notes and changelogs (#502)
 - ✅ Fork versions for experiments (#503) — cross-project copy from a source revision with `forkedFromRevisionId` / optional `upstreamProjectId`; distinct from **named branches** within the same project (#500)
@@ -26,7 +26,7 @@ This represents the different versions of the Objectified specification and thei
 
 **Advanced Versioning** ✅ PARTIALLY IMPLEMENTED
 - **Version Branches**: 📋 Create branches for experimental features
-- 📋 **Version Merging**: Merge branches with conflict resolution
+- ✅ **Version Merging** (#738): REST three-way merge + merge-base; Studio proxies to REST
 - 📋 **Version Tags**: Label versions (stable, beta, deprecated, archived)
 - ✅ **Version Comparison**:
   - ✅ Side-by-side diff view
@@ -57,7 +57,6 @@ This represents the different versions of the Objectified specification and thei
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| #738   | Create version merging functionality         |
 | #739   | Implement version tags feature               |
 | #740   | Highlight added/removed/changed classes      |
 | #741   | Detail property-level changes                |
@@ -73,3 +72,5 @@ This represents the different versions of the Objectified specification and thei
 ---
 
 # Completed
+
+- **#738** — Version merging (Git-style merge-base, three-way OpenAPI schema merge, merge revision with two parents, `baseRevisionId` lock; optional `compatGateOnMerge`).

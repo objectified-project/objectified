@@ -1081,18 +1081,30 @@ const Versions = () => {
         await loadVersions();
         await loadBranches();
       } else {
-        if (r.status === 409 && d.code === 'MERGE_CONFLICT') {
+        const err = typeof d.detail === 'object' && d.detail !== null ? d.detail : d;
+        const code = typeof err === 'object' && err && 'code' in err ? (err as { code?: string }).code : undefined;
+        const conflictPaths =
+          typeof err === 'object' && err && 'conflictPaths' in err
+            ? (err as { conflictPaths?: string[] }).conflictPaths
+            : undefined;
+        if (r.status === 409 && code === 'MERGE_CONFLICT') {
           toast.error('Merge blocked: overlapping changes. Resolve conflicts using a future merge flow.');
           setMergePreviewData((prev) => ({
             ...(prev ?? {}),
             classification: {
               canAutoMerge: false,
-              conflictPaths: d.conflictPaths ?? [],
+              conflictPaths: conflictPaths ?? [],
               addedSchemaNames: prev?.classification?.addedSchemaNames ?? [],
             },
           }));
         } else {
-          toast.error(typeof d.error === 'string' ? d.error : 'Merge failed');
+          const msg =
+            typeof err === 'object' && err && 'message' in err
+              ? String((err as { message?: string }).message)
+              : typeof d.error === 'string'
+                ? d.error
+                : 'Merge failed';
+          toast.error(msg);
         }
       }
     } catch (e) {
@@ -2563,7 +2575,7 @@ const Versions = () => {
           <DialogHeader>
             <DialogTitle>Merge branches</DialogTitle>
             <DialogDescription>
-              Preview compares branch tips (merge-base from #2593 not yet applied). Apply creates a merge revision with two parents when there are no overlapping schema conflicts.
+              Preview uses a three-way merge of OpenAPI components against the merge-base (LCA) revision. Apply creates a merge revision with two parents when the merge engine reports no conflicts.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -2598,8 +2610,10 @@ const Versions = () => {
                   : `Conflicts: ${mergePreviewData.classification.conflictPaths.length} path(s). Apply is blocked.`}
               </Alert>
             )}
-            {mergePreviewData?.mergeBaseVersionId === null && mergePreviewData?.classification && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">Merge-base (LCA) is not computed yet (#2593); preview uses two-way diff between tips.</p>
+            {mergePreviewData?.mergeBaseVersionId != null && mergePreviewData?.classification && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Merge-base revision: <span className="font-mono">{mergePreviewData.mergeBaseVersionId}</span>
+              </p>
             )}
             {mergeCompatLoading && (
               <p className="text-xs text-gray-500 dark:text-gray-400">Checking backward compatibility (target tip → source tip)…</p>
@@ -2616,7 +2630,7 @@ const Versions = () => {
               >
                 <span className="font-medium text-sm">Backward compatibility: {mergeCompat.overall}</span>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  Compares generated OpenAPI for <strong>target tip</strong> (base) vs <strong>source tip</strong> (head). Not a substitute for merge-base (#2593) when the merge result differs from the source tip.
+                  Compares generated OpenAPI for <strong>target tip</strong> (base) vs <strong>source tip</strong> (head). Merge execution uses the three-way engine plus optional project compat gate on the merged result.
                 </p>
                 {mergeCompat.findings.length > 0 && (
                   <ul className="mt-2 text-xs list-disc pl-4 max-h-36 overflow-y-auto space-y-0.5">

@@ -334,6 +334,45 @@ class VersionForkRequest(BaseModel):
     )
 
 
+class VersionBranchMergePreviewRequest(BaseModel):
+    """Dry-run merge preview (three-way schema merge + merge-base)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    source_branch_name: str = Field(
+        ...,
+        validation_alias=AliasChoices("sourceBranchName", "source_branch_name"),
+    )
+    target_branch_name: str = Field(
+        ...,
+        validation_alias=AliasChoices("targetBranchName", "target_branch_name"),
+    )
+
+
+class VersionBranchMergeRequest(BaseModel):
+    """Merge source branch into target: requires baseRevisionId = current target tip (optimistic lock)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    source_branch_name: str = Field(
+        ...,
+        validation_alias=AliasChoices("sourceBranchName", "source_branch_name"),
+    )
+    target_branch_name: str = Field(
+        ...,
+        validation_alias=AliasChoices("targetBranchName", "target_branch_name"),
+    )
+    base_revision_id: str = Field(
+        ...,
+        validation_alias=AliasChoices("baseRevisionId", "base_revision_id"),
+    )
+    skip_compat_gate: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("skipCompatGate", "skip_compat_gate"),
+        description="When true, skip optional project compatGateOnMerge check against merge result.",
+    )
+
+
 class VersionUpdateRequest(BaseModel):
     """Request model for updating a version."""
 
