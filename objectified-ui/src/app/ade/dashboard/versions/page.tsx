@@ -126,6 +126,7 @@ const Versions = () => {
   const [copySourceBranchKey, setCopySourceBranchKey] = useState<string>('blank');
   const [branchListLoading, setBranchListLoading] = useState(false);
   const [branchListError, setBranchListError] = useState<string | null>(null);
+  const [branchPermissionDenied, setBranchPermissionDenied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -279,17 +280,22 @@ const Versions = () => {
     if (!selectedProjectId) return;
     setBranchListLoading(true);
     setBranchListError(null);
+    setBranchPermissionDenied(false);
+    setVersionBranches([]);
     try {
       const r = await fetch(`/api/projects/${selectedProjectId}/version-branches`);
+      if (r.status === 401 || r.status === 403) {
+        setBranchPermissionDenied(true);
+        setBranchListError('You do not have permission to view branch metadata for this project.');
+        return;
+      }
       const d = await r.json();
       if (d.success && Array.isArray(d.branches)) {
         setVersionBranches(d.branches);
       } else {
-        setVersionBranches([]);
         setBranchListError(typeof d.error === 'string' ? d.error : 'Could not load branches');
       }
     } catch {
-      setVersionBranches([]);
       setBranchListError('Could not load branches');
     } finally {
       setBranchListLoading(false);
@@ -1642,7 +1648,7 @@ const Versions = () => {
                         : null
                   }
                   isLoading={branchListLoading}
-                  permissionDenied={false}
+                  permissionDenied={branchPermissionDenied}
                 />
                 <Alert variant="info">Classes and properties will be copied from the selected revision.</Alert>
               </>

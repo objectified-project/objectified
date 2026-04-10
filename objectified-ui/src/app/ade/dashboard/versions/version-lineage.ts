@@ -78,7 +78,7 @@ export function buildLineageSnippet(
 
   const rootToTip = [...primary].reverse();
   const breadcrumbLabels = rootToTip.map(shortLabel);
-  const revisionIds = rootToTip.map((v) => v.version_id);
+  const revisionIds = rootToTip.map((v) => v.id);
 
   let mergeParentLabel: string | null = null;
   const tipNode = primary[0];
@@ -86,15 +86,6 @@ export function buildLineageSnippet(
   if (tipMerge) {
     const m = byId.get(tipMerge);
     mergeParentLabel = m ? shortLabel(m) : 'unknown';
-  } else {
-    for (const node of primary) {
-      const mp = mergeParentOf(node);
-      if (mp) {
-        const m = byId.get(mp);
-        mergeParentLabel = m ? shortLabel(m) : 'unknown';
-        break;
-      }
-    }
   }
 
   const branchSuffix =
