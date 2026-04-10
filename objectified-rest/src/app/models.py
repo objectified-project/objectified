@@ -235,6 +235,33 @@ class VersionSchema(BaseModel):
     enabled: bool = True
     parent_version_id: Optional[str] = None
     merge_parent_version_id: Optional[str] = None
+    forked_from_revision_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("forkedFromRevisionId", "forked_from_revision_id"),
+        serialization_alias="forkedFromRevisionId",
+        description="Source revision (versions.id) if this row is a fork.",
+    )
+    upstream_project_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("upstreamProjectId", "upstream_project_id"),
+        serialization_alias="upstreamProjectId",
+        description="Upstream project for merge/sync (optional).",
+    )
+    fork_source_version_label: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("forkSourceVersionLabel", "fork_source_version_string"),
+        serialization_alias="forkSourceVersionLabel",
+    )
+    fork_source_project_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("forkSourceProjectName", "fork_source_project_name"),
+        serialization_alias="forkSourceProjectName",
+    )
+    upstream_project_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("upstreamProjectName", "upstream_project_name"),
+        serialization_alias="upstreamProjectName",
+    )
     creator_name: Optional[str] = None
     creator_email: Optional[str] = None
     project_name: Optional[str] = None
@@ -260,6 +287,33 @@ class VersionCreateRequest(BaseModel):
     )
     source_version_id: Optional[str] = None  # Copy classes from this version
     bump_strategy: Optional[str] = None  # 'patch' or 'minor' for auto-versioning
+
+
+class VersionForkRequest(BaseModel):
+    """Fork a schema version line into another project from a source revision (cross-project sandbox)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    source_revision_id: str = Field(
+        ...,
+        validation_alias=AliasChoices("sourceRevisionId", "source_revision_id"),
+        description="Source version row id (revision) to copy from.",
+    )
+    upstream_project_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("upstreamProjectId", "upstream_project_id"),
+        description="Optional upstream project for merge-back; defaults to the source revision's project.",
+    )
+    version_id: Optional[str] = None
+    short_message: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("shortMessage", "description"),
+    )
+    changelog: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("changelog", "change_log"),
+    )
+    bump_strategy: Optional[str] = None  # 'patch' or 'minor' when version_id omitted
 
 
 class VersionUpdateRequest(BaseModel):

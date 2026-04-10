@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -69,6 +69,11 @@ interface Version {
   creator_email: string;
   parent_version_id?: string | null;
   merge_parent_version_id?: string | null;
+  forkedFromRevisionId?: string | null;
+  upstreamProjectId?: string | null;
+  forkSourceVersionLabel?: string | null;
+  forkSourceProjectName?: string | null;
+  upstreamProjectName?: string | null;
 }
 
 interface VersionBranchRow {
@@ -157,6 +162,17 @@ const Versions = () => {
   const [branchNameInput, setBranchNameInput] = useState('');
   const [branchSaving, setBranchSaving] = useState(false);
 
+  const [showForkDialog, setShowForkDialog] = useState(false);
+  const [forkFromVersionId, setForkFromVersionId] = useState('');
+  const [forkTargetProjectId, setForkTargetProjectId] = useState('');
+  const [forkAutoGenerate, setForkAutoGenerate] = useState(true);
+  const [forkVersionId, setForkVersionId] = useState('');
+  const [forkBumpStrategy, setForkBumpStrategy] = useState<'patch' | 'minor'>('patch');
+  const [forkDescription, setForkDescription] = useState('');
+  const [forkChangeLog, setForkChangeLog] = useState('');
+  const [forkSaving, setForkSaving] = useState(false);
+  const [forkPreviewNext, setForkPreviewNext] = useState<string>('');
+
   const [versionTags, setVersionTags] = useState<VersionTagRow[]>([]);
   const [showTagDialog, setShowTagDialog] = useState(false);
   const [tagFromVersionId, setTagFromVersionId] = useState<string>('');
@@ -180,6 +196,11 @@ const Versions = () => {
     targetTipVersionId?: string;
     mergeBaseVersionId?: string | null;
   } | null>(null);
+
+  const otherProjects = useMemo(
+    () => projects.filter((p) => p.id !== selectedProjectId),
+    [projects, selectedProjectId]
+  );
 
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
@@ -208,6 +229,42 @@ const Versions = () => {
 
   useEffect(() => { if (currentTenantId) loadProjects(); }, [currentTenantId]);
   useEffect(() => { if (selectedProjectId) loadVersions(); else setVersions([]); }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (!forkTargetProjectId || !showForkDialog) {
+      setForkPreviewNext('');
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/versions?projectId=${forkTargetProjectId}`)
+      .then((r) => r.json())
+      .then((data: { success?: boolean; versions?: Array<{ version_id: string }> }) => {
+        if (cancelled || !data.success || !Array.isArray(data.versions)) return;
+        const list = data.versions;
+        if (list.length === 0) {
+          setForkPreviewNext('0.1.0');
+          return;
+        }
+        const latest = list[0].version_id;
+        const match = latest.match(/^(\d+)\.(\d+)\.(\d+)$/);
+        if (!match) {
+          setForkPreviewNext('0.1.0');
+          return;
+        }
+        const major = parseInt(match[1], 10);
+        const minor = parseInt(match[2], 10);
+        const patch = parseInt(match[3], 10);
+        const next =
+          forkBumpStrategy === 'minor' ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
+        setForkPreviewNext(next);
+      })
+      .catch(() => {
+        if (!cancelled) setForkPreviewNext('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [forkTargetProjectId, showForkDialog, forkBumpStrategy]);
 
   const loadBranches = async () => {
     if (!selectedProjectId) return;
@@ -618,6 +675,20 @@ const Versions = () => {
         setBranchNameInput('');
         setShowBranchDialog(true);
         break;
+      case 'forkToProject':
+        if (otherProjects.length === 0) {
+          toast.warning('Create another project in this tenant to fork into — forks are isolated copies in a different project.');
+          break;
+        }
+        setForkFromVersionId(version.id);
+        setForkTargetProjectId(otherProjects[0]?.id ?? '');
+        setForkAutoGenerate(true);
+        setForkVersionId('');
+        setForkBumpStrategy('patch');
+        setForkDescription(`Fork from v${version.version_id}`);
+        setForkChangeLog('');
+        setShowForkDialog(true);
+        break;
       case 'tagFrom':
         setTagFromVersionId(version.id);
         setTagNameInput('');
@@ -654,6 +725,53 @@ const Versions = () => {
       toast.error(e instanceof Error ? e.message : 'Could not create branch');
     } finally {
       setBranchSaving(false);
+    }
+  };
+
+  const handleForkSubmit = async () => {
+    if (!forkFromVersionId || !forkTargetProjectId) {
+      toast.warning('Choose a target project');
+      return;
+    }
+    const notesCheck = validateVersionNotesClient(forkDescription, forkChangeLog);
+    if (!notesCheck.ok) {
+      toast.error(notesCheck.error);
+      return;
+    }
+    if (!forkAutoGenerate && !forkVersionId.trim()) {
+      toast.warning('Enter a version ID or enable auto-generate');
+      return;
+    }
+    setForkSaving(true);
+    try {
+      const body: Record<string, string | undefined | null> = {
+        targetProjectId: forkTargetProjectId,
+        sourceRevisionId: forkFromVersionId,
+        shortMessage: forkDescription.trim(),
+        changelog: forkChangeLog.trim() || undefined,
+      };
+      if (!forkAutoGenerate) {
+        body.versionId = forkVersionId.trim();
+      } else {
+        body.bumpStrategy = forkBumpStrategy;
+      }
+      const r = await fetch('/api/versions/fork', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (d.success) {
+        toast.success(`Fork created in ${projects.find((p) => p.id === forkTargetProjectId)?.name ?? 'target project'}`);
+        setShowForkDialog(false);
+        setSelectedProjectId(forkTargetProjectId);
+      } else {
+        toast.error(typeof d.error === 'string' ? d.error : 'Could not create fork');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not create fork');
+    } finally {
+      setForkSaving(false);
     }
   };
 
@@ -1006,8 +1124,8 @@ const Versions = () => {
             ))}
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Use &quot;Branch from here&quot; on a version row to create a pointer. Merge uses optimistic concurrency on the target tip (
-            <code className="text-xs">baseRevisionId</code>).
+            <span className="font-medium text-gray-700 dark:text-gray-300">Branch vs fork:</span> a named branch stays in this project (same version line).
+            A <span className="font-medium">fork</span> copies a revision into a <em>different</em> project for isolated experiments; lineage is stored for audit and merge-back.
           </p>
         </div>
       )}
@@ -1078,6 +1196,21 @@ const Versions = () => {
                         </span>
                       ))}
                     </div>
+                    {version.forkedFromRevisionId && (
+                      <div className="mt-2 rounded-md border border-violet-200 dark:border-violet-800 bg-violet-50/80 dark:bg-violet-950/30 px-2 py-1.5 text-xs text-violet-900 dark:text-violet-100">
+                        <span className="font-medium">Fork</span>
+                        {' · '}
+                        from v{version.forkSourceVersionLabel ?? '?'}
+                        {version.forkSourceProjectName != null && version.forkSourceProjectName !== ''
+                          ? ` (${version.forkSourceProjectName})`
+                          : ''}
+                        {version.upstreamProjectName != null &&
+                          version.upstreamProjectName !== '' &&
+                          version.upstreamProjectName !== version.forkSourceProjectName && (
+                            <span className="text-violet-700 dark:text-violet-300"> · Upstream project: {version.upstreamProjectName}</span>
+                          )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm text-gray-900 dark:text-white max-w-xs truncate">{version.shortMessage || '—'}</div>
@@ -1167,6 +1300,17 @@ const Versions = () => {
                               >
                                 <GitBranch className="w-4 h-4 text-indigo-500" />
                                 Branch from here
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenVersionDropdown(null);
+                                  handleRowAction('forkToProject', version);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                              >
+                                <GitFork className="w-4 h-4 text-violet-500" />
+                                Fork to another project…
                               </button>
                               <button
                                 onClick={(e) => {
@@ -1925,12 +2069,112 @@ const Versions = () => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={showForkDialog} onOpenChange={(open) => !forkSaving && setShowForkDialog(open)}>
+        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Fork to another project</DialogTitle>
+            <DialogDescription>
+              Create an isolated copy of this revision in a different project. Edits stay separate from the upstream line until you merge or publish intentionally.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="fork-target-project">Target project</Label>
+              <Select value={forkTargetProjectId} onValueChange={setForkTargetProjectId}>
+                <SelectTrigger id="fork-target-project">
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {otherProjects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Version ID</Label>
+              <Select
+                value={forkAutoGenerate ? 'auto' : 'manual'}
+                onValueChange={(v) => {
+                  const isAuto = v === 'auto';
+                  setForkAutoGenerate(isAuto);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto-generate in target project</SelectItem>
+                  <SelectItem value="manual">Manual entry</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {forkAutoGenerate ? (
+              <div className="space-y-1">
+                <Label>Bump strategy</Label>
+                <Select value={forkBumpStrategy} onValueChange={(v) => setForkBumpStrategy(v as 'patch' | 'minor')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="patch">Patch — next {forkPreviewNext || '…'}</SelectItem>
+                    <SelectItem value="minor">Minor — next minor in target</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label htmlFor="fork-version-id">Version ID (semantic)</Label>
+                <Input
+                  id="fork-version-id"
+                  value={forkVersionId}
+                  onChange={(e) => setForkVersionId(e.target.value)}
+                  placeholder="e.g. 1.0.0"
+                  autoComplete="off"
+                />
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label htmlFor="fork-short">Revision note</Label>
+              <Input
+                id="fork-short"
+                value={forkDescription}
+                onChange={(e) => setForkDescription(e.target.value)}
+                placeholder="Short message"
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="fork-changelog">Changelog (optional)</Label>
+              <Textarea
+                id="fork-changelog"
+                value={forkChangeLog}
+                onChange={(e) => setForkChangeLog(e.target.value)}
+                placeholder="Markdown release notes"
+                rows={3}
+                className="resize-y min-h-[72px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowForkDialog(false)} disabled={forkSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleForkSubmit} disabled={forkSaving || !forkTargetProjectId}>
+              {forkSaving ? 'Creating…' : 'Create fork'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showBranchDialog} onOpenChange={(open) => !branchSaving && setShowBranchDialog(open)}>
         <DialogContent className="max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Create named branch</DialogTitle>
             <DialogDescription>
-              Point a new branch name at this version snapshot. Further work can advance the tip via merge workflows.
+              Point a new branch name at this version snapshot in this project. Further work can advance the tip via merge workflows.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">

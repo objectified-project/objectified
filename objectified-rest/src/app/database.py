@@ -1212,11 +1212,18 @@ class Database:
             SELECT v.id, v.project_id, v.creator_id, v.version_id, v.description,
                    v.change_log, v.visibility, v.published, v.published_at,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
+                   v.forked_from_revision_id, v.upstream_project_id,
+                   vf.version_id AS fork_source_version_string,
+                   pf.name AS fork_source_project_name,
+                   up.name AS upstream_project_name,
                    v.created_at, v.updated_at,
                    u.name as creator_name, u.email as creator_email,
                    p.name as project_name, p.slug as project_slug
             FROM odb.versions v
             JOIN odb.projects p ON v.project_id = p.id
+            LEFT JOIN odb.versions vf ON vf.id = v.forked_from_revision_id AND vf.deleted_at IS NULL
+            LEFT JOIN odb.projects pf ON pf.id = vf.project_id AND pf.deleted_at IS NULL
+            LEFT JOIN odb.projects up ON up.id = v.upstream_project_id AND up.deleted_at IS NULL
             LEFT JOIN odb.users u ON v.creator_id = u.id
             WHERE v.project_id = %s
               AND p.tenant_id = %s
@@ -1232,11 +1239,18 @@ class Database:
             SELECT v.id, v.project_id, v.creator_id, v.version_id, v.description,
                    v.change_log, v.visibility, v.published, v.published_at,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
+                   v.forked_from_revision_id, v.upstream_project_id,
+                   vf.version_id AS fork_source_version_string,
+                   pf.name AS fork_source_project_name,
+                   up.name AS upstream_project_name,
                    v.created_at, v.updated_at,
                    u.name as creator_name, u.email as creator_email,
                    p.name as project_name, p.slug as project_slug
             FROM odb.versions v
             JOIN odb.projects p ON v.project_id = p.id
+            LEFT JOIN odb.versions vf ON vf.id = v.forked_from_revision_id AND vf.deleted_at IS NULL
+            LEFT JOIN odb.projects pf ON pf.id = vf.project_id AND pf.deleted_at IS NULL
+            LEFT JOIN odb.projects up ON up.id = v.upstream_project_id AND up.deleted_at IS NULL
             LEFT JOIN odb.users u ON v.creator_id = u.id
             WHERE v.id = %s
               AND p.tenant_id = %s
@@ -1252,11 +1266,18 @@ class Database:
             SELECT v.id, v.project_id, v.creator_id, v.version_id, v.description,
                    v.change_log, v.visibility, v.published, v.published_at,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
+                   v.forked_from_revision_id, v.upstream_project_id,
+                   vf.version_id AS fork_source_version_string,
+                   pf.name AS fork_source_project_name,
+                   up.name AS upstream_project_name,
                    v.created_at, v.updated_at,
                    u.name as creator_name, u.email as creator_email,
                    p.name as project_name, p.slug as project_slug
             FROM odb.versions v
             JOIN odb.projects p ON v.project_id = p.id
+            LEFT JOIN odb.versions vf ON vf.id = v.forked_from_revision_id AND vf.deleted_at IS NULL
+            LEFT JOIN odb.projects pf ON pf.id = vf.project_id AND pf.deleted_at IS NULL
+            LEFT JOIN odb.projects up ON up.id = v.upstream_project_id AND up.deleted_at IS NULL
             LEFT JOIN odb.users u ON v.creator_id = u.id
             WHERE v.project_id = %s
               AND v.version_id = %s
@@ -1315,6 +1336,97 @@ class Database:
         except Exception as e:
             conn.rollback()
             raise e
+
+    def create_forked_version(
+        self,
+        target_project_id: str,
+        tenant_id: str,
+        creator_id: Optional[str],
+        version_id: str,
+        description: Optional[str],
+        change_log: Optional[str],
+        source_revision_id: str,
+        upstream_project_id: Optional[str],
+    ) -> Dict[str, Any]:
+        """
+        Create a new version in target_project_id as a fork of source_revision_id (cross-project).
+        Copies classes from the source revision. Sets fork lineage columns; parent_version_id stays NULL (new root in target project).
+        """
+        source = self.get_version_by_id(source_revision_id, tenant_id)
+        if not source:
+            return {"success": False, "error": "Source revision not found or not accessible"}
+
+        src_project_id = source["project_id"]
+        if src_project_id == target_project_id:
+            return {
+                "success": False,
+                "error": "Fork requires a different target project than the source. Use “Branch from here” for named branches within the same project.",
+            }
+
+        target = self.get_project_by_id(target_project_id, tenant_id)
+        if not target:
+            return {"success": False, "error": "Target project not found"}
+
+        upstream = upstream_project_id if upstream_project_id else src_project_id
+        up_proj = self.get_project_by_id(upstream, tenant_id)
+        if not up_proj:
+            return {"success": False, "error": "Upstream project not found or not accessible"}
+
+        effective_upstream = upstream
+
+        query = """
+            INSERT INTO odb.versions
+            (project_id, creator_id, version_id, description, change_log,
+             parent_version_id, forked_from_revision_id, upstream_project_id)
+            VALUES (%s, %s, %s, %s, %s, NULL, %s, %s)
+            RETURNING id
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    query,
+                    (
+                        target_project_id,
+                        creator_id,
+                        version_id,
+                        description,
+                        change_log,
+                        source_revision_id,
+                        effective_upstream,
+                    ),
+                )
+                row = cursor.fetchone()
+                new_id = row["id"] if row else None
+                if not new_id:
+                    conn.rollback()
+                    return {"success": False, "error": "Failed to create forked version"}
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            return {"success": False, "error": str(e)}
+
+        copy_result = self.copy_classes_from_version(source_revision_id, new_id)
+        if not copy_result.get("success"):
+            conn = self.connect()
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "DELETE FROM odb.versions WHERE id = %s AND deleted_at IS NULL",
+                        (new_id,),
+                    )
+                    conn.commit()
+            except Exception:
+                conn.rollback()
+            return {
+                "success": False,
+                "error": copy_result.get("error", "Failed to copy schema from source revision"),
+            }
+
+        full = self.get_version_by_id(new_id, tenant_id)
+        if not full:
+            return {"success": False, "error": "Fork created but could not load version"}
+        return {"success": True, "version": full, "copied_count": copy_result.get("copied_count", 0)}
 
     def update_version(
         self,

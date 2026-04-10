@@ -58,6 +58,15 @@ def test_create_version_requires_auth():
     assert response.status_code == 401
 
 
+def test_fork_version_requires_auth():
+    """Test that forking a version requires authentication."""
+    response = client.post(
+        '/v1/versions/test-tenant/some-project-id/fork',
+        json={'sourceRevisionId': '00000000-0000-0000-0000-000000000001'},
+    )
+    assert response.status_code == 401
+
+
 def test_update_version_requires_auth():
     """Test that updating a version requires authentication."""
     response = client.put(
