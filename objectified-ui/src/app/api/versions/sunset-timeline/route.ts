@@ -20,11 +20,11 @@ interface SessionUser {
 
 function createAuthHeaders(user: SessionUser): Record<string, string> {
   if (!user.user_id) {
-    return { 'Content-Type': 'application/json' };
+    throw new Error('Unable to create authorization token: session user_id is missing');
   }
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret) {
-    return { 'Content-Type': 'application/json' };
+    throw new Error('Unable to create authorization token: NEXTAUTH_SECRET is not configured');
   }
   const encodedToken = jwt.sign(
     {

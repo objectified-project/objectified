@@ -300,7 +300,7 @@ export default function SunsetTimelinePage() {
                       href={e.deprecationWarnings[0]?.migrationGuideUrl ?? MIGRATION_GUIDE_ISSUE_URL}
                       className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline mt-1 inline-block"
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                     >
                       Migration guide
                     </a>

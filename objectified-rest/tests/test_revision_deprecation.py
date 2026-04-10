@@ -56,11 +56,11 @@ def test_warnings_for_revision():
         },
     )
     assert len(w) == 1
-    assert w[0]["revisionId"] == "rev-full"
-    assert w[0]["role"] == "base"
-    assert w[0]["replacementRevisionId"] == "new-rev"
-    assert w[0]["sunsetDate"] == "2026-06-01"
-    assert MIGRATION_GUIDE_ISSUE_URL in w[0]["message"]
+    assert w[0].revision_id == "rev-full"
+    assert w[0].role == "base"
+    assert w[0].replacement_revision_id == "new-rev"
+    assert w[0].sunset_date == "2026-06-01"
+    assert MIGRATION_GUIDE_ISSUE_URL in w[0].message
 
 
 def test_parse_calendar_date():

@@ -502,7 +502,7 @@ class SunsetTimelineEntryOut(BaseModel):
     deprecation_message: Optional[str] = Field(default=None, serialization_alias="deprecationMessage")
     successor_revision_id: Optional[str] = Field(default=None, serialization_alias="successorRevisionId")
     published: bool
-    deprecation_warnings: List[Dict[str, Any]] = Field(
+    deprecation_warnings: List[RevisionDeprecationWarningOut] = Field(
         default_factory=list,
         serialization_alias="deprecationWarnings",
     )

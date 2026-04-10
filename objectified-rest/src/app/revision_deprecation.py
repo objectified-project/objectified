@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from .models import RevisionDeprecationWarningOut
 
 MIGRATION_GUIDE_ISSUE_URL = "https://github.com/KenSuenobu/objectified/issues/747"
 
@@ -125,12 +128,14 @@ def warnings_for_revision(
     version_label: str,
     role: str,
     metadata: Any,
-) -> List[Dict[str, Any]]:
+) -> "List[RevisionDeprecationWarningOut]":
     """
-    Build structured warning dicts for API responses (compatibility, etc.).
+    Build structured deprecation warnings for API responses (compatibility, etc.).
 
     role: ``base`` | ``head``
     """
+    from .models import RevisionDeprecationWarningOut  # local import to avoid circular dependency
+
     if not is_revision_deprecated(metadata):
         return []
     m = coerce_metadata(metadata)
@@ -149,13 +154,13 @@ def warnings_for_revision(
     parts.append(f"Migration guide: {MIGRATION_GUIDE_ISSUE_URL}")
 
     return [
-        {
-            "revisionId": revision_id,
-            "role": role,
-            "versionId": version_label,
-            "message": " ".join(parts),
-            "replacementRevisionId": succ.strip() if isinstance(succ, str) and succ.strip() else None,
-            "sunsetDate": sunset.strip() if isinstance(sunset, str) and sunset.strip() else None,
-            "migrationGuideUrl": MIGRATION_GUIDE_ISSUE_URL,
-        }
+        RevisionDeprecationWarningOut(
+            revision_id=revision_id,
+            role=role,
+            version_id=version_label,
+            message=" ".join(parts),
+            replacement_revision_id=succ.strip() if isinstance(succ, str) and succ.strip() else None,
+            sunset_date=sunset.strip() if isinstance(sunset, str) and sunset.strip() else None,
+            migration_guide_url=MIGRATION_GUIDE_ISSUE_URL,
+        )
     ]

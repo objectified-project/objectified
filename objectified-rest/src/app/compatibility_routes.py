@@ -169,8 +169,8 @@ async def check_revision_compatibility(
     ]
     finding_dicts = [f.model_dump(by_alias=True) for f in finding_out]
 
-    dep_raw: List[Dict[str, Any]] = []
-    dep_raw.extend(
+    dep_out: List[RevisionDeprecationWarningOut] = []
+    dep_out.extend(
         warnings_for_revision(
             revision_id=base_ver["id"],
             version_label=base_ver["version_id"],
@@ -178,7 +178,7 @@ async def check_revision_compatibility(
             metadata=base_ver.get("metadata"),
         )
     )
-    dep_raw.extend(
+    dep_out.extend(
         warnings_for_revision(
             revision_id=head_ver["id"],
             version_label=head_ver["version_id"],
@@ -186,20 +186,9 @@ async def check_revision_compatibility(
             metadata=head_ver.get("metadata"),
         )
     )
-    dep_out = [
-        RevisionDeprecationWarningOut(
-            revision_id=w["revisionId"],
-            role=w["role"],
-            version_id=w["versionId"],
-            message=w["message"],
-            replacement_revision_id=w.get("replacementRevisionId"),
-            sunset_date=w.get("sunsetDate"),
-            migration_guide_url=w["migrationGuideUrl"],
-        )
-        for w in dep_raw
-    ]
 
-    fp = _fingerprint(overall, finding_dicts, dep_raw or None)
+    dep_dicts = [w.model_dump(by_alias=True) for w in dep_out]
+    fp = _fingerprint(overall, finding_dicts, dep_dicts or None)
 
     tenant_gate = _tenant_compat_gate(project)
     merge_blocked = bool(tenant_gate and overall != "safe")
