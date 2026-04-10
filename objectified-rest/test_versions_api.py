@@ -365,13 +365,8 @@ def test_fork_version_bump_strategy_minor():
                 },
             )
         # create_forked_version must have been called with the minor-bumped version "1.3.0"
-        assert mock_db.create_forked_version.called
-        call_kwargs = mock_db.create_forked_version.call_args
-        actual_version_id = (
-            call_kwargs.kwargs.get("version_id")
-            if call_kwargs.kwargs
-            else call_kwargs[1].get("version_id") or call_kwargs[0][2]
-        )
+        mock_db.create_forked_version.assert_called_once()
+        actual_version_id = mock_db.create_forked_version.call_args.kwargs.get("version_id")
         assert actual_version_id == "1.3.0", f"Expected 1.3.0 but got {actual_version_id}"
         assert response.status_code == 200
     finally:
