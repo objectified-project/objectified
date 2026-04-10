@@ -3,10 +3,25 @@ Tests for Versions REST API endpoints with dual authentication (JWT and API Key)
 """
 
 import pytest
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from src.app.main import app
+from src.app.auth import validate_authentication
 
 client = TestClient(app)
+
+# ---------------------------------------------------------------------------
+# Auth-bypass helper
+# ---------------------------------------------------------------------------
+_MOCK_AUTH = {
+    "tenant_id": "test-tenant-id",
+    "user_id": "test-user-id",
+    "auth_method": "jwt",
+}
+
+
+def _override_auth():
+    return _MOCK_AUTH
 
 
 def test_list_versions_requires_auth():
@@ -241,3 +256,123 @@ def test_create_version_with_bump_strategy():
         }
     )
     assert response.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Fork endpoint – business logic tests (auth bypassed via dependency override)
+# ---------------------------------------------------------------------------
+
+_FAKE_PROJECT = {"id": "proj-a", "name": "Project A", "tenant_id": "test-tenant-id"}
+_FAKE_VERSION = {
+    "id": "ver-1",
+    "project_id": "proj-a",
+    "version_id": "1.0.1",
+    "description": None,
+    "change_log": None,
+    "visibility": "private",
+    "published": False,
+    "published_at": None,
+    "enabled": True,
+    "parent_version_id": None,
+    "merge_parent_version_id": None,
+    "forked_from_revision_id": "src-rev-id",
+    "upstream_project_id": "proj-source",
+    "created_at": "2026-01-01T00:00:00",
+    "updated_at": "2026-01-01T00:00:00",
+}
+
+
+def test_fork_version_missing_source_revision_id():
+    """POST /fork with empty sourceRevisionId returns 400 with a camelCase error message."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("src.app.versions_routes.db") as mock_db:
+            mock_db.get_project_by_id.return_value = _FAKE_PROJECT
+            response = client.post(
+                "/v1/versions/test-tenant/proj-a/fork",
+                json={"sourceRevisionId": ""},
+            )
+        assert response.status_code == 400
+        assert "sourceRevisionId" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_fork_version_bad_semantic_version_400():
+    """POST /fork with an explicit non-semver versionId returns 400."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("src.app.versions_routes.db") as mock_db:
+            mock_db.get_project_by_id.return_value = _FAKE_PROJECT
+            response = client.post(
+                "/v1/versions/test-tenant/proj-a/fork",
+                json={
+                    "sourceRevisionId": "src-rev-id",
+                    "versionId": "not-a-semver",
+                },
+            )
+        assert response.status_code == 400
+        assert "semantic versioning" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_fork_version_same_project_returns_400():
+    """POST /fork where source and target are the same project returns 400."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("src.app.versions_routes.db") as mock_db:
+            mock_db.get_project_by_id.return_value = _FAKE_PROJECT
+            mock_db.get_latest_version_for_project.return_value = None
+            mock_db.create_forked_version.return_value = {
+                "success": False,
+                "error": (
+                    'Fork requires a different target project than the source. '
+                    'Use \u201cBranch from here\u201d for named branches within the same project.'
+                ),
+            }
+            response = client.post(
+                "/v1/versions/test-tenant/proj-a/fork",
+                json={
+                    "sourceRevisionId": "src-rev-id",
+                    "shortMessage": "fork test",
+                },
+            )
+        assert response.status_code == 400
+        assert "different target project" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_fork_version_bump_strategy_minor():
+    """POST /fork with bumpStrategy='minor' increments the minor version component."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("src.app.versions_routes.db") as mock_db:
+            mock_db.get_project_by_id.return_value = _FAKE_PROJECT
+            mock_db.get_latest_version_for_project.return_value = "1.2.3"
+            mock_db.create_forked_version.return_value = {
+                "success": True,
+                "version": _FAKE_VERSION,
+                "copied_count": 0,
+            }
+            response = client.post(
+                "/v1/versions/test-tenant/proj-a/fork",
+                json={
+                    "sourceRevisionId": "src-rev-id",
+                    "bumpStrategy": "minor",
+                    "shortMessage": "minor bump fork",
+                },
+            )
+        # create_forked_version must have been called with the minor-bumped version "1.3.0"
+        assert mock_db.create_forked_version.called
+        call_kwargs = mock_db.create_forked_version.call_args
+        actual_version_id = (
+            call_kwargs.kwargs.get("version_id")
+            if call_kwargs.kwargs
+            else call_kwargs[1].get("version_id") or call_kwargs[0][2]
+        )
+        assert actual_version_id == "1.3.0", f"Expected 1.3.0 but got {actual_version_id}"
+        assert response.status_code == 200
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)

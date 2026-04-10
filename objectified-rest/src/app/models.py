@@ -304,7 +304,11 @@ class VersionForkRequest(BaseModel):
         validation_alias=AliasChoices("upstreamProjectId", "upstream_project_id"),
         description="Optional upstream project for merge-back; defaults to the source revision's project.",
     )
-    version_id: Optional[str] = None
+    version_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("versionId", "version_id"),
+        description="Explicit semantic version string for the forked version (e.g. '2.0.0').",
+    )
     short_message: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("shortMessage", "description"),
@@ -313,7 +317,11 @@ class VersionForkRequest(BaseModel):
         default=None,
         validation_alias=AliasChoices("changelog", "change_log"),
     )
-    bump_strategy: Optional[str] = None  # 'patch' or 'minor' when version_id omitted
+    bump_strategy: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("bumpStrategy", "bump_strategy"),
+        description="Auto-versioning strategy when versionId is omitted: 'minor' or 'patch' (default).",
+    )
 
 
 class VersionUpdateRequest(BaseModel):

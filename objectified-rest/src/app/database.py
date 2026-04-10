@@ -1374,7 +1374,7 @@ class Database:
 
         effective_upstream = upstream
 
-        query = """
+        insert_query = """
             INSERT INTO odb.versions
             (project_id, creator_id, version_id, description, change_log,
              parent_version_id, forked_from_revision_id, upstream_project_id)
@@ -1382,10 +1382,12 @@ class Database:
             RETURNING id
         """
         conn = self.connect()
+        new_id = None
+        copied_count = 0
         try:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    query,
+                    insert_query,
                     (
                         target_project_id,
                         creator_id,
@@ -1401,32 +1403,47 @@ class Database:
                 if not new_id:
                     conn.rollback()
                     return {"success": False, "error": "Failed to create forked version"}
+
+                # Copy classes within the same transaction so insert + copy are atomic
+                cursor.execute("""
+                    INSERT INTO odb.classes (version_id, name, description, schema, enabled, canvas_metadata)
+                    SELECT %s, name, description, schema, enabled, canvas_metadata
+                    FROM odb.classes
+                    WHERE version_id = %s AND deleted_at IS NULL
+                    RETURNING id, name
+                """, (new_id, source_revision_id))
+
+                copied_classes = cursor.fetchall()
+                copied_count = len(copied_classes)
+
+                for copied_class in copied_classes:
+                    new_class_id = copied_class["id"]
+                    class_name = copied_class["name"]
+
+                    cursor.execute("""
+                        SELECT id FROM odb.classes
+                        WHERE version_id = %s AND name = %s AND deleted_at IS NULL
+                    """, (source_revision_id, class_name))
+
+                    original = cursor.fetchone()
+                    if original:
+                        original_class_id = original["id"]
+                        cursor.execute("""
+                            INSERT INTO odb.class_properties (class_id, property_id, name, description, data)
+                            SELECT %s, property_id, name, description, data
+                            FROM odb.class_properties
+                            WHERE class_id = %s AND parent_id IS NULL
+                        """, (new_class_id, original_class_id))
+
                 conn.commit()
         except Exception as e:
             conn.rollback()
             return {"success": False, "error": str(e)}
 
-        copy_result = self.copy_classes_from_version(source_revision_id, new_id)
-        if not copy_result.get("success"):
-            conn = self.connect()
-            try:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        "DELETE FROM odb.versions WHERE id = %s AND deleted_at IS NULL",
-                        (new_id,),
-                    )
-                    conn.commit()
-            except Exception:
-                conn.rollback()
-            return {
-                "success": False,
-                "error": copy_result.get("error", "Failed to copy schema from source revision"),
-            }
-
         full = self.get_version_by_id(new_id, tenant_id)
         if not full:
             return {"success": False, "error": "Fork created but could not load version"}
-        return {"success": True, "version": full, "copied_count": copy_result.get("copied_count", 0)}
+        return {"success": True, "version": full, "copied_count": copied_count}
 
     def update_version(
         self,

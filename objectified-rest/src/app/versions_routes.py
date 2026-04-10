@@ -281,7 +281,7 @@ async def fork_version_from_revision(
 
     src_id = (request.source_revision_id or "").strip()
     if not src_id:
-        raise HTTPException(status_code=400, detail="source_revision_id is required")
+        raise HTTPException(status_code=400, detail="sourceRevisionId is required")
 
     version_id = (request.version_id or "").strip() if request.version_id else ""
     if not version_id:
