@@ -1373,13 +1373,26 @@ class Database:
             conn.rollback()
             raise e
 
-    def publish_version(self, version_record_id: str, tenant_id: str, user_id: str, visibility: str = "private") -> Optional[Dict[str, Any]]:
-        """Publish a version (only owner or tenant admin can publish). Captures class schemas to odb.class_schema."""
+    def publish_version(
+        self,
+        version_record_id: str,
+        tenant_id: str,
+        user_id: str,
+        visibility: str = "private",
+        description: Optional[str] = None,
+        change_log: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Publish a version (only owner or tenant admin can publish). Captures class schemas to odb.class_schema.
+
+        description and change_log are written in the same update as publish (validated in routes).
+        """
         query = """
             UPDATE odb.versions v
             SET published = true,
                 published_at = CURRENT_TIMESTAMP,
                 visibility = %s,
+                description = %s,
+                change_log = %s,
                 updated_at = CURRENT_TIMESTAMP
             FROM odb.projects p
             WHERE v.id = %s
@@ -1401,7 +1414,10 @@ class Database:
         conn = self.connect()
         try:
             with conn.cursor() as cursor:
-                cursor.execute(query, (visibility, version_record_id, tenant_id, user_id, user_id))
+                cursor.execute(
+                    query,
+                    (visibility, description, change_log, version_record_id, tenant_id, user_id, user_id),
+                )
                 result = cursor.fetchone()
                 if result:
                     # Capture frozen JSON Schema 2020-12 per class into class_schema

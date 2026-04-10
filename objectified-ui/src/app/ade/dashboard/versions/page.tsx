@@ -34,6 +34,7 @@ import { generateOpenApiSpec } from '../../../utils/openapi';
 import YAML from 'yaml';
 import { diffLines, Change } from 'diff';
 import { compareSchemas, type DiffSummary, getPathLabel } from '../../../../../lib/schema-diff';
+import { extractBreakingHintsFromChangelog, validateVersionNotesClient } from '../../../../../lib/version-notes';
 import RelationshipGraphDialog from './RelationshipGraphDialog';
 import { toast } from 'sonner';
 
@@ -101,6 +102,8 @@ const Versions = () => {
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [publishVersionId, setPublishVersionId] = useState<string | null>(null);
   const [publishVisibility, setPublishVisibility] = useState<'private' | 'public'>('private');
+  const [publishShortMessage, setPublishShortMessage] = useState('');
+  const [publishChangelog, setPublishChangelog] = useState('');
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
   const [versionId, setVersionId] = useState('');
   const [autoGenerate, setAutoGenerate] = useState(true);
@@ -320,7 +323,8 @@ const Versions = () => {
 
   const handleCreateSubmit = async () => {
     if (!autoGenerate && !versionId.trim()) { setErrorMessage('Version ID is required when not auto-generating'); return; }
-    if (!description.trim()) { setErrorMessage('Description is required'); return; }
+    const notesCheck = validateVersionNotesClient(description, changeLog);
+    if (!notesCheck.ok) { setErrorMessage(notesCheck.error); return; }
     setIsLoading(true); setErrorMessage('');
     try {
       const result = await createVersion(selectedProjectId, currentUserId, autoGenerate ? null : versionId, description, changeLog, sourceVersionId || null, autoGenerate ? bumpStrategy : undefined);
@@ -344,7 +348,8 @@ const Versions = () => {
 
   const handleEditSubmit = async () => {
     if (!selectedVersion) return;
-    if (!description.trim()) { setErrorMessage('Description is required'); return; }
+    const notesCheck = validateVersionNotesClient(description, changeLog);
+    if (!notesCheck.ok) { setErrorMessage(notesCheck.error); return; }
     setIsLoading(true); setErrorMessage('');
     try {
       const result = await updateVersion(selectedVersion.id, description, changeLog, enabled);
@@ -361,6 +366,8 @@ const Versions = () => {
     if (ver.creator_id !== currentUserId && !effectiveIsAdmin) return;
     setPublishVersionId(versionRecordId);
     setPublishVisibility('private');
+    setPublishShortMessage(ver.description?.trim() ?? '');
+    setPublishChangelog(ver.change_log?.trim() ?? '');
     setShowPublishDialog(true);
   };
 
@@ -371,11 +378,21 @@ const Versions = () => {
       await alertDialog({ message: 'Version not found', variant: 'error' });
       return;
     }
+    const notesCheck = validateVersionNotesClient(publishShortMessage, publishChangelog);
+    if (!notesCheck.ok) {
+      await alertDialog({ message: notesCheck.error, variant: 'error' });
+      return;
+    }
     try {
       const res = await fetch(`/api/versions/${publishVersionId}/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: version.project_id, visibility: publishVisibility }),
+        body: JSON.stringify({
+          projectId: version.project_id,
+          visibility: publishVisibility,
+          shortMessage: publishShortMessage.trim(),
+          changelog: publishChangelog.trim() || null,
+        }),
       });
       const response = await res.json();
       if (response.success) {
@@ -1037,7 +1054,7 @@ const Versions = () => {
             <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revision / changelog</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created By</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created</th>
@@ -1292,12 +1309,12 @@ const Versions = () => {
               </div>
             )}
             <div className="space-y-2">
-              <Label>Description *</Label>
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} disabled={isLoading} />
+              <Label>Revision note *</Label>
+              <Input value={description} onChange={(e) => setDescription(e.target.value)} disabled={isLoading} placeholder="Short summary (commit message)" />
             </div>
             <div className="space-y-2">
-              <Label>Change Log</Label>
-              <Textarea value={changeLog} onChange={(e) => setChangeLog(e.target.value)} rows={3} disabled={isLoading} />
+              <Label>Changelog (markdown)</Label>
+              <Textarea value={changeLog} onChange={(e) => setChangeLog(e.target.value)} rows={3} disabled={isLoading} placeholder="Release notes, breaking bullets (- breaking: …)" />
             </div>
           </div>
           <DialogFooter>
@@ -1318,12 +1335,12 @@ const Versions = () => {
               <Input value={versionId} disabled className="font-mono" />
             </div>
             <div className="space-y-2">
-              <Label>Description *</Label>
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} disabled={isLoading} autoFocus />
+              <Label>Revision note *</Label>
+              <Input value={description} onChange={(e) => setDescription(e.target.value)} disabled={isLoading} autoFocus placeholder="Short summary (commit message)" />
             </div>
             <div className="space-y-2">
-              <Label>Change Log</Label>
-              <Textarea value={changeLog} onChange={(e) => setChangeLog(e.target.value)} rows={4} disabled={isLoading} />
+              <Label>Changelog (markdown)</Label>
+              <Textarea value={changeLog} onChange={(e) => setChangeLog(e.target.value)} rows={4} disabled={isLoading} placeholder="Release notes, breaking bullets (- breaking: …)" />
             </div>
           </div>
           <DialogFooter>
@@ -1357,6 +1374,24 @@ const Versions = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {publishVisibility === 'private' ? 'Access requires an API Key.' : 'OpenAPI Specification will be public without requiring an API Key.'}
               </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Revision note *</Label>
+              <Input
+                value={publishShortMessage}
+                onChange={(e) => setPublishShortMessage(e.target.value)}
+                placeholder="Short summary frozen with this publish"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Changelog (markdown)</Label>
+              <Textarea
+                value={publishChangelog}
+                onChange={(e) => setPublishChangelog(e.target.value)}
+                rows={5}
+                placeholder="Release notes; use - breaking: lines for migration docs"
+                className="font-mono text-sm"
+              />
             </div>
           </div>
           <DialogFooter>
@@ -1523,6 +1558,61 @@ const Versions = () => {
               </div>
             ) : (
               <div className="flex flex-col h-full">
+                {(() => {
+                  const vBase = versions.find((v) => v.id === compareVersion1Id);
+                  const vTo = versions.find((v) => v.id === compareVersion2Id);
+                  if (!vBase || !vTo) return null;
+                  const breakBase = extractBreakingHintsFromChangelog(vBase.change_log);
+                  const breakTo = extractBreakingHintsFromChangelog(vTo.change_log);
+                  return (
+                    <div className="mb-4 space-y-3 flex-shrink-0">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/40 p-3 text-sm">
+                          <div className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                            v{vBase.version_id} (base)
+                          </div>
+                          <div className="text-gray-600 dark:text-gray-400">
+                            <span className="text-gray-500 dark:text-gray-500">Revision note:</span>{' '}
+                            {vBase.description?.trim() || '—'}
+                          </div>
+                          {vBase.change_log?.trim() ? (
+                            <pre className="mt-2 whitespace-pre-wrap text-xs text-gray-700 dark:text-gray-300 font-sans max-h-32 overflow-y-auto">
+                              {vBase.change_log}
+                            </pre>
+                          ) : (
+                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No changelog</p>
+                          )}
+                          {breakBase.length > 0 && (
+                            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                              Breaking hints: {breakBase.join(' · ')}
+                            </p>
+                          )}
+                        </div>
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/40 p-3 text-sm">
+                          <div className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                            v{vTo.version_id} (compare to)
+                          </div>
+                          <div className="text-gray-600 dark:text-gray-400">
+                            <span className="text-gray-500 dark:text-gray-500">Revision note:</span>{' '}
+                            {vTo.description?.trim() || '—'}
+                          </div>
+                          {vTo.change_log?.trim() ? (
+                            <pre className="mt-2 whitespace-pre-wrap text-xs text-gray-700 dark:text-gray-300 font-sans max-h-32 overflow-y-auto">
+                              {vTo.change_log}
+                            </pre>
+                          ) : (
+                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No changelog</p>
+                          )}
+                          {breakTo.length > 0 && (
+                            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                              Breaking hints: {breakTo.join(' · ')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
                 {/* Tab Navigation */}
                 <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
                   <button

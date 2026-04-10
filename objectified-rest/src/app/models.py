@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices, ConfigDict
 from typing import Optional, Dict, Any, List, Union, Literal
 
 
@@ -210,13 +210,25 @@ class ProjectUpdateRequest(BaseModel):
 # ==================== Version Models ====================
 
 class VersionSchema(BaseModel):
-    """Pydantic model for a version."""
+    """Schema revision: shortMessage = commit-style note; changelog = release notes (markdown)."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     id: str
     project_id: str
     creator_id: Optional[str] = None
     version_id: str
-    description: Optional[str] = None
-    change_log: Optional[str] = None
+    short_message: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("shortMessage", "description"),
+        serialization_alias="shortMessage",
+        description="Human-readable revision note (stored as description in DB).",
+    )
+    changelog: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("changelog", "change_log"),
+        description="Markdown changelog / release notes (stored as change_log in DB).",
+    )
     visibility: str = "private"
     published: bool = False
     published_at: Optional[Union[datetime, str]] = None
@@ -230,38 +242,56 @@ class VersionSchema(BaseModel):
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
 
-    class Config:
-        from_attributes = True
-
 
 class VersionCreateRequest(BaseModel):
     """Request model for creating a version."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
     version_id: Optional[str] = None  # Optional - auto-generated if not provided
-    description: Optional[str] = None
-    change_log: Optional[str] = None
+    short_message: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("shortMessage", "description"),
+        description="Revision note (commit message analog).",
+    )
+    changelog: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("changelog", "change_log"),
+    )
     source_version_id: Optional[str] = None  # Copy classes from this version
     bump_strategy: Optional[str] = None  # 'patch' or 'minor' for auto-versioning
-
-    class Config:
-        from_attributes = True
 
 
 class VersionUpdateRequest(BaseModel):
     """Request model for updating a version."""
-    description: Optional[str] = None
-    change_log: Optional[str] = None
-    enabled: Optional[bool] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(populate_by_name=True)
+
+    short_message: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("shortMessage", "description"),
+    )
+    changelog: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("changelog", "change_log"),
+    )
+    enabled: Optional[bool] = None
 
 
 class VersionPublishRequest(BaseModel):
-    """Request model for publishing a version."""
-    visibility: Optional[str] = "private"  # 'public' or 'private'
+    """Publish: optional last-minute revision note / changelog applied before freeze."""
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(populate_by_name=True)
+
+    visibility: Optional[str] = "private"  # 'public' or 'private'
+    short_message: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("shortMessage", "description"),
+    )
+    changelog: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("changelog", "change_log"),
+    )
 
 
 class VersionTagSchema(BaseModel):

@@ -10,14 +10,13 @@ This represents the different versions of the Objectified specification and thei
 - ✅ Visual diff with highlights
 - ✅ Branch and merge workflows (named branch tips, merge preview, merge apply with two parents when auto-mergeable; merge-base #2593 follow-up)
 - ✅ Tag versions (v1.0, stable, beta) — #501
-- 📋 Version notes and changelogs
+- ✅ Version notes and changelogs (#502)
 - 📋 Fork versions for experiments
 - 📋 Protected versions (can't be deleted)
 - Show branches when creating copies of schemas
 
 | Ticket  | Feature Description                           |
 |---------|-----------------------------------------------|
-| #502    | Add and modify version notes and changelogs   |
 | #503    | Add ability to fork versions for testing      |
 | #504    | Implement protected versions feature          |
 | #505    | Show branches when creating copies of schemas |
