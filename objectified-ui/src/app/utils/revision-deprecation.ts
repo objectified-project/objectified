@@ -1,13 +1,29 @@
 /**
  * Client-side helpers for schema revision deprecation (versions.metadata) — #507.
  * Keep in sync with objectified-rest `revision_deprecation.py`.
+ * Accepts either a plain object or a JSON string (matching the backend `coerce_metadata` helper).
  */
 
 export const MIGRATION_GUIDE_ISSUE_URL = 'https://github.com/KenSuenobu/objectified/issues/747';
 
+function coerceMetadata(raw: unknown): Record<string, unknown> {
+  if (!raw) return {};
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  return {};
+}
+
 export function isRevisionDeprecated(metadata: unknown): boolean {
-  if (!metadata || typeof metadata !== 'object') return false;
-  const m = metadata as Record<string, unknown>;
+  const m = coerceMetadata(metadata);
   const d = m.deprecated;
   if (d === true) return true;
   if (typeof d === 'string' && ['true', '1', 'yes'].includes(d.toLowerCase())) return true;
@@ -16,7 +32,7 @@ export function isRevisionDeprecated(metadata: unknown): boolean {
 
 export function revisionDeprecationLines(metadata: unknown): string[] {
   if (!isRevisionDeprecated(metadata)) return [];
-  const m = (metadata && typeof metadata === 'object' ? metadata : {}) as Record<string, unknown>;
+  const m = coerceMetadata(metadata);
   const lines: string[] = [];
   const msg = m.deprecationMessage ?? m.message;
   if (typeof msg === 'string' && msg.trim()) lines.push(msg.trim());
