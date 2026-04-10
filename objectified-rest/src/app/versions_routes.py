@@ -387,6 +387,15 @@ async def update_version(
         if request.enabled is not None:
             updates["enabled"] = request.enabled
 
+        if "revision_locked" in request.model_fields_set:
+            uid_lock = get_authenticated_user_id(auth_data)
+            if not uid_lock or not db.is_user_tenant_admin(auth_data["tenant_id"], uid_lock):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only tenant administrators can lock or unlock revisions",
+                )
+            updates["revision_locked"] = bool(request.revision_locked)
+
         note_keys = {"short_message", "changelog"}
         if request.model_fields_set & note_keys:
             merged_sm = existing.get("description")
@@ -420,6 +429,19 @@ async def update_version(
             raise HTTPException(
                 status_code=404,
                 detail=f"Version not found: {version_record_id}"
+            )
+
+        if "revision_locked" in request.model_fields_set:
+            uid_audit = get_authenticated_user_id(auth_data)
+            db.insert_version_protection_audit(
+                auth_data["tenant_id"],
+                existing.get("project_id"),
+                uid_audit,
+                "version.revision_lock",
+                "version",
+                version_record_id,
+                "policy_change",
+                {"revision_locked": bool(request.revision_locked)},
             )
 
         return VersionSchema(**version)
@@ -678,13 +700,22 @@ async def delete_version(
             detail=f"Version not found in project: {project_id}"
         )
 
-    # Delete the version
-    success = db.delete_version(version_record_id, auth_data['tenant_id'])
+    uid = get_authenticated_user_id(auth_data)
+    success, err = db.delete_version(version_record_id, auth_data["tenant_id"], uid)
 
     if not success:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to delete version"
-        )
+        if err == "not_found":
+            raise HTTPException(status_code=404, detail=f"Version not found: {version_record_id}")
+        if err == "forbidden":
+            raise HTTPException(
+                status_code=403,
+                detail="Only the version creator or a tenant admin can delete this version",
+            )
+        if err == "revision_locked":
+            raise HTTPException(
+                status_code=403,
+                detail="This revision is locked by policy and cannot be deleted",
+            )
+        raise HTTPException(status_code=500, detail="Failed to delete version")
 
     return {"message": f"Version '{existing['version_id']}' deleted successfully"}

@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -74,6 +74,7 @@ interface Version {
   forkSourceVersionLabel?: string | null;
   forkSourceProjectName?: string | null;
   upstreamProjectName?: string | null;
+  revisionLocked?: boolean;
 }
 
 interface VersionBranchRow {
@@ -83,6 +84,7 @@ interface VersionBranchRow {
   tip_version_string?: string;
   created_at?: string;
   created_by?: string | null;
+  protected?: boolean;
 }
 
 interface VersionTagRow {
@@ -93,6 +95,7 @@ interface VersionTagRow {
   message?: string | null;
   channel?: string | null;
   immutable?: boolean;
+  protected?: boolean;
   created_by?: string | null;
 }
 
@@ -180,6 +183,7 @@ const Versions = () => {
   const [tagMessageInput, setTagMessageInput] = useState('');
   const [tagChannelInput, setTagChannelInput] = useState('');
   const [tagImmutable, setTagImmutable] = useState(false);
+  const [tagProtected, setTagProtected] = useState(false);
   const [tagSaving, setTagSaving] = useState(false);
   const [historyTagFilter, setHistoryTagFilter] = useState<string>('');
   const [compareBaseTagId, setCompareBaseTagId] = useState<string>('');
@@ -525,9 +529,15 @@ const Versions = () => {
     if (!confirmed) return;
     try {
       const result = await deleteVersion(versionRecordId);
-      const response = JSON.parse(result);
+      const response = JSON.parse(result) as { success?: boolean; error?: string; code?: string };
       if (response.success) await loadVersions();
-      else await alertDialog({ message: response.error || 'Failed to delete', variant: 'error' });
+      else {
+        const msg =
+          response.code === 'REVISION_LOCKED'
+            ? 'This revision is locked by policy and cannot be deleted (tenant admins may override).'
+            : response.error || 'Failed to delete';
+        await alertDialog({ message: msg, variant: 'error' });
+      }
     } catch (error: any) { await alertDialog({ message: error.message || 'An error occurred', variant: 'error' }); }
   };
 
@@ -669,7 +679,13 @@ const Versions = () => {
       case 'publish': if (canPub) handlePublishClick(version.id); else toast.warning('Only owner or admin can publish'); break;
       case 'unpublish': if (canUnpub) await handleUnpublish(version.id); else toast.warning('Only owner or admin can unpublish'); break;
       case 'freezeSchema': if (canModify(version)) await handleFreezeSchema(version); else toast.warning('Only owner or admin can freeze schema'); break;
-      case 'delete': await handleDelete(version.id); break;
+      case 'delete':
+        if (version.revisionLocked && !effectiveIsAdmin) {
+          toast.warning('This revision is locked by policy; only a tenant admin can delete it.');
+          break;
+        }
+        await handleDelete(version.id);
+        break;
       case 'branchFrom':
         setBranchFromVersionId(version.id);
         setBranchNameInput('');
@@ -695,6 +711,7 @@ const Versions = () => {
         setTagMessageInput('');
         setTagChannelInput('');
         setTagImmutable(false);
+        setTagProtected(false);
         setShowTagDialog(true);
         break;
     }
@@ -792,6 +809,7 @@ const Versions = () => {
           message: tagMessageInput.trim() || undefined,
           channel: tagChannelInput.trim() || undefined,
           immutable: tagImmutable,
+          ...(effectiveIsAdmin && tagProtected ? { protected: true } : {}),
         }),
       });
       const d = await r.json();
@@ -859,6 +877,69 @@ const Versions = () => {
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not delete branch');
+    }
+  };
+
+  const handleToggleBranchProtection = async (branchId: string, nextProtected: boolean) => {
+    if (!selectedProjectId || !effectiveIsAdmin) return;
+    try {
+      const r = await fetch(`/api/projects/${selectedProjectId}/version-branches/${branchId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ protected: nextProtected }),
+      });
+      const d = await r.json();
+      if (d.success) {
+        toast.success(nextProtected ? 'Branch is now protected' : 'Branch protection removed');
+        await loadBranches();
+      } else {
+        toast.error(d.error || 'Could not update branch protection');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not update branch');
+    }
+  };
+
+  const handleToggleTagProtection = async (tagId: string, nextProtected: boolean) => {
+    if (!selectedProjectId || !effectiveIsAdmin) return;
+    try {
+      const r = await fetch(`/api/projects/${selectedProjectId}/version-tags/${tagId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ protected: nextProtected }),
+      });
+      const d = await r.json();
+      if (d.success) {
+        toast.success(nextProtected ? 'Tag is now protected' : 'Tag protection removed');
+        await loadVersionTags();
+      } else {
+        toast.error(d.error || 'Could not update tag protection');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not update tag');
+    }
+  };
+
+  const handleToggleRevisionLock = async (version: Version, nextLocked: boolean) => {
+    if (!selectedProjectId || !effectiveIsAdmin) return;
+    try {
+      const r = await fetch(
+        `/api/projects/${selectedProjectId}/versions/${version.id}/revision-lock`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ revisionLocked: nextLocked }),
+        }
+      );
+      const d = await r.json();
+      if (d.success) {
+        toast.success(nextLocked ? 'Revision locked against deletion' : 'Revision lock removed');
+        await loadVersions();
+      } else {
+        toast.error(d.error || 'Could not update revision lock');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not update lock');
     }
   };
 
@@ -1077,7 +1158,25 @@ const Versions = () => {
                     locked
                   </span>
                 )}
-                {!tg.immutable && (effectiveIsAdmin || tg.created_by === currentUserId) && (
+                {tg.protected && (
+                  <span
+                    title="Protected: only tenant admins can move or delete"
+                    className="inline-flex items-center gap-0.5 text-xs text-indigo-700 dark:text-indigo-300"
+                  >
+                    <Shield className="h-3 w-3" />
+                    protected
+                  </span>
+                )}
+                {effectiveIsAdmin && !tg.immutable && (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleTagProtection(tg.id, !tg.protected)}
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline text-xs"
+                  >
+                    {tg.protected ? 'Unprotect' : 'Protect'}
+                  </button>
+                )}
+                {!tg.immutable && (effectiveIsAdmin || (!tg.protected && tg.created_by === currentUserId)) && (
                   <button
                     type="button"
                     onClick={() => handleDeleteTag(tg.id)}
@@ -1091,8 +1190,8 @@ const Versions = () => {
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
             Tags are stable names for a schema revision (like Git tags). Use &quot;Tag this revision&quot; on a version row to add one.
-            Immutable tags cannot be moved or deleted; they work well for release labels such as <span className="font-mono">v1.0</span> or{' '}
-            <span className="font-mono">stable</span>, and pair with deprecation and sunset planning as last-known-good pointers.
+            Immutable tags cannot be moved or deleted; <span className="font-medium">protected</span> tags (tenant admin) add policy so only admins can move or delete.
+            Pair with deprecation and sunset planning as last-known-good pointers.
           </p>
         </div>
       )}
@@ -1111,7 +1210,25 @@ const Versions = () => {
               >
                 <span className="font-mono font-medium text-gray-900 dark:text-white">{b.name}</span>
                 <span className="text-gray-500 dark:text-gray-400">→ v{b.tip_version_string ?? '?'}</span>
-                {(effectiveIsAdmin || b.created_by === currentUserId) && (
+                {b.protected && (
+                  <span
+                    title="Protected branch: only tenant admins can delete"
+                    className="inline-flex items-center gap-0.5 text-xs text-indigo-700 dark:text-indigo-300"
+                  >
+                    <Shield className="h-3 w-3" />
+                    protected
+                  </span>
+                )}
+                {effectiveIsAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleBranchProtection(b.id, !b.protected)}
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline text-xs"
+                  >
+                    {b.protected ? 'Unprotect' : 'Protect'}
+                  </button>
+                )}
+                {(effectiveIsAdmin || (!b.protected && b.created_by === currentUserId)) && (
                   <button
                     type="button"
                     onClick={() => handleDeleteBranch(b.id)}
@@ -1186,6 +1303,11 @@ const Versions = () => {
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="text-sm font-bold text-gray-900 dark:text-white font-mono">v{version.version_id}</div>
                       {version.published && <div title="Published" className="p-1 bg-blue-100 dark:bg-blue-900/30 rounded"><Lock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /></div>}
+                      {version.revisionLocked && (
+                        <div title="Revision locked: non-admins cannot delete" className="p-1 bg-indigo-100 dark:bg-indigo-900/30 rounded">
+                          <Shield className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                      )}
                       {(tagsByVersionId.get(version.id) ?? []).map((t) => (
                         <span
                           key={t.id}
@@ -1375,6 +1497,19 @@ const Versions = () => {
                                   {freezingSchemaVersionId === version.id ? 'Freezing...' : 'Freeze schema'}
                                 </button>
                               )}
+                              {effectiveIsAdmin && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenVersionDropdown(null);
+                                    handleToggleRevisionLock(version, !version.revisionLocked);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                  <Shield className="w-4 h-4 text-indigo-500" />
+                                  {version.revisionLocked ? 'Unlock revision (allow delete)' : 'Lock revision (delete policy)'}
+                                </button>
+                              )}
                               <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
                               <button
                                 onClick={(e) => {
@@ -1382,7 +1517,9 @@ const Versions = () => {
                                   setOpenVersionDropdown(null);
                                   handleRowAction('delete', version);
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                                disabled={!!version.revisionLocked && !effectiveIsAdmin}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={version.revisionLocked && !effectiveIsAdmin ? 'Revision is locked; only a tenant admin can delete' : undefined}
                               >
                                 <Trash2 className="w-4 h-4" />
                                 Delete
@@ -2249,6 +2386,17 @@ const Versions = () => {
               />
               Lock tag (immutable — cannot move or delete)
             </label>
+            {effectiveIsAdmin && (
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={tagProtected}
+                  onChange={(e) => setTagProtected(e.target.checked)}
+                  className="rounded border-gray-300 dark:border-gray-600"
+                />
+                Protected (only tenant admins can move or delete)
+              </label>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTagDialog(false)} disabled={tagSaving}>

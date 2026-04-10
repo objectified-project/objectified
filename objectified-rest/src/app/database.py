@@ -1,12 +1,15 @@
 import psycopg2
 import json
+import logging
 import bcrypt
 import numpy as np
 from psycopg2.extras import RealDictCursor
 from psycopg2.extensions import register_adapter, AsIs, adapt
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from .config import settings
 from .jsonschema_generator import generate_class_jsonschema_spec
+
+_logger = logging.getLogger(__name__)
 
 
 def _deep_equal(a: Any, b: Any) -> bool:
@@ -1213,6 +1216,7 @@ class Database:
                    v.change_log, v.visibility, v.published, v.published_at,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
                    v.forked_from_revision_id, v.upstream_project_id,
+                   v.revision_locked,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1240,6 +1244,7 @@ class Database:
                    v.change_log, v.visibility, v.published, v.published_at,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
                    v.forked_from_revision_id, v.upstream_project_id,
+                   v.revision_locked,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1267,6 +1272,7 @@ class Database:
                    v.change_log, v.visibility, v.published, v.published_at,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
                    v.forked_from_revision_id, v.upstream_project_id,
+                   v.revision_locked,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1452,33 +1458,34 @@ class Database:
         updates: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
         """Update an existing version, ensuring it belongs to the tenant."""
-        # First verify the version belongs to the tenant and is not published
         existing = self.get_version_by_id(version_record_id, tenant_id)
         if not existing:
             return None
 
-        if existing.get('published'):
-            raise Exception("Cannot edit a published version. Published versions are frozen.")
+        if existing.get("published"):
+            allowed_only = set(updates.keys()) <= {"revision_locked"}
+            if not allowed_only:
+                raise Exception("Cannot edit a published version. Published versions are frozen.")
 
-        # Build dynamic update query
         update_fields = []
         params = []
 
-        if 'description' in updates:
+        if "description" in updates:
             update_fields.append("description = %s")
-            params.append(updates['description'])
-        if 'change_log' in updates:
+            params.append(updates["description"])
+        if "change_log" in updates:
             update_fields.append("change_log = %s")
-            params.append(updates['change_log'])
-        if 'enabled' in updates and updates['enabled'] is not None:
+            params.append(updates["change_log"])
+        if "enabled" in updates and updates["enabled"] is not None:
             update_fields.append("enabled = %s")
-            params.append(updates['enabled'])
+            params.append(updates["enabled"])
+        if "revision_locked" in updates:
+            update_fields.append("revision_locked = %s")
+            params.append(bool(updates["revision_locked"]))
 
         if not update_fields:
-            # Nothing to update, return current version
             return existing
 
-        # Always update updated_at
         update_fields.append("updated_at = CURRENT_TIMESTAMP")
 
         params.append(version_record_id)
@@ -1486,18 +1493,14 @@ class Database:
             UPDATE odb.versions
             SET {', '.join(update_fields)}
             WHERE id = %s AND deleted_at IS NULL
-            RETURNING id, project_id, creator_id, version_id, description,
-                      change_log, visibility, published, published_at,
-                      enabled, created_at, updated_at
         """
 
         conn = self.connect()
         try:
             with conn.cursor() as cursor:
                 cursor.execute(query, tuple(params))
-                result = cursor.fetchone()
                 conn.commit()
-                return result
+                return self.get_version_by_id(version_record_id, tenant_id)
         except Exception as e:
             conn.rollback()
             raise e
@@ -2040,8 +2043,106 @@ class Database:
             conn.rollback()
             raise e
 
-    def delete_version(self, version_record_id: str, tenant_id: str) -> bool:
-        """Soft delete a version, ensuring it belongs to the tenant."""
+    def is_user_tenant_admin(self, tenant_id: str, user_id: str) -> bool:
+        """True if user is a tenant administrator."""
+        q = """
+            SELECT 1 FROM odb.tenant_administrators
+            WHERE tenant_id = %s AND user_id = %s LIMIT 1
+        """
+        return bool(self.execute_query(q, (tenant_id, user_id)))
+
+    def insert_version_protection_audit(
+        self,
+        tenant_id: str,
+        project_id: Optional[str],
+        actor_id: Optional[str],
+        action: str,
+        resource_type: str,
+        resource_id: str,
+        outcome: str,
+        detail: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Best-effort audit row for protection policy and overrides (#504)."""
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO odb.version_protection_audit
+                      (tenant_id, project_id, actor_id, action, resource_type, resource_id, outcome, detail)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                    """,
+                    (
+                        tenant_id,
+                        project_id,
+                        actor_id,
+                        action,
+                        resource_type,
+                        resource_id,
+                        outcome,
+                        json.dumps(detail) if detail is not None else None,
+                    ),
+                )
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            _logger.warning("insert_version_protection_audit failed: %s", e)
+
+    def delete_version(
+        self, version_record_id: str, tenant_id: str, user_id: Optional[str]
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Soft delete a version. Returns (True, None) on success, or (False, error_code).
+        error_code: not_found | forbidden | revision_locked
+        """
+        existing = self.get_version_by_id(version_record_id, tenant_id)
+        if not existing:
+            return False, "not_found"
+
+        rev_locked = bool(existing.get("revision_locked"))
+        creator_id = existing.get("creator_id")
+        project_id = existing.get("project_id")
+
+        if user_id is None:
+            if rev_locked:
+                self.insert_version_protection_audit(
+                    tenant_id,
+                    project_id,
+                    None,
+                    "version.delete",
+                    "version",
+                    version_record_id,
+                    "denied",
+                    {"reason": "revision_locked_no_user_context"},
+                )
+                return False, "revision_locked"
+        else:
+            is_admin = self.is_user_tenant_admin(tenant_id, user_id)
+            if creator_id != user_id and not is_admin:
+                self.insert_version_protection_audit(
+                    tenant_id,
+                    project_id,
+                    user_id,
+                    "version.delete",
+                    "version",
+                    version_record_id,
+                    "denied",
+                    {"reason": "not_owner_or_admin"},
+                )
+                return False, "forbidden"
+            if rev_locked and not is_admin:
+                self.insert_version_protection_audit(
+                    tenant_id,
+                    project_id,
+                    user_id,
+                    "version.delete",
+                    "version",
+                    version_record_id,
+                    "denied",
+                    {"reason": "revision_locked"},
+                )
+                return False, "revision_locked"
+
         query = """
             UPDATE odb.versions v
             SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
@@ -2056,8 +2157,20 @@ class Database:
         try:
             with conn.cursor() as cursor:
                 cursor.execute(query, (version_record_id, tenant_id))
+                ok = cursor.rowcount > 0
                 conn.commit()
-                return cursor.rowcount > 0
+                if ok and rev_locked and user_id and self.is_user_tenant_admin(tenant_id, user_id):
+                    self.insert_version_protection_audit(
+                        tenant_id,
+                        project_id,
+                        user_id,
+                        "version.delete",
+                        "version",
+                        version_record_id,
+                        "allowed",
+                        {"reason": "admin_override_locked_revision"},
+                    )
+                return (True, None) if ok else (False, "not_found")
         except Exception as e:
             conn.rollback()
             raise e
@@ -3059,7 +3172,7 @@ class Database:
     def list_version_tags_for_project(self, project_id: str, tenant_id: str) -> List[Dict[str, Any]]:
         """List tags for a project; tenant-scoped."""
         query = """
-            SELECT t.id, t.project_id, t.version_id, t.name, t.message, t.channel, t.immutable,
+            SELECT t.id, t.project_id, t.version_id, t.name, t.message, t.channel, t.immutable, t.protected,
                    t.created_by, t.created_at, t.updated_at,
                    v.version_id AS target_version_string
             FROM odb.version_tags t
@@ -3075,7 +3188,7 @@ class Database:
 
     def get_version_tag_by_id(self, tag_id: str, project_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
         query = """
-            SELECT t.id, t.project_id, t.version_id, t.name, t.message, t.channel, t.immutable,
+            SELECT t.id, t.project_id, t.version_id, t.name, t.message, t.channel, t.immutable, t.protected,
                    t.created_by, t.created_at, t.updated_at
             FROM odb.version_tags t
             JOIN odb.projects p ON t.project_id = p.id
@@ -3104,15 +3217,16 @@ class Database:
         message: Optional[str],
         channel: Optional[str],
         immutable: bool,
+        tag_protected: bool,
         created_by: Optional[str],
     ) -> Dict[str, Any]:
         if not self.assert_version_in_project_tenant(version_row_id, project_id, tenant_id):
             raise ValueError("Target version not found in this project")
         query = """
             INSERT INTO odb.version_tags
-            (project_id, version_id, name, message, channel, immutable, created_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            RETURNING id, project_id, version_id, name, message, channel, immutable, created_by, created_at, updated_at
+            (project_id, version_id, name, message, channel, immutable, protected, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, project_id, version_id, name, message, channel, immutable, protected, created_by, created_at, updated_at
         """
         conn = self.connect()
         try:
@@ -3126,6 +3240,7 @@ class Database:
                         message,
                         channel,
                         immutable,
+                        tag_protected,
                         created_by,
                     ),
                 )
@@ -3141,20 +3256,46 @@ class Database:
         tag_id: str,
         project_id: str,
         tenant_id: str,
+        user_id: Optional[str],
+        is_admin: bool,
         new_version_row_id: Optional[str],
         set_immutable: bool,
+        set_protected: Optional[bool],
     ) -> Optional[Dict[str, Any]]:
         existing = self.get_version_tag_by_id(tag_id, project_id, tenant_id)
         if not existing:
             return None
         if existing.get("immutable"):
             raise PermissionError("TAG_IMMUTABLE")
+        if set_protected is not None and not is_admin:
+            raise PermissionError("TAG_PROTECT_POLICY_ADMIN_ONLY")
+        if existing.get("protected") and not is_admin:
+            self.insert_version_protection_audit(
+                tenant_id,
+                project_id,
+                user_id,
+                "tag.update",
+                "version_tag",
+                tag_id,
+                "denied",
+                {"reason": "tag_protected"},
+            )
+            raise PermissionError("TAG_PROTECTED")
+        if not self.user_may_manage_version_tag(
+            tenant_id, user_id or "", existing.get("created_by")
+        ):
+            raise PermissionError("TAG_FORBIDDEN")
+
         if new_version_row_id and not self.assert_version_in_project_tenant(
             new_version_row_id, project_id, tenant_id
         ):
             raise ValueError("Target version not found in this project")
-        if not new_version_row_id and not set_immutable:
-            raise ValueError("Provide new revision id and/or immutable lock")
+        if (
+            not new_version_row_id
+            and not set_immutable
+            and set_protected is None
+        ):
+            raise ValueError("Provide new revision id, immutable lock, and/or protected policy")
 
         sets = ["updated_at = CURRENT_TIMESTAMP"]
         params: List[Any] = []
@@ -3163,11 +3304,14 @@ class Database:
             params.append(new_version_row_id)
         if set_immutable:
             sets.append("immutable = true")
+        if set_protected is not None:
+            sets.append("protected = %s")
+            params.append(set_protected)
         params.extend([tag_id, project_id])
         q = f"""
             UPDATE odb.version_tags SET {", ".join(sets)}
             WHERE id = %s AND project_id = %s
-            RETURNING id, project_id, version_id, name, message, channel, immutable, created_by, created_at, updated_at
+            RETURNING id, project_id, version_id, name, message, channel, immutable, protected, created_by, created_at, updated_at
         """
         conn = self.connect()
         try:
@@ -3175,24 +3319,76 @@ class Database:
                 cursor.execute(q, tuple(params))
                 row = cursor.fetchone()
                 conn.commit()
+                if existing.get("protected") and is_admin and (new_version_row_id or set_immutable):
+                    self.insert_version_protection_audit(
+                        tenant_id,
+                        project_id,
+                        user_id,
+                        "tag.update",
+                        "version_tag",
+                        tag_id,
+                        "allowed",
+                        {"reason": "admin_override_tag_protection"},
+                    )
+                if set_protected is not None:
+                    self.insert_version_protection_audit(
+                        tenant_id,
+                        project_id,
+                        user_id,
+                        "tag.protection_policy",
+                        "version_tag",
+                        tag_id,
+                        "policy_change",
+                        {"protected": set_protected},
+                    )
                 return row
         except Exception as e:
             conn.rollback()
             raise e
 
-    def delete_version_tag(self, tag_id: str, project_id: str, tenant_id: str) -> bool:
+    def delete_version_tag(
+        self, tag_id: str, project_id: str, tenant_id: str, user_id: Optional[str], is_admin: bool
+    ) -> bool:
         existing = self.get_version_tag_by_id(tag_id, project_id, tenant_id)
         if not existing:
             return False
         if existing.get("immutable"):
             raise PermissionError("TAG_IMMUTABLE")
+        if existing.get("protected") and not is_admin:
+            self.insert_version_protection_audit(
+                tenant_id,
+                project_id,
+                user_id,
+                "tag.delete",
+                "version_tag",
+                tag_id,
+                "denied",
+                {"reason": "tag_protected"},
+            )
+            raise PermissionError("TAG_PROTECTED")
+        if not is_admin and not self.user_may_manage_version_tag(
+            tenant_id, user_id or "", existing.get("created_by")
+        ):
+            raise PermissionError("TAG_FORBIDDEN")
         query = "DELETE FROM odb.version_tags WHERE id = %s AND project_id = %s"
         conn = self.connect()
         try:
             with conn.cursor() as cursor:
                 cursor.execute(query, (tag_id, project_id))
+                ok = cursor.rowcount > 0
                 conn.commit()
-                return cursor.rowcount > 0
+                if ok and existing.get("protected") and is_admin:
+                    self.insert_version_protection_audit(
+                        tenant_id,
+                        project_id,
+                        user_id,
+                        "tag.delete",
+                        "version_tag",
+                        tag_id,
+                        "allowed",
+                        {"reason": "admin_override_tag_protection"},
+                    )
+                return ok
         except Exception as e:
             conn.rollback()
             raise e

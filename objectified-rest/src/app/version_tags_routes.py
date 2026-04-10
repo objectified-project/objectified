@@ -65,6 +65,13 @@ async def create_version_tag(
     msg = body.message.strip() if body.message else None
     if msg == "":
         msg = None
+    want_protected = bool(body.protected)
+    if want_protected:
+        if not uid or not db.is_user_tenant_admin(tenant_id, uid):
+            raise HTTPException(
+                status_code=403,
+                detail="Only tenant administrators can create protected tags",
+            )
     try:
         row = db.create_version_tag(
             project_id,
@@ -74,6 +81,7 @@ async def create_version_tag(
             msg,
             ch,
             bool(body.immutable),
+            want_protected,
             uid,
         )
         return VersionTagSchema(**dict(row))
@@ -94,32 +102,54 @@ async def patch_version_tag(
     body: VersionTagUpdateRequest,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> VersionTagSchema:
-    """Move a tag to another revision and/or set immutable lock."""
+    """Move a tag to another revision and/or set immutable lock / protection policy."""
     tenant_id = _tenant_id(auth_data)
     project = db.get_project_by_id(project_id, tenant_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     uid = get_authenticated_user_id(auth_data)
     auth_method = auth_data.get("auth_method")
-    tag = db.get_version_tag_by_id(tag_id, project_id, tenant_id)
-    if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
     if auth_method == "jwt":
         if not uid:
             raise HTTPException(status_code=403, detail="JWT must include a user id to modify tags")
-        if not db.user_may_manage_version_tag(tenant_id, uid, tag.get("created_by")):
-            raise HTTPException(status_code=403, detail="Not allowed to modify this tag")
 
     new_vid = body.version_id.strip() if body.version_id else None
     set_immutable = body.immutable is True
+    set_protected: Any = None
+    if "protected" in body.model_fields_set:
+        set_protected = body.protected
+
+    is_admin = bool(uid and db.is_user_tenant_admin(tenant_id, uid))
     try:
-        row = db.update_version_tag(tag_id, project_id, tenant_id, new_vid, set_immutable)
+        row = db.update_version_tag(
+            tag_id,
+            project_id,
+            tenant_id,
+            uid,
+            is_admin,
+            new_vid,
+            set_immutable,
+            set_protected,
+        )
     except PermissionError as e:
-        if str(e) == "TAG_IMMUTABLE":
+        code = str(e)
+        if code == "TAG_IMMUTABLE":
             raise HTTPException(
                 status_code=409,
                 detail={"code": "TAG_IMMUTABLE", "message": "This tag is immutable and cannot be changed"},
             )
+        if code == "TAG_PROTECTED":
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "TAG_PROTECTED", "message": "This tag is protected; only tenant admins may change it"},
+            )
+        if code == "TAG_PROTECT_POLICY_ADMIN_ONLY":
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "TAG_PROTECT_POLICY_ADMIN_ONLY", "message": "Only tenant admins can change protection policy"},
+            )
+        if code == "TAG_FORBIDDEN":
+            raise HTTPException(status_code=403, detail="Not allowed to modify this tag")
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -135,30 +165,34 @@ async def delete_version_tag(
     tag_id: str,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> Dict[str, str]:
-    """Delete a tag (not allowed when immutable)."""
+    """Delete a tag (not allowed when immutable; protected tags require admin)."""
     tenant_id = _tenant_id(auth_data)
     project = db.get_project_by_id(project_id, tenant_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     uid = get_authenticated_user_id(auth_data)
     auth_method = auth_data.get("auth_method")
-    tag = db.get_version_tag_by_id(tag_id, project_id, tenant_id)
-    if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
     if auth_method == "jwt":
         if not uid:
             raise HTTPException(status_code=403, detail="JWT must include a user id to delete tags")
-        if not db.user_may_manage_version_tag(tenant_id, uid, tag.get("created_by")):
-            raise HTTPException(status_code=403, detail="Not allowed to delete this tag")
 
+    is_admin = bool(uid and db.is_user_tenant_admin(tenant_id, uid))
     try:
-        ok = db.delete_version_tag(tag_id, project_id, tenant_id)
+        ok = db.delete_version_tag(tag_id, project_id, tenant_id, uid, is_admin)
     except PermissionError as e:
-        if str(e) == "TAG_IMMUTABLE":
+        code = str(e)
+        if code == "TAG_IMMUTABLE":
             raise HTTPException(
                 status_code=409,
                 detail={"code": "TAG_IMMUTABLE", "message": "This tag is immutable and cannot be deleted"},
             )
+        if code == "TAG_PROTECTED":
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "TAG_PROTECTED", "message": "This tag is protected and cannot be deleted"},
+            )
+        if code == "TAG_FORBIDDEN":
+            raise HTTPException(status_code=403, detail="Not allowed to delete this tag")
         raise
     if not ok:
         raise HTTPException(status_code=404, detail="Tag not found")

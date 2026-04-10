@@ -64,11 +64,21 @@ export async function POST(
         { status: 400 }
       );
     }
-    const raw = await createVersionTag(projectId, tenantId, name, versionId, userId, {
-      message: typeof body.message === 'string' ? body.message : null,
-      channel: typeof body.channel === 'string' ? body.channel : null,
-      immutable: body.immutable === true,
-    });
+    const isTenantAdmin = Boolean((session.user as { is_tenant_admin?: boolean }).is_tenant_admin);
+    const raw = await createVersionTag(
+      projectId,
+      tenantId,
+      name,
+      versionId,
+      userId,
+      {
+        message: typeof body.message === 'string' ? body.message : null,
+        channel: typeof body.channel === 'string' ? body.channel : null,
+        immutable: body.immutable === true,
+        protected: body.protected === true,
+      },
+      isTenantAdmin
+    );
     const data = JSON.parse(raw) as {
       success: boolean;
       tag?: unknown;
