@@ -17,7 +17,6 @@ This represents the different versions of the Objectified specification and thei
 
 | Ticket  | Feature Description                           |
 |---------|-----------------------------------------------|
-| #501    | ~~Add tagging functionality for versions~~ ✅   |
 | #502    | Add and modify version notes and changelogs   |
 | #503    | Add ability to fork versions for testing      |
 | #504    | Implement protected versions feature          |
