@@ -65,7 +65,7 @@ export async function POST(
     const sourceBranchName = typeof body.sourceBranchName === 'string' ? body.sourceBranchName : '';
     const targetBranchName = typeof body.targetBranchName === 'string' ? body.targetBranchName : '';
     const baseRevisionId = typeof body.baseRevisionId === 'string' ? body.baseRevisionId : '';
-    const skipCompatGate = Boolean(body.skipCompatGate);
+    const skipCompatGate = typeof body.skipCompatGate === 'boolean' ? body.skipCompatGate : false;
     if (!sourceBranchName.trim() || !targetBranchName.trim() || !baseRevisionId.trim()) {
       return NextResponse.json(
         { success: false, error: 'sourceBranchName, targetBranchName, and baseRevisionId are required' },

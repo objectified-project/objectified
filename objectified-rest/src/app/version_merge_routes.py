@@ -93,8 +93,6 @@ async def version_branch_merge_preview(
     project = db.get_project_by_id(project_id, tenant_id)
     if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
-    if project.get("slug") != tenant_slug:
-        raise HTTPException(status_code=404, detail="Project not found for tenant slug")
 
     src = db.get_version_branch_by_name(project_id, tenant_id, body.source_branch_name)
     tgt = db.get_version_branch_by_name(project_id, tenant_id, body.target_branch_name)
@@ -174,8 +172,6 @@ async def version_branch_merge(
     project = db.get_project_by_id(project_id, tenant_id)
     if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
-    if project.get("slug") != tenant_slug:
-        raise HTTPException(status_code=404, detail="Project not found for tenant slug")
 
     src = db.get_version_branch_by_name(project_id, tenant_id, body.source_branch_name)
     tgt = db.get_version_branch_by_name(project_id, tenant_id, body.target_branch_name)

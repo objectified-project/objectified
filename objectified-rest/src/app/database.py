@@ -3467,17 +3467,25 @@ class Database:
     def compute_merge_base_revision_id(
         self, rev_a: str, rev_b: str, tenant_id: str
     ) -> Optional[str]:
-        """Best common ancestor (first deterministically) for two revision ids in the same project."""
+        """Best common ancestor (nearest to tips by creation time) for two revision ids in the same project."""
         a = self.collect_revision_ancestors(rev_a, tenant_id)
         b = self.collect_revision_ancestors(rev_b, tenant_id)
         common = a & b
         if not common:
             return None
 
+        # Cache ancestor sets to avoid O(n²) repeated full graph walks.
+        ancestor_cache: Dict[str, Set[str]] = {rev_a: a, rev_b: b}
+
+        def get_cached_ancestors(vid: str) -> Set[str]:
+            if vid not in ancestor_cache:
+                ancestor_cache[vid] = self.collect_revision_ancestors(vid, tenant_id)
+            return ancestor_cache[vid]
+
         def is_strict_ancestor(anc: str, desc: str) -> bool:
             if anc == desc:
                 return False
-            return anc in self.collect_revision_ancestors(desc, tenant_id)
+            return anc in get_cached_ancestors(desc)
 
         bases = [
             c
@@ -3486,7 +3494,16 @@ class Database:
         ]
         if not bases:
             return None
-        return sorted(bases)[0]
+        if len(bases) == 1:
+            return bases[0]
+
+        # Multiple maximal common ancestors (criss-cross history): pick the one
+        # nearest to the branch tips by choosing the most recently created revision.
+        def created_at_key(vid: str):
+            row = self.get_version_by_id(vid, tenant_id)
+            return row["created_at"] if row and row.get("created_at") else None
+
+        return max(bases, key=created_at_key)
 
     def get_version_branch_by_name(
         self, project_id: str, tenant_id: str, name: str
