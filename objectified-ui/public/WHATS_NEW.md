@@ -25,6 +25,7 @@ We continue to improve the platform based on your feedback with improvements and
 - **OpenAPI import:** one shared rule for “direct” schema properties — specs that mix top-level `properties` with inline `allOf` fragments now pick up both (aligned with the unified class importer)
 
 ## Versioning
+- **Version tags (#501):** **Git-like tags** on schema revisions — create/list/delete from **ADE → Versions** (optional message, channel, **immutable** lock); **REST** `GET/POST /v1/version-tags/{tenant}/{project}` and `PATCH/DELETE .../{tag_id}`; compare dialog can **set base/compare from a tag**; history table filters by tag
 - **Versions (#500):** **Named branches** (tip = version snapshot), **merge preview** and **apply merge** with optimistic `baseRevisionId` / target tip; merge revisions record **two parent** version ids; conflict banner when overlapping schema paths differ (merge-base LCA planned in #2593)
 
 ## Projects:

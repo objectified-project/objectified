@@ -2909,6 +2909,162 @@ class Database:
             conn.rollback()
             return str(e)
 
+    # ==================== Version tags (git-like pointers to revisions) ====================
+
+    def list_version_tags_for_project(self, project_id: str, tenant_id: str) -> List[Dict[str, Any]]:
+        """List tags for a project; tenant-scoped."""
+        query = """
+            SELECT t.id, t.project_id, t.version_id, t.name, t.message, t.channel, t.immutable,
+                   t.created_by, t.created_at, t.updated_at,
+                   v.version_id AS target_version_string
+            FROM odb.version_tags t
+            JOIN odb.versions v ON v.id = t.version_id AND v.project_id = t.project_id
+            JOIN odb.projects p ON t.project_id = p.id
+            WHERE t.project_id = %s
+              AND p.tenant_id = %s
+              AND v.deleted_at IS NULL
+              AND p.deleted_at IS NULL
+            ORDER BY t.name ASC
+        """
+        return self.execute_query(query, (project_id, tenant_id))
+
+    def get_version_tag_by_id(self, tag_id: str, project_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+        query = """
+            SELECT t.id, t.project_id, t.version_id, t.name, t.message, t.channel, t.immutable,
+                   t.created_by, t.created_at, t.updated_at
+            FROM odb.version_tags t
+            JOIN odb.projects p ON t.project_id = p.id
+            WHERE t.id = %s AND t.project_id = %s AND p.tenant_id = %s AND p.deleted_at IS NULL
+        """
+        rows = self.execute_query(query, (tag_id, project_id, tenant_id))
+        return rows[0] if rows else None
+
+    def assert_version_in_project_tenant(
+        self, version_row_id: str, project_id: str, tenant_id: str
+    ) -> bool:
+        q = """
+            SELECT 1 FROM odb.versions v
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE v.id = %s AND v.project_id = %s AND p.tenant_id = %s AND v.deleted_at IS NULL
+        """
+        rows = self.execute_query(q, (version_row_id, project_id, tenant_id))
+        return bool(rows)
+
+    def create_version_tag(
+        self,
+        project_id: str,
+        tenant_id: str,
+        version_row_id: str,
+        name: str,
+        message: Optional[str],
+        channel: Optional[str],
+        immutable: bool,
+        created_by: Optional[str],
+    ) -> Dict[str, Any]:
+        if not self.assert_version_in_project_tenant(version_row_id, project_id, tenant_id):
+            raise ValueError("Target version not found in this project")
+        query = """
+            INSERT INTO odb.version_tags
+            (project_id, version_id, name, message, channel, immutable, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, project_id, version_id, name, message, channel, immutable, created_by, created_at, updated_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    query,
+                    (
+                        project_id,
+                        version_row_id,
+                        name.strip(),
+                        message,
+                        channel,
+                        immutable,
+                        created_by,
+                    ),
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_version_tag(
+        self,
+        tag_id: str,
+        project_id: str,
+        tenant_id: str,
+        new_version_row_id: Optional[str],
+        set_immutable: bool,
+    ) -> Optional[Dict[str, Any]]:
+        existing = self.get_version_tag_by_id(tag_id, project_id, tenant_id)
+        if not existing:
+            return None
+        if existing.get("immutable"):
+            raise PermissionError("TAG_IMMUTABLE")
+        if new_version_row_id and not self.assert_version_in_project_tenant(
+            new_version_row_id, project_id, tenant_id
+        ):
+            raise ValueError("Target version not found in this project")
+        if not new_version_row_id and not set_immutable:
+            raise ValueError("Provide new revision id and/or immutable lock")
+
+        sets = ["updated_at = CURRENT_TIMESTAMP"]
+        params: List[Any] = []
+        if new_version_row_id:
+            sets.append("version_id = %s")
+            params.append(new_version_row_id)
+        if set_immutable:
+            sets.append("immutable = true")
+        params.extend([tag_id, project_id])
+        q = f"""
+            UPDATE odb.version_tags SET {", ".join(sets)}
+            WHERE id = %s AND project_id = %s
+            RETURNING id, project_id, version_id, name, message, channel, immutable, created_by, created_at, updated_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, tuple(params))
+                row = cursor.fetchone()
+                conn.commit()
+                return row
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_version_tag(self, tag_id: str, project_id: str, tenant_id: str) -> bool:
+        existing = self.get_version_tag_by_id(tag_id, project_id, tenant_id)
+        if not existing:
+            return False
+        if existing.get("immutable"):
+            raise PermissionError("TAG_IMMUTABLE")
+        query = "DELETE FROM odb.version_tags WHERE id = %s AND project_id = %s"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (tag_id, project_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def user_may_manage_version_tag(
+        self, tenant_id: str, user_id: str, tag_created_by: Optional[str]
+    ) -> bool:
+        """Creator match or tenant administrator."""
+        if tag_created_by and tag_created_by == user_id:
+            return True
+        q = """
+            SELECT 1 FROM odb.tenant_administrators
+            WHERE tenant_id = %s AND user_id = %s
+            LIMIT 1
+        """
+        return bool(self.execute_query(q, (tenant_id, user_id)))
+
 
 # Global database instance
 db = Database()

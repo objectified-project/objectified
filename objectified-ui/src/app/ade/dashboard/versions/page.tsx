@@ -1,8 +1,8 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState, useRef } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge } from 'lucide-react';
+import { useEffect, useState, useRef, useMemo } from 'react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -79,6 +79,17 @@ interface VersionBranchRow {
   created_by?: string | null;
 }
 
+interface VersionTagRow {
+  id: string;
+  name: string;
+  version_id: string;
+  target_version_string?: string;
+  message?: string | null;
+  channel?: string | null;
+  immutable?: boolean;
+  created_by?: string | null;
+}
+
 const Versions = () => {
   const { data: session } = useSession();
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
@@ -143,6 +154,18 @@ const Versions = () => {
   const [branchNameInput, setBranchNameInput] = useState('');
   const [branchSaving, setBranchSaving] = useState(false);
 
+  const [versionTags, setVersionTags] = useState<VersionTagRow[]>([]);
+  const [showTagDialog, setShowTagDialog] = useState(false);
+  const [tagFromVersionId, setTagFromVersionId] = useState<string>('');
+  const [tagNameInput, setTagNameInput] = useState('');
+  const [tagMessageInput, setTagMessageInput] = useState('');
+  const [tagChannelInput, setTagChannelInput] = useState('');
+  const [tagImmutable, setTagImmutable] = useState(false);
+  const [tagSaving, setTagSaving] = useState(false);
+  const [historyTagFilter, setHistoryTagFilter] = useState<string>('');
+  const [compareBaseTagId, setCompareBaseTagId] = useState<string>('');
+  const [compareToTagId, setCompareToTagId] = useState<string>('');
+
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [mergeSourceBranch, setMergeSourceBranch] = useState('');
   const [mergeTargetBranch, setMergeTargetBranch] = useState('');
@@ -200,6 +223,27 @@ const Versions = () => {
     else setVersionBranches([]);
   }, [selectedProjectId]);
 
+  const loadVersionTags = async () => {
+    if (!selectedProjectId) return;
+    try {
+      const r = await fetch(`/api/projects/${selectedProjectId}/version-tags`);
+      const d = await r.json();
+      if (d.success && Array.isArray(d.tags)) setVersionTags(d.tags);
+      else setVersionTags([]);
+    } catch {
+      setVersionTags([]);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setVersionTags([]);
+      setHistoryTagFilter('');
+    } else {
+      setHistoryTagFilter('');
+    }
+  }, [selectedProjectId]);
+
   useEffect(() => {
     if (!currentTenantId || versions.length === 0) {
       setHasClassSchemaMap({});
@@ -246,6 +290,7 @@ const Versions = () => {
       const data = await response.json();
       if (data.success && data.versions) {
         setVersions(data.versions);
+        await loadVersionTags();
       } else {
         throw new Error(data.error || 'Failed to load versions');
       }
@@ -488,7 +533,25 @@ const Versions = () => {
     setShowCompareDialog(true); setCompareVersion1Id(''); setCompareVersion2Id('');
     setCompareSpec1(''); setCompareSpec2(''); setCompareFormat('json');
     setDiffResult([]); setSchemaDiffSummary(null); setDiffViewMode('overlay');
+    setCompareBaseTagId(''); setCompareToTagId('');
   };
+
+  const tagsByVersionId = useMemo(() => {
+    const map = new Map<string, VersionTagRow[]>();
+    for (const t of versionTags) {
+      const list = map.get(t.version_id) ?? [];
+      list.push(t);
+      map.set(t.version_id, list);
+    }
+    return map;
+  }, [versionTags]);
+
+  const displayVersions = useMemo(() => {
+    if (!historyTagFilter) return versions;
+    const t = versionTags.find((x) => x.id === historyTagFilter);
+    if (!t) return versions;
+    return versions.filter((v) => v.id === t.version_id);
+  }, [versions, versionTags, historyTagFilter]);
 
   const handleCompareFormatChange = (newFormat: 'json' | 'yaml') => {
     setCompareFormat(newFormat);
@@ -538,6 +601,14 @@ const Versions = () => {
         setBranchNameInput('');
         setShowBranchDialog(true);
         break;
+      case 'tagFrom':
+        setTagFromVersionId(version.id);
+        setTagNameInput('');
+        setTagMessageInput('');
+        setTagChannelInput('');
+        setTagImmutable(false);
+        setShowTagDialog(true);
+        break;
     }
   };
 
@@ -566,6 +637,67 @@ const Versions = () => {
       toast.error(e instanceof Error ? e.message : 'Could not create branch');
     } finally {
       setBranchSaving(false);
+    }
+  };
+
+  const handleCreateTagSubmit = async () => {
+    const name = tagNameInput.trim();
+    if (!name || !tagFromVersionId || !selectedProjectId) {
+      toast.warning('Enter a tag name');
+      return;
+    }
+    setTagSaving(true);
+    try {
+      const r = await fetch(`/api/projects/${selectedProjectId}/version-tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          versionId: tagFromVersionId,
+          message: tagMessageInput.trim() || undefined,
+          channel: tagChannelInput.trim() || undefined,
+          immutable: tagImmutable,
+        }),
+      });
+      const d = await r.json();
+      if (d.success) {
+        toast.success(`Tag "${name}" created`);
+        setShowTagDialog(false);
+        await loadVersionTags();
+      } else {
+        toast.error(d.error || 'Could not create tag');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not create tag');
+    } finally {
+      setTagSaving(false);
+    }
+  };
+
+  const handleDeleteTag = async (tagId: string) => {
+    if (!selectedProjectId) return;
+    const ok = await confirmDialog({
+      title: 'Delete tag',
+      message: 'Remove this named tag? Version rows are not deleted.',
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    });
+    if (!ok) return;
+    try {
+      const r = await fetch(`/api/projects/${selectedProjectId}/version-tags/${tagId}`, {
+        method: 'DELETE',
+      });
+      const d = await r.json();
+      if (d.success) {
+        toast.success('Tag removed');
+        if (historyTagFilter === tagId) setHistoryTagFilter('');
+        await loadVersionTags();
+      } else {
+        toast.error(d.error || 'Could not delete tag');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not delete tag');
     }
   };
 
@@ -786,6 +918,50 @@ const Versions = () => {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-7xl mx-auto space-y-6">
+      {selectedProjectId && versionTags.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Tag className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Version tags</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {versionTags.map((tg) => (
+              <div
+                key={tg.id}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-1.5 text-sm bg-amber-50/80 dark:bg-amber-950/20"
+              >
+                <span className="font-mono font-medium text-gray-900 dark:text-white">{tg.name}</span>
+                <span className="text-gray-500 dark:text-gray-400">→ v{tg.target_version_string ?? '?'}</span>
+                {tg.channel && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    {tg.channel}
+                  </span>
+                )}
+                {tg.immutable && (
+                  <span title="Immutable" className="text-xs text-amber-700 dark:text-amber-300">
+                    locked
+                  </span>
+                )}
+                {!tg.immutable && (effectiveIsAdmin || tg.created_by === currentUserId) && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTag(tg.id)}
+                    className="text-red-600 dark:text-red-400 hover:underline text-xs"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Tags are stable names for a schema revision (like Git tags). Use &quot;Tag this revision&quot; on a version row to add one.
+            Immutable tags cannot be moved or deleted; they work well for release labels such as <span className="font-mono">v1.0</span> or{' '}
+            <span className="font-mono">stable</span>, and pair with deprecation and sunset planning as last-known-good pointers.
+          </p>
+        </div>
+      )}
+
       {selectedProjectId && versionBranches.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -827,8 +1003,36 @@ const Versions = () => {
           description="Get started by creating your first version"
           iconContainerClassName="from-emerald-500 to-teal-600 shadow-emerald-500/30"
         />
+      ) : displayVersions.length === 0 ? (
+        <EmptyState
+          icon={<Tag className="h-10 w-10" />}
+          title="No version matches this tag"
+          description="Clear the tag filter above the table or choose a different tag."
+          iconContainerClassName="from-amber-500 to-orange-600 shadow-amber-500/30"
+        />
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          {versionTags.length > 0 && (
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center gap-3 bg-gray-50/80 dark:bg-gray-900/40">
+              <span className="text-sm text-gray-600 dark:text-gray-400">History filter</span>
+              <Select
+                value={historyTagFilter || '__all__'}
+                onValueChange={(v) => setHistoryTagFilter(v === '__all__' ? '' : v)}
+              >
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="All revisions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All revisions</SelectItem>
+                  {versionTags.map((tg) => (
+                    <SelectItem key={tg.id} value={tg.id}>
+                      Tag {tg.name} → v{tg.target_version_string ?? '?'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
             <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
               <tr>
@@ -841,12 +1045,21 @@ const Versions = () => {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
-              {versions.map((version) => (
+              {displayVersions.map((version) => (
                 <tr key={version.id} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 transition-all duration-200">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <div className="text-sm font-bold text-gray-900 dark:text-white font-mono">v{version.version_id}</div>
                       {version.published && <div title="Published" className="p-1 bg-blue-100 dark:bg-blue-900/30 rounded"><Lock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /></div>}
+                      {(tagsByVersionId.get(version.id) ?? []).map((t) => (
+                        <span
+                          key={t.id}
+                          title={t.message || t.name}
+                          className="text-xs font-mono px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 border border-amber-200 dark:border-amber-800"
+                        >
+                          {t.name}
+                        </span>
+                      ))}
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -937,6 +1150,17 @@ const Versions = () => {
                               >
                                 <GitBranch className="w-4 h-4 text-indigo-500" />
                                 Branch from here
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenVersionDropdown(null);
+                                  handleRowAction('tagFrom', version);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                              >
+                                <Tag className="w-4 h-4 text-amber-600" />
+                                Tag this revision
                               </button>
                               <button
                                 onClick={(e) => {
@@ -1214,19 +1438,85 @@ const Versions = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Version 1 (Base)</Label>
-                    <Select value={compareVersion1Id} onValueChange={setCompareVersion1Id}>
+                    <Select
+                      value={compareVersion1Id}
+                      onValueChange={(id) => {
+                        setCompareVersion1Id(id);
+                        setCompareBaseTagId('');
+                      }}
+                    >
                       <SelectTrigger><SelectValue placeholder="Select version..." /></SelectTrigger>
                       <SelectContent>{versions.map((v) => <SelectItem key={v.id} value={v.id}>{v.published ? '🔒 ' : ''}v{v.version_id}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Version 2 (Compare To)</Label>
-                    <Select value={compareVersion2Id} onValueChange={setCompareVersion2Id}>
+                    <Select
+                      value={compareVersion2Id}
+                      onValueChange={(id) => {
+                        setCompareVersion2Id(id);
+                        setCompareToTagId('');
+                      }}
+                    >
                       <SelectTrigger><SelectValue placeholder="Select version..." /></SelectTrigger>
                       <SelectContent>{versions.map((v) => <SelectItem key={v.id} value={v.id}>{v.published ? '🔒 ' : ''}v{v.version_id}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 </div>
+                {versionTags.length > 0 && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Set base from tag</Label>
+                      <Select
+                        value={compareBaseTagId || '__none__'}
+                        onValueChange={(id) => {
+                          if (id === '__none__') {
+                            setCompareBaseTagId('');
+                            return;
+                          }
+                          setCompareBaseTagId(id);
+                          const t = versionTags.find((x) => x.id === id);
+                          if (t) setCompareVersion1Id(t.version_id);
+                        }}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">—</SelectItem>
+                          {versionTags.map((tg) => (
+                            <SelectItem key={tg.id} value={tg.id}>
+                              {tg.name} → v{tg.target_version_string ?? '?'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Set compare target from tag</Label>
+                      <Select
+                        value={compareToTagId || '__none__'}
+                        onValueChange={(id) => {
+                          if (id === '__none__') {
+                            setCompareToTagId('');
+                            return;
+                          }
+                          setCompareToTagId(id);
+                          const t = versionTags.find((x) => x.id === id);
+                          if (t) setCompareVersion2Id(t.version_id);
+                        }}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">—</SelectItem>
+                          {versionTags.map((tg) => (
+                            <SelectItem key={tg.id} value={tg.id}>
+                              {tg.name} → v{tg.target_version_string ?? '?'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-center py-8">
                   <Button onClick={handleCompareVersions} disabled={!compareVersion1Id || !compareVersion2Id || isLoadingComparison}>{isLoadingComparison ? 'Loading...' : 'Compare Versions'}</Button>
                 </div>
@@ -1571,6 +1861,67 @@ const Versions = () => {
             </Button>
             <Button onClick={handleCreateBranchSubmit} disabled={branchSaving || !branchNameInput.trim()}>
               {branchSaving ? 'Saving…' : 'Create branch'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTagDialog} onOpenChange={(open) => !tagSaving && setShowTagDialog(open)}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Create version tag</DialogTitle>
+            <DialogDescription>
+              Attach a stable name to this schema revision (like <span className="font-mono">v1.0</span> or{' '}
+              <span className="font-mono">stable</span>). Immutable tags cannot be moved or deleted afterward.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="tag-name">Tag name</Label>
+              <Input
+                id="tag-name"
+                value={tagNameInput}
+                onChange={(e) => setTagNameInput(e.target.value)}
+                placeholder="e.g. v1.0.0 or stable"
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="tag-msg">Message (optional)</Label>
+              <Input
+                id="tag-msg"
+                value={tagMessageInput}
+                onChange={(e) => setTagMessageInput(e.target.value)}
+                placeholder="Release notes or annotation"
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="tag-channel">Channel (optional)</Label>
+              <Input
+                id="tag-channel"
+                value={tagChannelInput}
+                onChange={(e) => setTagChannelInput(e.target.value)}
+                placeholder="e.g. stable, beta"
+                autoComplete="off"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={tagImmutable}
+                onChange={(e) => setTagImmutable(e.target.checked)}
+                className="rounded border-gray-300 dark:border-gray-600"
+              />
+              Lock tag (immutable — cannot move or delete)
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTagDialog(false)} disabled={tagSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateTagSubmit} disabled={tagSaving || !tagNameInput.trim()}>
+              {tagSaving ? 'Saving…' : 'Create tag'}
             </Button>
           </DialogFooter>
         </DialogContent>
