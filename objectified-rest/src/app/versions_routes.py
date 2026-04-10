@@ -6,7 +6,7 @@ All endpoints are tenant and project-scoped and require authentication via JWT t
 """
 
 import re
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, Body
 from typing import Optional, List, Dict, Any
 
 from .database import db
@@ -17,6 +17,7 @@ from .models import (
     VersionPublishRequest
 )
 from .auth import validate_authentication, get_authenticated_user_id
+from .version_notes import limits_for_tenant, validate_version_notes
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
 
@@ -215,13 +216,24 @@ async def create_version(
         # Get creator_id from auth data (will be None for API key auth)
         creator_id = get_authenticated_user_id(auth_data)
 
+        limits = limits_for_tenant(auth_data["tenant_id"])
+        try:
+            sm, cl = validate_version_notes(
+                request.short_message,
+                request.changelog,
+                limits,
+                require_short_message=limits.require_short_message,
+            )
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve)) from ve
+
         # Create version
         version = db.create_version(
             project_id=project_id,
             creator_id=creator_id,
             version_id=version_id,
-            description=request.description.strip() if request.description else None,
-            change_log=request.change_log.strip() if request.change_log else None
+            description=sm,
+            change_log=cl,
         )
 
         response_data = {**version}
@@ -290,14 +302,32 @@ async def update_version(
         )
 
     try:
-        # Build updates dict from request
-        updates = {}
-        if request.description is not None:
-            updates['description'] = request.description.strip() if request.description else None
-        if request.change_log is not None:
-            updates['change_log'] = request.change_log.strip() if request.change_log else None
+        limits = limits_for_tenant(auth_data["tenant_id"])
+        updates: Dict[str, Any] = {}
         if request.enabled is not None:
-            updates['enabled'] = request.enabled
+            updates["enabled"] = request.enabled
+
+        note_keys = {"short_message", "changelog"}
+        if request.model_fields_set & note_keys:
+            merged_sm = existing.get("description")
+            merged_cl = existing.get("change_log")
+            if "short_message" in request.model_fields_set:
+                merged_sm = request.short_message
+            if "changelog" in request.model_fields_set:
+                merged_cl = request.changelog
+            try:
+                merged_sm, merged_cl = validate_version_notes(
+                    merged_sm,
+                    merged_cl,
+                    limits,
+                    require_short_message=limits.require_short_message,
+                )
+            except ValueError as ve:
+                raise HTTPException(status_code=400, detail=str(ve)) from ve
+            if "short_message" in request.model_fields_set:
+                updates["description"] = merged_sm
+            if "changelog" in request.model_fields_set:
+                updates["change_log"] = merged_cl
 
         # Update version
         version = db.update_version(
@@ -329,8 +359,8 @@ async def publish_version(
     tenant_slug: str,
     project_id: str,
     version_record_id: str,
-    request: VersionPublishRequest = None,
-    auth_data: Dict[str, Any] = Depends(validate_authentication)
+    request: VersionPublishRequest = Body(default_factory=VersionPublishRequest),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> VersionSchema:
     """
     Publish a version.
@@ -377,11 +407,37 @@ async def publish_version(
             detail="Publishing requires user authentication (JWT token)"
         )
 
-    visibility = request.visibility if request else "private"
+    visibility = request.visibility if request.visibility is not None else "private"
     if visibility not in ("public", "private"):
         visibility = "private"
 
-    version = db.publish_version(version_record_id, auth_data['tenant_id'], user_id, visibility)
+    limits = limits_for_tenant(auth_data["tenant_id"])
+    merged_sm = existing.get("description")
+    merged_cl = existing.get("change_log")
+    note_keys = {"short_message", "changelog"}
+    if request.model_fields_set & note_keys:
+        if "short_message" in request.model_fields_set:
+            merged_sm = request.short_message
+        if "changelog" in request.model_fields_set:
+            merged_cl = request.changelog
+    try:
+        merged_sm, merged_cl = validate_version_notes(
+            merged_sm,
+            merged_cl,
+            limits,
+            require_short_message=limits.require_short_message,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve)) from ve
+
+    version = db.publish_version(
+        version_record_id,
+        auth_data["tenant_id"],
+        user_id,
+        visibility,
+        description=merged_sm,
+        change_log=merged_cl,
+    )
 
     if not version:
         raise HTTPException(

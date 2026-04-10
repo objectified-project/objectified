@@ -110,7 +110,12 @@ export async function POST(
 
     const tenantSlug = tenant.slug;
     const body = await request.json();
-    const { projectId, visibility } = body;
+    const { projectId, visibility, shortMessage, changelog } = body as {
+      projectId?: string;
+      visibility?: string;
+      shortMessage?: string | null;
+      changelog?: string | null;
+    };
 
     if (!projectId) {
       return NextResponse.json(
@@ -126,10 +131,14 @@ export async function POST(
       current_tenant_id: tenantId,
     });
 
+    const payload: Record<string, unknown> = { visibility: visibility || 'private' };
+    if (shortMessage !== undefined) payload.shortMessage = shortMessage;
+    if (changelog !== undefined) payload.changelog = changelog;
+
     const response = await fetch(`${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}/${versionId}/publish`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ visibility: visibility || 'private' }),
+      body: JSON.stringify(payload),
     });
 
     const { data, error, status } = await handleRestResponse(response, 'Failed to publish version');
