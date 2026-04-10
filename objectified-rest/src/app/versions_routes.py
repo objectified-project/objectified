@@ -307,13 +307,14 @@ async def update_version(
         if request.enabled is not None:
             updates["enabled"] = request.enabled
 
-        if request.short_message is not None or request.changelog is not None:
-            merged_sm = (
-                request.short_message if request.short_message is not None else existing.get("description")
-            )
-            merged_cl = (
-                request.changelog if request.changelog is not None else existing.get("change_log")
-            )
+        note_keys = {"short_message", "changelog"}
+        if request.model_fields_set & note_keys:
+            merged_sm = existing.get("description")
+            merged_cl = existing.get("change_log")
+            if "short_message" in request.model_fields_set:
+                merged_sm = request.short_message
+            if "changelog" in request.model_fields_set:
+                merged_cl = request.changelog
             try:
                 merged_sm, merged_cl = validate_version_notes(
                     merged_sm,
@@ -323,9 +324,9 @@ async def update_version(
                 )
             except ValueError as ve:
                 raise HTTPException(status_code=400, detail=str(ve)) from ve
-            if request.short_message is not None:
+            if "short_message" in request.model_fields_set:
                 updates["description"] = merged_sm
-            if request.changelog is not None:
+            if "changelog" in request.model_fields_set:
                 updates["change_log"] = merged_cl
 
         # Update version

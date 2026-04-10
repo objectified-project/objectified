@@ -57,8 +57,8 @@ interface Version {
   project_id: string;
   creator_id: string;
   version_id: string;
-  description: string | null;
-  change_log: string | null;
+  shortMessage: string | null;
+  changelog: string | null;
   enabled: boolean;
   published: boolean;
   deleted_at: string | null;
@@ -342,7 +342,7 @@ const Versions = () => {
   const handleEditClick = (version: Version) => {
     if (version.published) { setErrorMessage('Cannot edit published version'); return; }
     setSelectedVersion(version); setVersionId(version.version_id);
-    setDescription(version.description || ''); setChangeLog(version.change_log || '');
+    setDescription(version.shortMessage || ''); setChangeLog(version.changelog || '');
     setEnabled(version.enabled); setErrorMessage(''); setShowEditDialog(true);
   };
 
@@ -366,8 +366,8 @@ const Versions = () => {
     if (ver.creator_id !== currentUserId && !effectiveIsAdmin) return;
     setPublishVersionId(versionRecordId);
     setPublishVisibility('private');
-    setPublishShortMessage(ver.description?.trim() ?? '');
-    setPublishChangelog(ver.change_log?.trim() ?? '');
+    setPublishShortMessage(ver.shortMessage?.trim() ?? '');
+    setPublishChangelog(ver.changelog?.trim() ?? '');
     setShowPublishDialog(true);
   };
 
@@ -484,7 +484,7 @@ const Versions = () => {
         return { ...cls, properties: JSON.parse(propsResult) };
       }));
       const project = projects.find(p => p.id === version.project_id);
-      const spec = await generateOpenApiSpec(classesWithProperties, { projectName: project?.name, version: version.version_id, description: version.description || undefined });
+      const spec = await generateOpenApiSpec(classesWithProperties, { projectName: project?.name, version: version.version_id, description: version.shortMessage || undefined });
       setOpenApiSpec(spec);
     } catch (error) { setOpenApiSpec(JSON.stringify({ openapi: '3.1.0', info: { title: 'Error Loading Spec', version: version.version_id }, components: { schemas: {} } }, null, 2)); }
     finally { setIsLoadingSpec(false); }
@@ -520,7 +520,7 @@ const Versions = () => {
       return { ...cls, properties: JSON.parse(propsResult) };
     }));
     const project = projects.find(p => p.id === version.project_id);
-    return generateOpenApiSpec(classesWithProperties, { projectName: project?.name, version: version.version_id, description: version.description || undefined });
+    return generateOpenApiSpec(classesWithProperties, { projectName: project?.name, version: version.version_id, description: version.shortMessage || undefined });
   };
 
   const handleCompareVersions = async () => {
@@ -1080,8 +1080,8 @@ const Versions = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900 dark:text-white max-w-xs truncate">{version.description || '—'}</div>
-                    {version.change_log && <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs truncate">{version.change_log}</div>}
+                    <div className="text-sm text-gray-900 dark:text-white max-w-xs truncate">{version.shortMessage || '—'}</div>
+                    {version.changelog && <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs truncate">{version.changelog}</div>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex gap-2">
@@ -1273,7 +1273,7 @@ const Versions = () => {
                 <SelectTrigger><SelectValue placeholder={versions.length === 0 ? 'No versions available' : 'Create blank version'} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__blank__">Create blank version</SelectItem>
-                  {versions.map((v) => <SelectItem key={v.id} value={v.id}>{v.published ? '🔒 ' : ''}v{v.version_id} - {v.description || 'No description'}</SelectItem>)}
+                  {versions.map((v) => <SelectItem key={v.id} value={v.id}>{v.published ? '🔒 ' : ''}v{v.version_id} - {v.shortMessage || 'No description'}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -1562,8 +1562,8 @@ const Versions = () => {
                   const vBase = versions.find((v) => v.id === compareVersion1Id);
                   const vTo = versions.find((v) => v.id === compareVersion2Id);
                   if (!vBase || !vTo) return null;
-                  const breakBase = extractBreakingHintsFromChangelog(vBase.change_log);
-                  const breakTo = extractBreakingHintsFromChangelog(vTo.change_log);
+                  const breakBase = extractBreakingHintsFromChangelog(vBase.changelog);
+                  const breakTo = extractBreakingHintsFromChangelog(vTo.changelog);
                   return (
                     <div className="mb-4 space-y-3 flex-shrink-0">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1573,11 +1573,11 @@ const Versions = () => {
                           </div>
                           <div className="text-gray-600 dark:text-gray-400">
                             <span className="text-gray-500 dark:text-gray-500">Revision note:</span>{' '}
-                            {vBase.description?.trim() || '—'}
+                            {vBase.shortMessage?.trim() || '—'}
                           </div>
-                          {vBase.change_log?.trim() ? (
+                          {vBase.changelog?.trim() ? (
                             <pre className="mt-2 whitespace-pre-wrap text-xs text-gray-700 dark:text-gray-300 font-sans max-h-32 overflow-y-auto">
-                              {vBase.change_log}
+                              {vBase.changelog}
                             </pre>
                           ) : (
                             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No changelog</p>
@@ -1594,11 +1594,11 @@ const Versions = () => {
                           </div>
                           <div className="text-gray-600 dark:text-gray-400">
                             <span className="text-gray-500 dark:text-gray-500">Revision note:</span>{' '}
-                            {vTo.description?.trim() || '—'}
+                            {vTo.shortMessage?.trim() || '—'}
                           </div>
-                          {vTo.change_log?.trim() ? (
+                          {vTo.changelog?.trim() ? (
                             <pre className="mt-2 whitespace-pre-wrap text-xs text-gray-700 dark:text-gray-300 font-sans max-h-32 overflow-y-auto">
-                              {vTo.change_log}
+                              {vTo.changelog}
                             </pre>
                           ) : (
                             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No changelog</p>
