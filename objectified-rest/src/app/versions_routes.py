@@ -13,6 +13,7 @@ from .database import db
 from .models import (
     VersionSchema,
     VersionCreateRequest,
+    VersionForkRequest,
     VersionUpdateRequest,
     VersionPublishRequest
 )
@@ -260,6 +261,85 @@ async def create_version(
                 detail=f"A version with ID '{version_id}' already exists in this project"
             )
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{tenant_slug}/{project_id}/fork")
+async def fork_version_from_revision(
+    tenant_slug: str,
+    project_id: str,
+    request: VersionForkRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> VersionSchema:
+    """
+    Fork a schema version line into this project from a source revision in another project (sandbox / provenance).
+
+    Not the same as a named branch within one project (#500): fork is cross-project isolation with recorded lineage.
+    """
+    target_project = db.get_project_by_id(project_id, auth_data["tenant_id"])
+    if not target_project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    src_id = (request.source_revision_id or "").strip()
+    if not src_id:
+        raise HTTPException(status_code=400, detail="sourceRevisionId is required")
+
+    version_id = (request.version_id or "").strip() if request.version_id else ""
+    if not version_id:
+        latest_version = db.get_latest_version_for_project(project_id, auth_data["tenant_id"])
+        if latest_version:
+            if request.bump_strategy == "minor":
+                version_id = bump_minor_version(latest_version)
+            else:
+                version_id = bump_patch_version(latest_version)
+        else:
+            version_id = "0.1.0"
+    else:
+        version_id = version_id.strip()
+
+    if not parse_semantic_version(version_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Version ID must follow semantic versioning format (e.g., 1.0.0)",
+        )
+
+    creator_id = get_authenticated_user_id(auth_data)
+    if not creator_id:
+        raise HTTPException(status_code=403, detail="Forking requires user authentication (JWT token)")
+
+    limits = limits_for_tenant(auth_data["tenant_id"])
+    try:
+        sm, cl = validate_version_notes(
+            request.short_message,
+            request.changelog,
+            limits,
+            require_short_message=limits.require_short_message,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve)) from ve
+
+    upstream_opt = (request.upstream_project_id or "").strip() or None
+
+    result = db.create_forked_version(
+        target_project_id=project_id,
+        tenant_id=auth_data["tenant_id"],
+        creator_id=creator_id,
+        version_id=version_id,
+        description=sm,
+        change_log=cl,
+        source_revision_id=src_id,
+        upstream_project_id=upstream_opt,
+    )
+
+    if not result.get("success"):
+        err = result.get("error", "Fork failed")
+        if "different target project" in err or "Branch from here" in err:
+            raise HTTPException(status_code=400, detail=err)
+        if "not found" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        raise HTTPException(status_code=400, detail=err)
+
+    version = result["version"]
+    return VersionSchema(**version)
 
 
 @router.put("/{tenant_slug}/{project_id}/{version_record_id}")
