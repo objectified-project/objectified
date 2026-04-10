@@ -1,0 +1,184 @@
+"""
+Backward compatibility API: compare two schema revisions (versions.id) using generated OpenAPI.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
+
+from .auth import validate_authentication
+from .database import db
+from .models import (
+    CompatibilityCheckRequest,
+    CompatibilityCheckResponse,
+    CompatibilityFindingOut,
+)
+from .openapi_generator import generate_openapi_spec
+from .schema_compatibility import (
+    BREAKING_DOC_ISSUE_URL,
+    CompatibilityRules,
+    analyze_schema_compatibility,
+)
+
+
+router = APIRouter(prefix="/v1/versions", tags=["compatibility"])
+
+
+def _parse_project_metadata(metadata: Any) -> Dict[str, Any]:
+    if metadata is None:
+        return {}
+    if isinstance(metadata, dict):
+        return metadata
+    if isinstance(metadata, str):
+        try:
+            parsed = json.loads(metadata)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _tenant_compat_gate(project: Dict[str, Any]) -> bool:
+    return bool(_parse_project_metadata(project.get("metadata")).get("compatGateOnMerge"))
+
+
+def _rules_from_payload(req: CompatibilityCheckRequest) -> CompatibilityRules:
+    p = req.rules
+    if not p:
+        return CompatibilityRules()
+    return CompatibilityRules(
+        check_paths=p.check_paths,
+        check_schemas=p.check_schemas,
+        treat_removed_schema_as_breaking=p.treat_removed_schema_as_breaking,
+        treat_removed_property_as_breaking=p.treat_removed_property_as_breaking,
+        treat_removed_path_as_breaking=p.treat_removed_path_as_breaking,
+        treat_removed_operation_as_breaking=p.treat_removed_operation_as_breaking,
+        detect_possible_renames=p.detect_possible_renames,
+    )
+
+
+def _openapi_for_revision(version: Dict[str, Any], tenant_slug: str, tenant_id: str) -> Dict[str, Any]:
+    project = db.get_project_by_id(version["project_id"], tenant_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found for revision")
+    classes = db.get_classes_for_version(version["id"])
+    all_properties: Dict[str, Any] = {}
+    for c in classes:
+        all_properties[c["id"]] = db.get_properties_for_class(c["id"])
+    return generate_openapi_spec(
+        tenant_slug,
+        project["slug"],
+        version["version_id"],
+        classes,
+        all_properties,
+        project.get("description"),
+        version_db_id=version["id"],
+    )
+
+
+def _fingerprint(overall: str, finding_dicts: list) -> str:
+    payload = {
+        "overall": overall,
+        "findings": sorted(
+            finding_dicts,
+            key=lambda x: (x.get("path", ""), x.get("rule", ""), x.get("id", "")),
+        ),
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+@router.post("/{tenant_slug}/{project_id}/compatibility")
+async def check_revision_compatibility(
+    tenant_slug: str,
+    project_id: str,
+    body: CompatibilityCheckRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> JSONResponse:
+    """
+    Compare **baseRevisionId** (older / consumer expectation) to **headRevisionId** (newer).
+    Returns structured safe / breaking / unknown findings for CI-style merge gates.
+    """
+    tenant_id = auth_data["tenant_id"]
+    project = db.get_project_by_id(project_id, tenant_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    base_id = (body.base_revision_id or "").strip()
+    head_id = (body.head_revision_id or "").strip()
+    if not base_id or not head_id:
+        raise HTTPException(
+            status_code=400,
+            detail="baseRevisionId and headRevisionId are required",
+        )
+    if base_id == head_id:
+        raise HTTPException(
+            status_code=400,
+            detail="baseRevisionId and headRevisionId must differ",
+        )
+
+    base_ver = db.get_version_by_id(base_id, tenant_id)
+    head_ver = db.get_version_by_id(head_id, tenant_id)
+    if not base_ver:
+        raise HTTPException(status_code=404, detail=f"Revision not found: {base_id}")
+    if not head_ver:
+        raise HTTPException(status_code=404, detail=f"Revision not found: {head_id}")
+
+    if base_ver["project_id"] != project_id or head_ver["project_id"] != project_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Both revisions must belong to the specified project",
+        )
+
+    rules = _rules_from_payload(body)
+    base_spec = _openapi_for_revision(base_ver, tenant_slug, tenant_id)
+    head_spec = _openapi_for_revision(head_ver, tenant_slug, tenant_id)
+
+    overall, findings = analyze_schema_compatibility(base_spec, head_spec, rules)
+    finding_out = [
+        CompatibilityFindingOut(
+            id=f.id,
+            path=f.path,
+            category=f.category,
+            rule=f.rule,
+            message=f.message,
+        )
+        for f in findings
+    ]
+    finding_dicts = [f.model_dump(by_alias=True) for f in finding_out]
+    fp = _fingerprint(overall, finding_dicts)
+
+    tenant_gate = _tenant_compat_gate(project)
+    merge_blocked = bool(tenant_gate and overall != "safe")
+
+    doc_url = BREAKING_DOC_ISSUE_URL if overall == "breaking" else None
+
+    response = CompatibilityCheckResponse(
+        overall=overall,
+        base_revision_id=base_id,
+        head_revision_id=head_id,
+        findings=finding_out,
+        breaking_change_documentation_issue_url=doc_url,
+        report_fingerprint=fp,
+        tenant_compat_gate_active=tenant_gate,
+        merge_blocked_by_compat_gate=merge_blocked,
+    )
+
+    policy = body.policy
+    if policy and policy.http409_when_breaking and overall == "breaking":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "COMPATIBILITY_BREAKING",
+                "message": "Head revision introduces breaking changes relative to base",
+                "report": response.model_dump(by_alias=True),
+            },
+        )
+
+    return JSONResponse(content=response.model_dump(by_alias=True))

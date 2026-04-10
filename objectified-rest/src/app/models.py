@@ -367,6 +367,108 @@ class VersionPublishRequest(BaseModel):
     )
 
 
+class CompatibilityRulesPayload(BaseModel):
+    """Optional toggles for backward-compatibility checks (defaults are strict)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    check_paths: bool = True
+    check_schemas: bool = True
+    treat_removed_schema_as_breaking: bool = Field(
+        True,
+        validation_alias=AliasChoices(
+            "treatRemovedSchemaAsBreaking", "treat_removed_schema_as_breaking"
+        ),
+    )
+    treat_removed_property_as_breaking: bool = Field(
+        True,
+        validation_alias=AliasChoices(
+            "treatRemovedPropertyAsBreaking", "treat_removed_property_as_breaking"
+        ),
+    )
+    treat_removed_path_as_breaking: bool = Field(
+        True,
+        validation_alias=AliasChoices(
+            "treatRemovedPathAsBreaking", "treat_removed_path_as_breaking"
+        ),
+    )
+    treat_removed_operation_as_breaking: bool = Field(
+        True,
+        validation_alias=AliasChoices(
+            "treatRemovedOperationAsBreaking", "treat_removed_operation_as_breaking"
+        ),
+    )
+    detect_possible_renames: bool = Field(
+        True,
+        validation_alias=AliasChoices("detectPossibleRenames", "detect_possible_renames"),
+    )
+
+
+class CompatibilityPolicyPayload(BaseModel):
+    """Optional HTTP semantics (e.g. CI gate)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    http409_when_breaking: bool = Field(
+        False,
+        validation_alias=AliasChoices("http409WhenBreaking", "http409_when_breaking"),
+        description="Return 409 Conflict when overall classification is breaking.",
+    )
+
+
+class CompatibilityCheckRequest(BaseModel):
+    """Compare two schema revisions (versions.id) for backward compatibility."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    base_revision_id: str = Field(
+        ...,
+        validation_alias=AliasChoices("baseRevisionId", "base_revision_id"),
+        description="Older / merge-base side revision (versions.id UUID).",
+    )
+    head_revision_id: str = Field(
+        ...,
+        validation_alias=AliasChoices("headRevisionId", "head_revision_id"),
+        description="Newer / branch tip side revision (versions.id UUID).",
+    )
+    rules: Optional[CompatibilityRulesPayload] = None
+    policy: Optional[CompatibilityPolicyPayload] = None
+
+
+class CompatibilityFindingOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    path: str
+    category: str
+    rule: str
+    message: str
+
+
+class CompatibilityCheckResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    overall: str
+    base_revision_id: str = Field(serialization_alias="baseRevisionId")
+    head_revision_id: str = Field(serialization_alias="headRevisionId")
+    findings: List[CompatibilityFindingOut]
+    breaking_change_documentation_issue_url: Optional[str] = Field(
+        default=None,
+        serialization_alias="breakingChangeDocumentationIssueUrl",
+    )
+    report_fingerprint: str = Field(serialization_alias="reportFingerprint")
+    tenant_compat_gate_active: bool = Field(
+        default=False,
+        serialization_alias="tenantCompatGateActive",
+        description="True when project metadata requests merge-time compat gating.",
+    )
+    merge_blocked_by_compat_gate: bool = Field(
+        default=False,
+        serialization_alias="mergeBlockedByCompatGate",
+        description="True when tenant gate is on and the revision pair is not fully safe.",
+    )
+
+
 class VersionTagSchema(BaseModel):
     """Git-like tag pointing at a schema revision (versions.id)."""
 

@@ -3,9 +3,556 @@
   "info": {
     "title": "Objectified REST API",
     "description": "REST API for serving OpenAPI specifications from the Objectified database",
-    "version": "1.0.4"
+    "version": "1.0.6"
   },
   "paths": {
+    "/v1/data/{tenant_slug}": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Data Api Info",
+        "description": "Verify data API is mounted and tenant is authenticated. Returns 200 with tenant_slug.",
+        "operationId": "data_api_info_v1_data__tenant_slug__get",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Data Api Info V1 Data  Tenant Slug  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/data/{tenant_slug}/records/{record_id}": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Get Data Record",
+        "description": "Get the current snapshot data for a record (for edit form).\nReturns 404 if record not found or deleted.",
+        "operationId": "get_data_record_v1_data__tenant_slug__records__record_id__get",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Record Id"
+            }
+          },
+          {
+            "name": "class_schema_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Class schema ID",
+              "title": "Class Schema Id"
+            },
+            "description": "Class schema ID"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Data Record V1 Data  Tenant Slug  Records  Record Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Update Data Record",
+        "description": "Update an existing data record and data_snapshot.\nEmbedding is recomputed asynchronously and stored in data_snapshot.",
+        "operationId": "update_data_record_v1_data__tenant_slug__records__record_id__patch",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Record Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataRecordUpdateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Data Record V1 Data  Tenant Slug  Records  Record Id  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Delete Data Record",
+        "description": "Delete a data record (append deleted event, remove data_snapshot row).",
+        "operationId": "delete_data_record_v1_data__tenant_slug__records__record_id__delete",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Record Id"
+            }
+          },
+          {
+            "name": "class_schema_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Class schema ID",
+              "title": "Class Schema Id"
+            },
+            "description": "Class schema ID"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Data Record V1 Data  Tenant Slug  Records  Record Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/data/{tenant_slug}/records": {
+      "post": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Create Data Record",
+        "description": "Create a new data record and data_snapshot row.\nEmbedding is computed asynchronously and stored in data_snapshot.",
+        "operationId": "create_data_record_v1_data__tenant_slug__records_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataRecordCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Data Record V1 Data  Tenant Slug  Records Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/data/{tenant_slug}/records/{record_id}/restore": {
+      "post": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Restore Data Record",
+        "description": "Restore a deleted data record (recreate data_snapshot from deleted event, append restored event).",
+        "operationId": "restore_data_record_v1_data__tenant_slug__records__record_id__restore_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Record Id"
+            }
+          },
+          {
+            "name": "class_schema_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Class schema ID",
+              "title": "Class Schema Id"
+            },
+            "description": "Class schema ID"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Restore Data Record V1 Data  Tenant Slug  Records  Record Id  Restore Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/primitives/{tenant_slug}": {
       "get": {
         "tags": [
@@ -2045,6 +2592,100 @@
         }
       }
     },
+    "/v1/versions/{tenant_slug}/{project_id}/compatibility": {
+      "post": {
+        "tags": [
+          "compatibility"
+        ],
+        "summary": "Check Revision Compatibility",
+        "description": "Compare **baseRevisionId** (older / consumer expectation) to **headRevisionId** (newer).\nReturns structured safe / breaking / unknown findings for CI-style merge gates.",
+        "operationId": "check_revision_compatibility_v1_versions__tenant_slug___project_id__compatibility_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompatibilityCheckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompatibilityCheckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/versions/{tenant_slug}/{project_id}": {
       "get": {
         "tags": [
@@ -2607,6 +3248,100 @@
         }
       }
     },
+    "/v1/versions/{tenant_slug}/{project_id}/fork": {
+      "post": {
+        "tags": [
+          "versions"
+        ],
+        "summary": "Fork Version From Revision",
+        "description": "Fork a schema version line into this project from a source revision in another project (sandbox / provenance).\n\nNot the same as a named branch within one project (#500): fork is cross-project isolation with recorded lineage.",
+        "operationId": "fork_version_from_revision_v1_versions__tenant_slug___project_id__fork_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionForkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/versions/{tenant_slug}/{project_id}/{version_record_id}/publish": {
       "post": {
         "tags": [
@@ -2717,6 +3452,99 @@
         "summary": "Unpublish Version",
         "description": "Unpublish a version.\n\nOnly the version creator or a tenant administrator can unpublish a version.\n\nArgs:\n    tenant_slug: The tenant slug\n    project_id: The project ID\n    version_record_id: The version record ID\n    auth_data: Authentication data (injected by dependency)\n\nReturns:\n    The unpublished version",
         "operationId": "unpublish_version_v1_versions__tenant_slug___project_id___version_record_id__unpublish_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "version_record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Record Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/versions/{tenant_slug}/{project_id}/{version_record_id}/freeze-schema": {
+      "post": {
+        "tags": [
+          "versions"
+        ],
+        "summary": "Freeze Version Schema",
+        "description": "Freeze (capture) class schemas into odb.class_schema for this version.\nOnly available when the version has no class_schema rows yet (e.g. published before schema capture existed).\nOnly the version creator or a tenant administrator can freeze schema.",
+        "operationId": "freeze_version_schema_v1_versions__tenant_slug___project_id___version_record_id__freeze_schema_post",
         "parameters": [
           {
             "name": "tenant_slug",
@@ -6542,6 +7370,688 @@
         }
       }
     },
+    "/v1/migration-plans/{tenant_slug}": {
+      "get": {
+        "tags": [
+          "migration-plans"
+        ],
+        "summary": "Get Migration Plan Rules",
+        "description": "Get migration plan rules for a (project, from_version, to_version, class_name).\nReturns rules keyed by migration-edge-prop-{source_property}.",
+        "operationId": "get_migration_plan_rules_v1_migration_plans__tenant_slug__get",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Projectid"
+            }
+          },
+          {
+            "name": "fromVersionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Fromversionid"
+            }
+          },
+          {
+            "name": "toVersionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Toversionid"
+            }
+          },
+          {
+            "name": "className",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Classname"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Migration Plan Rules V1 Migration Plans  Tenant Slug  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "migration-plans"
+        ],
+        "summary": "Save Migration Plan Rules",
+        "description": "Save migration plan rules for a (project, from_version, to_version, class_name).\nBody: project_id, from_version_id, to_version_id, class_name, rules.",
+        "operationId": "save_migration_plan_rules_v1_migration_plans__tenant_slug__put",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Save Migration Plan Rules V1 Migration Plans  Tenant Slug  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/migration-plans/{tenant_slug}/counts": {
+      "get": {
+        "tags": [
+          "migration-plans"
+        ],
+        "summary": "Get Migration Plan Rule Counts",
+        "description": "Get rule counts per class_name for a migration plan (project, from_version, to_version).\nReturns { \"counts\": { \"ClassName\": 2, ... } }.",
+        "operationId": "get_migration_plan_rule_counts_v1_migration_plans__tenant_slug__counts_get",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Projectid"
+            }
+          },
+          {
+            "name": "fromVersionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Fromversionid"
+            }
+          },
+          {
+            "name": "toVersionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Toversionid"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Migration Plan Rule Counts V1 Migration Plans  Tenant Slug  Counts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/version-tags/{tenant_slug}/{project_id}": {
+      "get": {
+        "tags": [
+          "version-tags"
+        ],
+        "summary": "List Version Tags",
+        "description": "List all tags for a project.",
+        "operationId": "list_version_tags_v1_version_tags__tenant_slug___project_id__get",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VersionTagSchema"
+                  },
+                  "title": "Response List Version Tags V1 Version Tags  Tenant Slug   Project Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "version-tags"
+        ],
+        "summary": "Create Version Tag",
+        "description": "Create a tag pointing at an existing schema revision.",
+        "operationId": "create_version_tag_v1_version_tags__tenant_slug___project_id__post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionTagCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionTagSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/version-tags/{tenant_slug}/{project_id}/{tag_id}": {
+      "patch": {
+        "tags": [
+          "version-tags"
+        ],
+        "summary": "Patch Version Tag",
+        "description": "Move a tag to another revision and/or set immutable lock / protection policy.",
+        "operationId": "patch_version_tag_v1_version_tags__tenant_slug___project_id___tag_id__patch",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tag Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionTagUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionTagSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "version-tags"
+        ],
+        "summary": "Delete Version Tag",
+        "description": "Delete a tag (not allowed when immutable; protected tags require admin).",
+        "operationId": "delete_version_tag_v1_version_tags__tenant_slug___project_id___tag_id__delete",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tag Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Version Tag V1 Version Tags  Tenant Slug   Project Id   Tag Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",
@@ -7464,6 +8974,194 @@
         "title": "ClassUpdateRequest",
         "description": "Request model for updating a class."
       },
+      "CompatibilityCheckRequest": {
+        "properties": {
+          "baseRevisionId": {
+            "type": "string",
+            "title": "Baserevisionid",
+            "description": "Older / merge-base side revision (versions.id UUID)."
+          },
+          "headRevisionId": {
+            "type": "string",
+            "title": "Headrevisionid",
+            "description": "Newer / branch tip side revision (versions.id UUID)."
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompatibilityRulesPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompatibilityPolicyPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "baseRevisionId",
+          "headRevisionId"
+        ],
+        "title": "CompatibilityCheckRequest",
+        "description": "Compare two schema revisions (versions.id) for backward compatibility."
+      },
+      "CompatibilityCheckResponse": {
+        "properties": {
+          "overall": {
+            "type": "string",
+            "title": "Overall"
+          },
+          "baseRevisionId": {
+            "type": "string",
+            "title": "Baserevisionid"
+          },
+          "headRevisionId": {
+            "type": "string",
+            "title": "Headrevisionid"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/CompatibilityFindingOut"
+            },
+            "type": "array",
+            "title": "Findings"
+          },
+          "breakingChangeDocumentationIssueUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Breakingchangedocumentationissueurl"
+          },
+          "reportFingerprint": {
+            "type": "string",
+            "title": "Reportfingerprint"
+          },
+          "tenantCompatGateActive": {
+            "type": "boolean",
+            "title": "Tenantcompatgateactive",
+            "description": "True when project metadata requests merge-time compat gating.",
+            "default": false
+          },
+          "mergeBlockedByCompatGate": {
+            "type": "boolean",
+            "title": "Mergeblockedbycompatgate",
+            "description": "True when tenant gate is on and the revision pair is not fully safe.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "overall",
+          "baseRevisionId",
+          "headRevisionId",
+          "findings",
+          "reportFingerprint"
+        ],
+        "title": "CompatibilityCheckResponse"
+      },
+      "CompatibilityFindingOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "path",
+          "category",
+          "rule",
+          "message"
+        ],
+        "title": "CompatibilityFindingOut"
+      },
+      "CompatibilityPolicyPayload": {
+        "properties": {
+          "http409WhenBreaking": {
+            "type": "boolean",
+            "title": "Http409Whenbreaking",
+            "description": "Return 409 Conflict when overall classification is breaking.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "CompatibilityPolicyPayload",
+        "description": "Optional HTTP semantics (e.g. CI gate)."
+      },
+      "CompatibilityRulesPayload": {
+        "properties": {
+          "check_paths": {
+            "type": "boolean",
+            "title": "Check Paths",
+            "default": true
+          },
+          "check_schemas": {
+            "type": "boolean",
+            "title": "Check Schemas",
+            "default": true
+          },
+          "treatRemovedSchemaAsBreaking": {
+            "type": "boolean",
+            "title": "Treatremovedschemaasbreaking",
+            "default": true
+          },
+          "treatRemovedPropertyAsBreaking": {
+            "type": "boolean",
+            "title": "Treatremovedpropertyasbreaking",
+            "default": true
+          },
+          "treatRemovedPathAsBreaking": {
+            "type": "boolean",
+            "title": "Treatremovedpathasbreaking",
+            "default": true
+          },
+          "treatRemovedOperationAsBreaking": {
+            "type": "boolean",
+            "title": "Treatremovedoperationasbreaking",
+            "default": true
+          },
+          "detectPossibleRenames": {
+            "type": "boolean",
+            "title": "Detectpossiblerenames",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "CompatibilityRulesPayload",
+        "description": "Optional toggles for backward-compatibility checks (defaults are strict)."
+      },
       "CopyClassToInlineSchemaRequest": {
         "properties": {
           "class_id": {
@@ -7477,6 +9175,48 @@
         ],
         "title": "CopyClassToInlineSchemaRequest",
         "description": "Request model for copying class properties to inline schema."
+      },
+      "DataRecordCreateBody": {
+        "properties": {
+          "class_schema_id": {
+            "type": "string",
+            "title": "Class Schema Id",
+            "description": "Class schema ID (frozen version class)"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "Record payload validated against schema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "class_schema_id",
+          "data"
+        ],
+        "title": "DataRecordCreateBody"
+      },
+      "DataRecordUpdateBody": {
+        "properties": {
+          "class_schema_id": {
+            "type": "string",
+            "title": "Class Schema Id",
+            "description": "Class schema ID"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "Updated record payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "class_schema_id",
+          "data"
+        ],
+        "title": "DataRecordUpdateBody"
       },
       "HTTPValidationError": {
         "properties": {
@@ -8015,6 +9755,11 @@
               }
             ],
             "title": "Updated At"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
           }
         },
         "type": "object",
@@ -9108,7 +10853,7 @@
             ],
             "title": "Version Id"
           },
-          "description": {
+          "shortMessage": {
             "anyOf": [
               {
                 "type": "string"
@@ -9117,9 +10862,10 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Shortmessage",
+            "description": "Revision note (commit message analog)."
           },
-          "change_log": {
+          "changelog": {
             "anyOf": [
               {
                 "type": "string"
@@ -9128,7 +10874,7 @@
                 "type": "null"
               }
             ],
-            "title": "Change Log"
+            "title": "Changelog"
           },
           "source_version_id": {
             "anyOf": [
@@ -9157,6 +10903,79 @@
         "title": "VersionCreateRequest",
         "description": "Request model for creating a version."
       },
+      "VersionForkRequest": {
+        "properties": {
+          "sourceRevisionId": {
+            "type": "string",
+            "title": "Sourcerevisionid",
+            "description": "Source version row id (revision) to copy from."
+          },
+          "upstreamProjectId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstreamprojectid",
+            "description": "Optional upstream project for merge-back; defaults to the source revision's project."
+          },
+          "versionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Versionid",
+            "description": "Explicit semantic version string for the forked version (e.g. '2.0.0')."
+          },
+          "shortMessage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shortmessage"
+          },
+          "changelog": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changelog"
+          },
+          "bumpStrategy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bumpstrategy",
+            "description": "Auto-versioning strategy when versionId is omitted: 'minor' or 'patch' (default)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sourceRevisionId"
+        ],
+        "title": "VersionForkRequest",
+        "description": "Fork a schema version line into another project from a source revision (cross-project sandbox)."
+      },
       "VersionPublishRequest": {
         "properties": {
           "visibility": {
@@ -9170,11 +10989,33 @@
             ],
             "title": "Visibility",
             "default": "private"
+          },
+          "shortMessage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shortmessage"
+          },
+          "changelog": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changelog"
           }
         },
         "type": "object",
         "title": "VersionPublishRequest",
-        "description": "Request model for publishing a version."
+        "description": "Publish: optional last-minute revision note / changelog applied before freeze."
       },
       "VersionSchema": {
         "properties": {
@@ -9201,7 +11042,7 @@
             "type": "string",
             "title": "Version Id"
           },
-          "description": {
+          "shortMessage": {
             "anyOf": [
               {
                 "type": "string"
@@ -9210,9 +11051,10 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Shortmessage",
+            "description": "Human-readable revision note (stored as description in DB)."
           },
-          "change_log": {
+          "changelog": {
             "anyOf": [
               {
                 "type": "string"
@@ -9221,7 +11063,8 @@
                 "type": "null"
               }
             ],
-            "title": "Change Log"
+            "title": "Changelog",
+            "description": "Markdown changelog / release notes (stored as change_log in DB)."
           },
           "visibility": {
             "type": "string",
@@ -9252,6 +11095,91 @@
             "type": "boolean",
             "title": "Enabled",
             "default": true
+          },
+          "parent_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Version Id"
+          },
+          "merge_parent_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merge Parent Version Id"
+          },
+          "forkedFromRevisionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forkedfromrevisionid",
+            "description": "Source revision (versions.id) if this row is a fork."
+          },
+          "upstreamProjectId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstreamprojectid",
+            "description": "Upstream project for merge/sync (optional)."
+          },
+          "forkSourceVersionLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forksourceversionlabel"
+          },
+          "forkSourceProjectName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forksourceprojectname"
+          },
+          "upstreamProjectName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstreamprojectname"
+          },
+          "revisionLocked": {
+            "type": "boolean",
+            "title": "Revisionlocked",
+            "description": "Tenant-admin lock: revision cannot be soft-deleted by non-admins.",
+            "default": false
           },
           "creator_name": {
             "anyOf": [
@@ -9335,11 +11263,229 @@
           "version_id"
         ],
         "title": "VersionSchema",
-        "description": "Pydantic model for a version."
+        "description": "Schema revision: shortMessage = commit-style note; changelog = release notes (markdown)."
+      },
+      "VersionTagCreateRequest": {
+        "properties": {
+          "version_id": {
+            "type": "string",
+            "title": "Version Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "immutable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Immutable",
+            "default": false
+          },
+          "protected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protected",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_id",
+          "name"
+        ],
+        "title": "VersionTagCreateRequest",
+        "description": "Create a named tag at a revision."
+      },
+      "VersionTagSchema": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "version_id": {
+            "type": "string",
+            "title": "Version Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "immutable": {
+            "type": "boolean",
+            "title": "Immutable",
+            "default": false
+          },
+          "protected": {
+            "type": "boolean",
+            "title": "Protected",
+            "default": false
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "target_version_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Version String"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "version_id",
+          "name"
+        ],
+        "title": "VersionTagSchema",
+        "description": "Git-like tag pointing at a schema revision (versions.id)."
+      },
+      "VersionTagUpdateRequest": {
+        "properties": {
+          "version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          },
+          "immutable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Immutable"
+          },
+          "protected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protected"
+          }
+        },
+        "type": "object",
+        "title": "VersionTagUpdateRequest",
+        "description": "Move tag to another revision and/or lock it."
       },
       "VersionUpdateRequest": {
         "properties": {
-          "description": {
+          "shortMessage": {
             "anyOf": [
               {
                 "type": "string"
@@ -9348,9 +11494,9 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Shortmessage"
           },
-          "change_log": {
+          "changelog": {
             "anyOf": [
               {
                 "type": "string"
@@ -9359,7 +11505,7 @@
                 "type": "null"
               }
             ],
-            "title": "Change Log"
+            "title": "Changelog"
           },
           "enabled": {
             "anyOf": [
@@ -9371,6 +11517,18 @@
               }
             ],
             "title": "Enabled"
+          },
+          "revisionLocked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisionlocked",
+            "description": "Tenant admins only: lock revision against deletion."
           }
         },
         "type": "object",

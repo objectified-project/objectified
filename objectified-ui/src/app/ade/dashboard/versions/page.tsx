@@ -206,6 +206,14 @@ const Versions = () => {
     targetTipVersionId?: string;
     mergeBaseVersionId?: string | null;
   } | null>(null);
+  const [mergeCompatLoading, setMergeCompatLoading] = useState(false);
+  const [mergeCompat, setMergeCompat] = useState<{
+    overall: string;
+    findings: Array<{ category: string; rule: string; path: string; message: string }>;
+    breakingChangeDocumentationIssueUrl?: string | null;
+    tenantCompatGateActive?: boolean;
+    mergeBlockedByCompatGate?: boolean;
+  } | null>(null);
 
   const otherProjects = useMemo(
     () => projects.filter((p) => p.id !== selectedProjectId),
@@ -977,6 +985,7 @@ const Versions = () => {
     }
     setMergePreviewLoading(true);
     setMergePreviewData(null);
+    setMergeCompat(null);
     try {
       const r = await fetch(`/api/projects/${selectedProjectId}/version-branches/merge-preview`, {
         method: 'POST',
@@ -996,6 +1005,37 @@ const Versions = () => {
         });
         if (!d.classification?.canAutoMerge) {
           toast.info('Merge preview: conflicts detected — apply is blocked until resolved.');
+        }
+        const targetTip = typeof d.targetTipVersionId === 'string' ? d.targetTipVersionId : '';
+        const sourceTip = typeof d.sourceTipVersionId === 'string' ? d.sourceTipVersionId : '';
+        if (targetTip && sourceTip) {
+          setMergeCompatLoading(true);
+          try {
+            const cr = await fetch(`/api/projects/${selectedProjectId}/compatibility`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                baseRevisionId: targetTip,
+                headRevisionId: sourceTip,
+              }),
+            });
+            const cd = await cr.json();
+            if (cr.ok && cd.success === true && typeof cd.overall === 'string') {
+              setMergeCompat({
+                overall: cd.overall,
+                findings: Array.isArray(cd.findings) ? cd.findings : [],
+                breakingChangeDocumentationIssueUrl: cd.breakingChangeDocumentationIssueUrl ?? null,
+                tenantCompatGateActive: Boolean(cd.tenantCompatGateActive),
+                mergeBlockedByCompatGate: Boolean(cd.mergeBlockedByCompatGate),
+              });
+            } else {
+              setMergeCompat(null);
+            }
+          } catch {
+            setMergeCompat(null);
+          } finally {
+            setMergeCompatLoading(false);
+          }
         }
       } else {
         toast.error(d.error || 'Preview failed');
@@ -1138,6 +1178,7 @@ const Versions = () => {
                   setMergeSourceBranch('');
                   setMergeTargetBranch('');
                   setMergePreviewData(null);
+                  setMergeCompat(null);
                   setShowMergeDialog(true);
                 }}
                 disabled={!selectedProjectId || versionBranches.length < 2}
@@ -2503,7 +2544,13 @@ const Versions = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showMergeDialog} onOpenChange={(open) => !mergePreviewLoading && !mergeApplyLoading && setShowMergeDialog(open)}>
+      <Dialog
+        open={showMergeDialog}
+        onOpenChange={(open) => {
+          if (!open) setMergeCompat(null);
+          if (!mergePreviewLoading && !mergeApplyLoading) setShowMergeDialog(open);
+        }}
+      >
         <DialogContent className="max-w-lg" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Merge branches</DialogTitle>
@@ -2546,6 +2593,51 @@ const Versions = () => {
             {mergePreviewData?.mergeBaseVersionId === null && mergePreviewData?.classification && (
               <p className="text-xs text-gray-500 dark:text-gray-400">Merge-base (LCA) is not computed yet (#2593); preview uses two-way diff between tips.</p>
             )}
+            {mergeCompatLoading && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">Checking backward compatibility (target tip → source tip)…</p>
+            )}
+            {mergeCompat && !mergeCompatLoading && (
+              <Alert
+                variant={
+                  mergeCompat.overall === 'safe'
+                    ? 'success'
+                    : mergeCompat.overall === 'unknown'
+                      ? 'default'
+                      : 'error'
+                }
+              >
+                <span className="font-medium text-sm">Backward compatibility: {mergeCompat.overall}</span>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Compares generated OpenAPI for <strong>target tip</strong> (base) vs <strong>source tip</strong> (head). Not a substitute for merge-base (#2593) when the merge result differs from the source tip.
+                </p>
+                {mergeCompat.findings.length > 0 && (
+                  <ul className="mt-2 text-xs list-disc pl-4 max-h-36 overflow-y-auto space-y-0.5">
+                    {mergeCompat.findings.slice(0, 14).map((f) => (
+                      <li key={`${f.path}-${f.rule}-${f.message.slice(0, 40)}`}>
+                        <span className="font-mono text-[11px]">{f.path}</span>
+                        {' — '}
+                        {f.message}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {mergeCompat.breakingChangeDocumentationIssueUrl && (
+                  <a
+                    href={mergeCompat.breakingChangeDocumentationIssueUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs underline mt-2 inline-block text-blue-600 dark:text-blue-400"
+                  >
+                    Breaking changes documentation (#746)
+                  </a>
+                )}
+                {mergeCompat.mergeBlockedByCompatGate && (
+                  <p className="text-xs mt-2 text-amber-800 dark:text-amber-200">
+                    Project metadata enables compat gating — merge is blocked until compatibility is safe or policy is updated.
+                  </p>
+                )}
+              </Alert>
+            )}
           </div>
           <DialogFooter className="gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setShowMergeDialog(false)} disabled={mergePreviewLoading || mergeApplyLoading}>
@@ -2559,9 +2651,11 @@ const Versions = () => {
               disabled={
                 mergeApplyLoading ||
                 mergePreviewLoading ||
+                mergeCompatLoading ||
                 !mergeSourceBranch ||
                 !mergeTargetBranch ||
-                mergePreviewData?.classification?.canAutoMerge === false
+                mergePreviewData?.classification?.canAutoMerge === false ||
+                mergeCompat?.mergeBlockedByCompatGate === true
               }
             >
               {mergeApplyLoading ? 'Merging…' : 'Apply merge'}

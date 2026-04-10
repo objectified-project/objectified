@@ -16,15 +16,14 @@ This represents the different versions of the Objectified specification and thei
 - ✅ Show branches when creating copies of schemas (#505)
 
 ### Migration Tools 📋 PLANNED
-- Generate migration guides
-- Data migration scripts
-- 📋 Backward compatibility checker
+- 📋 Generate migration guides
+- 📋 Data migration scripts
+- ✅ Backward compatibility checker (#506) — REST `POST /v1/versions/{tenant}/{projectId}/compatibility`; merge dialog runs target-tip vs source-tip check; optional `compatGateOnMerge` in project metadata
 - 📋 Deprecation warnings
-- Sunset timeline for old versions
+- 📋 Sunset timeline for old versions
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
-| #506   | Add backward compatibility checker               |
 | #507   | Implement deprecation warnings                   |
 | #508   | Create sunset timeline feature                   |
 
