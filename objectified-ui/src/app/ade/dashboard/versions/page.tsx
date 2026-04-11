@@ -564,13 +564,74 @@ const Versions = () => {
       setErrorMessage(`External reference must be at most ${COMMIT_EXTERNAL_REF_MAX_CHARS} characters`);
       return;
     }
+
+    let baseRevisionId = '';
+    let branchName: string | undefined;
+    if (versionBranches.length > 1) {
+      if (copySourceBranchKey === 'blank') {
+        const msg =
+          'Select a branch line to push to (choose a branch tip or copy from a branch).';
+        setErrorMessage(msg);
+        toast.error(msg);
+        return;
+      }
+      if (!copySourceBranchKey.startsWith('branch:')) {
+        const msg = 'Select a valid branch for this commit.';
+        setErrorMessage(msg);
+        toast.error(msg);
+        return;
+      }
+      const bid = copySourceBranchKey.slice('branch:'.length);
+      const br = versionBranches.find((b) => b.id === bid);
+      if (!br?.tip_version_id) {
+        const msg = 'Could not resolve branch tip for push.';
+        setErrorMessage(msg);
+        toast.error(msg);
+        return;
+      }
+      baseRevisionId = br.tip_version_id;
+      branchName = br.name;
+    } else if (versionBranches.length === 1) {
+      baseRevisionId = versionBranches[0].tip_version_id;
+      branchName = versionBranches[0].name;
+    } else {
+      // No named branches: fetch the unfiltered head so lifecycle filtering on the
+      // current view doesn't cause a false STALE_HEAD when versions[0] is not the
+      // true project head.
+      try {
+        const headRes = await fetch(`/api/versions?projectId=${encodeURIComponent(selectedProjectId)}`);
+        const headJson = (await headRes.json()) as {
+          success?: boolean;
+          error?: string;
+          versions?: Array<{ id?: string }>;
+        };
+        if (!headRes.ok || !headJson.success) {
+          const msg =
+            typeof headJson.error === 'string'
+              ? headJson.error
+              : 'Could not resolve latest revision for push.';
+          setErrorMessage(msg);
+          toast.error(msg);
+          return;
+        }
+        baseRevisionId = headJson.versions?.[0]?.id ?? '';
+      } catch {
+        const msg = 'Network error: could not resolve latest revision for push.';
+        setErrorMessage(msg);
+        toast.error(msg);
+        return;
+      }
+    }
+
     setIsLoading(true); setErrorMessage('');
     try {
       const body: Record<string, unknown> = {
         projectId: selectedProjectId,
         shortMessage: description.trim(),
         changelog: changeLog.trim() || null,
+        baseRevisionId,
       };
+      if (branchName) body.branchName = branchName;
       if (commitExternalRefTrim) body.externalRef = commitExternalRefTrim;
       if (!autoGenerate) body.version_id = versionId.trim();
       if (autoGenerate) body.bump_strategy = bumpStrategy;
