@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import {
   BREAKING_CHANGES_DOC_TEMPLATE_VERSION,
   buildBreakingChangesBullets,

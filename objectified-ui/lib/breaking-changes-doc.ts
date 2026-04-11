@@ -219,11 +219,11 @@ export function buildBreakingChangesBullets(summary: DiffSummary): BreakingChang
   }
 
   out.sort((a, b) => {
-    const c = a.stableId.localeCompare(b.stableId);
-    if (c !== 0) {
-      return c;
-    }
-    return a.text.localeCompare(b.text);
+    if (a.stableId < b.stableId) return -1;
+    if (a.stableId > b.stableId) return 1;
+    if (a.text < b.text) return -1;
+    if (a.text > b.text) return 1;
+    return 0;
   });
 
   return out;
