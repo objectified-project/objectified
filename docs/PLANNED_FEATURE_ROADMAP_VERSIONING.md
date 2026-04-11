@@ -48,7 +48,7 @@ This represents the different versions of the Objectified specification and thei
   - ✅ Migration guide (#747)
 - **Version Deprecation**:
   - ✅ Mark versions as deprecated
-  - 📋 Set sunset dates
+  - ✅ Set sunset dates (#748) — `versions.metadata.sunsetAt` (UTC ISO), validation vs `deprecatedAt`, `successorRevisionId` required when sunset is set; ADE Edit Version + tenant-admin metadata on published
   - 📋 Redirect to newer versions
   - ✅ Deprecation warnings in API
 - **Version Copy**: ✅ IMPLEMENTED
@@ -57,7 +57,7 @@ This represents the different versions of the Objectified specification and thei
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| #748   | Set sunset dates for deprecated versions     |
+| #748   | ✅ Set sunset dates for deprecated versions  |
 | #749   | Redirect to newer versions                   |
 
 ---

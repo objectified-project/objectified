@@ -127,6 +127,7 @@ async def get_sunset_timeline(
                 project_slug=row.get("project_slug"),
                 version_line=row["version_id"],
                 sunset_date=norm,
+                sunset_at=norm,
                 timeline_status=t_status,
                 lifecycle_phase=life,
                 deprecation_message=msg,
@@ -585,6 +586,8 @@ async def update_version(
         return VersionSchema(**version)
     except HTTPException:
         raise
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve)) from ve
     except Exception as e:
         if "published" in str(e).lower() and "frozen" in str(e).lower():
             raise HTTPException(

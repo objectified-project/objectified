@@ -10,7 +10,13 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from .revision_deprecation import coerce_metadata, is_revision_deprecated, merge_version_metadata
+from .revision_deprecation import (
+    coerce_metadata,
+    is_revision_deprecated,
+    merge_version_metadata,
+    normalize_deprecation_metadata_for_storage,
+    validate_deprecation_schedule,
+)
 
 LIFECYCLE_STABLE = "stable"
 LIFECYCLE_BETA = "beta"
@@ -127,6 +133,22 @@ def prepare_version_metadata_update(
         if old_lc == LIFECYCLE_DEPRECATED:
             m["deprecated"] = False
 
+    # Sunset / successor apply only while the revision is deprecated for consumers (#748).
+    # Keep keys when lifecycle is archived (audit) or still deprecated.
+    if new_lc in (LIFECYCLE_STABLE, LIFECYCLE_BETA) and not is_revision_deprecated(m):
+        for k in (
+            "sunsetAt",
+            "sunsetDate",
+            "sunset_date",
+            "deprecatedAt",
+            "deprecated_at",
+            "successorRevisionId",
+            "successor_revision_id",
+        ):
+            m.pop(k, None)
+
+    m = normalize_deprecation_metadata_for_storage(m)
+    validate_deprecation_schedule(m)
     return m
 
 

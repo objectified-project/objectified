@@ -8,6 +8,7 @@ from psycopg2.extensions import register_adapter, AsIs, adapt
 from typing import Optional, List, Dict, Any, Tuple, Set
 from .config import settings
 from .jsonschema_generator import generate_class_jsonschema_spec
+from .revision_deprecation import coerce_metadata, effective_sunset_string
 from .revision_lifecycle import prepare_version_metadata_update, sql_effective_lifecycle_expr
 
 _logger = logging.getLogger(__name__)
@@ -1494,6 +1495,28 @@ class Database:
             return {"success": False, "error": "Fork created but could not load version"}
         return {"success": True, "version": full, "copied_count": copied_count}
 
+    def _validate_successor_revision_pointer(
+        self,
+        *,
+        tenant_id: str,
+        project_id: str,
+        version_record_id: str,
+        metadata: Dict[str, Any],
+    ) -> None:
+        """When a sunset is set, successor must point at another revision in the same project (#748)."""
+        if not effective_sunset_string(metadata):
+            return
+        m = coerce_metadata(metadata)
+        succ = m.get("successorRevisionId") or m.get("successor_revision_id")
+        if not isinstance(succ, str) or not succ.strip():
+            return
+        succ_id = succ.strip()
+        if succ_id == version_record_id:
+            raise ValueError("successorRevisionId cannot reference the same revision")
+        other = self.get_version_by_id(succ_id, tenant_id)
+        if not other or str(other.get("project_id")) != project_id:
+            raise ValueError("successorRevisionId must reference another revision in the same project")
+
     def update_version(
         self,
         version_record_id: str,
@@ -1531,6 +1554,12 @@ class Database:
                 existing.get("metadata"),
                 updates["metadata"],
                 allow_exit_archived=lifecycle_admin,
+            )
+            self._validate_successor_revision_pointer(
+                tenant_id=tenant_id,
+                project_id=str(existing.get("project_id")),
+                version_record_id=version_record_id,
+                metadata=merged_meta,
             )
             update_fields.append("metadata = %s::jsonb")
             params.append(json.dumps(merged_meta))

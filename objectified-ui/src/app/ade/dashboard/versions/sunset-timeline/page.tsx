@@ -25,6 +25,8 @@ interface SunsetEntry {
   projectSlug?: string | null;
   versionLine: string;
   sunsetDate?: string | null;
+  /** Canonical UTC instant (#748); same value as sunsetDate when present */
+  sunsetAt?: string | null;
   timelineStatus: string;
   lifecyclePhase: string;
   deprecationMessage?: string | null;
@@ -275,7 +277,7 @@ export default function SunsetTimelinePage() {
                   </td>
                   <td className="p-3 align-top font-mono text-xs">{e.versionLine}</td>
                   <td className="p-3 align-top text-slate-700 dark:text-slate-300">
-                    {e.sunsetDate ?? '—'}
+                    {e.sunsetAt ?? e.sunsetDate ?? '—'}
                   </td>
                   <td className="p-3 align-top">
                     <Badge variant="outline" className={statusBadgeClass(e.timelineStatus)}>

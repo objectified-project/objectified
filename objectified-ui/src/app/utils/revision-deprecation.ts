@@ -31,6 +31,22 @@ export function isRevisionDeprecated(metadata: unknown): boolean {
   return false;
 }
 
+/** Convert `datetime-local` value (browser local) to UTC ISO for API `sunsetAt`. */
+export function localDatetimeLocalToUtcIso(local: string): string | null {
+  if (!local?.trim()) return null;
+  const d = new Date(local);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+/** Format a UTC ISO string for `datetime-local` (local timezone). */
+export function utcIsoToDatetimeLocalValue(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function revisionDeprecationLines(metadata: unknown): string[] {
   if (!isRevisionDeprecated(metadata)) return [];
   const m = coerceMetadata(metadata);
@@ -41,9 +57,9 @@ export function revisionDeprecationLines(metadata: unknown): string[] {
   if (typeof succ === 'string' && succ.trim()) {
     lines.push(`Successor revision: ${succ.trim()}.`);
   }
-  const sunset = m.sunsetDate ?? m.sunset_date;
+  const sunset = m.sunsetAt ?? m.sunsetDate ?? m.sunset_date;
   if (typeof sunset === 'string' && sunset.trim()) {
-    lines.push(`Sunset: ${sunset.trim()}.`);
+    lines.push(`Sunset: ${sunset.trim()} (UTC).`);
   }
   lines.push(`Migration guide: ${MIGRATION_GUIDE_ISSUE_URL}`);
   return lines;

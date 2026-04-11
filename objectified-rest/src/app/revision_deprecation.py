@@ -5,8 +5,15 @@ Stored in ``odb.versions.metadata`` as a shallow object. Keys (camelCase in API)
 
 - ``deprecated`` (bool): revision is deprecated for new consumer work.
 - ``deprecationMessage`` (str): human-readable explanation / what changed.
-- ``successorRevisionId`` (str): optional ``versions.id`` UUID of the replacement revision (#749).
-- ``sunsetDate`` (str): optional ISO 8601 date (calendar day or full timestamp) (#748).
+- ``successorRevisionId`` (str): optional ``versions.id`` UUID of the replacement revision (#749);
+  **required** when ``sunsetAt`` is set (#748).
+- ``sunsetAt`` (str): optional instant in **UTC** (ISO 8601, e.g. ``2026-12-01T00:00:00Z`` or calendar day
+  ``YYYY-MM-DD`` normalized to UTC midnight). Canonical field for sunset (#748).
+- ``sunsetDate`` (str): legacy alias; reads/writes mirror ``sunsetAt`` for #507 / #508 consumers.
+- ``deprecatedAt`` (str): optional UTC instant when deprecation was announced; must be **on or before**
+  ``sunsetAt`` when both are set (#748).
+
+Display: clients show stored UTC in the user local timezone; API contract is UTC strings.
 
 Migration guide: `#747` (GitHub).
 """
@@ -14,10 +21,46 @@ Migration guide: `#747` (GitHub).
 from __future__ import annotations
 
 import json
-from datetime import date
+import re
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 MIGRATION_GUIDE_ISSUE_URL = "https://github.com/KenSuenobu/objectified-commercial/issues/747"
+
+_SUNSET_ALIAS_KEYS = ("sunsetAt", "sunsetDate", "sunset_date")
+_SUCCESSOR_ALIAS_KEYS = ("successorRevisionId", "successor_revision_id")
+_DEPRECATION_MSG_ALIAS_KEYS = ("deprecationMessage", "message")
+
+# Keys where JSON ``null`` or empty string in a patch means "remove from metadata".
+_REMOVABLE_DEPRECATION_KEYS = frozenset(
+    {
+        "sunsetAt",
+        "sunsetDate",
+        "sunset_date",
+        "deprecatedAt",
+        "deprecated_at",
+        "successorRevisionId",
+        "successor_revision_id",
+        "deprecationMessage",
+        "message",
+    }
+)
+
+
+def _patch_clears_key(patch: Dict[str, Any], key: str) -> bool:
+    """Return True if *patch* explicitly clears *key* via ``None`` or empty/whitespace string."""
+    if key not in patch:
+        return False
+    v = patch[key]
+    return v is None or (isinstance(v, str) and not v.strip())
+
+
+def _patch_clears_any_in_group(patch: Dict[str, Any], keys: tuple) -> bool:
+    return any(_patch_clears_key(patch, k) for k in keys)
+
+
+def _patch_clears_sunset_aliases(patch: Dict[str, Any]) -> bool:
+    return _patch_clears_any_in_group(patch, _SUNSET_ALIAS_KEYS)
 
 
 def coerce_metadata(raw: Any) -> Dict[str, Any]:
@@ -39,7 +82,26 @@ def merge_version_metadata(existing: Any, patch: Optional[Dict[str, Any]]) -> Di
     base = coerce_metadata(existing)
     if not patch:
         return base
-    return {**base, **patch}
+    out = dict(base)
+    for k, v in patch.items():
+        if k in _REMOVABLE_DEPRECATION_KEYS:
+            if v is None:
+                out.pop(k, None)
+                continue
+            if isinstance(v, str) and not v.strip():
+                out.pop(k, None)
+                continue
+        out[k] = v
+    if _patch_clears_sunset_aliases(patch):
+        for sk in _SUNSET_ALIAS_KEYS:
+            out.pop(sk, None)
+    if _patch_clears_any_in_group(patch, _SUCCESSOR_ALIAS_KEYS):
+        for sk in _SUCCESSOR_ALIAS_KEYS:
+            out.pop(sk, None)
+    if _patch_clears_any_in_group(patch, _DEPRECATION_MSG_ALIAS_KEYS):
+        for sk in _DEPRECATION_MSG_ALIAS_KEYS:
+            out.pop(sk, None)
+    return out
 
 
 def parse_calendar_date(s: Optional[str]) -> Optional[date]:
@@ -53,6 +115,159 @@ def parse_calendar_date(s: Optional[str]) -> Optional[date]:
         return date.fromisoformat(t[:10])
     except ValueError:
         return None
+
+
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+
+
+def is_uuid_string(s: str) -> bool:
+    return bool(_UUID_RE.match(s.strip()))
+
+
+def parse_iso_utc_instant(s: Optional[str]) -> Optional[datetime]:
+    """Parse a metadata instant to UTC (calendar day ``YYYY-MM-DD`` → UTC midnight)."""
+    if not s or not isinstance(s, str):
+        return None
+    t = s.strip()
+    if not t:
+        return None
+    if len(t) == 10 and t[4] == "-" and t[7] == "-":
+        try:
+            d = date.fromisoformat(t)
+            return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+        except ValueError:
+            return None
+    if t.endswith("Z"):
+        t = t[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(t)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt
+
+
+def format_utc_z(dt: datetime) -> str:
+    dt = dt.astimezone(timezone.utc)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+
+
+def normalize_sunset_instant_str(raw: Optional[str]) -> Optional[str]:
+    """Normalize user/API input to a single UTC ``Z`` string for storage."""
+    if not raw or not isinstance(raw, str):
+        return None
+    t = raw.strip()
+    if not t:
+        return None
+    parsed = parse_iso_utc_instant(t)
+    if parsed is None:
+        raise ValueError(
+            "Invalid sunsetAt / sunsetDate: expected ISO 8601 date or timestamp (UTC stored; use Z or offset).",
+        )
+    return format_utc_z(parsed)
+
+
+def effective_sunset_string(metadata: Any) -> Optional[str]:
+    """Canonical sunset for reads: ``sunsetAt`` preferred, then legacy keys."""
+    m = coerce_metadata(metadata)
+    for key in ("sunsetAt", "sunsetDate", "sunset_date"):
+        v = m.get(key)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return None
+
+
+def effective_deprecated_at_string(metadata: Any) -> Optional[str]:
+    m = coerce_metadata(metadata)
+    for key in ("deprecatedAt", "deprecated_at"):
+        v = m.get(key)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return None
+
+
+def normalize_deprecation_metadata_for_storage(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    After lifecycle / merge: mirror ``sunsetAt`` and ``sunsetDate`` to the same normalized UTC string,
+    drop redundant ``sunset_date``, normalize ``deprecatedAt`` form.
+    """
+    m = dict(metadata)
+    raw_sunset: Optional[str] = None
+    for key in ("sunsetAt", "sunsetDate", "sunset_date"):
+        v = m.get(key)
+        if isinstance(v, str) and v.strip():
+            raw_sunset = v.strip()
+            break
+    if raw_sunset is not None:
+        norm = normalize_sunset_instant_str(raw_sunset)
+        m["sunsetAt"] = norm
+        m["sunsetDate"] = norm
+        m.pop("sunset_date", None)
+    else:
+        for k in ("sunsetAt", "sunsetDate", "sunset_date"):
+            m.pop(k, None)
+
+    raw_dep_at = effective_deprecated_at_string(m)
+    if raw_dep_at is not None:
+        norm_d = normalize_sunset_instant_str(raw_dep_at)
+        m["deprecatedAt"] = norm_d
+        m.pop("deprecated_at", None)
+    else:
+        m.pop("deprecatedAt", None)
+        m.pop("deprecated_at", None)
+
+    succ = m.get("successorRevisionId") or m.get("successor_revision_id")
+    if isinstance(succ, str) and succ.strip():
+        m["successorRevisionId"] = succ.strip()
+        m.pop("successor_revision_id", None)
+    else:
+        m.pop("successorRevisionId", None)
+        m.pop("successor_revision_id", None)
+
+    return m
+
+
+def validate_deprecation_schedule(metadata: Dict[str, Any]) -> None:
+    """
+    Rules (#748): if a sunset is set, the revision must be deprecated and must name a successor.
+    If ``deprecatedAt`` and sunset are both set, sunset must be on or after deprecatedAt.
+    """
+    from .revision_lifecycle import (  # local: avoid import cycle with revision_lifecycle
+        LIFECYCLE_ARCHIVED,
+        LIFECYCLE_DEPRECATED,
+        effective_lifecycle,
+    )
+
+    m = coerce_metadata(metadata)
+    sunset_s = effective_sunset_string(m)
+    if not sunset_s:
+        return
+
+    elc = effective_lifecycle(metadata)
+    if elc not in (LIFECYCLE_DEPRECATED, LIFECYCLE_ARCHIVED) and not is_revision_deprecated(m):
+        raise ValueError(
+            "sunsetAt requires a deprecated revision (set deprecated: true or lifecycle deprecated/archived)",
+        )
+
+    succ = m.get("successorRevisionId") or m.get("successor_revision_id")
+    if not (isinstance(succ, str) and succ.strip()):
+        raise ValueError("sunsetAt requires successorRevisionId (replacement revision in this project)")
+    succ_id = succ.strip()
+    if not is_uuid_string(succ_id):
+        raise ValueError("successorRevisionId must be a UUID")
+
+    dep_at_s = effective_deprecated_at_string(m)
+    if dep_at_s:
+        d_dep = parse_iso_utc_instant(dep_at_s)
+        d_sun = parse_iso_utc_instant(sunset_s)
+        if d_dep is not None and d_sun is not None and d_sun < d_dep:
+            raise ValueError("sunsetAt must be on or after deprecatedAt")
 
 
 def sunset_timeline_fields(
@@ -69,10 +284,7 @@ def sunset_timeline_fields(
     """
     today = today or date.today()
     m = coerce_metadata(metadata)
-    sunset_raw = m.get("sunsetDate") or m.get("sunset_date")
-    norm_sunset: Optional[str] = None
-    if isinstance(sunset_raw, str) and sunset_raw.strip():
-        norm_sunset = sunset_raw.strip()
+    norm_sunset = effective_sunset_string(m)
     sunset_d = parse_calendar_date(norm_sunset) if norm_sunset else None
     dep = is_revision_deprecated(metadata)
 
@@ -113,9 +325,10 @@ def deprecation_payload_for_openapi(metadata: Any) -> Optional[Dict[str, Any]]:
     succ = m.get("successorRevisionId") or m.get("successor_revision_id")
     if isinstance(succ, str) and succ.strip():
         out["successorRevisionId"] = succ.strip()
-    sunset = m.get("sunsetDate") or m.get("sunset_date")
-    if isinstance(sunset, str) and sunset.strip():
-        out["sunsetDate"] = sunset.strip()
+    sunset = effective_sunset_string(m)
+    if sunset:
+        out["sunsetAt"] = sunset
+        out["sunsetDate"] = sunset
     return out
 
 
@@ -145,9 +358,9 @@ def warnings_for_revision(
     succ = m.get("successorRevisionId") or m.get("successor_revision_id")
     if isinstance(succ, str) and succ.strip():
         parts.append(f"Prefer successor revision {succ.strip()}.")
-    sunset = m.get("sunsetDate") or m.get("sunset_date")
-    if isinstance(sunset, str) and sunset.strip():
-        parts.append(f"Sunset: {sunset.strip()}.")
+    sunset = effective_sunset_string(m)
+    if sunset:
+        parts.append(f"Sunset: {sunset}.")
     parts.append(f"Migration guide: {MIGRATION_GUIDE_ISSUE_URL}")
 
     return [
@@ -157,7 +370,7 @@ def warnings_for_revision(
             version_id=version_label,
             message=" ".join(parts),
             replacement_revision_id=succ.strip() if isinstance(succ, str) and succ.strip() else None,
-            sunset_date=sunset.strip() if isinstance(sunset, str) and sunset.strip() else None,
+            sunset_date=sunset if sunset else None,
             migration_guide_url=MIGRATION_GUIDE_ISSUE_URL,
         )
     ]

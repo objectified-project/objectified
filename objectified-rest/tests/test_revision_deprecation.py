@@ -40,6 +40,7 @@ def test_deprecation_payload_for_openapi():
     assert p["message"] == "Use v2"
     assert p["successorRevisionId"] == "uuid-1"
     assert p["sunsetDate"] == "2026-12-01"
+    assert p["sunsetAt"] == "2026-12-01"
     assert p["migrationGuideUrl"] == MIGRATION_GUIDE_ISSUE_URL
 
 

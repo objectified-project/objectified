@@ -599,6 +599,11 @@ class SunsetTimelineEntryOut(BaseModel):
     project_slug: Optional[str] = Field(default=None, serialization_alias="projectSlug")
     version_line: str = Field(serialization_alias="versionLine")
     sunset_date: Optional[str] = Field(default=None, serialization_alias="sunsetDate")
+    sunset_at: Optional[str] = Field(
+        default=None,
+        serialization_alias="sunsetAt",
+        description="Same normalized UTC instant as sunsetDate; canonical name for #748.",
+    )
     timeline_status: str = Field(serialization_alias="timelineStatus")
     lifecycle_phase: str = Field(serialization_alias="lifecyclePhase")
     deprecation_message: Optional[str] = Field(default=None, serialization_alias="deprecationMessage")

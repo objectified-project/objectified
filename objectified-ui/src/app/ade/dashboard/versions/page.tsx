@@ -56,6 +56,7 @@ import VersionLineageSnippet from './VersionLineageSnippet';
 import VersionHistoryGraphPanel from './VersionHistoryGraphPanel';
 import { DEFAULT_HISTORY_WINDOW } from './version-history-dag';
 import { toast } from 'sonner';
+import { localDatetimeLocalToUtcIso, utcIsoToDatetimeLocalValue } from '../../../utils/revision-deprecation';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -108,6 +109,8 @@ interface Version {
   revisionLocked?: boolean;
   /** Governance lifecycle (#739): stable | beta | deprecated | archived */
   lifecycle?: string;
+  /** Revision JSON (#507, #748): deprecation, sunsetAt, successorRevisionId, … */
+  metadata?: Record<string, unknown>;
 }
 
 interface VersionBranchRow {
@@ -243,6 +246,10 @@ const Versions = () => {
   const [historyTagFilter, setHistoryTagFilter] = useState<string>('');
   const [lifecycleFilter, setLifecycleFilter] = useState<string>('');
   const [editLifecycle, setEditLifecycle] = useState<string>('stable');
+  const [editDeprecationMessage, setEditDeprecationMessage] = useState('');
+  const [editSunsetLocal, setEditSunsetLocal] = useState('');
+  const [editSuccessorRevisionId, setEditSuccessorRevisionId] = useState('');
+  const [editPublishedMetadataOnly, setEditPublishedMetadataOnly] = useState(false);
   const [compareBaseTagId, setCompareBaseTagId] = useState<string>('');
   const [compareToTagId, setCompareToTagId] = useState<string>('');
   /** #743: newest-first window for history DAG + "Load older" */
@@ -553,12 +560,36 @@ const Versions = () => {
   };
 
   const handleEditClick = (version: Version) => {
-    if (version.published) { setErrorMessage('Cannot edit published version'); return; }
+    if (version.published && !effectiveIsAdmin) {
+      setErrorMessage('Cannot edit published version');
+      return;
+    }
     const lc = version.lifecycle ?? 'stable';
     if (lc === 'archived' && !effectiveIsAdmin) {
       toast.warning('Archived revisions are read-only.');
       return;
     }
+    const meta = version.metadata ?? {};
+    setEditDeprecationMessage(
+      typeof meta.deprecationMessage === 'string' ? meta.deprecationMessage
+        : typeof meta.message === 'string' ? meta.message
+        : ''
+    );
+    const sunsetRaw =
+      typeof meta.sunsetAt === 'string'
+        ? meta.sunsetAt
+        : typeof meta.sunsetDate === 'string'
+          ? meta.sunsetDate
+          : typeof meta.sunset_date === 'string'
+            ? meta.sunset_date
+            : '';
+    setEditSunsetLocal(sunsetRaw ? utcIsoToDatetimeLocalValue(sunsetRaw) : '');
+    setEditSuccessorRevisionId(
+      typeof meta.successorRevisionId === 'string' ? meta.successorRevisionId
+        : typeof meta.successor_revision_id === 'string' ? meta.successor_revision_id
+        : ''
+    );
+    setEditPublishedMetadataOnly(Boolean(version.published && effectiveIsAdmin));
     setSelectedVersion(version); setVersionId(version.version_id);
     setDescription(version.shortMessage || ''); setChangeLog(version.changelog || '');
     setEnabled(version.enabled); setEditLifecycle(lc);
@@ -567,21 +598,63 @@ const Versions = () => {
 
   const handleEditSubmit = async () => {
     if (!selectedVersion) return;
-    const notesCheck = validateVersionNotesClient(description, changeLog);
-    if (!notesCheck.ok) { setErrorMessage(notesCheck.error); return; }
+    if (!editPublishedMetadataOnly) {
+      const notesCheck = validateVersionNotesClient(description, changeLog);
+      if (!notesCheck.ok) {
+        setErrorMessage(notesCheck.error);
+        return;
+      }
+    }
     const isArchived = (selectedVersion.lifecycle ?? 'stable') === 'archived';
     if (isArchived && !effectiveIsAdmin) return;
+    if (editSunsetLocal.trim()) {
+      if (editLifecycle !== 'deprecated') {
+        setErrorMessage('Set lifecycle to Deprecated when scheduling a sunset.');
+        return;
+      }
+      if (!editSuccessorRevisionId.trim()) {
+        setErrorMessage('Successor revision is required when a sunset is set.');
+        return;
+      }
+    }
     setIsLoading(true); setErrorMessage('');
     try {
+      const prevMeta = { ...(selectedVersion.metadata ?? {}) };
+      const metadata: Record<string, unknown> = { ...prevMeta };
+      metadata.lifecycle = editLifecycle;
+      if (editDeprecationMessage.trim()) {
+        metadata.deprecationMessage = editDeprecationMessage.trim();
+      } else {
+        delete metadata.deprecationMessage;
+      }
+      if (editSunsetLocal.trim()) {
+        const iso = localDatetimeLocalToUtcIso(editSunsetLocal.trim());
+        if (!iso) {
+          setErrorMessage('Invalid sunset date/time');
+          setIsLoading(false);
+          return;
+        }
+        metadata.sunsetAt = iso;
+      } else {
+        metadata.sunsetAt = null;
+        metadata.sunsetDate = null;
+      }
+      if (editSuccessorRevisionId.trim()) {
+        metadata.successorRevisionId = editSuccessorRevisionId.trim();
+      } else {
+        metadata.successorRevisionId = null;
+      }
+
       const body: Record<string, unknown> = {
         projectId: selectedProjectId,
-        shortMessage: description.trim(),
-        changelog: changeLog.trim() || null,
-        enabled,
       };
-      const prevLc = selectedVersion.lifecycle ?? 'stable';
-      if (editLifecycle !== prevLc) {
-        body.metadata = { lifecycle: editLifecycle };
+      if (editPublishedMetadataOnly) {
+        body.metadata = metadata;
+      } else {
+        body.shortMessage = description.trim();
+        body.changelog = changeLog.trim() || null;
+        body.enabled = enabled;
+        body.metadata = metadata;
       }
       const res = await fetch(`/api/versions/${selectedVersion.id}`, {
         method: 'PUT',
@@ -2324,9 +2397,14 @@ const Versions = () => {
           <DialogHeader><DialogTitle>Edit Version</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
-            {selectedVersion && (selectedVersion.lifecycle ?? 'stable') === 'archived' && effectiveIsAdmin && (
+            {selectedVersion && (selectedVersion.lifecycle ?? 'stable') === 'archived' && effectiveIsAdmin && !editPublishedMetadataOnly && (
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 This revision is archived (read-only). You can change its lifecycle or use revision lock; notes cannot be edited here.
+              </p>
+            )}
+            {editPublishedMetadataOnly && (
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Published revision — notes are frozen. As a tenant admin you can update deprecation and sunset metadata only (#748).
               </p>
             )}
             <div className="space-y-2">
@@ -2351,12 +2429,55 @@ const Versions = () => {
               </p>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="deprecation-msg">Deprecation message</Label>
+              <Textarea
+                id="deprecation-msg"
+                value={editDeprecationMessage}
+                onChange={(e) => setEditDeprecationMessage(e.target.value)}
+                rows={2}
+                disabled={isLoading}
+                placeholder="Why this revision is deprecated (optional)"
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sunset-local">Sunset (local time → stored as UTC)</Label>
+              <Input
+                id="sunset-local"
+                type="datetime-local"
+                value={editSunsetLocal}
+                onChange={(e) => setEditSunsetLocal(e.target.value)}
+                disabled={isLoading}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Requires lifecycle Deprecated and a successor revision. Cleared if empty.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="successor-rev">Successor revision ID</Label>
+              <Input
+                id="successor-rev"
+                value={editSuccessorRevisionId}
+                onChange={(e) => setEditSuccessorRevisionId(e.target.value)}
+                disabled={isLoading}
+                placeholder="UUID of replacement revision in this project"
+                className="font-mono text-sm"
+              />
+            </div>
+            <div className="space-y-2">
               <Label>Revision note *</Label>
               <Input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                disabled={isLoading || ((selectedVersion?.lifecycle ?? 'stable') === 'archived' && effectiveIsAdmin)}
-                autoFocus={((selectedVersion?.lifecycle ?? 'stable') !== 'archived') || !effectiveIsAdmin}
+                disabled={
+                  isLoading ||
+                  editPublishedMetadataOnly ||
+                  ((selectedVersion?.lifecycle ?? 'stable') === 'archived' && effectiveIsAdmin)
+                }
+                autoFocus={
+                  !editPublishedMetadataOnly &&
+                  (((selectedVersion?.lifecycle ?? 'stable') !== 'archived') || !effectiveIsAdmin)
+                }
                 placeholder="Short summary (commit message)"
               />
             </div>
@@ -2366,7 +2487,11 @@ const Versions = () => {
                 value={changeLog}
                 onChange={(e) => setChangeLog(e.target.value)}
                 rows={4}
-                disabled={isLoading || ((selectedVersion?.lifecycle ?? 'stable') === 'archived' && effectiveIsAdmin)}
+                disabled={
+                  isLoading ||
+                  editPublishedMetadataOnly ||
+                  ((selectedVersion?.lifecycle ?? 'stable') === 'archived' && effectiveIsAdmin)
+                }
                 placeholder="Release notes, breaking bullets (- breaking: …)"
               />
             </div>
