@@ -217,6 +217,7 @@ export default function VersionHistoryGraphPanel({
                 <button
                   key={b.id}
                   type="button"
+                  aria-pressed={on}
                   title={on ? `Hide history for ${b.name}` : `Show history for ${b.name}`}
                   onClick={() => toggleBranch(b.id)}
                   className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${
