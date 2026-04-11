@@ -38,6 +38,15 @@ from .revision_lifecycle import (
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
 
+
+def _optional_commit_metadata_str(value: Optional[str]) -> Optional[str]:
+    """Normalize optional commit metadata: strip whitespace; empty becomes None (#2563)."""
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s if s else None
+
+
 _SUCCESSOR_RESOLUTION_DESC = (
     "none: return the requested revision only. "
     "resolve: follow metadata.successorRevisionId (same project, #748); JSON body is the final revision; "
@@ -544,6 +553,9 @@ async def create_version(
             version_id=version_id,
             description=sm,
             change_log=cl,
+            commit_author=_optional_commit_metadata_str(request.author),
+            commit_message=_optional_commit_metadata_str(request.message),
+            external_ref=_optional_commit_metadata_str(request.external_ref),
         )
 
         response_data = {**version}
@@ -637,6 +649,9 @@ async def fork_version_from_revision(
         change_log=cl,
         source_revision_id=src_id,
         upstream_project_id=upstream_opt,
+        commit_author=_optional_commit_metadata_str(request.author),
+        commit_message=_optional_commit_metadata_str(request.message),
+        external_ref=_optional_commit_metadata_str(request.external_ref),
     )
 
     if not result.get("success"):
