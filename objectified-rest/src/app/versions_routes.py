@@ -12,7 +12,7 @@ from typing import Literal, Optional, List, Dict, Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 
-from .database import StaleHeadPushError, db
+from .database import BranchNotFoundError, StaleHeadPushError, db
 from .models import (
     VersionSchema,
     VersionCreateRequest,
@@ -693,6 +693,11 @@ async def create_version(
                     tenant_id=tenant_id, head_revision_id=sh.current_tip_revision_id
                 ),
             ) from sh
+        except BranchNotFoundError as bnf:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Branch not found or inaccessible: {bnf.branch_id}",
+            ) from bnf
 
         response_data = {**version}
         if copy_warning:

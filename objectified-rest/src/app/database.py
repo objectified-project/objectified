@@ -39,6 +39,14 @@ class StaleHeadPushError(Exception):
         super().__init__("stale head")
 
 
+class BranchNotFoundError(Exception):
+    """Branch row disappeared between head-resolution and the transactional FOR UPDATE lock."""
+
+    def __init__(self, branch_id: str):
+        self.branch_id = branch_id
+        super().__init__(f"branch not found: {branch_id}")
+
+
 def _compute_delta(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
     """
     Compute top-level delta: keys added, removed, or changed.
@@ -3894,9 +3902,38 @@ class Database:
                     )
                     locked = cursor.fetchone()
                     if not locked:
-                        raise ValueError("Branch not found or not accessible")
+                        raise BranchNotFoundError(bid)
                     if str(locked["tip_version_id"]) != base:
                         raise StaleHeadPushError(str(locked["tip_version_id"]))
+                else:
+                    # No named branches: lock the project row to serialize concurrent no-branch
+                    # pushes and re-verify the head under the lock (TOCTOU fix, #2566).
+                    cursor.execute(
+                        """
+                        SELECT p.id FROM odb.projects p
+                        WHERE p.id = %s AND p.tenant_id = %s
+                        FOR UPDATE
+                        """,
+                        (project_id, tenant_id),
+                    )
+                    if not cursor.fetchone():
+                        raise ValueError("Project not found or not accessible")
+                    cursor.execute(
+                        """
+                        SELECT v.id::text AS id
+                        FROM odb.versions v
+                        WHERE v.project_id = %s AND v.deleted_at IS NULL
+                        ORDER BY v.created_at DESC
+                        LIMIT 1
+                        """,
+                        (project_id,),
+                    )
+                    head_row = cursor.fetchone()
+                    current_tip: Optional[str] = str(head_row["id"]) if head_row else None
+                    if current_tip is None and base:
+                        raise ValueError("baseRevisionId must be empty: project has no revisions")
+                    if current_tip is not None and base != current_tip:
+                        raise StaleHeadPushError(current_tip)
 
                 cursor.execute(
                     """
@@ -3937,7 +3974,7 @@ class Database:
                     )
 
             conn.commit()
-        except StaleHeadPushError:
+        except (StaleHeadPushError, BranchNotFoundError):
             conn.rollback()
             raise
         except Exception:

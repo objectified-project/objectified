@@ -595,7 +595,25 @@ const Versions = () => {
       baseRevisionId = versionBranches[0].tip_version_id;
       branchName = versionBranches[0].name;
     } else {
-      baseRevisionId = versions[0]?.id ?? '';
+      // No named branches: fetch the unfiltered head so lifecycle filtering on the
+      // current view doesn't cause a false STALE_HEAD when versions[0] is not the
+      // true project head.
+      const headRes = await fetch(`/api/versions?projectId=${encodeURIComponent(selectedProjectId)}`);
+      const headJson = (await headRes.json()) as {
+        success?: boolean;
+        error?: string;
+        versions?: Array<{ id?: string }>;
+      };
+      if (!headRes.ok || !headJson.success) {
+        const msg =
+          typeof headJson.error === 'string'
+            ? headJson.error
+            : 'Could not resolve latest revision for push.';
+        setErrorMessage(msg);
+        toast.error(msg);
+        return;
+      }
+      baseRevisionId = headJson.versions?.[0]?.id ?? '';
     }
 
     setIsLoading(true); setErrorMessage('');
