@@ -17,7 +17,7 @@ import json
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
-MIGRATION_GUIDE_ISSUE_URL = "https://github.com/KenSuenobu/objectified/issues/747"
+MIGRATION_GUIDE_ISSUE_URL = "https://github.com/KenSuenobu/objectified-commercial/issues/747"
 
 
 def coerce_metadata(raw: Any) -> Dict[str, Any]:

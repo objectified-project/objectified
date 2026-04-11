@@ -6,14 +6,10 @@ import { jsPDF } from 'jspdf';
 import type { LayoutQualityResult } from '@/app/utils/layout-quality';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
 import type { CanvasSuggestion } from '@/app/utils/canvas-suggestions';
+import { sanitizeFilenameSegment } from '@/app/utils/filename-utils';
+export { sanitizeFilenameSegment };
 
 const LIST_CAP = 45;
-
-/** Safe filename segment for downloads. */
-export function sanitizeFilenameSegment(raw: string): string {
-  const s = raw.replace(/[^\w\-+.]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-  return s.slice(0, 96) || 'report';
-}
 
 type PdfContext = {
   pdf: jsPDF;

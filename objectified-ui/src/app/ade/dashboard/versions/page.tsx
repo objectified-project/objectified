@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -48,6 +48,9 @@ import { compareLayouts, type LayoutDiffSummary, type LayoutState } from '../../
 import { loadLayoutStateForVersionCompare } from '../../../../../lib/version-canvas-layout';
 import { extractBreakingHintsFromChangelog, validateVersionNotesClient } from '../../../../../lib/version-notes';
 import { generateBreakingChangesMarkdownFromSummary } from '../../../../../lib/breaking-changes-doc';
+import { generateMigrationGuideMarkdownFromSummary } from '../../../../../lib/migration-guide-doc';
+import { downloadMigrationGuidePdf } from '../../../utils/export-migration-guide-pdf';
+import { sanitizeFilenameSegment } from '../../../utils/filename-utils';
 import RelationshipGraphDialog from './RelationshipGraphDialog';
 import VersionLineageSnippet from './VersionLineageSnippet';
 import VersionHistoryGraphPanel from './VersionHistoryGraphPanel';
@@ -192,7 +195,9 @@ const Versions = () => {
     showRemoved: boolean;
     showModified: boolean;
   }>({ showAdded: true, showRemoved: true, showModified: true });
-  const [activeCompareTab, setActiveCompareTab] = useState<'diff' | 'summary' | 'breaking' | 'canvas'>('diff');
+  const [activeCompareTab, setActiveCompareTab] = useState<
+    'diff' | 'summary' | 'breaking' | 'migration' | 'canvas'
+  >('diff');
   const [canvasCompareLeft, setCanvasCompareLeft] = useState<LayoutState | null>(null);
   const [canvasCompareRight, setCanvasCompareRight] = useState<LayoutState | null>(null);
   const [canvasCompareDiff, setCanvasCompareDiff] = useState<LayoutDiffSummary | null>(null);
@@ -913,6 +918,26 @@ const Versions = () => {
     });
   }, [schemaDiffSummary, compareVersion1Id, compareVersion2Id, versions]);
 
+  const migrationGuideMarkdown = useMemo(() => {
+    if (!schemaDiffSummary) return '';
+    const vBase = versions.find((v) => v.id === compareVersion1Id);
+    const vTo = versions.find((v) => v.id === compareVersion2Id);
+    const hintSet = new Set<string>();
+    for (const h of extractBreakingHintsFromChangelog(vBase?.changelog)) {
+      hintSet.add(h);
+    }
+    for (const h of extractBreakingHintsFromChangelog(vTo?.changelog)) {
+      hintSet.add(h);
+    }
+    return generateMigrationGuideMarkdownFromSummary(schemaDiffSummary, {
+      baseLabel: vBase ? `v${vBase.version_id} (base)` : 'base',
+      targetLabel: vTo ? `v${vTo.version_id} (compare)` : 'target',
+      baseRevisionId: compareVersion1Id,
+      targetRevisionId: compareVersion2Id,
+      breakingHintsFromChangelog: [...hintSet].sort((a, b) => a.localeCompare(b)),
+    });
+  }, [schemaDiffSummary, compareVersion1Id, compareVersion2Id, versions]);
+
   const appendBreakingDocToCompareTargetChangelog = () => {
     const vTo = versions.find((v) => v.id === compareVersion2Id);
     if (!vTo || !breakingChangesMarkdown.trim()) {
@@ -942,6 +967,52 @@ const Versions = () => {
     setShowCompareDialog(false);
     setShowEditDialog(true);
     toast.success('Review changelog in Edit Version, then save.');
+  };
+
+  const appendMigrationGuideToCompareTargetChangelog = () => {
+    const vTo = versions.find((v) => v.id === compareVersion2Id);
+    if (!vTo || !migrationGuideMarkdown.trim()) {
+      toast.warning('Nothing to append');
+      return;
+    }
+    if (vTo.published) {
+      toast.warning('Cannot edit changelog on a published revision.');
+      return;
+    }
+    const lc = vTo.lifecycle ?? 'stable';
+    if (lc === 'archived') {
+      toast.warning('Archived revisions cannot update changelog here. Copy the generated guide instead.');
+      return;
+    }
+    const md = migrationGuideMarkdown.trim();
+    const existing = vTo.changelog?.trim() ?? '';
+    const sep = existing ? '\n\n---\n\n' : '';
+    const merged = `${existing}${sep}${md}`;
+    setSelectedVersion(vTo);
+    setVersionId(vTo.version_id);
+    setDescription(vTo.shortMessage || '');
+    setChangeLog(merged);
+    setEnabled(vTo.enabled);
+    setEditLifecycle(lc);
+    setErrorMessage('');
+    setShowCompareDialog(false);
+    setShowEditDialog(true);
+    toast.success('Review changelog in Edit Version, then save.');
+  };
+
+  const downloadMigrationGuideMarkdownFile = () => {
+    const vBase = versions.find((v) => v.id === compareVersion1Id);
+    const vTo = versions.find((v) => v.id === compareVersion2Id);
+    const proj = projects.find((p) => p.id === selectedProjectId);
+    const name = `migration-guide-${sanitizeFilenameSegment(proj?.name ?? 'project')}-${sanitizeFilenameSegment(vBase?.version_id ?? 'base')}-to-${sanitizeFilenameSegment(vTo?.version_id ?? 'target')}.md`;
+    const blob = new Blob([migrationGuideMarkdown], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Markdown downloaded');
   };
 
   const classDiffListRender = useMemo(() => {
@@ -2645,6 +2716,20 @@ const Versions = () => {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setActiveCompareTab('migration')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeCompareTab === 'migration'
+                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <ListOrdered className="h-4 w-4" aria-hidden />
+                      <span>Migration guide</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setActiveCompareTab('canvas')}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                       activeCompareTab === 'canvas'
@@ -3149,6 +3234,81 @@ const Versions = () => {
                       value={breakingChangesMarkdown}
                       placeholder="Compare two versions to generate breaking-changes Markdown."
                       aria-label="Generated breaking changes markdown"
+                    />
+                  </div>
+                ) : activeCompareTab === 'migration' ? (
+                  <div className="h-[calc(90vh-280px)] overflow-y-auto flex flex-col gap-3 p-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between shrink-0">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 max-w-prose">
+                        Ordered steps for <strong className="font-medium text-gray-800 dark:text-gray-200">breaking</strong>{' '}
+                        contract changes, tied to this revision pair. Companion to the{' '}
+                        <strong className="font-medium text-gray-800 dark:text-gray-200">Breaking doc</strong> tab (#746) and
+                        compatibility checks (#506). Template version is in the header; edit the Markdown after export if
+                        needed (#502).
+                      </p>
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="text-xs h-8"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(migrationGuideMarkdown);
+                              toast.success('Migration guide copied');
+                            } catch {
+                              toast.error('Copy failed');
+                            }
+                          }}
+                          disabled={!migrationGuideMarkdown}
+                        >
+                          Copy
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="default"
+                          className="text-xs h-8"
+                          onClick={appendMigrationGuideToCompareTargetChangelog}
+                          disabled={!migrationGuideMarkdown}
+                        >
+                          Append to compare-to changelog
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="text-xs h-8"
+                          onClick={downloadMigrationGuideMarkdownFile}
+                          disabled={!migrationGuideMarkdown}
+                        >
+                          Download Markdown
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="text-xs h-8"
+                          onClick={() => {
+                            const vBase = versions.find((v) => v.id === compareVersion1Id);
+                            const vTo = versions.find((v) => v.id === compareVersion2Id);
+                            const proj = projects.find((p) => p.id === selectedProjectId);
+                            downloadMigrationGuidePdf({
+                              body: migrationGuideMarkdown,
+                              projectName: proj?.name ?? 'Project',
+                              baseVersionLabel: vBase ? `v${vBase.version_id}` : 'base',
+                              targetVersionLabel: vTo ? `v${vTo.version_id}` : 'target',
+                            });
+                            toast.success('PDF downloaded');
+                          }}
+                          disabled={!migrationGuideMarkdown}
+                        >
+                          Download PDF
+                        </Button>
+                      </div>
+                    </div>
+                    <Textarea
+                      readOnly
+                      className="flex-1 min-h-[min(420px,50vh)] font-mono text-xs"
+                      value={migrationGuideMarkdown}
+                      placeholder="Compare two versions to generate a migration guide."
+                      aria-label="Generated migration guide markdown"
                     />
                   </div>
                 ) : (
