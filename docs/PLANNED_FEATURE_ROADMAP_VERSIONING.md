@@ -16,7 +16,7 @@ This represents the different versions of the Objectified specification and thei
 - ✅ Show branches when creating copies of schemas (#505)
 
 ### Migration Tools 📋 PLANNED
-- 📋 Generate migration guides
+- ✅ Generate migration guides (#747) — **ADE → Versions → Compare → Migration guide** tab: ordered steps for breaking deltas, revision-pair metadata, links to **#746** / **#506**; copy, append to compare-to changelog, **Markdown** + **PDF** export; ties to **#502** changelog `breaking:` hints
 - 📋 Data migration scripts
 - ✅ Backward compatibility checker (#506) — REST `POST /v1/versions/{tenant}/{projectId}/compatibility`; merge dialog runs target-tip vs source-tip check; optional `compatGateOnMerge` in project metadata
 - ✅ Deprecation warnings (#507) — `versions.metadata` (`deprecated`, `deprecationMessage`, `successorRevisionId`, `sunsetDate`); compat API `deprecationWarnings` + optional `policy.http409WhenDeprecatedRevision`; project `failCiOnDeprecatedRevision`; OpenAPI `info.x-objectified-revision-deprecation`; Studio & migration banners
@@ -45,7 +45,7 @@ This represents the different versions of the Objectified specification and thei
   - ✅ Release notes per version
   - ✅ What's new highlights
   - ✅ Breaking changes documentation
-  - 📋 Migration guide
+  - ✅ Migration guide (#747)
 - **Version Deprecation**:
   - ✅ Mark versions as deprecated
   - 📋 Set sunset dates
@@ -57,7 +57,6 @@ This represents the different versions of the Objectified specification and thei
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| #747   | Migration guide generation for version notes |
 | #748   | Set sunset dates for deprecated versions     |
 | #749   | Redirect to newer versions                   |
 
@@ -65,6 +64,7 @@ This represents the different versions of the Objectified specification and thei
 
 # Completed
 
+- **#747** — **Migration guide from compare:** deterministic Markdown (**Migration guide** tab) with **ordered steps** per breaking change, **revision pair** ids + template version, **#746** / **#506** cross-links, optional **#502** changelog `breaking:` notes; **Copy**, **append to compare-to changelog**, **Download Markdown**, **Download PDF**; deprecation warnings (#507) point at the **#747** tracker URL
 - **#746** — **Breaking changes doc from diff:** deterministic Markdown (**Breaking** / **Additions** / **Other**) from schema-aware `compareSchemas` output, stable `components.schemas…` identifiers, template version in header; **ADE → Versions → Compare → Breaking doc** tab with copy and **append to compare-to changelog** (opens Edit Version)
 - **#745** — **Version rollback (revert-style):** **REST** `POST .../version-branches/rollback-preview` and `POST .../rollback` — new head revision with **content** from a **prior ancestor** revision, **`parent_version_id`** = prior tip, **`metadata.rollback`** lineage; **#506**-style OpenAPI compare (tip → target) + optional **`compatGateOnRollback`**; **version.rollback** audit; **ADE → Versions** row action with preview / confirm / diff summary
 - **#744** — **ADE → Versions → Revision history graph (branches & merges)**: **Left-to-right** layered layout (**lanes**); **merge commits** (violet, dashed merge-parent edge) vs **branch tips** (emerald marker, **Tip:** labels from named branches, hover); **branch toggles** filter by **ancestor union** from each selected tip so **merge readability** is preserved; shared **#743** panel/DAG module.

@@ -4,7 +4,8 @@
  * Accepts either a plain object or a JSON string (matching the backend `coerce_metadata` helper).
  */
 
-export const MIGRATION_GUIDE_ISSUE_URL = 'https://github.com/KenSuenobu/objectified/issues/747';
+export const MIGRATION_GUIDE_ISSUE_URL =
+  'https://github.com/KenSuenobu/objectified-commercial/issues/747';
 
 function coerceMetadata(raw: unknown): Record<string, unknown> {
   if (!raw) return {};
