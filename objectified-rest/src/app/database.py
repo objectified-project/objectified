@@ -8,7 +8,7 @@ from psycopg2.extensions import register_adapter, AsIs, adapt
 from typing import Optional, List, Dict, Any, Tuple, Set
 from .config import settings
 from .jsonschema_generator import generate_class_jsonschema_spec
-from .revision_deprecation import coerce_metadata, effective_sunset_string
+from .revision_deprecation import coerce_metadata, effective_sunset_string, successor_revision_id_from_metadata
 from .revision_lifecycle import prepare_version_metadata_update, sql_effective_lifecycle_expr
 
 _logger = logging.getLogger(__name__)
@@ -1337,6 +1337,82 @@ class Database:
         """
         results = self.execute_query(query, (project_id, version_id_str, tenant_id))
         return results[0] if results else None
+
+    def revision_has_protected_named_ref(
+        self, version_row_id: str, project_id: str, tenant_id: str
+    ) -> bool:
+        """
+        True if this revision is the tip of a protected branch or the target of a protected tag (#504).
+        Used to block successor redirection off an immutable anchor (#749).
+        """
+        q_branch = """
+            SELECT 1 FROM odb.version_branches b
+            INNER JOIN odb.projects p ON p.id = b.project_id AND p.deleted_at IS NULL
+            WHERE b.project_id = %s AND b.tip_version_id = %s AND b.protected = TRUE
+              AND p.tenant_id = %s
+            LIMIT 1
+        """
+        q_tag = """
+            SELECT 1 FROM odb.version_tags t
+            INNER JOIN odb.projects p ON p.id = t.project_id AND p.deleted_at IS NULL
+            WHERE t.project_id = %s AND t.version_id = %s AND t.protected = TRUE
+              AND p.tenant_id = %s
+            LIMIT 1
+        """
+        if self.execute_query(q_branch, (project_id, version_row_id, tenant_id)):
+            return True
+        if self.execute_query(q_tag, (project_id, version_row_id, tenant_id)):
+            return True
+        return False
+
+    def resolve_successor_revision_chain(
+        self,
+        start_version_id: str,
+        tenant_id: str,
+        project_id: str,
+        *,
+        max_hops: int = 32,
+    ) -> Tuple[str, List[str], str, Optional[str]]:
+        """
+        Walk ``metadata.successorRevisionId`` from ``start_version_id`` (#749).
+
+        Returns ``(final_id, hop_targets, status, missing_successor_id)`` where ``hop_targets`` lists
+        each successor revision id visited in order. ``missing_successor_id`` is set when ``status``
+        is ``missing_target`` (pointer to a deleted or unknown revision).
+        """
+        current = start_version_id
+        visited: Set[str] = {start_version_id}
+        hops: List[str] = []
+
+        for _ in range(max_hops + 1):
+            row = self.get_version_by_id(current, tenant_id)
+            if not row:
+                return current, hops, "missing_target", None
+            if str(row.get("project_id")) != project_id:
+                return current, hops, "project_mismatch", None
+
+            succ = successor_revision_id_from_metadata(row.get("metadata"))
+            if not succ:
+                st = "none" if not hops else "resolved"
+                return current, hops, st, None
+
+            if self.revision_has_protected_named_ref(current, project_id, tenant_id):
+                return current, hops, "blocked_protected_ref", None
+
+            if succ in visited:
+                return current, hops, "cycle", None
+
+            nxt = self.get_version_by_id(succ, tenant_id)
+            if not nxt:
+                return current, hops, "missing_target", succ
+            if str(nxt.get("project_id")) != project_id:
+                return current, hops, "project_mismatch", None
+
+            hops.append(succ)
+            visited.add(succ)
+            current = succ
+
+        return current, hops, "max_hops_exceeded", None
 
     def get_latest_version_for_project(self, project_id: str, tenant_id: str) -> Optional[str]:
         """Get the latest version_id string for a project."""

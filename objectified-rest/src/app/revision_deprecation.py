@@ -5,8 +5,10 @@ Stored in ``odb.versions.metadata`` as a shallow object. Keys (camelCase in API)
 
 - ``deprecated`` (bool): revision is deprecated for new consumer work.
 - ``deprecationMessage`` (str): human-readable explanation / what changed.
-- ``successorRevisionId`` (str): optional ``versions.id`` UUID of the replacement revision (#749);
-  **required** when ``sunsetAt`` is set (#748).
+- ``successorRevisionId`` (str): optional ``versions.id`` UUID of the replacement revision;
+  **required** when ``sunsetAt`` is set (#748). **GET** ``/v1/versions/{tenant}/{project}/{revisionId}`` supports
+  ``successorResolution=none|resolve|redirect`` (#749): follows this pointer (cycle-safe; missing-target and
+  protected-ref rules documented on the route).
 - ``sunsetAt`` (str): optional instant in **UTC** (ISO 8601, e.g. ``2026-12-01T00:00:00Z`` or calendar day
   ``YYYY-MM-DD`` normalized to UTC midnight). Canonical field for sunset (#748).
 - ``sunsetDate`` (str): legacy alias; reads/writes mirror ``sunsetAt`` for #507 / #508 consumers.
@@ -75,6 +77,16 @@ def coerce_metadata(raw: Any) -> Dict[str, Any]:
         except json.JSONDecodeError:
             return {}
     return {}
+
+
+def successor_revision_id_from_metadata(metadata: Any) -> Optional[str]:
+    """Return the successor revision UUID from ``versions.metadata`` (#748, #749)."""
+    m = coerce_metadata(metadata)
+    for key in _SUCCESSOR_ALIAS_KEYS:
+        succ = m.get(key)
+        if isinstance(succ, str) and succ.strip():
+            return succ.strip()
+    return None
 
 
 def merge_version_metadata(existing: Any, patch: Optional[Dict[str, Any]]) -> Dict[str, Any]:

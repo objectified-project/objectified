@@ -128,10 +128,37 @@ export async function GET(
       current_tenant_id: tenantId,
     });
 
-    const response = await fetch(`${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}/${versionId}`, {
+    const sr = searchParams.get('successorResolution');
+    const ar = searchParams.get('auditSuccessorResolution');
+    const qs = new URLSearchParams();
+    if (sr) qs.set('successorResolution', sr);
+    if (ar) qs.set('auditSuccessorResolution', ar);
+    const q = qs.toString();
+    const restUrl = `${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}/${versionId}${q ? `?${q}` : ''}`;
+
+    const response = await fetch(restUrl, {
       method: 'GET',
       headers,
+      redirect: sr === 'redirect' ? 'manual' : 'follow',
     });
+
+    if (response.status === 307 || response.status === 308) {
+      const loc = response.headers.get('Location');
+      if (loc) {
+        try {
+          const remote = new URL(loc, restUrl);
+          const segs = remote.pathname.replace(/\/$/, '').split('/').filter(Boolean);
+          const finalRevisionId = segs[segs.length - 1] ?? versionId;
+          const dest = new URL(request.url);
+          dest.pathname = `/api/versions/${encodeURIComponent(finalRevisionId)}`;
+          dest.searchParams.set('projectId', projectId);
+          dest.searchParams.set('successorResolution', 'none');
+          return NextResponse.redirect(dest, 307);
+        } catch {
+          /* fall through */
+        }
+      }
+    }
 
     const { data, error, status } = await handleRestResponse(response, 'Failed to fetch version');
 
@@ -139,7 +166,13 @@ export async function GET(
       return NextResponse.json({ success: false, error }, { status });
     }
 
-    return NextResponse.json({ success: true, version: data });
+    const res = NextResponse.json({ success: true, version: data });
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase().startsWith('x-objectified-')) {
+        res.headers.set(key, value);
+      }
+    });
+    return res;
   } catch (error) {
     console.error('Error fetching version:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
