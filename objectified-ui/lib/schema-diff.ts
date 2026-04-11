@@ -162,7 +162,8 @@ export function compactJsonValue(value: unknown): string {
     return String(value);
   }
   if (typeof value === 'string') {
-    return value.length > COMPACT_VALUE_MAX ? `${value.slice(0, COMPACT_VALUE_MAX)}…` : value;
+    const compactValue = value.length > COMPACT_VALUE_MAX ? `${value.slice(0, COMPACT_VALUE_MAX)}…` : value;
+    return JSON.stringify(compactValue);
   }
   const s = JSON.stringify(value);
   return s.length > COMPACT_VALUE_MAX ? `${s.slice(0, COMPACT_VALUE_MAX)}…` : s;

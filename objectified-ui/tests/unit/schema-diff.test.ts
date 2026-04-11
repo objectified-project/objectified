@@ -407,7 +407,7 @@ describe('Schema Diff Utility', () => {
     it('renders primitives and truncates long strings', () => {
       expect(compactJsonValue(null)).toBe('null');
       expect(compactJsonValue(undefined)).toBe('—');
-      expect(compactJsonValue('x'.repeat(200)).endsWith('…')).toBe(true);
+      expect(compactJsonValue('x'.repeat(200)).endsWith('…"')).toBe(true);
     });
   });
 
