@@ -50,7 +50,7 @@ import { extractBreakingHintsFromChangelog, validateVersionNotesClient } from '.
 import { generateBreakingChangesMarkdownFromSummary } from '../../../../../lib/breaking-changes-doc';
 import { generateMigrationGuideMarkdownFromSummary } from '../../../../../lib/migration-guide-doc';
 import { downloadMigrationGuidePdf } from '../../../utils/export-migration-guide-pdf';
-import { sanitizeFilenameSegment } from '../../../utils/export-schema-score-report-pdf';
+import { sanitizeFilenameSegment } from '../../../utils/filename-utils';
 import RelationshipGraphDialog from './RelationshipGraphDialog';
 import VersionLineageSnippet from './VersionLineageSnippet';
 import VersionHistoryGraphPanel from './VersionHistoryGraphPanel';

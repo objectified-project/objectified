@@ -3,7 +3,7 @@
  */
 
 import { jsPDF } from 'jspdf';
-import { sanitizeFilenameSegment } from '@/app/utils/export-schema-score-report-pdf';
+import { sanitizeFilenameSegment } from '@/app/utils/filename-utils';
 
 type PdfCtx = {
   pdf: jsPDF;
