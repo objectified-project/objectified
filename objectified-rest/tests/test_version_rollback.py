@@ -1,0 +1,137 @@
+"""
+Rollback preview / apply API (#745) — auth and validation smoke tests.
+"""
+
+from unittest.mock import patch
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.auth import validate_authentication
+from app.main import app
+
+client = TestClient(app)
+
+_MOCK_AUTH = {
+    "tenant_id": "t1",
+    "user_id": "u1",
+    "auth_method": "jwt",
+}
+
+
+def _override_auth():
+    return _MOCK_AUTH
+
+
+def test_rollback_preview_requires_auth():
+    r = client.post(
+        "/v1/versions/slug/p1/version-branches/rollback-preview",
+        json={"branchName": "main", "targetRevisionId": "00000000-0000-0000-0000-000000000001"},
+    )
+    assert r.status_code == 401
+
+
+def test_rollback_apply_requires_auth():
+    r = client.post(
+        "/v1/versions/slug/p1/version-branches/rollback",
+        json={
+            "branchName": "main",
+            "targetRevisionId": "00000000-0000-0000-0000-000000000001",
+            "baseRevisionId": "00000000-0000-0000-0000-000000000002",
+        },
+    )
+    assert r.status_code == 401
+
+
+@pytest.fixture
+def auth_client():
+    app.dependency_overrides[validate_authentication] = _override_auth
+    yield client
+    app.dependency_overrides.clear()
+
+
+def test_rollback_preview_project_not_found(auth_client):
+    with patch("app.version_merge_routes.db.get_project_by_id", return_value=None):
+        r = auth_client.post(
+            "/v1/versions/slug/missing-project/version-branches/rollback-preview",
+            json={"branchName": "main", "targetRevisionId": "00000000-0000-0000-0000-000000000001"},
+        )
+    assert r.status_code == 404
+
+
+def test_rollback_preview_branch_not_found(auth_client):
+    proj = {"id": "p1", "metadata": {}}
+    with patch("app.version_merge_routes.db.get_project_by_id", return_value=proj), patch(
+        "app.version_merge_routes.db.get_version_branch_by_name", return_value=None
+    ):
+        r = auth_client.post(
+            "/v1/versions/slug/p1/version-branches/rollback-preview",
+            json={"branchName": "main", "targetRevisionId": "00000000-0000-0000-0000-000000000001"},
+        )
+    assert r.status_code == 404
+    assert "Branch not found" in r.json()["detail"]
+
+
+def test_rollback_tip_equals_target_bad_request(auth_client):
+    tip = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    proj = {"id": "p1", "metadata": {}}
+    branch = {"id": "b1", "tip_version_id": tip, "protected": False}
+    head_ver = {"id": tip, "project_id": "p1", "version_id": "1.0.0", "metadata": None, "published": False}
+    with patch("app.version_merge_routes.db.get_project_by_id", return_value=proj), patch(
+        "app.version_merge_routes.db.get_version_branch_by_name", return_value=branch
+    ), patch("app.version_merge_routes.db.get_version_by_id", return_value=head_ver):
+        r = auth_client.post(
+            "/v1/versions/slug/p1/version-branches/rollback-preview",
+            json={"branchName": "main", "targetRevisionId": tip},
+        )
+    assert r.status_code == 400
+
+
+def test_rollback_apply_protected_branch_forbidden(auth_client):
+    tip = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    old = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    proj = {"id": "p1", "metadata": {}}
+    branch = {"id": "b1", "tip_version_id": tip, "protected": True}
+    head_ver = {
+        "id": tip,
+        "project_id": "p1",
+        "version_id": "1.0.1",
+        "metadata": None,
+        "published": False,
+    }
+    target_ver = {
+        "id": old,
+        "project_id": "p1",
+        "version_id": "1.0.0",
+        "metadata": None,
+        "published": False,
+    }
+
+    def gv(vid, _tid):
+        if vid == tip:
+            return head_ver
+        if vid == old:
+            return target_ver
+        return None
+
+    ancestors = {tip, old}
+
+    with patch("app.version_merge_routes.db.get_project_by_id", return_value=proj), patch(
+        "app.version_merge_routes.db.get_version_branch_by_name", return_value=branch
+    ), patch("app.version_merge_routes.db.get_version_by_id", side_effect=gv), patch(
+        "app.version_merge_routes.db.collect_revision_ancestors", return_value=ancestors
+    ), patch(
+        "app.version_merge_routes.db.is_user_tenant_admin", return_value=False
+    ), patch(
+        "app.version_merge_routes._rollback_analyze",
+        return_value=("safe", [], [], "fp", None),
+    ):
+        r = auth_client.post(
+            "/v1/versions/slug/p1/version-branches/rollback",
+            json={
+                "branchName": "main",
+                "targetRevisionId": old,
+                "baseRevisionId": tip,
+            },
+        )
+    assert r.status_code == 403

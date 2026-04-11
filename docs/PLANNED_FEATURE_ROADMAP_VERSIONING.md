@@ -38,7 +38,7 @@ This represents the different versions of the Objectified specification and thei
   - ✅ Show branches and merges (#744) — left-to-right **lanes**, **branch tips** vs **merge commits**, **branch filter** (ancestor union keeps merges readable)
   - ✅ Click to switch versions
 - **Version Rollback**:
-  - 📋 Rollback to any previous version
+  - ✅ Rollback to any previous version (revert-style new revision) — **#745**
   - ✅ Create new version from old version
   - ✅ Undo version publish
 - **Version Notes**: 
@@ -57,7 +57,7 @@ This represents the different versions of the Objectified specification and thei
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| #745   | Rollback to any previous version             |
+| ~~#745~~ | ~~Rollback to any previous version~~ — **done** |
 | #746   | Breaking changes documentation               |
 | #747   | Migration guide generation for version notes |
 | #748   | Set sunset dates for deprecated versions     |
@@ -67,6 +67,7 @@ This represents the different versions of the Objectified specification and thei
 
 # Completed
 
+- **#745** — **Version rollback (revert-style):** **REST** `POST .../version-branches/rollback-preview` and `POST .../rollback` — new head revision with **content** from a **prior ancestor** revision, **`parent_version_id`** = prior tip, **`metadata.rollback`** lineage; **#506**-style OpenAPI compare (tip → target) + optional **`compatGateOnRollback`**; **version.rollback** audit; **ADE → Versions** row action with preview / confirm / diff summary
 - **#744** — **ADE → Versions → Revision history graph (branches & merges)**: **Left-to-right** layered layout (**lanes**); **merge commits** (violet, dashed merge-parent edge) vs **branch tips** (emerald marker, **Tip:** labels from named branches, hover); **branch toggles** filter by **ancestor union** from each selected tip so **merge readability** is preserved; shared **#743** panel/DAG module.
 - **#743** — **ADE → Versions → Revision history graph**: interactive **DAG** from `parent_version_id` / `merge_parent_version_id` (React Flow: zoom/pan, minimap); **compare** to primary parent or **view spec** (Ctrl/Cmd-click); **Load older** for large histories; merge nodes show **two parents** (dashed merge edge).
 - **#741** — **Property-level diff** in **Schema Changes**: readable lines per property/schema (`property name: field old → new`), expanded OpenAPI compare (**default**, **nullable**, **readOnly** / **writeOnly**, **deprecated**, **example**, **title**, **multipleOf**, **uniqueItems**, **exclusiveMin/Max**, etc.), sorted drill lists, **performance** cap with **show all** for huge classes; **Merge branches** preview shows **conflict paths grouped by class** (aligned with `schemas.*` IDs).

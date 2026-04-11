@@ -12,10 +12,22 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from .auth import validate_authentication, get_authenticated_user_id
-from .compatibility_routes import _openapi_for_revision
+from .compatibility_routes import _fingerprint, _openapi_for_revision
 from .database import db
-from .models import VersionBranchMergePreviewRequest, VersionBranchMergeRequest, VersionSchema
-from .schema_compatibility import CompatibilityRules, analyze_schema_compatibility
+from .models import (
+    CompatibilityFindingOut,
+    VersionBranchMergePreviewRequest,
+    VersionBranchMergeRequest,
+    VersionBranchRollbackPreviewRequest,
+    VersionBranchRollbackRequest,
+    VersionSchema,
+)
+from .revision_deprecation import warnings_for_revision
+from .schema_compatibility import (
+    BREAKING_DOC_ISSUE_URL,
+    CompatibilityRules,
+    analyze_schema_compatibility,
+)
 from .schema_merge import (
     _MISSING,
     classify_merge_diff_two_way,
@@ -47,6 +59,10 @@ def _parse_project_metadata(metadata: Any) -> Dict[str, Any]:
 
 def _tenant_compat_gate(project: Dict[str, Any]) -> bool:
     return bool(_parse_project_metadata(project.get("metadata")).get("compatGateOnMerge"))
+
+
+def _tenant_compat_gate_rollback(project: Dict[str, Any]) -> bool:
+    return bool(_parse_project_metadata(project.get("metadata")).get("compatGateOnRollback"))
 
 
 def parse_semantic_version(version: str) -> Optional[Dict[str, int]]:
@@ -346,6 +362,308 @@ async def version_branch_merge(
     full = db.get_version_by_id(new_id, tenant_id)
     if not full:
         raise HTTPException(status_code=500, detail="Merge succeeded but revision not readable")
+    return {
+        "success": True,
+        "version": VersionSchema.model_validate(full).model_dump(by_alias=True),
+    }
+
+
+def _rollback_analyze(
+    tenant_slug: str,
+    tenant_id: str,
+    head_ver: Dict[str, Any],
+    target_ver: Dict[str, Any],
+) -> tuple:
+    """
+    Compare current branch tip (consumer expectation) to rollback snapshot (target).
+    Semantics match #506: base = tip, head = restored content.
+    """
+    tip_spec = _openapi_for_revision(head_ver, tenant_slug, tenant_id)
+    target_spec = _openapi_for_revision(target_ver, tenant_slug, tenant_id)
+    overall, findings = analyze_schema_compatibility(tip_spec, target_spec, CompatibilityRules())
+    finding_out = [
+        CompatibilityFindingOut(
+            id=f.id,
+            path=f.path,
+            category=f.category,
+            rule=f.rule,
+            message=f.message,
+        )
+        for f in findings
+    ]
+    finding_dicts = [f.model_dump(by_alias=True) for f in finding_out]
+    dep_out = []
+    dep_out.extend(
+        warnings_for_revision(
+            revision_id=head_ver["id"],
+            version_label=head_ver["version_id"],
+            role="head",
+            metadata=head_ver.get("metadata"),
+        )
+    )
+    dep_out.extend(
+        warnings_for_revision(
+            revision_id=target_ver["id"],
+            version_label=target_ver["version_id"],
+            role="rollbackTarget",
+            metadata=target_ver.get("metadata"),
+        )
+    )
+    dep_dicts = [w.model_dump(by_alias=True) for w in dep_out]
+    fp = _fingerprint(overall, finding_dicts, dep_dicts or None)
+    doc_url = BREAKING_DOC_ISSUE_URL if overall == "breaking" else None
+    return overall, finding_out, dep_out, fp, doc_url
+
+
+def _rollback_validate_branch_and_revisions(
+    project_id: str,
+    tenant_id: str,
+    branch_name: str,
+    target_revision_id: str,
+) -> tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any], Dict[str, Any], str, str]:
+    """
+    Returns (project, branch_row, head_ver, target_ver, head_tip, target_id).
+    """
+    tgt_id = (target_revision_id or "").strip()
+    if not tgt_id:
+        raise HTTPException(status_code=400, detail="targetRevisionId is required")
+
+    bname = (branch_name or "").strip()
+    if not bname:
+        raise HTTPException(status_code=400, detail="branchName is required")
+
+    project = db.get_project_by_id(project_id, tenant_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    branch = db.get_version_branch_by_name(project_id, tenant_id, bname)
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    head_tip = str(branch["tip_version_id"])
+    head_ver = db.get_version_by_id(head_tip, tenant_id)
+    target_ver = db.get_version_by_id(tgt_id, tenant_id)
+    if not head_ver or not target_ver:
+        raise HTTPException(status_code=404, detail="Revision not found")
+
+    if head_ver["project_id"] != project_id or target_ver["project_id"] != project_id:
+        raise HTTPException(status_code=400, detail="Revisions must belong to this project")
+
+    if head_tip == tgt_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Branch tip already matches target revision; nothing to roll back.",
+        )
+
+    if bool(head_ver.get("published")):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PUBLISHED_VERSION",
+                "message": "Cannot roll back a published branch tip; unpublish or use an admin workflow.",
+            },
+        )
+
+    anc = db.collect_revision_ancestors(head_tip, tenant_id)
+    if tgt_id not in anc:
+        raise HTTPException(
+            status_code=400,
+            detail="Target revision is not an ancestor of the branch tip; only in-history rollbacks are allowed.",
+        )
+
+    return project, branch, head_ver, target_ver, head_tip, tgt_id
+
+
+@router.post("/{tenant_slug}/{project_id}/version-branches/rollback-preview")
+async def version_branch_rollback_preview(
+    tenant_slug: str,
+    project_id: str,
+    body: VersionBranchRollbackPreviewRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> Dict[str, Any]:
+    """
+    Dry-run rollback: schema compatibility tip→target, deprecation warnings (#506), fingerprint.
+    """
+    tenant_id = auth_data["tenant_id"]
+    _project, _branch, head_ver, target_ver, head_tip, tgt_id = _rollback_validate_branch_and_revisions(
+        project_id, tenant_id, body.branch_name, body.target_revision_id
+    )
+
+    overall, finding_out, dep_out, fp, doc_url = _rollback_analyze(
+        tenant_slug, tenant_id, head_ver, target_ver
+    )
+    gate = _tenant_compat_gate_rollback(_project)
+    blocked = bool(gate and overall != "safe")
+
+    return {
+        "success": True,
+        "branchTipRevisionId": head_tip,
+        "targetRevisionId": tgt_id,
+        "compatOverall": overall,
+        "findings": [f.model_dump(by_alias=True) for f in finding_out],
+        "deprecationWarnings": [w.model_dump(by_alias=True) for w in dep_out],
+        "reportFingerprint": fp,
+        "breakingChangeDocumentationIssueUrl": doc_url,
+        "tenantCompatGateRollbackActive": gate,
+        "rollbackBlockedByCompatGate": blocked,
+    }
+
+
+@router.post("/{tenant_slug}/{project_id}/version-branches/rollback")
+async def version_branch_rollback(
+    tenant_slug: str,
+    project_id: str,
+    body: VersionBranchRollbackRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> Dict[str, Any]:
+    """
+    Apply revert-style rollback: new revision with target snapshot, parent = prior tip (#745).
+    """
+    tenant_id = auth_data["tenant_id"]
+    creator_id = get_authenticated_user_id(auth_data)
+    if not creator_id:
+        raise HTTPException(status_code=403, detail="Rollback requires user authentication (JWT token)")
+
+    project, branch, head_ver, target_ver, head_tip, tgt_id = _rollback_validate_branch_and_revisions(
+        project_id, tenant_id, body.branch_name, body.target_revision_id
+    )
+
+    base = (body.base_revision_id or "").strip()
+    if base != head_tip:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Branch tip does not match baseRevisionId (stale head or wrong base).",
+                "code": "STALE_HEAD",
+            },
+        )
+
+    if bool(branch.get("protected")) and not db.is_user_tenant_admin(tenant_id, creator_id):
+        raise HTTPException(
+            status_code=403,
+            detail="This branch is protected; only tenant administrators may roll back.",
+        )
+
+    overall, _finding_out, dep_out, _fp, _doc_url = _rollback_analyze(
+        tenant_slug, tenant_id, head_ver, target_ver
+    )
+    gate = _tenant_compat_gate_rollback(project)
+    if gate and overall != "safe":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Rollback blocked by compatibility gate (compatGateOnRollback).",
+                "code": "ROLLBACK_BLOCKED_BY_COMPAT_GATE",
+                "overall": overall,
+            },
+        )
+    if overall != "safe" and not body.skip_compat_warning:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Rollback may remove or change schema surface relative to the branch tip; confirm or set skipCompatWarning.",
+                "code": "ROLLBACK_NEEDS_CONFIRMATION",
+                "overall": overall,
+            },
+        )
+
+    limits = limits_for_tenant(tenant_id)
+    latest = db.get_latest_version_for_project(project_id, tenant_id)
+    new_version_string = bump_patch_version(latest) if latest else "0.1.0"
+
+    default_msg = f"Rollback schema to v{target_ver['version_id']} (revert-style)"
+    raw_msg = (body.short_message or "").strip() or default_msg
+    raw_cl = (body.changelog or "").strip() or None
+    try:
+        short_msg, cl = validate_version_notes(raw_msg, raw_cl, limits, require_short_message=limits.require_short_message)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    rb_meta = {
+        "rollback": {
+            "contentRevisionId": tgt_id,
+            "priorHeadRevisionId": head_tip,
+            "branchName": (body.branch_name or "").strip(),
+        }
+    }
+
+    conn = db.connect()
+    prev_autocommit = conn.autocommit
+    try:
+        conn.autocommit = False
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO odb.versions (project_id, creator_id, version_id, description, change_log,
+                    parent_version_id, merge_parent_version_id, metadata)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                RETURNING id, project_id, creator_id, version_id, description, change_log,
+                    visibility, published, published_at, enabled, parent_version_id, merge_parent_version_id,
+                    metadata, created_at, updated_at
+                """,
+                (
+                    project_id,
+                    creator_id,
+                    new_version_string,
+                    short_msg,
+                    cl,
+                    head_tip,
+                    None,
+                    json.dumps(rb_meta),
+                ),
+            )
+            new_row = cursor.fetchone()
+            new_id = str(new_row["id"])
+
+            db.copy_classes_from_version_for_merge(cursor, tgt_id, new_id)
+
+            cursor.execute(
+                """
+                UPDATE odb.version_branches
+                SET tip_version_id = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s AND tip_version_id = %s
+                """,
+                (new_id, str(branch["id"]), head_tip),
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "message": "Branch tip was modified concurrently; please retry (stale head).",
+                        "code": "STALE_HEAD",
+                    },
+                )
+
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.autocommit = prev_autocommit
+
+    db.insert_version_protection_audit(
+        tenant_id,
+        project_id,
+        creator_id,
+        "version.rollback",
+        "version",
+        new_id,
+        "allowed",
+        {
+            "branchName": (body.branch_name or "").strip(),
+            "targetRevisionId": tgt_id,
+            "priorTipRevisionId": head_tip,
+            "compatOverall": overall,
+            "deprecationWarningCount": len(dep_out),
+        },
+    )
+
+    full = db.get_version_by_id(new_id, tenant_id)
+    if not full:
+        raise HTTPException(status_code=500, detail="Rollback succeeded but revision not readable")
     return {
         "success": True,
         "version": VersionSchema.model_validate(full).model_dump(by_alias=True),

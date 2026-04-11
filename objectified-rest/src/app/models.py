@@ -386,6 +386,56 @@ class VersionBranchMergeRequest(BaseModel):
     )
 
 
+class VersionBranchRollbackPreviewRequest(BaseModel):
+    """Dry-run rollback: compatibility / deprecation signals before apply (#745)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    branch_name: str = Field(
+        ...,
+        validation_alias=AliasChoices("branchName", "branch_name"),
+        description="Named branch whose tip is rolled forward with restored content.",
+    )
+    target_revision_id: str = Field(
+        ...,
+        validation_alias=AliasChoices("targetRevisionId", "target_revision_id"),
+        description="Revision (versions.id) whose class snapshot is restored (must be an ancestor of the branch tip).",
+    )
+
+
+class VersionBranchRollbackRequest(BaseModel):
+    """Revert-style rollback: new revision whose tree matches target; parent = prior branch tip (#745)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    branch_name: str = Field(
+        ...,
+        validation_alias=AliasChoices("branchName", "branch_name"),
+    )
+    target_revision_id: str = Field(
+        ...,
+        validation_alias=AliasChoices("targetRevisionId", "target_revision_id"),
+    )
+    base_revision_id: str = Field(
+        ...,
+        validation_alias=AliasChoices("baseRevisionId", "base_revision_id"),
+        description="Must equal current branch tip (optimistic concurrency).",
+    )
+    skip_compat_warning: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("skipCompatWarning", "skip_compat_warning"),
+        description="When true, apply even if compat analysis is not safe (still blocked if compatGateOnRollback is on).",
+    )
+    short_message: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("shortMessage", "description"),
+    )
+    changelog: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("changelog", "change_log"),
+    )
+
+
 class VersionUpdateRequest(BaseModel):
     """Request model for updating a version."""
 
