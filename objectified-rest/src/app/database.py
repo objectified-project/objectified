@@ -3931,7 +3931,7 @@ class Database:
                     head_row = cursor.fetchone()
                     current_tip: Optional[str] = str(head_row["id"]) if head_row else None
                     if current_tip is None and base:
-                        raise ValueError("baseRevisionId must be empty: project has no revisions")
+                        raise ValueError("baseRevisionId must be empty for projects with no existing revisions")
                     if current_tip is not None and base != current_tip:
                         raise StaleHeadPushError(current_tip)
 
