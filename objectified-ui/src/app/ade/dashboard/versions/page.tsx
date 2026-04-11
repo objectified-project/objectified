@@ -37,7 +37,9 @@ import {
   compareSchemas,
   buildClassLevelDiff,
   formatClassDiffStatLines,
+  formatPropertyDiffLine,
   getClassChangeDiffs,
+  groupSchemaConflictPathsByClass,
   type DiffSummary,
   type ClassDiffRow,
   getPathLabel,
@@ -163,6 +165,8 @@ const Versions = () => {
   const [classDiffSearch, setClassDiffSearch] = useState('');
   const [classDiffShowUnchanged, setClassDiffShowUnchanged] = useState(true);
   const [expandedClassDiffId, setExpandedClassDiffId] = useState<string | null>(null);
+  /** When true, show all property drill lines for that class (performance for large schemas / #741). */
+  const [propDrillShowAllByClass, setPropDrillShowAllByClass] = useState<Record<string, boolean>>({});
   const [classListScrollTop, setClassListScrollTop] = useState(0);
   const classListScrollRef = useRef<HTMLDivElement | null>(null);
   const [diffViewMode, setDiffViewMode] = useState<'overlay' | 'side-by-side'>('overlay');
@@ -701,6 +705,7 @@ const Versions = () => {
     setCompareSpec1(''); setCompareSpec2(''); setCompareFormat('json');
     setDiffResult([]); setSchemaDiffSummary(null); setClassDiffRows(null);
     setClassDiffSearch(''); setClassDiffShowUnchanged(true); setExpandedClassDiffId(null);
+    setPropDrillShowAllByClass({});
     setClassListScrollTop(0); setDiffViewMode('overlay');
     setCompareBaseTagId(''); setCompareToTagId('');
   };
@@ -717,6 +722,15 @@ const Versions = () => {
 
   const CLASS_DIFF_ROW_PX = 40;
   const CLASS_DIFF_VIEWPORT_PX = 288;
+  const CLASS_PROP_DRILL_LIMIT = 64;
+
+  const mergeConflictGroups = useMemo(() => {
+    const paths = mergePreviewData?.classification?.conflictPaths;
+    if (!paths?.length) {
+      return [];
+    }
+    return groupSchemaConflictPathsByClass(paths);
+  }, [mergePreviewData?.classification?.conflictPaths]);
 
   const filteredClassDiffRows = useMemo(() => {
     if (!classDiffRows) return [];
@@ -2454,6 +2468,11 @@ const Versions = () => {
                                     : 'bg-gray-50 dark:bg-gray-900/40 border-gray-200 dark:border-gray-700 border-l-gray-400';
                             const expanded = expandedClassDiffId === row.stableId;
                             const drill = expanded ? getClassChangeDiffs(schemaDiffSummary, row.stableId) : [];
+                            const showAllProps = propDrillShowAllByClass[row.stableId] === true;
+                            const drillVisible =
+                              drill.length <= CLASS_PROP_DRILL_LIMIT || showAllProps
+                                ? drill
+                                : drill.slice(0, CLASS_PROP_DRILL_LIMIT);
                             return (
                               <div key={row.stableId} className="border-b border-gray-100 dark:border-gray-800 last:border-b-0">
                                 <button
@@ -2505,10 +2524,10 @@ const Versions = () => {
                                     <p className="text-[10px] font-medium text-gray-600 dark:text-gray-400 pt-2">
                                       Property-level changes
                                     </p>
-                                    {drill.map((d, i) => (
+                                    {drillVisible.map((d, i) => (
                                       <div
                                         key={`${d.path}-${d.type}-${i}`}
-                                        className={`text-xs rounded px-2 py-1 font-mono flex flex-wrap gap-x-2 ${
+                                        className={`text-xs rounded px-2 py-1 font-mono flex flex-wrap gap-x-2 items-start ${
                                           d.type === 'added'
                                             ? 'bg-green-50 dark:bg-green-950/20 text-green-900 dark:text-green-100'
                                             : d.type === 'removed'
@@ -2516,18 +2535,29 @@ const Versions = () => {
                                               : 'bg-yellow-50 dark:bg-yellow-950/20 text-yellow-900 dark:text-yellow-100'
                                         }`}
                                       >
-                                        <span>
+                                        <span className="shrink-0 pt-px">
                                           {d.type === 'added' ? '+' : d.type === 'removed' ? '−' : '~'}
                                         </span>
-                                        <span>{getPathLabel(d.path)}</span>
-                                        <span className="text-gray-600 dark:text-gray-400">({d.itemType})</span>
-                                        {d.changes && d.changes.length > 0 && (
-                                          <span className="text-gray-600 dark:text-gray-400">
-                                            {d.changes.join(', ')}
-                                          </span>
-                                        )}
+                                        <span className="min-w-0 break-words">{formatPropertyDiffLine(d)}</span>
                                       </div>
                                     ))}
+                                    {drill.length > CLASS_PROP_DRILL_LIMIT && (
+                                      <button
+                                        type="button"
+                                        className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline mt-1"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setPropDrillShowAllByClass((prev) => ({
+                                            ...prev,
+                                            [row.stableId]: !showAllProps,
+                                          }));
+                                        }}
+                                      >
+                                        {showAllProps
+                                          ? `Show first ${CLASS_PROP_DRILL_LIMIT} only`
+                                          : `Show all ${drill.length} changes`}
+                                      </button>
+                                    )}
                                   </div>
                                 )}
                                 {expanded && drill.length === 0 && row.status === 'unchanged' && (
@@ -2728,6 +2758,7 @@ const Versions = () => {
                   setClassDiffRows(null);
                   setClassDiffSearch('');
                   setExpandedClassDiffId(null);
+                  setPropDrillShowAllByClass({});
                 }}
               >
                 Compare Different Versions
@@ -2948,7 +2979,7 @@ const Versions = () => {
           if (!mergePreviewLoading && !mergeApplyLoading) setShowMergeDialog(open);
         }}
       >
-        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Merge branches</DialogTitle>
             <DialogDescription>
@@ -2987,6 +3018,29 @@ const Versions = () => {
                   : `Conflicts: ${mergePreviewData.classification.conflictPaths.length} path(s). Apply is blocked.`}
               </Alert>
             )}
+            {mergePreviewData?.classification &&
+              !mergePreviewData.classification.canAutoMerge &&
+              mergeConflictGroups.length > 0 && (
+                <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 max-h-56 overflow-y-auto">
+                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                    Conflict paths (grouped by class, same IDs as Schema Changes)
+                  </p>
+                  <ul className="space-y-2 text-xs">
+                    {mergeConflictGroups.map((g) => (
+                      <li key={g.className}>
+                        <span className="font-mono font-medium text-gray-900 dark:text-gray-100">{g.className}</span>
+                        <ul className="mt-1 ml-2 space-y-0.5 pl-2 border-l border-gray-300 dark:border-gray-600">
+                          {g.paths.map((p) => (
+                            <li key={p} className="font-mono text-[11px] text-gray-700 dark:text-gray-300 break-all">
+                              {p}
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             {mergePreviewData?.mergeBaseVersionId != null && mergePreviewData?.classification && (
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Merge-base revision: <span className="font-mono">{mergePreviewData.mergeBaseVersionId}</span>

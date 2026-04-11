@@ -30,8 +30,8 @@ This represents the different versions of the Objectified specification and thei
 - ✅ **Lifecycle version tags** (#739): governance labels (`stable` / `beta` / `deprecated` / `archived`) in `versions.metadata.lifecycle`, list filter, Studio badges; distinct from **git-like release tags** (#501)
 - ✅ **Version Comparison**:
   - ✅ Side-by-side diff view
-  - 📋 Highlight added/removed/changed classes
-  - 📋 Property-level changes
+  - ✅ Highlight added/removed/changed classes (#740 class list; #741 property drill-down)
+  - ✅ Property-level changes (#741)
   - 📋 Visual canvas comparison
 - **Version History Graph**:
   - 📋 Visual tree of version history
@@ -57,7 +57,6 @@ This represents the different versions of the Objectified specification and thei
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| #741   | Detail property-level changes                |
 | #742   | Visual canvas comparison                     |
 | #743   | Visual tree of version history               |
 | #744   | Show branches and merges                     |
@@ -71,5 +70,6 @@ This represents the different versions of the Objectified specification and thei
 
 # Completed
 
+- **#741** — **Property-level diff** in **Schema Changes**: readable lines per property/schema (`property name: field old → new`), expanded OpenAPI compare (**default**, **nullable**, **readOnly** / **writeOnly**, **deprecated**, **example**, **title**, **multipleOf**, **uniqueItems**, **exclusiveMin/Max**, etc.), sorted drill lists, **performance** cap with **show all** for huge classes; **Merge branches** preview shows **conflict paths grouped by class** (aligned with `schemas.*` IDs).
 - **#740** — Version compare **Schema Changes**: **class-level** structural diff (stable OpenAPI schema IDs), git-style **+/−/~** highlights, search and **virtualized** list for large schemas, **property drill-down** per class, **Copy class stat** export text.
 - **#738** — Version merging (Git-style merge-base, three-way OpenAPI schema merge, merge revision with two parents, `baseRevisionId` lock; optional `compatGateOnMerge`).
