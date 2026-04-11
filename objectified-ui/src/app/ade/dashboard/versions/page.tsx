@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -261,6 +261,22 @@ const Versions = () => {
     tenantCompatGateActive?: boolean;
     mergeBlockedByCompatGate?: boolean;
   } | null>(null);
+
+  const [showRollbackDialog, setShowRollbackDialog] = useState(false);
+  const [rollbackTargetVersion, setRollbackTargetVersion] = useState<Version | null>(null);
+  const [rollbackBranchName, setRollbackBranchName] = useState('');
+  const [rollbackPreviewLoading, setRollbackPreviewLoading] = useState(false);
+  const [rollbackApplyLoading, setRollbackApplyLoading] = useState(false);
+  const [rollbackPreview, setRollbackPreview] = useState<{
+    branchTipRevisionId?: string;
+    compatOverall?: string;
+    findings?: Array<{ id?: string; path: string; message: string; rule?: string }>;
+    deprecationWarnings?: unknown[];
+    rollbackBlockedByCompatGate?: boolean;
+    breakingChangeDocumentationIssueUrl?: string | null;
+  } | null>(null);
+  const [rollbackSkipCompat, setRollbackSkipCompat] = useState(false);
+  const [rollbackShortMessage, setRollbackShortMessage] = useState('');
 
   const otherProjects = useMemo(
     () => projects.filter((p) => p.id !== selectedProjectId),
@@ -1010,6 +1026,18 @@ const Versions = () => {
         setTagProtected(false);
         setShowTagDialog(true);
         break;
+      case 'rollbackBranch':
+        if (versionBranches.length === 0) {
+          toast.warning('Create a named branch first');
+          break;
+        }
+        setRollbackTargetVersion(version);
+        setRollbackBranchName(versionBranches[0]?.name ?? '');
+        setRollbackPreview(null);
+        setRollbackShortMessage('');
+        setRollbackSkipCompat(false);
+        setShowRollbackDialog(true);
+        break;
     }
   };
 
@@ -1375,6 +1403,102 @@ const Versions = () => {
       toast.error(e instanceof Error ? e.message : 'Merge failed');
     } finally {
       setMergeApplyLoading(false);
+    }
+  };
+
+  const runRollbackPreview = async () => {
+    if (!selectedProjectId || !rollbackTargetVersion || !rollbackBranchName.trim()) {
+      toast.warning('Choose a branch');
+      return;
+    }
+    setRollbackPreviewLoading(true);
+    setRollbackPreview(null);
+    try {
+      const r = await fetch(`/api/projects/${selectedProjectId}/version-branches/rollback-preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          branchName: rollbackBranchName.trim(),
+          targetRevisionId: rollbackTargetVersion.id,
+        }),
+      });
+      const d = await r.json();
+      if (d.success) {
+        setRollbackPreview({
+          branchTipRevisionId: typeof d.branchTipRevisionId === 'string' ? d.branchTipRevisionId : undefined,
+          compatOverall: typeof d.compatOverall === 'string' ? d.compatOverall : undefined,
+          findings: Array.isArray(d.findings) ? d.findings : [],
+          deprecationWarnings: Array.isArray(d.deprecationWarnings) ? d.deprecationWarnings : [],
+          rollbackBlockedByCompatGate: Boolean(d.rollbackBlockedByCompatGate),
+          breakingChangeDocumentationIssueUrl:
+            typeof d.breakingChangeDocumentationIssueUrl === 'string' ? d.breakingChangeDocumentationIssueUrl : null,
+        });
+        setRollbackSkipCompat(false);
+      } else {
+        const msg =
+          typeof d.detail === 'string'
+            ? d.detail
+            : typeof d.error === 'string'
+              ? d.error
+              : 'Preview failed';
+        toast.error(msg);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Preview failed');
+    } finally {
+      setRollbackPreviewLoading(false);
+    }
+  };
+
+  const runRollbackApply = async () => {
+    if (!selectedProjectId || !rollbackTargetVersion || !rollbackBranchName.trim() || !rollbackPreview?.branchTipRevisionId) {
+      toast.warning('Run preview first');
+      return;
+    }
+    const overall = rollbackPreview.compatOverall ?? 'unknown';
+    if (rollbackPreview.rollbackBlockedByCompatGate) {
+      toast.error('Project policy blocks rollback when compatibility is not safe');
+      return;
+    }
+    if (overall !== 'safe' && !rollbackSkipCompat) {
+      toast.warning('Acknowledge compatibility risk using the checkbox below');
+      return;
+    }
+    setRollbackApplyLoading(true);
+    try {
+      const r = await fetch(`/api/projects/${selectedProjectId}/version-branches/rollback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          branchName: rollbackBranchName.trim(),
+          targetRevisionId: rollbackTargetVersion.id,
+          baseRevisionId: rollbackPreview.branchTipRevisionId,
+          skipCompatWarning: overall !== 'safe',
+          ...(rollbackShortMessage.trim() ? { shortMessage: rollbackShortMessage.trim() } : {}),
+        }),
+      });
+      const d = await r.json();
+      if (d.success) {
+        toast.success(`Rollback complete — new revision v${d.version?.version_id ?? ''}`);
+        setShowRollbackDialog(false);
+        setRollbackPreview(null);
+        setRollbackTargetVersion(null);
+        await loadVersions();
+        await loadBranches();
+      } else {
+        const err = d.detail;
+        const msg =
+          typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message?: string }).message)
+            : typeof d.error === 'string'
+              ? d.error
+              : 'Rollback failed';
+        toast.error(msg);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Rollback failed');
+    } finally {
+      setRollbackApplyLoading(false);
     }
   };
 
@@ -1813,6 +1937,19 @@ const Versions = () => {
                                 <GitBranch className="w-4 h-4 text-indigo-500" />
                                 Branch from here
                               </button>
+                              {versionBranches.length > 0 && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenVersionDropdown(null);
+                                    handleRowAction('rollbackBranch', version);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                  <Undo2 className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                                  Rollback branch to this revision…
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -3309,6 +3446,156 @@ const Versions = () => {
               }
             >
               {mergeApplyLoading ? 'Merging…' : 'Apply merge'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showRollbackDialog}
+        onOpenChange={(open) => {
+          if (!rollbackPreviewLoading && !rollbackApplyLoading) {
+            setShowRollbackDialog(open);
+            if (!open) setRollbackPreview(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Rollback branch (revert-style)</DialogTitle>
+            <DialogDescription>
+              Creates a <strong>new</strong> revision whose schema matches the selected row; the branch tip moves forward
+              with <span className="font-mono">parent</span> pointing at the prior head. History is not rewritten.
+              {rollbackTargetVersion ? (
+                <span className="block mt-2 text-gray-700 dark:text-gray-300">
+                  Restore snapshot from <span className="font-mono">v{rollbackTargetVersion.version_id}</span>
+                </span>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label>Branch to update</Label>
+              <Select
+                value={rollbackBranchName || '__pick__'}
+                onValueChange={(v) => setRollbackBranchName(v === '__pick__' ? '' : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__pick__">Choose branch</SelectItem>
+                  {versionBranches.map((b) => (
+                    <SelectItem key={`rb-${b.id}`} value={b.name}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rollback-msg">Revision note (optional)</Label>
+              <Input
+                id="rollback-msg"
+                value={rollbackShortMessage}
+                onChange={(e) => setRollbackShortMessage(e.target.value)}
+                placeholder="Defaults to a rollback summary"
+                autoComplete="off"
+              />
+            </div>
+            {rollbackPreview && (
+              <>
+                <Alert
+                  variant={
+                    rollbackPreview.compatOverall === 'safe'
+                      ? 'success'
+                      : rollbackPreview.compatOverall === 'unknown'
+                        ? 'default'
+                        : 'error'
+                  }
+                >
+                  <span className="font-medium text-sm">
+                    Schema impact (current tip → restored content): {rollbackPreview.compatOverall ?? '—'}
+                  </span>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Same compatibility rules as elsewhere (#506): rolling back can remove paths or fields consumers rely on.
+                  </p>
+                  {(rollbackPreview.findings ?? []).length > 0 && (
+                    <ul className="mt-2 text-xs list-disc pl-4 max-h-36 overflow-y-auto space-y-0.5">
+                      {(rollbackPreview.findings ?? []).slice(0, 14).map((f) => (
+                        <li key={f.id ?? `${f.path}-${f.message}`}>
+                          <span className="font-mono text-[11px]">{f.path}</span>
+                          {' — '}
+                          {f.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {rollbackPreview.breakingChangeDocumentationIssueUrl ? (
+                    <a
+                      href={rollbackPreview.breakingChangeDocumentationIssueUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs underline mt-2 inline-block text-blue-600 dark:text-blue-400"
+                    >
+                      Breaking changes documentation (#746)
+                    </a>
+                  ) : null}
+                </Alert>
+                {rollbackPreview.rollbackBlockedByCompatGate ? (
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    Project metadata sets <span className="font-mono">compatGateOnRollback</span> — apply is blocked until the
+                    rollback pair is safe or policy is updated.
+                  </p>
+                ) : null}
+                {(rollbackPreview.deprecationWarnings ?? []).length > 0 ? (
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Deprecation warnings: {(rollbackPreview.deprecationWarnings ?? []).length} (see compatibility API / sunset
+                    timeline)
+                  </p>
+                ) : null}
+                {rollbackPreview.compatOverall && rollbackPreview.compatOverall !== 'safe' ? (
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rollbackSkipCompat}
+                      onChange={(e) => setRollbackSkipCompat(e.target.checked)}
+                      className="rounded border-gray-300 dark:border-gray-600"
+                    />
+                    I understand this rollback may break existing consumers; proceed anyway
+                  </label>
+                ) : null}
+              </>
+            )}
+          </div>
+          <DialogFooter className="gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => setShowRollbackDialog(false)}
+              disabled={rollbackPreviewLoading || rollbackApplyLoading}
+            >
+              Close
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => void runRollbackPreview()}
+              disabled={rollbackPreviewLoading || rollbackApplyLoading || !rollbackBranchName || !rollbackTargetVersion}
+            >
+              {rollbackPreviewLoading ? 'Previewing…' : 'Preview impact'}
+            </Button>
+            <Button
+              onClick={() => void runRollbackApply()}
+              disabled={
+                rollbackApplyLoading ||
+                rollbackPreviewLoading ||
+                !rollbackPreview?.branchTipRevisionId ||
+                rollbackPreview.rollbackBlockedByCompatGate === true ||
+                (Boolean(rollbackPreview.compatOverall) &&
+                  rollbackPreview.compatOverall !== 'safe' &&
+                  !rollbackSkipCompat)
+              }
+            >
+              {rollbackApplyLoading ? 'Applying…' : 'Apply rollback'}
             </Button>
           </DialogFooter>
         </DialogContent>
