@@ -37,22 +37,26 @@ export function rowToLayoutState(row: Record<string, unknown>): LayoutState {
 /**
  * Load the best-effort layout snapshot for a version: default row, else the effective named layout
  * (same resolution as Studio open).
+ *
+ * Caller-supplied actor identifiers are intentionally ignored here. User/tenant context must be
+ * derived and enforced in the server action layer rather than forwarded from potentially
+ * client-controlled inputs.
  */
 export async function loadLayoutStateForVersionCompare(
   versionId: string,
-  userId: string | undefined,
-  tenantId: string | undefined
+  _userId: string | undefined,
+  _tenantId: string | undefined
 ): Promise<LayoutState | null> {
-  const defRaw = await getDefaultCanvasLayout(versionId, userId);
+  const defRaw = await getDefaultCanvasLayout(versionId, undefined);
   const def = JSON.parse(defRaw) as { success?: boolean; layout?: Record<string, unknown> };
   if (def.success && def.layout) {
     return rowToLayoutState(def.layout);
   }
 
-  const effRaw = await getEffectiveDefaultLayoutName(versionId, userId, tenantId);
+  const effRaw = await getEffectiveDefaultLayoutName(versionId, undefined, undefined);
   const eff = JSON.parse(effRaw) as { success?: boolean; layoutName?: string };
   if (eff.success && eff.layoutName) {
-    const namedRaw = await getNamedCanvasLayout(versionId, userId ?? null, eff.layoutName);
+    const namedRaw = await getNamedCanvasLayout(versionId, null, eff.layoutName);
     const named = JSON.parse(namedRaw) as { success?: boolean; layout?: Record<string, unknown> };
     if (named.success && named.layout) {
       return rowToLayoutState(named.layout);

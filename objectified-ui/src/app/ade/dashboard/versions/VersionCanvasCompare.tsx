@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -8,8 +8,10 @@ import {
   Controls,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type Node,
   type Edge,
+  type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { LayoutState, LayoutDiffSummary } from '../../../../../lib/layout-diff';
@@ -50,52 +52,66 @@ function strokeForTone(tone: 'added' | 'removed' | 'modified' | 'unchanged'): st
   }
 }
 
+type DiffSets = {
+  nodes: { added: Set<string>; removed: Set<string>; modified: Set<string> };
+  edges: { added: Set<string>; removed: Set<string>; modified: Set<string> };
+};
+
+function buildDiffSets(diff: LayoutDiffSummary): DiffSets {
+  return {
+    nodes: {
+      added: new Set(diff.nodes.added.map((e) => e.id)),
+      removed: new Set(diff.nodes.removed.map((e) => e.id)),
+      modified: new Set(diff.nodes.modified.map((e) => e.id)),
+    },
+    edges: {
+      added: new Set(diff.edges.added.map((e) => e.id)),
+      removed: new Set(diff.edges.removed.map((e) => e.id)),
+      modified: new Set(diff.edges.modified.map((e) => e.id)),
+    },
+  };
+}
+
 function classifyNode(
   nodeId: string,
   side: 'left' | 'right',
-  diff: LayoutDiffSummary
+  sets: DiffSets
 ): 'added' | 'removed' | 'modified' | 'unchanged' {
-  const isAdded = diff.nodes.added.some((e) => e.id === nodeId);
-  const isRemoved = diff.nodes.removed.some((e) => e.id === nodeId);
-  const isModified = diff.nodes.modified.some((e) => e.id === nodeId);
   if (side === 'left') {
-    if (isRemoved) return 'removed';
-    if (isModified) return 'modified';
+    if (sets.nodes.removed.has(nodeId)) return 'removed';
+    if (sets.nodes.modified.has(nodeId)) return 'modified';
     return 'unchanged';
   }
-  if (isAdded) return 'added';
-  if (isModified) return 'modified';
+  if (sets.nodes.added.has(nodeId)) return 'added';
+  if (sets.nodes.modified.has(nodeId)) return 'modified';
   return 'unchanged';
 }
 
 function classifyEdge(
   edgeId: string,
   side: 'left' | 'right',
-  diff: LayoutDiffSummary
+  sets: DiffSets
 ): 'added' | 'removed' | 'modified' | 'unchanged' {
-  const isAdded = diff.edges.added.some((e) => e.id === edgeId);
-  const isRemoved = diff.edges.removed.some((e) => e.id === edgeId);
-  const isModified = diff.edges.modified.some((e) => e.id === edgeId);
   if (side === 'left') {
-    if (isRemoved) return 'removed';
-    if (isModified) return 'modified';
+    if (sets.edges.removed.has(edgeId)) return 'removed';
+    if (sets.edges.modified.has(edgeId)) return 'modified';
     return 'unchanged';
   }
-  if (isAdded) return 'added';
-  if (isModified) return 'modified';
+  if (sets.edges.added.has(edgeId)) return 'added';
+  if (sets.edges.modified.has(edgeId)) return 'modified';
   return 'unchanged';
 }
 
 function toFlow(
   state: LayoutState | null,
   side: 'left' | 'right',
-  diff: LayoutDiffSummary
+  sets: DiffSets
 ): { nodes: Node[]; edges: Edge[] } {
   if (!state) {
     return { nodes: [], edges: [] };
   }
   const nodes: Node[] = safeArray(state.nodes).map((n) => {
-    const tone = classifyNode(n.id, side, diff);
+    const tone = classifyNode(n.id, side, sets);
     const label =
       typeof n.data?.name === 'string'
         ? n.data.name
@@ -114,7 +130,7 @@ function toFlow(
     };
   });
   const edges: Edge[] = safeArray(state.edges).map((e) => {
-    const tone = classifyEdge(e.id, side, diff);
+    const tone = classifyEdge(e.id, side, sets);
     return {
       id: e.id,
       source: e.source,
@@ -130,6 +146,22 @@ function toFlow(
   return { nodes, edges };
 }
 
+/** Rendered inside a ReactFlow instance to expose its setViewport for overlay synchronisation. */
+function ViewportCapture({
+  syncRef,
+}: {
+  syncRef: React.MutableRefObject<((vp: Viewport) => void) | null>;
+}) {
+  const { setViewport } = useReactFlow();
+  useEffect(() => {
+    syncRef.current = (vp: Viewport) => setViewport(vp, { duration: 0 });
+    return () => {
+      syncRef.current = null;
+    };
+  }, [setViewport, syncRef]);
+  return null;
+}
+
 function FlowPane({
   state,
   side,
@@ -137,6 +169,8 @@ function FlowPane({
   title,
   showTitle,
   interactive,
+  viewportSyncRef,
+  onMoveCallback,
 }: {
   state: LayoutState | null;
   side: 'left' | 'right';
@@ -144,10 +178,15 @@ function FlowPane({
   title: string;
   showTitle: boolean;
   interactive: boolean;
+  /** Underlay: expose this instance's setViewport for cross-instance sync. */
+  viewportSyncRef?: React.MutableRefObject<((vp: Viewport) => void) | null>;
+  /** Overlay: called on every pan/zoom so the underlay can mirror the viewport. */
+  onMoveCallback?: (vp: Viewport) => void;
 }) {
+  const diffSets = useMemo(() => buildDiffSets(diff), [diff]);
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
-    () => toFlow(state, side, diff),
-    [state, side, diff]
+    () => toFlow(state, side, diffSets),
+    [state, side, diffSets]
   );
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -189,8 +228,10 @@ function FlowPane({
             preventScrolling={!interactive}
             fitView
             fitViewOptions={{ padding: 0.15, maxZoom: 1.1 }}
+            onMove={onMoveCallback ? (_, vp) => onMoveCallback(vp) : undefined}
             className="bg-gray-50 dark:bg-gray-900"
           >
+            {viewportSyncRef && <ViewportCapture syncRef={viewportSyncRef} />}
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
             <Controls showInteractive={interactive} />
           </ReactFlow>
@@ -245,6 +286,7 @@ export default function VersionCanvasCompare({
   diff: diffProp,
 }: VersionCanvasCompareProps) {
   const diff = useMemo(() => diffProp ?? buildDiff(left, right), [diffProp, left, right]);
+  const underlaySetViewportRef = useRef<((vp: Viewport) => void) | null>(null);
 
   return (
     <div className="flex min-h-0 flex-col">
@@ -295,6 +337,7 @@ export default function VersionCanvasCompare({
                 title={leftLabel}
                 showTitle={false}
                 interactive={false}
+                viewportSyncRef={underlaySetViewportRef}
               />
             </div>
             <div className="absolute inset-0 z-10 opacity-[0.88]">
@@ -305,6 +348,7 @@ export default function VersionCanvasCompare({
                 title={rightLabel}
                 showTitle={false}
                 interactive
+                onMoveCallback={(vp) => underlaySetViewportRef.current?.(vp)}
               />
             </div>
           </div>
