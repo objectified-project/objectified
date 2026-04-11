@@ -570,15 +570,25 @@ const Versions = () => {
       return;
     }
     const meta = version.metadata ?? {};
-    setEditDeprecationMessage(typeof meta.deprecationMessage === 'string' ? meta.deprecationMessage : '');
+    setEditDeprecationMessage(
+      typeof meta.deprecationMessage === 'string' ? meta.deprecationMessage
+        : typeof meta.message === 'string' ? meta.message
+        : ''
+    );
     const sunsetRaw =
       typeof meta.sunsetAt === 'string'
         ? meta.sunsetAt
         : typeof meta.sunsetDate === 'string'
           ? meta.sunsetDate
-          : '';
+          : typeof meta.sunset_date === 'string'
+            ? meta.sunset_date
+            : '';
     setEditSunsetLocal(sunsetRaw ? utcIsoToDatetimeLocalValue(sunsetRaw) : '');
-    setEditSuccessorRevisionId(typeof meta.successorRevisionId === 'string' ? meta.successorRevisionId : '');
+    setEditSuccessorRevisionId(
+      typeof meta.successorRevisionId === 'string' ? meta.successorRevisionId
+        : typeof meta.successor_revision_id === 'string' ? meta.successor_revision_id
+        : ''
+    );
     setEditPublishedMetadataOnly(Boolean(version.published && effectiveIsAdmin));
     setSelectedVersion(version); setVersionId(version.version_id);
     setDescription(version.shortMessage || ''); setChangeLog(version.changelog || '');

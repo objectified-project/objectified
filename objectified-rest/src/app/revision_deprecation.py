@@ -28,6 +28,8 @@ from typing import Any, Dict, List, Optional, Tuple
 MIGRATION_GUIDE_ISSUE_URL = "https://github.com/KenSuenobu/objectified-commercial/issues/747"
 
 _SUNSET_ALIAS_KEYS = ("sunsetAt", "sunsetDate", "sunset_date")
+_SUCCESSOR_ALIAS_KEYS = ("successorRevisionId", "successor_revision_id")
+_DEPRECATION_MSG_ALIAS_KEYS = ("deprecationMessage", "message")
 
 # Keys where JSON ``null`` or empty string in a patch means "remove from metadata".
 _REMOVABLE_DEPRECATION_KEYS = frozenset(
@@ -45,8 +47,20 @@ _REMOVABLE_DEPRECATION_KEYS = frozenset(
 )
 
 
+def _patch_clears_key(patch: Dict[str, Any], key: str) -> bool:
+    """Return True if *patch* explicitly clears *key* via ``None`` or empty/whitespace string."""
+    if key not in patch:
+        return False
+    v = patch[key]
+    return v is None or (isinstance(v, str) and not v.strip())
+
+
+def _patch_clears_any_in_group(patch: Dict[str, Any], keys: tuple) -> bool:
+    return any(_patch_clears_key(patch, k) for k in keys)
+
+
 def _patch_clears_sunset_aliases(patch: Dict[str, Any]) -> bool:
-    return any(k in patch and patch[k] is None for k in _SUNSET_ALIAS_KEYS)
+    return _patch_clears_any_in_group(patch, _SUNSET_ALIAS_KEYS)
 
 
 def coerce_metadata(raw: Any) -> Dict[str, Any]:
@@ -80,6 +94,12 @@ def merge_version_metadata(existing: Any, patch: Optional[Dict[str, Any]]) -> Di
         out[k] = v
     if _patch_clears_sunset_aliases(patch):
         for sk in _SUNSET_ALIAS_KEYS:
+            out.pop(sk, None)
+    if _patch_clears_any_in_group(patch, _SUCCESSOR_ALIAS_KEYS):
+        for sk in _SUCCESSOR_ALIAS_KEYS:
+            out.pop(sk, None)
+    if _patch_clears_any_in_group(patch, _DEPRECATION_MSG_ALIAS_KEYS):
+        for sk in _DEPRECATION_MSG_ALIAS_KEYS:
             out.pop(sk, None)
     return out
 
