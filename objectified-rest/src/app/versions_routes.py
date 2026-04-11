@@ -599,9 +599,9 @@ async def create_version(
                     response_data['copy_warning'] = copy_result.get('error')
 
         return VersionSchema(**response_data)
+    except HTTPException:
+        raise
     except Exception as e:
-        if isinstance(e, HTTPException):
-            raise
         # Check for unique constraint violation
         if "unique constraint" in str(e).lower() or "23505" in str(e):
             raise HTTPException(
