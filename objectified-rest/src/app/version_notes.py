@@ -10,6 +10,7 @@ import json
 from dataclasses import dataclass, replace
 from typing import Any, Dict, Optional, Tuple
 
+from fastapi import HTTPException
 from pydantic import BaseModel
 
 from .config import settings
@@ -22,6 +23,11 @@ class CommitPolicyViolation(Exception):
         self.code = code
         self.message = message
         super().__init__(message)
+
+
+def commit_policy_http_exception(exc: CommitPolicyViolation) -> HTTPException:
+    """Convert a :class:`CommitPolicyViolation` to a 400 :class:`HTTPException` with a machine-readable body."""
+    return HTTPException(status_code=400, detail={"code": exc.code, "message": exc.message})
 
 
 @dataclass(frozen=True)
@@ -116,8 +122,8 @@ def limits_for_tenant(tenant_id: str) -> VersionNotesLimits:
 
 
 def commit_request_json_byte_length(model: BaseModel) -> int:
-    """UTF-8 size of the JSON representation (alias keys), for payload policy."""
-    return len(model.model_dump_json(by_alias=True).encode("utf-8"))
+    """UTF-8 size of the JSON representation (alias keys, excluding unset fields), for payload policy."""
+    return len(model.model_dump_json(by_alias=True, exclude_unset=True).encode("utf-8"))
 
 
 def enforce_max_commit_payload(model: BaseModel, limits: VersionNotesLimits) -> None:

@@ -39,6 +39,7 @@ from .schema_merge import (
 )
 from .version_notes import (
     CommitPolicyViolation,
+    commit_policy_http_exception,
     effective_commit_policy,
     enforce_max_commit_payload,
     validate_version_notes,
@@ -46,10 +47,6 @@ from .version_notes import (
 
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
-
-
-def _commit_policy_http(exc: CommitPolicyViolation) -> HTTPException:
-    return HTTPException(status_code=400, detail={"code": exc.code, "message": exc.message})
 
 
 def _parse_project_metadata(metadata: Any) -> Dict[str, Any]:
@@ -286,7 +283,7 @@ async def version_branch_merge(
     try:
         enforce_max_commit_payload(body, limits)
     except CommitPolicyViolation as pe:
-        raise _commit_policy_http(pe) from pe
+        raise commit_policy_http_exception(pe) from pe
 
     latest = db.get_latest_version_for_project(project_id, tenant_id)
     new_version_string = bump_patch_version(latest) if latest else "0.1.0"
@@ -294,7 +291,7 @@ async def version_branch_merge(
     try:
         short_msg, _ = validate_version_notes(raw_msg, None, limits)
     except CommitPolicyViolation as e:
-        raise _commit_policy_http(e) from e
+        raise commit_policy_http_exception(e) from e
     if not short_msg:
         short_msg = raw_msg
 
@@ -585,7 +582,7 @@ async def version_branch_rollback(
     try:
         enforce_max_commit_payload(body, limits)
     except CommitPolicyViolation as pe:
-        raise _commit_policy_http(pe) from pe
+        raise commit_policy_http_exception(pe) from pe
 
     latest = db.get_latest_version_for_project(project_id, tenant_id)
     new_version_string = bump_patch_version(latest) if latest else "0.1.0"
@@ -596,7 +593,7 @@ async def version_branch_rollback(
     try:
         short_msg, cl = validate_version_notes(raw_msg, raw_cl, limits, require_short_message=limits.require_short_message)
     except CommitPolicyViolation as e:
-        raise _commit_policy_http(e) from e
+        raise commit_policy_http_exception(e) from e
 
     rb_meta = {
         "rollback": {

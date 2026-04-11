@@ -25,6 +25,7 @@ from .models import (
 from .auth import validate_authentication, get_authenticated_user_id
 from .version_notes import (
     CommitPolicyViolation,
+    commit_policy_http_exception,
     effective_commit_policy,
     enforce_max_commit_payload,
     validate_version_notes,
@@ -42,10 +43,6 @@ from .revision_lifecycle import (
 )
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
-
-
-def _commit_policy_http(exc: CommitPolicyViolation) -> HTTPException:
-    return HTTPException(status_code=400, detail={"code": exc.code, "message": exc.message})
 
 
 _DEFAULT_COMMIT_METADATA_MAX_CHARS = 10_000
@@ -570,7 +567,7 @@ async def create_version(
                 require_short_message=limits.require_short_message,
             )
         except CommitPolicyViolation as pe:
-            raise _commit_policy_http(pe) from pe
+            raise commit_policy_http_exception(pe) from pe
 
         # Validate and normalize commit metadata before DB call so 400s surface correctly
         commit_author = _optional_commit_metadata_str(
@@ -674,7 +671,7 @@ async def fork_version_from_revision(
             require_short_message=limits.require_short_message,
         )
     except CommitPolicyViolation as pe:
-        raise _commit_policy_http(pe) from pe
+        raise commit_policy_http_exception(pe) from pe
 
     upstream_opt = (request.upstream_project_id or "").strip() or None
 
@@ -753,7 +750,7 @@ async def update_version(
         try:
             enforce_max_commit_payload(request, limits)
         except CommitPolicyViolation as pe:
-            raise _commit_policy_http(pe) from pe
+            raise commit_policy_http_exception(pe) from pe
 
         existing_lc = effective_lifecycle(existing.get("metadata"))
         tenant_id = auth_data["tenant_id"]
@@ -807,7 +804,7 @@ async def update_version(
                     require_short_message=limits.require_short_message,
                 )
             except CommitPolicyViolation as pe:
-                raise _commit_policy_http(pe) from pe
+                raise commit_policy_http_exception(pe) from pe
             if "short_message" in request.model_fields_set:
                 updates["description"] = merged_sm
             if "changelog" in request.model_fields_set:
@@ -856,7 +853,7 @@ async def update_version(
     except HTTPException:
         raise
     except CommitPolicyViolation as pe:
-        raise _commit_policy_http(pe) from pe
+        raise commit_policy_http_exception(pe) from pe
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve)) from ve
     except Exception as e:
@@ -944,7 +941,7 @@ async def publish_version(
             require_short_message=limits.require_short_message,
         )
     except CommitPolicyViolation as pe:
-        raise _commit_policy_http(pe) from pe
+        raise commit_policy_http_exception(pe) from pe
 
     version = db.publish_version(
         version_record_id,
