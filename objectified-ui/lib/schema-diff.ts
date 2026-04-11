@@ -136,7 +136,109 @@ export function getClassChangeDiffs(summary: DiffSummary, className: string): Sc
       }
     }
   }
+  out.sort((a, b) => {
+    if (a.itemType !== b.itemType) {
+      return a.itemType === 'schema' ? -1 : 1;
+    }
+    return a.path.localeCompare(b.path);
+  });
   return out;
+}
+
+const COMPACT_VALUE_MAX = 120;
+
+/** Short string for inline old → new display in property diff lines. */
+export function compactJsonValue(value: unknown): string {
+  if (value === undefined) {
+    return '—';
+  }
+  if (value === null) {
+    return 'null';
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
+  }
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  if (typeof value === 'string') {
+    const compactValue = value.length > COMPACT_VALUE_MAX ? `${value.slice(0, COMPACT_VALUE_MAX)}…` : value;
+    return JSON.stringify(compactValue);
+  }
+  const s = JSON.stringify(value);
+  return s.length > COMPACT_VALUE_MAX ? `${s.slice(0, COMPACT_VALUE_MAX)}…` : s;
+}
+
+function propertyNameFromPath(path: string): string {
+  const m = path.match(/\.properties\.([^.]+)$/);
+  return m?.[1] ?? getPathLabel(path);
+}
+
+/**
+ * One readable line per schema/property delta (aligned with class summary / #740 labels).
+ * Example: `property total: type number → string · default 0 → null`
+ */
+export function formatPropertyDiffLine(d: SchemaDiff): string {
+  if (d.itemType === 'schema') {
+    const name = getPathLabel(d.path);
+    if (d.type === 'added') {
+      return `class ${name}: [added]`;
+    }
+    if (d.type === 'removed') {
+      return `class ${name}: [removed]`;
+    }
+    const bits = d.changes?.length ? d.changes.join(', ') : 'changed';
+    return `class ${name}: ${bits}`;
+  }
+
+  const prop = propertyNameFromPath(d.path);
+  if (d.type === 'added') {
+    const t = d.newValue?.type;
+    const extra = t !== undefined ? ` · type ${compactJsonValue(t)}` : '';
+    return `property ${prop}: [added]${extra}`;
+  }
+  if (d.type === 'removed') {
+    return `property ${prop}: [removed]`;
+  }
+
+  const parts: string[] = [];
+  for (const key of d.changes ?? []) {
+    const oldV = d.oldValue != null && typeof d.oldValue === 'object' ? (d.oldValue as Record<string, unknown>)[key] : undefined;
+    const newV = d.newValue != null && typeof d.newValue === 'object' ? (d.newValue as Record<string, unknown>)[key] : undefined;
+    const hasOld = d.oldValue != null && typeof d.oldValue === 'object' && key in (d.oldValue as object);
+    const hasNew = d.newValue != null && typeof d.newValue === 'object' && key in (d.newValue as object);
+    if (hasOld || hasNew) {
+      parts.push(`${key} ${compactJsonValue(hasOld ? oldV : undefined)} → ${compactJsonValue(hasNew ? newV : undefined)}`);
+    } else {
+      parts.push(key);
+    }
+  }
+  return `property ${prop}: ${parts.length ? parts.join(' · ') : 'changed'}`;
+}
+
+/** Group REST merge `conflictPaths` (e.g. `schemas.Order.properties.total`) by schema name for UI alignment with class diff. */
+export function groupSchemaConflictPathsByClass(paths: string[]): { className: string; paths: string[] }[] {
+  const map = new Map<string, string[]>();
+  const other: string[] = [];
+  for (const p of paths) {
+    const m = p.match(/^schemas\.([^.]+)/);
+    if (m) {
+      const cn = m[1];
+      if (!map.has(cn)) {
+        map.set(cn, []);
+      }
+      map.get(cn)!.push(p);
+    } else {
+      other.push(p);
+    }
+  }
+  const rows = [...map.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([className, ps]) => ({ className, paths: [...ps].sort((x, y) => x.localeCompare(y)) }));
+  if (other.length > 0) {
+    rows.push({ className: 'Other', paths: [...other].sort((x, y) => x.localeCompare(y)) });
+  }
+  return rows;
 }
 
 /** Plain-text export: one line per class, git stat style (feeds export / #746). */
@@ -377,9 +479,49 @@ function comparePropertyObjects(prop1: any, prop2: any): string[] {
     changes.push('items');
   }
 
+  if (JSON.stringify(prop1.default) !== JSON.stringify(prop2.default)) {
+    changes.push('default');
+  }
+
+  if (prop1.nullable !== prop2.nullable) {
+    changes.push('nullable');
+  }
+
+  if (prop1.readOnly !== prop2.readOnly) {
+    changes.push('readOnly');
+  }
+
+  if (prop1.writeOnly !== prop2.writeOnly) {
+    changes.push('writeOnly');
+  }
+
+  if (prop1.deprecated !== prop2.deprecated) {
+    changes.push('deprecated');
+  }
+
+  if (JSON.stringify(prop1.example) !== JSON.stringify(prop2.example)) {
+    changes.push('example');
+  }
+
+  if (prop1.title !== prop2.title) {
+    changes.push('title');
+  }
+
   // Compare constraints
-  ['minimum', 'maximum', 'minLength', 'maxLength', 'pattern', 'minItems', 'maxItems'].forEach(key => {
-    if (prop1[key] !== prop2[key]) {
+  [
+    'minimum',
+    'maximum',
+    'exclusiveMinimum',
+    'exclusiveMaximum',
+    'minLength',
+    'maxLength',
+    'pattern',
+    'minItems',
+    'maxItems',
+    'multipleOf',
+    'uniqueItems',
+  ].forEach((key) => {
+    if (JSON.stringify(prop1[key]) !== JSON.stringify(prop2[key])) {
       changes.push(key);
     }
   });

@@ -6,10 +6,12 @@
 import {
   compareSchemas,
   buildClassLevelDiff,
+  compactJsonValue,
   formatClassDiffStatLines,
+  formatPropertyDiffLine,
   getClassChangeDiffs,
   getPathLabel,
-  type DiffSummary,
+  groupSchemaConflictPathsByClass,
 } from '../../lib/schema-diff';
 
 describe('Schema Diff Utility', () => {
@@ -214,6 +216,40 @@ describe('Schema Diff Utility', () => {
       expect(modifiedProperty?.changes).toContain('type');
     });
 
+    it('should detect default and nullable changes on properties', () => {
+      const spec1 = {
+        openapi: '3.1.0',
+        components: {
+          schemas: {
+            Order: {
+              type: 'object',
+              properties: {
+                total: { type: 'number', default: 0, nullable: false },
+              },
+            },
+          },
+        },
+      };
+      const spec2 = {
+        openapi: '3.1.0',
+        components: {
+          schemas: {
+            Order: {
+              type: 'object',
+              properties: {
+                total: { type: 'string', default: '0', nullable: true },
+              },
+            },
+          },
+        },
+      };
+      const result = compareSchemas(spec1, spec2);
+      const m = result.modified.find((d) => d.path === 'schemas.Order.properties.total');
+      expect(m?.changes).toContain('default');
+      expect(m?.changes).toContain('nullable');
+      expect(m?.changes).toContain('type');
+    });
+
     it('should detect modified schema with required changes', () => {
       const spec1 = {
         openapi: '3.1.0',
@@ -329,6 +365,49 @@ describe('Schema Diff Utility', () => {
       const text = formatClassDiffStatLines(rows, { includeUnchanged: false });
       expect(text).toContain('- A:');
       expect(text).toContain('removed');
+    });
+  });
+
+  describe('formatPropertyDiffLine', () => {
+    it('formats modified property with old → new for changed fields', () => {
+      const spec1 = {
+        openapi: '3.1.0',
+        components: { schemas: { Order: { type: 'object', properties: { total: { type: 'number' } } } } },
+      };
+      const spec2 = {
+        openapi: '3.1.0',
+        components: { schemas: { Order: { type: 'object', properties: { total: { type: 'string' } } } } },
+      };
+      const summary = compareSchemas(spec1, spec2);
+      const d = summary.modified.find((x) => x.path === 'schemas.Order.properties.total');
+      if (!d) {
+        throw new Error('expected modified Order.total');
+      }
+      const line = formatPropertyDiffLine(d);
+      expect(line).toContain('property total:');
+      expect(line).toContain('type');
+      expect(line).toContain('→');
+    });
+  });
+
+  describe('groupSchemaConflictPathsByClass', () => {
+    it('groups schemas.* paths by component name', () => {
+      const g = groupSchemaConflictPathsByClass([
+        'schemas.B.properties.y',
+        'schemas.A.properties.x',
+        'foo.bar',
+      ]);
+      expect(g.map((x) => x.className)).toEqual(['A', 'B', 'Other']);
+      expect(g.find((x) => x.className === 'B')?.paths).toEqual(['schemas.B.properties.y']);
+      expect(g.find((x) => x.className === 'Other')?.paths).toEqual(['foo.bar']);
+    });
+  });
+
+  describe('compactJsonValue', () => {
+    it('renders primitives and truncates long strings', () => {
+      expect(compactJsonValue(null)).toBe('null');
+      expect(compactJsonValue(undefined)).toBe('—');
+      expect(compactJsonValue('x'.repeat(200)).endsWith('…"')).toBe(true);
     });
   });
 
