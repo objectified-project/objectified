@@ -57,7 +57,6 @@ This represents the different versions of the Objectified specification and thei
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| #742   | Visual canvas comparison                     |
 | #743   | Visual tree of version history               |
 | #744   | Show branches and merges                     |
 | #745   | Rollback to any previous version             |
@@ -71,5 +70,6 @@ This represents the different versions of the Objectified specification and thei
 # Completed
 
 - **#741** — **Property-level diff** in **Schema Changes**: readable lines per property/schema (`property name: field old → new`), expanded OpenAPI compare (**default**, **nullable**, **readOnly** / **writeOnly**, **deprecated**, **example**, **title**, **multipleOf**, **uniqueItems**, **exclusiveMin/Max**, etc.), sorted drill lists, **performance** cap with **show all** for huge classes; **Merge branches** preview shows **conflict paths grouped by class** (aligned with `schemas.*` IDs).
+- **#742** — **ADE → Versions → Compare → Canvas**: **visual** diagram compare for saved Studio layouts (default snapshot, else effective named layout) with **split** or **stacked overlay**, legend (**added / removed / moved / unchanged**), **lazy-loaded** when the tab opens (orthogonal to OpenAPI diff **#740** / **#741**).
 - **#740** — Version compare **Schema Changes**: **class-level** structural diff (stable OpenAPI schema IDs), git-style **+/−/~** highlights, search and **virtualized** list for large schemas, **property drill-down** per class, **Copy class stat** export text.
 - **#738** — Version merging (Git-style merge-base, three-way OpenAPI schema merge, merge revision with two parents, `baseRevisionId` lock; optional `compatGateOnMerge`).

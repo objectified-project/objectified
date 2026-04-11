@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -44,6 +44,8 @@ import {
   type ClassDiffRow,
   getPathLabel,
 } from '../../../../../lib/schema-diff';
+import { compareLayouts, type LayoutDiffSummary, type LayoutState } from '../../../../../lib/layout-diff';
+import { loadLayoutStateForVersionCompare } from '../../../../../lib/version-canvas-layout';
 import { extractBreakingHintsFromChangelog, validateVersionNotesClient } from '../../../../../lib/version-notes';
 import RelationshipGraphDialog from './RelationshipGraphDialog';
 import VersionLineageSnippet from './VersionLineageSnippet';
@@ -57,6 +59,18 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
       minHeightClassName="min-h-0"
       spinnerSize="md"
       message="Loading editor..."
+    />
+  ),
+});
+
+const VersionCanvasCompare = dynamic(() => import('./VersionCanvasCompare'), {
+  ssr: false,
+  loading: () => (
+    <LoadingState
+      className="min-h-[min(380px,45vh)] w-full"
+      minHeightClassName="min-h-[min(380px,45vh)]"
+      spinnerSize="md"
+      message="Loading canvas compare…"
     />
   ),
 });
@@ -175,7 +189,14 @@ const Versions = () => {
     showRemoved: boolean;
     showModified: boolean;
   }>({ showAdded: true, showRemoved: true, showModified: true });
-  const [activeCompareTab, setActiveCompareTab] = useState<'diff' | 'summary'>('diff');
+  const [activeCompareTab, setActiveCompareTab] = useState<'diff' | 'summary' | 'canvas'>('diff');
+  const [canvasCompareLeft, setCanvasCompareLeft] = useState<LayoutState | null>(null);
+  const [canvasCompareRight, setCanvasCompareRight] = useState<LayoutState | null>(null);
+  const [canvasCompareDiff, setCanvasCompareDiff] = useState<LayoutDiffSummary | null>(null);
+  const [canvasCompareLoading, setCanvasCompareLoading] = useState(false);
+  /** When this matches `baseId:compareId`, canvas snapshots for that pair are loaded (lazy). */
+  const [canvasComparePairKey, setCanvasComparePairKey] = useState('');
+  const [canvasCompareViewMode, setCanvasCompareViewMode] = useState<'split' | 'overlay'>('split');
 
   const [showRelationshipGraphDialog, setShowRelationshipGraphDialog] = useState(false);
   const [relationshipGraphVersion, setRelationshipGraphVersion] = useState<Version | null>(null);
@@ -266,6 +287,54 @@ const Versions = () => {
     resolveAdmin();
     return () => { cancelled = true; };
   }, [isAdmin, currentUserId, currentTenantId]);
+
+  /**
+   * Canvas snapshots load only when the Canvas tab is opened (#742) — not during OpenAPI compare —
+   * to keep the initial compare fast and defer React Flow + layout queries.
+   */
+  useEffect(() => {
+    if (activeCompareTab !== 'canvas' || diffResult.length === 0) return;
+    if (!compareVersion1Id || !compareVersion2Id) return;
+    const key = `${compareVersion1Id}:${compareVersion2Id}`;
+    if (canvasComparePairKey === key) return;
+
+    let cancelled = false;
+    setCanvasCompareLoading(true);
+    (async () => {
+      try {
+        const [left, right] = await Promise.all([
+          loadLayoutStateForVersionCompare(compareVersion1Id, currentUserId, currentTenantId),
+          loadLayoutStateForVersionCompare(compareVersion2Id, currentUserId, currentTenantId),
+        ]);
+        if (cancelled) return;
+        setCanvasCompareLeft(left);
+        setCanvasCompareRight(right);
+        const l = left ?? { nodes: [], edges: [] };
+        const r = right ?? { nodes: [], edges: [] };
+        setCanvasCompareDiff(compareLayouts(l, r));
+        setCanvasComparePairKey(key);
+      } catch (e) {
+        console.error('Canvas compare load failed:', e);
+        if (!cancelled) {
+          setCanvasCompareDiff(null);
+          toast.error('Could not load canvas layouts for comparison');
+        }
+      } finally {
+        if (!cancelled) setCanvasCompareLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeCompareTab,
+    diffResult.length,
+    compareVersion1Id,
+    compareVersion2Id,
+    canvasComparePairKey,
+    currentUserId,
+    currentTenantId,
+  ]);
 
   useEffect(() => { if (currentTenantId) loadProjects(); }, [currentTenantId]);
   useEffect(() => { if (selectedProjectId) loadVersions(); else setVersions([]); }, [selectedProjectId, lifecycleFilter]);
@@ -679,6 +748,10 @@ const Versions = () => {
   const handleCompareVersions = async () => {
     if (!compareVersion1Id || !compareVersion2Id) { toast.warning('Please select two versions'); return; }
     if (compareVersion1Id === compareVersion2Id) { toast.warning('Select two different versions'); return; }
+    setCanvasCompareLeft(null);
+    setCanvasCompareRight(null);
+    setCanvasCompareDiff(null);
+    setCanvasComparePairKey('');
     setIsLoadingComparison(true);
     try {
       const [spec1, spec2] = await Promise.all([loadVersionSpec(compareVersion1Id), loadVersionSpec(compareVersion2Id)]);
@@ -708,6 +781,12 @@ const Versions = () => {
     setPropDrillShowAllByClass({});
     setClassListScrollTop(0); setDiffViewMode('overlay');
     setCompareBaseTagId(''); setCompareToTagId('');
+    setCanvasCompareLeft(null);
+    setCanvasCompareRight(null);
+    setCanvasCompareDiff(null);
+    setCanvasComparePairKey('');
+    setCanvasCompareViewMode('split');
+    setActiveCompareTab('diff');
   };
 
   const tagsByVersionId = useMemo(() => {
@@ -2102,6 +2181,24 @@ const Versions = () => {
                   </div>
                 </div>
               )}
+              {diffResult.length > 0 && activeCompareTab === 'canvas' && (
+                <div className="flex border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setCanvasCompareViewMode('split')}
+                    className={`px-2 py-1 text-xs ${canvasCompareViewMode === 'split' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                  >
+                    Split
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCanvasCompareViewMode('overlay')}
+                    className={`px-2 py-1 text-xs border-l border-gray-300 dark:border-gray-600 ${canvasCompareViewMode === 'overlay' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                  >
+                    Overlay
+                  </button>
+                </div>
+              )}
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto overflow-x-hidden">
@@ -2291,6 +2388,20 @@ const Versions = () => {
                       )}
                     </div>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCompareTab('canvas')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeCompareTab === 'canvas'
+                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <LayoutGrid className="h-4 w-4" aria-hidden />
+                      <span>Canvas</span>
+                    </div>
+                  </button>
                 </div>
 
                 {/* Tab Content */}
@@ -2378,7 +2489,7 @@ const Versions = () => {
                       )}
                     </div>
                   </div>
-                ) : (
+                ) : activeCompareTab === 'summary' ? (
                   // Schema Changes Summary Tab
                   <div className="h-[calc(90vh-280px)] overflow-y-auto">
                     {schemaDiffSummary && (
@@ -2742,6 +2853,26 @@ const Versions = () => {
                   </div>
                     )}
                   </div>
+                ) : (
+                  <div className="h-[calc(90vh-280px)] overflow-y-auto px-1 pt-1">
+                    {canvasCompareLoading ? (
+                      <LoadingState
+                        className="min-h-[min(380px,45vh)] w-full py-8"
+                        minHeightClassName="min-h-[min(380px,45vh)]"
+                        spinnerSize="md"
+                        message="Loading canvas layouts…"
+                      />
+                    ) : (
+                      <VersionCanvasCompare
+                        left={canvasCompareLeft}
+                        right={canvasCompareRight}
+                        leftLabel={`v${versions.find((v) => v.id === compareVersion1Id)?.version_id ?? '?'} (base)`}
+                        rightLabel={`v${versions.find((v) => v.id === compareVersion2Id)?.version_id ?? '?'} (compare)`}
+                        mode={canvasCompareViewMode}
+                        diff={canvasCompareDiff}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -2759,6 +2890,11 @@ const Versions = () => {
                   setClassDiffSearch('');
                   setExpandedClassDiffId(null);
                   setPropDrillShowAllByClass({});
+                  setCanvasCompareLeft(null);
+                  setCanvasCompareRight(null);
+                  setCanvasCompareDiff(null);
+                  setCanvasComparePairKey('');
+                  setActiveCompareTab('diff');
                 }}
               >
                 Compare Different Versions
