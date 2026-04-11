@@ -37,7 +37,13 @@ from .schema_merge import (
     merge_components_schemas_three_way,
     schema_merge_materializable_paths,
 )
-from .version_notes import limits_for_tenant, validate_version_notes
+from .version_notes import (
+    CommitPolicyViolation,
+    commit_policy_http_exception,
+    effective_commit_policy,
+    enforce_max_commit_payload,
+    validate_version_notes,
+)
 
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
@@ -273,14 +279,19 @@ async def version_branch_merge(
                 },
             )
 
-    limits = limits_for_tenant(tenant_id)
+    limits = effective_commit_policy(tenant_id, project.get("metadata"))
+    try:
+        enforce_max_commit_payload(body, limits)
+    except CommitPolicyViolation as pe:
+        raise commit_policy_http_exception(pe) from pe
+
     latest = db.get_latest_version_for_project(project_id, tenant_id)
     new_version_string = bump_patch_version(latest) if latest else "0.1.0"
     raw_msg = f"Merge {body.source_branch_name} into {body.target_branch_name}"
     try:
         short_msg, _ = validate_version_notes(raw_msg, None, limits)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except CommitPolicyViolation as e:
+        raise commit_policy_http_exception(e) from e
     if not short_msg:
         short_msg = raw_msg
 
@@ -567,7 +578,12 @@ async def version_branch_rollback(
             },
         )
 
-    limits = limits_for_tenant(tenant_id)
+    limits = effective_commit_policy(tenant_id, project.get("metadata"))
+    try:
+        enforce_max_commit_payload(body, limits)
+    except CommitPolicyViolation as pe:
+        raise commit_policy_http_exception(pe) from pe
+
     latest = db.get_latest_version_for_project(project_id, tenant_id)
     new_version_string = bump_patch_version(latest) if latest else "0.1.0"
 
@@ -576,8 +592,8 @@ async def version_branch_rollback(
     raw_cl = (body.changelog or "").strip() or None
     try:
         short_msg, cl = validate_version_notes(raw_msg, raw_cl, limits, require_short_message=limits.require_short_message)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except CommitPolicyViolation as e:
+        raise commit_policy_http_exception(e) from e
 
     rb_meta = {
         "rollback": {

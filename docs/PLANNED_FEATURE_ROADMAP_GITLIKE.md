@@ -88,7 +88,7 @@ Workstreams below can proceed in parallel once shared contracts (revision id, he
 
 | Parallel track | Tickets | Notes |
 |----------------|---------|--------|
-| **A — Commit & metadata** | P0-01, P0-02 ✓, P0-03 | P0-02 (ADE **Commit** dialog) shipped after P0-01 API |
+| **A — Commit & metadata** | P0-01, P0-02 ✓, P0-03 ✓ | P0-02 (ADE **Commit** dialog) shipped after P0-01 API |
 | **B — Push & conflict UX** | P0-04, P0-05 | P0-05 can mock 409 until P0-04 stable |
 | **C — Pull efficiency** | P0-06 | Coordinate ETag with P0-04 head semantics |
 | **D — Studio status** | P0-07 | Depends on signals from B/C; can mock |
@@ -140,6 +140,8 @@ Add a Radix dialog for commit action with message, optional external reference, 
 ---
 
 ## P0-03: Add Pre-Commit Policy Enforcement (Message Required + Max Payload)
+
+**Status:** **Done** — REST evaluates policy before persisting revisions; `projects.metadata.commitPolicy` overrides defaults; errors use `POLICY_VIOLATION` / `PAYLOAD_TOO_LARGE`.
 
 **GitHub:** [#2565](https://github.com/KenSuenobu/objectified-commercial/issues/2565) · **Epic:** [#2558](https://github.com/KenSuenobu/objectified-commercial/issues/2558)
 
