@@ -25,6 +25,9 @@ We continue to improve the platform based on your feedback with improvements and
 - **Import classes:** duplicate-schema rows in the conflict report include **Schema diff** — side-by-side property diff (new / modified / removed), summary counts, and resolution choices (merge, replace, keep current, rename) before you apply
 - **OpenAPI import:** one shared rule for “direct” schema properties — specs that mix top-level `properties` with inline `allOf` fragments now pick up both (aligned with the unified class importer)
 
+## Git Behavior
+
+
 ## Versioning
 - **Successor redirect (#749):** **GET** a schema revision with **`successorResolution=resolve`** (JSON body is the replacement revision; **`X-Objectified-Resolved-From`** / **`X-Objectified-Successor-Chain`** headers) or **`redirect`** (**HTTP 307**); optional **`auditSuccessorResolution`** for audit rows. **ADE** `/api/versions/[id]` forwards those query params and response headers; **`redirect`** is re-mapped to the portal URL
 - **Sunset dates (#748):** Schema revision metadata supports **`sunsetAt`** (UTC ISO), optional **`deprecatedAt`** for ordering, and **`successorRevisionId`** (required when a sunset is set). **Edit Version** picks local **datetime** and sends UTC to the API; tenant admins can update deprecation metadata on **published** revisions. Sunset timeline entries expose **`sunsetAt`** alongside **`sunsetDate`**
