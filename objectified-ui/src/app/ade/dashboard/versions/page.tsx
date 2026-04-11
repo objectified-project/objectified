@@ -49,6 +49,7 @@ import {
   COMMIT_EXTERNAL_REF_MAX_CHARS,
   extractBreakingHintsFromChangelog,
   validateVersionNotesClient,
+  VERSION_NOTES_LIMITS,
 } from '../../../../../lib/version-notes';
 import { generateBreakingChangesMarkdownFromSummary } from '../../../../../lib/breaking-changes-doc';
 import { generateMigrationGuideMarkdownFromSummary } from '../../../../../lib/migration-guide-doc';
@@ -546,10 +547,12 @@ const Versions = () => {
     setShowCreateDialog(true);
   };
 
-  const createCommitNotesCheck = validateVersionNotesClient(description, changeLog);
+  const createCommitMessageCheck = validateVersionNotesClient(description, '');
+  const commitChangelogOverLimit = changeLog.trim().length > VERSION_NOTES_LIMITS.maxChangelogChars;
   const commitExternalRefTrim = commitExternalRef.trim();
   const createCommitFormValid =
-    createCommitNotesCheck.ok &&
+    createCommitMessageCheck.ok &&
+    !commitChangelogOverLimit &&
     commitExternalRefTrim.length <= COMMIT_EXTERNAL_REF_MAX_CHARS &&
     (autoGenerate || versionId.trim().length > 0);
 
@@ -2438,12 +2441,12 @@ const Versions = () => {
                 disabled={isLoading}
                 rows={4}
                 placeholder="Describe this revision (required)"
-                aria-invalid={description.length > 0 && !createCommitNotesCheck.ok}
+                aria-invalid={description.length > 0 && !createCommitMessageCheck.ok}
                 className="min-h-[6rem]"
               />
-              {!createCommitNotesCheck.ok && description.length > 0 && (
+              {!createCommitMessageCheck.ok && description.length > 0 && (
                 <p className="text-xs text-red-600 dark:text-red-400" role="alert">
-                  {createCommitNotesCheck.error}
+                  {createCommitMessageCheck.error}
                 </p>
               )}
             </div>
@@ -2455,7 +2458,6 @@ const Versions = () => {
                 onChange={(e) => setCommitExternalRef(e.target.value)}
                 disabled={isLoading}
                 placeholder="e.g. LINEAR-42, JIRA-123"
-                maxLength={COMMIT_EXTERNAL_REF_MAX_CHARS}
                 aria-invalid={commitExternalRefTrim.length > COMMIT_EXTERNAL_REF_MAX_CHARS}
               />
               {commitExternalRefTrim.length > COMMIT_EXTERNAL_REF_MAX_CHARS && (
@@ -2466,7 +2468,12 @@ const Versions = () => {
             </div>
             <div className="space-y-2">
               <Label>Changelog (markdown, optional)</Label>
-              <Textarea value={changeLog} onChange={(e) => setChangeLog(e.target.value)} rows={3} disabled={isLoading} placeholder="Release notes, breaking bullets (- breaking: …)" />
+              <Textarea value={changeLog} onChange={(e) => setChangeLog(e.target.value)} rows={3} disabled={isLoading} placeholder="Release notes, breaking bullets (- breaking: …)" aria-invalid={commitChangelogOverLimit} />
+              {commitChangelogOverLimit && (
+                <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                  Changelog exceeds {VERSION_NOTES_LIMITS.maxChangelogChars} characters
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
