@@ -52,3 +52,39 @@ def test_prepare_clears_deprecated_when_stable_after_deprecated():
 def test_prepare_rejects_invalid_token():
     with pytest.raises(ValueError, match="Invalid lifecycle"):
         prepare_version_metadata_update(None, {"lifecycle": "gamma"})
+
+
+def test_prepare_sunset_requires_successor():
+    with pytest.raises(ValueError, match="successorRevisionId"):
+        prepare_version_metadata_update(
+            None,
+            {"lifecycle": "deprecated", "sunsetAt": "2026-12-01T00:00:00Z"},
+        )
+
+
+def test_prepare_sunset_ok():
+    sid = "123e4567-e89b-12d3-a456-426614174000"
+    out = prepare_version_metadata_update(
+        None,
+        {
+            "lifecycle": "deprecated",
+            "sunsetAt": "2026-12-01",
+            "successorRevisionId": sid,
+        },
+    )
+    assert out["sunsetAt"] == out["sunsetDate"]
+    assert out["sunsetAt"].endswith("Z")
+    assert out["successorRevisionId"] == sid
+
+
+def test_prepare_sunset_deprecated_at_ordering():
+    with pytest.raises(ValueError, match="sunsetAt must be on or after"):
+        prepare_version_metadata_update(
+            None,
+            {
+                "lifecycle": "deprecated",
+                "deprecatedAt": "2026-12-15T00:00:00Z",
+                "sunsetAt": "2026-12-01T00:00:00Z",
+                "successorRevisionId": "123e4567-e89b-12d3-a456-426614174000",
+            },
+        )

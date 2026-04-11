@@ -420,6 +420,7 @@ def test_sunset_timeline_returns_entries():
         assert e["timelineStatus"] == "announced"
         assert e["lifecyclePhase"] == "deprecated"
         assert e["sunsetDate"] == "2099-06-01"
+        assert e.get("sunsetAt") == "2099-06-01"
         assert len(e["deprecationWarnings"]) == 1
         assert e["deprecationWarnings"][0]["revisionId"] == "rev-uuid-1"
         mock_db.list_sunset_timeline_entries.assert_called_once_with("test-tenant-id", None)
