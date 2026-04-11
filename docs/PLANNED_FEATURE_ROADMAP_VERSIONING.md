@@ -49,21 +49,17 @@ This represents the different versions of the Objectified specification and thei
 - **Version Deprecation**:
   - ✅ Mark versions as deprecated
   - ✅ Set sunset dates (#748) — `versions.metadata.sunsetAt` (UTC ISO), validation vs `deprecatedAt`, `successorRevisionId` required when sunset is set; ADE Edit Version + tenant-admin metadata on published
-  - 📋 Redirect to newer versions
+  - ✅ Redirect to newer versions (#749) — `GET /v1/versions/{tenant}/{project}/{revisionId}` and `.../by-version/{version}` with `successorResolution=none|resolve|redirect`; optional `auditSuccessorResolution`; protected branch/tag tips block following (#504); portal proxy forwards query + `X-Objectified-*` headers
   - ✅ Deprecation warnings in API
 - **Version Copy**: ✅ IMPLEMENTED
   - ✅ Copy classes and properties from existing version
   - ✅ Create new version based on previous version
 
-| Ticket | Feature Description                          |
-|--------|----------------------------------------------|
-| #748   | ✅ Set sunset dates for deprecated versions  |
-| #749   | Redirect to newer versions                   |
-
 ---
 
 # Completed
 
+- **#749** — **Successor resolution / redirect:** REST **GET** revision (by id or `by-version`) supports **`successorResolution`** (`none` default, `resolve` returns final revision + **`X-Objectified-*`** headers, `redirect` → **307**); optional **`auditSuccessorResolution`** → **`version.successor_resolution`** audit; **#504** protected branch tips / protected tags block chaining off that anchor; cycles **409** `SUCCESSOR_CYCLE`. Portal **`/api/versions/[id]`** forwards query params, maps REST **307** to app URL, passes through **`X-Objectified-*`**
 - **#747** — **Migration guide from compare:** deterministic Markdown (**Migration guide** tab) with **ordered steps** per breaking change, **revision pair** ids + template version, **#746** / **#506** cross-links, optional **#502** changelog `breaking:` notes; **Copy**, **append to compare-to changelog**, **Download Markdown**, **Download PDF**; deprecation warnings (#507) point at the **#747** tracker URL
 - **#746** — **Breaking changes doc from diff:** deterministic Markdown (**Breaking** / **Additions** / **Other**) from schema-aware `compareSchemas` output, stable `components.schemas…` identifiers, template version in header; **ADE → Versions → Compare → Breaking doc** tab with copy and **append to compare-to changelog** (opens Edit Version)
 - **#745** — **Version rollback (revert-style):** **REST** `POST .../version-branches/rollback-preview` and `POST .../rollback` — new head revision with **content** from a **prior ancestor** revision, **`parent_version_id`** = prior tip, **`metadata.rollback`** lineage; **#506**-style OpenAPI compare (tip → target) + optional **`compatGateOnRollback`**; **version.rollback** audit; **ADE → Versions** row action with preview / confirm / diff summary

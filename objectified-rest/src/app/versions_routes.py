@@ -7,8 +7,10 @@ All endpoints are tenant and project-scoped and require authentication via JWT t
 
 import re
 from datetime import date as date_cls
-from fastapi import APIRouter, HTTPException, Query, Depends, Body
-from typing import Optional, List, Dict, Any
+from typing import Literal, Optional, List, Dict, Any
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import RedirectResponse
 
 from .database import db
 from .models import (
@@ -35,6 +37,31 @@ from .revision_lifecycle import (
 )
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
+
+_SUCCESSOR_RESOLUTION_DESC = (
+    "none: return the requested revision only. "
+    "resolve: follow metadata.successorRevisionId (same project, #748); JSON body is the final revision; "
+    "see X-Objectified-* response headers. "
+    "redirect: HTTP 307 to this path with the final revision id and successorResolution=none."
+)
+
+
+def _successor_resolution_headers(
+    *,
+    requested_id: str,
+    final_id: str,
+    hops: List[str],
+    status: str,
+    missing_id: Optional[str],
+) -> Dict[str, str]:
+    h: Dict[str, str] = {"X-Objectified-Successor-Resolution-Status": status}
+    if requested_id != final_id:
+        h["X-Objectified-Resolved-From"] = requested_id
+    if hops:
+        h["X-Objectified-Successor-Chain"] = ",".join(hops)
+    if missing_id:
+        h["X-Objectified-Missing-Successor-Id"] = missing_id
+    return h
 
 
 def parse_semantic_version(version: str) -> Optional[Dict[str, int]]:
@@ -190,73 +217,232 @@ async def list_versions(
 
 @router.get("/{tenant_slug}/{project_id}/{version_record_id}")
 async def get_version(
+    request: Request,
+    response: Response,
     tenant_slug: str,
     project_id: str,
     version_record_id: str,
-    auth_data: Dict[str, Any] = Depends(validate_authentication)
-) -> VersionSchema:
+    successor_resolution: Literal["none", "resolve", "redirect"] = Query(
+        "none",
+        alias="successorResolution",
+        description=_SUCCESSOR_RESOLUTION_DESC,
+    ),
+    audit_successor_resolution: bool = Query(
+        False,
+        alias="auditSuccessorResolution",
+        description="When true, emit version_protection_audit for successor resolution (#749).",
+    ),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+):
     """
     Get a specific version by ID.
 
     Supports authentication via JWT token or API key.
 
-    Args:
-        tenant_slug: The tenant slug
-        project_id: The project ID
-        version_record_id: The version record ID (UUID)
-        auth_data: Authentication data (injected by dependency)
-
-    Returns:
-        The version details
+    Successor resolution (#749): when ``successorResolution`` is ``resolve`` or ``redirect``, follows
+    ``metadata.successorRevisionId`` (#748) within the project until a revision has no successor, hits a
+    protected branch tip / protected tag target (#504), or errors. Loops return 409 ``SUCCESSOR_CYCLE``.
     """
-    version = db.get_version_by_id(version_record_id, auth_data['tenant_id'])
+    version = db.get_version_by_id(version_record_id, auth_data["tenant_id"])
 
     if not version:
         raise HTTPException(
             status_code=404,
-            detail=f"Version not found: {version_record_id}"
+            detail=f"Version not found: {version_record_id}",
         )
 
-    # Verify version belongs to the specified project
-    if version['project_id'] != project_id:
+    if version["project_id"] != project_id:
         raise HTTPException(
             status_code=404,
-            detail=f"Version not found in project: {project_id}"
+            detail=f"Version not found in project: {project_id}",
         )
 
-    return VersionSchema(**version)
+    if successor_resolution == "none":
+        return VersionSchema(**version)
+
+    final_id, hops, status, missing_id = db.resolve_successor_revision_chain(
+        version_record_id,
+        auth_data["tenant_id"],
+        project_id,
+    )
+
+    if status == "cycle":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "SUCCESSOR_CYCLE",
+                "message": "Successor chain contains a cycle",
+                "chain": hops,
+            },
+        )
+
+    if status == "project_mismatch":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "SUCCESSOR_PROJECT_MISMATCH",
+                "message": "Successor revision is not in this project",
+            },
+        )
+
+    final_row = db.get_version_by_id(final_id, auth_data["tenant_id"])
+    if not final_row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version not found: {final_id}",
+        )
+
+    _audit_resolution = bool(
+        hops or status not in ("none", "resolved")
+    )
+    if audit_successor_resolution and successor_resolution != "none" and _audit_resolution:
+        uid = get_authenticated_user_id(auth_data)
+        db.insert_version_protection_audit(
+            auth_data["tenant_id"],
+            project_id,
+            uid,
+            "version.successor_resolution",
+            "version",
+            final_id,
+            "allowed",
+            {
+                "fromRevisionId": version_record_id,
+                "mode": successor_resolution,
+                "chain": hops,
+                "status": status,
+            },
+        )
+
+    if successor_resolution == "redirect":
+        if final_id == version_record_id:
+            return VersionSchema(**version)
+        base = request.url.path.rstrip("/").rsplit("/", 1)[0]
+        loc = request.url.replace(path=f"{base}/{final_id}", query="successorResolution=none")
+        return RedirectResponse(str(loc), status_code=307)
+
+    for k, v in _successor_resolution_headers(
+        requested_id=version_record_id,
+        final_id=final_id,
+        hops=hops,
+        status=status,
+        missing_id=missing_id,
+    ).items():
+        response.headers[k] = v
+
+    return VersionSchema(**final_row)
 
 
 @router.get("/{tenant_slug}/{project_id}/by-version/{version_id}")
 async def get_version_by_version_id(
+    request: Request,
+    response: Response,
     tenant_slug: str,
     project_id: str,
     version_id: str,
-    auth_data: Dict[str, Any] = Depends(validate_authentication)
-) -> VersionSchema:
+    successor_resolution: Literal["none", "resolve", "redirect"] = Query(
+        "none",
+        alias="successorResolution",
+        description=_SUCCESSOR_RESOLUTION_DESC,
+    ),
+    audit_successor_resolution: bool = Query(
+        False,
+        alias="auditSuccessorResolution",
+        description="When true, emit version_protection_audit for successor resolution (#749).",
+    ),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+):
     """
     Get a specific version by version ID string (e.g., '1.0.0').
 
     Supports authentication via JWT token or API key.
-
-    Args:
-        tenant_slug: The tenant slug
-        project_id: The project ID
-        version_id: The version ID string (e.g., '1.0.0')
-        auth_data: Authentication data (injected by dependency)
-
-    Returns:
-        The version details
+    Successor resolution (#749) matches ``GET .../{version_record_id}``.
     """
-    version = db.get_version_by_version_id(project_id, version_id, auth_data['tenant_id'])
+    version = db.get_version_by_version_id(project_id, version_id, auth_data["tenant_id"])
 
     if not version:
         raise HTTPException(
             status_code=404,
-            detail=f"Version '{version_id}' not found in project"
+            detail=f"Version '{version_id}' not found in project",
         )
 
-    return VersionSchema(**version)
+    version_record_id = str(version["id"])
+
+    if successor_resolution == "none":
+        return VersionSchema(**version)
+
+    final_id, hops, status, missing_id = db.resolve_successor_revision_chain(
+        version_record_id,
+        auth_data["tenant_id"],
+        project_id,
+    )
+
+    if status == "cycle":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "SUCCESSOR_CYCLE",
+                "message": "Successor chain contains a cycle",
+                "chain": hops,
+            },
+        )
+
+    if status == "project_mismatch":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "SUCCESSOR_PROJECT_MISMATCH",
+                "message": "Successor revision is not in this project",
+            },
+        )
+
+    final_row = db.get_version_by_id(final_id, auth_data["tenant_id"])
+    if not final_row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version not found: {final_id}",
+        )
+
+    _audit_resolution = bool(
+        hops or status not in ("none", "resolved")
+    )
+    if audit_successor_resolution and successor_resolution != "none" and _audit_resolution:
+        uid = get_authenticated_user_id(auth_data)
+        db.insert_version_protection_audit(
+            auth_data["tenant_id"],
+            project_id,
+            uid,
+            "version.successor_resolution",
+            "version",
+            final_id,
+            "allowed",
+            {
+                "fromRevisionId": version_record_id,
+                "mode": successor_resolution,
+                "chain": hops,
+                "status": status,
+            },
+        )
+
+    if successor_resolution == "redirect":
+        if final_id == version_record_id:
+            return VersionSchema(**version)
+        base = request.url.path.rstrip("/").rsplit("/", 1)[0]
+        loc = request.url.replace(
+            path=f"{base}/by-version/{final_row['version_id']}",
+            query="successorResolution=none",
+        )
+        return RedirectResponse(str(loc), status_code=307)
+
+    for k, v in _successor_resolution_headers(
+        requested_id=version_record_id,
+        final_id=final_id,
+        hops=hops,
+        status=status,
+        missing_id=missing_id,
+    ).items():
+        response.headers[k] = v
+
+    return VersionSchema(**final_row)
 
 
 @router.post("/{tenant_slug}/{project_id}")
