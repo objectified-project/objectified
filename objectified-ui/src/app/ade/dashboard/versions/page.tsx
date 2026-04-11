@@ -164,6 +164,7 @@ const Versions = () => {
   const [classDiffShowUnchanged, setClassDiffShowUnchanged] = useState(true);
   const [expandedClassDiffId, setExpandedClassDiffId] = useState<string | null>(null);
   const [classListScrollTop, setClassListScrollTop] = useState(0);
+  const classListScrollRef = useRef<HTMLDivElement | null>(null);
   const [diffViewMode, setDiffViewMode] = useState<'overlay' | 'side-by-side'>('overlay');
   const [diffFilter, setDiffFilter] = useState<{
     showAdded: boolean;
@@ -728,6 +729,9 @@ const Versions = () => {
 
   useEffect(() => {
     setClassListScrollTop(0);
+    if (classListScrollRef.current) {
+      classListScrollRef.current.scrollTop = 0;
+    }
   }, [classDiffSearch, classDiffShowUnchanged]);
 
   const classListVirtual = useMemo(() => {
@@ -757,8 +761,11 @@ const Versions = () => {
   }, [classDiffRows]);
 
   const classDiffListRender = useMemo(() => {
+    const hasVisibleExpandedClassDiff =
+      expandedClassDiffId !== null &&
+      filteredClassDiffRows.some((row) => row.stableId === expandedClassDiffId);
     const virtualize =
-      expandedClassDiffId === null && filteredClassDiffRows.length > 64;
+      !hasVisibleExpandedClassDiff && filteredClassDiffRows.length > 64;
     if (virtualize) {
       return {
         virtualize: true as const,
@@ -2383,9 +2390,13 @@ const Versions = () => {
                               type="button"
                               variant="outline"
                               className="text-xs h-8"
-                              onClick={() => {
-                                void navigator.clipboard.writeText(formatClassDiffStatLines(classDiffRows));
-                                toast.success('Class diff copied to clipboard');
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(formatClassDiffStatLines(classDiffRows));
+                                  toast.success('Class diff copied to clipboard');
+                                } catch {
+                                  toast.error('Failed to copy class diff to clipboard');
+                                }
                               }}
                             >
                               Copy class stat
@@ -2416,6 +2427,7 @@ const Versions = () => {
                           {classDiffListRender.virtualize ? ' · Virtualized list' : ''}
                         </p>
                         <div
+                          ref={classListScrollRef}
                           className="max-h-72 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-950"
                           style={
                             classDiffListRender.virtualize ? { height: CLASS_DIFF_VIEWPORT_PX } : undefined

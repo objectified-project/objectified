@@ -49,25 +49,42 @@ export function buildClassLevelDiff(spec1: any, spec2: any): ClassDiffRow[] {
 
   const sorted = [...names].sort((a, b) => a.localeCompare(b));
 
+  const getPropertySchemaName = (path: string): string | undefined => {
+    const match = path.match(/^schemas\.([^.]+)\.properties\./);
+    return match?.[1];
+  };
+
+  const countPropertyDiffsBySchema = (diffs: SchemaDiff[]): Map<string, number> => {
+    const counts = new Map<string, number>();
+    diffs.forEach((d) => {
+      if (d.itemType !== 'property') return;
+      const schemaName = getPropertySchemaName(d.path);
+      if (!schemaName) return;
+      counts.set(schemaName, (counts.get(schemaName) || 0) + 1);
+    });
+    return counts;
+  };
+
+  const propertyAddedBySchema = countPropertyDiffsBySchema(summary.added);
+  const propertyRemovedBySchema = countPropertyDiffsBySchema(summary.removed);
+  const propertyModifiedBySchema = countPropertyDiffsBySchema(summary.modified);
+
+  const schemaModifiedByName = new Map<string, SchemaDiff>();
+  summary.modified.forEach((d) => {
+    if (d.itemType !== 'schema') return;
+    const match = d.path.match(/^schemas\.([^.]+)$/);
+    if (match) schemaModifiedByName.set(match[1], d);
+  });
+
   return sorted.map((name) => {
     const in1 = name in schemas1;
     const in2 = name in schemas2;
 
-    const propPrefix = `schemas.${name}.properties.`;
-    const propAdded = summary.added.filter(
-      (d) => d.itemType === 'property' && d.path.startsWith(propPrefix)
-    ).length;
-    const propRemoved = summary.removed.filter(
-      (d) => d.itemType === 'property' && d.path.startsWith(propPrefix)
-    ).length;
-    const propModified = summary.modified.filter(
-      (d) => d.itemType === 'property' && d.path.startsWith(propPrefix)
-    ).length;
+    const propAdded = propertyAddedBySchema.get(name) || 0;
+    const propRemoved = propertyRemovedBySchema.get(name) || 0;
+    const propModified = propertyModifiedBySchema.get(name) || 0;
 
-    const schemaPath = `schemas.${name}`;
-    const schemaMod = summary.modified.find(
-      (d) => d.path === schemaPath && d.itemType === 'schema'
-    );
+    const schemaMod = schemaModifiedByName.get(name);
 
     if (!in1 && in2) {
       return {
