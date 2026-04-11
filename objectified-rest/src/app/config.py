@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Embedding (Ollama) for data_snapshot vectorization
     ollama_base_url: str = "http://localhost:11434"
 
+    # Pre-commit policy default when project metadata omits maxCommitPayloadBytes (#2565)
+    commit_policy_max_payload_bytes_default: int = 5_242_880
+
     @property
     def effective_database_url(self) -> str:
         """Get the database URL, preferring DATABASE_URL over building from components."""

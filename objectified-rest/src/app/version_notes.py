@@ -1,13 +1,27 @@
 """Revision note + changelog validation (git-like commit / annotated tag analog).
 
-Size limits are tenant-scoped in the API contract; defaults apply until per-tenant
-policy is stored on tenants (future).
+Policy defaults come from :class:`VersionNotesLimits` and ``Settings``; per-project
+overrides live in ``projects.metadata.commitPolicy`` (JSON).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional, Tuple
+import json
+from dataclasses import dataclass, replace
+from typing import Any, Dict, Optional, Tuple
+
+from pydantic import BaseModel
+
+from .config import settings
+
+
+class CommitPolicyViolation(Exception):
+    """Pre-commit policy rejection; use ``code`` + ``message`` for REST error bodies."""
+
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        self.message = message
+        super().__init__(message)
 
 
 @dataclass(frozen=True)
@@ -15,18 +29,105 @@ class VersionNotesLimits:
     max_short_message_chars: int
     max_changelog_chars: int
     require_short_message: bool
+    max_commit_payload_bytes: int
 
+
+_DEFAULT_MAX_COMMIT_PAYLOAD_BYTES = 5_242_880  # 5 MiB; kept in sync with Settings default
 
 DEFAULT_VERSION_NOTES_LIMITS = VersionNotesLimits(
     max_short_message_chars=2000,
     max_changelog_chars=65535,
     require_short_message=True,
+    max_commit_payload_bytes=_DEFAULT_MAX_COMMIT_PAYLOAD_BYTES,
 )
 
 
-def limits_for_tenant(_tenant_id: str) -> VersionNotesLimits:
-    """Return effective limits for a tenant (defaults until DB-backed policy exists)."""
-    return DEFAULT_VERSION_NOTES_LIMITS
+def _coerce_metadata_dict(metadata: Any) -> Dict[str, Any]:
+    if metadata is None:
+        return {}
+    if isinstance(metadata, dict):
+        return metadata
+    if isinstance(metadata, str):
+        try:
+            parsed = json.loads(metadata)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _int_from_policy(raw: Any) -> Optional[int]:
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def effective_commit_policy(
+    _tenant_id: str,
+    project_metadata: Optional[Any] = None,
+) -> VersionNotesLimits:
+    """
+    Effective limits for a tenant + optional project ``metadata`` (DB JSON).
+
+    Reads ``metadata.commitPolicy`` (or ``commit_policy``) with optional keys:
+    ``requireShortMessage``, ``maxShortMessageChars``, ``maxChangelogChars``,
+    ``maxCommitPayloadBytes`` (camelCase or snake_case).
+    """
+    base = DEFAULT_VERSION_NOTES_LIMITS
+    max_payload = int(
+        getattr(settings, "commit_policy_max_payload_bytes_default", _DEFAULT_MAX_COMMIT_PAYLOAD_BYTES)
+    )
+    lim = replace(base, max_commit_payload_bytes=max_payload)
+
+    md = _coerce_metadata_dict(project_metadata)
+    policy = md.get("commitPolicy") or md.get("commit_policy")
+    if not isinstance(policy, dict):
+        return lim
+
+    updates: Dict[str, Any] = {}
+    if "requireShortMessage" in policy:
+        updates["require_short_message"] = bool(policy["requireShortMessage"])
+    elif "require_short_message" in policy:
+        updates["require_short_message"] = bool(policy["require_short_message"])
+
+    m = _int_from_policy(policy.get("maxShortMessageChars") or policy.get("max_short_message_chars"))
+    if m is not None and m > 0:
+        updates["max_short_message_chars"] = m
+
+    m = _int_from_policy(policy.get("maxChangelogChars") or policy.get("max_changelog_chars"))
+    if m is not None and m > 0:
+        updates["max_changelog_chars"] = m
+
+    m = _int_from_policy(policy.get("maxCommitPayloadBytes") or policy.get("max_commit_payload_bytes"))
+    if m is not None and m > 0:
+        updates["max_commit_payload_bytes"] = m
+
+    if not updates:
+        return lim
+    return replace(lim, **updates)
+
+
+def limits_for_tenant(tenant_id: str) -> VersionNotesLimits:
+    """Backward-compatible: defaults only (no project metadata). Prefer :func:`effective_commit_policy`."""
+    return effective_commit_policy(tenant_id, None)
+
+
+def commit_request_json_byte_length(model: BaseModel) -> int:
+    """UTF-8 size of the JSON representation (alias keys), for payload policy."""
+    return len(model.model_dump_json(by_alias=True).encode("utf-8"))
+
+
+def enforce_max_commit_payload(model: BaseModel, limits: VersionNotesLimits) -> None:
+    """Reject when serialized request JSON exceeds ``limits.max_commit_payload_bytes``."""
+    n = commit_request_json_byte_length(model)
+    if n > limits.max_commit_payload_bytes:
+        raise CommitPolicyViolation(
+            "PAYLOAD_TOO_LARGE",
+            f"Commit request payload exceeds maximum size ({limits.max_commit_payload_bytes} bytes).",
+        )
 
 
 def validate_version_notes(
@@ -40,20 +141,25 @@ def validate_version_notes(
     Strip and validate revision note + changelog.
 
     Returns (short_message, changelog) with None for empty optional strings.
-    Raises ValueError with a human-readable message on violation.
+    Raises CommitPolicyViolation on violation.
     """
     req = limits.require_short_message if require_short_message is None else require_short_message
     sm = short_message.strip() if short_message else None
     cl = changelog.strip() if changelog else None
     if req and not sm:
-        raise ValueError("Revision note (shortMessage) is required")
+        raise CommitPolicyViolation(
+            "POLICY_VIOLATION",
+            "Revision note (shortMessage) is required",
+        )
     if sm and len(sm) > limits.max_short_message_chars:
-        raise ValueError(
-            f"Revision note exceeds maximum length ({limits.max_short_message_chars} characters)"
+        raise CommitPolicyViolation(
+            "POLICY_VIOLATION",
+            f"Revision note exceeds maximum length ({limits.max_short_message_chars} characters)",
         )
     if cl and len(cl) > limits.max_changelog_chars:
-        raise ValueError(
-            f"Changelog exceeds maximum length ({limits.max_changelog_chars} characters)"
+        raise CommitPolicyViolation(
+            "POLICY_VIOLATION",
+            f"Changelog exceeds maximum length ({limits.max_changelog_chars} characters)",
         )
     return sm, cl
 

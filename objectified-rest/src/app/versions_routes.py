@@ -23,7 +23,12 @@ from .models import (
     SunsetTimelineEntryOut,
 )
 from .auth import validate_authentication, get_authenticated_user_id
-from .version_notes import limits_for_tenant, validate_version_notes
+from .version_notes import (
+    CommitPolicyViolation,
+    effective_commit_policy,
+    enforce_max_commit_payload,
+    validate_version_notes,
+)
 from .revision_deprecation import (
     coerce_metadata,
     parse_calendar_date,
@@ -37,6 +42,10 @@ from .revision_lifecycle import (
 )
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
+
+
+def _commit_policy_http(exc: CommitPolicyViolation) -> HTTPException:
+    return HTTPException(status_code=400, detail={"code": exc.code, "message": exc.message})
 
 
 _DEFAULT_COMMIT_METADATA_MAX_CHARS = 10_000
@@ -551,16 +560,17 @@ async def create_version(
         # Get creator_id from auth data (will be None for API key auth)
         creator_id = get_authenticated_user_id(auth_data)
 
-        limits = limits_for_tenant(auth_data["tenant_id"])
+        limits = effective_commit_policy(auth_data["tenant_id"], project.get("metadata"))
         try:
+            enforce_max_commit_payload(request, limits)
             sm, cl = validate_version_notes(
                 request.short_message,
                 request.changelog,
                 limits,
                 require_short_message=limits.require_short_message,
             )
-        except ValueError as ve:
-            raise HTTPException(status_code=400, detail=str(ve)) from ve
+        except CommitPolicyViolation as pe:
+            raise _commit_policy_http(pe) from pe
 
         # Validate and normalize commit metadata before DB call so 400s surface correctly
         commit_author = _optional_commit_metadata_str(
@@ -654,16 +664,17 @@ async def fork_version_from_revision(
     if not creator_id:
         raise HTTPException(status_code=403, detail="Forking requires user authentication (JWT token)")
 
-    limits = limits_for_tenant(auth_data["tenant_id"])
+    limits = effective_commit_policy(auth_data["tenant_id"], target_project.get("metadata"))
     try:
+        enforce_max_commit_payload(request, limits)
         sm, cl = validate_version_notes(
             request.short_message,
             request.changelog,
             limits,
             require_short_message=limits.require_short_message,
         )
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve)) from ve
+    except CommitPolicyViolation as pe:
+        raise _commit_policy_http(pe) from pe
 
     upstream_opt = (request.upstream_project_id or "").strip() or None
 
@@ -737,6 +748,13 @@ async def update_version(
         )
 
     try:
+        proj_row = db.get_project_by_id(project_id, auth_data["tenant_id"])
+        limits = effective_commit_policy(auth_data["tenant_id"], proj_row.get("metadata") if proj_row else None)
+        try:
+            enforce_max_commit_payload(request, limits)
+        except CommitPolicyViolation as pe:
+            raise _commit_policy_http(pe) from pe
+
         existing_lc = effective_lifecycle(existing.get("metadata"))
         tenant_id = auth_data["tenant_id"]
         uid_session = get_authenticated_user_id(auth_data)
@@ -760,7 +778,6 @@ async def update_version(
                     detail="Cannot edit version notes on an archived revision.",
                 )
 
-        limits = limits_for_tenant(auth_data["tenant_id"])
         updates: Dict[str, Any] = {}
         if request.enabled is not None:
             updates["enabled"] = request.enabled
@@ -789,8 +806,8 @@ async def update_version(
                     limits,
                     require_short_message=limits.require_short_message,
                 )
-            except ValueError as ve:
-                raise HTTPException(status_code=400, detail=str(ve)) from ve
+            except CommitPolicyViolation as pe:
+                raise _commit_policy_http(pe) from pe
             if "short_message" in request.model_fields_set:
                 updates["description"] = merged_sm
             if "changelog" in request.model_fields_set:
@@ -838,6 +855,8 @@ async def update_version(
         return VersionSchema(**version)
     except HTTPException:
         raise
+    except CommitPolicyViolation as pe:
+        raise _commit_policy_http(pe) from pe
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve)) from ve
     except Exception as e:
@@ -906,24 +925,26 @@ async def publish_version(
     if visibility not in ("public", "private"):
         visibility = "private"
 
-    limits = limits_for_tenant(auth_data["tenant_id"])
-    merged_sm = existing.get("description")
-    merged_cl = existing.get("change_log")
-    note_keys = {"short_message", "changelog"}
-    if request.model_fields_set & note_keys:
-        if "short_message" in request.model_fields_set:
-            merged_sm = request.short_message
-        if "changelog" in request.model_fields_set:
-            merged_cl = request.changelog
+    proj_pub = db.get_project_by_id(project_id, auth_data["tenant_id"])
+    limits = effective_commit_policy(auth_data["tenant_id"], proj_pub.get("metadata") if proj_pub else None)
     try:
+        enforce_max_commit_payload(request, limits)
+        merged_sm = existing.get("description")
+        merged_cl = existing.get("change_log")
+        note_keys = {"short_message", "changelog"}
+        if request.model_fields_set & note_keys:
+            if "short_message" in request.model_fields_set:
+                merged_sm = request.short_message
+            if "changelog" in request.model_fields_set:
+                merged_cl = request.changelog
         merged_sm, merged_cl = validate_version_notes(
             merged_sm,
             merged_cl,
             limits,
             require_short_message=limits.require_short_message,
         )
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve)) from ve
+    except CommitPolicyViolation as pe:
+        raise _commit_policy_http(pe) from pe
 
     version = db.publish_version(
         version_record_id,
