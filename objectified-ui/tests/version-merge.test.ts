@@ -1,4 +1,8 @@
-import { classifyMergeDiff } from '../lib/version-merge';
+import {
+  classifyMergeDiff,
+  formatMergeConflictKinds,
+  normalizeMergeConflictRows,
+} from '../lib/version-merge';
 import type { DiffSummary } from '../lib/schema-diff';
 
 describe('classifyMergeDiff', () => {
@@ -25,5 +29,28 @@ describe('classifyMergeDiff', () => {
     const c = classifyMergeDiff(summary);
     expect(c.canAutoMerge).toBe(true);
     expect(c.addedSchemaNames).toContain('NewThing');
+  });
+});
+
+describe('formatMergeConflictKinds', () => {
+  test('labels known kinds and joins with separator', () => {
+    expect(formatMergeConflictKinds(['twoWay', 'threeWay'])).toBe('Three-way · Two-way (divergent)');
+    expect(formatMergeConflictKinds(['blend'])).toBe('Blend / materialize');
+  });
+});
+
+describe('normalizeMergeConflictRows', () => {
+  test('uses API conflicts when present', () => {
+    const rows = normalizeMergeConflictRows(
+      [{ path: 'schemas.A', kinds: ['threeWay'] }],
+      ['schemas.B']
+    );
+    expect(rows).toEqual([{ path: 'schemas.A', kinds: ['threeWay'] }]);
+  });
+
+  test('falls back to conflict paths with twoWay', () => {
+    expect(normalizeMergeConflictRows(undefined, ['schemas.X'])).toEqual([
+      { path: 'schemas.X', kinds: ['twoWay'] },
+    ]);
   });
 });
