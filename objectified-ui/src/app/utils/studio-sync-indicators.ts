@@ -9,8 +9,8 @@ export type StudioSyncVersionRow = {
   creator_id?: string | null;
 };
 
-/** Walk parent_version_id from project head toward ancestors; count revisions authored by the user before hitting `localVersionId`. */
-export function countUnpushedAuthoredRevisionsTowardHead(
+/** Walk parent_version_id from the project head toward ancestors; count revisions authored by the user on the path down to `localVersionId`. */
+export function countAuthoredRevisionsTowardHead(
   versionsNewestFirst: StudioSyncVersionRow[],
   localVersionId: string | null,
   currentUserId: string | undefined

@@ -7,7 +7,7 @@ import { cn } from '@lib/utils';
 
 export type StudioSyncStatusChipsProps = {
   localDirty: boolean;
-  unpushedCount: number;
+  authoredRevisionCount: number;
   serverAhead: boolean;
   className?: string;
 };
@@ -40,13 +40,13 @@ function Chip({
 
 export function StudioSyncStatusChips({
   localDirty,
-  unpushedCount,
+  authoredRevisionCount,
   serverAhead,
   className,
 }: StudioSyncStatusChipsProps) {
-  const showUnpushed = unpushedCount > 0;
+  const showAuthoredRevisions = authoredRevisionCount > 0;
 
-  if (!localDirty && !showUnpushed && !serverAhead) {
+  if (!localDirty && !showAuthoredRevisions && !serverAhead) {
     return null;
   }
 
@@ -59,7 +59,7 @@ export function StudioSyncStatusChips({
         {localDirty ? (
           <Tooltip.Root>
             <Tooltip.Trigger asChild>
-              <span>
+              <span tabIndex={0} className="rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-400">
                 <Chip
                   title="Unsaved canvas changes (layout auto-save pending or in progress)."
                   aria-label="Dirty: unsaved local changes"
@@ -82,17 +82,17 @@ export function StudioSyncStatusChips({
           </Tooltip.Root>
         ) : null}
 
-        {showUnpushed ? (
+        {showAuthoredRevisions ? (
           <Tooltip.Root>
             <Tooltip.Trigger asChild>
-              <span>
+              <span tabIndex={0} className="rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-slate-400">
                 <Chip
                   title="Revisions you authored between this selection and the latest revision (main lineage)."
-                  aria-label={`Unpushed authored revisions: ${unpushedCount}`}
+                  aria-label={`Your authored revisions between this selection and head: ${authoredRevisionCount}`}
                   className="border-slate-300/90 bg-slate-50 text-slate-900 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-100"
                 >
                   <ArrowUp className="h-3 w-3" aria-hidden />
-                  {unpushedCount}
+                  {authoredRevisionCount}
                 </Chip>
               </span>
             </Tooltip.Trigger>
@@ -112,7 +112,7 @@ export function StudioSyncStatusChips({
         {serverAhead ? (
           <Tooltip.Root>
             <Tooltip.Trigger asChild>
-              <span>
+              <span tabIndex={0} className="rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-violet-400">
                 <Chip
                   title="The project has a newer revision than your selection, or the server rejected a push as stale."
                   aria-label="Server ahead: newer revision available or push base stale"

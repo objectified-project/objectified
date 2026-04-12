@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import {
-  countUnpushedAuthoredRevisionsTowardHead,
+  countAuthoredRevisionsTowardHead,
   isRemoteHeadAheadOfSelection,
 } from '@/app/utils/studio-sync-indicators';
 
@@ -21,25 +21,25 @@ describe('studio-sync-indicators', () => {
     expect(isRemoteHeadAheadOfSelection(versions, 'o')).toBe(true);
   });
 
-  test('countUnpushedAuthoredRevisionsTowardHead counts only authored nodes above selection', () => {
+  test('countAuthoredRevisionsTowardHead counts only authored nodes above selection', () => {
     const versions = [
       { id: 'v3', parent_version_id: 'v2', creator_id: u },
       { id: 'v2', parent_version_id: 'v1', creator_id: other },
       { id: 'v1', parent_version_id: null, creator_id: u },
     ];
-    expect(countUnpushedAuthoredRevisionsTowardHead(versions, 'v1', u)).toBe(1);
+    expect(countAuthoredRevisionsTowardHead(versions, 'v1', u)).toBe(1);
   });
 
-  test('countUnpushedAuthoredRevisionsTowardHead is zero at head', () => {
+  test('countAuthoredRevisionsTowardHead is zero at head', () => {
     const versions = [{ id: 'v3', parent_version_id: 'v2', creator_id: u }];
-    expect(countUnpushedAuthoredRevisionsTowardHead(versions, 'v3', u)).toBe(0);
+    expect(countAuthoredRevisionsTowardHead(versions, 'v3', u)).toBe(0);
   });
 
-  test('countUnpushedAuthoredRevisionsTowardHead returns zero when lineage does not reach selection', () => {
+  test('countAuthoredRevisionsTowardHead returns zero when lineage does not reach selection', () => {
     const versions = [
       { id: 'a', parent_version_id: 'b', creator_id: u },
       { id: 'c', parent_version_id: null, creator_id: u },
     ];
-    expect(countUnpushedAuthoredRevisionsTowardHead(versions, 'c', u)).toBe(0);
+    expect(countAuthoredRevisionsTowardHead(versions, 'c', u)).toBe(0);
   });
 });

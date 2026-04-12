@@ -22,7 +22,7 @@ import ServerAheadPushBanner from '@/app/components/ade/ServerAheadPushBanner';
 import { usePushConflictBanner } from '@/app/providers/PushConflictBannerProvider';
 import { isRevisionDeprecated } from '@/app/utils/revision-deprecation';
 import {
-  countUnpushedAuthoredRevisionsTowardHead,
+  countAuthoredRevisionsTowardHead,
   isRemoteHeadAheadOfSelection,
 } from '@/app/utils/studio-sync-indicators';
 import { StudioSyncStatusChips } from './StudioSyncStatusChips';
@@ -40,7 +40,7 @@ interface Version {
   published: boolean;
   metadata?: Record<string, unknown>;
   parent_version_id?: string | null;
-  creator_id?: string | null;
+  creator_id: string | null;
 }
 
 type ViewMode = 'editor' | 'paths' | 'code';
@@ -279,8 +279,8 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     [versions]
   );
 
-  const unpushedAuthoredCount = React.useMemo(
-    () => countUnpushedAuthoredRevisionsTowardHead(syncVersionsForMetrics, localVersionId, sessionUserId),
+  const authoredRevisionCount = React.useMemo(
+    () => countAuthoredRevisionsTowardHead(syncVersionsForMetrics, localVersionId, sessionUserId),
     [syncVersionsForMetrics, localVersionId, sessionUserId]
   );
 
@@ -463,7 +463,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
         {localProjectId && localVersionId ? (
           <StudioSyncStatusChips
             localDirty={syncLocalDirty}
-            unpushedCount={unpushedAuthoredCount}
+            authoredRevisionCount={authoredRevisionCount}
             serverAhead={showSyncServerAheadChip}
           />
         ) : null}
