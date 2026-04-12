@@ -1826,14 +1826,8 @@ const Versions = () => {
       toast.warning('Run Preview merge for the current source and target branches before applying.');
       return;
     }
-    if (mergeApplyBlockedByEngineWithoutRows) {
-      toast.warning('Merge preview reported conflicts but no conflict rows were returned — run Preview merge again.');
-      return;
-    }
-    if (mergeApplyBlockedByUnresolvedChoices) {
-      toast.warning(
-        `Resolve all merge conflicts before applying (${mergeUnresolvedChoiceCount} unresolved).`
-      );
+    if (mergeHasEngineConflicts) {
+      toast.warning('Merge preview reported conflicts — the server does not yet accept resolution choices. Resolve conflicts server-side before applying.');
       return;
     }
     const target = versionBranches.find((b) => b.name === mergeTargetBranch.trim());
@@ -1864,6 +1858,7 @@ const Versions = () => {
       } else {
         const err = typeof d.detail === 'object' && d.detail !== null ? d.detail : d;
         const code = typeof err === 'object' && err && 'code' in err ? (err as { code?: string }).code : undefined;
+        const reason = typeof err === 'object' && err && 'reason' in err ? (err as { reason?: string }).reason : undefined;
         const conflictPaths =
           typeof err === 'object' && err && 'conflictPaths' in err
             ? (err as { conflictPaths?: string[] }).conflictPaths
@@ -1888,6 +1883,7 @@ const Versions = () => {
               : 'Merge blocked: unresolved conflicts. Resolve all conflicts before applying.'
           );
           const paths = conflictPaths ?? [];
+          const conflictKind = reason === 'MERGE_CONFLICT' ? 'threeWay' : reason === 'MERGE_BLEND' ? 'blend' : 'twoWay';
           setMergePreviewData((prev) => ({
             ...(prev ?? {}),
             classification: {
@@ -1895,7 +1891,7 @@ const Versions = () => {
               conflictPaths: paths,
               addedSchemaNames: prev?.classification?.addedSchemaNames ?? [],
             },
-            conflicts: paths.map((p) => ({ path: p, kinds: ['twoWay'] })),
+            conflicts: paths.map((p) => ({ path: p, kinds: [conflictKind] })),
             previewSourceBranch: prev?.previewSourceBranch ?? mergeSourceBranch.trim(),
             previewTargetBranch: prev?.previewTargetBranch ?? mergeTargetBranch.trim(),
           }));
@@ -4196,8 +4192,7 @@ const Versions = () => {
                 !mergeSourceBranch ||
                 !mergeTargetBranch ||
                 !mergePreviewMatchesBranches ||
-                mergeApplyBlockedByUnresolvedChoices ||
-                mergeApplyBlockedByEngineWithoutRows ||
+                mergeHasEngineConflicts ||
                 mergeCompat?.mergeBlockedByCompatGate === true
               }
             >

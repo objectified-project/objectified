@@ -460,7 +460,7 @@ async def version_branch_merge(
     t = _extract_schemas(source_spec)
 
     merged, conflicts = merge_components_schemas_three_way(b, o, t)
-    if not merged or conflicts:
+    if merged is None or conflicts:
         uc = len(conflicts)
         raise HTTPException(
             status_code=409,
