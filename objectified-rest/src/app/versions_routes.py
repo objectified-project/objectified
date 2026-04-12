@@ -95,6 +95,50 @@ def _successor_resolution_headers(
     return h
 
 
+def _strong_etag_for_revision(revision_id: str) -> str:
+    """Strong ETag for conditional GET (P0-06); value is the revision id (same as push head identity)."""
+    return f'"{str(revision_id).strip()}"'
+
+
+def _if_none_match_matches_revision(revision_id: str, if_none_match: Optional[str]) -> bool:
+    """
+    True when If-None-Match lists this revision's strong ETag, or when the
+    header value is ``*``.  Per RFC 9110 §13.1.2, ``*`` on a GET/HEAD request
+    matches any current representation of the resource, so a 304 is
+    appropriate whenever the resource exists.
+    """
+    if not if_none_match or not str(if_none_match).strip():
+        return False
+    header = str(if_none_match).strip()
+    if header == "*":
+        return True
+    rid = str(revision_id).strip().lower()
+    for raw in header.split(","):
+        token = raw.strip()
+        if not token:
+            continue
+        if token == "*":
+            return True
+        if token.startswith("W/"):
+            token = token[2:].strip()
+        if len(token) >= 2 and token[0] == '"' and token[-1] == '"':
+            token = token[1:-1]
+        if token.strip().lower() == rid:
+            return True
+    return False
+
+
+def _not_modified_revision_response(
+    *,
+    revision_id: str,
+    extra_headers: Optional[Dict[str, str]] = None,
+) -> Response:
+    headers: Dict[str, str] = {"ETag": _strong_etag_for_revision(revision_id)}
+    if extra_headers:
+        headers.update(extra_headers)
+    return Response(status_code=304, headers=headers)
+
+
 def parse_semantic_version(version: str) -> Optional[Dict[str, int]]:
     """Parse a semantic version string into components."""
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)$', version)
@@ -343,7 +387,13 @@ async def get_version(
             detail=f"Version not found in project: {project_id}",
         )
 
+    if_none_match = request.headers.get("if-none-match")
+
     if successor_resolution == "none":
+        etag_id = str(version["id"])
+        if _if_none_match_matches_revision(etag_id, if_none_match):
+            return _not_modified_revision_response(revision_id=etag_id)
+        response.headers["ETag"] = _strong_etag_for_revision(etag_id)
         return VersionSchema(**version)
 
     final_id, hops, status, missing_id = db.resolve_successor_revision_chain(
@@ -411,20 +461,27 @@ async def get_version(
 
     if successor_resolution == "redirect":
         if final_id == version_record_id:
+            etag_id = str(version["id"])
+            if _if_none_match_matches_revision(etag_id, if_none_match):
+                return _not_modified_revision_response(revision_id=etag_id)
+            response.headers["ETag"] = _strong_etag_for_revision(etag_id)
             return VersionSchema(**version)
         base = request.url.path.rstrip("/").rsplit("/", 1)[0]
         loc = request.url.replace(path=f"{base}/{final_id}", query="successorResolution=none")
         return RedirectResponse(str(loc), status_code=307)
 
-    for k, v in _successor_resolution_headers(
+    succ_headers = _successor_resolution_headers(
         requested_id=version_record_id,
         final_id=final_id,
         hops=hops,
         status=status,
         missing_id=missing_id,
-    ).items():
+    )
+    if _if_none_match_matches_revision(final_id, if_none_match):
+        return _not_modified_revision_response(revision_id=final_id, extra_headers=succ_headers)
+    for k, v in succ_headers.items():
         response.headers[k] = v
-
+    response.headers["ETag"] = _strong_etag_for_revision(final_id)
     return VersionSchema(**final_row)
 
 
@@ -463,7 +520,13 @@ async def get_version_by_version_id(
 
     version_record_id = str(version["id"])
 
+    if_none_match = request.headers.get("if-none-match")
+
     if successor_resolution == "none":
+        etag_id = str(version["id"])
+        if _if_none_match_matches_revision(etag_id, if_none_match):
+            return _not_modified_revision_response(revision_id=etag_id)
+        response.headers["ETag"] = _strong_etag_for_revision(etag_id)
         return VersionSchema(**version)
 
     final_id, hops, status, missing_id = db.resolve_successor_revision_chain(
@@ -531,6 +594,10 @@ async def get_version_by_version_id(
 
     if successor_resolution == "redirect":
         if final_id == version_record_id:
+            etag_id = str(version["id"])
+            if _if_none_match_matches_revision(etag_id, if_none_match):
+                return _not_modified_revision_response(revision_id=etag_id)
+            response.headers["ETag"] = _strong_etag_for_revision(etag_id)
             return VersionSchema(**version)
         base = request.url.path.rstrip("/").rsplit("/", 1)[0]
         loc = request.url.replace(
@@ -539,15 +606,18 @@ async def get_version_by_version_id(
         )
         return RedirectResponse(str(loc), status_code=307)
 
-    for k, v in _successor_resolution_headers(
+    succ_headers = _successor_resolution_headers(
         requested_id=version_record_id,
         final_id=final_id,
         hops=hops,
         status=status,
         missing_id=missing_id,
-    ).items():
+    )
+    if _if_none_match_matches_revision(final_id, if_none_match):
+        return _not_modified_revision_response(revision_id=final_id, extra_headers=succ_headers)
+    for k, v in succ_headers.items():
         response.headers[k] = v
-
+    response.headers["ETag"] = _strong_etag_for_revision(final_id)
     return VersionSchema(**final_row)
 
 
