@@ -70,6 +70,7 @@ def test_get_version_resolve_returns_final_revision_and_headers():
     assert r.status_code == 200
     body = r.json()
     assert body["id"] == "rev-b"
+    assert r.headers.get("etag") == '"rev-b"'
     assert r.headers.get("x-objectified-resolved-from") == "rev-a"
     assert r.headers.get("x-objectified-successor-chain") == "rev-b"
     assert r.headers.get("x-objectified-successor-resolution-status") == "resolved"

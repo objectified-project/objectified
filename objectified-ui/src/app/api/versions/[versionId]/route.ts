@@ -136,11 +136,31 @@ export async function GET(
     const q = qs.toString();
     const restUrl = `${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}/${versionId}${q ? `?${q}` : ''}`;
 
+    const ifNoneMatch = request.headers.get('if-none-match');
+    const fetchHeaders: Record<string, string> = { ...headers };
+    if (ifNoneMatch) {
+      fetchHeaders['If-None-Match'] = ifNoneMatch;
+    }
+
     const response = await fetch(restUrl, {
       method: 'GET',
-      headers,
+      headers: fetchHeaders,
       redirect: sr === 'redirect' ? 'manual' : 'follow',
     });
+
+    if (response.status === 304) {
+      const res = new NextResponse(null, { status: 304 });
+      const etag = response.headers.get('ETag');
+      if (etag) {
+        res.headers.set('ETag', etag);
+      }
+      response.headers.forEach((value, key) => {
+        if (key.toLowerCase().startsWith('x-objectified-')) {
+          res.headers.set(key, value);
+        }
+      });
+      return res;
+    }
 
     if (response.status === 307 || response.status === 308) {
       const loc = response.headers.get('Location');
@@ -167,6 +187,10 @@ export async function GET(
     }
 
     const res = NextResponse.json({ success: true, version: data });
+    const restEtag = response.headers.get('ETag');
+    if (restEtag) {
+      res.headers.set('ETag', restEtag);
+    }
     response.headers.forEach((value, key) => {
       if (key.toLowerCase().startsWith('x-objectified-')) {
         res.headers.set(key, value);

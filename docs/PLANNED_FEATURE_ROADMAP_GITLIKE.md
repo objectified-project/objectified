@@ -210,6 +210,8 @@ Add server-ahead conflict banner with direct CTAs (`Pull`, `Open Merge`) in edit
 
 ## P0-06: Add Pull Conditional Fetch (ETag / 304)
 
+**Status:** **Done** — `GET /v1/versions/.../{revisionId}` and `GET .../by-version/{versionId}` send **`ETag`** (revision id); **`If-None-Match`** → **`304`** empty body when unchanged; Next.js **`/api/versions/[versionId]`** forwards **`If-None-Match`** / **`ETag`**.
+
 **GitHub:** [#2568](https://github.com/KenSuenobu/objectified-commercial/issues/2568) · **Epic:** [#2558](https://github.com/KenSuenobu/objectified-commercial/issues/2558)
 
 ### Problem statement
