@@ -427,6 +427,8 @@ Add search/filter controls for message, author, and date range.
 - Date range filter returns only matching revisions.
 - Empty state is user-friendly and reset is one click.
 
+**Status:** Shipped — ADE **Versions** **Timeline** bar (search, author, From/To dates, **Reset**); table + revision graph respect the same filtered set; empty state + reset when nothing matches. REST: **`GET /v1/versions/{tenant}/{projectId}`** supports **`q`**, **`creatorId`**, **`createdAfter`**, **`createdBefore`** (database-side filter for scale / API clients).
+
 ---
 
 ## P1-08: Compare Selected Revision with Current

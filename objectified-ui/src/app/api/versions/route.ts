@@ -117,8 +117,8 @@ function nextJsonFromVersionCreateError(
 }
 
 /**
- * GET /api/versions?projectId=xxx
- * List all versions for a project
+ * GET /api/versions?projectId=xxx&lifecycle=&q=&creatorId=&createdAfter=&createdBefore=
+ * List all versions for a project (optional history filters #2579 proxy to REST)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -145,6 +145,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
     const lifecycle = searchParams.get('lifecycle');
+    const q = searchParams.get('q');
+    const creatorId = searchParams.get('creatorId');
+    const createdAfter = searchParams.get('createdAfter');
+    const createdBefore = searchParams.get('createdBefore');
 
     if (!projectId) {
       return NextResponse.json(
@@ -165,8 +169,14 @@ export async function GET(request: NextRequest) {
     const tenantSlug = tenant.slug;
 
     // Build REST API URL
-    const qs = lifecycle ? `?lifecycle=${encodeURIComponent(lifecycle)}` : '';
-    const url = `${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}${qs}`;
+    const restParams = new URLSearchParams();
+    if (lifecycle) restParams.set('lifecycle', lifecycle);
+    if (q) restParams.set('q', q);
+    if (creatorId) restParams.set('creatorId', creatorId);
+    if (createdAfter) restParams.set('createdAfter', createdAfter);
+    if (createdBefore) restParams.set('createdBefore', createdBefore);
+    const qs = restParams.toString();
+    const url = `${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}${qs ? `?${qs}` : ''}`;
 
     // Create auth headers with JWT token from session
     const headers = createAuthHeaders({

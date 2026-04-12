@@ -344,6 +344,34 @@ def test_fork_version_same_project_returns_400():
         app.dependency_overrides.pop(validate_authentication, None)
 
 
+def test_list_versions_forwards_history_filters_to_db():
+    """GET /v1/versions/... passes q, creatorId, createdAfter, createdBefore to the DB layer (#2579)."""
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        with patch("src.app.versions_routes.db") as mock_db:
+            mock_db.get_project_by_id.return_value = {"id": "proj-a", "tenant_id": "test-tenant-id"}
+            mock_db.get_versions_for_project.return_value = []
+            response = client.get(
+                "/v1/versions/test-tenant/proj-a",
+                params={
+                    "q": "fix typo",
+                    "creatorId": "user-xyz",
+                    "createdAfter": "2024-06-01T00:00:00Z",
+                    "createdBefore": "2024-06-30T23:59:59Z",
+                },
+            )
+        assert response.status_code == 200
+        assert response.json() == []
+        mock_db.get_versions_for_project.assert_called_once()
+        kwargs = mock_db.get_versions_for_project.call_args.kwargs
+        assert kwargs["message_q"] == "fix typo"
+        assert kwargs["creator_id"] == "user-xyz"
+        assert kwargs["created_after"] is not None
+        assert kwargs["created_before"] is not None
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
 def test_fork_version_bump_strategy_minor():
     """POST /fork with bumpStrategy='minor' increments the minor version component."""
     app.dependency_overrides[validate_authentication] = _override_auth

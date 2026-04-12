@@ -7,6 +7,7 @@ All endpoints are tenant and project-scoped and require authentication via JWT t
 
 import re
 from datetime import date as date_cls
+from datetime import datetime
 from typing import Literal, Optional, List, Dict, Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
@@ -343,6 +344,25 @@ async def list_versions(
         None,
         description="Filter catalog/history by revision lifecycle tag (#739): stable, beta, deprecated, archived.",
     ),
+    q: Optional[str] = Query(
+        None,
+        description="Search revision note, changelog, and full commit message body (case-insensitive, #2579).",
+    ),
+    creator_id: Optional[str] = Query(
+        None,
+        alias="creatorId",
+        description="Filter by creator user id (#2579).",
+    ),
+    created_after: Optional[datetime] = Query(
+        None,
+        alias="createdAfter",
+        description="Include revisions with created_at on or after this instant (ISO 8601, #2579).",
+    ),
+    created_before: Optional[datetime] = Query(
+        None,
+        alias="createdBefore",
+        description="Include revisions with created_at on or before this instant (ISO 8601, #2579).",
+    ),
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> List[VersionSchema]:
     """
@@ -378,7 +398,18 @@ async def list_versions(
             )
         lc_filter = lc_norm
 
-    versions = db.get_versions_for_project(project_id, auth_data["tenant_id"], lifecycle=lc_filter)
+    mq = (q or "").strip()
+    cid = (creator_id or "").strip()
+
+    versions = db.get_versions_for_project(
+        project_id,
+        auth_data["tenant_id"],
+        lifecycle=lc_filter,
+        message_q=mq or None,
+        creator_id=cid or None,
+        created_after=created_after,
+        created_before=created_before,
+    )
 
     return [VersionSchema(**v) for v in versions]
 
