@@ -4,8 +4,8 @@ SET search_path TO odb, public;
 CREATE TABLE IF NOT EXISTS workflow_audit (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
-    version_id UUID REFERENCES versions(id) ON DELETE SET NULL,
+    project_id UUID,
+    version_id UUID,
     action VARCHAR(96) NOT NULL,
     outcome VARCHAR(24) NOT NULL,
     actor_id UUID REFERENCES users(id) ON DELETE SET NULL,

@@ -1,6 +1,6 @@
 """Workflow audit ledger writes (#2577)."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 import pytest
 from fastapi.testclient import TestClient
@@ -107,3 +107,57 @@ def test_create_version_push_success_audits():
     assert args[3] == "version.push"
     assert args[4] == "success"
     assert args[2] == "new-rev"
+
+
+def test_merge_project_not_found_emits_failure_audit():
+    with patch("app.version_merge_routes.db") as mdb:
+        mdb.get_project_by_id.return_value = None
+        mdb.insert_workflow_audit = MagicMock()
+        r = client.post(
+            "/v1/versions/tn/proj-1/version-branches/merge",
+            json={
+                "sourceBranchName": "feature",
+                "targetBranchName": "main",
+                "baseRevisionId": "rev-base",
+            },
+        )
+    assert r.status_code == 404
+    mdb.insert_workflow_audit.assert_called_once()
+    args = mdb.insert_workflow_audit.call_args[0]
+    assert args[3] == "version.merge"
+    assert args[4] == "failure"
+    assert args[6]["reason"] == "project_not_found"
+
+
+def test_rollback_project_not_found_emits_failure_audit():
+    head_tip = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    tgt_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    proj = {"id": "proj-1", "metadata": {}}
+    branch = {"id": "br-1", "tip_version_id": head_tip, "protected": False}
+    head_ver = {"id": head_tip, "project_id": "proj-1", "version_id": "1.0.0",
+                "metadata": None, "published": False}
+    tgt_ver = {"id": tgt_id, "project_id": "proj-1", "version_id": "0.9.0",
+               "metadata": None, "published": False}
+    with patch("app.version_merge_routes.db") as mdb:
+        mdb.get_project_by_id.return_value = proj
+        mdb.get_version_branch_by_name.return_value = branch
+        mdb.get_version_by_id.side_effect = lambda vid, tid: (
+            head_ver if vid == head_tip else tgt_ver if vid == tgt_id else None
+        )
+        mdb.collect_revision_ancestors.return_value = [tgt_id]
+        mdb.insert_workflow_audit = MagicMock()
+        # base_revision_id deliberately wrong → STALE_HEAD → audit failure
+        r = client.post(
+            "/v1/versions/tn/proj-1/version-branches/rollback",
+            json={
+                "branchName": "main",
+                "targetRevisionId": tgt_id,
+                "baseRevisionId": "wrong-base",
+            },
+        )
+    assert r.status_code == 409
+    mdb.insert_workflow_audit.assert_called_once()
+    args = mdb.insert_workflow_audit.call_args[0]
+    assert args[3] == "version.rollback"
+    assert args[4] == "failure"
+    assert args[6]["detail"]["code"] == "STALE_HEAD"

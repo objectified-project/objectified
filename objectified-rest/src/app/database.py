@@ -2347,7 +2347,7 @@ class Database:
                    wa.actor_id, wa.detail, wa.created_at
             FROM odb.workflow_audit wa
             WHERE {' AND '.join(clauses)}
-            ORDER BY wa.created_at ASC
+            ORDER BY wa.created_at ASC, wa.id ASC
             LIMIT %s
         """
         params.append(limit)

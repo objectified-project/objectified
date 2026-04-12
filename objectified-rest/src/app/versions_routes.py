@@ -873,7 +873,7 @@ async def create_version(
                     "failure",
                     creator_id,
                     {
-                        "reason": "INVALID_BASE",
+                        "reason": "invalid_base",
                         "httpStatus": 400,
                         "detail": {
                             "message": "baseRevisionId must be empty when there is no current revision",

@@ -742,24 +742,32 @@ async def version_branch_merge(
         conn.commit()
     except HTTPException as he:
         conn.rollback()
+        _attempted = locals().get("new_id")
+        _audit_detail: Dict[str, Any] = {"httpStatus": he.status_code, "detail": he.detail}
+        if _attempted:
+            _audit_detail["attemptedNewRevisionId"] = _attempted
         _workflow_audit_merge(
             tenant_id,
             project_id,
-            locals().get("new_id") or target_tip,
+            target_tip,
             "failure",
             creator_id,
-            {"httpStatus": he.status_code, "detail": he.detail},
+            _audit_detail,
         )
         raise
     except Exception as ex:
         conn.rollback()
+        _attempted = locals().get("new_id")
+        _audit_detail = {"httpStatus": 500, "reason": "unexpected_error", "message": str(ex)}
+        if _attempted:
+            _audit_detail["attemptedNewRevisionId"] = _attempted
         _workflow_audit_merge(
             tenant_id,
             project_id,
-            locals().get("new_id") or target_tip,
+            target_tip,
             "failure",
             creator_id,
-            {"httpStatus": 500, "reason": "unexpected_error", "message": str(ex)},
+            _audit_detail,
         )
         raise
     finally:
@@ -1132,24 +1140,32 @@ async def version_branch_rollback(
         conn.commit()
     except HTTPException as he:
         conn.rollback()
+        _attempted = locals().get("new_id")
+        _audit_detail: Dict[str, Any] = {"httpStatus": he.status_code, "detail": he.detail}
+        if _attempted:
+            _audit_detail["attemptedNewRevisionId"] = _attempted
         _workflow_audit_rollback(
             tenant_id,
             project_id,
-            locals().get("new_id") or head_tip,
+            head_tip,
             "failure",
             creator_id,
-            {"httpStatus": he.status_code, "detail": he.detail},
+            _audit_detail,
         )
         raise
     except Exception as ex:
         conn.rollback()
+        _attempted = locals().get("new_id")
+        _audit_detail = {"httpStatus": 500, "reason": "unexpected_error", "message": str(ex)}
+        if _attempted:
+            _audit_detail["attemptedNewRevisionId"] = _attempted
         _workflow_audit_rollback(
             tenant_id,
             project_id,
-            locals().get("new_id") or head_tip,
+            head_tip,
             "failure",
             creator_id,
-            {"httpStatus": 500, "reason": "unexpected_error", "message": str(ex)},
+            _audit_detail,
         )
         raise
     finally:
