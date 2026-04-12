@@ -26,6 +26,7 @@ import {
   isRemoteHeadAheadOfSelection,
 } from '@/app/utils/studio-sync-indicators';
 import { StudioSyncStatusChips } from './StudioSyncStatusChips';
+import { DraftLockHeaderChip } from './DraftLockHeaderChip';
 
 interface Project {
   id: string;
@@ -465,6 +466,15 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
             localDirty={syncLocalDirty}
             authoredRevisionCount={authoredRevisionCount}
             serverAhead={showSyncServerAheadChip}
+          />
+        ) : null}
+
+        {localProjectId && localVersionId ? (
+          <DraftLockHeaderChip
+            projectId={localProjectId}
+            versionId={localVersionId}
+            published={versions.find((v) => v.id === localVersionId)?.published ?? true}
+            sessionUserId={sessionUserId}
           />
         ) : null}
 

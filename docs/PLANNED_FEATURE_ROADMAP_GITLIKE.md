@@ -541,6 +541,8 @@ Display lock chip with owner and expiration tooltip in header.
 - Tooltip includes owner identity and expiry.
 - UI updates live after acquire/release actions.
 
+**Status:** Shipped — **`GET .../{revisionId}/draft-lock`** (REST); **Studio** header chip + tooltip with owner, countdown, and absolute UTC; **10s** poll + **1s** countdown refresh (**#2585**).
+
 ---
 
 ## P2-04: Add Published Version Immutability Flag Enforcement

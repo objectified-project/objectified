@@ -4620,6 +4620,49 @@ class Database:
             db_now = db_now.replace(tzinfo=timezone.utc)
         return exp > db_now
 
+    def get_version_draft_lock_status(
+        self,
+        tenant_id: str,
+        project_id: str,
+        version_record_id: str,
+    ) -> Dict[str, Any]:
+        """
+        Read-only draft lock state for polling (#2585).
+
+        Returns:
+            ``{active: False}`` when no row, version missing, published, no lock, or lock expired.
+            ``{active: True, version_id, owner_user_id, expires_at}`` when a lock is active.
+        """
+        rows = self.execute_query(
+            """
+            SELECT v.id::text AS version_id, v.published,
+                   l.owner_user_id::text AS owner_user_id, l.expires_at
+            FROM odb.versions v
+            JOIN odb.projects p ON v.project_id = p.id
+            LEFT JOIN odb.version_draft_lock l ON l.version_id = v.id
+            WHERE v.id = %s::uuid AND v.project_id = %s AND p.tenant_id = %s
+              AND v.deleted_at IS NULL
+            """,
+            (version_record_id, project_id, tenant_id),
+        )
+        if not rows:
+            return {"active": False}
+        row = rows[0]
+        if row.get("published"):
+            return {"active": False}
+        ouid = row.get("owner_user_id")
+        exp = row.get("expires_at")
+        if not ouid or exp is None:
+            return {"active": False}
+        if not self._draft_lock_expires_active(exp):
+            return {"active": False}
+        return {
+            "active": True,
+            "version_id": str(row["version_id"]),
+            "owner_user_id": ouid,
+            "expires_at": exp,
+        }
+
     def acquire_version_draft_lock(
         self,
         tenant_id: str,
