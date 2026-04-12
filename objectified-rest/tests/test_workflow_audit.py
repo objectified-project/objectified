@@ -193,5 +193,9 @@ def test_rollback_stale_head_audit_includes_optional_reason():
             },
         )
     assert r.status_code == 409
+    mdb.insert_workflow_audit.assert_called_once()
     args = mdb.insert_workflow_audit.call_args[0]
+    assert args[3] == "version.rollback"
+    assert args[4] == "failure"
+    assert args[6]["detail"]["code"] == "STALE_HEAD"
     assert args[6]["reason"] == "incident-42 mitigation"
