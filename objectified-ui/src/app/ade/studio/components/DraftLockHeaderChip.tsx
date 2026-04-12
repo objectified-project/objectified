@@ -50,23 +50,27 @@ export function DraftLockHeaderChip({
   const [nowMs, setNowMs] = React.useState(() => Date.now());
 
   const fetchStatus = React.useCallback(async () => {
-    const qs = new URLSearchParams({ projectId });
-    const res = await fetch(`/api/versions/${encodeURIComponent(versionId)}/draft-lock?${qs.toString()}`);
-    const json = (await res.json()) as {
-      success?: boolean;
-      status?: { active?: boolean; ownerUserId?: string; expiresAt?: string };
-      error?: string;
-    };
-    if (!res.ok || !json.success || !json.status) {
+    try {
+      const qs = new URLSearchParams({ projectId });
+      const res = await fetch(`/api/versions/${encodeURIComponent(versionId)}/draft-lock?${qs.toString()}`);
+      const json = (await res.json()) as {
+        success?: boolean;
+        status?: { active?: boolean; ownerUserId?: string; expiresAt?: string };
+        error?: string;
+      };
+      if (!res.ok || !json.success || !json.status) {
+        setRemote(null);
+        return;
+      }
+      const st = json.status;
+      setRemote({
+        active: Boolean(st.active),
+        ownerUserId: typeof st.ownerUserId === 'string' ? st.ownerUserId : undefined,
+        expiresAt: typeof st.expiresAt === 'string' ? st.expiresAt : undefined,
+      });
+    } catch {
       setRemote(null);
-      return;
     }
-    const st = json.status;
-    setRemote({
-      active: Boolean(st.active),
-      ownerUserId: typeof st.ownerUserId === 'string' ? st.ownerUserId : undefined,
-      expiresAt: typeof st.expiresAt === 'string' ? st.expiresAt : undefined,
-    });
   }, [projectId, versionId]);
 
   React.useEffect(() => {

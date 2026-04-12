@@ -22,6 +22,18 @@ describe('DraftLockHeaderChip', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it('renders nothing and does not throw when fetch fails (network error)', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+    const { container } = render(
+      <DraftLockHeaderChip projectId="p1" versionId="v1" published={false} sessionUserId="u1" />
+    );
+    // Wait a tick for the async fetch to settle
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+    expect(container.querySelector('[data-testid="studio-draft-lock-chip"]')).toBeNull();
+  });
+
   it('shows lock chip when API reports an active draft lock', async () => {
     const exp = new Date(Date.now() + 5 * 60_000).toISOString();
     global.fetch = jest.fn().mockResolvedValue({
