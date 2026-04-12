@@ -284,6 +284,9 @@ const Versions = () => {
     targetTipVersionId?: string;
     mergeBaseVersionId?: string | null;
     conflicts?: Array<{ path: string; kinds: string[] }>;
+    /** Branches used for the last successful preview — apply requires a matching preview (#2576). */
+    previewSourceBranch?: string;
+    previewTargetBranch?: string;
   } | null>(null);
   const [mergeConflictResolutions, setMergeConflictResolutions] = useState<
     Record<string, MergeConflictResolutionChoice | null>
@@ -1146,6 +1149,38 @@ const Versions = () => {
     [mergePreviewData?.conflicts, mergePreviewData?.classification?.conflictPaths]
   );
 
+  const mergePreviewMatchesBranches = useMemo(() => {
+    if (!mergePreviewData?.previewSourceBranch || !mergePreviewData?.previewTargetBranch) return false;
+    return (
+      mergePreviewData.previewSourceBranch === mergeSourceBranch.trim() &&
+      mergePreviewData.previewTargetBranch === mergeTargetBranch.trim()
+    );
+  }, [mergePreviewData, mergeSourceBranch, mergeTargetBranch]);
+
+  const mergeHasEngineConflicts = Boolean(
+    mergePreviewData?.classification && !mergePreviewData.classification.canAutoMerge
+  );
+
+  const mergeApplyBlockedByUnresolvedChoices = useMemo(() => {
+    if (!mergeHasEngineConflicts || mergeConflictRows.length === 0) return false;
+    return mergeConflictRows.some((r) => {
+      const c = mergeConflictResolutions[r.path];
+      return c !== 'mine' && c !== 'theirs' && c !== 'manual';
+    });
+  }, [mergeHasEngineConflicts, mergeConflictRows, mergeConflictResolutions]);
+
+  const mergeApplyBlockedByEngineWithoutRows = Boolean(
+    mergeHasEngineConflicts && mergeConflictRows.length === 0
+  );
+
+  const mergeUnresolvedChoiceCount = useMemo(() => {
+    if (!mergeHasEngineConflicts || mergeConflictRows.length === 0) return 0;
+    return mergeConflictRows.filter((r) => {
+      const c = mergeConflictResolutions[r.path];
+      return c !== 'mine' && c !== 'theirs' && c !== 'manual';
+    }).length;
+  }, [mergeHasEngineConflicts, mergeConflictRows, mergeConflictResolutions]);
+
   const handleMergeConflictResolve = useCallback((path: string, choice: MergeConflictResolutionChoice) => {
     setMergeConflictResolutions((prev) => ({ ...prev, [path]: choice }));
   }, []);
@@ -1731,6 +1766,8 @@ const Versions = () => {
           targetTipVersionId: d.targetTipVersionId,
           mergeBaseVersionId: d.mergeBaseVersionId ?? null,
           conflicts: Array.isArray(d.conflicts) ? d.conflicts : undefined,
+          previewSourceBranch: mergeSourceBranch.trim(),
+          previewTargetBranch: mergeTargetBranch.trim(),
         });
         if (!d.classification?.canAutoMerge) {
           toast.info('Merge preview: conflicts detected — apply is blocked until resolved.');
@@ -1785,6 +1822,20 @@ const Versions = () => {
       toast.warning('Source and target must be different branches');
       return;
     }
+    if (!mergePreviewMatchesBranches) {
+      toast.warning('Run Preview merge for the current source and target branches before applying.');
+      return;
+    }
+    if (mergeApplyBlockedByEngineWithoutRows) {
+      toast.warning('Merge preview reported conflicts but no conflict rows were returned — run Preview merge again.');
+      return;
+    }
+    if (mergeApplyBlockedByUnresolvedChoices) {
+      toast.warning(
+        `Resolve all merge conflicts before applying (${mergeUnresolvedChoiceCount} unresolved).`
+      );
+      return;
+    }
     const target = versionBranches.find((b) => b.name === mergeTargetBranch.trim());
     if (!target) {
       toast.error('Target branch not found in list — refresh branches');
@@ -1817,8 +1868,25 @@ const Versions = () => {
           typeof err === 'object' && err && 'conflictPaths' in err
             ? (err as { conflictPaths?: string[] }).conflictPaths
             : undefined;
-        if (r.status === 409 && code === 'MERGE_CONFLICT') {
-          toast.error('Merge blocked: overlapping changes. Resolve conflicts using a future merge flow.');
+        const unresolvedCount =
+          typeof err === 'object' && err && 'unresolvedCount' in err
+            ? Number((err as { unresolvedCount?: unknown }).unresolvedCount)
+            : NaN;
+        const n =
+          Number.isFinite(unresolvedCount) && unresolvedCount >= 0
+            ? unresolvedCount
+            : (conflictPaths?.length ?? 0);
+        if (
+          r.status === 409 &&
+          (code === 'MERGE_CONFLICT' ||
+            code === 'MERGE_UNRESOLVED_CONFLICTS' ||
+            code === 'MERGE_BLEND')
+        ) {
+          toast.error(
+            n > 0
+              ? `Merge blocked: ${n} unresolved conflict(s). Resolve all conflicts before applying.`
+              : 'Merge blocked: unresolved conflicts. Resolve all conflicts before applying.'
+          );
           const paths = conflictPaths ?? [];
           setMergePreviewData((prev) => ({
             ...(prev ?? {}),
@@ -1828,6 +1896,8 @@ const Versions = () => {
               addedSchemaNames: prev?.classification?.addedSchemaNames ?? [],
             },
             conflicts: paths.map((p) => ({ path: p, kinds: ['twoWay'] })),
+            previewSourceBranch: prev?.previewSourceBranch ?? mergeSourceBranch.trim(),
+            previewTargetBranch: prev?.previewTargetBranch ?? mergeTargetBranch.trim(),
           }));
         } else {
           const msg =
@@ -4012,7 +4082,7 @@ const Versions = () => {
           <DialogHeader>
             <DialogTitle>Merge branches</DialogTitle>
             <DialogDescription>
-              Preview uses a three-way merge of OpenAPI components against the merge-base (LCA) revision. Apply creates a merge revision with two parents when the merge engine reports no conflicts.
+              Preview uses a three-way merge of OpenAPI components against the merge-base (LCA) revision. Run Preview merge before Apply — when conflicts exist, choose a resolution for every path before applying.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -4044,7 +4114,7 @@ const Versions = () => {
               <Alert variant={mergePreviewData.classification.canAutoMerge ? 'success' : 'error'}>
                 {mergePreviewData.classification.canAutoMerge
                   ? 'No overlapping modified or removed paths — apply is allowed if the target tip has not moved.'
-                  : `Conflicts: ${mergePreviewData.classification.conflictPaths.length} path(s). Apply is blocked.`}
+                  : `Conflicts: ${mergePreviewData.classification.conflictPaths.length} path(s). Apply stays disabled until every conflict row has a resolution (mine / theirs / manual).`}
               </Alert>
             )}
             {mergePreviewData?.classification &&
@@ -4125,7 +4195,9 @@ const Versions = () => {
                 mergeCompatLoading ||
                 !mergeSourceBranch ||
                 !mergeTargetBranch ||
-                mergePreviewData?.classification?.canAutoMerge === false ||
+                !mergePreviewMatchesBranches ||
+                mergeApplyBlockedByUnresolvedChoices ||
+                mergeApplyBlockedByEngineWithoutRows ||
                 mergeCompat?.mergeBlockedByCompatGate === true
               }
             >

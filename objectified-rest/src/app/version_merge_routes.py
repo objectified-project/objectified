@@ -461,22 +461,28 @@ async def version_branch_merge(
 
     merged, conflicts = merge_components_schemas_three_way(b, o, t)
     if not merged or conflicts:
+        uc = len(conflicts)
         raise HTTPException(
             status_code=409,
             detail={
-                "message": "Merge blocked: overlapping schema changes detected",
-                "code": "MERGE_CONFLICT",
+                "message": f"Merge blocked: {uc} unresolved conflict(s) — overlapping schema changes",
+                "code": "MERGE_UNRESOLVED_CONFLICTS",
+                "reason": "MERGE_CONFLICT",
+                "unresolvedCount": uc,
                 "conflictPaths": conflicts,
             },
         )
 
     ok_mat, blend_paths = schema_merge_materializable_paths(merged, o, t)
     if not ok_mat:
+        uc = len(blend_paths)
         raise HTTPException(
             status_code=409,
             detail={
-                "message": "Merge blocked: resolved schema differs from both branch tips (blend)",
-                "code": "MERGE_BLEND",
+                "message": f"Merge blocked: {uc} unresolved conflict(s) — resolved schema differs from both branch tips (blend)",
+                "code": "MERGE_UNRESOLVED_CONFLICTS",
+                "reason": "MERGE_BLEND",
+                "unresolvedCount": uc,
                 "conflictPaths": blend_paths,
             },
         )
