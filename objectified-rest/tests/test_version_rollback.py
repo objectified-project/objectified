@@ -124,7 +124,20 @@ def test_rollback_apply_protected_branch_forbidden(auth_client):
         "app.version_merge_routes.db.is_user_tenant_admin", return_value=False
     ), patch(
         "app.version_merge_routes._rollback_analyze",
-        return_value=("safe", [], [], "fp", None),
+        return_value=(
+            "safe",
+            [],
+            [],
+            "fp",
+            None,
+            {
+                "added": 0,
+                "removed": 0,
+                "modified": 0,
+                "unchanged": 0,
+                "changedEntityCount": 0,
+            },
+        ),
     ):
         r = auth_client.post(
             "/v1/versions/slug/p1/version-branches/rollback",
@@ -135,3 +148,65 @@ def test_rollback_apply_protected_branch_forbidden(auth_client):
             },
         )
     assert r.status_code == 403
+
+
+def test_rollback_preview_impact_summary_keys(auth_client):
+    """rollback-preview success path returns impactSummary with expected keys."""
+    tip = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    old = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    proj = {"id": "p1", "metadata": {}}
+    branch = {"id": "b1", "tip_version_id": tip, "protected": False}
+    head_ver = {
+        "id": tip,
+        "project_id": "p1",
+        "version_id": "1.0.1",
+        "metadata": None,
+        "published": False,
+    }
+    target_ver = {
+        "id": old,
+        "project_id": "p1",
+        "version_id": "1.0.0",
+        "metadata": None,
+        "published": False,
+    }
+
+    def gv(vid, _tid):
+        if vid == tip:
+            return head_ver
+        if vid == old:
+            return target_ver
+        return None
+
+    ancestors = {tip, old}
+    impact = {
+        "added": 1,
+        "removed": 2,
+        "modified": 3,
+        "unchanged": 10,
+        "changedEntityCount": 6,
+    }
+
+    with patch("app.version_merge_routes.db.get_project_by_id", return_value=proj), patch(
+        "app.version_merge_routes.db.get_version_branch_by_name", return_value=branch
+    ), patch("app.version_merge_routes.db.get_version_by_id", side_effect=gv), patch(
+        "app.version_merge_routes.db.collect_revision_ancestors", return_value=ancestors
+    ), patch(
+        "app.version_merge_routes._rollback_analyze",
+        return_value=("safe", [], [], "fp", None, impact),
+    ):
+        r = auth_client.post(
+            "/v1/versions/slug/p1/version-branches/rollback-preview",
+            json={"branchName": "main", "targetRevisionId": old},
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert "impactSummary" in body
+    summary = body["impactSummary"]
+    for key in ("added", "removed", "modified", "unchanged", "changedEntityCount"):
+        assert key in summary, f"impactSummary missing key: {key}"
+    assert summary["added"] == 1
+    assert summary["removed"] == 2
+    assert summary["modified"] == 3
+    assert summary["unchanged"] == 10
+    assert summary["changedEntityCount"] == 6

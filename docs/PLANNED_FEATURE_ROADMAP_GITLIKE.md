@@ -465,6 +465,8 @@ Add Radix confirmation dialog showing target revision and changed entity count.
 - User must explicitly confirm rollback action.
 - Successful rollback creates a new revision and refreshes timeline.
 
+**Status:** Shipped — **ADE → Versions** rollback flow keeps the branch **Preview impact** step; **Apply rollback** opens a Radix **`AlertDialog`** with **target revision id**, **UTC commit time**, and **`impactSummary`** from **`POST .../version-branches/rollback-preview`** (`changedEntityCount` plus added / removed / modified OpenAPI schema paths vs the branch tip). **Roll back** runs apply; success closes both dialogs and **`loadVersions`** / **`loadBranches`** refresh the timeline.
+
 ---
 
 ## P1-10: Rollback Event Audit Persistence

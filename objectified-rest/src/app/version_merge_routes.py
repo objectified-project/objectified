@@ -17,6 +17,7 @@ from .database import db
 from .models import (
     CompatibilityFindingOut,
     MergeSessionStatusPatchRequest,
+    RevisionDeprecationWarningOut,
     VersionBranchFromRevisionRequest,
     VersionBranchFromRevisionResponse,
     VersionBranchMergePreviewRequest,
@@ -810,13 +811,36 @@ def _rollback_analyze(
     tenant_id: str,
     head_ver: Dict[str, Any],
     target_ver: Dict[str, Any],
-) -> tuple:
+    include_impact: bool = True,
+) -> tuple[
+    str,
+    list[CompatibilityFindingOut],
+    list[RevisionDeprecationWarningOut],
+    str,
+    Optional[str],
+    Optional[Dict[str, Any]],
+]:
     """
     Compare current branch tip (consumer expectation) to rollback snapshot (target).
     Semantics match #506: base = tip, head = restored content.
+
+    Returns a 6-tuple:
+        (overall, finding_out, dep_out, fp, doc_url, impact_summary)
+    where ``impact_summary`` is ``None`` when *include_impact* is ``False``.
     """
     tip_spec = _openapi_for_revision(head_ver, tenant_slug, tenant_id)
     target_spec = _openapi_for_revision(target_ver, tenant_slug, tenant_id)
+    impact_summary: Optional[Dict[str, Any]] = None
+    if include_impact:
+        schema_diff = compare_schemas(tip_spec, target_spec)
+        diff_counts = _diff_summary_counts(schema_diff)
+        changed_entity_count = (
+            diff_counts["added"] + diff_counts["removed"] + diff_counts["modified"]
+        )
+        impact_summary = {
+            **diff_counts,
+            "changedEntityCount": changed_entity_count,
+        }
     overall, findings = analyze_schema_compatibility(tip_spec, target_spec, CompatibilityRules())
     finding_out = [
         CompatibilityFindingOut(
@@ -849,7 +873,7 @@ def _rollback_analyze(
     dep_dicts = [w.model_dump(by_alias=True) for w in dep_out]
     fp = _fingerprint(overall, finding_dicts, dep_dicts or None)
     doc_url = BREAKING_DOC_ISSUE_URL if overall == "breaking" else None
-    return overall, finding_out, dep_out, fp, doc_url
+    return overall, finding_out, dep_out, fp, doc_url, impact_summary
 
 
 def _rollback_validate_branch_and_revisions(
@@ -926,7 +950,7 @@ async def version_branch_rollback_preview(
         project_id, tenant_id, body.branch_name, body.target_revision_id
     )
 
-    overall, finding_out, dep_out, fp, doc_url = _rollback_analyze(
+    overall, finding_out, dep_out, fp, doc_url, impact_summary = _rollback_analyze(
         tenant_slug, tenant_id, head_ver, target_ver
     )
     gate = _tenant_compat_gate_rollback(_project)
@@ -943,6 +967,13 @@ async def version_branch_rollback_preview(
         "breakingChangeDocumentationIssueUrl": doc_url,
         "tenantCompatGateRollbackActive": gate,
         "rollbackBlockedByCompatGate": blocked,
+        "impactSummary": {
+            "added": impact_summary["added"],
+            "removed": impact_summary["removed"],
+            "modified": impact_summary["modified"],
+            "unchanged": impact_summary["unchanged"],
+            "changedEntityCount": impact_summary["changedEntityCount"],
+        },
     }
 
 
@@ -1006,8 +1037,8 @@ async def version_branch_rollback(
             detail="This branch is protected; only tenant administrators may roll back.",
         )
 
-    overall, _finding_out, dep_out, _fp, _doc_url = _rollback_analyze(
-        tenant_slug, tenant_id, head_ver, target_ver
+    overall, _finding_out, dep_out, _fp, _doc_url, _impact_summary = _rollback_analyze(
+        tenant_slug, tenant_id, head_ver, target_ver, include_impact=False
     )
     gate = _tenant_compat_gate_rollback(project)
     if gate and overall != "safe":
