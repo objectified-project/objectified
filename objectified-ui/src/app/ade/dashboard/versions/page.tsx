@@ -1150,6 +1150,20 @@ const Versions = () => {
     setMergeConflictResolutions((prev) => ({ ...prev, [path]: choice }));
   }, []);
 
+  const handleMergeConflictBulkResolve = useCallback(
+    (paths: string[], choice: MergeConflictResolutionChoice) => {
+      if (paths.length === 0) return;
+      setMergeConflictResolutions((prev) => {
+        const next = { ...prev };
+        for (const p of paths) {
+          next[p] = choice;
+        }
+        return next;
+      });
+    },
+    []
+  );
+
   const filteredClassDiffRows = useMemo(() => {
     if (!classDiffRows) return [];
     let rows = classDiffRows;
@@ -4042,6 +4056,7 @@ const Versions = () => {
                   sourceBranchName={mergeSourceBranch.trim()}
                   resolutions={mergeConflictResolutions}
                   onResolve={handleMergeConflictResolve}
+                  onBulkResolve={handleMergeConflictBulkResolve}
                 />
               )}
             {mergePreviewData?.mergeBaseVersionId != null && mergePreviewData?.classification && (

@@ -36,6 +36,28 @@ export function formatMergeConflictKinds(kinds: string[]): string {
 /**
  * Prefer API `conflicts`; otherwise build rows from `classification.conflictPaths` (e.g. 409 replay).
  */
+/** Stable key for grouping/filtering rows by `kinds` (order-independent). */
+export function mergeConflictKindSignature(kinds: string[]): string {
+  const uniq = [...new Set(kinds.map((k) => k.trim()).filter((k) => k.length > 0))];
+  return uniq.sort().join('|');
+}
+
+export type MergeConflictRow = { path: string; kinds: string[] };
+
+/** Rows matching optional path substring and/or conflict-kind signature. */
+export function filterMergeConflictRows(
+  rows: MergeConflictRow[],
+  opts: { pathContains?: string; kindSignature?: string | 'all' }
+): MergeConflictRow[] {
+  const q = (opts.pathContains ?? '').trim().toLowerCase();
+  const sig = opts.kindSignature ?? 'all';
+  return rows.filter((row) => {
+    if (q && !row.path.toLowerCase().includes(q)) return false;
+    if (sig !== 'all' && mergeConflictKindSignature(row.kinds) !== sig) return false;
+    return true;
+  });
+}
+
 export function normalizeMergeConflictRows(
   conflicts: unknown,
   fallbackPaths: string[]

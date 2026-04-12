@@ -94,7 +94,7 @@ Workstreams below can proceed in parallel once shared contracts (revision id, he
 | **D — Studio status** | P0-07 | Depends on signals from B/C; can mock |
 | **E — Branching** | P0-08 ✓, P0-09 ✓ | P0-09 after P0-08 |
 | **F — Merge preview** | P0-10 ✓ | Gates P1-01 — P1-04 |
-| **G — Merge resolution UI** | P1-01 ✓, P1-02 ✓, P1-03, P1-04 | Sequential within: 01→02→03→04 |
+| **G — Merge resolution UI** | P1-01 ✓, P1-02 ✓, P1-03 ✓, P1-04 | Sequential within: 01→02→03→04 |
 | **H — Audit** | P1-05, P1-06 | 05 before 06 |
 | **I — History & rollback** | P1-07, P1-08, P1-09, P1-10 | P1-07/08 parallel; 09/10 pair with rollback API |
 | **J — Enterprise** | P2-01 — P2-10 | Parallel across subdomains after core push/pull stable |
@@ -340,9 +340,9 @@ Render conflicts with actions per item (`Use mine`, `Use theirs`, `Manual`).
 
 ---
 
-## P1-03: Bulk Resolve Actions for Conflict Groups
+## P1-03: Bulk Resolve Actions for Conflict Groups ✓
 
-**GitHub:** [#2575](https://github.com/KenSuenobu/objectified-commercial/issues/2575) · **Epic:** [#2559](https://github.com/KenSuenobu/objectified-commercial/issues/2559)
+**GitHub:** [#2575](https://github.com/KenSuenobu/objectified-commercial/issues/2575) · **Epic:** [#2559](https://github.com/KenSuenobu/objectified-commercial/issues/2559) · **Status:** shipped (ADE merge conflict panel: path + conflict-type filters; **Bulk (shown)** and **Bulk (all)** mine/theirs; per-row overrides unchanged)
 
 ### Problem statement
 Resolving many similar conflicts one-by-one is slow and error-prone.

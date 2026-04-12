@@ -1,6 +1,8 @@
 import {
   classifyMergeDiff,
+  filterMergeConflictRows,
   formatMergeConflictKinds,
+  mergeConflictKindSignature,
   normalizeMergeConflictRows,
 } from '../lib/version-merge';
 import type { DiffSummary } from '../lib/schema-diff';
@@ -52,5 +54,27 @@ describe('normalizeMergeConflictRows', () => {
     expect(normalizeMergeConflictRows(undefined, ['schemas.X'])).toEqual([
       { path: 'schemas.X', kinds: ['twoWay'] },
     ]);
+  });
+});
+
+describe('mergeConflictKindSignature', () => {
+  test('is order-independent and de-duplicates', () => {
+    expect(mergeConflictKindSignature(['twoWay', 'threeWay'])).toBe(mergeConflictKindSignature(['threeWay', 'twoWay', 'twoWay']));
+  });
+});
+
+describe('filterMergeConflictRows', () => {
+  const rows = [
+    { path: 'schemas.Alpha', kinds: ['threeWay'] },
+    { path: 'schemas.Beta', kinds: ['twoWay'] },
+  ];
+
+  test('filters by path substring', () => {
+    expect(filterMergeConflictRows(rows, { pathContains: 'beta' })).toEqual([rows[1]]);
+  });
+
+  test('filters by kind signature', () => {
+    const sig = mergeConflictKindSignature(['threeWay']);
+    expect(filterMergeConflictRows(rows, { kindSignature: sig })).toEqual([rows[0]]);
   });
 });
