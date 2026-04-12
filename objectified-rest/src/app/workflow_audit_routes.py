@@ -10,7 +10,7 @@ import base64
 import binascii
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -34,12 +34,15 @@ def _parse_iso_datetime(label: str, raw: Optional[str]) -> Optional[datetime]:
         return None
     s = str(raw).strip().replace("Z", "+00:00")
     try:
-        return datetime.fromisoformat(s)
+        dt = datetime.fromisoformat(s)
     except ValueError as e:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid {label}: expected ISO 8601 datetime ({e})",
         ) from e
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def _optional_uuid_param(label: str, raw: Optional[str]) -> Optional[str]:
@@ -107,6 +110,8 @@ def _decode_cursor(token: str) -> Tuple[datetime, str]:
         dt = datetime.fromisoformat(ts_norm)
     except ValueError as e:
         raise ValueError("bad timestamp") from e
+    if dt.tzinfo is None:
+        raise ValueError("cursor timestamp missing timezone info")
     try:
         uuid.UUID(rid)
     except ValueError as e:
