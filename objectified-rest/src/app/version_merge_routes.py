@@ -104,6 +104,44 @@ def bump_patch_version(version: str) -> str:
     return "0.1.0"
 
 
+def _workflow_audit_merge(
+    tenant_id: str,
+    project_id: str,
+    version_id: Optional[str],
+    outcome: str,
+    actor_id: Optional[str],
+    detail: Optional[Dict[str, Any]] = None,
+) -> None:
+    db.insert_workflow_audit(
+        tenant_id,
+        project_id,
+        version_id,
+        "version.merge",
+        outcome,
+        actor_id,
+        detail,
+    )
+
+
+def _workflow_audit_rollback(
+    tenant_id: str,
+    project_id: str,
+    version_id: Optional[str],
+    outcome: str,
+    actor_id: Optional[str],
+    detail: Optional[Dict[str, Any]] = None,
+) -> None:
+    db.insert_workflow_audit(
+        tenant_id,
+        project_id,
+        version_id,
+        "version.rollback",
+        outcome,
+        actor_id,
+        detail,
+    )
+
+
 def _extract_schemas(spec: Dict[str, Any]) -> Dict[str, Any]:
     return (spec.get("components") or {}).get("schemas") or {}
 
@@ -405,43 +443,109 @@ async def version_branch_merge(
     tenant_id = auth_data["tenant_id"]
     creator_id = get_authenticated_user_id(auth_data)
     if not creator_id:
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            None,
+            "failure",
+            None,
+            {"httpStatus": 403, "reason": "auth_required"},
+        )
         raise HTTPException(status_code=403, detail="Merge requires user authentication (JWT token)")
 
     project = db.get_project_by_id(project_id, tenant_id)
     if not project:
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            None,
+            "failure",
+            creator_id,
+            {"httpStatus": 404, "reason": "project_not_found"},
+        )
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
 
     src = db.get_version_branch_by_name(project_id, tenant_id, body.source_branch_name)
     tgt = db.get_version_branch_by_name(project_id, tenant_id, body.target_branch_name)
     if not src or not tgt:
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            None,
+            "failure",
+            creator_id,
+            {"httpStatus": 404, "reason": "branch_not_found"},
+        )
         raise HTTPException(status_code=404, detail="Source or target branch not found")
 
     source_tip = str(src["tip_version_id"])
     target_tip = str(tgt["tip_version_id"])
 
     if target_tip != body.base_revision_id.strip():
+        d = {
+            "message": "Target branch tip does not match baseRevisionId (stale head or wrong base).",
+            "code": "STALE_HEAD",
+        }
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            target_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": 409, "detail": d},
+        )
         raise HTTPException(
             status_code=409,
-            detail={
-                "message": "Target branch tip does not match baseRevisionId (stale head or wrong base).",
-                "code": "STALE_HEAD",
-            },
+            detail=d,
         )
 
     src_ver = db.get_version_by_id(source_tip, tenant_id)
     tgt_ver = db.get_version_by_id(target_tip, tenant_id)
     if not src_ver or not tgt_ver:
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            target_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": 403, "reason": "tip_not_accessible"},
+        )
         raise HTTPException(status_code=403, detail="Version tip not accessible")
     if src_ver["project_id"] != project_id or tgt_ver["project_id"] != project_id:
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            target_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": 400, "reason": "branch_tip_project_mismatch"},
+        )
         raise HTTPException(status_code=400, detail="Branch tips must belong to this project")
     if src_ver.get("published") or tgt_ver.get("published"):
+        d = {"message": "Cannot merge published or frozen versions", "code": "PUBLISHED_VERSION"}
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            target_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": 409, "detail": d},
+        )
         raise HTTPException(
             status_code=409,
-            detail={"message": "Cannot merge published or frozen versions", "code": "PUBLISHED_VERSION"},
+            detail=d,
         )
 
     merge_base_id = db.compute_merge_base_revision_id(source_tip, target_tip, tenant_id)
     if not merge_base_id:
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            target_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": 400, "reason": "unrelated_histories"},
+        )
         raise HTTPException(
             status_code=400,
             detail="No common ancestor between branch tips (unrelated histories).",
@@ -449,6 +553,14 @@ async def version_branch_merge(
 
     base_ver = db.get_version_by_id(merge_base_id, tenant_id)
     if not base_ver:
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            merge_base_id,
+            "failure",
+            creator_id,
+            {"httpStatus": 404, "reason": "merge_base_not_found"},
+        )
         raise HTTPException(status_code=404, detail="Merge base revision not found")
 
     base_spec = _openapi_for_revision(base_ver, tenant_slug, tenant_id)
@@ -462,29 +574,47 @@ async def version_branch_merge(
     merged, conflicts = merge_components_schemas_three_way(b, o, t)
     if merged is None or conflicts:
         uc = len(conflicts)
+        d = {
+            "message": f"Merge blocked: {uc} unresolved conflict(s) — overlapping schema changes",
+            "code": "MERGE_UNRESOLVED_CONFLICTS",
+            "reason": "MERGE_CONFLICT",
+            "unresolvedCount": uc,
+            "conflictPaths": conflicts,
+        }
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            target_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": 409, "detail": d},
+        )
         raise HTTPException(
             status_code=409,
-            detail={
-                "message": f"Merge blocked: {uc} unresolved conflict(s) — overlapping schema changes",
-                "code": "MERGE_UNRESOLVED_CONFLICTS",
-                "reason": "MERGE_CONFLICT",
-                "unresolvedCount": uc,
-                "conflictPaths": conflicts,
-            },
+            detail=d,
         )
 
     ok_mat, blend_paths = schema_merge_materializable_paths(merged, o, t)
     if not ok_mat:
         uc = len(blend_paths)
+        d = {
+            "message": f"Merge blocked: {uc} unresolved conflict(s) — resolved schema differs from both branch tips (blend)",
+            "code": "MERGE_UNRESOLVED_CONFLICTS",
+            "reason": "MERGE_BLEND",
+            "unresolvedCount": uc,
+            "conflictPaths": blend_paths,
+        }
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            target_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": 409, "detail": d},
+        )
         raise HTTPException(
             status_code=409,
-            detail={
-                "message": f"Merge blocked: {uc} unresolved conflict(s) — resolved schema differs from both branch tips (blend)",
-                "code": "MERGE_UNRESOLVED_CONFLICTS",
-                "reason": "MERGE_BLEND",
-                "unresolvedCount": uc,
-                "conflictPaths": blend_paths,
-            },
+            detail=d,
         )
 
     gate = _tenant_compat_gate(project) and not body.skip_compat_gate
@@ -492,20 +622,38 @@ async def version_branch_merge(
         merged_spec = _merge_openapi_components(target_spec, merged)
         overall, _ = analyze_schema_compatibility(base_spec, merged_spec, CompatibilityRules())
         if overall != "safe":
+            d = {
+                "message": "Merge blocked by compatibility gate (compatGateOnMerge).",
+                "code": "MERGE_BLOCKED_BY_COMPAT_GATE",
+                "overall": overall,
+            }
+            _workflow_audit_merge(
+                tenant_id,
+                project_id,
+                target_tip,
+                "failure",
+                creator_id,
+                {"httpStatus": 409, "detail": d},
+            )
             raise HTTPException(
                 status_code=409,
-                detail={
-                    "message": "Merge blocked by compatibility gate (compatGateOnMerge).",
-                    "code": "MERGE_BLOCKED_BY_COMPAT_GATE",
-                    "overall": overall,
-                },
+                detail=d,
             )
 
     limits = effective_commit_policy(tenant_id, project.get("metadata"))
     try:
         enforce_max_commit_payload(body, limits)
     except CommitPolicyViolation as pe:
-        raise commit_policy_http_exception(pe) from pe
+        he = commit_policy_http_exception(pe)
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            target_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": he.status_code, "detail": he.detail},
+        )
+        raise he from pe
 
     latest = db.get_latest_version_for_project(project_id, tenant_id)
     new_version_string = bump_patch_version(latest) if latest else "0.1.0"
@@ -513,7 +661,16 @@ async def version_branch_merge(
     try:
         short_msg, _ = validate_version_notes(raw_msg, None, limits)
     except CommitPolicyViolation as e:
-        raise commit_policy_http_exception(e) from e
+        he = commit_policy_http_exception(e)
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            target_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": he.status_code, "detail": he.detail},
+        )
+        raise he from e
     if not short_msg:
         short_msg = raw_msg
 
@@ -583,18 +740,65 @@ async def version_branch_merge(
             )
 
         conn.commit()
-    except HTTPException:
+    except HTTPException as he:
         conn.rollback()
+        _attempted = locals().get("new_id")
+        _audit_detail: Dict[str, Any] = {"httpStatus": he.status_code, "detail": he.detail}
+        if _attempted:
+            _audit_detail["attemptedNewRevisionId"] = _attempted
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            target_tip,
+            "failure",
+            creator_id,
+            _audit_detail,
+        )
         raise
-    except Exception:
+    except Exception as ex:
         conn.rollback()
+        _attempted = locals().get("new_id")
+        _audit_detail = {"httpStatus": 500, "reason": "unexpected_error", "message": str(ex)}
+        if _attempted:
+            _audit_detail["attemptedNewRevisionId"] = _attempted
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            target_tip,
+            "failure",
+            creator_id,
+            _audit_detail,
+        )
         raise
     finally:
         conn.autocommit = prev_autocommit
 
     full = db.get_version_by_id(new_id, tenant_id)
     if not full:
+        _workflow_audit_merge(
+            tenant_id,
+            project_id,
+            new_id,
+            "failure",
+            creator_id,
+            {"httpStatus": 500, "reason": "revision_unreadable_after_merge"},
+        )
         raise HTTPException(status_code=500, detail="Merge succeeded but revision not readable")
+    _workflow_audit_merge(
+        tenant_id,
+        project_id,
+        new_id,
+        "success",
+        creator_id,
+        {
+            "sourceBranch": body.source_branch_name,
+            "targetBranch": body.target_branch_name,
+            "sourceTipRevisionId": source_tip,
+            "targetTipRevisionId": target_tip,
+            "mergeBaseRevisionId": merge_base_id,
+            "versionLine": full.get("version_id"),
+        },
+    )
     return {
         "success": True,
         "version": VersionSchema.model_validate(full).model_dump(by_alias=True),
@@ -755,6 +959,14 @@ async def version_branch_rollback(
     tenant_id = auth_data["tenant_id"]
     creator_id = get_authenticated_user_id(auth_data)
     if not creator_id:
+        _workflow_audit_rollback(
+            tenant_id,
+            project_id,
+            None,
+            "failure",
+            None,
+            {"httpStatus": 403, "reason": "auth_required"},
+        )
         raise HTTPException(status_code=403, detail="Rollback requires user authentication (JWT token)")
 
     project, branch, head_ver, target_ver, head_tip, tgt_id = _rollback_validate_branch_and_revisions(
@@ -763,15 +975,32 @@ async def version_branch_rollback(
 
     base = (body.base_revision_id or "").strip()
     if base != head_tip:
+        d = {
+            "message": "Branch tip does not match baseRevisionId (stale head or wrong base).",
+            "code": "STALE_HEAD",
+        }
+        _workflow_audit_rollback(
+            tenant_id,
+            project_id,
+            head_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": 409, "detail": d},
+        )
         raise HTTPException(
             status_code=409,
-            detail={
-                "message": "Branch tip does not match baseRevisionId (stale head or wrong base).",
-                "code": "STALE_HEAD",
-            },
+            detail=d,
         )
 
     if bool(branch.get("protected")) and not db.is_user_tenant_admin(tenant_id, creator_id):
+        _workflow_audit_rollback(
+            tenant_id,
+            project_id,
+            head_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": 403, "reason": "branch_protected"},
+        )
         raise HTTPException(
             status_code=403,
             detail="This branch is protected; only tenant administrators may roll back.",
@@ -782,29 +1011,56 @@ async def version_branch_rollback(
     )
     gate = _tenant_compat_gate_rollback(project)
     if gate and overall != "safe":
+        d = {
+            "message": "Rollback blocked by compatibility gate (compatGateOnRollback).",
+            "code": "ROLLBACK_BLOCKED_BY_COMPAT_GATE",
+            "overall": overall,
+        }
+        _workflow_audit_rollback(
+            tenant_id,
+            project_id,
+            head_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": 409, "detail": d},
+        )
         raise HTTPException(
             status_code=409,
-            detail={
-                "message": "Rollback blocked by compatibility gate (compatGateOnRollback).",
-                "code": "ROLLBACK_BLOCKED_BY_COMPAT_GATE",
-                "overall": overall,
-            },
+            detail=d,
         )
     if overall != "safe" and not body.skip_compat_warning:
+        d = {
+            "message": "Rollback may remove or change schema surface relative to the branch tip; confirm or set skipCompatWarning.",
+            "code": "ROLLBACK_NEEDS_CONFIRMATION",
+            "overall": overall,
+        }
+        _workflow_audit_rollback(
+            tenant_id,
+            project_id,
+            head_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": 409, "detail": d},
+        )
         raise HTTPException(
             status_code=409,
-            detail={
-                "message": "Rollback may remove or change schema surface relative to the branch tip; confirm or set skipCompatWarning.",
-                "code": "ROLLBACK_NEEDS_CONFIRMATION",
-                "overall": overall,
-            },
+            detail=d,
         )
 
     limits = effective_commit_policy(tenant_id, project.get("metadata"))
     try:
         enforce_max_commit_payload(body, limits)
     except CommitPolicyViolation as pe:
-        raise commit_policy_http_exception(pe) from pe
+        he = commit_policy_http_exception(pe)
+        _workflow_audit_rollback(
+            tenant_id,
+            project_id,
+            head_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": he.status_code, "detail": he.detail},
+        )
+        raise he from pe
 
     latest = db.get_latest_version_for_project(project_id, tenant_id)
     new_version_string = bump_patch_version(latest) if latest else "0.1.0"
@@ -815,7 +1071,16 @@ async def version_branch_rollback(
     try:
         short_msg, cl = validate_version_notes(raw_msg, raw_cl, limits, require_short_message=limits.require_short_message)
     except CommitPolicyViolation as e:
-        raise commit_policy_http_exception(e) from e
+        he = commit_policy_http_exception(e)
+        _workflow_audit_rollback(
+            tenant_id,
+            project_id,
+            head_tip,
+            "failure",
+            creator_id,
+            {"httpStatus": he.status_code, "detail": he.detail},
+        )
+        raise he from e
 
     rb_meta = {
         "rollback": {
@@ -873,11 +1138,35 @@ async def version_branch_rollback(
                 )
 
         conn.commit()
-    except HTTPException:
+    except HTTPException as he:
         conn.rollback()
+        _attempted = locals().get("new_id")
+        _audit_detail: Dict[str, Any] = {"httpStatus": he.status_code, "detail": he.detail}
+        if _attempted:
+            _audit_detail["attemptedNewRevisionId"] = _attempted
+        _workflow_audit_rollback(
+            tenant_id,
+            project_id,
+            head_tip,
+            "failure",
+            creator_id,
+            _audit_detail,
+        )
         raise
-    except Exception:
+    except Exception as ex:
         conn.rollback()
+        _attempted = locals().get("new_id")
+        _audit_detail = {"httpStatus": 500, "reason": "unexpected_error", "message": str(ex)}
+        if _attempted:
+            _audit_detail["attemptedNewRevisionId"] = _attempted
+        _workflow_audit_rollback(
+            tenant_id,
+            project_id,
+            head_tip,
+            "failure",
+            creator_id,
+            _audit_detail,
+        )
         raise
     finally:
         conn.autocommit = prev_autocommit
@@ -901,7 +1190,29 @@ async def version_branch_rollback(
 
     full = db.get_version_by_id(new_id, tenant_id)
     if not full:
+        _workflow_audit_rollback(
+            tenant_id,
+            project_id,
+            new_id,
+            "failure",
+            creator_id,
+            {"httpStatus": 500, "reason": "revision_unreadable_after_rollback"},
+        )
         raise HTTPException(status_code=500, detail="Rollback succeeded but revision not readable")
+    _workflow_audit_rollback(
+        tenant_id,
+        project_id,
+        new_id,
+        "success",
+        creator_id,
+        {
+            "branchName": (body.branch_name or "").strip(),
+            "targetRevisionId": tgt_id,
+            "priorTipRevisionId": head_tip,
+            "compatOverall": overall,
+            "versionLine": full.get("version_id"),
+        },
+    )
     return {
         "success": True,
         "version": VersionSchema.model_validate(full).model_dump(by_alias=True),

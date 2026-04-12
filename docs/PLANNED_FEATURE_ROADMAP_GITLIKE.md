@@ -389,6 +389,8 @@ Create workflow audit table and write an event on every workflow action outcome.
 - Failures write events with structured error details.
 - Query by version and date range is indexed and performant.
 
+**Status:** Shipped — `odb.workflow_audit` migration (`objectified-db/scripts/20260412-120000.sql`); `Database.insert_workflow_audit` / `list_workflow_audit_for_version`; writes from push (`version.push`), pull (`version.pull` on revision GET), merge (`version.merge`), rollback (`version.rollback`).
+
 ---
 
 ## P1-06: Audit API Endpoint with Filter + Pagination
