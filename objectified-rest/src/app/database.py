@@ -3678,13 +3678,132 @@ class Database:
         self, project_id: str, tenant_id: str, name: str
     ) -> Optional[Dict[str, Any]]:
         q = """
-            SELECT b.id, b.project_id, b.name, b.tip_version_id, b.protected, b.created_by
+            SELECT b.id, b.project_id, b.name, b.tip_version_id, b.branched_from_revision_id,
+                   b.protected, b.created_by, b.created_at, b.updated_at
             FROM odb.version_branches b
             JOIN odb.projects p ON b.project_id = p.id
             WHERE b.project_id = %s AND p.tenant_id = %s AND b.name = %s
         """
         rows = self.execute_query(q, (project_id, tenant_id, name.strip()))
         return rows[0] if rows else None
+
+    def _branch_from_revision_idempotent_result(
+        self,
+        existing: Dict[str, Any],
+        source_revision_id: str,
+        tenant_id: str,
+    ) -> Dict[str, Any]:
+        """If existing branch matches source revision as tip (and lineage), return success replay."""
+        tip = str(existing["tip_version_id"])
+        bf = existing.get("branched_from_revision_id")
+        bf_s = str(bf) if bf is not None else None
+        src = str(source_revision_id).strip()
+        if tip == src and (bf_s is None or bf_s == src):
+            full_tip = self.get_version_by_id(tip, tenant_id)
+            if not full_tip:
+                return {
+                    "success": False,
+                    "error": "Branch tip revision not found",
+                    "code": "NOT_FOUND",
+                }
+            return {
+                "success": True,
+                "branch": existing,
+                "tip_version": full_tip,
+                "idempotent_replay": True,
+            }
+        return {
+            "success": False,
+            "error": (
+                f"A branch named '{existing.get('name')}' already exists in this project "
+                "with a different tip or lineage."
+            ),
+            "code": "BRANCH_NAME_CONFLICT",
+        }
+
+    def create_version_branch_from_revision(
+        self,
+        project_id: str,
+        tenant_id: str,
+        branch_name: str,
+        source_revision_id: str,
+        creator_id: Optional[str],
+    ) -> Dict[str, Any]:
+        """
+        Insert a named branch whose tip is ``source_revision_id``; persist ``branched_from_revision_id`` (#2570).
+        Idempotent when the same name already points at the same source revision (and compatible lineage).
+        """
+        bn = (branch_name or "").strip()
+        src = (source_revision_id or "").strip()
+        if not bn:
+            return {"success": False, "error": "branchName is required", "code": "INVALID_INPUT"}
+        if not src:
+            return {"success": False, "error": "sourceRevisionId is required", "code": "INVALID_INPUT"}
+
+        ver = self.get_version_by_id(src, tenant_id)
+        if not ver or str(ver["project_id"]) != str(project_id):
+            return {
+                "success": False,
+                "error": "Source revision not found in this project",
+                "code": "NOT_FOUND",
+            }
+
+        existing = self.get_version_branch_by_name(project_id, tenant_id, bn)
+        if existing:
+            return self._branch_from_revision_idempotent_result(existing, src, tenant_id)
+
+        conn = self.connect()
+        row: Optional[Dict[str, Any]] = None
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO odb.version_branches
+                        (project_id, name, tip_version_id, created_by, branched_from_revision_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id, project_id, name, tip_version_id, branched_from_revision_id,
+                              protected, created_by, created_at, updated_at
+                    """,
+                    (project_id, bn, src, creator_id, src),
+                )
+                row = cursor.fetchone()
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            err = str(e).lower()
+            if "23505" in err or "unique" in err:
+                existing2 = self.get_version_branch_by_name(project_id, tenant_id, bn)
+                if existing2:
+                    return self._branch_from_revision_idempotent_result(
+                        existing2, src, tenant_id
+                    )
+            _logger.exception(
+                "Database error creating version branch from revision "
+                "(project_id=%s, tenant_id=%s, branch_name=%s, source_revision_id=%s)",
+                project_id,
+                tenant_id,
+                bn,
+                src,
+            )
+            return {
+                "success": False,
+                "error": "Failed to create branch due to a database error",
+                "code": "DATABASE_ERROR",
+            }
+
+        if not row:
+            return {"success": False, "error": "Failed to create branch", "code": "DATABASE_ERROR"}
+
+        branch_row = dict(row)
+        full_tip = self.get_version_by_id(src, tenant_id)
+        if not full_tip:
+            return {"success": False, "error": "Tip revision not found after insert", "code": "NOT_FOUND"}
+        return {
+            "success": True,
+            "branch": branch_row,
+            "tip_version": full_tip,
+            "idempotent_replay": False,
+        }
 
     def delete_class_by_name_for_version(
         self,
@@ -3836,7 +3955,8 @@ class Database:
     ) -> List[Dict[str, Any]]:
         """Named branches for a project (tenant-scoped)."""
         q = """
-            SELECT b.id, b.project_id, b.name, b.tip_version_id, b.protected, b.created_by
+            SELECT b.id, b.project_id, b.name, b.tip_version_id, b.branched_from_revision_id,
+                   b.protected, b.created_by
             FROM odb.version_branches b
             JOIN odb.projects p ON b.project_id = p.id
             WHERE b.project_id = %s AND p.tenant_id = %s
