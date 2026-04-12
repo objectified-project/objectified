@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Input';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,9 @@ import {
   DialogDescription,
 } from '../../ui/Dialog';
 import {
+  filterMergeConflictRows,
   formatMergeConflictKinds,
+  mergeConflictKindSignature,
   type MergeConflictResolutionChoice,
 } from '../../../../../lib/version-merge';
 import { cn } from '../../../../../lib/utils';
@@ -23,6 +26,7 @@ export interface VersionMergeConflictListProps {
   sourceBranchName: string;
   resolutions: Record<string, MergeConflictResolutionChoice | null>;
   onResolve: (path: string, choice: MergeConflictResolutionChoice) => void;
+  onBulkResolve: (paths: string[], choice: MergeConflictResolutionChoice) => void;
   className?: string;
 }
 
@@ -39,11 +43,44 @@ export function VersionMergeConflictList({
   sourceBranchName,
   resolutions,
   onResolve,
+  onBulkResolve,
   className = '',
 }: VersionMergeConflictListProps) {
   const [manualPath, setManualPath] = useState<string | null>(null);
+  const [pathFilter, setPathFilter] = useState('');
+  const [kindFilter, setKindFilter] = useState<string | 'all'>('all');
+
+  const kindOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of conflicts) {
+      const sig = mergeConflictKindSignature(row.kinds);
+      if (!map.has(sig)) {
+        map.set(sig, formatMergeConflictKinds(row.kinds));
+      }
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [conflicts]);
+
+  useEffect(() => {
+    if (kindFilter === 'all') return;
+    const valid = kindOptions.some(([sig]) => sig === kindFilter);
+    if (!valid) setKindFilter('all');
+  }, [kindFilter, kindOptions]);
+
+  const filteredConflicts = useMemo(
+    () => filterMergeConflictRows(conflicts, { pathContains: pathFilter, kindSignature: kindFilter }),
+    [conflicts, pathFilter, kindFilter]
+  );
+
+  const applyBulk = (paths: string[], choice: MergeConflictResolutionChoice) => {
+    if (paths.length === 0) return;
+    onBulkResolve(paths, choice);
+  };
 
   if (conflicts.length === 0) return null;
+
+  const allPaths = conflicts.map((c) => c.path);
+  const shownPaths = filteredConflicts.map((c) => c.path);
 
   return (
     <>
@@ -70,6 +107,109 @@ export function VersionMergeConflictList({
               <span className="font-medium text-gray-800 dark:text-gray-200">Theirs</span> = source branch{' '}
               <span className="font-mono">{sourceBranchName || '—'}</span>
             </p>
+          </div>
+        </div>
+
+        <div className="px-4 py-3 border-b border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20 space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="min-w-0 flex-1 space-y-1">
+              <label htmlFor="merge-conflict-path-filter" className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                Filter paths
+              </label>
+              <Input
+                id="merge-conflict-path-filter"
+                type="search"
+                placeholder="Substring match on path…"
+                value={pathFilter}
+                onChange={(e) => setPathFilter(e.target.value)}
+                className="h-9 text-xs"
+                autoComplete="off"
+              />
+            </div>
+            <div className="w-full sm:w-56 space-y-1">
+              <label htmlFor="merge-conflict-kind-filter" className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                Conflict type
+              </label>
+              <select
+                id="merge-conflict-kind-filter"
+                value={kindFilter}
+                onChange={(e) => setKindFilter(e.target.value === 'all' ? 'all' : e.target.value)}
+                className={cn(
+                  'flex h-9 w-full rounded-md border border-slate-300 dark:border-slate-600',
+                  'bg-white dark:bg-slate-800 px-2 py-1.5 text-xs',
+                  'text-slate-900 dark:text-slate-100',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2',
+                  'ring-offset-white dark:ring-offset-slate-900'
+                )}
+              >
+                <option value="all">All types</option>
+                {kindOptions.map(([sig, label]) => (
+                  <option key={sig} value={sig}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-gray-400">
+            Showing <span className="font-medium text-gray-800 dark:text-gray-200">{filteredConflicts.length}</span> of{' '}
+            <span className="font-medium text-gray-800 dark:text-gray-200">{conflicts.length}</span> path
+            {conflicts.length !== 1 ? 's' : ''}. Bulk actions for <span className="font-medium">shown</span> use this
+            filter.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 shrink-0">Bulk (shown)</span>
+            <div className="flex flex-wrap gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                disabled={shownPaths.length === 0}
+                onClick={() => applyBulk(shownPaths, 'mine')}
+                title={`Set Target (mine) for ${shownPaths.length} path(s) matching the filter`}
+                aria-label={`Bulk mine for ${shownPaths.length} path(s) matching filter`}
+              >
+                Mine
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                disabled={shownPaths.length === 0}
+                onClick={() => applyBulk(shownPaths, 'theirs')}
+                title={`Set Source (theirs) for ${shownPaths.length} path(s) matching the filter`}
+                aria-label={`Bulk theirs for ${shownPaths.length} path(s) matching filter`}
+              >
+                Theirs
+              </Button>
+            </div>
+            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 shrink-0 sm:ml-2">Bulk (all)</span>
+            <div className="flex flex-wrap gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="text-xs"
+                onClick={() => applyBulk(allPaths, 'mine')}
+                title={`Set Target (mine) for all ${allPaths.length} conflict path(s)`}
+                aria-label={`Bulk mine for all ${allPaths.length} conflict path(s)`}
+              >
+                Mine
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="text-xs"
+                onClick={() => applyBulk(allPaths, 'theirs')}
+                title={`Set Source (theirs) for all ${allPaths.length} conflict path(s)`}
+                aria-label={`Bulk theirs for all ${allPaths.length} conflict path(s)`}
+              >
+                Theirs
+              </Button>
+            </div>
           </div>
         </div>
 
