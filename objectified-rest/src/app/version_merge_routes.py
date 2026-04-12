@@ -290,7 +290,7 @@ async def version_branch_merge_preview(
         and isinstance(merged, dict)
     ):
         candidate = _merge_openapi_components(base_spec, merged)
-        raw = json.dumps(candidate, sort_keys=True, separators=(",", ":"), default=str)
+        raw = json.dumps(candidate, separators=(",", ":"), ensure_ascii=False)
         if len(raw.encode("utf-8")) <= _MERGE_PREVIEW_MAX_JSON_BYTES:
             merged_open_api = candidate
         else:
