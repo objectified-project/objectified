@@ -61,7 +61,7 @@ Implement and verify in this order so each step stays testable. **Issue → road
 |------:|------|-----|--------|
 | — | [#2583](https://github.com/KenSuenobu/objectified-commercial/issues/2583) | P2-01 | Branch protection — **shipped** (`require_merge_path` + `metadata.branchPushPolicy.patterns`; push **403** `MERGE_PATH_REQUIRED`; `PATCH .../version-branches/{id}`; tenant-admin bypass) |
 | — | [#2584](https://github.com/KenSuenobu/objectified-commercial/issues/2584) | P2-02 | Draft lock API — **shipped** (`draft-lock/acquire|renew|release|force-release`; **409** `DRAFT_LOCK_CONFLICT`; migration **`20260412-150000.sql`**) |
-| — | [#2585](https://github.com/KenSuenobu/objectified-commercial/issues/2585) | P2-03 | Lock state in Studio header |
+| — | [#2585](https://github.com/KenSuenobu/objectified-commercial/issues/2585) | P2-03 | Lock state in Studio header — **shipped** (**GET** `.../draft-lock` polling; chip + tooltip in **Studio** header) |
 | — | [#2586](https://github.com/KenSuenobu/objectified-commercial/issues/2586) | P2-04 | Published immutability |
 | — | [#2587](https://github.com/KenSuenobu/objectified-commercial/issues/2587) | P2-05 | Push webhook CRUD |
 | — | [#2588](https://github.com/KenSuenobu/objectified-commercial/issues/2588) | P2-06 | Webhook retry + DLQ |
@@ -74,7 +74,7 @@ Implement and verify in this order so each step stays testable. **Issue → road
 
 ### A.2 Codebase alignment (for verification, not redesign)
 
-- **`objectified-rest`:** `versions_routes.py` documents **#2566** behavior (`baseRevisionId`, `STALE_HEAD`). `version_merge_routes.py` implements merge preview, merge apply, merge sessions (**#2572–#2574** area). **`workflow_audit`** (**#2577**) is the git-like workflow ledger; **`version_protection_audit`** remains separate for protection overrides. **P1-06** query API: **`GET /v1/versions/{tenant}/workflow-audit`** (**#2578**, `objectified-rest/docs/WORKFLOW_AUDIT_API.md`). **P1-07** list filters (**#2579**): **`GET .../versions/{tenant}/{project}`** optional **`q`**, **`creatorId`**, **`createdAfter`**, **`createdBefore`**. **P2-02** draft edit locks (**#2584**): **`POST .../versions/{tenant}/{project}/{revisionId}/draft-lock/acquire|renew|release|force-release`**; table **`odb.version_draft_lock`**.
+- **`objectified-rest`:** `versions_routes.py` documents **#2566** behavior (`baseRevisionId`, `STALE_HEAD`). `version_merge_routes.py` implements merge preview, merge apply, merge sessions (**#2572–#2574** area). **`workflow_audit`** (**#2577**) is the git-like workflow ledger; **`version_protection_audit`** remains separate for protection overrides. **P1-06** query API: **`GET /v1/versions/{tenant}/workflow-audit`** (**#2578**, `objectified-rest/docs/WORKFLOW_AUDIT_API.md`). **P1-07** list filters (**#2579**): **`GET .../versions/{tenant}/{project}`** optional **`q`**, **`creatorId`**, **`createdAfter`**, **`createdBefore`**. **P2-02** draft edit locks (**#2584**): **`POST .../versions/{tenant}/{project}/{revisionId}/draft-lock/acquire|renew|release|force-release`**; table **`odb.version_draft_lock`**. **P2-03** draft lock visibility (**#2585**): **`GET .../draft-lock`** (active lock + owner + expiry for polling).
 - **`objectified-ui`:** Versions UX is centralized in a very large dashboard module; when testing, prefer **stable selectors** or **data-testid** additions **inside the issues that own the UI** (this doc does not prescribe code).
 
 ### A.3 Testing checkpoint 1 — After P0-10 (merge preview) and P1-04

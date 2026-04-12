@@ -121,3 +121,29 @@ def test_published_version_acquire_400():
         mdb.acquire_version_draft_lock.side_effect = ValueError("published_version")
         r = client.post("/v1/versions/tn/proj/v1/draft-lock/acquire", json={})
         assert r.status_code == 400
+
+
+def test_get_draft_lock_status_inactive():
+    with patch("app.draft_lock_routes.db") as mdb:
+        mdb.get_version_draft_lock_status.return_value = {"active": False}
+        r = client.get("/v1/versions/tn/proj/v1/draft-lock")
+        assert r.status_code == 200
+        assert r.json() == {"active": False}
+
+
+def test_get_draft_lock_status_active():
+    exp = datetime(2026, 4, 12, 12, 0, 0, tzinfo=timezone.utc)
+    with patch("app.draft_lock_routes.db") as mdb:
+        mdb.get_version_draft_lock_status.return_value = {
+            "active": True,
+            "version_id": "vid-1",
+            "owner_user_id": "user-b",
+            "expires_at": exp,
+        }
+        r = client.get("/v1/versions/tn/proj/v1/draft-lock")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["active"] is True
+        assert body["versionId"] == "vid-1"
+        assert body["ownerUserId"] == "user-b"
+        assert "expiresAt" in body

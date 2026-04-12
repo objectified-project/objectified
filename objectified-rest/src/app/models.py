@@ -824,6 +824,17 @@ class VersionDraftLockResponse(BaseModel):
     expires_at: datetime = Field(serialization_alias="expiresAt")
 
 
+class VersionDraftLockStatusResponse(BaseModel):
+    """Draft lock presence for a revision — used for Studio polling (#2585)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    active: bool
+    version_id: Optional[str] = Field(default=None, serialization_alias="versionId")
+    owner_user_id: Optional[str] = Field(default=None, serialization_alias="ownerUserId")
+    expires_at: Optional[datetime] = Field(default=None, serialization_alias="expiresAt")
+
+
 class CompatibilityCheckResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

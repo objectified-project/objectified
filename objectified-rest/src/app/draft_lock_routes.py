@@ -16,6 +16,7 @@ from .models import (
     VersionDraftLockAcquireRequest,
     VersionDraftLockRenewRequest,
     VersionDraftLockResponse,
+    VersionDraftLockStatusResponse,
 )
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
@@ -66,6 +67,30 @@ def _require_jwt_user(auth_data: Dict[str, Any]) -> str:
             detail="Draft lock actions require a signed-in user (JWT); API keys cannot hold edit locks.",
         )
     return uid
+
+
+@router.get(
+    "/{tenant_slug}/{project_id}/{version_record_id}/draft-lock",
+    response_model=VersionDraftLockStatusResponse,
+)
+async def get_draft_lock_status(
+    tenant_slug: str,
+    project_id: str,
+    version_record_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> VersionDraftLockStatusResponse:
+    """Return whether an active edit lock exists on this draft revision (polling / Studio header #2585)."""
+    _ = tenant_slug
+    tenant_id = auth_data["tenant_id"]
+    raw = db.get_version_draft_lock_status(tenant_id, project_id, version_record_id)
+    if not raw.get("active"):
+        return VersionDraftLockStatusResponse(active=False)
+    return VersionDraftLockStatusResponse(
+        active=True,
+        version_id=raw["version_id"],
+        owner_user_id=raw["owner_user_id"],
+        expires_at=raw["expires_at"],
+    )
 
 
 @router.post(
