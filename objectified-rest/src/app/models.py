@@ -422,7 +422,7 @@ class VersionBranchRecordOut(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: str
-    project_id: str
+    project_id: str = Field(..., serialization_alias="projectId")
     name: str
     tip_revision_id: str = Field(
         ...,
@@ -434,9 +434,9 @@ class VersionBranchRecordOut(BaseModel):
         description="Revision this branch was created from (lineage; persists when tip advances).",
     )
     protected: bool = False
-    created_by: Optional[str] = None
-    created_at: Optional[Union[datetime, str]] = None
-    updated_at: Optional[Union[datetime, str]] = None
+    created_by: Optional[str] = Field(default=None, serialization_alias="createdBy")
+    created_at: Optional[Union[datetime, str]] = Field(default=None, serialization_alias="createdAt")
+    updated_at: Optional[Union[datetime, str]] = Field(default=None, serialization_alias="updatedAt")
 
 
 class VersionBranchFromRevisionResponse(BaseModel):

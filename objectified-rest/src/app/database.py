@@ -3777,7 +3777,19 @@ class Database:
                     return self._branch_from_revision_idempotent_result(
                         existing2, src, tenant_id
                     )
-            return {"success": False, "error": str(e), "code": "DATABASE_ERROR"}
+            _logger.exception(
+                "Database error creating version branch from revision "
+                "(project_id=%s, tenant_id=%s, branch_name=%s, source_revision_id=%s)",
+                project_id,
+                tenant_id,
+                bn,
+                src,
+            )
+            return {
+                "success": False,
+                "error": "Failed to create branch due to a database error",
+                "code": "DATABASE_ERROR",
+            }
 
         if not row:
             return {"success": False, "error": "Failed to create branch", "code": "DATABASE_ERROR"}
