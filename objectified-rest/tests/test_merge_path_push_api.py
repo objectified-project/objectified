@@ -81,10 +81,16 @@ def test_push_merge_path_allowed_for_tenant_admin():
         "merge_parent_version_id": None,
         "metadata": None,
     }
+    head_row = {
+        "id": head,
+        "published": False,
+        "published_immutable": False,
+    }
     with patch("app.versions_routes.db") as mdb:
         mdb.get_project_by_id.return_value = {"id": "proj-1", "metadata": {}}
         mdb.get_latest_version_for_project.return_value = None
         mdb.get_version_branch_by_name.return_value = branch
+        mdb.get_version_by_id.return_value = head_row
         mdb.is_user_tenant_admin.return_value = True
         mdb.create_version_push_transaction.return_value = (row, 0)
         r = client.post(

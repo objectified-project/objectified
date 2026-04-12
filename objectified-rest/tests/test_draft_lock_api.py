@@ -128,7 +128,11 @@ def test_get_draft_lock_status_inactive():
         mdb.get_version_draft_lock_status.return_value = {"active": False}
         r = client.get("/v1/versions/tn/proj/v1/draft-lock")
         assert r.status_code == 200
-        assert r.json() == {"active": False}
+        body = r.json()
+        assert body["active"] is False
+        assert body.get("versionId") is None
+        assert body.get("ownerUserId") is None
+        assert body.get("expiresAt") is None
 
 
 def test_get_draft_lock_status_active():

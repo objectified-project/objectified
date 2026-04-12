@@ -1281,7 +1281,7 @@ class Database:
 
         query = f"""
             SELECT v.id, v.project_id, v.creator_id, v.version_id, v.description,
-                   v.change_log, v.visibility, v.published, v.published_at,
+                   v.change_log, v.visibility, v.published, v.published_at, v.published_immutable,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
                    v.forked_from_revision_id, v.upstream_project_id,
                    v.revision_locked, v.metadata,
@@ -1345,7 +1345,7 @@ class Database:
         """Get a specific version by ID, ensuring it belongs to the tenant."""
         query = """
             SELECT v.id, v.project_id, v.creator_id, v.version_id, v.description,
-                   v.change_log, v.visibility, v.published, v.published_at,
+                   v.change_log, v.visibility, v.published, v.published_at, v.published_immutable,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
                    v.forked_from_revision_id, v.upstream_project_id,
                    v.revision_locked, v.metadata,
@@ -1374,7 +1374,7 @@ class Database:
         """Get a specific version by version_id string (e.g., '1.0.0'), ensuring it belongs to tenant."""
         query = """
             SELECT v.id, v.project_id, v.creator_id, v.version_id, v.description,
-                   v.change_log, v.visibility, v.published, v.published_at,
+                   v.change_log, v.visibility, v.published, v.published_at, v.published_immutable,
                    v.enabled, v.parent_version_id, v.merge_parent_version_id,
                    v.forked_from_revision_id, v.upstream_project_id,
                    v.revision_locked, v.metadata,
@@ -1753,6 +1753,7 @@ class Database:
         visibility: str = "private",
         description: Optional[str] = None,
         change_log: Optional[str] = None,
+        published_immutable: bool = True,
     ) -> Optional[Dict[str, Any]]:
         """Publish a version (only owner or tenant admin can publish). Captures class schemas to odb.class_schema.
 
@@ -1765,6 +1766,7 @@ class Database:
                 visibility = %s,
                 description = %s,
                 change_log = %s,
+                published_immutable = %s,
                 updated_at = CURRENT_TIMESTAMP
             FROM odb.projects p
             WHERE v.id = %s
@@ -1780,7 +1782,7 @@ class Database:
                 )
               )
             RETURNING v.id, v.project_id, v.creator_id, v.version_id, v.description,
-                      v.change_log, v.visibility, v.published, v.published_at,
+                      v.change_log, v.visibility, v.published, v.published_at, v.published_immutable,
                       v.enabled, v.commit_author, v.commit_message, v.external_ref,
                       v.created_at, v.updated_at
         """
@@ -1789,7 +1791,16 @@ class Database:
             with conn.cursor() as cursor:
                 cursor.execute(
                     query,
-                    (visibility, description, change_log, version_record_id, tenant_id, user_id, user_id),
+                    (
+                        visibility,
+                        description,
+                        change_log,
+                        published_immutable,
+                        version_record_id,
+                        tenant_id,
+                        user_id,
+                        user_id,
+                    ),
                 )
                 result = cursor.fetchone()
                 if result:
@@ -2255,6 +2266,7 @@ class Database:
             UPDATE odb.versions v
             SET published = false,
                 published_at = NULL,
+                published_immutable = false,
                 updated_at = CURRENT_TIMESTAMP
             FROM odb.projects p
             WHERE v.id = %s
@@ -2270,7 +2282,7 @@ class Database:
                 )
               )
             RETURNING v.id, v.project_id, v.creator_id, v.version_id, v.description,
-                      v.change_log, v.visibility, v.published, v.published_at,
+                      v.change_log, v.visibility, v.published, v.published_at, v.published_immutable,
                       v.enabled, v.commit_author, v.commit_message, v.external_ref,
                       v.created_at, v.updated_at
         """

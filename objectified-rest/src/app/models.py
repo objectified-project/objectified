@@ -250,6 +250,12 @@ class VersionSchema(BaseModel):
     visibility: str = "private"
     published: bool = False
     published_at: Optional[Union[datetime, str]] = None
+    published_immutable: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("publishedImmutable", "published_immutable"),
+        serialization_alias="publishedImmutable",
+        description="When published: if true, git-like writes require tenant-admin override (#2586).",
+    )
     enabled: bool = True
     parent_version_id: Optional[str] = None
     merge_parent_version_id: Optional[str] = None
@@ -350,6 +356,19 @@ class VersionCreateRequest(BaseModel):
     )
     source_version_id: Optional[str] = None  # Copy classes from this version
     bump_strategy: Optional[str] = None  # 'patch' or 'minor' for auto-versioning
+    override_published_immutability: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "overridePublishedImmutability", "override_published_immutability"
+        ),
+        description="Tenant admin only: allow push from an immutable published tip (#2586).",
+    )
+    override_reason: Optional[str] = Field(
+        default=None,
+        max_length=2000,
+        validation_alias=AliasChoices("overrideReason", "override_reason"),
+        description="Audit text when overriding published immutability (#2586).",
+    )
 
 
 class VersionForkRequest(BaseModel):
@@ -507,6 +526,19 @@ class VersionBranchMergePreviewRequest(BaseModel):
         validation_alias=AliasChoices("persistMergeSession", "persist_merge_session"),
         description="When true, insert merge_sessions + conflict rows for resumable resolution (#2573).",
     )
+    override_published_immutability: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "overridePublishedImmutability", "override_published_immutability"
+        ),
+        description="Tenant admin only: preview merge when a branch tip is published immutable (#2586).",
+    )
+    override_reason: Optional[str] = Field(
+        default=None,
+        max_length=2000,
+        validation_alias=AliasChoices("overrideReason", "override_reason"),
+        description="Audit text when overriding published immutability (#2586).",
+    )
 
 
 class MergeSessionStatusPatchRequest(BaseModel):
@@ -543,6 +575,19 @@ class VersionBranchMergeRequest(BaseModel):
         validation_alias=AliasChoices("skipCompatGate", "skip_compat_gate"),
         description="When true, skip optional project compatGateOnMerge check against merge result.",
     )
+    override_published_immutability: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "overridePublishedImmutability", "override_published_immutability"
+        ),
+        description="Tenant admin only: merge when a branch tip is published immutable (#2586).",
+    )
+    override_reason: Optional[str] = Field(
+        default=None,
+        max_length=2000,
+        validation_alias=AliasChoices("overrideReason", "override_reason"),
+        description="Audit text when overriding published immutability (#2586).",
+    )
 
 
 class VersionBranchRollbackPreviewRequest(BaseModel):
@@ -559,6 +604,19 @@ class VersionBranchRollbackPreviewRequest(BaseModel):
         ...,
         validation_alias=AliasChoices("targetRevisionId", "target_revision_id"),
         description="Revision (versions.id) whose class snapshot is restored (must be an ancestor of the branch tip).",
+    )
+    override_published_immutability: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "overridePublishedImmutability", "override_published_immutability"
+        ),
+        description="Tenant admin only: preview rollback when branch tip is published immutable (#2586).",
+    )
+    override_reason: Optional[str] = Field(
+        default=None,
+        max_length=2000,
+        validation_alias=AliasChoices("overrideReason", "override_reason"),
+        description="Audit text when overriding published immutability (#2586).",
     )
 
 
@@ -597,6 +655,19 @@ class VersionBranchRollbackRequest(BaseModel):
         default=None,
         description="Optional audit reason persisted on rollback workflow audit (#2582).",
         max_length=2000,
+    )
+    override_published_immutability: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "overridePublishedImmutability", "override_published_immutability"
+        ),
+        description="Tenant admin only: roll back when branch tip is published immutable (#2586).",
+    )
+    override_reason: Optional[str] = Field(
+        default=None,
+        max_length=2000,
+        validation_alias=AliasChoices("overrideReason", "override_reason"),
+        description="Audit text when overriding published immutability (#2586).",
     )
 
 
@@ -638,6 +709,11 @@ class VersionPublishRequest(BaseModel):
     changelog: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("changelog", "change_log"),
+    )
+    published_immutable: Optional[bool] = Field(
+        default=True,
+        validation_alias=AliasChoices("publishedImmutable", "published_immutable"),
+        description="If true (default), published revision rejects git-like writes unless admin override (#2586).",
     )
 
 
