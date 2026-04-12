@@ -117,7 +117,11 @@ export async function POST(
         ? branchRaw.tipRevisionId
         : typeof branchRaw?.tip_revision_id === 'string'
           ? branchRaw.tip_revision_id
-          : '';
+          : typeof branchRaw?.tip_version_id === 'string'
+            ? branchRaw.tip_version_id
+            : typeof tipRaw?.id === 'string'
+              ? tipRaw.id
+              : '';
     const tipVersionString =
       typeof tipRaw?.versionId === 'string'
         ? tipRaw.versionId
