@@ -102,16 +102,23 @@ def _strong_etag_for_revision(revision_id: str) -> str:
 
 def _if_none_match_matches_revision(revision_id: str, if_none_match: Optional[str]) -> bool:
     """
-    True when If-None-Match lists this revision's strong ETag.
-    Ignores ``*`` (RFC 9110: not used for 304 when a representation exists).
+    True when If-None-Match lists this revision's strong ETag, or when the
+    header value is ``*``.  Per RFC 9110 §13.1.2, ``*`` on a GET/HEAD request
+    matches any current representation of the resource, so a 304 is
+    appropriate whenever the resource exists.
     """
     if not if_none_match or not str(if_none_match).strip():
         return False
+    header = str(if_none_match).strip()
+    if header == "*":
+        return True
     rid = str(revision_id).strip().lower()
-    for raw in str(if_none_match).split(","):
+    for raw in header.split(","):
         token = raw.strip()
-        if not token or token == "*":
+        if not token:
             continue
+        if token == "*":
+            return True
         if token.startswith("W/"):
             token = token[2:].strip()
         if len(token) >= 2 and token[0] == '"' and token[-1] == '"':

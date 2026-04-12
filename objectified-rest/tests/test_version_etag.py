@@ -112,9 +112,34 @@ def test_get_version_by_version_id_sets_etag():
     assert r.headers.get("etag") == '"rev-x"'
 
 
+def test_get_version_304_when_if_none_match_wildcard():
+    """If-None-Match: * must return 304 for any existing resource (RFC 9110 §13.1.2)."""
+    row = _min_version("rev-1", "1.0.0")
+    with patch("app.versions_routes.db") as mdb:
+        mdb.get_version_by_id.return_value = row
+        r = client.get(
+            "/v1/versions/tn/proj-1/rev-1",
+            headers={"If-None-Match": "*"},
+        )
+    assert r.status_code == 304
+    assert r.headers.get("etag") == '"rev-1"'
+    assert r.content == b""
+
+
 def test_helpers_if_none_match_case_insensitive():
     from app.versions_routes import _if_none_match_matches_revision
 
     rid = "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
     assert _if_none_match_matches_revision(rid, f'"{rid.lower()}"')
     assert not _if_none_match_matches_revision(rid, '"other"')
+
+
+def test_helpers_if_none_match_wildcard():
+    from app.versions_routes import _if_none_match_matches_revision
+
+    rid = "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
+    assert _if_none_match_matches_revision(rid, "*")
+    assert _if_none_match_matches_revision(rid, ' * ')
+    assert _if_none_match_matches_revision(rid, '"other", *')
+    assert _if_none_match_matches_revision(rid, '*, "other"')
+    assert not _if_none_match_matches_revision(rid, "")
