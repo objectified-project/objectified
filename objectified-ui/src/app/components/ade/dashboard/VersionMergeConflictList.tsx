@@ -152,7 +152,7 @@ export function VersionMergeConflictList({
             </div>
           </div>
           <p className="text-xs text-gray-600 dark:text-gray-400">
-            Showing <span className="font-medium text-gray-800 dark:text-gray-200">{filteredConflicts.length}</span> of{' '}
+            Filter matches <span className="font-medium text-gray-800 dark:text-gray-200">{filteredConflicts.length}</span> of{' '}
             <span className="font-medium text-gray-800 dark:text-gray-200">{conflicts.length}</span> path
             {conflicts.length !== 1 ? 's' : ''}. Bulk actions for <span className="font-medium">shown</span> use this
             filter.
