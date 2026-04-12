@@ -13,6 +13,15 @@ import {
   DialogFooter,
   DialogDescription,
 } from '../../../components/ui/Dialog';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../../components/ui/AlertDialog';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
@@ -167,6 +176,14 @@ function revisionMatchesHistoryFilters(
     }
   }
   return true;
+}
+
+/** Rollback confirm dialog (#2581): revision row time in UTC for display. */
+function formatRevisionTimestampUtc(iso: string | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
 }
 
 interface VersionBranchRow {
@@ -361,9 +378,17 @@ const Versions = () => {
     deprecationWarnings?: unknown[];
     rollbackBlockedByCompatGate?: boolean;
     breakingChangeDocumentationIssueUrl?: string | null;
+    impactSummary?: {
+      added: number;
+      removed: number;
+      modified: number;
+      unchanged: number;
+      changedEntityCount: number;
+    };
   } | null>(null);
   const [rollbackSkipCompat, setRollbackSkipCompat] = useState(false);
   const [rollbackShortMessage, setRollbackShortMessage] = useState('');
+  const [showRollbackConfirmAlert, setShowRollbackConfirmAlert] = useState(false);
 
   const otherProjects = useMemo(
     () => projects.filter((p) => p.id !== selectedProjectId),
@@ -2043,6 +2068,17 @@ const Versions = () => {
       });
       const d = await r.json();
       if (d.success) {
+        const rawImpact = d.impactSummary as Record<string, unknown> | undefined;
+        const impactSummary =
+          rawImpact && typeof rawImpact === 'object'
+            ? {
+                added: Number(rawImpact.added) || 0,
+                removed: Number(rawImpact.removed) || 0,
+                modified: Number(rawImpact.modified) || 0,
+                unchanged: Number(rawImpact.unchanged) || 0,
+                changedEntityCount: Number(rawImpact.changedEntityCount) || 0,
+              }
+            : undefined;
         setRollbackPreview({
           branchTipRevisionId: typeof d.branchTipRevisionId === 'string' ? d.branchTipRevisionId : undefined,
           compatOverall: typeof d.compatOverall === 'string' ? d.compatOverall : undefined,
@@ -2051,6 +2087,7 @@ const Versions = () => {
           rollbackBlockedByCompatGate: Boolean(d.rollbackBlockedByCompatGate),
           breakingChangeDocumentationIssueUrl:
             typeof d.breakingChangeDocumentationIssueUrl === 'string' ? d.breakingChangeDocumentationIssueUrl : null,
+          ...(impactSummary ? { impactSummary } : {}),
         });
         setRollbackSkipCompat(false);
       } else {
@@ -2100,6 +2137,7 @@ const Versions = () => {
       const d = await r.json();
       if (d.success) {
         toast.success(`Rollback complete — new revision v${d.version?.version_id ?? ''}`);
+        setShowRollbackConfirmAlert(false);
         setShowRollbackDialog(false);
         setRollbackPreview(null);
         setRollbackTargetVersion(null);
@@ -4420,7 +4458,10 @@ const Versions = () => {
         onOpenChange={(open) => {
           if (!rollbackPreviewLoading && !rollbackApplyLoading) {
             setShowRollbackDialog(open);
-            if (!open) setRollbackPreview(null);
+            if (!open) {
+              setRollbackPreview(null);
+              setShowRollbackConfirmAlert(false);
+            }
           }
         }}
       >
@@ -4548,7 +4589,7 @@ const Versions = () => {
               {rollbackPreviewLoading ? 'Previewing…' : 'Preview impact'}
             </Button>
             <Button
-              onClick={() => void runRollbackApply()}
+              onClick={() => setShowRollbackConfirmAlert(true)}
               disabled={
                 rollbackApplyLoading ||
                 rollbackPreviewLoading ||
@@ -4559,11 +4600,58 @@ const Versions = () => {
                   !rollbackSkipCompat)
               }
             >
-              {rollbackApplyLoading ? 'Applying…' : 'Apply rollback'}
+              Apply rollback
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={showRollbackConfirmAlert}
+        onOpenChange={(open) => {
+          if (!rollbackApplyLoading) setShowRollbackConfirmAlert(open);
+        }}
+      >
+        <AlertDialogContent className="max-w-md" aria-describedby={undefined}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Roll back?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-left text-sm text-gray-700 dark:text-gray-300">
+                <p>
+                  <span className="text-gray-500 dark:text-gray-400">Target revision: </span>
+                  <span className="font-mono text-xs break-all">{rollbackTargetVersion?.id ?? '—'}</span>
+                </p>
+                <p>
+                  <span className="text-gray-500 dark:text-gray-400">Committed: </span>
+                  {rollbackTargetVersion ? formatRevisionTimestampUtc(rollbackTargetVersion.created_at) : '—'}
+                </p>
+                <p>
+                  <span className="text-gray-500 dark:text-gray-400">Impact: </span>
+                  {rollbackPreview?.impactSummary != null ? (
+                    <>
+                      ~{rollbackPreview.impactSummary.changedEntityCount} entities differ vs branch tip (+
+                      {rollbackPreview.impactSummary.added} added, −{rollbackPreview.impactSummary.removed} removed,{' '}
+                      {rollbackPreview.impactSummary.modified} modified)
+                    </>
+                  ) : (
+                    <>Run preview impact first to load entity counts.</>
+                  )}
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={rollbackApplyLoading}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={rollbackApplyLoading || !rollbackPreview?.branchTipRevisionId}
+              onClick={() => void runRollbackApply()}
+            >
+              {rollbackApplyLoading ? 'Rolling back…' : 'Roll back'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Relationship graph (#322) */}
       <RelationshipGraphDialog

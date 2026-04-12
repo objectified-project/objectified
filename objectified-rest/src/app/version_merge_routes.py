@@ -817,6 +817,15 @@ def _rollback_analyze(
     """
     tip_spec = _openapi_for_revision(head_ver, tenant_slug, tenant_id)
     target_spec = _openapi_for_revision(target_ver, tenant_slug, tenant_id)
+    schema_diff = compare_schemas(tip_spec, target_spec)
+    diff_counts = _diff_summary_counts(schema_diff)
+    changed_entity_count = (
+        diff_counts["added"] + diff_counts["removed"] + diff_counts["modified"]
+    )
+    impact_summary: Dict[str, Any] = {
+        **diff_counts,
+        "changedEntityCount": changed_entity_count,
+    }
     overall, findings = analyze_schema_compatibility(tip_spec, target_spec, CompatibilityRules())
     finding_out = [
         CompatibilityFindingOut(
@@ -849,7 +858,7 @@ def _rollback_analyze(
     dep_dicts = [w.model_dump(by_alias=True) for w in dep_out]
     fp = _fingerprint(overall, finding_dicts, dep_dicts or None)
     doc_url = BREAKING_DOC_ISSUE_URL if overall == "breaking" else None
-    return overall, finding_out, dep_out, fp, doc_url
+    return overall, finding_out, dep_out, fp, doc_url, impact_summary
 
 
 def _rollback_validate_branch_and_revisions(
@@ -926,7 +935,7 @@ async def version_branch_rollback_preview(
         project_id, tenant_id, body.branch_name, body.target_revision_id
     )
 
-    overall, finding_out, dep_out, fp, doc_url = _rollback_analyze(
+    overall, finding_out, dep_out, fp, doc_url, impact_summary = _rollback_analyze(
         tenant_slug, tenant_id, head_ver, target_ver
     )
     gate = _tenant_compat_gate_rollback(_project)
@@ -943,6 +952,13 @@ async def version_branch_rollback_preview(
         "breakingChangeDocumentationIssueUrl": doc_url,
         "tenantCompatGateRollbackActive": gate,
         "rollbackBlockedByCompatGate": blocked,
+        "impactSummary": {
+            "added": impact_summary["added"],
+            "removed": impact_summary["removed"],
+            "modified": impact_summary["modified"],
+            "unchanged": impact_summary["unchanged"],
+            "changedEntityCount": impact_summary["changedEntityCount"],
+        },
     }
 
 
@@ -1006,7 +1022,7 @@ async def version_branch_rollback(
             detail="This branch is protected; only tenant administrators may roll back.",
         )
 
-    overall, _finding_out, dep_out, _fp, _doc_url = _rollback_analyze(
+    overall, _finding_out, dep_out, _fp, _doc_url, _impact_summary = _rollback_analyze(
         tenant_slug, tenant_id, head_ver, target_ver
     )
     gate = _tenant_compat_gate_rollback(project)

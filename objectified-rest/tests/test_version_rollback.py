@@ -124,7 +124,7 @@ def test_rollback_apply_protected_branch_forbidden(auth_client):
         "app.version_merge_routes.db.is_user_tenant_admin", return_value=False
     ), patch(
         "app.version_merge_routes._rollback_analyze",
-        return_value=("safe", [], [], "fp", None),
+        return_value=("safe", [], [], "fp", None, {"added": 0, "removed": 0, "modified": 0, "unchanged": 0, "changedEntityCount": 0}),
     ):
         r = auth_client.post(
             "/v1/versions/slug/p1/version-branches/rollback",
