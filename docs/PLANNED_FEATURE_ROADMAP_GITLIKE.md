@@ -446,6 +446,8 @@ Add `Compare with current` action for any revision in history.
 - Diff view supports both light and dark themes.
 - User can return to timeline without losing filter state.
 
+**Status:** Shipped — ADE **Versions** table row menu **Compare with current** opens the existing **Compare Version Schemas** dialog; diff is **selected revision (base) → latest head** (max `created_at` among revisions returned for the project / lifecycle filter). Overlay and side-by-side diff use existing **light/dark** Tailwind styling; closing the dialog does not reset **Timeline** search/author/date filters.
+
 ---
 
 ## P1-09: Rollback Confirmation Dialog with Impact Summary

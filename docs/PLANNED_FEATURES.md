@@ -51,7 +51,7 @@ Implement and verify in this order so each step stays testable. **Issue → road
 | 15 | [#2577](https://github.com/KenSuenobu/objectified-commercial/issues/2577) | P1-05 | Workflow audit **ledger** + write path — roadmap: shipped |
 | 16 | [#2578](https://github.com/KenSuenobu/objectified-commercial/issues/2578) | P1-06 | Audit API (filters + pagination) — **shipped** (`GET .../workflow-audit`, `objectified-rest/docs/WORKFLOW_AUDIT_API.md`) |
 | 17 | [#2579](https://github.com/KenSuenobu/objectified-commercial/issues/2579) | P1-07 | History search/filter in timeline — **shipped** (ADE **Timeline** bar: search, author, date range, reset; REST `q`, `creatorId`, `createdAfter`, `createdBefore` on list versions) |
-| 18 | [#2580](https://github.com/KenSuenobu/objectified-commercial/issues/2580) | P1-08 | Compare revision with current |
+| 18 | [#2580](https://github.com/KenSuenobu/objectified-commercial/issues/2580) | P1-08 | Compare revision with current — **shipped** (version row **Compare with current** → schema diff dialog; base = selected, compare-to = latest head by `created_at`; timeline filters unchanged on close) |
 | 19 | [#2581](https://github.com/KenSuenobu/objectified-commercial/issues/2581) | P1-09 | Rollback confirmation + impact summary |
 | 20 | [#2582](https://github.com/KenSuenobu/objectified-commercial/issues/2582) | P1-10 | Rollback audit persistence |
 
