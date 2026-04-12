@@ -179,6 +179,9 @@ interface StudioContextType {
   /** Weighted breakdown for header dialog / metrics card (#2548); null when score is unavailable */
   schemaQualityDetail: OverallSchemaQualityDetail | null;
   setSchemaQualityDetail: (value: OverallSchemaQualityDetail | null) => void;
+  /** Canvas / studio edits not yet persisted (#2569). */
+  syncLocalDirty: boolean;
+  setSyncLocalDirty: (value: boolean) => void;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -380,6 +383,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [canvasPresentationMode, setCanvasPresentationMode] = useState(false);
   const [schemaQualityScore, setSchemaQualityScore] = useState<number | null>(null);
   const [schemaQualityDetail, setSchemaQualityDetail] = useState<OverallSchemaQualityDetail | null>(null);
+  const [syncLocalDirty, setSyncLocalDirty] = useState(false);
 
   // Persist grid settings to localStorage
   useEffect(() => {
@@ -568,7 +572,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       schemaQualityScore,
       setSchemaQualityScore,
       schemaQualityDetail,
-      setSchemaQualityDetail
+      setSchemaQualityDetail,
+      syncLocalDirty,
+      setSyncLocalDirty
     }}>
       {children}
     </StudioContext.Provider>
