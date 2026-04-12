@@ -522,6 +522,8 @@ Add lock endpoints for acquire, renew, release, and force release (authorized ro
 - Second editor receives lock conflict with owner and expiry metadata.
 - Lock release and renew update lock state correctly.
 
+**Status:** Shipped — table **`odb.version_draft_lock`** (migration **`20260412-150000.sql`**); **`POST .../{versionId}/draft-lock/acquire|renew|release|force-release`** (JWT required for holder identity; **409** `DRAFT_LOCK_CONFLICT` with **`ownerUserId`** / **`expiresAt`**; tenant-admin **force-release**) (**#2584**).
+
 ---
 
 ## P2-03: Show Lock State and Owner in Studio Header

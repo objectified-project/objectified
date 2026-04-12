@@ -4583,6 +4583,364 @@ class Database:
 
         return True, None
 
+    def _draft_lock_version_row_for_update(
+        self, cursor, tenant_id: str, project_id: str, version_record_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Lock the version row; return id and published, or None if not found."""
+        cursor.execute(
+            """
+            SELECT v.id::text AS id, v.published
+            FROM odb.versions v
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE v.id = %s::uuid AND v.project_id = %s AND p.tenant_id = %s
+              AND v.deleted_at IS NULL
+            FOR UPDATE OF v
+            """,
+            (version_record_id, project_id, tenant_id),
+        )
+        return cursor.fetchone()
+
+    def _draft_lock_expires_active(self, exp: Any) -> bool:
+        from datetime import timezone
+
+        if exp is None:
+            return False
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+
+        rows = self.execute_query(
+            """
+            SELECT CURRENT_TIMESTAMP AS current_timestamp
+            """
+        )
+        db_now = rows[0]["current_timestamp"] if rows else None
+        if db_now is None:
+            return False
+        if db_now.tzinfo is None:
+            db_now = db_now.replace(tzinfo=timezone.utc)
+        return exp > db_now
+
+    def acquire_version_draft_lock(
+        self,
+        tenant_id: str,
+        project_id: str,
+        version_record_id: str,
+        user_id: str,
+        lease_seconds: int,
+    ) -> Dict[str, Any]:
+        """
+        Acquire or refresh a draft edit lock on an unpublished revision.
+
+        Returns:
+            ``{kind: 'ok', version_id, owner_user_id, expires_at}`` on success.
+            ``{kind: 'conflict', owner_user_id, expires_at}`` when another user holds an active lock.
+
+        Raises:
+            ValueError: ``version_not_found`` or ``published_version``.
+        """
+        conn = self.connect()
+        prev_autocommit = conn.autocommit
+        try:
+            conn.autocommit = False
+            with conn.cursor() as cursor:
+                vrow = self._draft_lock_version_row_for_update(
+                    cursor, tenant_id, project_id, version_record_id
+                )
+                if not vrow:
+                    conn.rollback()
+                    raise ValueError("version_not_found")
+                if vrow.get("published"):
+                    conn.rollback()
+                    raise ValueError("published_version")
+
+                vid = str(vrow["id"])
+                cursor.execute(
+                    """
+                    SELECT owner_user_id::text AS owner_user_id, expires_at
+                    FROM odb.version_draft_lock
+                    WHERE version_id = %s::uuid
+                    FOR UPDATE
+                    """,
+                    (vid,),
+                )
+                lock_row = cursor.fetchone()
+
+                if not lock_row:
+                    cursor.execute(
+                        """
+                        INSERT INTO odb.version_draft_lock
+                          (version_id, owner_user_id, expires_at, updated_at)
+                        VALUES (
+                          %s::uuid, %s::uuid,
+                          NOW() + (%s * INTERVAL '1 second'),
+                          CURRENT_TIMESTAMP
+                        )
+                        RETURNING owner_user_id::text AS owner_user_id, expires_at
+                        """,
+                        (vid, user_id, lease_seconds),
+                    )
+                    out = cursor.fetchone()
+                    conn.commit()
+                    return {
+                        "kind": "ok",
+                        "version_id": vid,
+                        "owner_user_id": str(out["owner_user_id"]),
+                        "expires_at": out["expires_at"],
+                    }
+
+                owner = str(lock_row["owner_user_id"])
+                exp = lock_row["expires_at"]
+                active = self._draft_lock_expires_active(exp)
+
+                if not active:
+                    cursor.execute(
+                        """
+                        UPDATE odb.version_draft_lock
+                        SET owner_user_id = %s::uuid,
+                            expires_at = NOW() + (%s * INTERVAL '1 second'),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE version_id = %s::uuid
+                        RETURNING owner_user_id::text AS owner_user_id, expires_at
+                        """,
+                        (user_id, lease_seconds, vid),
+                    )
+                    out = cursor.fetchone()
+                    conn.commit()
+                    return {
+                        "kind": "ok",
+                        "version_id": vid,
+                        "owner_user_id": str(out["owner_user_id"]),
+                        "expires_at": out["expires_at"],
+                    }
+
+                if owner == user_id:
+                    cursor.execute(
+                        """
+                        UPDATE odb.version_draft_lock
+                        SET expires_at = NOW() + (%s * INTERVAL '1 second'),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE version_id = %s::uuid
+                        RETURNING owner_user_id::text AS owner_user_id, expires_at
+                        """,
+                        (lease_seconds, vid),
+                    )
+                    out = cursor.fetchone()
+                    conn.commit()
+                    return {
+                        "kind": "ok",
+                        "version_id": vid,
+                        "owner_user_id": str(out["owner_user_id"]),
+                        "expires_at": out["expires_at"],
+                    }
+
+                conn.rollback()
+                return {
+                    "kind": "conflict",
+                    "owner_user_id": owner,
+                    "expires_at": exp,
+                }
+        except ValueError:
+            raise
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.autocommit = prev_autocommit
+
+    def renew_version_draft_lock(
+        self,
+        tenant_id: str,
+        project_id: str,
+        version_record_id: str,
+        user_id: str,
+        lease_seconds: int,
+    ) -> Dict[str, Any]:
+        """
+        Extend an active draft lock held by the same user.
+
+        Returns:
+            ``{kind: 'ok', ...}``, ``{kind: 'not_held'}``, or
+            ``{kind: 'conflict', owner_user_id, expires_at}``.
+
+        Raises:
+            ValueError: ``version_not_found`` or ``published_version``.
+        """
+        conn = self.connect()
+        prev_autocommit = conn.autocommit
+        try:
+            conn.autocommit = False
+            with conn.cursor() as cursor:
+                vrow = self._draft_lock_version_row_for_update(
+                    cursor, tenant_id, project_id, version_record_id
+                )
+                if not vrow:
+                    conn.rollback()
+                    raise ValueError("version_not_found")
+                if vrow.get("published"):
+                    conn.rollback()
+                    raise ValueError("published_version")
+
+                vid = str(vrow["id"])
+                cursor.execute(
+                    """
+                    SELECT owner_user_id::text AS owner_user_id, expires_at
+                    FROM odb.version_draft_lock
+                    WHERE version_id = %s::uuid
+                    FOR UPDATE
+                    """,
+                    (vid,),
+                )
+                lock_row = cursor.fetchone()
+                if not lock_row:
+                    conn.rollback()
+                    return {"kind": "not_held"}
+
+                if not self._draft_lock_expires_active(lock_row["expires_at"]):
+                    conn.rollback()
+                    return {"kind": "not_held"}
+
+                owner = str(lock_row["owner_user_id"])
+                if owner != user_id:
+                    conn.rollback()
+                    return {
+                        "kind": "conflict",
+                        "owner_user_id": owner,
+                        "expires_at": lock_row["expires_at"],
+                    }
+
+                cursor.execute(
+                    """
+                    UPDATE odb.version_draft_lock
+                    SET expires_at = NOW() + (%s * INTERVAL '1 second'),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE version_id = %s::uuid AND owner_user_id = %s::uuid
+                    RETURNING owner_user_id::text AS owner_user_id, expires_at
+                    """,
+                    (lease_seconds, vid, user_id),
+                )
+                out = cursor.fetchone()
+                conn.commit()
+                return {
+                    "kind": "ok",
+                    "version_id": vid,
+                    "owner_user_id": str(out["owner_user_id"]),
+                    "expires_at": out["expires_at"],
+                }
+        except ValueError:
+            raise
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.autocommit = prev_autocommit
+
+    def release_version_draft_lock(
+        self,
+        tenant_id: str,
+        project_id: str,
+        version_record_id: str,
+        user_id: str,
+    ) -> str:
+        """
+        Release a draft lock held by ``user_id``.
+
+        Returns:
+            ``released``, ``not_found`` (no lock row), or ``forbidden`` (another user holds the lock).
+        """
+        conn = self.connect()
+        prev_autocommit = conn.autocommit
+        try:
+            conn.autocommit = False
+            with conn.cursor() as cursor:
+                vrow = self._draft_lock_version_row_for_update(
+                    cursor, tenant_id, project_id, version_record_id
+                )
+                if not vrow:
+                    conn.rollback()
+                    raise ValueError("version_not_found")
+
+                vid = str(vrow["id"])
+                cursor.execute(
+                    """
+                    DELETE FROM odb.version_draft_lock
+                    WHERE version_id = %s::uuid AND owner_user_id = %s::uuid
+                    RETURNING version_id
+                    """,
+                    (vid, user_id),
+                )
+                if cursor.fetchone():
+                    conn.commit()
+                    return "released"
+
+                cursor.execute(
+                    """
+                    SELECT 1 FROM odb.version_draft_lock
+                    WHERE version_id = %s::uuid
+                    LIMIT 1
+                    """,
+                    (vid,),
+                )
+                if not cursor.fetchone():
+                    conn.commit()
+                    return "not_found"
+
+                conn.rollback()
+                return "forbidden"
+        except ValueError:
+            raise
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.autocommit = prev_autocommit
+
+    def force_release_version_draft_lock(
+        self,
+        tenant_id: str,
+        project_id: str,
+        version_record_id: str,
+    ) -> bool:
+        """
+        Remove any draft lock on the revision (tenant-admin force release).
+
+        Returns:
+            True if a lock row was deleted.
+
+        Raises:
+            ValueError: ``version_not_found``.
+        """
+        conn = self.connect()
+        prev_autocommit = conn.autocommit
+        try:
+            conn.autocommit = False
+            with conn.cursor() as cursor:
+                vrow = self._draft_lock_version_row_for_update(
+                    cursor, tenant_id, project_id, version_record_id
+                )
+                if not vrow:
+                    conn.rollback()
+                    raise ValueError("version_not_found")
+
+                vid = str(vrow["id"])
+                cursor.execute(
+                    """
+                    DELETE FROM odb.version_draft_lock
+                    WHERE version_id = %s::uuid
+                    RETURNING version_id
+                    """,
+                    (vid,),
+                )
+                deleted = cursor.fetchone() is not None
+                conn.commit()
+                return deleted
+        except ValueError:
+            raise
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.autocommit = prev_autocommit
+
 
 # Global database instance
 db = Database()

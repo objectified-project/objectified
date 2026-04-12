@@ -787,6 +787,43 @@ class SunsetTimelineResponse(BaseModel):
     entries: List[SunsetTimelineEntryOut] = Field(default_factory=list)
 
 
+class VersionDraftLockAcquireRequest(BaseModel):
+    """Optional lease duration for draft lock acquire/renew (#2584)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    lease_seconds: Optional[int] = Field(
+        default=None,
+        ge=60,
+        le=86400,
+        validation_alias=AliasChoices("leaseSeconds", "lease_seconds"),
+        serialization_alias="leaseSeconds",
+        description="Lock duration in seconds (default 900).",
+    )
+
+
+class VersionDraftLockRenewRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    lease_seconds: Optional[int] = Field(
+        default=None,
+        ge=60,
+        le=86400,
+        validation_alias=AliasChoices("leaseSeconds", "lease_seconds"),
+        serialization_alias="leaseSeconds",
+    )
+
+
+class VersionDraftLockResponse(BaseModel):
+    """Active draft edit lock on an unpublished revision (#2584)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    version_id: str = Field(serialization_alias="versionId")
+    owner_user_id: str = Field(serialization_alias="ownerUserId")
+    expires_at: datetime = Field(serialization_alias="expiresAt")
+
+
 class CompatibilityCheckResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
