@@ -72,6 +72,20 @@ Stable envelope (bump **`schemaVersion`** only on incompatible changes):
 - **`pagination.offset`** / **`nextOffset`** are null.
 - **`total`** is still the count of all rows matching the filters (excluding pagination).
 
+## `version.rollback` detail shape (`#2582`)
+
+For **`action`** = **`version.rollback`**, **`detail`** is a JSON object that may include:
+
+| Key | Meaning |
+|-----|---------|
+| `fromRevision` | Branch tip revision (`versions.id`) before the rollback attempt (when known). |
+| `toRevision` | On **success**, the new head revision created by the rollback; on failed attempts before a new row exists, the **target** revision id; if a new revision was inserted but the transaction failed, the attempted new revision id may appear via `attemptedNewRevisionId`. |
+| `branchName` | Git-like branch label. |
+| `reason` | Optional operator reason from the rollback request body. |
+| `targetRevisionId` / `priorTipRevisionId` | Snapshot source and previous tip (same lineage as `metadata.rollback` on the new revision). |
+
+**`actorId`** and **`createdAt`** on the audit row identify **who** and **when**; they are not duplicated inside **`detail`**.
+
 ## Errors
 
 | Code | When |

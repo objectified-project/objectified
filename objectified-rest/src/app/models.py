@@ -570,6 +570,11 @@ class VersionBranchRollbackRequest(BaseModel):
         default=None,
         validation_alias=AliasChoices("changelog", "change_log"),
     )
+    reason: Optional[str] = Field(
+        default=None,
+        description="Optional audit reason persisted on rollback workflow audit (#2582).",
+        max_length=2000,
+    )
 
 
 class VersionUpdateRequest(BaseModel):

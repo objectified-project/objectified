@@ -484,6 +484,8 @@ Persist rollback events with source/target revision and optional reason.
 - Reason field is persisted when provided.
 - Rollback events are visible via audit API.
 
+**Status:** Shipped — **`workflow_audit.detail`** on **`version.rollback`** includes **`fromRevision`**, **`toRevision`**, optional **`reason`**; **`POST .../version-branches/rollback`** body **`reason`**; row **`actor_id`** and **`created_at`**; **`GET .../workflow-audit`** unchanged (**#2578**). **`metadata.rollback`** may include **`reason`**.
+
 ---
 
 ## P2-01: Add Branch Protection Rules (No Direct Push / Require Merge)

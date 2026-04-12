@@ -68,6 +68,7 @@ export async function POST(
     const skipCompatWarning = typeof body.skipCompatWarning === 'boolean' ? body.skipCompatWarning : false;
     const shortMessage = typeof body.shortMessage === 'string' ? body.shortMessage : undefined;
     const changelog = typeof body.changelog === 'string' ? body.changelog : undefined;
+    const reason = typeof body.reason === 'string' ? body.reason : undefined;
     if (!branchName.trim() || !targetRevisionId.trim() || !baseRevisionId.trim()) {
       return NextResponse.json(
         { success: false, error: 'branchName, targetRevisionId, and baseRevisionId are required' },
@@ -85,6 +86,7 @@ export async function POST(
         skipCompatWarning,
         ...(shortMessage !== undefined ? { shortMessage } : {}),
         ...(changelog !== undefined ? { changelog } : {}),
+        ...(reason !== undefined ? { reason } : {}),
       }),
     });
     const text = await response.text();
