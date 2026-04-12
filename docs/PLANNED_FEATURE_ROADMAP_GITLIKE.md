@@ -229,6 +229,8 @@ Support `If-None-Match` on pull and return `304` when version head is unchanged.
 
 ## P0-07: Show Sync State Indicators (Dirty, Unpushed, Server Ahead)
 
+**Status:** **Done** — **Studio header** compact **Dirty / ↑N / Ahead** chips (Tailwind + Radix tooltips): local dirty from canvas **auto-save pending**; **↑N** counts **your** revisions on the **parent** chain from latest to the selected revision; **Ahead** when latest ≠ selection or **`STALE_HEAD`** push conflict is active.
+
 **GitHub:** [#2569](https://github.com/KenSuenobu/objectified-commercial/issues/2569) · **Epic:** [#2558](https://github.com/KenSuenobu/objectified-commercial/issues/2558)
 
 ### Problem statement

@@ -21,6 +21,11 @@ import RevisionDeprecationBanner from '@/app/components/ade/RevisionDeprecationB
 import ServerAheadPushBanner from '@/app/components/ade/ServerAheadPushBanner';
 import { usePushConflictBanner } from '@/app/providers/PushConflictBannerProvider';
 import { isRevisionDeprecated } from '@/app/utils/revision-deprecation';
+import {
+  countAuthoredRevisionsTowardHead,
+  isRemoteHeadAheadOfSelection,
+} from '@/app/utils/studio-sync-indicators';
+import { StudioSyncStatusChips } from './StudioSyncStatusChips';
 
 interface Project {
   id: string;
@@ -34,6 +39,8 @@ interface Version {
   description: string;
   published: boolean;
   metadata?: Record<string, unknown>;
+  parent_version_id?: string | null;
+  creator_id: string | null;
 }
 
 type ViewMode = 'editor' | 'paths' | 'code';
@@ -82,6 +89,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     schemaQualityDetail,
     triggerCanvasRefresh,
     triggerSidebarRefresh,
+    syncLocalDirty,
   } = useStudio();
 
   const { conflict, clearPushConflict } = usePushConflictBanner();
@@ -259,6 +267,30 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   const serverAheadForProject =
     conflict && localProjectId && conflict.projectId === localProjectId ? conflict : null;
 
+  const sessionUserId = (session?.user as { user_id?: string } | undefined)?.user_id;
+
+  const syncVersionsForMetrics = React.useMemo(
+    () =>
+      versions.map((v) => ({
+        id: v.id,
+        parent_version_id: v.parent_version_id ?? null,
+        creator_id: v.creator_id ?? null,
+      })),
+    [versions]
+  );
+
+  const authoredRevisionCount = React.useMemo(
+    () => countAuthoredRevisionsTowardHead(syncVersionsForMetrics, localVersionId, sessionUserId),
+    [syncVersionsForMetrics, localVersionId, sessionUserId]
+  );
+
+  const serverHeadAheadOfSelection = React.useMemo(
+    () => isRemoteHeadAheadOfSelection(syncVersionsForMetrics, localVersionId),
+    [syncVersionsForMetrics, localVersionId]
+  );
+
+  const showSyncServerAheadChip = Boolean(serverAheadForProject) || serverHeadAheadOfSelection;
+
   const handlePullReconcile = React.useCallback(async () => {
     if (!localProjectId || !serverAheadForProject) return;
     setPullReconcileLoading(true);
@@ -427,6 +459,14 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
             </Select.Portal>
           </Select.Root>
         </div>
+
+        {localProjectId && localVersionId ? (
+          <StudioSyncStatusChips
+            localDirty={syncLocalDirty}
+            authoredRevisionCount={authoredRevisionCount}
+            serverAhead={showSyncServerAheadChip}
+          />
+        ) : null}
 
         {/* Overall schema quality (#245) — live from Canvas; click for breakdown (#2548) */}
         {localProjectId && localVersionId && (

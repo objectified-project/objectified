@@ -361,6 +361,7 @@ const StudioContent = () => {
     setCanvasPresentationMode,
     setSchemaQualityScore,
     setSchemaQualityDetail,
+    setSyncLocalDirty,
   } = useStudio();
 
   // Toggle click-to-focus mode (defined after useStudio to access setContextClickToFocusEnabled)
@@ -694,6 +695,14 @@ const StudioContent = () => {
   useEffect(() => {
     setAutoSavePending(false);
   }, [selectedVersionId]);
+
+  useEffect(() => {
+    setSyncLocalDirty(autoSavePending);
+  }, [autoSavePending, setSyncLocalDirty]);
+
+  useEffect(() => {
+    return () => setSyncLocalDirty(false);
+  }, [setSyncLocalDirty]);
 
   // Export wizard state
   const [exportWizardOpen, setExportWizardOpen] = useState(false);
