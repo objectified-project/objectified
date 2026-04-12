@@ -38,7 +38,6 @@ import {
   formatClassDiffStatLines,
   formatPropertyDiffLine,
   getClassChangeDiffs,
-  groupSchemaConflictPathsByClass,
   type DiffSummary,
   type ClassDiffRow,
   getPathLabel,
@@ -65,6 +64,11 @@ import { usePushConflictBanner } from '@/app/providers/PushConflictBannerProvide
 import ServerAheadPushBanner from '@/app/components/ade/ServerAheadPushBanner';
 import { parseStaleHeadFromVersionsPostJson } from '@/app/utils/push-conflict';
 import { suggestBranchNameFromRevision } from '../../../../../lib/version-branch-utils';
+import {
+  normalizeMergeConflictRows,
+  type MergeConflictResolutionChoice,
+} from '../../../../../lib/version-merge';
+import { VersionMergeConflictList } from '../../../components/ade/dashboard/VersionMergeConflictList';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -279,7 +283,11 @@ const Versions = () => {
     sourceTipVersionId?: string;
     targetTipVersionId?: string;
     mergeBaseVersionId?: string | null;
+    conflicts?: Array<{ path: string; kinds: string[] }>;
   } | null>(null);
+  const [mergeConflictResolutions, setMergeConflictResolutions] = useState<
+    Record<string, MergeConflictResolutionChoice | null>
+  >({});
   const [mergeCompatLoading, setMergeCompatLoading] = useState(false);
   const [mergeCompat, setMergeCompat] = useState<{
     overall: string;
@@ -1129,13 +1137,18 @@ const Versions = () => {
   const CLASS_DIFF_VIEWPORT_PX = 288;
   const CLASS_PROP_DRILL_LIMIT = 64;
 
-  const mergeConflictGroups = useMemo(() => {
-    const paths = mergePreviewData?.classification?.conflictPaths;
-    if (!paths?.length) {
-      return [];
-    }
-    return groupSchemaConflictPathsByClass(paths);
-  }, [mergePreviewData?.classification?.conflictPaths]);
+  const mergeConflictRows = useMemo(
+    () =>
+      normalizeMergeConflictRows(
+        mergePreviewData?.conflicts,
+        mergePreviewData?.classification?.conflictPaths ?? []
+      ),
+    [mergePreviewData?.conflicts, mergePreviewData?.classification?.conflictPaths]
+  );
+
+  const handleMergeConflictResolve = useCallback((path: string, choice: MergeConflictResolutionChoice) => {
+    setMergeConflictResolutions((prev) => ({ ...prev, [path]: choice }));
+  }, []);
 
   const filteredClassDiffRows = useMemo(() => {
     if (!classDiffRows) return [];
@@ -1685,6 +1698,7 @@ const Versions = () => {
     }
     setMergePreviewLoading(true);
     setMergePreviewData(null);
+    setMergeConflictResolutions({});
     setMergeCompat(null);
     try {
       const r = await fetch(`/api/projects/${selectedProjectId}/version-branches/merge-preview`, {
@@ -1702,6 +1716,7 @@ const Versions = () => {
           sourceTipVersionId: d.sourceTipVersionId,
           targetTipVersionId: d.targetTipVersionId,
           mergeBaseVersionId: d.mergeBaseVersionId ?? null,
+          conflicts: Array.isArray(d.conflicts) ? d.conflicts : undefined,
         });
         if (!d.classification?.canAutoMerge) {
           toast.info('Merge preview: conflicts detected — apply is blocked until resolved.');
@@ -1777,6 +1792,7 @@ const Versions = () => {
         toast.success(`Merged into ${mergeTargetBranch.trim()} — new version ${d.version?.version_id ?? ''}`);
         setShowMergeDialog(false);
         setMergePreviewData(null);
+        setMergeConflictResolutions({});
         clearPushConflict();
         await loadVersions();
         await loadBranches();
@@ -1789,13 +1805,15 @@ const Versions = () => {
             : undefined;
         if (r.status === 409 && code === 'MERGE_CONFLICT') {
           toast.error('Merge blocked: overlapping changes. Resolve conflicts using a future merge flow.');
+          const paths = conflictPaths ?? [];
           setMergePreviewData((prev) => ({
             ...(prev ?? {}),
             classification: {
               canAutoMerge: false,
-              conflictPaths: conflictPaths ?? [],
+              conflictPaths: paths,
               addedSchemaNames: prev?.classification?.addedSchemaNames ?? [],
             },
+            conflicts: paths.map((p) => ({ path: p, kinds: ['twoWay'] })),
           }));
         } else {
           const msg =
@@ -4017,26 +4035,14 @@ const Versions = () => {
             )}
             {mergePreviewData?.classification &&
               !mergePreviewData.classification.canAutoMerge &&
-              mergeConflictGroups.length > 0 && (
-                <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 max-h-56 overflow-y-auto">
-                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    Conflict paths (grouped by class, same IDs as Schema Changes)
-                  </p>
-                  <ul className="space-y-2 text-xs">
-                    {mergeConflictGroups.map((g) => (
-                      <li key={g.className}>
-                        <span className="font-mono font-medium text-gray-900 dark:text-gray-100">{g.className}</span>
-                        <ul className="mt-1 ml-2 space-y-0.5 pl-2 border-l border-gray-300 dark:border-gray-600">
-                          {g.paths.map((p) => (
-                            <li key={p} className="font-mono text-[11px] text-gray-700 dark:text-gray-300 break-all">
-                              {p}
-                            </li>
-                          ))}
-                        </ul>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              mergeConflictRows.length > 0 && (
+                <VersionMergeConflictList
+                  conflicts={mergeConflictRows}
+                  targetBranchName={mergeTargetBranch.trim()}
+                  sourceBranchName={mergeSourceBranch.trim()}
+                  resolutions={mergeConflictResolutions}
+                  onResolve={handleMergeConflictResolve}
+                />
               )}
             {mergePreviewData?.mergeBaseVersionId != null && mergePreviewData?.classification && (
               <p className="text-xs text-gray-500 dark:text-gray-400">
