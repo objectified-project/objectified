@@ -1258,9 +1258,10 @@ class Database:
                 strpos(lower(COALESCE(v.description, '')), lower(%s)) > 0
                 OR strpos(lower(COALESCE(v.change_log, '')), lower(%s)) > 0
                 OR strpos(lower(COALESCE(v.commit_message, '')), lower(%s)) > 0
+                OR strpos(lower(COALESCE(v.commit_author, '')), lower(%s)) > 0
               )
             """
-            params.extend([mq, mq, mq])
+            params.extend([mq, mq, mq, mq])
 
         creator_clause = ""
         cid = (creator_id or "").strip()

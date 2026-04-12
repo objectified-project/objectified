@@ -346,7 +346,7 @@ async def list_versions(
     ),
     q: Optional[str] = Query(
         None,
-        description="Search revision note, changelog, and full commit message body (case-insensitive, #2579).",
+        description="Search revision note, changelog, full commit message body, and commit author (case-insensitive, #2579).",
     ),
     creator_id: Optional[str] = Query(
         None,

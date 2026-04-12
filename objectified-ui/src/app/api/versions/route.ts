@@ -117,8 +117,15 @@ function nextJsonFromVersionCreateError(
 }
 
 /**
- * GET /api/versions?projectId=xxx&lifecycle=&q=&creatorId=&createdAfter=&createdBefore=
- * List all versions for a project (optional history filters #2579 proxy to REST)
+ * List all versions for a project.
+ *
+ * Supported query parameters:
+ * - projectId: Project identifier to list versions for.
+ * - lifecycle: Optional lifecycle/status filter.
+ * - q: Optional search query (revision note, changelog, commit message body, commit author).
+ * - creatorId: Optional creator/user filter.
+ * - createdAfter: Optional lower bound for creation timestamp.
+ * - createdBefore: Optional upper bound for creation timestamp.
  */
 export async function GET(request: NextRequest) {
   try {
