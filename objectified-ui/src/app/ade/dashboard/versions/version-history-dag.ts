@@ -186,10 +186,13 @@ export type RevisionNodeData = {
   tipAccentClass: string;
   layoutDirection: 'LR';
   shortMessage?: string | null;
+  /** Opens branch-from-revision dialog for this revision (#2571). */
+  onBranchFromRevision?: (revisionId: string) => void;
 };
 
 export type BuildLayoutedHistoryGraphOptions = {
   branches?: VersionHistoryBranchMeta[];
+  onBranchFromRevision?: (revisionId: string) => void;
 };
 
 export function buildLayoutedHistoryGraph(
@@ -203,6 +206,7 @@ export function buildLayoutedHistoryGraph(
     return { nodes: [], edges: [] };
   }
   const branches = _options?.branches ?? [];
+  const onBranchFromRevision = _options?.onBranchFromRevision;
   const tips = branchNamesByTipVersionId(branches);
 
   const edges = buildHistoryEdges(versions);
@@ -223,6 +227,7 @@ export function buildLayoutedHistoryGraph(
         tipAccentClass,
         layoutDirection: 'LR',
         shortMessage: v.shortMessage ?? null,
+        onBranchFromRevision,
       },
       width: NODE_W,
       height: NODE_H,

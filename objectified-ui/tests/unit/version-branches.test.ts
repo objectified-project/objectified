@@ -30,7 +30,7 @@ jest.mock('../../src/app/utils/openapi', () => ({
   generateOpenApiSpec: jest.fn(() => '{}'),
 }));
 
-import { isValidVersionBranchName } from '../../lib/version-branch-utils';
+import { isValidVersionBranchName, suggestBranchNameFromRevision } from '../../lib/version-branch-utils';
 import {
   listVersionBranches,
   createVersionBranch,
@@ -82,6 +82,22 @@ describe('isValidVersionBranchName', () => {
 
   it('accepts exactly 255-char name', () => {
     expect(isValidVersionBranchName('a' + 'x'.repeat(254))).toBe(true);
+  });
+});
+
+// ─── suggestBranchNameFromRevision (#2571) ─────────────────────────────────────
+
+describe('suggestBranchNameFromRevision', () => {
+  it('builds feature/ slug from short message', () => {
+    expect(suggestBranchNameFromRevision('Add enums API', '1.0.0')).toBe('feature/add-enums-api');
+  });
+
+  it('falls back to branch/v semver when message is empty', () => {
+    expect(suggestBranchNameFromRevision('', '2.3.4')).toBe('branch/v2-3-4');
+  });
+
+  it('falls back when message yields no usable slug', () => {
+    expect(suggestBranchNameFromRevision('---', '0.1.0')).toBe('branch/v0-1-0');
   });
 });
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
@@ -64,6 +64,7 @@ import { localDatetimeLocalToUtcIso, utcIsoToDatetimeLocalValue } from '../../..
 import { usePushConflictBanner } from '@/app/providers/PushConflictBannerProvider';
 import ServerAheadPushBanner from '@/app/components/ade/ServerAheadPushBanner';
 import { parseStaleHeadFromVersionsPostJson } from '@/app/utils/push-conflict';
+import { suggestBranchNameFromRevision } from '../../../../../lib/version-branch-utils';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -233,6 +234,8 @@ const Versions = () => {
   const [branchFromVersionId, setBranchFromVersionId] = useState<string>('');
   const [branchNameInput, setBranchNameInput] = useState('');
   const [branchSaving, setBranchSaving] = useState(false);
+  /** Scroll target after creating a branch (panel may not exist yet for the first named branch). */
+  const historyGraphSectionRef = useRef<HTMLDivElement | null>(null);
 
   const [showForkDialog, setShowForkDialog] = useState(false);
   const [forkFromVersionId, setForkFromVersionId] = useState('');
@@ -1361,6 +1364,20 @@ const Versions = () => {
 
   const canModify = (version: Version) => version.creator_id === currentUserId || !!effectiveIsAdmin;
 
+  const openBranchFromRevisionDialog = useCallback(
+    (revisionId: string) => {
+      const v = versions.find((x) => x.id === revisionId);
+      if (!v) {
+        toast.warning('Revision not found in the current list.');
+        return;
+      }
+      setBranchFromVersionId(v.id);
+      setBranchNameInput(suggestBranchNameFromRevision(v.shortMessage, v.version_id));
+      setShowBranchDialog(true);
+    },
+    [versions]
+  );
+
   const handleRowAction = async (action: string, version: Version) => {
     const isPublished = !!version.published;
     const canPub = !isPublished && canModify(version);
@@ -1381,7 +1398,7 @@ const Versions = () => {
         break;
       case 'branchFrom':
         setBranchFromVersionId(version.id);
-        setBranchNameInput('');
+        setBranchNameInput(suggestBranchNameFromRevision(version.shortMessage, version.version_id));
         setShowBranchDialog(true);
         break;
       case 'forkToProject':
@@ -1430,18 +1447,27 @@ const Versions = () => {
     }
     setBranchSaving(true);
     try {
-      const r = await fetch(`/api/projects/${selectedProjectId}/version-branches`, {
+      const r = await fetch(`/api/projects/${selectedProjectId}/version-branches/from-revision`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, fromVersionId: branchFromVersionId }),
+        body: JSON.stringify({ branchName: name, sourceRevisionId: branchFromVersionId }),
       });
       const d = await r.json();
-      if (d.success) {
+      if (d.success && d.branch?.id && d.branch?.tip_version_id) {
         toast.success(`Branch "${name}" created`);
         setShowBranchDialog(false);
         await loadBranches();
+        setCopySourceBranchKey(`branch:${d.branch.id}`);
+        setSourceVersionId(d.branch.tip_version_id);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const panel = document.getElementById('ade-named-branches-panel');
+            if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            else historyGraphSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          });
+        });
       } else {
-        toast.error(d.error || 'Could not create branch');
+        toast.error(typeof d.error === 'string' ? d.error : 'Could not create branch');
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not create branch');
@@ -2065,7 +2091,7 @@ const Versions = () => {
       )}
 
       {selectedProjectId && versionBranches.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
+        <div id="ade-named-branches-panel" className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
           <div className="flex items-center gap-2 mb-3">
             <GitBranch className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Named branches</h3>
@@ -2132,7 +2158,7 @@ const Versions = () => {
         />
       ) : (
         <>
-          <div className="mb-6">
+          <div className="mb-6" ref={historyGraphSectionRef}>
             <VersionHistoryGraphPanel
               key={versionBranches.map((b) => b.id).sort().join('|') || 'graph-branches'}
               versions={displayVersions.map((v) => ({
@@ -2152,6 +2178,7 @@ const Versions = () => {
               onWindowSizeIncrease={setHistoryGraphWindowSize}
               onCompareToPrimaryParent={handleHistoryGraphCompareToParent}
               onViewSpec={handleHistoryGraphViewSpec}
+              onBranchFromRevision={openBranchFromRevisionDialog}
             />
           </div>
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
