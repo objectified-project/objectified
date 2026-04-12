@@ -16,6 +16,7 @@ from .compatibility_routes import _fingerprint, _openapi_for_revision
 from .database import db
 from .models import (
     CompatibilityFindingOut,
+    MergeSessionStatusPatchRequest,
     VersionBranchFromRevisionRequest,
     VersionBranchFromRevisionResponse,
     VersionBranchMergePreviewRequest,
@@ -141,6 +142,49 @@ def _merge_openapi_components(
     out = copy.deepcopy(base_spec)
     out.setdefault("components", {})["schemas"] = merged_schemas
     return out
+
+
+def _merge_session_json(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "id": str(row["id"]),
+        "projectId": str(row["project_id"]),
+        "sourceBranchId": str(row["source_branch_id"]) if row.get("source_branch_id") else None,
+        "sourceBranchName": row["source_branch_name"],
+        "targetBranchName": row["target_branch_name"],
+        "mergeBaseVersionId": str(row["merge_base_version_id"]),
+        "sourceTipVersionId": str(row["source_tip_version_id"]),
+        "targetTipVersionId": str(row["target_tip_version_id"]),
+        "status": row["status"],
+        "createdBy": str(row["created_by"]) if row.get("created_by") else None,
+        "createdAt": row.get("created_at"),
+        "updatedAt": row.get("updated_at"),
+    }
+
+
+def _merge_session_status_event_json(r: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "id": str(r["id"]),
+        "fromStatus": r.get("from_status"),
+        "toStatus": r.get("to_status"),
+        "changedBy": str(r["changed_by"]) if r.get("changed_by") else None,
+        "changedAt": r.get("changed_at"),
+    }
+
+
+def _merge_session_conflict_json(r: Dict[str, Any]) -> Dict[str, Any]:
+    kinds = r.get("kinds")
+    if isinstance(kinds, str):
+        try:
+            kinds = json.loads(kinds)
+        except json.JSONDecodeError:
+            kinds = []
+    return {
+        "id": str(r["id"]),
+        "path": r["path"],
+        "kinds": kinds if isinstance(kinds, list) else [],
+        "sortOrder": r.get("sort_order", 0),
+        "createdAt": r.get("created_at"),
+    }
 
 
 @router.post("/{tenant_slug}/{project_id}/version-branches/from-revision")
@@ -325,6 +369,25 @@ async def version_branch_merge_preview(
     if merged_open_api_omitted:
         preview["mergedOpenApiOmitted"] = True
         preview["mergedOpenApiOmittedReason"] = merged_open_api_omitted
+
+    if body.persist_merge_session:
+        creator_id = get_authenticated_user_id(auth_data)
+        ms = db.create_merge_session_for_preview(
+            project_id=project_id,
+            tenant_id=tenant_id,
+            source_branch_name=body.source_branch_name,
+            target_branch_name=body.target_branch_name,
+            source_branch_id=str(src["id"]) if src.get("id") else None,
+            merge_base_version_id=merge_base_id,
+            source_tip_version_id=source_tip,
+            target_tip_version_id=target_tip,
+            conflict_records=conflict_records,
+            created_by=creator_id,
+        )
+        if not ms:
+            raise HTTPException(status_code=500, detail="Failed to persist merge session")
+        preview["mergeSessionId"] = str(ms["id"])
+        preview["mergeSession"] = _merge_session_json(ms)
 
     return preview
 
@@ -836,4 +899,90 @@ async def version_branch_rollback(
     return {
         "success": True,
         "version": VersionSchema.model_validate(full).model_dump(by_alias=True),
+    }
+
+
+@router.get("/{tenant_slug}/{project_id}/merge-sessions/{merge_session_id}")
+async def get_merge_session(
+    tenant_slug: str,
+    project_id: str,
+    merge_session_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> Dict[str, Any]:
+    """Load persisted merge session and status transition history (#2573)."""
+    tenant_id = auth_data["tenant_id"]
+    project = db.get_project_by_id(project_id, tenant_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    detail = db.get_merge_session_detail(merge_session_id, project_id, tenant_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Merge session not found")
+
+    sess = detail["session"]
+    events = [_merge_session_status_event_json(e) for e in detail["status_events"]]
+    return {
+        "success": True,
+        "mergeSession": _merge_session_json(sess),
+        "statusEvents": events,
+    }
+
+
+@router.get("/{tenant_slug}/{project_id}/merge-sessions/{merge_session_id}/conflicts")
+async def list_merge_session_conflicts_route(
+    tenant_slug: str,
+    project_id: str,
+    merge_session_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> Dict[str, Any]:
+    """List conflict rows for a merge session (#2573)."""
+    tenant_id = auth_data["tenant_id"]
+    project = db.get_project_by_id(project_id, tenant_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    rows = db.list_merge_session_conflicts(merge_session_id, project_id, tenant_id)
+    if rows is None:
+        raise HTTPException(status_code=404, detail="Merge session not found")
+
+    return {
+        "success": True,
+        "mergeSessionId": merge_session_id,
+        "conflicts": [_merge_session_conflict_json(r) for r in rows],
+    }
+
+
+@router.patch("/{tenant_slug}/{project_id}/merge-sessions/{merge_session_id}")
+async def patch_merge_session_status(
+    tenant_slug: str,
+    project_id: str,
+    merge_session_id: str,
+    body: MergeSessionStatusPatchRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> Dict[str, Any]:
+    """Transition merge session status with audited events (#2573)."""
+    tenant_id = auth_data["tenant_id"]
+    project = db.get_project_by_id(project_id, tenant_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    uid = get_authenticated_user_id(auth_data)
+    ok, err = db.update_merge_session_status(
+        merge_session_id, project_id, tenant_id, body.status, uid
+    )
+    if not ok:
+        if err and err.startswith("Merge session not found"):
+            raise HTTPException(status_code=404, detail=err)
+        raise HTTPException(status_code=400, detail=err or "Invalid status transition")
+
+    detail = db.get_merge_session_detail(merge_session_id, project_id, tenant_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Merge session not found after update")
+
+    sess = detail["session"]
+    events = [_merge_session_status_event_json(e) for e in detail["status_events"]]
+    return {
+        "success": True,
+        "mergeSession": _merge_session_json(sess),
+        "statusEvents": events,
     }

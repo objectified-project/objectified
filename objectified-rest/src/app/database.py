@@ -3,7 +3,7 @@ import json
 import logging
 import bcrypt
 import numpy as np
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import Json, RealDictCursor
 from psycopg2.extensions import register_adapter, AsIs, adapt
 from typing import Optional, List, Dict, Any, Tuple, Set
 from .config import settings
@@ -4110,6 +4110,193 @@ class Database:
         if not full:
             raise ValueError("Version created but could not be loaded")
         return full, copied_count
+
+    _MERGE_SESSION_TRANSITIONS: Dict[str, Set[str]] = {
+        "preview": {"resolving", "aborted"},
+        "resolving": {"applied", "aborted"},
+        "applied": set(),
+        "aborted": set(),
+    }
+
+    def _merge_session_project_scope(
+        self, merge_session_id: str, project_id: str, tenant_id: str
+    ) -> Optional[Dict[str, Any]]:
+        q = """
+            SELECT ms.id, ms.project_id, ms.source_branch_id, ms.source_branch_name, ms.target_branch_name,
+                   ms.merge_base_version_id, ms.source_tip_version_id, ms.target_tip_version_id,
+                   ms.status, ms.created_by, ms.created_at, ms.updated_at
+            FROM odb.merge_sessions ms
+            JOIN odb.projects p ON ms.project_id = p.id
+            WHERE ms.id = %s AND ms.project_id = %s AND p.tenant_id = %s AND p.deleted_at IS NULL
+        """
+        rows = self.execute_query(q, (merge_session_id, project_id, tenant_id))
+        return dict(rows[0]) if rows else None
+
+    def create_merge_session_for_preview(
+        self,
+        project_id: str,
+        tenant_id: str,
+        source_branch_name: str,
+        target_branch_name: str,
+        source_branch_id: Optional[str],
+        merge_base_version_id: str,
+        source_tip_version_id: str,
+        target_tip_version_id: str,
+        conflict_records: List[Dict[str, Any]],
+        created_by: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Insert merge session in ``preview``, conflict rows, and initial status event (#2573).
+        """
+        proj = self.get_project_by_id(project_id, tenant_id)
+        if not proj:
+            return None
+
+        conn = self.connect()
+        session_row: Optional[Dict[str, Any]] = None
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO odb.merge_sessions (
+                        project_id, source_branch_id, source_branch_name, target_branch_name,
+                        merge_base_version_id, source_tip_version_id, target_tip_version_id,
+                        status, created_by
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'preview', %s)
+                    RETURNING id, project_id, source_branch_id, source_branch_name, target_branch_name,
+                              merge_base_version_id, source_tip_version_id, target_tip_version_id,
+                              status, created_by, created_at, updated_at
+                    """,
+                    (
+                        project_id,
+                        source_branch_id,
+                        source_branch_name.strip(),
+                        target_branch_name.strip(),
+                        merge_base_version_id,
+                        source_tip_version_id,
+                        target_tip_version_id,
+                        created_by,
+                    ),
+                )
+                session_row = dict(cursor.fetchone() or {})
+                sid = str(session_row["id"])
+
+                for i, rec in enumerate(conflict_records):
+                    path = (rec.get("path") or "").strip()
+                    kinds = rec.get("kinds") or []
+                    if not path:
+                        continue
+                    cursor.execute(
+                        """
+                        INSERT INTO odb.merge_session_conflicts (merge_session_id, path, kinds, sort_order)
+                        VALUES (%s, %s, %s::jsonb, %s)
+                        """,
+                        (sid, path, Json(kinds), i),
+                    )
+
+                cursor.execute(
+                    """
+                    INSERT INTO odb.merge_session_status_events (merge_session_id, from_status, to_status, changed_by)
+                    VALUES (%s, NULL, 'preview', %s)
+                    """,
+                    (sid, created_by),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            _logger.exception(
+                "create_merge_session_for_preview failed project_id=%s tenant_id=%s",
+                project_id,
+                tenant_id,
+            )
+            return None
+
+        return session_row
+
+    def get_merge_session_detail(
+        self, merge_session_id: str, project_id: str, tenant_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Session row plus ordered status events for the same project/tenant (#2573)."""
+        base = self._merge_session_project_scope(merge_session_id, project_id, tenant_id)
+        if not base:
+            return None
+        ev = self.execute_query(
+            """
+            SELECT id, from_status, to_status, changed_by, changed_at
+            FROM odb.merge_session_status_events
+            WHERE merge_session_id = %s
+            ORDER BY changed_at ASC, id ASC
+            """,
+            (merge_session_id,),
+        )
+        return {"session": base, "status_events": [dict(r) for r in ev]}
+
+    def list_merge_session_conflicts(
+        self, merge_session_id: str, project_id: str, tenant_id: str
+    ) -> Optional[List[Dict[str, Any]]]:
+        if not self._merge_session_project_scope(merge_session_id, project_id, tenant_id):
+            return None
+        rows = self.execute_query(
+            """
+            SELECT id, path, kinds, sort_order, created_at
+            FROM odb.merge_session_conflicts
+            WHERE merge_session_id = %s
+            ORDER BY sort_order ASC, path ASC
+            """,
+            (merge_session_id,),
+        )
+        return [dict(r) for r in rows]
+
+    def update_merge_session_status(
+        self,
+        merge_session_id: str,
+        project_id: str,
+        tenant_id: str,
+        new_status: str,
+        changed_by: Optional[str],
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Validated transition; returns (ok, error_message).
+        """
+        ns = (new_status or "").strip()
+        if ns not in self._MERGE_SESSION_TRANSITIONS:
+            return False, f"Invalid status: {new_status}"
+
+        current = self._merge_session_project_scope(merge_session_id, project_id, tenant_id)
+        if not current:
+            return False, "Merge session not found"
+
+        cur_status = str(current["status"])
+        allowed = self._MERGE_SESSION_TRANSITIONS.get(cur_status, set())
+        if ns not in allowed:
+            return False, f"Cannot transition from {cur_status} to {ns}"
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE odb.merge_sessions
+                    SET status = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s AND project_id = %s
+                    """,
+                    (ns, merge_session_id, project_id),
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO odb.merge_session_status_events (merge_session_id, from_status, to_status, changed_by)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (merge_session_id, cur_status, ns, changed_by),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            _logger.exception("update_merge_session_status failed merge_session_id=%s", merge_session_id)
+            return False, "Database error updating merge session"
+
+        return True, None
 
 
 # Global database instance
