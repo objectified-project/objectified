@@ -4600,15 +4600,25 @@ class Database:
         )
         return cursor.fetchone()
 
-    @staticmethod
-    def _draft_lock_expires_active(exp: Any) -> bool:
-        from datetime import datetime, timezone
+    def _draft_lock_expires_active(self, exp: Any) -> bool:
+        from datetime import timezone
 
         if exp is None:
             return False
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=timezone.utc)
-        return exp > datetime.now(timezone.utc)
+
+        rows = self.execute_query(
+            """
+            SELECT CURRENT_TIMESTAMP AS current_timestamp
+            """
+        )
+        db_now = rows[0]["current_timestamp"] if rows else None
+        if db_now is None:
+            return False
+        if db_now.tzinfo is None:
+            db_now = db_now.replace(tzinfo=timezone.utc)
+        return exp > db_now
 
     def acquire_version_draft_lock(
         self,

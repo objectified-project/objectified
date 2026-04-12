@@ -796,6 +796,7 @@ class VersionDraftLockAcquireRequest(BaseModel):
         default=None,
         ge=60,
         le=86400,
+        validation_alias=AliasChoices("leaseSeconds", "lease_seconds"),
         serialization_alias="leaseSeconds",
         description="Lock duration in seconds (default 900).",
     )
@@ -808,6 +809,7 @@ class VersionDraftLockRenewRequest(BaseModel):
         default=None,
         ge=60,
         le=86400,
+        validation_alias=AliasChoices("leaseSeconds", "lease_seconds"),
         serialization_alias="leaseSeconds",
     )
 

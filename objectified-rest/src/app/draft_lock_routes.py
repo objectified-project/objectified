@@ -35,14 +35,15 @@ def _renew_lease_seconds(req: Optional[VersionDraftLockRenewRequest]) -> int:
     return int(req.lease_seconds)
 
 
-def _expires_iso(expires_at: Any) -> str:
+def _normalize_expires_at(expires_at: Any) -> Optional[str]:
+    """Return a UTC ISO-8601 string matching FastAPI/Pydantic's default datetime encoding."""
     if expires_at is None:
-        return ""
+        return None
     if isinstance(expires_at, datetime):
         exp = expires_at
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=timezone.utc)
-        return exp.isoformat().replace("+00:00", "Z")
+        return exp.isoformat()
     return str(expires_at)
 
 
@@ -52,7 +53,7 @@ def _conflict_http(owner_user_id: str, expires_at: Any) -> HTTPException:
         detail={
             "code": "DRAFT_LOCK_CONFLICT",
             "ownerUserId": owner_user_id,
-            "expiresAt": _expires_iso(expires_at),
+            "expiresAt": _normalize_expires_at(expires_at),
         },
     )
 
@@ -91,7 +92,7 @@ async def acquire_draft_lock(
 
     try:
         result = db.acquire_version_draft_lock(
-            tenant_id, project_id, version_record_id, user_id, lease
+            tenant_id, project_id, version_record_id, user_id, lease_seconds=lease
         )
     except ValueError as ve:
         code = str(ve)
@@ -164,7 +165,7 @@ async def renew_draft_lock(
     )
 
 
-@router.post("/{tenant_slug}/{project_id}/{version_record_id}/draft-lock/release")
+@router.post("/{tenant_slug}/{project_id}/{version_record_id}/draft-lock/release", status_code=204)
 async def release_draft_lock(
     tenant_slug: str,
     project_id: str,
@@ -194,7 +195,7 @@ async def release_draft_lock(
     return Response(status_code=204)
 
 
-@router.post("/{tenant_slug}/{project_id}/{version_record_id}/draft-lock/force-release")
+@router.post("/{tenant_slug}/{project_id}/{version_record_id}/draft-lock/force-release", status_code=204)
 async def force_release_draft_lock(
     tenant_slug: str,
     project_id: str,

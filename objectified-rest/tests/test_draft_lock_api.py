@@ -44,6 +44,8 @@ def test_acquire_conflict_409_metadata():
             json={"leaseSeconds": 120},
         )
         assert r.status_code == 409
+        mdb.acquire_version_draft_lock.assert_called_once()
+        assert mdb.acquire_version_draft_lock.call_args.kwargs["lease_seconds"] == 120
         d = r.json()["detail"]
         assert d["code"] == "DRAFT_LOCK_CONFLICT"
         assert d["ownerUserId"] == "user-b"
