@@ -94,7 +94,7 @@ Workstreams below can proceed in parallel once shared contracts (revision id, he
 | **D — Studio status** | P0-07 | Depends on signals from B/C; can mock |
 | **E — Branching** | P0-08 ✓, P0-09 ✓ | P0-09 after P0-08 |
 | **F — Merge preview** | P0-10 ✓ | Gates P1-01 — P1-04 |
-| **G — Merge resolution UI** | P1-01 ✓, P1-02 ✓, P1-03 ✓, P1-04 | Sequential within: 01→02→03→04 |
+| **G — Merge resolution UI** | P1-01 ✓, P1-02 ✓, P1-03 ✓, P1-04 ✓ | Sequential within: 01→02→03→04 |
 | **H — Audit** | P1-05, P1-06 | 05 before 06 |
 | **I — History & rollback** | P1-07, P1-08, P1-09, P1-10 | P1-07/08 parallel; 09/10 pair with rollback API |
 | **J — Enterprise** | P2-01 — P2-10 | Parallel across subdomains after core push/pull stable |
@@ -359,7 +359,7 @@ Add group-level and global bulk actions for repetitive conflict types.
 
 ## P1-04: Block Merge Apply Until All Conflicts Resolved
 
-**GitHub:** [#2576](https://github.com/KenSuenobu/objectified-commercial/issues/2576) · **Epic:** [#2559](https://github.com/KenSuenobu/objectified-commercial/issues/2559)
+**GitHub:** [#2576](https://github.com/KenSuenobu/objectified-commercial/issues/2576) · **Epic:** [#2559](https://github.com/KenSuenobu/objectified-commercial/issues/2559) · **Status:** shipped (REST structured 409 + Studio gating)
 
 ### Problem statement
 Partial conflict resolution can produce invalid merges.
