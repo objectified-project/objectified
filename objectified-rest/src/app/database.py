@@ -4263,26 +4263,43 @@ class Database:
         if ns not in self._MERGE_SESSION_TRANSITIONS:
             return False, f"Invalid status: {new_status}"
 
-        current = self._merge_session_project_scope(merge_session_id, project_id, tenant_id)
-        if not current:
-            return False, "Merge session not found"
-
-        cur_status = str(current["status"])
-        allowed = self._MERGE_SESSION_TRANSITIONS.get(cur_status, set())
-        if ns not in allowed:
-            return False, f"Cannot transition from {cur_status} to {ns}"
-
         conn = self.connect()
         try:
             with conn.cursor() as cursor:
+                # Lock the row for this transaction to prevent concurrent status changes.
+                cursor.execute(
+                    """
+                    SELECT ms.status
+                    FROM odb.merge_sessions ms
+                    JOIN odb.projects p ON ms.project_id = p.id
+                    WHERE ms.id = %s AND ms.project_id = %s AND p.tenant_id = %s AND p.deleted_at IS NULL
+                    FOR UPDATE
+                    """,
+                    (merge_session_id, project_id, tenant_id),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    conn.rollback()
+                    return False, "Merge session not found"
+
+                cur_status = str(row["status"])
+                allowed = self._MERGE_SESSION_TRANSITIONS.get(cur_status, set())
+                if ns not in allowed:
+                    conn.rollback()
+                    return False, f"Cannot transition from {cur_status} to {ns}"
+
                 cursor.execute(
                     """
                     UPDATE odb.merge_sessions
                     SET status = %s, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s AND project_id = %s
+                    WHERE id = %s AND project_id = %s AND status = %s
                     """,
-                    (ns, merge_session_id, project_id),
+                    (ns, merge_session_id, project_id, cur_status),
                 )
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    return False, f"Cannot transition from {cur_status} to {ns}"
+
                 cursor.execute(
                     """
                     INSERT INTO odb.merge_session_status_events (merge_session_id, from_status, to_status, changed_by)

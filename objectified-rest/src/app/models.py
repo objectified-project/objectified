@@ -491,7 +491,7 @@ class MergeSessionStatusPatchRequest(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    status: str = Field(
+    status: Literal["resolving", "applied", "aborted"] = Field(
         ...,
         validation_alias=AliasChoices("status"),
         description="Target status: resolving, applied, or aborted (from preview/resolving only).",
