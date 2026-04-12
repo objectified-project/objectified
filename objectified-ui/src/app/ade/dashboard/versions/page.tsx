@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered, Search, GitCompareArrows } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -64,6 +64,7 @@ import { usePushConflictBanner } from '@/app/providers/PushConflictBannerProvide
 import ServerAheadPushBanner from '@/app/components/ade/ServerAheadPushBanner';
 import { parseStaleHeadFromVersionsPostJson } from '@/app/utils/push-conflict';
 import { suggestBranchNameFromRevision } from '../../../../../lib/version-branch-utils';
+import { projectHeadRevisionId } from '../../../utils/project-head-revision';
 import {
   normalizeMergeConflictRows,
   type MergeConflictResolutionChoice,
@@ -1136,6 +1137,9 @@ const Versions = () => {
     }
   };
 
+  /** Latest revision by `created_at` in the loaded list — used as “current” for compare (#2580). */
+  const headRevisionId = useMemo(() => projectHeadRevisionId(versions), [versions]);
+
   const handleCompareVersions = async () => {
     await runCompareBetween(compareVersion1Id, compareVersion2Id);
   };
@@ -1150,6 +1154,26 @@ const Versions = () => {
     setCompareVersion2Id(v.id);
     setShowCompareDialog(true);
     await runCompareBetween(v.parent_version_id, v.id);
+  };
+
+  /** Diff selected revision (base) → project head (current); closing the dialog leaves timeline filters intact (#2580). */
+  const handleCompareWithCurrent = async (revisionId: string) => {
+    const headId = headRevisionId;
+    if (!headId) {
+      toast.warning('No revisions loaded.');
+      return;
+    }
+    if (revisionId === headId) {
+      toast.info('This revision is already the project head (current).');
+      return;
+    }
+    setCompareBaseTagId('');
+    setCompareToTagId('');
+    setCompareVersion1Id(revisionId);
+    setCompareVersion2Id(headId);
+    setActiveCompareTab('diff');
+    setShowCompareDialog(true);
+    await runCompareBetween(revisionId, headId);
   };
 
   const handleHistoryGraphViewSpec = async (revisionId: string) => {
@@ -2604,6 +2628,26 @@ const Versions = () => {
                               >
                                 <Eye className="w-4 h-4 text-purple-500" />
                                 View Spec
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!headRevisionId || version.id === headRevisionId}
+                                title={
+                                  !headRevisionId
+                                    ? 'No head revision'
+                                    : version.id === headRevisionId
+                                      ? 'This revision is already the current head'
+                                      : 'OpenAPI diff: this revision → latest (current) head'
+                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenVersionDropdown(null);
+                                  void handleCompareWithCurrent(version.id);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <GitCompareArrows className="w-4 h-4 text-indigo-500 shrink-0" aria-hidden />
+                                Compare with current
                               </button>
                               <button
                                 onClick={(e) => {
