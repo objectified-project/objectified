@@ -92,7 +92,7 @@ Workstreams below can proceed in parallel once shared contracts (revision id, he
 | **B — Push & conflict UX** | P0-04, P0-05 | P0-05 can mock 409 until P0-04 stable |
 | **C — Pull efficiency** | P0-06 | Coordinate ETag with P0-04 head semantics |
 | **D — Studio status** | P0-07 | Depends on signals from B/C; can mock |
-| **E — Branching** | P0-08 ✓, P0-09 | P0-09 after P0-08 |
+| **E — Branching** | P0-08 ✓, P0-09 ✓ | P0-09 after P0-08 |
 | **F — Merge preview** | P0-10 | Gates P1-01 — P1-04 |
 | **G — Merge resolution UI** | P1-01, P1-02, P1-03, P1-04 | Sequential within: 01→02→03→04 |
 | **H — Audit** | P1-05, P1-06 | 05 before 06 |
@@ -266,7 +266,7 @@ Create endpoint to generate new version branch from provided revision id with li
 
 ---
 
-## P0-09: Branch Creation Dialog from History Row
+## P0-09: Branch Creation Dialog from History Row ✓
 
 **GitHub:** [#2571](https://github.com/KenSuenobu/objectified-commercial/issues/2571) · **Epic:** [#2559](https://github.com/KenSuenobu/objectified-commercial/issues/2559)
 
@@ -275,6 +275,12 @@ Users cannot branch directly from the revision they are inspecting.
 
 ### Scope
 Add branch action in history UI row with Radix dialog for branch name and open behavior.
+
+### Shipped
+- **ADE → Versions** revision **history graph** node menu **Branch → Branch from here** opens the same Radix **Create named branch** dialog as the versions table row action.
+- Dialog **prefills** a suggested name (`feature/<slug>` from the revision note, else `branch/v<semver>`).
+- Create calls **Next.js** `POST .../version-branches/from-revision` (proxies **REST** P0-08) for lineage on `version_branches`.
+- On success: **commit base** switches to the **new branch tip** (`copySourceBranchKey` + `sourceVersionId`) and the view **scrolls** to the named-branches panel (or the history graph when it is the first branch).
 
 ### Acceptance criteria
 - History row exposes `Branch from here` action.

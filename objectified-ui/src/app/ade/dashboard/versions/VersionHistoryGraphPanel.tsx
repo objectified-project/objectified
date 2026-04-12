@@ -15,7 +15,8 @@ import {
   Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { GitBranch, GitMerge } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { ChevronDown, GitBranch, GitMerge } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import {
   buildLayoutedHistoryGraph,
@@ -28,8 +29,8 @@ import {
   type VersionHistoryVertex,
 } from './version-history-dag';
 
-function RevisionHistoryNode({ data, selected }: NodeProps<Node<RevisionNodeData>>) {
-  const { isMerge, isBranchTip, branchNamesForTip, tipAccentClass, layoutDirection } = data;
+function RevisionHistoryNode({ id, data, selected }: NodeProps<Node<RevisionNodeData>>) {
+  const { isMerge, isBranchTip, branchNamesForTip, tipAccentClass, layoutDirection, onBranchFromRevision } = data;
   const horizontal = layoutDirection === 'LR';
 
   const hoverTitle =
@@ -75,8 +76,41 @@ function RevisionHistoryNode({ data, selected }: NodeProps<Node<RevisionNodeData
           {isBranchTip ? <GitBranch className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : null}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-sm font-semibold text-gray-900 dark:text-gray-50 truncate">
-            v{data.versionString}
+          <div className="flex items-start justify-between gap-1">
+            <div className="font-mono text-sm font-semibold text-gray-900 dark:text-gray-50 truncate min-w-0">
+              v{data.versionString}
+            </div>
+            {onBranchFromRevision ? (
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <button
+                    type="button"
+                    className="shrink-0 inline-flex items-center gap-0.5 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                    title="Branch actions"
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    Branch
+                    <ChevronDown className="h-3 w-3 opacity-70" aria-hidden />
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    className="z-[100] min-w-[10rem] rounded-md border border-gray-200 bg-white p-1 text-sm shadow-md dark:border-gray-600 dark:bg-gray-900"
+                    sideOffset={4}
+                    align="end"
+                    onPointerDownOutside={(e) => e.stopPropagation()}
+                  >
+                    <DropdownMenu.Item
+                      className="cursor-pointer rounded px-2 py-1.5 outline-none hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onSelect={() => onBranchFromRevision(id)}
+                    >
+                      Branch from here
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            ) : null}
           </div>
           {isMerge ? (
             <div className="text-[10px] uppercase tracking-wide text-violet-800 dark:text-violet-200 font-semibold mt-0.5">
@@ -112,6 +146,8 @@ export type VersionHistoryGraphPanelProps = {
   onCompareToPrimaryParent: (revisionId: string) => void;
   /** Open read-only spec for this revision */
   onViewSpec: (revisionId: string) => void;
+  /** Create a named branch from this revision (#2571) */
+  onBranchFromRevision?: (revisionId: string) => void;
 };
 
 export default function VersionHistoryGraphPanel({
@@ -121,6 +157,7 @@ export default function VersionHistoryGraphPanel({
   onWindowSizeIncrease,
   onCompareToPrimaryParent,
   onViewSpec,
+  onBranchFromRevision,
 }: VersionHistoryGraphPanelProps) {
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>(() => branches.map((b) => b.id));
 
@@ -132,8 +169,8 @@ export default function VersionHistoryGraphPanel({
   const expanded = useMemo(() => expandVersionsForWindow(branchFiltered, windowSize), [branchFiltered, windowSize]);
 
   const { nodes: layoutNodes, edges: layoutEdges } = useMemo(
-    () => buildLayoutedHistoryGraph(expanded, { branches }),
-    [expanded, branches]
+    () => buildLayoutedHistoryGraph(expanded, { branches, onBranchFromRevision }),
+    [expanded, branches, onBranchFromRevision]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutNodes);
