@@ -77,14 +77,14 @@ export function VersionMergeConflictList({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-                <th className="text-left py-2.5 px-3 font-semibold text-gray-700 dark:text-gray-300">Path</th>
-                <th className="text-left py-2.5 px-3 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                <th scope="col" className="text-left py-2.5 px-3 font-semibold text-gray-700 dark:text-gray-300">Path</th>
+                <th scope="col" className="text-left py-2.5 px-3 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
                   Type
                 </th>
-                <th className="text-left py-2.5 px-3 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                <th scope="col" className="text-left py-2.5 px-3 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
                   Resolution
                 </th>
-                <th className="text-left py-2.5 px-3 font-semibold text-gray-700 dark:text-gray-300 min-w-[220px]">
+                <th scope="col" className="text-left py-2.5 px-3 font-semibold text-gray-700 dark:text-gray-300 min-w-[220px]">
                   Actions
                 </th>
               </tr>

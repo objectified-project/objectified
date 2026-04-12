@@ -45,12 +45,17 @@ export function normalizeMergeConflictRows(
     for (const c of conflicts) {
       if (typeof c !== 'object' || c === null) continue;
       const path = (c as { path?: unknown }).path;
-      if (typeof path !== 'string' || !path.trim()) continue;
+      if (typeof path !== 'string') continue;
+      const normalizedPath = path.trim();
+      if (!normalizedPath) continue;
       const raw = (c as { kinds?: unknown }).kinds;
       const kinds = Array.isArray(raw)
-        ? raw.filter((k): k is string => typeof k === 'string')
+        ? raw
+            .filter((k): k is string => typeof k === 'string')
+            .map((k) => k.trim())
+            .filter((k) => k.length > 0)
         : [];
-      out.push({ path, kinds: kinds.length > 0 ? kinds : ['twoWay'] });
+      out.push({ path: normalizedPath, kinds: kinds.length > 0 ? kinds : ['twoWay'] });
     }
     if (out.length > 0) return out;
   }
