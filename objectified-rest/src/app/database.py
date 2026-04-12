@@ -2287,6 +2287,72 @@ class Database:
             conn.rollback()
             _logger.warning("insert_version_protection_audit failed: %s", e)
 
+    def insert_workflow_audit(
+        self,
+        tenant_id: str,
+        project_id: Optional[str],
+        version_id: Optional[str],
+        action: str,
+        outcome: str,
+        actor_id: Optional[str],
+        detail: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Append-only workflow audit row (#2577). Best-effort: logs and swallows DB errors."""
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO odb.workflow_audit
+                      (tenant_id, project_id, version_id, action, outcome, actor_id, detail)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
+                    """,
+                    (
+                        tenant_id,
+                        project_id,
+                        version_id,
+                        action,
+                        outcome,
+                        actor_id,
+                        json.dumps(detail) if detail is not None else None,
+                    ),
+                )
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            _logger.warning("insert_workflow_audit failed: %s", e)
+
+    def list_workflow_audit_for_version(
+        self,
+        version_id: str,
+        tenant_id: str,
+        since=None,
+        until=None,
+        limit: int = 500,
+    ) -> List[Dict[str, Any]]:
+        """Rows for one revision, tenant-scoped, optional created_at range (for queries / tests)."""
+        clauses = [
+            "wa.version_id = %s",
+            "wa.tenant_id = %s",
+        ]
+        params: List[Any] = [version_id, tenant_id]
+        if since is not None:
+            clauses.append("wa.created_at >= %s")
+            params.append(since)
+        if until is not None:
+            clauses.append("wa.created_at <= %s")
+            params.append(until)
+        q = f"""
+            SELECT wa.id, wa.tenant_id, wa.project_id, wa.version_id, wa.action, wa.outcome,
+                   wa.actor_id, wa.detail, wa.created_at
+            FROM odb.workflow_audit wa
+            WHERE {' AND '.join(clauses)}
+            ORDER BY wa.created_at ASC
+            LIMIT %s
+        """
+        params.append(limit)
+        return self.execute_query(q, tuple(params))
+
     def delete_version(
         self, version_record_id: str, tenant_id: str, user_id: Optional[str]
     ) -> Tuple[bool, Optional[str]]:

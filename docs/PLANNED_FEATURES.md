@@ -48,7 +48,7 @@ Implement and verify in this order so each step stays testable. **Issue → road
 | 12 | [#2574](https://github.com/KenSuenobu/objectified-commercial/issues/2574) | P1-02 | Conflict list UI — roadmap: shipped |
 | 13 | [#2575](https://github.com/KenSuenobu/objectified-commercial/issues/2575) | P1-03 | Bulk resolve — roadmap: shipped |
 | 14 | [#2576](https://github.com/KenSuenobu/objectified-commercial/issues/2576) | P1-04 | Block merge apply until resolved — roadmap: shipped |
-| 15 | [#2577](https://github.com/KenSuenobu/objectified-commercial/issues/2577) | P1-05 | Workflow audit **ledger** + write path |
+| 15 | [#2577](https://github.com/KenSuenobu/objectified-commercial/issues/2577) | P1-05 | Workflow audit **ledger** + write path — roadmap: shipped |
 | 16 | [#2578](https://github.com/KenSuenobu/objectified-commercial/issues/2578) | P1-06 | Audit API (filters + pagination) |
 | 17 | [#2579](https://github.com/KenSuenobu/objectified-commercial/issues/2579) | P1-07 | History search/filter in timeline |
 | 18 | [#2580](https://github.com/KenSuenobu/objectified-commercial/issues/2580) | P1-08 | Compare revision with current |
@@ -74,7 +74,7 @@ Implement and verify in this order so each step stays testable. **Issue → road
 
 ### A.2 Codebase alignment (for verification, not redesign)
 
-- **`objectified-rest`:** `versions_routes.py` documents **#2566** behavior (`baseRevisionId`, `STALE_HEAD`). `version_merge_routes.py` implements merge preview, merge apply, merge sessions (**#2572–#2574** area). There is **separate** `version_protection_audit` usage—**do not assume** it satisfies **P1-05 / P1-06** until those issues are closed and API contracts match.
+- **`objectified-rest`:** `versions_routes.py` documents **#2566** behavior (`baseRevisionId`, `STALE_HEAD`). `version_merge_routes.py` implements merge preview, merge apply, merge sessions (**#2572–#2574** area). **`workflow_audit`** (**#2577**) is the git-like workflow ledger; **`version_protection_audit`** remains separate for protection overrides—**P1-06** will expose query APIs for **`workflow_audit`**.
 - **`objectified-ui`:** Versions UX is centralized in a very large dashboard module; when testing, prefer **stable selectors** or **data-testid** additions **inside the issues that own the UI** (this doc does not prescribe code).
 
 ### A.3 Testing checkpoint 1 — After P0-10 (merge preview) and P1-04

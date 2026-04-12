@@ -139,6 +139,44 @@ def _not_modified_revision_response(
     return Response(status_code=304, headers=headers)
 
 
+def _workflow_audit_push(
+    tenant_id: str,
+    project_id: str,
+    version_id: Optional[str],
+    outcome: str,
+    actor_id: Optional[str],
+    detail: Optional[Dict[str, Any]] = None,
+) -> None:
+    db.insert_workflow_audit(
+        tenant_id,
+        project_id,
+        version_id,
+        "version.push",
+        outcome,
+        actor_id,
+        detail,
+    )
+
+
+def _workflow_audit_pull(
+    tenant_id: str,
+    project_id: str,
+    version_id: Optional[str],
+    outcome: str,
+    actor_id: Optional[str],
+    detail: Optional[Dict[str, Any]] = None,
+) -> None:
+    db.insert_workflow_audit(
+        tenant_id,
+        project_id,
+        version_id,
+        "version.pull",
+        outcome,
+        actor_id,
+        detail,
+    )
+
+
 def parse_semantic_version(version: str) -> Optional[Dict[str, int]]:
     """Parse a semantic version string into components."""
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)$', version)
@@ -373,15 +411,41 @@ async def get_version(
     ``metadata.successorRevisionId`` (#748) within the project until a revision has no successor, hits a
     protected branch tip / protected tag target (#504), or errors. Loops return 409 ``SUCCESSOR_CYCLE``.
     """
-    version = db.get_version_by_id(version_record_id, auth_data["tenant_id"])
+    tenant_id = auth_data["tenant_id"]
+    pull_actor = get_authenticated_user_id(auth_data)
+    version = db.get_version_by_id(version_record_id, tenant_id)
 
     if not version:
+        _workflow_audit_pull(
+            tenant_id,
+            project_id,
+            None,
+            "failure",
+            pull_actor,
+            {
+                "reason": "not_found",
+                "httpStatus": 404,
+                "requestedRevisionId": version_record_id,
+            },
+        )
         raise HTTPException(
             status_code=404,
             detail=f"Version not found: {version_record_id}",
         )
 
     if version["project_id"] != project_id:
+        _workflow_audit_pull(
+            tenant_id,
+            project_id,
+            str(version["id"]),
+            "failure",
+            pull_actor,
+            {
+                "reason": "project_mismatch",
+                "httpStatus": 404,
+                "requestedProjectId": project_id,
+            },
+        )
         raise HTTPException(
             status_code=404,
             detail=f"Version not found in project: {project_id}",
@@ -392,8 +456,24 @@ async def get_version(
     if successor_resolution == "none":
         etag_id = str(version["id"])
         if _if_none_match_matches_revision(etag_id, if_none_match):
+            _workflow_audit_pull(
+                tenant_id,
+                project_id,
+                etag_id,
+                "success",
+                pull_actor,
+                {"httpStatus": 304},
+            )
             return _not_modified_revision_response(revision_id=etag_id)
         response.headers["ETag"] = _strong_etag_for_revision(etag_id)
+        _workflow_audit_pull(
+            tenant_id,
+            project_id,
+            etag_id,
+            "success",
+            pull_actor,
+            {"httpStatus": 200},
+        )
         return VersionSchema(**version)
 
     final_id, hops, status, missing_id = db.resolve_successor_revision_chain(
@@ -510,9 +590,23 @@ async def get_version_by_version_id(
     Supports authentication via JWT token or API key.
     Successor resolution (#749) matches ``GET .../{version_record_id}``.
     """
-    version = db.get_version_by_version_id(project_id, version_id, auth_data["tenant_id"])
+    tenant_id = auth_data["tenant_id"]
+    pull_actor = get_authenticated_user_id(auth_data)
+    version = db.get_version_by_version_id(project_id, version_id, tenant_id)
 
     if not version:
+        _workflow_audit_pull(
+            tenant_id,
+            project_id,
+            None,
+            "failure",
+            pull_actor,
+            {
+                "reason": "not_found",
+                "httpStatus": 404,
+                "requestedVersionLine": version_id,
+            },
+        )
         raise HTTPException(
             status_code=404,
             detail=f"Version '{version_id}' not found in project",
@@ -525,8 +619,24 @@ async def get_version_by_version_id(
     if successor_resolution == "none":
         etag_id = str(version["id"])
         if _if_none_match_matches_revision(etag_id, if_none_match):
+            _workflow_audit_pull(
+                tenant_id,
+                project_id,
+                etag_id,
+                "success",
+                pull_actor,
+                {"httpStatus": 304, "byVersionLine": True},
+            )
             return _not_modified_revision_response(revision_id=etag_id)
         response.headers["ETag"] = _strong_etag_for_revision(etag_id)
+        _workflow_audit_pull(
+            tenant_id,
+            project_id,
+            etag_id,
+            "success",
+            pull_actor,
+            {"httpStatus": 200, "byVersionLine": True},
+        )
         return VersionSchema(**version)
 
     final_id, hops, status, missing_id = db.resolve_successor_revision_chain(
@@ -653,9 +763,18 @@ async def create_version(
         The created version
     """
     tenant_id = auth_data["tenant_id"]
+    push_actor = get_authenticated_user_id(auth_data)
     # Verify project belongs to tenant
     project = db.get_project_by_id(project_id, tenant_id)
     if not project:
+        _workflow_audit_push(
+            tenant_id,
+            project_id,
+            None,
+            "failure",
+            push_actor,
+            {"reason": "project_not_found", "httpStatus": 404},
+        )
         raise HTTPException(
             status_code=404,
             detail=f"Project not found: {project_id}"
@@ -678,6 +797,18 @@ async def create_version(
 
     # Validate semantic versioning format
     if not parse_semantic_version(version_id):
+        _workflow_audit_push(
+            tenant_id,
+            project_id,
+            None,
+            "failure",
+            push_actor,
+            {
+                "reason": "invalid_semver",
+                "httpStatus": 400,
+                "versionLine": version_id,
+            },
+        )
         raise HTTPException(
             status_code=400,
             detail="Version ID must follow semantic versioning format (e.g., 1.0.0)"
@@ -697,7 +828,16 @@ async def create_version(
                 require_short_message=limits.require_short_message,
             )
         except CommitPolicyViolation as pe:
-            raise commit_policy_http_exception(pe) from pe
+            he = commit_policy_http_exception(pe)
+            _workflow_audit_push(
+                tenant_id,
+                project_id,
+                None,
+                "failure",
+                creator_id,
+                {"httpStatus": he.status_code, "detail": he.detail},
+            )
+            raise he from pe
 
         # Validate and normalize commit metadata before DB call so 400s surface correctly
         commit_author = _optional_commit_metadata_str(
@@ -709,12 +849,38 @@ async def create_version(
         )
 
         base = (request.base_revision_id or "").strip()
-        expected_tip, branch_row = _resolve_expected_push_head(
-            project_id, tenant_id, request.branch_name
-        )
+        try:
+            expected_tip, branch_row = _resolve_expected_push_head(
+                project_id, tenant_id, request.branch_name
+            )
+        except HTTPException as he:
+            _workflow_audit_push(
+                tenant_id,
+                project_id,
+                None,
+                "failure",
+                creator_id,
+                {"httpStatus": he.status_code, "detail": he.detail},
+            )
+            raise
 
         if expected_tip is None:
             if base:
+                _workflow_audit_push(
+                    tenant_id,
+                    project_id,
+                    None,
+                    "failure",
+                    creator_id,
+                    {
+                        "reason": "INVALID_BASE",
+                        "httpStatus": 400,
+                        "detail": {
+                            "message": "baseRevisionId must be empty when there is no current revision",
+                            "code": "INVALID_BASE",
+                        },
+                    },
+                )
                 raise HTTPException(
                     status_code=400,
                     detail={
@@ -725,9 +891,20 @@ async def create_version(
             parent_version_id: Optional[str] = None
         else:
             if base != expected_tip:
+                stale_detail = _push_stale_head_detail(
+                    tenant_id=tenant_id, head_revision_id=expected_tip
+                )
+                _workflow_audit_push(
+                    tenant_id,
+                    project_id,
+                    expected_tip,
+                    "failure",
+                    creator_id,
+                    {"httpStatus": 409, "detail": stale_detail},
+                )
                 raise HTTPException(
                     status_code=409,
-                    detail=_push_stale_head_detail(tenant_id=tenant_id, head_revision_id=expected_tip),
+                    detail=stale_detail,
                 )
             parent_version_id = expected_tip
 
@@ -757,17 +934,55 @@ async def create_version(
                 client_base_revision_id=base,
             )
         except StaleHeadPushError as sh:
+            stale_detail = _push_stale_head_detail(
+                tenant_id=tenant_id, head_revision_id=sh.current_tip_revision_id
+            )
+            _workflow_audit_push(
+                tenant_id,
+                project_id,
+                sh.current_tip_revision_id,
+                "failure",
+                creator_id,
+                {"httpStatus": 409, "detail": stale_detail},
+            )
             raise HTTPException(
                 status_code=409,
-                detail=_push_stale_head_detail(
-                    tenant_id=tenant_id, head_revision_id=sh.current_tip_revision_id
-                ),
+                detail=stale_detail,
             ) from sh
         except BranchNotFoundError as bnf:
+            _workflow_audit_push(
+                tenant_id,
+                project_id,
+                None,
+                "failure",
+                creator_id,
+                {
+                    "httpStatus": 404,
+                    "reason": "branch_not_found",
+                    "branchId": bnf.branch_id,
+                },
+            )
             raise HTTPException(
                 status_code=404,
                 detail=f"Branch not found or inaccessible: {bnf.branch_id}",
             ) from bnf
+
+        detail_ok: Dict[str, Any] = {
+            "versionLine": version.get("version_id"),
+            "branchName": (request.branch_name or "").strip() or None,
+        }
+        if copied_count > 0:
+            detail_ok["copiedClasses"] = copied_count
+        if copy_warning:
+            detail_ok["copyWarning"] = copy_warning
+        _workflow_audit_push(
+            tenant_id,
+            project_id,
+            str(version["id"]),
+            "success",
+            creator_id,
+            detail_ok,
+        )
 
         response_data = {**version}
         if copy_warning:
@@ -781,10 +996,31 @@ async def create_version(
     except Exception as e:
         # Check for unique constraint violation
         if "unique constraint" in str(e).lower() or "23505" in str(e):
+            _workflow_audit_push(
+                tenant_id,
+                project_id,
+                None,
+                "failure",
+                push_actor,
+                {
+                    "httpStatus": 409,
+                    "reason": "duplicate_version_line",
+                    "versionLine": version_id,
+                    "message": f"A version with ID '{version_id}' already exists in this project",
+                },
+            )
             raise HTTPException(
                 status_code=409,
                 detail=f"A version with ID '{version_id}' already exists in this project"
             )
+        _workflow_audit_push(
+            tenant_id,
+            project_id,
+            None,
+            "failure",
+            push_actor,
+            {"httpStatus": 500, "reason": "unexpected_error", "message": str(e)},
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
