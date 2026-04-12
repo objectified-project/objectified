@@ -5,7 +5,8 @@
 
 export type VersionsPostStaleHeadPayload = {
   code: 'STALE_HEAD';
-  message: string;
+  /** Server-supplied error string; undefined when no specific detail was returned. */
+  message?: string;
   currentHeadRevisionId?: string;
   currentHead?: Record<string, unknown> | null;
 };
@@ -17,12 +18,12 @@ export function parseStaleHeadFromVersionsPostJson(
   if (httpStatus !== 409 || !json || typeof json !== 'object') return null;
   const o = json as Record<string, unknown>;
   if (o.code !== 'STALE_HEAD') return null;
-  const message =
+  const message: string | undefined =
     typeof o.error === 'string' && o.error.trim()
       ? o.error
-      : typeof o.message === 'string'
+      : typeof o.message === 'string' && o.message.trim()
         ? o.message
-        : 'Server has newer changes. Pull to integrate or open merge.';
+        : undefined;
   const currentHeadRevisionId =
     typeof o.currentHeadRevisionId === 'string' ? o.currentHeadRevisionId : undefined;
   const ch = o.currentHead;

@@ -509,8 +509,8 @@ const Versions = () => {
     }
   };
 
-  const loadVersions = async () => {
-    if (!selectedProjectId) return;
+  const loadVersions = async (): Promise<boolean> => {
+    if (!selectedProjectId) return false;
     try {
       const qs = new URLSearchParams({ projectId: selectedProjectId });
       if (lifecycleFilter) qs.set('lifecycle', lifecycleFilter);
@@ -522,12 +522,14 @@ const Versions = () => {
       if (data.success && data.versions) {
         setVersions(data.versions);
         await loadVersionTags();
+        return true;
       } else {
         throw new Error(data.error || 'Failed to load versions');
       }
     } catch (error) {
       console.error('Failed to load versions:', error);
       setVersions([]);
+      return false;
     }
   };
 
@@ -535,9 +537,13 @@ const Versions = () => {
     if (!selectedProjectId) return;
     setVersionsPullBannerLoading(true);
     try {
-      await loadVersions();
-      clearPushConflict();
-      toast.success('Version list refreshed. Update your commit base from the latest revision, then try again.');
+      const ok = await loadVersions();
+      if (ok) {
+        clearPushConflict();
+        toast.success('Version list refreshed. Update your commit base from the latest revision, then try again.');
+      } else {
+        toast.error('Failed to refresh versions. Please try again.');
+      }
     } finally {
       setVersionsPullBannerLoading(false);
     }

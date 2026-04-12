@@ -274,11 +274,13 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
       const headId = serverAheadForProject.currentHeadRevisionId;
       const match = headId ? list.find((v) => v.id === headId) : undefined;
       const next = match ?? list[0];
-      if (next) {
-        setLocalVersionId(next.id);
-        setContextVersionId(next.id);
-        setIsReadOnly(next.published ?? false);
+      if (!next) {
+        toast.error('No versions available after pull. Please check your project.');
+        return;
       }
+      setLocalVersionId(next.id);
+      setContextVersionId(next.id);
+      setIsReadOnly(next.published ?? false);
       clearPushConflict();
       triggerCanvasRefresh();
       triggerSidebarRefresh();

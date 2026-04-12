@@ -20,7 +20,7 @@ export type PushConflictCurrentHead = {
 
 export type PushConflictState = {
   projectId: string;
-  message: string;
+  message?: string;
   currentHeadRevisionId?: string;
   currentHead?: PushConflictCurrentHead | null;
 };
@@ -40,8 +40,14 @@ function readConflictFromSession(): PushConflictState | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as PushConflictState;
-    if (parsed?.projectId && typeof parsed.message === 'string') return parsed;
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof (parsed as Record<string, unknown>).projectId === 'string'
+    ) {
+      return parsed as PushConflictState;
+    }
   } catch {
     /* ignore */
   }
