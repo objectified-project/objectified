@@ -53,7 +53,7 @@ Implement and verify in this order so each step stays testable. **Issue → road
 | 17 | [#2579](https://github.com/KenSuenobu/objectified-commercial/issues/2579) | P1-07 | History search/filter in timeline — **shipped** (ADE **Timeline** bar: search, author, date range, reset; REST `q`, `creatorId`, `createdAfter`, `createdBefore` on list versions) |
 | 18 | [#2580](https://github.com/KenSuenobu/objectified-commercial/issues/2580) | P1-08 | Compare revision with current — **shipped** (version row **Compare with current** → schema diff dialog; base = selected, compare-to = latest head by `created_at`; timeline filters unchanged on close) |
 | 19 | [#2581](https://github.com/KenSuenobu/objectified-commercial/issues/2581) | P1-09 | Rollback confirmation + impact summary — **shipped** (Radix **AlertDialog** after preview; REST **`impactSummary`** on rollback-preview) |
-| 20 | [#2582](https://github.com/KenSuenobu/objectified-commercial/issues/2582) | P1-10 | Rollback audit persistence |
+| 20 | [#2582](https://github.com/KenSuenobu/objectified-commercial/issues/2582) | P1-10 | Rollback audit persistence — **shipped** (`workflow_audit.detail`: **`fromRevision`**, **`toRevision`**, optional **`reason`**; `POST .../rollback` **`reason`**; **`metadata.rollback.reason`**) |
 
 **First-release MVP (git-like):** per `PLANNED_FEATURE_ROADMAP_GITLIKE.md`, the **labeled MVP** slice is **P0-01 → P0-10** and **P1-05 → P1-10** (P1-01 → P1-04 are merge-resolution depth; roadmap shows them shipped). **P2-01 → P2-10** below are **enterprise / platform** follow-ons—**exclude from minimal MVP** unless you explicitly expand v1 scope.
 

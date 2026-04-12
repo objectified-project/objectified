@@ -143,6 +143,30 @@ def _workflow_audit_rollback(
     )
 
 
+def _enrich_rollback_audit_detail(
+    base: Optional[Dict[str, Any]] = None,
+    *,
+    from_revision: Optional[str] = None,
+    to_revision: Optional[str] = None,
+    branch_name: Optional[str] = None,
+    reason: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Normalize workflow_audit.detail for version.rollback (#2582): fromRevision, toRevision,
+    optional branchName and reason. Actor and timestamp live on the workflow_audit row.
+    """
+    out: Dict[str, Any] = dict(base) if base else {}
+    if from_revision:
+        out["fromRevision"] = from_revision
+    if to_revision:
+        out["toRevision"] = to_revision
+    if branch_name:
+        out["branchName"] = branch_name
+    if reason:
+        out["reason"] = reason
+    return out or None
+
+
 def _extract_schemas(spec: Dict[str, Any]) -> Dict[str, Any]:
     return (spec.get("components") or {}).get("schemas") or {}
 
@@ -988,6 +1012,8 @@ async def version_branch_rollback(
     Apply revert-style rollback: new revision with target snapshot, parent = prior tip (#745).
     """
     tenant_id = auth_data["tenant_id"]
+    audit_reason = (body.reason or "").strip() or None
+    branch_label = (body.branch_name or "").strip()
     creator_id = get_authenticated_user_id(auth_data)
     if not creator_id:
         _workflow_audit_rollback(
@@ -996,7 +1022,11 @@ async def version_branch_rollback(
             None,
             "failure",
             None,
-            {"httpStatus": 403, "reason": "auth_required"},
+            _enrich_rollback_audit_detail(
+                {"httpStatus": 403, "reason": "auth_required"},
+                branch_name=branch_label or None,
+                reason=audit_reason,
+            ),
         )
         raise HTTPException(status_code=403, detail="Rollback requires user authentication (JWT token)")
 
@@ -1016,7 +1046,13 @@ async def version_branch_rollback(
             head_tip,
             "failure",
             creator_id,
-            {"httpStatus": 409, "detail": d},
+            _enrich_rollback_audit_detail(
+                {"httpStatus": 409, "detail": d},
+                from_revision=head_tip,
+                to_revision=tgt_id,
+                branch_name=branch_label,
+                reason=audit_reason,
+            ),
         )
         raise HTTPException(
             status_code=409,
@@ -1030,7 +1066,13 @@ async def version_branch_rollback(
             head_tip,
             "failure",
             creator_id,
-            {"httpStatus": 403, "reason": "branch_protected"},
+            _enrich_rollback_audit_detail(
+                {"httpStatus": 403, "reason": "branch_protected"},
+                from_revision=head_tip,
+                to_revision=tgt_id,
+                branch_name=branch_label,
+                reason=audit_reason,
+            ),
         )
         raise HTTPException(
             status_code=403,
@@ -1053,7 +1095,13 @@ async def version_branch_rollback(
             head_tip,
             "failure",
             creator_id,
-            {"httpStatus": 409, "detail": d},
+            _enrich_rollback_audit_detail(
+                {"httpStatus": 409, "detail": d},
+                from_revision=head_tip,
+                to_revision=tgt_id,
+                branch_name=branch_label,
+                reason=audit_reason,
+            ),
         )
         raise HTTPException(
             status_code=409,
@@ -1071,7 +1119,13 @@ async def version_branch_rollback(
             head_tip,
             "failure",
             creator_id,
-            {"httpStatus": 409, "detail": d},
+            _enrich_rollback_audit_detail(
+                {"httpStatus": 409, "detail": d},
+                from_revision=head_tip,
+                to_revision=tgt_id,
+                branch_name=branch_label,
+                reason=audit_reason,
+            ),
         )
         raise HTTPException(
             status_code=409,
@@ -1089,7 +1143,13 @@ async def version_branch_rollback(
             head_tip,
             "failure",
             creator_id,
-            {"httpStatus": he.status_code, "detail": he.detail},
+            _enrich_rollback_audit_detail(
+                {"httpStatus": he.status_code, "detail": he.detail},
+                from_revision=head_tip,
+                to_revision=tgt_id,
+                branch_name=branch_label,
+                reason=audit_reason,
+            ),
         )
         raise he from pe
 
@@ -1109,17 +1169,24 @@ async def version_branch_rollback(
             head_tip,
             "failure",
             creator_id,
-            {"httpStatus": he.status_code, "detail": he.detail},
+            _enrich_rollback_audit_detail(
+                {"httpStatus": he.status_code, "detail": he.detail},
+                from_revision=head_tip,
+                to_revision=tgt_id,
+                branch_name=branch_label,
+                reason=audit_reason,
+            ),
         )
         raise he from e
 
-    rb_meta = {
-        "rollback": {
-            "contentRevisionId": tgt_id,
-            "priorHeadRevisionId": head_tip,
-            "branchName": (body.branch_name or "").strip(),
-        }
+    rb_rollback: Dict[str, Any] = {
+        "contentRevisionId": tgt_id,
+        "priorHeadRevisionId": head_tip,
+        "branchName": branch_label,
     }
+    if audit_reason:
+        rb_rollback["reason"] = audit_reason
+    rb_meta = {"rollback": rb_rollback}
 
     conn = db.connect()
     prev_autocommit = conn.autocommit
@@ -1175,13 +1242,20 @@ async def version_branch_rollback(
         _audit_detail: Dict[str, Any] = {"httpStatus": he.status_code, "detail": he.detail}
         if _attempted:
             _audit_detail["attemptedNewRevisionId"] = _attempted
+        _to_rev = str(_attempted) if _attempted else tgt_id
         _workflow_audit_rollback(
             tenant_id,
             project_id,
             head_tip,
             "failure",
             creator_id,
-            _audit_detail,
+            _enrich_rollback_audit_detail(
+                _audit_detail,
+                from_revision=head_tip,
+                to_revision=_to_rev,
+                branch_name=branch_label,
+                reason=audit_reason,
+            ),
         )
         raise
     except Exception as ex:
@@ -1190,13 +1264,20 @@ async def version_branch_rollback(
         _audit_detail = {"httpStatus": 500, "reason": "unexpected_error", "message": str(ex)}
         if _attempted:
             _audit_detail["attemptedNewRevisionId"] = _attempted
+        _to_rev = str(_attempted) if _attempted else tgt_id
         _workflow_audit_rollback(
             tenant_id,
             project_id,
             head_tip,
             "failure",
             creator_id,
-            _audit_detail,
+            _enrich_rollback_audit_detail(
+                _audit_detail,
+                from_revision=head_tip,
+                to_revision=_to_rev,
+                branch_name=branch_label,
+                reason=audit_reason,
+            ),
         )
         raise
     finally:
@@ -1211,11 +1292,14 @@ async def version_branch_rollback(
         new_id,
         "allowed",
         {
-            "branchName": (body.branch_name or "").strip(),
+            "branchName": branch_label,
             "targetRevisionId": tgt_id,
             "priorTipRevisionId": head_tip,
+            "fromRevision": head_tip,
+            "toRevision": new_id,
             "compatOverall": overall,
             "deprecationWarningCount": len(dep_out),
+            **({"reason": audit_reason} if audit_reason else {}),
         },
     )
 
@@ -1227,7 +1311,13 @@ async def version_branch_rollback(
             new_id,
             "failure",
             creator_id,
-            {"httpStatus": 500, "reason": "revision_unreadable_after_rollback"},
+            _enrich_rollback_audit_detail(
+                {"httpStatus": 500, "reason": "revision_unreadable_after_rollback"},
+                from_revision=head_tip,
+                to_revision=new_id,
+                branch_name=branch_label,
+                reason=audit_reason,
+            ),
         )
         raise HTTPException(status_code=500, detail="Rollback succeeded but revision not readable")
     _workflow_audit_rollback(
@@ -1236,13 +1326,18 @@ async def version_branch_rollback(
         new_id,
         "success",
         creator_id,
-        {
-            "branchName": (body.branch_name or "").strip(),
-            "targetRevisionId": tgt_id,
-            "priorTipRevisionId": head_tip,
-            "compatOverall": overall,
-            "versionLine": full.get("version_id"),
-        },
+        _enrich_rollback_audit_detail(
+            {
+                "targetRevisionId": tgt_id,
+                "priorTipRevisionId": head_tip,
+                "compatOverall": overall,
+                "versionLine": full.get("version_id"),
+            },
+            from_revision=head_tip,
+            to_revision=new_id,
+            branch_name=branch_label,
+            reason=audit_reason,
+        ),
     )
     return {
         "success": True,
