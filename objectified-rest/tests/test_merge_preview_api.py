@@ -140,3 +140,43 @@ def test_merge_preview_merged_omitted_when_over_size_cap():
     assert d.get("mergedOpenApiOmitted") is True
     assert d.get("mergedOpenApiOmittedReason") == "payload_too_large"
     assert "mergedOpenApi" not in d
+
+
+def test_merge_preview_persist_merge_session_calls_db():
+    fake_ms = {
+        "id": "00000000-0000-0000-0000-0000000000e1",
+        "project_id": PID,
+        "source_branch_id": "00000000-0000-0000-0000-0000000000b1",
+        "source_branch_name": "src",
+        "target_branch_name": "tgt",
+        "merge_base_version_id": "vb",
+        "source_tip_version_id": "vs",
+        "target_tip_version_id": "vt",
+        "status": "preview",
+        "created_by": None,
+        "created_at": None,
+        "updated_at": None,
+    }
+    p0, p1, p2, p3, p4 = _preview_mocks()
+    with p0, p1, p2, p3, p4, patch(
+        "src.app.version_merge_routes.db.create_merge_session_for_preview",
+        return_value=fake_ms,
+    ) as pcm:
+        r = client.post(
+            f"/v1/versions/acme/{PID}/version-branches/merge-preview",
+            json={
+                "sourceBranchName": "src",
+                "targetBranchName": "tgt",
+                "persistMergeSession": True,
+            },
+        )
+    assert r.status_code == 200
+    d = r.json()
+    assert d["mergeSessionId"] == "00000000-0000-0000-0000-0000000000e1"
+    assert d["mergeSession"]["status"] == "preview"
+    assert d["mergeSession"]["mergeBaseVersionId"] == "vb"
+    pcm.assert_called_once()
+    call_kw = pcm.call_args[1]
+    assert call_kw["project_id"] == PID
+    assert call_kw["source_branch_name"] == "src"
+    assert "conflict_records" in call_kw

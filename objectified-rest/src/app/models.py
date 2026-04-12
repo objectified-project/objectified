@@ -479,6 +479,23 @@ class VersionBranchMergePreviewRequest(BaseModel):
             "and under the size cap; set false to omit large payloads (counts and conflicts unchanged)."
         ),
     )
+    persist_merge_session: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("persistMergeSession", "persist_merge_session"),
+        description="When true, insert merge_sessions + conflict rows for resumable resolution (#2573).",
+    )
+
+
+class MergeSessionStatusPatchRequest(BaseModel):
+    """Update merge session lifecycle state (#2573)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    status: Literal["resolving", "applied", "aborted"] = Field(
+        ...,
+        validation_alias=AliasChoices("status"),
+        description="Target status: resolving, applied, or aborted (from preview/resolving only).",
+    )
 
 
 class VersionBranchMergeRequest(BaseModel):

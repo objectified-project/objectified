@@ -27,7 +27,7 @@ from .compatibility_routes import router as compatibility_router
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.11"
+    version="1.0.21"
 )
 
 

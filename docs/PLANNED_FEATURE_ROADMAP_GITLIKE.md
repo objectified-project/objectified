@@ -94,7 +94,7 @@ Workstreams below can proceed in parallel once shared contracts (revision id, he
 | **D — Studio status** | P0-07 | Depends on signals from B/C; can mock |
 | **E — Branching** | P0-08 ✓, P0-09 ✓ | P0-09 after P0-08 |
 | **F — Merge preview** | P0-10 ✓ | Gates P1-01 — P1-04 |
-| **G — Merge resolution UI** | P1-01, P1-02, P1-03, P1-04 | Sequential within: 01→02→03→04 |
+| **G — Merge resolution UI** | P1-01 ✓, P1-02, P1-03, P1-04 | Sequential within: 01→02→03→04 |
 | **H — Audit** | P1-05, P1-06 | 05 before 06 |
 | **I — History & rollback** | P1-07, P1-08, P1-09, P1-10 | P1-07/08 parallel; 09/10 pair with rollback API |
 | **J — Enterprise** | P2-01 — P2-10 | Parallel across subdomains after core push/pull stable |
@@ -308,7 +308,7 @@ Add dry-run merge API returning merged preview and conflict list without persist
 
 ## P1-01: Persist Merge Session + Conflict Records
 
-**GitHub:** [#2573](https://github.com/KenSuenobu/objectified-commercial/issues/2573) · **Epic:** [#2559](https://github.com/KenSuenobu/objectified-commercial/issues/2559)
+**GitHub:** [#2573](https://github.com/KenSuenobu/objectified-commercial/issues/2573) · **Epic:** [#2559](https://github.com/KenSuenobu/objectified-commercial/issues/2559) · **Status:** shipped (DB `merge_sessions` + `merge_session_conflicts` + `merge_session_status_events`; REST `persistMergeSession` on merge-preview; GET/PATCH merge-session APIs)
 
 ### Problem statement
 Conflict resolution work cannot be resumed reliably without persisted merge session state.
@@ -317,9 +317,9 @@ Conflict resolution work cannot be resumed reliably without persisted merge sess
 Store merge session header and per-conflict records for resolution lifecycle.
 
 ### Acceptance criteria
-- Merge preview can optionally create a persisted merge session.
-- Conflicts are queryable by `mergeSessionId`.
-- Session status transitions are tracked (`preview`, `resolving`, `applied`, `aborted`).
+- Merge preview can optionally create a persisted merge session (`persistMergeSession` on dry-run).
+- Conflicts are queryable by `mergeSessionId` (`GET .../merge-sessions/{id}/conflicts`).
+- Session status transitions are tracked (`preview`, `resolving`, `applied`, `aborted`) with audited events (`PATCH .../merge-sessions/{id}`).
 
 ---
 
