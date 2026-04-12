@@ -17,6 +17,7 @@ from .database import db
 from .models import (
     CompatibilityFindingOut,
     MergeSessionStatusPatchRequest,
+    RevisionDeprecationWarningOut,
     VersionBranchFromRevisionRequest,
     VersionBranchFromRevisionResponse,
     VersionBranchMergePreviewRequest,
@@ -811,7 +812,14 @@ def _rollback_analyze(
     head_ver: Dict[str, Any],
     target_ver: Dict[str, Any],
     include_impact: bool = True,
-) -> tuple[str, list, list, str, Optional[str], Optional[Dict[str, Any]]]:
+) -> tuple[
+    str,
+    list[CompatibilityFindingOut],
+    list[RevisionDeprecationWarningOut],
+    str,
+    Optional[str],
+    Optional[Dict[str, Any]],
+]:
     """
     Compare current branch tip (consumer expectation) to rollback snapshot (target).
     Semantics match #506: base = tip, head = restored content.
