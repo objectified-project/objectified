@@ -810,22 +810,29 @@ def _rollback_analyze(
     tenant_id: str,
     head_ver: Dict[str, Any],
     target_ver: Dict[str, Any],
-) -> tuple:
+    include_impact: bool = True,
+) -> tuple[str, list, list, str, Optional[str], Optional[Dict[str, Any]]]:
     """
     Compare current branch tip (consumer expectation) to rollback snapshot (target).
     Semantics match #506: base = tip, head = restored content.
+
+    Returns a 6-tuple:
+        (overall, finding_out, dep_out, fp, doc_url, impact_summary)
+    where ``impact_summary`` is ``None`` when *include_impact* is ``False``.
     """
     tip_spec = _openapi_for_revision(head_ver, tenant_slug, tenant_id)
     target_spec = _openapi_for_revision(target_ver, tenant_slug, tenant_id)
-    schema_diff = compare_schemas(tip_spec, target_spec)
-    diff_counts = _diff_summary_counts(schema_diff)
-    changed_entity_count = (
-        diff_counts["added"] + diff_counts["removed"] + diff_counts["modified"]
-    )
-    impact_summary: Dict[str, Any] = {
-        **diff_counts,
-        "changedEntityCount": changed_entity_count,
-    }
+    impact_summary: Optional[Dict[str, Any]] = None
+    if include_impact:
+        schema_diff = compare_schemas(tip_spec, target_spec)
+        diff_counts = _diff_summary_counts(schema_diff)
+        changed_entity_count = (
+            diff_counts["added"] + diff_counts["removed"] + diff_counts["modified"]
+        )
+        impact_summary = {
+            **diff_counts,
+            "changedEntityCount": changed_entity_count,
+        }
     overall, findings = analyze_schema_compatibility(tip_spec, target_spec, CompatibilityRules())
     finding_out = [
         CompatibilityFindingOut(
@@ -1023,7 +1030,7 @@ async def version_branch_rollback(
         )
 
     overall, _finding_out, dep_out, _fp, _doc_url, _impact_summary = _rollback_analyze(
-        tenant_slug, tenant_id, head_ver, target_ver
+        tenant_slug, tenant_id, head_ver, target_ver, include_impact=False
     )
     gate = _tenant_compat_gate_rollback(project)
     if gate and overall != "safe":

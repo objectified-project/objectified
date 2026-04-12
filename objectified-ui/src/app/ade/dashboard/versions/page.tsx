@@ -4612,7 +4612,7 @@ const Versions = () => {
           if (!rollbackApplyLoading) setShowRollbackConfirmAlert(open);
         }}
       >
-        <AlertDialogContent className="max-w-md" aria-describedby={undefined}>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Roll back?</AlertDialogTitle>
             <AlertDialogDescription asChild>
