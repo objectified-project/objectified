@@ -92,7 +92,7 @@ Workstreams below can proceed in parallel once shared contracts (revision id, he
 | **B — Push & conflict UX** | P0-04, P0-05 | P0-05 can mock 409 until P0-04 stable |
 | **C — Pull efficiency** | P0-06 | Coordinate ETag with P0-04 head semantics |
 | **D — Studio status** | P0-07 | Depends on signals from B/C; can mock |
-| **E — Branching** | P0-08, P0-09 | P0-09 after P0-08 |
+| **E — Branching** | P0-08 ✓, P0-09 | P0-09 after P0-08 |
 | **F — Merge preview** | P0-10 | Gates P1-01 — P1-04 |
 | **G — Merge resolution UI** | P1-01, P1-02, P1-03, P1-04 | Sequential within: 01→02→03→04 |
 | **H — Audit** | P1-05, P1-06 | 05 before 06 |
@@ -246,15 +246,18 @@ Add compact sync indicators in toolbar/header using modern status chips.
 
 ---
 
-## P0-08: Add Branch from Revision API Endpoint
+## P0-08: Add Branch from Revision API Endpoint ✓
 
-**GitHub:** [#2570](https://github.com/KenSuenobu/objectified-commercial/issues/2570) · **Epic:** [#2559](https://github.com/KenSuenobu/objectified-commercial/issues/2559)
+**GitHub:** [#2570](https://github.com/KenSuenobu/objectified-commercial/issues/2570) (done) · **Epic:** [#2559](https://github.com/KenSuenobu/objectified-commercial/issues/2559)
 
 ### Problem statement
 Branching from a selected historical revision is required for safe experimentation but is not a first-class endpoint.
 
 ### Scope
 Create endpoint to generate new version branch from provided revision id with lineage metadata.
+
+### Shipped
+- **REST** `POST .../version-branches/from-revision` with `sourceRevisionId`, `branchName`; column `version_branches.branched_from_revision_id`; **409** `BRANCH_NAME_CONFLICT` on name reuse; **idempotent** replay when the same name + source tip already match (response `idempotentReplay`).
 
 ### Acceptance criteria
 - Endpoint accepts source revision and target branch name.

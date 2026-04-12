@@ -399,6 +399,65 @@ class VersionForkRequest(BaseModel):
     )
 
 
+class VersionBranchFromRevisionRequest(BaseModel):
+    """Create a named branch whose tip is an existing revision (in-project; #2570)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    source_revision_id: str = Field(
+        ...,
+        validation_alias=AliasChoices("sourceRevisionId", "source_revision_id"),
+        description="Revision (versions.id) to use as the branch tip.",
+    )
+    branch_name: str = Field(
+        ...,
+        validation_alias=AliasChoices("branchName", "branch_name"),
+        description="New branch name; unique per project.",
+    )
+
+
+class VersionBranchRecordOut(BaseModel):
+    """Named version branch row (REST camelCase)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    project_id: str
+    name: str
+    tip_revision_id: str = Field(
+        ...,
+        serialization_alias="tipRevisionId",
+    )
+    branched_from_revision_id: Optional[str] = Field(
+        default=None,
+        serialization_alias="branchedFromRevisionId",
+        description="Revision this branch was created from (lineage; persists when tip advances).",
+    )
+    protected: bool = False
+    created_by: Optional[str] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+
+class VersionBranchFromRevisionResponse(BaseModel):
+    """Result of branch-from-revision; idempotentReplay documents safe retries (#2570)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    branch: VersionBranchRecordOut
+    tip_version: VersionSchema = Field(
+        ...,
+        validation_alias=AliasChoices("tipVersion", "tip_version"),
+        serialization_alias="tipVersion",
+    )
+    idempotent_replay: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("idempotentReplay", "idempotent_replay"),
+        serialization_alias="idempotentReplay",
+        description="True when the branch already existed with the same tip and lineage (safe retry).",
+    )
+
+
 class VersionBranchMergePreviewRequest(BaseModel):
     """Dry-run merge preview (three-way schema merge + merge-base)."""
 

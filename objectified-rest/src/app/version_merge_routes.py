@@ -16,8 +16,11 @@ from .compatibility_routes import _fingerprint, _openapi_for_revision
 from .database import db
 from .models import (
     CompatibilityFindingOut,
+    VersionBranchFromRevisionRequest,
+    VersionBranchFromRevisionResponse,
     VersionBranchMergePreviewRequest,
     VersionBranchMergeRequest,
+    VersionBranchRecordOut,
     VersionBranchRollbackPreviewRequest,
     VersionBranchRollbackRequest,
     VersionSchema,
@@ -47,6 +50,14 @@ from .version_notes import (
 
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
+
+_VERSION_BRANCH_NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9._\-/]{0,254}$")
+
+
+def _is_valid_version_branch_name(name: str) -> bool:
+    """Aligned with objectified-ui/lib/version-branch-utils.ts (Git-like branch labels)."""
+    s = (name or "").strip()
+    return bool(_VERSION_BRANCH_NAME_RE.match(s))
 
 
 def _parse_project_metadata(metadata: Any) -> Dict[str, Any]:
@@ -99,6 +110,81 @@ def _merge_openapi_components(
     out = copy.deepcopy(base_spec)
     out.setdefault("components", {})["schemas"] = merged_schemas
     return out
+
+
+@router.post("/{tenant_slug}/{project_id}/version-branches/from-revision")
+async def version_branch_from_revision(
+    tenant_slug: str,
+    project_id: str,
+    body: VersionBranchFromRevisionRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> VersionBranchFromRevisionResponse:
+    """
+    Create a **named branch** whose tip is an existing revision (in-project lineage; #2570).
+
+    **Idempotency:** Repeating the same ``branchName`` + ``sourceRevisionId`` returns **200** with
+    ``idempotentReplay: true`` when the branch already exists with that tip (and compatible lineage).
+    Conflicting reuse of ``branchName`` returns **409** with a clear message.
+    """
+    tenant_id = auth_data["tenant_id"]
+
+    if not _is_valid_version_branch_name(body.branch_name):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "branchName must start with a letter and contain only letters, digits, "
+                "._-/ (max 255 characters)"
+            ),
+        )
+
+    project = db.get_project_by_id(project_id, tenant_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    creator_id = get_authenticated_user_id(auth_data)
+
+    result = db.create_version_branch_from_revision(
+        project_id=project_id,
+        tenant_id=tenant_id,
+        branch_name=body.branch_name,
+        source_revision_id=body.source_revision_id,
+        creator_id=creator_id,
+    )
+
+    if not result.get("success"):
+        code = result.get("code") or "ERROR"
+        err = result.get("error", "Branch creation failed")
+        if code == "NOT_FOUND":
+            raise HTTPException(status_code=404, detail=err)
+        if code == "BRANCH_NAME_CONFLICT":
+            raise HTTPException(
+                status_code=409,
+                detail={"message": err, "code": "BRANCH_NAME_CONFLICT"},
+            )
+        if code == "INVALID_INPUT":
+            raise HTTPException(status_code=400, detail=err)
+        raise HTTPException(status_code=500, detail=err)
+
+    br = result["branch"]
+    record = VersionBranchRecordOut(
+        id=str(br["id"]),
+        project_id=str(br["project_id"]),
+        name=str(br["name"]),
+        tip_revision_id=str(br["tip_version_id"]),
+        branched_from_revision_id=(
+            str(br["branched_from_revision_id"]) if br.get("branched_from_revision_id") else None
+        ),
+        protected=bool(br.get("protected")),
+        created_by=str(br["created_by"]) if br.get("created_by") else None,
+        created_at=br.get("created_at"),
+        updated_at=br.get("updated_at"),
+    )
+    tip = result["tip_version"]
+    return VersionBranchFromRevisionResponse(
+        branch=record,
+        tip_version=VersionSchema(**tip),
+        idempotent_replay=bool(result.get("idempotent_replay")),
+    )
 
 
 @router.post("/{tenant_slug}/{project_id}/version-branches/merge-preview")
