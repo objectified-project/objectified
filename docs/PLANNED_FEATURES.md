@@ -50,7 +50,7 @@ Implement and verify in this order so each step stays testable. **Issue → road
 | 14 | [#2576](https://github.com/KenSuenobu/objectified-commercial/issues/2576) | P1-04 | Block merge apply until resolved — roadmap: shipped |
 | 15 | [#2577](https://github.com/KenSuenobu/objectified-commercial/issues/2577) | P1-05 | Workflow audit **ledger** + write path — roadmap: shipped |
 | 16 | [#2578](https://github.com/KenSuenobu/objectified-commercial/issues/2578) | P1-06 | Audit API (filters + pagination) — **shipped** (`GET .../workflow-audit`, `objectified-rest/docs/WORKFLOW_AUDIT_API.md`) |
-| 17 | [#2579](https://github.com/KenSuenobu/objectified-commercial/issues/2579) | P1-07 | History search/filter in timeline |
+| 17 | [#2579](https://github.com/KenSuenobu/objectified-commercial/issues/2579) | P1-07 | History search/filter in timeline — **shipped** (ADE **Timeline** bar: search, author, date range, reset; REST `q`, `creatorId`, `createdAfter`, `createdBefore` on list versions) |
 | 18 | [#2580](https://github.com/KenSuenobu/objectified-commercial/issues/2580) | P1-08 | Compare revision with current |
 | 19 | [#2581](https://github.com/KenSuenobu/objectified-commercial/issues/2581) | P1-09 | Rollback confirmation + impact summary |
 | 20 | [#2582](https://github.com/KenSuenobu/objectified-commercial/issues/2582) | P1-10 | Rollback audit persistence |
@@ -74,7 +74,7 @@ Implement and verify in this order so each step stays testable. **Issue → road
 
 ### A.2 Codebase alignment (for verification, not redesign)
 
-- **`objectified-rest`:** `versions_routes.py` documents **#2566** behavior (`baseRevisionId`, `STALE_HEAD`). `version_merge_routes.py` implements merge preview, merge apply, merge sessions (**#2572–#2574** area). **`workflow_audit`** (**#2577**) is the git-like workflow ledger; **`version_protection_audit`** remains separate for protection overrides. **P1-06** query API: **`GET /v1/versions/{tenant}/workflow-audit`** (**#2578**, `objectified-rest/docs/WORKFLOW_AUDIT_API.md`).
+- **`objectified-rest`:** `versions_routes.py` documents **#2566** behavior (`baseRevisionId`, `STALE_HEAD`). `version_merge_routes.py` implements merge preview, merge apply, merge sessions (**#2572–#2574** area). **`workflow_audit`** (**#2577**) is the git-like workflow ledger; **`version_protection_audit`** remains separate for protection overrides. **P1-06** query API: **`GET /v1/versions/{tenant}/workflow-audit`** (**#2578**, `objectified-rest/docs/WORKFLOW_AUDIT_API.md`). **P1-07** list filters (**#2579**): **`GET .../versions/{tenant}/{project}`** optional **`q`**, **`creatorId`**, **`createdAfter`**, **`createdBefore`**.
 - **`objectified-ui`:** Versions UX is centralized in a very large dashboard module; when testing, prefer **stable selectors** or **data-testid** additions **inside the issues that own the UI** (this doc does not prescribe code).
 
 ### A.3 Testing checkpoint 1 — After P0-10 (merge preview) and P1-04

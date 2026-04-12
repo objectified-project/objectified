@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered, Search } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -123,6 +123,49 @@ interface Version {
   lifecycle?: string;
   /** Revision JSON (#507, #748): deprecation, sunsetAt, successorRevisionId, … */
   metadata?: Record<string, unknown>;
+  /** Optional commit author string (REST: author / commit_author, #2579) */
+  author?: string | null;
+  /** Optional full commit message body (REST: message / commit_message, #2579) */
+  message?: string | null;
+}
+
+/** Client-side history timeline filters (#2579) — matches REST list `q` / creator / date range semantics. */
+function revisionMatchesHistoryFilters(
+  v: Version,
+  q: string,
+  authorCreatorId: string,
+  dateFrom: string,
+  dateTo: string,
+): boolean {
+  const needle = q.trim().toLowerCase();
+  if (needle) {
+    const hay = [v.shortMessage, v.changelog, v.author, v.message]
+      .filter((x): x is string => typeof x === 'string' && x.length > 0)
+      .join('\n')
+      .toLowerCase();
+    if (!hay.includes(needle)) return false;
+  }
+  if (authorCreatorId && v.creator_id !== authorCreatorId) return false;
+  if (dateFrom || dateTo) {
+    const t = new Date(v.created_at).getTime();
+    if (dateFrom) {
+      const parts = dateFrom.split('-').map((x) => parseInt(x, 10));
+      if (parts.length === 3 && parts.every((n) => !Number.isNaN(n))) {
+        const [y, m, d] = parts;
+        const start = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+        if (t < start) return false;
+      }
+    }
+    if (dateTo) {
+      const parts = dateTo.split('-').map((x) => parseInt(x, 10));
+      if (parts.length === 3 && parts.every((n) => !Number.isNaN(n))) {
+        const [y, m, d] = parts;
+        const end = new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+        if (t > end) return false;
+      }
+    }
+  }
+  return true;
 }
 
 interface VersionBranchRow {
@@ -262,6 +305,11 @@ const Versions = () => {
   const [tagProtected, setTagProtected] = useState(false);
   const [tagSaving, setTagSaving] = useState(false);
   const [historyTagFilter, setHistoryTagFilter] = useState<string>('');
+  /** Timeline: message / changelog / commit body / commit author (#2579) */
+  const [historySearchQ, setHistorySearchQ] = useState('');
+  const [historyAuthorCreatorId, setHistoryAuthorCreatorId] = useState('');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
   const [lifecycleFilter, setLifecycleFilter] = useState<string>('');
   const [editLifecycle, setEditLifecycle] = useState<string>('stable');
   const [editDeprecationMessage, setEditDeprecationMessage] = useState('');
@@ -1370,16 +1418,57 @@ const Versions = () => {
     };
   }, [expandedClassDiffId, filteredClassDiffRows, classListVirtual]);
 
-  const displayVersions = useMemo(() => {
+  const tagFilteredVersions = useMemo(() => {
     if (!historyTagFilter) return versions;
     const t = versionTags.find((x) => x.id === historyTagFilter);
     if (!t) return versions;
     return versions.filter((v) => v.id === t.version_id);
   }, [versions, versionTags, historyTagFilter]);
 
+  const historyAuthorOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const v of tagFilteredVersions) {
+      if (!v.creator_id || byId.has(v.creator_id)) continue;
+      const label =
+        (v.creator_name && v.creator_name.trim()) ||
+        (v.creator_email && v.creator_email.trim()) ||
+        v.creator_id;
+      byId.set(v.creator_id, label);
+    }
+    return Array.from(byId.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [tagFilteredVersions]);
+
+  const displayVersions = useMemo(() => {
+    return tagFilteredVersions.filter((v) =>
+      revisionMatchesHistoryFilters(v, historySearchQ, historyAuthorCreatorId, historyDateFrom, historyDateTo)
+    );
+  }, [tagFilteredVersions, historySearchQ, historyAuthorCreatorId, historyDateFrom, historyDateTo]);
+
+  const historyTimelineFiltersActive =
+    historySearchQ.trim() !== '' || !!historyAuthorCreatorId || !!historyDateFrom || !!historyDateTo;
+
+  const resetHistoryTimelineFilters = useCallback(() => {
+    setHistorySearchQ('');
+    setHistoryAuthorCreatorId('');
+    setHistoryDateFrom('');
+    setHistoryDateTo('');
+  }, []);
+
+  useEffect(() => {
+    resetHistoryTimelineFilters();
+  }, [selectedProjectId, resetHistoryTimelineFilters]);
+
   useEffect(() => {
     setHistoryGraphWindowSize(DEFAULT_HISTORY_WINDOW);
-  }, [selectedProjectId, historyTagFilter, lifecycleFilter]);
+  }, [selectedProjectId, historyTagFilter, lifecycleFilter, historySearchQ, historyAuthorCreatorId, historyDateFrom, historyDateTo]);
+
+  useEffect(() => {
+    if (historyAuthorCreatorId && !historyAuthorOptions.some((o) => o.id === historyAuthorCreatorId)) {
+      setHistoryAuthorCreatorId('');
+    }
+  }, [historyAuthorCreatorId, historyAuthorOptions]);
 
   const handleCompareFormatChange = (newFormat: 'json' | 'yaml') => {
     setCompareFormat(newFormat);
@@ -2247,15 +2336,95 @@ const Versions = () => {
           description="Get started by creating your first version"
           iconContainerClassName="from-emerald-500 to-teal-600 shadow-emerald-500/30"
         />
-      ) : displayVersions.length === 0 ? (
+      ) : tagFilteredVersions.length === 0 ? (
         <EmptyState
           icon={<Tag className="h-10 w-10" />}
           title="No version matches this tag"
           description="Clear the tag filter above the table or choose a different tag."
           iconContainerClassName="from-amber-500 to-orange-600 shadow-amber-500/30"
         />
+      ) : displayVersions.length === 0 ? (
+        <EmptyState
+          icon={<Search className="h-10 w-10" />}
+          title="No revisions match your filters"
+          description="Adjust search, author, or the date range, or reset timeline filters to see the full history again."
+          iconContainerClassName="from-slate-500 to-gray-600 shadow-slate-500/30"
+          action={
+            <Button type="button" variant="secondary" onClick={resetHistoryTimelineFilters}>
+              Reset timeline filters
+            </Button>
+          }
+        />
       ) : (
         <>
+          <div className="mb-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 px-4 py-3 flex flex-wrap items-end gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <ScrollText className="h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
+              <span className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">Timeline</span>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[12rem] flex-1">
+              <Label htmlFor="history-timeline-search" className="text-xs text-gray-500 dark:text-gray-400">
+                Search
+              </Label>
+              <Input
+                id="history-timeline-search"
+                type="search"
+                placeholder="Message, changelog, commit…"
+                value={historySearchQ}
+                onChange={(e) => setHistorySearchQ(e.target.value)}
+                className="w-full min-w-0"
+                autoComplete="off"
+              />
+            </div>
+            <div className="flex flex-col gap-1 w-full sm:w-52">
+              <Label className="text-xs text-gray-500 dark:text-gray-400">Author</Label>
+              <Select
+                value={historyAuthorCreatorId || '__all__'}
+                onValueChange={(v) => setHistoryAuthorCreatorId(v === '__all__' ? '' : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All authors" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All authors</SelectItem>
+                  {historyAuthorOptions.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 w-full sm:w-40">
+              <Label htmlFor="history-date-from" className="text-xs text-gray-500 dark:text-gray-400">
+                From
+              </Label>
+              <Input
+                id="history-date-from"
+                type="date"
+                value={historyDateFrom}
+                onChange={(e) => setHistoryDateFrom(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div className="flex flex-col gap-1 w-full sm:w-40">
+              <Label htmlFor="history-date-to" className="text-xs text-gray-500 dark:text-gray-400">
+                To
+              </Label>
+              <Input
+                id="history-date-to"
+                type="date"
+                value={historyDateTo}
+                onChange={(e) => setHistoryDateTo(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            {historyTimelineFiltersActive ? (
+              <Button type="button" variant="secondary" className="shrink-0" onClick={resetHistoryTimelineFilters}>
+                Reset
+              </Button>
+            ) : null}
+          </div>
           <div className="mb-6" ref={historyGraphSectionRef}>
             <VersionHistoryGraphPanel
               key={versionBranches.map((b) => b.id).sort().join('|') || 'graph-branches'}

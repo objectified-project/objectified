@@ -1,6 +1,7 @@
 import psycopg2
 import json
 import logging
+from datetime import datetime
 import bcrypt
 import numpy as np
 from psycopg2.extras import Json, RealDictCursor
@@ -1232,13 +1233,51 @@ class Database:
         project_id: str,
         tenant_id: str,
         lifecycle: Optional[str] = None,
+        *,
+        message_q: Optional[str] = None,
+        creator_id: Optional[str] = None,
+        created_after: Optional[datetime] = None,
+        created_before: Optional[datetime] = None,
     ) -> List[Dict[str, Any]]:
-        """Get all versions for a project, ensuring project belongs to tenant. Optional lifecycle filter (#739)."""
+        """Get all versions for a project, ensuring project belongs to tenant.
+
+        Optional lifecycle filter (#739). Optional history filters (#2579): substring match on
+        revision note / changelog / commit message body, creator id, and created_at range.
+        """
         lifecycle_clause = ""
         params: List[Any] = [project_id, tenant_id]
         if lifecycle:
             lifecycle_clause = f" AND {sql_effective_lifecycle_expr('v')} = %s"
             params.append(lifecycle.strip().lower())
+
+        message_clause = ""
+        mq = (message_q or "").strip()
+        if mq:
+            message_clause = """
+              AND (
+                strpos(lower(COALESCE(v.description, '')), lower(%s)) > 0
+                OR strpos(lower(COALESCE(v.change_log, '')), lower(%s)) > 0
+                OR strpos(lower(COALESCE(v.commit_message, '')), lower(%s)) > 0
+                OR strpos(lower(COALESCE(v.commit_author, '')), lower(%s)) > 0
+              )
+            """
+            params.extend([mq, mq, mq, mq])
+
+        creator_clause = ""
+        cid = (creator_id or "").strip()
+        if cid:
+            creator_clause = " AND v.creator_id = %s"
+            params.append(cid)
+
+        created_after_clause = ""
+        if created_after is not None:
+            created_after_clause = " AND v.created_at >= %s"
+            params.append(created_after)
+
+        created_before_clause = ""
+        if created_before is not None:
+            created_before_clause = " AND v.created_at <= %s"
+            params.append(created_before)
 
         query = f"""
             SELECT v.id, v.project_id, v.creator_id, v.version_id, v.description,
@@ -1264,6 +1303,10 @@ class Database:
               AND v.deleted_at IS NULL
               AND p.deleted_at IS NULL
               {lifecycle_clause}
+              {message_clause}
+              {creator_clause}
+              {created_after_clause}
+              {created_before_clause}
             ORDER BY v.created_at DESC
         """
         return self.execute_query(query, tuple(params))
