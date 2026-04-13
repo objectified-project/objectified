@@ -3660,7 +3660,7 @@ function PathsCanvasInner({
           if (!selectedPathId) {
             await alertDialog({
               title: 'No Path Selected',
-              message: 'Please select a path before adding an operation.',
+              message: 'Please select a path from the sidebar before adding an operation.',
               variant: 'warning',
             });
             return;
