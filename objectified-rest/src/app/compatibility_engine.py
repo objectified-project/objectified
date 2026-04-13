@@ -9,8 +9,13 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from types import MappingProxyType
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
+from fastapi import HTTPException
+
+from .database import db
+from .openapi_generator import generate_openapi_spec
 from .schema_compatibility import (
     CompatibilityFinding,
     CompatibilityRules,
@@ -44,12 +49,12 @@ def compat_report_fingerprint(
     ).hexdigest()
 
 
-def rule_hits_from_findings(findings: List[CompatibilityFinding]) -> Dict[str, int]:
+def rule_hits_from_findings(findings: List[CompatibilityFinding]) -> MappingProxyType:
     """Count findings per rule id (deterministic key order when serialized via sorted())."""
     hits: Dict[str, int] = {}
     for f in findings:
         hits[f.rule] = hits.get(f.rule, 0) + 1
-    return hits
+    return MappingProxyType(hits)
 
 
 @dataclass(frozen=True)
@@ -58,7 +63,7 @@ class CompatibilityCheckResult:
 
     overall: Overall
     findings: Tuple[CompatibilityFinding, ...]
-    rule_hits: Dict[str, int]
+    rule_hits: MappingProxyType
     report_fingerprint: str
 
     @property
@@ -127,3 +132,29 @@ def compat_audit_detail(
         "reportFingerprint": result.report_fingerprint,
         "findingCount": len(result.findings),
     }
+
+
+def openapi_for_revision(version: Dict[str, Any], tenant_slug: str, tenant_id: str) -> Dict[str, Any]:
+    """
+    Build the OpenAPI spec for a persisted revision.
+
+    Shared helper used by the compatibility API and push/merge audit pipelines.
+    Extracted from ``compatibility_routes`` to avoid cross-router coupling.
+    """
+    project = db.get_project_by_id(version["project_id"], tenant_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found for revision")
+    classes = db.get_classes_for_version(version["id"])
+    all_properties: Dict[str, Any] = {}
+    for c in classes:
+        all_properties[c["id"]] = db.get_properties_for_class(c["id"])
+    return generate_openapi_spec(
+        tenant_slug,
+        project["slug"],
+        version["version_id"],
+        classes,
+        all_properties,
+        project.get("description"),
+        version_db_id=version["id"],
+        revision_metadata=version.get("metadata"),
+    )

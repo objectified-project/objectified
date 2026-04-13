@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import re
 from typing import Any, Callable, Dict, List, Optional, Set
 
@@ -16,8 +17,8 @@ from .compatibility_engine import (
     CompatibilityCheckEngine,
     compat_audit_detail,
     compat_report_fingerprint,
+    openapi_for_revision,
 )
-from .compatibility_routes import _openapi_for_revision
 from .database import db
 from .models import (
     CompatibilityFindingOut,
@@ -55,6 +56,7 @@ from .published_immutability import IMMUTABLE_DETAIL, revision_is_published_immu
 
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
+logger = logging.getLogger(__name__)
 
 # Max UTF-8 size of serialized merged OpenAPI in merge-preview (dry-run only; avoids huge payloads).
 _MERGE_PREVIEW_MAX_JSON_BYTES = 512 * 1024
@@ -544,9 +546,9 @@ async def version_branch_merge_preview(
         on_failure_audit=None,
     )
 
-    base_spec = _openapi_for_revision(base_ver, tenant_slug, tenant_id)
-    source_spec = _openapi_for_revision(src_ver, tenant_slug, tenant_id)
-    target_spec = _openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
+    base_spec = openapi_for_revision(base_ver, tenant_slug, tenant_id)
+    source_spec = openapi_for_revision(src_ver, tenant_slug, tenant_id)
+    target_spec = openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
 
     b = _extract_schemas(base_spec)
     o = _extract_schemas(target_spec)
@@ -762,9 +764,9 @@ async def version_branch_merge(
         )
         raise HTTPException(status_code=404, detail="Merge base revision not found")
 
-    base_spec = _openapi_for_revision(base_ver, tenant_slug, tenant_id)
-    source_spec = _openapi_for_revision(src_ver, tenant_slug, tenant_id)
-    target_spec = _openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
+    base_spec = openapi_for_revision(base_ver, tenant_slug, tenant_id)
+    source_spec = openapi_for_revision(src_ver, tenant_slug, tenant_id)
+    target_spec = openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
 
     b = _extract_schemas(base_spec)
     o = _extract_schemas(target_spec)
@@ -1002,27 +1004,34 @@ async def version_branch_merge(
         },
     )
     try:
-        new_spec = _openapi_for_revision(full, tenant_slug, tenant_id)
-        pre_merge_target_spec = _openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
+        new_spec = openapi_for_revision(full, tenant_slug, tenant_id)
+        pre_merge_target_spec = openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
         post_merge = CompatibilityCheckEngine.run(
             pre_merge_target_spec, new_spec, CompatibilityRules()
         )
-        db.insert_workflow_audit(
-            tenant_id,
-            project_id,
-            new_id,
-            "schema.compatibility",
-            "success",
-            creator_id,
-            compat_audit_detail(
-                pipeline="version.merge",
-                base_revision_id=target_tip,
-                head_revision_id=new_id,
-                result=post_merge,
-            ),
-        )
+        try:
+            db.insert_workflow_audit(
+                tenant_id,
+                project_id,
+                new_id,
+                "schema.compatibility",
+                "success",
+                creator_id,
+                compat_audit_detail(
+                    pipeline="version.merge",
+                    base_revision_id=target_tip,
+                    head_revision_id=new_id,
+                    result=post_merge,
+                ),
+            )
+        except Exception:
+            pass
     except Exception:
-        pass
+        logger.warning(
+            "post-merge compatibility audit failed for revision %s",
+            new_id,
+            exc_info=True,
+        )
 
     return {
         "success": True,
@@ -1052,8 +1061,8 @@ def _rollback_analyze(
         (overall, finding_out, dep_out, fp, doc_url, impact_summary)
     where ``impact_summary`` is ``None`` when *include_impact* is ``False``.
     """
-    tip_spec = _openapi_for_revision(head_ver, tenant_slug, tenant_id)
-    target_spec = _openapi_for_revision(target_ver, tenant_slug, tenant_id)
+    tip_spec = openapi_for_revision(head_ver, tenant_slug, tenant_id)
+    target_spec = openapi_for_revision(target_ver, tenant_slug, tenant_id)
     impact_summary: Optional[Dict[str, Any]] = None
     if include_impact:
         schema_diff = compare_schemas(tip_spec, target_spec)

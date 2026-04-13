@@ -84,15 +84,17 @@ def test_compatibility_reports_breaking(mock_auth):
     }
     with (
         patch("src.app.compatibility_routes.db") as mock_db,
+        patch("src.app.compatibility_engine.db") as mock_engine_db,
         patch(
-            "src.app.compatibility_routes.generate_openapi_spec",
+            "src.app.compatibility_engine.generate_openapi_spec",
             side_effect=[_MIN_SPEC, removed_spec],
         ),
     ):
-        mock_db.get_project_by_id.return_value = _FAKE_PROJECT
         mock_db.get_version_by_id.side_effect = lambda vid, tid: (
             _FAKE_BASE_VER if vid == "base-rev" else _FAKE_HEAD_VER if vid == "head-rev" else None
         )
+        mock_engine_db.get_project_by_id.return_value = _FAKE_PROJECT
+        mock_engine_db.get_classes_for_version.return_value = []
         r = client.post(
             "/v1/versions/t/proj-1/compatibility",
             json={"baseRevisionId": "base-rev", "headRevisionId": "head-rev"},
@@ -114,15 +116,17 @@ def test_compatibility_409_when_policy(mock_auth):
     }
     with (
         patch("src.app.compatibility_routes.db") as mock_db,
+        patch("src.app.compatibility_engine.db") as mock_engine_db,
         patch(
-            "src.app.compatibility_routes.generate_openapi_spec",
+            "src.app.compatibility_engine.generate_openapi_spec",
             side_effect=[_MIN_SPEC, removed_spec],
         ),
     ):
-        mock_db.get_project_by_id.return_value = _FAKE_PROJECT
         mock_db.get_version_by_id.side_effect = lambda vid, tid: (
             _FAKE_BASE_VER if vid == "base-rev" else _FAKE_HEAD_VER if vid == "head-rev" else None
         )
+        mock_engine_db.get_project_by_id.return_value = _FAKE_PROJECT
+        mock_engine_db.get_classes_for_version.return_value = []
         r = client.post(
             "/v1/versions/t/proj-1/compatibility",
             json={
@@ -140,12 +144,12 @@ def test_compatibility_409_when_policy(mock_auth):
 def test_compatibility_deprecation_warnings(mock_auth):
     with (
         patch("src.app.compatibility_routes.db") as mock_db,
+        patch("src.app.compatibility_engine.db") as mock_engine_db,
         patch(
-            "src.app.compatibility_routes.generate_openapi_spec",
+            "src.app.compatibility_engine.generate_openapi_spec",
             side_effect=[_MIN_SPEC, _MIN_SPEC],
         ),
     ):
-        mock_db.get_project_by_id.return_value = _FAKE_PROJECT
         mock_db.get_version_by_id.side_effect = lambda vid, tid: (
             _FAKE_BASE_VER_DEPRECATED
             if vid == "base-rev"
@@ -153,6 +157,8 @@ def test_compatibility_deprecation_warnings(mock_auth):
             if vid == "head-rev"
             else None
         )
+        mock_engine_db.get_project_by_id.return_value = _FAKE_PROJECT
+        mock_engine_db.get_classes_for_version.return_value = []
         r = client.post(
             "/v1/versions/t/proj-1/compatibility",
             json={"baseRevisionId": "base-rev", "headRevisionId": "head-rev"},
@@ -168,12 +174,12 @@ def test_compatibility_deprecation_warnings(mock_auth):
 def test_compatibility_409_deprecated_policy(mock_auth):
     with (
         patch("src.app.compatibility_routes.db") as mock_db,
+        patch("src.app.compatibility_engine.db") as mock_engine_db,
         patch(
-            "src.app.compatibility_routes.generate_openapi_spec",
+            "src.app.compatibility_engine.generate_openapi_spec",
             side_effect=[_MIN_SPEC, _MIN_SPEC],
         ),
     ):
-        mock_db.get_project_by_id.return_value = _FAKE_PROJECT
         mock_db.get_version_by_id.side_effect = lambda vid, tid: (
             _FAKE_BASE_VER_DEPRECATED
             if vid == "base-rev"
@@ -181,6 +187,8 @@ def test_compatibility_409_deprecated_policy(mock_auth):
             if vid == "head-rev"
             else None
         )
+        mock_engine_db.get_project_by_id.return_value = _FAKE_PROJECT
+        mock_engine_db.get_classes_for_version.return_value = []
         r = client.post(
             "/v1/versions/t/proj-1/compatibility",
             json={

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from .auth import validate_authentication
-from .compatibility_engine import CompatibilityCheckEngine, compat_report_fingerprint
+from .compatibility_engine import CompatibilityCheckEngine, compat_report_fingerprint, openapi_for_revision
 from .database import db
 from .models import (
     CompatibilityCheckRequest,
@@ -18,7 +18,6 @@ from .models import (
     CompatibilityFindingOut,
     RevisionDeprecationWarningOut,
 )
-from .openapi_generator import generate_openapi_spec
 from .revision_deprecation import warnings_for_revision
 from .schema_compatibility import BREAKING_DOC_ISSUE_URL, CompatibilityRules
 
@@ -61,26 +60,6 @@ def _rules_from_payload(req: CompatibilityCheckRequest) -> CompatibilityRules:
         treat_removed_path_as_breaking=p.treat_removed_path_as_breaking,
         treat_removed_operation_as_breaking=p.treat_removed_operation_as_breaking,
         detect_possible_renames=p.detect_possible_renames,
-    )
-
-
-def _openapi_for_revision(version: Dict[str, Any], tenant_slug: str, tenant_id: str) -> Dict[str, Any]:
-    project = db.get_project_by_id(version["project_id"], tenant_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found for revision")
-    classes = db.get_classes_for_version(version["id"])
-    all_properties: Dict[str, Any] = {}
-    for c in classes:
-        all_properties[c["id"]] = db.get_properties_for_class(c["id"])
-    return generate_openapi_spec(
-        tenant_slug,
-        project["slug"],
-        version["version_id"],
-        classes,
-        all_properties,
-        project.get("description"),
-        version_db_id=version["id"],
-        revision_metadata=version.get("metadata"),
     )
 
 
@@ -127,8 +106,8 @@ async def check_revision_compatibility(
         )
 
     rules = _rules_from_payload(body)
-    base_spec = _openapi_for_revision(base_ver, tenant_slug, tenant_id)
-    head_spec = _openapi_for_revision(head_ver, tenant_slug, tenant_id)
+    base_spec = openapi_for_revision(base_ver, tenant_slug, tenant_id)
+    head_spec = openapi_for_revision(head_ver, tenant_slug, tenant_id)
 
     result = CompatibilityCheckEngine.run(base_spec, head_spec, rules)
     overall = result.overall
