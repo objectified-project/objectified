@@ -115,7 +115,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
       ? 'paths'
       : 'editor';
 
-  const isPathsRoute = Boolean(pathname?.includes('/paths'));
+  const isPathsRoute = viewMode === 'paths';
 
   // Handle settings save
   const handleSettingsSave = React.useCallback((settings: {

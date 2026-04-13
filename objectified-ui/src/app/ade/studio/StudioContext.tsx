@@ -187,7 +187,7 @@ interface StudioContextType {
   setPathsViewMode: (mode: 'canvas' | 'code') => void;
 }
 
-const PATHS_VIEW_MODE_STORAGE_KEY = 'studio.paths.viewMode';
+export const PATHS_VIEW_MODE_STORAGE_KEY = 'studio.paths.viewMode';
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
 

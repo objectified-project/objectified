@@ -6,7 +6,7 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-import { StudioProvider, useStudio } from '../src/app/ade/studio/StudioContext';
+import { StudioProvider, useStudio, PATHS_VIEW_MODE_STORAGE_KEY } from '../src/app/ade/studio/StudioContext';
 
 function PathsModeProbe() {
   const { pathsViewMode, setPathsViewMode } = useStudio();
@@ -36,14 +36,14 @@ describe('StudioContext pathsViewMode', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'use-code' }));
-    expect(sessionStorage.getItem('studio.paths.viewMode')).toBe('code');
+    expect(sessionStorage.getItem(PATHS_VIEW_MODE_STORAGE_KEY)).toBe('code');
 
     fireEvent.click(screen.getByRole('button', { name: 'use-canvas' }));
-    expect(sessionStorage.getItem('studio.paths.viewMode')).toBe('canvas');
+    expect(sessionStorage.getItem(PATHS_VIEW_MODE_STORAGE_KEY)).toBe('canvas');
   });
 
   it('restores paths view mode from sessionStorage after mount', async () => {
-    sessionStorage.setItem('studio.paths.viewMode', 'code');
+    sessionStorage.setItem(PATHS_VIEW_MODE_STORAGE_KEY, 'code');
 
     render(
       <StudioProvider>
