@@ -42,6 +42,9 @@ import type { SecurityRequirement } from '../../../../../../lib/utils/openapi-pa
 import { ExtensionsEditor } from '../../../../components/ade/studio/ExtensionsEditor';
 import { useStudio } from '../../StudioContext';
 import { getSecuritySchemesForVersion } from '../../../../../../lib/db/helper-security-schemes';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/Tabs';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface OperationPropertiesPanelProps {
   operationId: string | null;
@@ -124,6 +127,10 @@ export default function OperationPropertiesPanel({
   // Deprecated flag state
   const [deprecated, setDeprecated] = useState(false);
 
+  // OpenAPI tags (metadata.tags)
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState('');
+
   // Private (x-private) flag: hide operation from Swagger
   const [xPrivate, setXPrivate] = useState(false);
 
@@ -145,6 +152,8 @@ export default function OperationPropertiesPanel({
       setSecurityDescription('');
       setLoadedMetadata({});
       setDeprecated(false);
+      setTags([]);
+      setTagDraft('');
       setXPrivate(false);
       setExternalDocsUrl('');
       setExternalDocsDescription('');
@@ -163,6 +172,8 @@ export default function OperationPropertiesPanel({
       setSecurityDescription('');
       setLoadedMetadata({});
       setDeprecated(false);
+      setTags([]);
+      setTagDraft('');
       setXPrivate(false);
       setExternalDocsUrl('');
       setExternalDocsDescription('');
@@ -192,6 +203,12 @@ export default function OperationPropertiesPanel({
             setSecurity(Array.isArray(sec) ? sec : sec ? [sec] : []);
           }
           setDeprecated(meta.deprecated === true);
+          const metaTags = meta.tags;
+          if (Array.isArray(metaTags)) {
+            setTags([...new Set(metaTags.map((t) => String(t).trim()).filter(Boolean))]);
+          } else {
+            setTags([]);
+          }
           setXPrivate(meta['x-private'] === true || meta.x_private === true);
           setSecurityDescription(
             (meta.security_description ?? meta.securityDescription ?? meta['x-security-description'] ?? '') as string
@@ -359,6 +376,7 @@ export default function OperationPropertiesPanel({
 
     setIsSaving(true);
     setSaveStatus('idle');
+    const trimmedOperationIdName = operationIdName.trim();
     try {
       // Strip placeholder keys (__new__*) so we don't persist them
       const sanitizedSecurity =
@@ -375,6 +393,7 @@ export default function OperationPropertiesPanel({
           : undefined;
       // Unsecured = explicit security: [] (public); otherwise omit or set requirements
       const securityValue = unsecured ? [] : (sanitizedSecurity?.length ? sanitizedSecurity : undefined);
+      const cleanedTags = tags.map((t) => t.trim()).filter(Boolean);
       const metadata: Record<string, unknown> = {
         security: securityValue,
         security_description: securityDescription.trim() || undefined,
@@ -388,6 +407,7 @@ export default function OperationPropertiesPanel({
               }
             : undefined,
         ...extensions,
+        ...(cleanedTags.length > 0 ? { tags: cleanedTags } : {}),
       };
       // Keep security when explicitly [] (unsecured) or when we have requirements
       if (metadata.security === undefined) {
@@ -404,9 +424,11 @@ export default function OperationPropertiesPanel({
         operationId,
         summary,
         description,
-        operationIdName,
+        trimmedOperationIdName,
         Object.keys(metadata).length > 0 ? metadata : undefined
       );
+      // Sync local state to the normalized (trimmed) value
+      setOperationIdName(trimmedOperationIdName);
       // Update loadedMetadata to reflect the saved state
       setLoadedMetadata(metadata);
       // Show "Saved" in button briefly
@@ -416,16 +438,29 @@ export default function OperationPropertiesPanel({
       if (onRefresh) {
         onRefresh();
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error saving operation description:', error);
+      const message =
+        error instanceof Error ? error.message : 'Failed to save operation description. Please try again.';
       await alertDialog({
         title: 'Error',
-        message: 'Failed to save operation description. Please try again.',
+        message,
         variant: 'error',
       });
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const addTag = () => {
+    const next = tagDraft.trim();
+    if (!next || tags.includes(next)) return;
+    setTags((prev) => [...prev, next]);
+    setTagDraft('');
+  };
+
+  const removeTag = (tag: string) => {
+    setTags((prev) => prev.filter((t) => t !== tag));
   };
 
   const handleSaveParameter = async () => {
@@ -1121,73 +1156,148 @@ export default function OperationPropertiesPanel({
       ) : (
         /* Operation Details Form */
         <>
-          <div className="flex-1 overflow-auto p-4">
-            <div className="flex flex-col gap-4">
-              {/* Operation ID */}
-              <div>
-                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Operation ID
-                </Label>
-                <Input
-                  className="w-full text-sm"
-                  value={operationIdName}
-                  onChange={(e) => setOperationIdName(e.target.value)}
-                  placeholder="Auto-generated from path and verb"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Used for code generation and API client SDKs
-                </p>
-              </div>
+          <div className="flex-1 overflow-auto p-4 min-h-0">
+            <Tabs defaultValue="general" className="flex flex-col gap-3 min-h-0">
+              <TabsList className="w-full h-auto min-h-10 shrink-0 flex flex-wrap justify-start gap-1 p-1">
+                <TabsTrigger value="general" className="text-xs px-2 py-1.5">
+                  General
+                </TabsTrigger>
+                <TabsTrigger value="docs" className="text-xs px-2 py-1.5">
+                  Docs
+                </TabsTrigger>
+                <TabsTrigger value="tags" className="text-xs px-2 py-1.5">
+                  Tags
+                </TabsTrigger>
+                <TabsTrigger value="advanced" className="text-xs px-2 py-1.5">
+                  Advanced
+                </TabsTrigger>
+              </TabsList>
 
-              {/* Summary */}
-              <div>
-                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Summary
-                </Label>
-                <Input
-                  className="w-full text-sm"
-                  value={summary}
-                  onChange={(e) => setSummary(e.target.value)}
-                  placeholder="Brief summary of the operation"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Description
-                </Label>
-                <Textarea
-                  rows={4}
-                  className="w-full text-sm"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Detailed description of what this operation does..."
-                />
-              </div>
-
-              {/* Deprecated and Hidden: side-by-side */}
-              <div className="mt-2 flex flex-wrap gap-4 items-center">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <TabsContent value="general" className="mt-0 flex flex-col gap-4 outline-none">
+                <div>
+                  <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    operationId
+                  </Label>
+                  <Input
+                    className="w-full text-sm font-mono"
+                    value={operationIdName}
+                    onChange={(e) => setOperationIdName(e.target.value)}
+                    placeholder="Auto-generated from path and verb"
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Must be unique among all operations in this API version. Used for codegen and clients.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer w-fit">
                   <Checkbox
                     checked={deprecated}
                     onCheckedChange={(checked) => setDeprecated(checked === true)}
                   />
-                  <span className={`text-xs ${deprecated ? 'text-amber-600 dark:text-amber-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                    Deprecated
+                  <span
+                    className={`text-xs ${deprecated ? 'text-amber-600 dark:text-amber-400' : 'text-gray-700 dark:text-gray-300'}`}
+                  >
+                    deprecated
                   </span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+              </TabsContent>
+
+              <TabsContent value="docs" className="mt-0 flex flex-col gap-4 outline-none">
+                <div>
+                  <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    summary
+                  </Label>
+                  <Input
+                    className="w-full text-sm"
+                    value={summary}
+                    onChange={(e) => setSummary(e.target.value)}
+                    placeholder="Brief summary of the operation"
+                  />
+                </div>
+                <div>
+                  <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    description
+                  </Label>
+                  <Textarea
+                    rows={5}
+                    className="w-full text-sm font-mono"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Detailed description (Markdown supported)"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Preview</p>
+                  <div
+                    className={`mt-1 max-h-40 overflow-y-auto rounded-md border p-3 text-sm ${
+                      isDark ? 'border-slate-600 bg-slate-900/80' : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {description.trim() ? description : '*No description yet.*'}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="tags" className="mt-0 flex flex-col gap-3 outline-none">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  OpenAPI <code className="text-[11px]">tags</code> group operations in documentation UIs.
+                </p>
+                <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+                  {tags.length === 0 ? (
+                    <span className="text-xs text-gray-500 dark:text-gray-400 italic">No tags</span>
+                  ) : (
+                    tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 rounded-md border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-gray-800 dark:text-gray-100"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          className="rounded p-0.5 text-gray-500 hover:bg-indigo-500/20 hover:text-gray-900 dark:hover:text-white"
+                          onClick={() => removeTag(tag)}
+                          aria-label={`Remove tag ${tag}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    className="flex-1 text-sm"
+                    value={tagDraft}
+                    onChange={(e) => setTagDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addTag();
+                      }
+                    }}
+                    placeholder="e.g. Users"
+                  />
+                  <Button type="button" size="sm" variant="secondary" className="shrink-0" onClick={addTag}>
+                    Add
+                  </Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="advanced" className="mt-0 flex flex-col gap-4 outline-none">
+                <label className="flex items-center gap-2 cursor-pointer w-fit">
                   <Checkbox
                     checked={xPrivate}
                     onCheckedChange={(checked) => setXPrivate(checked === true)}
                   />
-                  <span className={`text-xs flex items-center gap-1 ${xPrivate ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                  <span
+                    className={`text-xs flex items-center gap-1 ${xPrivate ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}
+                  >
                     <Lock className="w-3.5 h-3.5" />
-                    Hidden
+                    Hidden from public docs (x-private)
                   </span>
                 </label>
-              </div>
 
               {/* Custom x-* extensions */}
               <div className="mt-4">
@@ -1658,7 +1768,8 @@ export default function OperationPropertiesPanel({
                   </div>
                 )}
               </div>
-            </div>
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Footer with Save button */}

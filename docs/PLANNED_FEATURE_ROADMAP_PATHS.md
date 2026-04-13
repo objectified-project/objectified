@@ -27,7 +27,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | P-03 | [#2642](https://github.com/KenSuenobu/objectified-commercial/issues/2642) (shipped) | Yes |
 | P-04 | [#2643](https://github.com/KenSuenobu/objectified-commercial/issues/2643) (shipped) | Yes |
 | P-05 | [#2644](https://github.com/KenSuenobu/objectified-commercial/issues/2644) **(shipped)** | Yes |
-| P-06 | [#2645](https://github.com/KenSuenobu/objectified-commercial/issues/2645) | Yes |
+| P-06 | [#2645](https://github.com/KenSuenobu/objectified-commercial/issues/2645) **(shipped)** | Yes |
 | P-07 | [#2646](https://github.com/KenSuenobu/objectified-commercial/issues/2646) | Yes |
 | P-08 | [#2647](https://github.com/KenSuenobu/objectified-commercial/issues/2647) | Yes |
 | P-09 | [#2648](https://github.com/KenSuenobu/objectified-commercial/issues/2648) | Yes |
@@ -63,7 +63,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 |---|--------|-----|
 | ~~2643~~ | ~~P-04 Palette drag GET/PUT/PATCH/DELETE/OPTIONS~~ **(shipped)** | Yes |
 | ~~2644~~ | ~~P-05 Path nodes + persist `version_path` / `path_operation`~~ **(shipped)** | Yes |
-| 2645 | P-06 Operation inspector (operationId, tags, …) | Yes |
+| ~~2645~~ | ~~P-06 Operation inspector (operationId, tags, …)~~ **(shipped)** | Yes |
 | 2646 | P-07 Edges path/op/attachments | Yes |
 | 2653 | P-14 OPTIONS first-class | Yes |
 
@@ -332,7 +332,7 @@ Add a **Path** node representing the OpenAPI **path template** (e.g. `/users/{id
 
 ---
 
-### P-06 — Operation inspector (Radix): summary, operationId, tags, deprecated, description
+### P-06 — Operation inspector (Radix): summary, operationId, tags, deprecated, description **(shipped)**
 
 **Epic:** E2 · **Labels:** `paths`, `mvp`, `ui`, `openapi`
 
