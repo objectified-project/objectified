@@ -26,7 +26,6 @@ import {
   createSharedPathParameter,
   linkParameterToOperation,
   unlinkParameterFromOperation,
-  getSharedPathParameters,
 } from '../../../../../../lib/db/helper-shared-path-parameters';
 import {
   getLinkedResponsesForOperation,
@@ -36,6 +35,7 @@ import {
 } from '../../../../../../lib/db/helper-shared-path-responses';
 import { operationHasLinkedRequestBody } from '../../../../../../lib/db/helper-shared-path-request-bodies';
 import { extractPathParameters } from '../../../../../../lib/utils/path-params';
+import { validateOpenApiParameterName } from '../../../../../../lib/utils/openapi-parameter-name';
 import ResponseSection from './ResponseSection';
 import RequestBodySection from './RequestBodySection';
 import { getHttpStatusDescription } from '../../../../../../lib/utils/http-status-codes';
@@ -509,13 +509,28 @@ export default function OperationPropertiesPanel({
       }
     }
 
+    const nameErr = validateOpenApiParameterName(newParamName.trim(), newParamLocation);
+    if (nameErr) {
+      await alertDialog({
+        title: 'Invalid parameter name',
+        message: nameErr,
+        variant: 'warning',
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      // Schema with required field included
-      const schemaData = {
+      const schemaData: Record<string, unknown> = {
         type: 'string',
         required: newParamRequired,
+        explode: false,
       };
+      if (newParamLocation === 'path' || newParamLocation === 'header') {
+        schemaData.style = 'simple';
+      } else {
+        schemaData.style = 'form';
+      }
 
       // Create or get existing shared parameter
       const paramResult = await createSharedPathParameter(

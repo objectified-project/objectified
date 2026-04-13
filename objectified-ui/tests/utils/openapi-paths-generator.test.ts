@@ -86,6 +86,46 @@ describe('OpenAPI Paths Generator', () => {
       expect(result.explode).toBe(true);
     });
 
+    it('should emit header and cookie parameters with correct `in` and schema', () => {
+      const headerParam: PathParameter = {
+        id: 'h1',
+        name: 'Authorization',
+        in_location: 'header',
+        data: { type: 'string', style: 'simple', required: true },
+      };
+      const cookieParam: PathParameter = {
+        id: 'c1',
+        name: 'session',
+        in_location: 'cookie',
+        data: { type: 'string', style: 'form', required: false },
+      };
+
+      const h = buildParameterForOpenAPI(headerParam);
+      expect(h.in).toBe('header');
+      expect(h.name).toBe('Authorization');
+      expect(h.required).toBe(true);
+      expect(h.schema).toEqual({ type: 'string' });
+      expect(h.style).toBe('simple');
+
+      const c = buildParameterForOpenAPI(cookieParam);
+      expect(c.in).toBe('cookie');
+      expect(c.name).toBe('session');
+      expect(c.required).toBeUndefined();
+      expect(c.schema).toEqual({ type: 'string' });
+      expect(c.style).toBe('form');
+    });
+
+    it('should emit allowReserved for query parameters when set', () => {
+      const param: PathParameter = {
+        id: 'q1',
+        name: 'q',
+        in_location: 'query',
+        data: { type: 'string', allowReserved: true },
+      };
+      const result = buildParameterForOpenAPI(param);
+      expect(result.allowReserved).toBe(true);
+    });
+
     it('should use inline JSON Schema when schemaMode is inline', () => {
       const param: PathParameter = {
         id: 'param-inline',

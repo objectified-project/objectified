@@ -145,6 +145,9 @@ export function buildParameterForOpenAPI(param: PathParameter): Record<string, u
     if (data.explode !== undefined) {
       result.explode = data.explode;
     }
+    if (data.allowReserved === true) {
+      result.allowReserved = true;
+    }
     if (data.example !== undefined) {
       result.example = data.example;
     }
@@ -171,6 +174,11 @@ export function buildParameterForOpenAPI(param: PathParameter): Record<string, u
   if (schemaData.allowEmptyValue !== undefined) {
     result.allowEmptyValue = schemaData.allowEmptyValue;
     delete schemaData.allowEmptyValue;
+  }
+
+  if (schemaData.allowReserved === true) {
+    result.allowReserved = true;
+    delete schemaData.allowReserved;
   }
 
   // Handle style and explode

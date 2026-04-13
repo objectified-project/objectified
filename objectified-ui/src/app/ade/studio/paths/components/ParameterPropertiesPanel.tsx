@@ -26,6 +26,13 @@ import {
 import { getClassesWithPropertiesAndTags } from '../../../../../../lib/db/helper';
 import { extractPathParameters, getPathParameterCoverageError } from '../../../../../../lib/utils/path-params';
 import { propertyDataToParameterSchema } from '../../../../../../lib/utils/path-parameter-schema';
+import { validateOpenApiParameterName } from '../../../../../../lib/utils/openapi-parameter-name';
+import {
+  PARAM_STYLE_OPTIONS,
+  defaultStyleForIn,
+  normalizeStyleForLocation,
+  type ParamSerializationStyle,
+} from '../../../../../../lib/utils/openapi-parameter-style';
 import { useStudio } from '../../StudioContext';
 
 // Simple types allowed for path parameters (no 'object')
@@ -61,16 +68,6 @@ const ARRAY_ITEM_TYPES = [
   { value: 'number', label: 'Number' },
   { value: 'boolean', label: 'Boolean' },
 ];
-
-// Serialization style for parameters (OpenAPI 3.0; default "form")
-export const PARAM_STYLE_DEFAULT = 'form' as const;
-export const PARAM_STYLES = [
-  { value: 'form', label: 'form' },
-  { value: 'spaceDelimited', label: 'spaceDelimited' },
-  { value: 'pipeDelimited', label: 'pipeDelimited' },
-  { value: 'deepObject', label: 'deepObject' },
-] as const;
-export type ParamStyle = (typeof PARAM_STYLES)[number]['value'];
 
 // Common parameter name patterns for suggestion (query, header, cookie, and path)
 const COMMON_PARAM_NAMES = [
@@ -165,8 +162,9 @@ export default function ParameterPropertiesPanel({
   const [schemaDefault, setSchemaDefault] = useState('');
   const [schemaEnum, setSchemaEnum] = useState('');
   const [schemaArrayItemType, setSchemaArrayItemType] = useState<'string' | 'integer' | 'number' | 'boolean'>('string');
-  const [paramStyle, setParamStyle] = useState<ParamStyle>(PARAM_STYLE_DEFAULT);
+  const [paramStyle, setParamStyle] = useState<ParamSerializationStyle>(defaultStyleForIn('path'));
   const [paramExplode, setParamExplode] = useState(false);
+  const [paramAllowReserved, setParamAllowReserved] = useState(false);
 
   const [schemaMode, setSchemaMode] = useState<'form' | 'inline'>('form');
   const [inlineSchemaText, setInlineSchemaText] = useState('{\n  "type": "string"\n}');
@@ -208,8 +206,9 @@ export default function ParameterPropertiesPanel({
       setSchemaDefault('');
       setSchemaEnum('');
       setSchemaArrayItemType('string');
-      setParamStyle(PARAM_STYLE_DEFAULT);
+      setParamStyle(defaultStyleForIn('path'));
       setParamExplode(false);
+      setParamAllowReserved(false);
       setSchemaMode('form');
       setInlineSchemaText('{\n  "type": "string"\n}');
       setPropertyRef(null);
@@ -291,10 +290,9 @@ export default function ParameterPropertiesPanel({
             }
             // Read required from data field
             setRequired(schema.required ?? (param.in_location === 'path'));
-            // Serialization style (default form)
-            setParamStyle(PARAM_STYLES.some((s) => s.value === schema.style) ? (schema.style as ParamStyle) : PARAM_STYLE_DEFAULT);
-            // Explode (arrays/objects)
+            setParamStyle(normalizeStyleForLocation(param.in_location, schema.style as string | undefined));
             setParamExplode(schema.explode === true);
+            setParamAllowReserved(schema.allowReserved === true);
           } else {
             // Reset to defaults if no schema
             setSchemaMode('form');
@@ -311,8 +309,9 @@ export default function ParameterPropertiesPanel({
             setSchemaEnum('');
             setSchemaArrayItemType('string');
             setSchemaDefault('');
-            setParamStyle(PARAM_STYLE_DEFAULT);
+            setParamStyle(defaultStyleForIn(param.in_location));
             setParamExplode(false);
+            setParamAllowReserved(false);
             setRequired(param.in_location === 'path');
           }
         }
@@ -484,6 +483,16 @@ export default function ParameterPropertiesPanel({
   const handleSave = async () => {
     if (!parameterId || !name.trim() || !versionPathId) return;
 
+    const nameValidationError = validateOpenApiParameterName(name, inLocation);
+    if (nameValidationError) {
+      await alertDialog({
+        title: 'Invalid parameter name',
+        message: nameValidationError,
+        variant: 'warning',
+      });
+      return;
+    }
+
     setIsSaving(true);
     setSaveStatus('idle');
     try {
@@ -538,6 +547,9 @@ export default function ParameterPropertiesPanel({
           style: paramStyle,
           explode: paramExplode,
         };
+        if (inLocation === 'query' && paramAllowReserved) {
+          schemaData.allowReserved = true;
+        }
         if (propertyRef) {
           schemaData.propertyRef = propertyRef;
         }
@@ -575,6 +587,9 @@ export default function ParameterPropertiesPanel({
         schemaData.required = inLocation === 'path' ? true : required;
         schemaData.style = paramStyle;
         schemaData.explode = paramExplode;
+        if (inLocation === 'query' && paramAllowReserved) {
+          schemaData.allowReserved = true;
+        }
         if (propertyRef) {
           schemaData.propertyRef = propertyRef;
         }
@@ -732,6 +747,11 @@ export default function ParameterPropertiesPanel({
                     </datalist>
                   </>
                 )}
+                {inLocation === 'cookie' && (
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                    Cookie names in browsers follow RFC 6265; this field validates names for OpenAPI export only.
+                  </p>
+                )}
               </div>
 
               {/* Location */}
@@ -745,6 +765,8 @@ export default function ParameterPropertiesPanel({
                     const loc = v as typeof inLocation;
                     setInLocation(loc);
                     if (loc === 'path') setRequired(true);
+                    setParamStyle((prev) => normalizeStyleForLocation(loc, prev));
+                    if (loc !== 'query') setParamAllowReserved(false);
                   }}
                 >
                   <SelectTrigger className="h-9 text-sm">
@@ -782,17 +804,20 @@ export default function ParameterPropertiesPanel({
                 )}
               </div>
 
-              {/* Serialization style — default "form" (OpenAPI 3.0) */}
+              {/* Serialization style — OpenAPI Parameter Object; allowed values depend on `in` */}
               <div>
                 <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                   Serialization style
                 </Label>
-                <Select value={paramStyle} onValueChange={(v) => setParamStyle(v as ParamStyle)}>
+                <Select
+                  value={paramStyle}
+                  onValueChange={(v) => setParamStyle(v as ParamSerializationStyle)}
+                >
                   <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="form" />
+                    <SelectValue placeholder="style" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PARAM_STYLES.map((s) => (
+                    {PARAM_STYLE_OPTIONS[inLocation].map((s) => (
                       <SelectItem key={s.value} value={s.value}>
                         {s.label}
                       </SelectItem>
@@ -800,7 +825,10 @@ export default function ParameterPropertiesPanel({
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                  How arrays/objects are serialized (query, header, etc.). Default: form.
+                  {inLocation === 'query' && 'Query parameters: form, spaceDelimited, pipeDelimited, or deepObject.'}
+                  {inLocation === 'path' && 'Path parameters: simple, label, or matrix.'}
+                  {inLocation === 'header' && 'Header parameters use style simple.'}
+                  {inLocation === 'cookie' && 'Cookie parameters use style form.'}
                 </p>
               </div>
 
@@ -820,6 +848,24 @@ export default function ParameterPropertiesPanel({
                   When true, array/object values are expanded (e.g. id=1&amp;id=2 for form style).
                 </p>
               </div>
+
+              {inLocation === 'query' && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="param-allow-reserved"
+                      checked={paramAllowReserved}
+                      onCheckedChange={(checked) => setParamAllowReserved(checked === true)}
+                    />
+                    <Label htmlFor="param-allow-reserved" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                      allowReserved (query only)
+                    </Label>
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    When true, reserved URI characters in query values are not encoded (OpenAPI 3.x).
+                  </p>
+                </div>
+              )}
 
               {/* Summary */}
               <div>

@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## UI:
+- **Header & cookie parameters (#2649):** **Paths** palette adds **in:header** / **in:cookie** drag chips (drop on an **operation**); **Parameter** inspector uses **OpenAPI-accurate `style` options per `in`**, **query `allowReserved`**, **surface-level name validation**, and export includes **`parameters`** with correct **`in`** / **`schema`**
 - **Request body (#2648):** **Operation** inspector **Advanced** tab uses **`shared_path_request_body`**, per-**media-type** content (`application/json` and more), and **`path_operation_request_body_link`** (one body per operation); duplicates **Content-Type** rows are rejected; canvas link changes refresh the panel
 - **Path & query parameters (#2647):** **Parameter** panel supports **Designer property** binding, **form** vs **inline JSON Schema**, and **path-template coverage** checks so `{segments}` match **`in: path`** parameters; **path template** and **sidebar** path saves block on mismatch
 - **OPTIONS operations (#2653):** **Paths** export emits OpenAPI **`options`** on the path item; default **204 No Content** when no responses are modeled; operation inspector shows a **warning** if a **request body** is linked (export still omits `requestBody` for OPTIONS per common practice)

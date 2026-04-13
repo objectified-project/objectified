@@ -5,9 +5,9 @@
 import React from 'react';
 import { Trash2, Braces } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
+import type { ParamSerializationStyle } from '../../../../../../lib/utils/openapi-parameter-style';
 
-/** Serialization style for the parameter (OpenAPI 3.0; default "form") */
-export type ParamSerializationStyle = 'form' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject';
+export type { ParamSerializationStyle } from '../../../../../../lib/utils/openapi-parameter-style';
 
 export interface PathParameterData {
   name: string;
@@ -27,7 +27,7 @@ export interface PathParameterData {
   onDelete?: () => void;
 }
 
-// Plan 2.4: Color and icon per location (Query=Blue/? , Path=Green/{} , Header=Purple/H , Cookie=Orange/🍪)
+// Plan 2.4: Color and icon per location (Query=Blue/? , Path=Green/{} , Header=H , Cookie=C)
 const LOCATION_CONFIG = {
   path: {
     color: '#22c55e',
@@ -66,7 +66,7 @@ function LocationIcon({ location }: { location: keyof typeof LOCATION_CONFIG }) 
   if (config.icon === 'header') {
     return <span className={`font-sans font-bold text-xs uppercase ${config.textClass}`}>H</span>;
   }
-  return <span className={`text-sm ${config.textClass}`} aria-hidden>🍪</span>;
+  return <span className={`font-sans font-bold text-xs uppercase ${config.textClass}`}>C</span>;
 }
 
 export default function PathParameterNode({ data }: { data: PathParameterData }) {

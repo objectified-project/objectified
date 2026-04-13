@@ -45,6 +45,7 @@ import {
   deleteSharedPathParameter,
 } from '../../../../../../lib/db/helper-shared-path-parameters';
 import { extractPathParameters, isValidPath, getPathWithSampleValues } from '../../../../../../lib/utils/path-params';
+import { normalizeStyleForLocation } from '../../../../../../lib/utils/openapi-parameter-style';
 import { propertyDataToParameterSchema } from '../../../../../../lib/utils/path-parameter-schema';
 import {
   getLinkedResponsesForOperation,
@@ -2286,7 +2287,10 @@ function PathsCanvasInner({
                 type: paramData.type || 'string',
                 format: paramData.format,
                 defaultValue: paramData.default,
-                style: ['form', 'spaceDelimited', 'pipeDelimited', 'deepObject'].includes(paramData.style) ? paramData.style : 'form',
+                style: normalizeStyleForLocation(
+                  param.in_location as 'path' | 'query' | 'header' | 'cookie',
+                  paramData.style as string | undefined
+                ),
                 explode: paramData.explode === true,
                 dbParameterId: param.id,
                 onDelete: () => handleDeleteParameter(param.id, param.name),
@@ -3612,7 +3616,7 @@ function PathsCanvasInner({
       if (dropTargetNode?.type === 'parameter' && dropData?.type !== 'property') {
         await alertDialog({
           title: 'Invalid drop',
-          message: 'Only properties are allowed to be bound to a path parameter.',
+          message: 'Only designer properties can be dropped onto a parameter node to set its schema.',
           variant: 'warning',
         });
         return;
@@ -3876,11 +3880,106 @@ function PathsCanvasInner({
           });
         }
       } else if (dropData.type === 'parameter') {
-        await alertDialog({
-          title: 'Add Parameter via Properties Panel',
-          message: 'To add a parameter, click on an operation node and use the "Add Parameter" button in the Operation Details panel on the right.',
-          variant: 'info',
-        });
+        const inLoc = dropData.inLocation as 'header' | 'cookie' | undefined;
+        const suggested =
+          typeof dropData.suggestedName === 'string' && dropData.suggestedName.trim()
+            ? dropData.suggestedName.trim()
+            : inLoc === 'cookie'
+              ? 'session'
+              : 'Authorization';
+        if (inLoc !== 'header' && inLoc !== 'cookie') {
+          await alertDialog({
+            title: 'Add Parameter',
+            message:
+              'Drag a Header or Cookie chip from the left palette onto an operation, or use Add Parameter in Operation Details.',
+            variant: 'info',
+          });
+          return;
+        }
+        const elementAtPoint = document.elementFromPoint(event.clientX, event.clientY);
+        const nodeWrapper = elementAtPoint?.closest('[data-id]');
+        const nodeId = nodeWrapper?.getAttribute('data-id');
+        if (!nodeId) {
+          await alertDialog({
+            title: 'Drop on Operation',
+            message: 'Drag the parameter chip onto an operation node to attach it to that operation.',
+            variant: 'info',
+          });
+          return;
+        }
+        const opNode = nodes.find((n) => n.id === nodeId && n.type === 'operation');
+        if (!opNode || !selectedPathId) {
+          await alertDialog({
+            title: 'Drop on Operation',
+            message: 'Drag the parameter chip onto an operation node to attach it to that operation.',
+            variant: 'info',
+          });
+          return;
+        }
+        const dbOperationId = opNode.id;
+        try {
+          const allRes = await getSharedPathParameters(selectedPathId);
+          const allParsed = JSON.parse(allRes) as {
+            parameters?: Array<{ name: string; in_location: string }>;
+          };
+          const used = new Set(
+            (allParsed.parameters || [])
+              .filter((p) => p.in_location === inLoc)
+              .map((p) => p.name)
+          );
+          let finalName = suggested;
+          let suffix = 2;
+          while (used.has(finalName)) {
+            finalName = `${suggested}_${suffix}`;
+            suffix += 1;
+          }
+          const schemaData: Record<string, unknown> =
+            inLoc === 'header'
+              ? { type: 'string', required: false, style: 'simple', explode: false }
+              : { type: 'string', required: false, style: 'form', explode: false };
+          const paramResult = await createSharedPathParameter(
+            selectedPathId,
+            finalName,
+            inLoc,
+            undefined,
+            undefined,
+            schemaData
+          );
+          const paramParsed = JSON.parse(paramResult);
+          if (!paramParsed.success || !paramParsed.parameter) {
+            await alertDialog({
+              title: 'Error',
+              message: paramParsed.error || 'Failed to create parameter',
+              variant: 'error',
+            });
+            return;
+          }
+          const linkResult = await linkParameterToOperation(dbOperationId, paramParsed.parameter.id);
+          const linkParsed = JSON.parse(linkResult);
+          if (!linkParsed.success) {
+            await alertDialog({
+              title: 'Error',
+              message: linkParsed.error || 'Failed to link parameter to operation',
+              variant: 'error',
+            });
+            return;
+          }
+          if (onParameterSelect) {
+            onParameterSelect({
+              id: paramParsed.parameter.id,
+              name: finalName,
+              operationId: dbOperationId,
+            });
+          }
+          if (onRefresh) onRefresh();
+        } catch (err) {
+          console.error('Error adding parameter from palette:', err);
+          await alertDialog({
+            title: 'Error',
+            message: 'Failed to add parameter.',
+            variant: 'error',
+          });
+        }
       } else if (dropData.type === 'security-scheme') {
         const schemeName = dropData.schemeName;
         if (!schemeName) return;
@@ -4019,6 +4118,9 @@ function PathsCanvasInner({
       edgeRouting,
       edgeAnimation,
       edgeStyling,
+      createSharedPathParameter,
+      linkParameterToOperation,
+      getSharedPathParameters,
     ]
   );
 
