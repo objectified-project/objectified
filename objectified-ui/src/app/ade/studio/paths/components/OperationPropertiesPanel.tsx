@@ -36,8 +36,8 @@ import {
 } from '../../../../../../lib/db/helper-shared-path-responses';
 import { operationHasLinkedRequestBody } from '../../../../../../lib/db/helper-shared-path-request-bodies';
 import { extractPathParameters } from '../../../../../../lib/utils/path-params';
-import SchemaBuilder from './SchemaBuilder';
 import ResponseSection from './ResponseSection';
+import RequestBodySection from './RequestBodySection';
 import { getHttpStatusDescription } from '../../../../../../lib/utils/http-status-codes';
 import type { SecurityRequirement } from '../../../../../../lib/utils/openapi-paths-generator';
 import { ExtensionsEditor } from '../../../../components/ade/studio/ExtensionsEditor';
@@ -112,10 +112,6 @@ export default function OperationPropertiesPanel({
   const [newResponseAutoFillDescription, setNewResponseAutoFillDescription] = useState(true);
   const [newResponseSchemaType, setNewResponseSchemaType] = useState<'object' | 'string' | 'number' | 'integer' | 'boolean' | 'array'>('object');
   const [newResponseArrayItemType, setNewResponseArrayItemType] = useState<'string' | 'number' | 'integer' | 'boolean'>('string');
-
-  // Request body schema state
-  const [requestBodySchema, setRequestBodySchema] = useState<any>(null);
-  const [requestBodyRequired, setRequestBodyRequired] = useState(true);
 
   // Security requirements state (OpenAPI security array)
   const [security, setSecurity] = useState<SecurityRequirement[]>([]);
@@ -1466,29 +1462,14 @@ export default function OperationPropertiesPanel({
                 )}
               </div>
 
-              {/* Request Body Section (for POST/PUT/PATCH) */}
-              {['POST', 'PUT', 'PATCH'].includes(operation) && (
+              {/* Request body: shared_path_request_body + content rows + operation link (#2648) */}
+              {['POST', 'PUT', 'PATCH'].includes(operation) && operationId && versionPathId && (
                 <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                  <div className="flex justify-between items-center mb-3">
-                    <Label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
-                      Request Body
-                    </Label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={requestBodyRequired}
-                        onCheckedChange={(checked) => setRequestBodyRequired(checked === true)}
-                      />
-                      <span className="text-[10px] text-gray-600 dark:text-gray-400">
-                        Required
-                      </span>
-                    </label>
-                  </div>
-                  <SchemaBuilder
-                    value={requestBodySchema}
-                    onChange={setRequestBodySchema}
-                    label=""
-                    description="Define the request body schema using existing classes or create inline schemas"
-                    allowInline={true}
+                  <RequestBodySection
+                    operationId={operationId}
+                    versionPathId={versionPathId}
+                    onRefresh={onRefresh}
+                    refreshKey={refreshKey}
                   />
                 </div>
               )}

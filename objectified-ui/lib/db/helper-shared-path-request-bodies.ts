@@ -472,6 +472,12 @@ export async function updateRequestBodyContentType(
     return JSON.stringify({ success: true, content: result.rows[0] });
   } catch (error: any) {
     console.error('Error updating request body content type:', error);
+    if (error.code === '23505') {
+      return JSON.stringify({
+        success: false,
+        error: 'A content type with this media type already exists for this request body',
+      });
+    }
     return JSON.stringify({ success: false, error: error.message });
   }
 }

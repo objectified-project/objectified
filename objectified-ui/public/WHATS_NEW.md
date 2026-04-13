@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## UI:
+- **Request body (#2648):** **Operation** inspector **Advanced** tab uses **`shared_path_request_body`**, per-**media-type** content (`application/json` and more), and **`path_operation_request_body_link`** (one body per operation); duplicates **Content-Type** rows are rejected; canvas link changes refresh the panel
 - **Path & query parameters (#2647):** **Parameter** panel supports **Designer property** binding, **form** vs **inline JSON Schema**, and **path-template coverage** checks so `{segments}` match **`in: path`** parameters; **path template** and **sidebar** path saves block on mismatch
 - **OPTIONS operations (#2653):** **Paths** export emits OpenAPI **`options`** on the path item; default **204 No Content** when no responses are modeled; operation inspector shows a **warning** if a **request body** is linked (export still omits `requestBody` for OPTIONS per common practice)
 - **Paths canvas edges (#2646):** **Path → operation** and **operation → parameter / request body / response** edges use **semantic labels** (`has`, `hasParam`, `requestBody`, `response <code>`); **request body** links render **operation → request body** (tree from the operation); **manual** connect / **delete edge** syncs **request body** link like parameters and responses; **`edge.data.semantic`** tags role for layout persistence (**P-03**)
