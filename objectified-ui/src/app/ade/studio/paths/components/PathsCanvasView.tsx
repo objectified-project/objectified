@@ -2462,6 +2462,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                 const classNode: Node = {
                   id: classNodeId,
                   type: 'class',
+                  deletable: false,
                   position: {
                     x: 100 + (allClassNodes.length * 320), // Horizontal arrangement (increased spacing)
                     y: 700, // Below responses (increased gap)
@@ -2570,6 +2571,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               allResponseBodyNodes.push({
                 id: responseBodyNodeId,
                 type: 'responseBody',
+                deletable: false,
                 position: {
                   x: 400 + (responseIndex * 300), // Offset to the right of response nodes
                   y: 550 + (responseIndex * 50), // Slightly below and staggered
@@ -2760,6 +2762,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             allRequestBodyNodes.push({
               id: requestBodyNodeId,
               type: 'requestBody',
+              deletable: false,
               position: {
                 x: -200,
                 y: 50 + rbIndex * 280,
@@ -3321,6 +3324,56 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     [nodes, alertDialog, setNodes]
   );
 
+  /** Keyboard delete (Delete/Backspace): sync removed nodes to the API. Auxiliary nodes stay non-deletable. */
+  const onNodesDelete = useCallback(
+    async (deleted: Node[]) => {
+      for (const node of deleted) {
+        try {
+          if (node.type === 'operation') {
+            await deleteOperation(node.id);
+          } else if (node.type === 'parameter') {
+            const pid = (node.data as { dbParameterId?: string })?.dbParameterId;
+            if (pid) {
+              const result = await deleteSharedPathParameter(pid);
+              const parsed = JSON.parse(result);
+              if (!parsed.success) {
+                await alertDialog({
+                  title: 'Error',
+                  message: parsed.error || 'Failed to delete parameter',
+                  variant: 'error',
+                });
+              }
+            }
+          } else if (node.type === 'response') {
+            const rid = (node.data as { dbResponseId?: string })?.dbResponseId;
+            if (rid) {
+              const result = await deleteSharedPathResponse(rid);
+              const parsed = JSON.parse(result);
+              if (!parsed.success) {
+                await alertDialog({
+                  title: 'Error',
+                  message: parsed.error || 'Failed to delete response',
+                  variant: 'error',
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error('onNodesDelete:', error);
+          await alertDialog({
+            title: 'Error',
+            message: 'Failed to delete node on the server. Refresh the page to resync the canvas.',
+            variant: 'error',
+          });
+        }
+      }
+      if (onRefresh) {
+        onRefresh();
+      }
+    },
+    [alertDialog, onRefresh]
+  );
+
   // Handle drop
   const onDrop = useCallback(
     async (event: React.DragEvent) => {
@@ -3541,6 +3594,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
           const newNode: Node = {
             id: savedOperation.id,
             type: 'operation',
+            deletable: true,
             position,
             data: {
               operation: savedOperation.operation,
@@ -3820,6 +3874,8 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onEdgesDelete={onEdgesDelete}
+        onNodesDelete={onNodesDelete}
+        deleteKeyCode={['Delete', 'Backspace']}
         onDrop={onDrop}
         onDragOver={onDragOver}
         onNodeClick={onNodeClick}
