@@ -18,7 +18,16 @@ import { Label } from '../../../components/ui/Label';
 import { Alert } from '../../../components/ui/Alert';
 import { Textarea } from '../../../components/ui/Textarea';
 import { EmptyState } from '../../../components/ui/EmptyState';
-import { Card, CardContent } from '../../../components/ui/Card';
+import {
+  dashboardContentStackClass,
+  dashboardMainClass,
+  dashboardTableWrapClass,
+  dashboardTableTheadClass,
+  dashboardThClass,
+  dashboardThRightClass,
+  dashboardTbodyClass,
+  dashboardTrHoverClass,
+} from '@/app/components/ade/dashboard/dashboardScreenClasses';
 import { Switch } from '../../../components/ui/Switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../components/ui/Tooltip';
 import { cn } from '../../../../../lib/utils';
@@ -225,35 +234,64 @@ const ApiKeys = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto">
-        {/* API Keys List */}
-        <div className="space-y-4">
-          {apiKeys.length === 0 ? (
-            <EmptyState
-              icon={<Key className="h-10 w-10" />}
-              title="No API Keys Yet"
-              description="Create your first API key to access your tenant data via REST API"
-              iconContainerClassName="from-amber-500 to-orange-600 shadow-amber-500/30"
-            />
-          ) : (
-            apiKeys.map((apiKey) => (
-              <Card
-                key={apiKey.id}
-                className={cn(
-                  'transition-all duration-200 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-500/10',
-                  isExpired(apiKey.expires_at) && 'border-red-200 dark:border-red-800 bg-red-50/30 dark:bg-red-900/10',
-                  !apiKey.enabled && !isExpired(apiKey.expires_at) && 'bg-gray-50 dark:bg-gray-800/50'
-                )}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center">
-                          <Key className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+        <main className={dashboardMainClass}>
+          <div className={dashboardContentStackClass}>
+        {apiKeys.length === 0 ? (
+          <div className={dashboardTableWrapClass}>
+            <div className="p-8">
+              <EmptyState
+                icon={<Key className="h-10 w-10" />}
+                title="No API Keys Yet"
+                description="Create your first API key to access your tenant data via REST API"
+                variant="compact"
+                showOrbs={false}
+                iconContainerClassName="from-amber-500 to-orange-600 shadow-amber-500/30"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className={dashboardTableWrapClass}>
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className={dashboardTableTheadClass}>
+                  <tr>
+                    <th className={dashboardThClass}>Name</th>
+                    <th className={dashboardThClass}>Prefix</th>
+                    <th className={dashboardThClass}>Status</th>
+                    <th className={dashboardThClass}>Last used</th>
+                    <th className={dashboardThClass}>Created</th>
+                    <th className={dashboardThClass}>Expires</th>
+                    <th className={dashboardThClass}>Enabled</th>
+                    <th className={dashboardThRightClass}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody className={dashboardTbodyClass}>
+                  {apiKeys.map((apiKey) => (
+                    <tr
+                      key={apiKey.id}
+                      className={cn(
+                        dashboardTrHoverClass,
+                        isExpired(apiKey.expires_at) && 'bg-red-50/50 dark:bg-red-950/20',
+                        !apiKey.enabled && !isExpired(apiKey.expires_at) && 'bg-gray-50/80 dark:bg-gray-900/40'
+                      )}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-start gap-2">
+                          <Key className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{apiKey.name}</div>
+                            {apiKey.description ? (
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs line-clamp-2">{apiKey.description}</div>
+                            ) : null}
+                          </div>
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{apiKey.name}</h3>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md text-gray-900 dark:text-gray-100">
+                          {apiKey.key_prefix}…
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         {isExpired(apiKey.expires_at) && (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700">
                             <AlertCircle className="h-3 w-3" />Expired
@@ -261,62 +299,49 @@ const ApiKeys = () => {
                         )}
                         {!apiKey.enabled && !isExpired(apiKey.expires_at) && (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
-                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Disabled
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />Disabled
                           </span>
                         )}
                         {apiKey.enabled && !isExpired(apiKey.expires_at) && (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Active
                           </span>
                         )}
-                      </div>
-
-                      {apiKey.description && (
-                        <p className="text-sm text-gray-500 dark:text-gray-300 mb-4 ml-13">{apiKey.description}</p>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-4 text-sm ml-13">
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                        {formatDate(apiKey.last_used_at)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                        {formatDate(apiKey.created_at)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span className={isExpired(apiKey.expires_at) ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-gray-600 dark:text-gray-300'}>
+                          {apiKey.expires_at ? formatDate(apiKey.expires_at) : 'Never'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Key Prefix:</span>
-                          <span className="font-mono bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-lg text-gray-900 dark:text-gray-100 text-xs">{apiKey.key_prefix}...</span>
+                          <Switch checked={apiKey.enabled} onCheckedChange={(checked) => handleToggleStatus(apiKey, checked)} />
+                          <span className="text-sm text-gray-600 dark:text-gray-300">{apiKey.enabled ? 'On' : 'Off'}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Last Used:</span>
-                          <span className="text-gray-600 dark:text-gray-300">{formatDate(apiKey.last_used_at)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Created:</span>
-                          <span className="text-gray-600 dark:text-gray-300">{formatDate(apiKey.created_at)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Expires:</span>
-                          <span className={isExpired(apiKey.expires_at) ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-gray-600 dark:text-gray-300'}>
-                            {apiKey.expires_at ? formatDate(apiKey.expires_at) : 'Never'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 ml-4">
-                      <div className="flex items-center gap-2">
-                        <Switch checked={apiKey.enabled} onCheckedChange={(checked) => handleToggleStatus(apiKey, checked)} />
-                        <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{apiKey.enabled ? 'Enabled' : 'Disabled'}</span>
-                      </div>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button onClick={() => handleDeleteClick(apiKey)} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors">
-                            <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500 transition-colors" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>Delete API Key</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" onClick={() => handleDeleteClick(apiKey)} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors inline-flex">
+                              <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500 transition-colors" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete API Key</TooltipContent>
+                        </Tooltip>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Create API Key Modal */}
         <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>

@@ -18,6 +18,12 @@ import { Alert } from '../../../components/ui/Alert';
 import { LoadingState } from '../../../components/ui/LoadingState';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/Card';
 import { updateUserName, updateUserPassword, getCurrentUserLastLoginAt } from '../../../../../lib/db/helper';
+import {
+  dashboardContentStackClass,
+  dashboardMainClass,
+  dashboardPanelClass,
+} from '@/app/components/ade/dashboard/dashboardScreenClasses';
+import { cn } from '../../../../../lib/utils';
 
 const Profile = () => {
   const { data: session, update } = useSession();
@@ -197,8 +203,8 @@ const Profile = () => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto">
+      <main className={dashboardMainClass}>
+        <div className={dashboardContentStackClass}>
 
       {successMessage && (
         <Alert variant="success" className="mb-6" onClose={() => setSuccessMessage('')}>
@@ -208,8 +214,8 @@ const Profile = () => {
 
       <div className="space-y-6">
         {/* Account card */}
-        <Card>
-          <CardHeader>
+        <Card className={cn(dashboardPanelClass, 'shadow-none overflow-hidden')}>
+          <CardHeader className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5 text-indigo-500" />
               Account
@@ -289,8 +295,8 @@ const Profile = () => {
         </Card>
 
         {/* Security card */}
-        <Card>
-          <CardHeader>
+        <Card className={cn(dashboardPanelClass, 'shadow-none overflow-hidden')}>
+          <CardHeader className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-emerald-500" />
               Security

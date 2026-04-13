@@ -10,8 +10,13 @@ import {
   Code,
   Clock,
   TrendingUp,
+  LayoutDashboard,
 } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui/Card';
+import {
+  dashboardContentStackClass,
+  dashboardMainClass,
+  dashboardPanelClass,
+} from '@/app/components/ade/dashboard/dashboardScreenClasses';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
 import { cn } from '../../../../lib/utils';
@@ -136,92 +141,64 @@ const Dashboard = () => {
       label: 'Tenants',
       value: stats.total_tenants,
       subtitle: `${stats.admin_tenants} admin`,
-      color: 'blue',
-      bgClass: 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30',
       iconColor: 'text-blue-600 dark:text-blue-400',
-      hoverBorder: 'hover:border-blue-400',
-      hoverShadow: 'hover:shadow-blue-500/20',
     },
     {
       icon: Folder,
       label: 'Projects',
       value: stats.total_projects,
       subtitle: `${stats.created_projects} created`,
-      color: 'purple',
-      bgClass: 'bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30',
       iconColor: 'text-purple-600 dark:text-purple-400',
-      hoverBorder: 'hover:border-purple-400',
-      hoverShadow: 'hover:shadow-purple-500/20',
     },
     {
       icon: GitBranch,
       label: 'Versions',
       value: stats.total_versions,
       subtitle: `${stats.published_versions} published`,
-      color: 'emerald',
-      bgClass: 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30',
       iconColor: 'text-emerald-600 dark:text-emerald-400',
-      hoverBorder: 'hover:border-emerald-400',
-      hoverShadow: 'hover:shadow-emerald-500/20',
     },
     {
       icon: Box,
       label: 'Classes',
       value: stats.total_classes,
       subtitle: 'schema definitions',
-      color: 'cyan',
-      bgClass: 'bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900/30 dark:to-cyan-800/30',
       iconColor: 'text-cyan-600 dark:text-cyan-400',
-      hoverBorder: 'hover:border-cyan-400',
-      hoverShadow: 'hover:shadow-cyan-500/20',
     },
     {
       icon: Code,
       label: 'Properties',
       value: stats.total_properties,
       subtitle: `${stats.total_class_properties} in classes`,
-      color: 'amber',
-      bgClass: 'bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/30',
       iconColor: 'text-amber-600 dark:text-amber-400',
-      hoverBorder: 'hover:border-amber-400',
-      hoverShadow: 'hover:shadow-amber-500/20',
     },
   ];
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      {/* Welcome Section */}
-      <div className="mb-10">
-        <div className="flex items-center gap-4 mb-2">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-            <TrendingUp className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-              Welcome back, {userName}!
-            </h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
-              Here's an overview of your schema projects and activity.
-            </p>
+    <>
+      <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="px-6 py-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <LayoutDashboard className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                Dashboard
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                Welcome back, {userName}. Here&apos;s an overview of your schema projects and activity.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
+      <main className={dashboardMainClass}>
+        <div className={dashboardContentStackClass}>
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {statsConfig.map((stat) => {
           const IconComponent = stat.icon;
           return (
-            <Card
-              key={stat.label}
-              className={cn(
-                "transition-all duration-300 hover:-translate-y-1",
-                stat.hoverBorder,
-                stat.hoverShadow,
-                "hover:shadow-lg"
-              )}
-            >
-              <CardContent className="p-5">
+            <div key={stat.label} className={`${dashboardPanelClass} p-4`}>
                 {isLoading ? (
                   <div className="space-y-3">
                     <Skeleton className="h-10 w-10 rounded-xl" />
@@ -229,42 +206,34 @@ const Dashboard = () => {
                     <Skeleton className="h-4 w-24" />
                   </div>
                 ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                        {stat.label}
-                      </span>
-                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", stat.bgClass)}>
-                        <IconComponent className={cn("h-5 w-5", stat.iconColor)} />
-                      </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{stat.label}</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                        {stat.value}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {stat.subtitle}
+                      </p>
                     </div>
-                    <h3 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-1">
-                      {stat.value}
-                    </h3>
-                    <p className="text-sm text-gray-400 dark:text-gray-500">
-                      {stat.subtitle}
-                    </p>
-                  </>
+                    <IconComponent className={cn('w-8 h-8 opacity-50', stat.iconColor)} />
+                  </div>
                 )}
-              </CardContent>
-            </Card>
+            </div>
           );
         })}
       </div>
 
-      {/* Recent Activity Section */}
+      {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="overflow-hidden">
-          {/* Section Header */}
-          <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700/50 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 dark:from-indigo-900/10 dark:to-purple-900/10">
+        <div className={`${dashboardPanelClass} overflow-hidden`}>
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/25">
-                <Clock className="h-4 w-4 text-white" />
-              </div>
+              <Clock className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                   Recent Activity
-                </h2>
+                </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Your latest actions
                 </p>
@@ -272,7 +241,6 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Activity List */}
           <div className="p-4">
             {isLoading ? (
               <div className="space-y-3">
@@ -331,9 +299,11 @@ const Dashboard = () => {
               </div>
             )}
           </div>
-        </Card>
+        </div>
       </div>
-    </div>
+        </div>
+      </main>
+    </>
   );
 };
 

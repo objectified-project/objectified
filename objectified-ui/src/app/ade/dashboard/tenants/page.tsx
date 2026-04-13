@@ -22,6 +22,17 @@ import { Textarea } from '../../../components/ui/Textarea';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { useDialog } from '../../../components/providers/DialogProvider';
 import { toast } from 'sonner';
+import {
+  dashboardContentStackClass,
+  dashboardMainClass,
+  dashboardPanelClass,
+  dashboardTableWrapClass,
+  dashboardTableTheadClass,
+  dashboardThClass,
+  dashboardThRightClass,
+  dashboardTbodyClass,
+  dashboardTrHoverClass,
+} from '@/app/components/ade/dashboard/dashboardScreenClasses';
 
 interface Tenant {
   id: string;
@@ -443,8 +454,8 @@ const Tenants = () => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto">
+      <main className={dashboardMainClass}>
+        <div className={dashboardContentStackClass}>
       {tenants.length === 0 ? (
         <EmptyState
           icon={<Building2 className="h-10 w-10" />}
@@ -454,19 +465,20 @@ const Tenants = () => {
         />
       ) : (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
-              <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
+          <div className={dashboardTableWrapClass}>
+            <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className={dashboardTableTheadClass}>
                 <tr>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tenant Name</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                  <th scope="col" className={dashboardThClass}>Tenant Name</th>
+                  <th scope="col" className={dashboardThClass}>Description</th>
+                  <th scope="col" className={dashboardThClass}>Status</th>
+                  <th scope="col" className={dashboardThRightClass}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+              <tbody className={dashboardTbodyClass}>
                 {tenants.map(tenant => (
-                  <tr key={tenant.id} className={`transition-all duration-200 ${tenant.id === currentTenantId ? 'bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20' : 'hover:bg-blue-50/50 dark:hover:bg-blue-900/10'}`}>
+                  <tr key={tenant.id} className={`${dashboardTrHoverClass} ${tenant.id === currentTenantId ? 'bg-indigo-50/80 dark:bg-indigo-950/30' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <div className="text-sm font-semibold text-gray-900 dark:text-white">{tenant.name}</div>
@@ -550,12 +562,13 @@ const Tenants = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Admin sections for each tenant */}
           {tenants.map(tenant => (
             isCurrentUserAdmin(tenant.id) && (
-              <div key={`admin-${tenant.id}`} id={`tenant-${tenant.id}`} className="hidden relative bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mt-4">
+              <div key={`admin-${tenant.id}`} id={`tenant-${tenant.id}`} className={`hidden relative ${dashboardPanelClass} p-6 mt-4`}>
                 <button
                   type="button"
                   onClick={() => {
@@ -602,17 +615,17 @@ const Tenants = () => {
                             </button>
                           )}
                         </div>
-                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-                          <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
-                            <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
+                        <div className={dashboardTableWrapClass}>
+                          <table className="min-w-full">
+                            <thead className={dashboardTableTheadClass}>
                               <tr>
-                                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
-                                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
-                                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Role</th>
-                                <th scope="col" className="px-6 py-3.5 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                                <th scope="col" className={dashboardThClass}>Name</th>
+                                <th scope="col" className={dashboardThClass}>Email</th>
+                                <th scope="col" className={dashboardThClass}>Role</th>
+                                <th scope="col" className={dashboardThRightClass}>Actions</th>
                               </tr>
                             </thead>
-                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+                            <tbody className={dashboardTbodyClass}>
                               {getMembersForTenant(tenant.id).length === 0 ? (
                                 <tr>
                                   <td colSpan={4} className="px-6 py-8 text-center">
@@ -626,7 +639,7 @@ const Tenants = () => {
                                 </tr>
                               ) : (
                                 getMembersForTenant(tenant.id).map((member) => (
-                                  <tr key={member.userId} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-all duration-200">
+                                  <tr key={member.userId} className={dashboardTrHoverClass}>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                       <div className="text-sm font-semibold text-gray-900 dark:text-white">{member.name}</div>
                                     </td>

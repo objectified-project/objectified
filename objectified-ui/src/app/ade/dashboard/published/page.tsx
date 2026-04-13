@@ -23,6 +23,17 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../
 import { cn } from '../../../../../lib/utils';
 import { useDialog } from '../../../components/providers/DialogProvider';
 import { toast } from 'sonner';
+import {
+  dashboardContentStackClass,
+  dashboardMainClass,
+  dashboardPanelPaddedClass,
+  dashboardTableWrapClass,
+  dashboardTableTheadClass,
+  dashboardThClass,
+  dashboardThRightClass,
+  dashboardTbodyClass,
+  dashboardTrHoverClass,
+} from '@/app/components/ade/dashboard/dashboardScreenClasses';
 
 interface PublishedVersion {
   id: string;
@@ -275,12 +286,14 @@ const PublishedVersions = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto">
+        <main className={dashboardMainClass}>
+          <div className={dashboardContentStackClass}>
         {/* Search */}
-        <div className="mb-6 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by project name, version, or description..." className="pl-10" />
+        <div className={dashboardPanelPaddedClass}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by project name, version, or description..." className="pl-10" />
+          </div>
         </div>
 
         {isLoading ? (
@@ -304,21 +317,21 @@ const PublishedVersions = () => {
             iconContainerClassName="from-gray-400 to-gray-500 shadow-gray-500/30"
           />
         ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className={dashboardTableWrapClass}>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
-                <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
+              <table className="min-w-full">
+                <thead className={dashboardTableTheadClass}>
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Project / Version</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Visibility</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Access URL</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Published</th>
-                    <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                    <th className={dashboardThClass}>Project / Version</th>
+                    <th className={dashboardThClass}>Visibility</th>
+                    <th className={dashboardThClass}>Access URL</th>
+                    <th className={dashboardThClass}>Published</th>
+                    <th className={dashboardThRightClass}>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+                <tbody className={dashboardTbodyClass}>
                   {filteredVersions.map((version) => (
-                    <tr key={version.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-all duration-200">
+                    <tr key={version.id} className={dashboardTrHoverClass}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-col">
                           <div className="text-sm font-semibold text-gray-900 dark:text-white">{version.project_name}</div>

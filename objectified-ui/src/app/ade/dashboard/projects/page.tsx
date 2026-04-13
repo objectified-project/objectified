@@ -43,6 +43,16 @@ import { getProjectQualityHistory } from '../../../utils/project-quality-score-h
 import { getNumericScoreTier } from '../../../utils/numeric-score-tier';
 import { ProjectQualityTrendSparkline } from '../../../components/ade/dashboard/ProjectQualityTrendSparkline';
 import { ProjectQualityHistoryDialog } from '../../../components/ade/dashboard/ProjectQualityHistoryDialog';
+import {
+  dashboardContentStackClass,
+  dashboardMainClass,
+  dashboardTableWrapClass,
+  dashboardTableTheadClass,
+  dashboardThClass,
+  dashboardThRightClass,
+  dashboardTbodyClass,
+  dashboardTrHoverClass,
+} from '@/app/components/ade/dashboard/dashboardScreenClasses';
 
 type ProjectMetadata = ProjectOpenApiMetadata;
 
@@ -429,56 +439,62 @@ const Projects = () => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto">
+      <main className={dashboardMainClass}>
+        <div className={dashboardContentStackClass}>
       {/* Projects List */}
       {projects.length === 0 ? (
-        <EmptyState
-          icon={<FolderOpen className="h-10 w-10" />}
-          title="No Projects Yet"
-          description="Get started by creating your first project"
-          iconContainerClassName="from-indigo-500 to-purple-600 shadow-indigo-500/30"
-        />
+        <div className={dashboardTableWrapClass}>
+          <div className="p-8">
+            <EmptyState
+              icon={<FolderOpen className="h-10 w-10" />}
+              title="No Projects Yet"
+              description="Get started by creating your first project"
+              variant="compact"
+              showOrbs={false}
+              iconContainerClassName="from-indigo-500 to-purple-600 shadow-indigo-500/30"
+            />
+          </div>
+        </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className={dashboardTableWrapClass}>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
-              <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
+            <table className="min-w-full">
+              <thead className={dashboardTableTheadClass}>
                 <tr>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-64">
+                  <th scope="col" className={`${dashboardThClass} w-64`}>
                     Project Name
                   </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th scope="col" className={dashboardThClass}>
                     Description
                   </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-52">
+                  <th scope="col" className={`${dashboardThClass} w-52`}>
                     <span className="inline-flex items-center gap-1.5">
                       <TrendingUp className="h-3.5 w-3.5 opacity-70" aria-hidden />
                       Quality trend
                     </span>
                   </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">
+                  <th scope="col" className={`${dashboardThClass} w-48`}>
                     Status
                   </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-56">
+                  <th scope="col" className={`${dashboardThClass} w-56`}>
                     Created By
                   </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-40">
+                  <th scope="col" className={`${dashboardThClass} w-40`}>
                     Created
                   </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-40">
+                  <th scope="col" className={`${dashboardThClass} w-40`}>
                     Updated
                   </th>
-                  <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
+                  <th scope="col" className={`${dashboardThRightClass} w-24`}>
 
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+              <tbody className={dashboardTbodyClass}>
                 {projects.map((project) => {
                   const domainCategoryLabel = getProjectDomainCategoryLabel(project.metadata?.domainCategory);
                   return (
-                  <tr key={project.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all duration-200">
+                  <tr key={project.id} className={dashboardTrHoverClass}>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
                         <div className="text-sm font-semibold text-gray-900 dark:text-white truncate max-w-xs" title={project.name}>

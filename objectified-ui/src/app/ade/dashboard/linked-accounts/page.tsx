@@ -23,6 +23,17 @@ import { Badge } from '../../../components/ui/Badge';
 import { cn } from '../../../../../lib/utils';
 import { useDialog } from '@/app/components/providers/DialogProvider';
 import { getLinkedAccountsForUser, unlinkExternalAccount, updatePersonalAccessToken, removePersonalAccessToken } from '../../../../../lib/db/helper';
+import {
+  dashboardContentStackClass,
+  dashboardMainClass,
+  dashboardPanelClass,
+  dashboardTableWrapClass,
+  dashboardTableTheadClass,
+  dashboardThClass,
+  dashboardThRightClass,
+  dashboardTbodyClass,
+  dashboardTrHoverClass,
+} from '@/app/components/ade/dashboard/dashboardScreenClasses';
 
 interface LinkedAccount {
   id: string;
@@ -247,8 +258,8 @@ const LinkedAccounts = () => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto">
+      <main className={dashboardMainClass}>
+        <div className={dashboardContentStackClass}>
 
       {/* Success / Error */}
       {successMessage && <Alert variant="success" className="mb-4" onClose={() => setSuccessMessage('')}>{successMessage}</Alert>}
@@ -264,25 +275,25 @@ const LinkedAccounts = () => {
             iconContainerClassName="from-cyan-500 to-blue-600 shadow-cyan-500/30"
           />
         ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className={dashboardTableWrapClass}>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
-                <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
+              <table className="min-w-full">
+                <thead className={dashboardTableTheadClass}>
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Account</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Linked</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last login</th>
-                    <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                    <th className={dashboardThClass}>Account</th>
+                    <th className={dashboardThClass}>Linked</th>
+                    <th className={dashboardThClass}>Last login</th>
+                    <th className={dashboardThRightClass}>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+                <tbody className={dashboardTbodyClass}>
                   {linkedAccounts.map((account) => {
                     const Icon = getProviderIcon(account.provider);
                     const displayName = getProviderDisplayName(account.provider);
                     const config = providerConfigs[account.provider];
 
                     return (
-                      <tr key={account.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-all duration-200">
+                      <tr key={account.id} className={dashboardTrHoverClass}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div
@@ -335,7 +346,8 @@ const LinkedAccounts = () => {
               <Card
                 key={provider.name}
                 className={cn(
-                  'transition-colors',
+                  dashboardPanelClass,
+                  'transition-colors shadow-none',
                   !isAvailable && 'opacity-50',
                   isAvailable && 'hover:border-gray-300 dark:hover:border-gray-600'
                 )}

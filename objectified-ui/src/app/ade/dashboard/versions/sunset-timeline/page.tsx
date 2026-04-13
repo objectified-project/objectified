@@ -11,6 +11,16 @@ import { Badge } from '../../../../components/ui/Badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/Select';
 import { Alert } from '../../../../components/ui/Alert';
 import { MIGRATION_GUIDE_ISSUE_URL } from '../../../../utils/revision-deprecation';
+import {
+  dashboardContentStackClass,
+  dashboardMainClass,
+  dashboardPanelPaddedClass,
+  dashboardTableWrapClass,
+  dashboardTableTheadClass,
+  dashboardThClass,
+  dashboardTbodyClass,
+  dashboardTrHoverClass,
+} from '@/app/components/ade/dashboard/dashboardScreenClasses';
 
 interface Project {
   id: string;
@@ -177,9 +187,9 @@ export default function SunsetTimelinePage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+    <>
+      <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="px-6 py-4">
           <Link
             href="/ade/dashboard/versions"
             className="inline-flex items-center gap-1 text-sm text-indigo-600 dark:text-indigo-400 hover:underline mb-2"
@@ -187,50 +197,56 @@ export default function SunsetTimelinePage() {
             <ArrowLeft className="h-4 w-4" />
             Back to Versions
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Sun className="h-7 w-7 text-amber-500" />
-            Sunset timeline
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400 text-sm mt-1">
-            End-of-life schedule for deprecated schema revisions. Dates come from the server (
-            <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">versions.metadata</code>
-            , #507). Status <span className="font-medium">imminent</span> means sunset within 30 days.
-          </p>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Sun className="w-6 h-6 text-amber-500" />
+                Sunset timeline
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1 max-w-3xl">
+                End-of-life schedule for deprecated schema revisions. Dates come from the server (
+                <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1 rounded">versions.metadata</code>
+                , #507). Status <span className="font-medium">imminent</span> means sunset within 30 days.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Select value={projectFilter} onValueChange={setProjectFilter}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Filter by project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All projects</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={exportCsv}
+                disabled={entries.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={projectFilter} onValueChange={setProjectFilter}>
-            <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Filter by project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All projects</SelectItem>
-              {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={exportCsv}
-            disabled={entries.length === 0}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-        </div>
-      </div>
+      </header>
 
+      <main className={dashboardMainClass}>
+        <div className={dashboardContentStackClass}>
       {error && (
-        <Alert variant="error" className="mb-4">
+        <Alert variant="error">
           {error}
         </Alert>
       )}
 
       {hasWarnings && (
-        <Alert variant="warning" className="mb-4">
+        <Alert variant="warning">
           <span className="text-sm">
             Rows include the same structured warnings as compatibility checks (#507). Open a revision in Versions to
             see banners in context.
@@ -239,35 +255,44 @@ export default function SunsetTimelinePage() {
       )}
 
       {loading ? (
-        <LoadingState minHeightClassName="min-h-[240px]" message="Loading schedule…" />
+        <div className={dashboardPanelPaddedClass}>
+          <LoadingState minHeightClassName="min-h-[240px]" message="Loading schedule…" />
+        </div>
       ) : entries.length === 0 ? (
-        <EmptyState
-          icon={<Sun className="h-10 w-10" />}
-          title="No deprecation or sunset entries"
-          description="Mark revisions as deprecated or set a sunset date on revision metadata to see them here."
-          iconContainerClassName="from-amber-500 to-orange-600 shadow-amber-500/30"
-        />
+        <div className={dashboardTableWrapClass}>
+          <div className="p-8">
+            <EmptyState
+              icon={<Sun className="h-10 w-10" />}
+              title="No deprecation or sunset entries"
+              description="Mark revisions as deprecated or set a sunset date on revision metadata to see them here."
+              variant="compact"
+              showOrbs={false}
+              iconContainerClassName="from-amber-500 to-orange-600 shadow-amber-500/30"
+            />
+          </div>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
+        <div className={dashboardTableWrapClass}>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-slate-500 dark:text-slate-400">
-                <th className="p-3 font-medium">Project</th>
-                <th className="p-3 font-medium">Version line</th>
-                <th className="p-3 font-medium">Sunset</th>
-                <th className="p-3 font-medium">Timeline</th>
-                <th className="p-3 font-medium">Lifecycle</th>
-                <th className="p-3 font-medium">Successor</th>
-                <th className="p-3 font-medium min-w-[200px]">Notes / #507</th>
+            <thead className={dashboardTableTheadClass}>
+              <tr>
+                <th className={`${dashboardThClass} align-bottom`}>Project</th>
+                <th className={`${dashboardThClass} align-bottom`}>Version line</th>
+                <th className={`${dashboardThClass} align-bottom`}>Sunset</th>
+                <th className={`${dashboardThClass} align-bottom`}>Timeline</th>
+                <th className={`${dashboardThClass} align-bottom`}>Lifecycle</th>
+                <th className={`${dashboardThClass} align-bottom`}>Successor</th>
+                <th className={`${dashboardThClass} min-w-[200px] align-bottom`}>Notes / #507</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className={dashboardTbodyClass}>
               {entries.map((e) => (
                 <tr
                   key={e.revisionId}
-                  className="border-b border-slate-100 dark:border-slate-800 last:border-0"
+                  className={dashboardTrHoverClass}
                 >
-                  <td className="p-3 align-top">
+                  <td className="px-6 py-4 align-top">
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4 text-slate-400 flex-shrink-0" />
                       <span className="font-medium text-slate-900 dark:text-slate-100">
@@ -275,22 +300,22 @@ export default function SunsetTimelinePage() {
                       </span>
                     </div>
                   </td>
-                  <td className="p-3 align-top font-mono text-xs">{e.versionLine}</td>
-                  <td className="p-3 align-top text-slate-700 dark:text-slate-300">
+                  <td className="px-6 py-4 align-top font-mono text-xs">{e.versionLine}</td>
+                  <td className="px-6 py-4 align-top text-slate-700 dark:text-slate-300">
                     {e.sunsetAt ?? e.sunsetDate ?? '—'}
                   </td>
-                  <td className="p-3 align-top">
+                  <td className="px-6 py-4 align-top">
                     <Badge variant="outline" className={statusBadgeClass(e.timelineStatus)}>
                       {e.timelineStatus}
                     </Badge>
                   </td>
-                  <td className="p-3 align-top text-slate-700 dark:text-slate-300 max-w-[220px]">
+                  <td className="px-6 py-4 align-top text-slate-700 dark:text-slate-300 max-w-[220px]">
                     {lifecycleLabel(e.lifecyclePhase)}
                   </td>
-                  <td className="p-3 align-top font-mono text-xs break-all">
+                  <td className="px-6 py-4 align-top font-mono text-xs break-all">
                     {e.successorRevisionId ?? '—'}
                   </td>
-                  <td className="p-3 align-top text-slate-600 dark:text-slate-400">
+                  <td className="px-6 py-4 align-top text-slate-600 dark:text-slate-400">
                     {e.deprecationWarnings[0]?.message ? (
                       <p className="text-xs leading-relaxed">{e.deprecationWarnings[0].message}</p>
                     ) : e.deprecationMessage ? (
@@ -311,8 +336,11 @@ export default function SunsetTimelinePage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
-    </div>
+        </div>
+      </main>
+    </>
   );
 }

@@ -80,6 +80,18 @@ import {
 } from '../../../../../lib/version-merge';
 import { VersionMergeConflictList } from '../../../components/ade/dashboard/VersionMergeConflictList';
 import { CompatibilityReportPanel } from '../../../components/ade/dashboard/CompatibilityReportPanel';
+import {
+  dashboardContentStackClass,
+  dashboardMainClass,
+  dashboardPanelClass,
+  dashboardPanelPaddedClass,
+  dashboardTableWrapClass,
+  dashboardTableTheadClass,
+  dashboardThClass,
+  dashboardThRightClass,
+  dashboardTbodyClass,
+  dashboardTrHoverClass,
+} from '@/app/components/ade/dashboard/dashboardScreenClasses';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -2285,7 +2297,7 @@ const Versions = () => {
 
       {conflict && conflict.projectId === selectedProjectId && selectedProjectId && (
         <div className="border-b border-amber-200/80 bg-amber-50/50 px-6 py-3 dark:border-amber-800/50 dark:bg-amber-950/25">
-          <div className="max-w-7xl mx-auto">
+          <div>
             <ServerAheadPushBanner
               detail={conflict.message}
               pullLoading={versionsPullBannerLoading}
@@ -2296,10 +2308,10 @@ const Versions = () => {
         </div>
       )}
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <main className={dashboardMainClass}>
+        <div className={dashboardContentStackClass}>
       {selectedProjectId && versionTags.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
+        <div className={dashboardPanelPaddedClass}>
           <div className="flex items-center gap-2 mb-3">
             <Tag className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Version tags</h3>
@@ -2361,7 +2373,7 @@ const Versions = () => {
       )}
 
       {selectedProjectId && versionBranches.length > 0 && (
-        <div id="ade-named-branches-panel" className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
+        <div id="ade-named-branches-panel" className={dashboardPanelPaddedClass}>
           <div className="flex items-center gap-2 mb-3">
             <GitBranch className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Named branches</h3>
@@ -2440,7 +2452,7 @@ const Versions = () => {
         />
       ) : (
         <>
-          <div className="mb-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 px-4 py-3 flex flex-wrap items-end gap-3">
+          <div className={`mb-4 ${dashboardPanelClass} px-4 py-3 flex flex-wrap items-end gap-3`}>
             <div className="flex items-center gap-2 min-w-0">
               <ScrollText className="h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
               <span className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">Timeline</span>
@@ -2531,8 +2543,8 @@ const Versions = () => {
               onBranchFromRevision={openBranchFromRevisionDialog}
             />
           </div>
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center gap-3 bg-gray-50/80 dark:bg-gray-900/40">
+        <div className={dashboardTableWrapClass}>
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-3 bg-gray-50 dark:bg-gray-900">
             <span className="text-sm text-gray-600 dark:text-gray-400">Lifecycle filter</span>
             <Select
               value={lifecycleFilter || '__all__'}
@@ -2551,7 +2563,7 @@ const Versions = () => {
             </Select>
           </div>
           {versionTags.length > 0 && (
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center gap-3 bg-gray-50/80 dark:bg-gray-900/40">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-3 bg-gray-50 dark:bg-gray-900">
               <span className="text-sm text-gray-600 dark:text-gray-400">History filter</span>
               <Select
                 value={historyTagFilter || '__all__'}
@@ -2571,20 +2583,20 @@ const Versions = () => {
               </Select>
             </div>
           )}
-          <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
-            <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
+          <table className="min-w-full">
+            <thead className={dashboardTableTheadClass}>
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revision / changelog</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created By</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created</th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                <th className={dashboardThClass}>Version</th>
+                <th className={dashboardThClass}>Revision / changelog</th>
+                <th className={dashboardThClass}>Status</th>
+                <th className={dashboardThClass}>Created By</th>
+                <th className={dashboardThClass}>Created</th>
+                <th className={dashboardThRightClass}>Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+            <tbody className={dashboardTbodyClass}>
               {displayVersions.map((version) => (
-                <tr key={version.id} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 transition-all duration-200">
+                <tr key={version.id} className={dashboardTrHoverClass}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="text-sm font-bold text-gray-900 dark:text-white font-mono">v{version.version_id}</div>

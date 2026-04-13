@@ -1,0 +1,23 @@
+/** Shared layout tokens aligned with the Primitives dashboard screen. */
+export const dashboardMainClass = 'flex-1 overflow-y-auto p-6';
+export const dashboardContentStackClass = 'space-y-6';
+
+export const dashboardPanelClass =
+  'bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700';
+export const dashboardPanelPaddedClass = `${dashboardPanelClass} p-4`;
+
+export const dashboardTableWrapClass = `${dashboardPanelClass} overflow-hidden`;
+
+export const dashboardTableTheadClass =
+  'bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700';
+
+export const dashboardThClass =
+  'px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider';
+
+export const dashboardThRightClass =
+  'px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider';
+
+export const dashboardTbodyClass = 'divide-y divide-gray-200 dark:divide-gray-700';
+
+export const dashboardTrHoverClass =
+  'hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors';

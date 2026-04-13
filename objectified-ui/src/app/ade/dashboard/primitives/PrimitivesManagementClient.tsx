@@ -23,6 +23,18 @@ import { EmptyState } from '@/app/components/ui/EmptyState';
 import { useDialog } from '@/app/components/providers/DialogProvider';
 import PrimitiveEditorDialog from './PrimitiveEditorDialog';
 import PrimitiveImportDialog from './PrimitiveImportDialog';
+import {
+  dashboardContentStackClass,
+  dashboardMainClass,
+  dashboardPanelClass,
+  dashboardPanelPaddedClass,
+  dashboardTableWrapClass,
+  dashboardTableTheadClass,
+  dashboardThClass,
+  dashboardThRightClass,
+  dashboardTbodyClass,
+  dashboardTrHoverClass,
+} from '@/app/components/ade/dashboard/dashboardScreenClasses';
 
 interface Primitive {
   id: string;
@@ -246,8 +258,8 @@ export default function PrimitivesManagementClient() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="space-y-6">
+      <main className={dashboardMainClass}>
+        <div className={dashboardContentStackClass}>
           {/* Message Banner */}
           {message && (
             <Alert variant={message.type === 'success' ? 'default' : 'error'}>
@@ -262,7 +274,7 @@ export default function PrimitivesManagementClient() {
 
           {/* Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className={`${dashboardPanelClass} p-4`}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Primitives</p>
@@ -272,7 +284,7 @@ export default function PrimitivesManagementClient() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className={`${dashboardPanelClass} p-4`}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">System</p>
@@ -282,7 +294,7 @@ export default function PrimitivesManagementClient() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className={`${dashboardPanelClass} p-4`}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Tenant</p>
@@ -292,7 +304,7 @@ export default function PrimitivesManagementClient() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className={`${dashboardPanelClass} p-4`}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Categories</p>
@@ -304,7 +316,7 @@ export default function PrimitivesManagementClient() {
           </div>
 
           {/* Filters */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className={dashboardPanelPaddedClass}>
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <div className="relative">
@@ -354,7 +366,7 @@ export default function PrimitivesManagementClient() {
           </div>
 
           {/* Primitives Table */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className={dashboardTableWrapClass}>
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <RefreshCw className="w-6 h-6 animate-spin text-indigo-600" />
@@ -373,36 +385,36 @@ export default function PrimitivesManagementClient() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                  <thead className={dashboardTableTheadClass}>
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className={dashboardThClass}>
                         Name
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className={dashboardThClass}>
                         Category
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className={dashboardThClass}>
                         Description
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className={dashboardThClass}>
                         Tags
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className={dashboardThClass}>
                         Usage
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className={dashboardThClass}>
                         Type
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className={dashboardThRightClass}>
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  <tbody className={dashboardTbodyClass}>
                     {filteredPrimitives.map((primitive) => (
                       <tr
                         key={primitive.id}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                        className={dashboardTrHoverClass}
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
