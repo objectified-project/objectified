@@ -8,7 +8,7 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const connectionPool = require('./db');
 
-import type { InlineSchema } from '../utils/inline-schema-utils';
+import { getActiveCompositionKind, type InlineSchema } from '../utils/inline-schema-utils';
 
 // =============================================================================
 // RESPONSE CONTENT TYPES
@@ -477,7 +477,14 @@ export async function addPropertyToResponseInlineSchema(
     }
 
     // Initialize inline schema if it doesn't exist
-    let inlineSchema = getResult.rows[0].inline_schema;
+    let inlineSchema: InlineSchema | Record<string, unknown> | null = getResult.rows[0].inline_schema;
+    if (typeof inlineSchema === 'string') {
+      try {
+        inlineSchema = inlineSchema ? (JSON.parse(inlineSchema) as InlineSchema) : null;
+      } catch {
+        inlineSchema = null;
+      }
+    }
     if (!inlineSchema) {
       inlineSchema = {
         type: 'object',
@@ -485,11 +492,21 @@ export async function addPropertyToResponseInlineSchema(
       };
     }
 
-    inlineSchema.properties = inlineSchema.properties || [];
+    const schema = inlineSchema as InlineSchema;
+
+    if (getActiveCompositionKind(schema)) {
+      return JSON.stringify({
+        success: false,
+        error:
+          'Remove schema composition (allOf/anyOf/oneOf) before adding inline properties.',
+      });
+    }
+
+    schema.properties = Array.isArray(schema.properties) ? schema.properties : [];
 
     // Check for duplicate property name at the same level (same parent_id)
     const parentId = property.parent_id || null;
-    const duplicateProperty = inlineSchema.properties.find(
+    const duplicateProperty = schema.properties.find(
       (p: { name: string; parent_id: string | null }) =>
         p.name === property.name && (p.parent_id || null) === parentId
     );
@@ -510,7 +527,7 @@ export async function addPropertyToResponseInlineSchema(
       parent_id: property.parent_id || null,
     };
 
-    inlineSchema.properties.push(newProperty);
+    schema.properties.push(newProperty);
 
     // Update the schema
     const updateQuery = `
@@ -519,7 +536,7 @@ export async function addPropertyToResponseInlineSchema(
       WHERE id = $2
       RETURNING id
     `;
-    await connectionPool.query(updateQuery, [JSON.stringify(inlineSchema), contentId]);
+    await connectionPool.query(updateQuery, [JSON.stringify(schema), contentId]);
 
     return JSON.stringify({ success: true, property: newProperty });
   } catch (error: unknown) {

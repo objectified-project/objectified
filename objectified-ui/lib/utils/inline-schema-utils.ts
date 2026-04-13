@@ -240,6 +240,49 @@ export function getPropertyChildren(
  *
  * CRITICAL: This function is essential for OpenAPI export of paths with inline request/response bodies
  */
+/** Non-empty composition arrays present on the inline schema (OpenAPI Schema Object). */
+export function getActiveCompositionKind(
+  inline: InlineSchema | null | undefined
+): 'allOf' | 'anyOf' | 'oneOf' | null {
+  if (!inline) return null;
+  if (Array.isArray(inline.allOf) && inline.allOf.length > 0) return 'allOf';
+  if (Array.isArray(inline.anyOf) && inline.anyOf.length > 0) return 'anyOf';
+  if (Array.isArray(inline.oneOf) && inline.oneOf.length > 0) return 'oneOf';
+  return null;
+}
+
+/**
+ * Validates allOf / anyOf / oneOf usage for response/request inline schemas.
+ * - At most one combinator may have branches.
+ * - Combinators cannot be combined with a property tree (mutually exclusive).
+ */
+export function validateInlineSchemaCompositions(inlineSchema: InlineSchema | null | undefined): string[] {
+  const errors: string[] = [];
+  if (!inlineSchema) return errors;
+
+  const branches = [
+    Array.isArray(inlineSchema.allOf) ? inlineSchema.allOf.length : 0,
+    Array.isArray(inlineSchema.anyOf) ? inlineSchema.anyOf.length : 0,
+    Array.isArray(inlineSchema.oneOf) ? inlineSchema.oneOf.length : 0,
+  ];
+  const nonEmpty = branches.filter((n) => n > 0).length;
+  if (nonEmpty > 1) {
+    errors.push('Use only one of allOf, anyOf, or oneOf — not several at once.');
+  }
+
+  const props = Array.isArray(inlineSchema.properties) ? inlineSchema.properties : [];
+  const hasProps = props.length > 0;
+  const hasComposition = nonEmpty > 0;
+
+  if (hasProps && hasComposition) {
+    errors.push(
+      'Inline properties and schema composition (allOf/anyOf/oneOf) cannot be combined. Remove one or the other.'
+    );
+  }
+
+  return errors;
+}
+
 export function buildSchemaFromInlineProperties(
   inlineSchema: InlineSchema | null
 ): Record<string, any> {
@@ -247,25 +290,25 @@ export function buildSchemaFromInlineProperties(
     return { type: 'object' };
   }
 
-  // Ensure properties is an array (handle legacy data where it might be an object)
   const properties = Array.isArray(inlineSchema.properties) ? inlineSchema.properties : [];
+  const kindOnly = getActiveCompositionKind(inlineSchema);
+
+  // Property tree + composition together: invalid — export properties only (composition dropped).
+  if (properties.length > 0 && kindOnly) {
+    const tree = buildPropertyTreeFromInlineSchema(inlineSchema);
+    return buildSchemaFromTree(tree, inlineSchema.description);
+  }
+
+  // Composition-only: no property tree (first non-empty combinator wins if several are set)
+  if (kindOnly && properties.length === 0) {
+    const out: Record<string, any> = {};
+    if (inlineSchema.description) out.description = inlineSchema.description;
+    out[kindOnly] = (inlineSchema as any)[kindOnly];
+    return out;
+  }
+
   const tree = buildPropertyTreeFromInlineSchema(inlineSchema);
-
-  // Build the schema from the tree
-  const schema = buildSchemaFromTree(tree, inlineSchema.description);
-
-  // Preserve composition patterns if present
-  if (inlineSchema.allOf) {
-    schema.allOf = inlineSchema.allOf;
-  }
-  if (inlineSchema.oneOf) {
-    schema.oneOf = inlineSchema.oneOf;
-  }
-  if (inlineSchema.anyOf) {
-    schema.anyOf = inlineSchema.anyOf;
-  }
-
-  return schema;
+  return buildSchemaFromTree(tree, inlineSchema.description);
 }
 
 /**
@@ -464,6 +507,8 @@ export function validateInlineSchema(inlineSchema: InlineSchema): string[] {
     errors.push('Inline schema is required');
     return errors;
   }
+
+  errors.push(...validateInlineSchemaCompositions(inlineSchema));
 
   if (inlineSchema.type !== 'object') {
     errors.push('Inline schema type must be "object"');
