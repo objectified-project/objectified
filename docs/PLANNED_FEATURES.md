@@ -6,7 +6,8 @@ This document is a **sequencing and verification guide** for shipping a credible
 
 1. **Git-like** versioning (commit / push / pull / branch / merge / history / rollback / audit) — complete the remaining `mvp`-labeled work and prove it end-to-end.
 2. **Paths** — OpenAPI 3.2 paths authoring aligned to **P-00 → P-17** (exclude **P-18** and **V2-01 → V2-05** from first MVP).
-3. **AI** — Studio AI (Ollama-backed chat, context, guardrails, and prioritized NL/schema assist) per **`docs/PLANNED_FEATURE_ROADMAP_AI.md`**.
+3. **Publication change reports** — semantic OpenAPI diff at publish time, templated human-readable report on the **Version** page, persistence and editing per **`docs/FUTURE_FEATURE_CHANGE_REPORTS.md`** and **`docs/CHANGE_REPORTS.md`** (commercial **#2698–#2704**; **#2705** is V2 enterprise).
+4. **AI** — Studio AI (Ollama-backed chat, context, guardrails, and prioritized NL/schema assist) per **`docs/PLANNED_FEATURE_ROADMAP_AI.md`**.
 
 **Rules you asked for:**
 
@@ -203,7 +204,43 @@ Implement and verify in this order so each step stays testable. **Issue → road
 
 ---
 
-## Phase C — AI features (after Git-like + Paths MVP)
+## Phase D — Publication change reports (MVP slice, CR-R1)
+
+**Epic (parent issue):** [#2698](https://github.com/KenSuenobu/objectified-commercial/issues/2698). **Source docs:** `docs/FUTURE_FEATURE_CHANGE_REPORTS.md`, `docs/CHANGE_REPORTS.md`. **Label pack:** `roadmap-change-reports` on **`KenSuenobu/objectified-commercial`**.
+
+**What ships:** On **publish**, Objectified compares the **resolved** OpenAPI for the new publication to a **baseline** (typically the prior published revision), stores a **structured diff** and a **rendered** report (header, body, footnote), and shows it on the **Version** page; users can **edit** the report instance and manage **templates** per the issues below. **Enterprise-only** follow-on: [#2705](https://github.com/KenSuenobu/objectified-commercial/issues/2705) (PDF, approvals, extended audit).
+
+### D.1 Ordered MVP issues (CR-01 → CR-06)
+
+Implement in this order so each step stays testable. **Issue → roadmap ID** for cross-reference.
+
+| Order | Issue | ID | Notes |
+|------:|------|-----|--------|
+| 1 | [#2699](https://github.com/KenSuenobu/objectified-commercial/issues/2699) | CR-01 | Semantic OpenAPI diff → `ChangeReportModel` (schemas, properties, refs, relationships, docs) |
+| 2 | [#2700](https://github.com/KenSuenobu/objectified-commercial/issues/2700) | CR-02 | DB + REST: persist report, edits, template linkage per published revision |
+| 3 | [#2701](https://github.com/KenSuenobu/objectified-commercial/issues/2701) | CR-03 | Template system (header / body / footnote) + safe rendering |
+| 4 | [#2702](https://github.com/KenSuenobu/objectified-commercial/issues/2702) | CR-04 | Publication workflow hook: baseline selection, generate on publish |
+| 5 | [#2703](https://github.com/KenSuenobu/objectified-commercial/issues/2703) | CR-05 | **Version** page: view / edit report + template + regenerate |
+| 6 | [#2704](https://github.com/KenSuenobu/objectified-commercial/issues/2704) | CR-06 | Golden fixtures, REST integration tests, Playwright E2E, release gate |
+
+**Excluded from minimal MVP (same epic, V2 enterprise):** [#2705](https://github.com/KenSuenobu/objectified-commercial/issues/2705) (CR-V2-01) — PDF export, approval workflow, extended audit trail.
+
+### D.2 Codebase alignment (for verification, not redesign)
+
+- **`objectified-rest`:** Publication and revision resolution paths own the hook for CR-04; new routes/tables for CR-02 should follow existing tenancy and `workflow_audit` patterns where applicable.
+- **`objectified-ui`:** Version dashboard (`src/app/ade/dashboard/versions/` and related) owns CR-05; reuse ADE patterns and add **data-testid** in the issues that own the UI.
+
+### D.3 Testing checkpoints
+
+**After CR-02 + CR-03 (render + persist):** API can produce and fetch a report for seeded revisions without the full UI (see **`docs/CHANGE_REPORTS.md`** CR-02 / CR-03 test blocks).
+
+**After CR-04 (publish hook):** One integration path **publish → stored report**; first-publish edge case documented.
+
+**After CR-05 + CR-06:** Manual exploratory on Version page + CI green for golden + E2E (see **`docs/CHANGE_REPORTS.md`**).
+
+---
+
+## Phase C — AI features (after Git-like + Paths MVP; may overlap Phase D)
 
 **Source:** `docs/PLANNED_FEATURE_ROADMAP_AI.md`. Issue numbers below are **as listed in that file** (e.g. **#257**); they are **not** verified here against `objectified-commercial`.
 
@@ -255,6 +292,7 @@ Implement and verify in this order so each step stays testable. **Issue → road
 | Auth / routing | `objectified-ui/e2e/navigation.spec.ts`, `login.spec.ts`, `authenticated.spec.ts` | Reuse fixtures for **logged-in** flows |
 | Git-like | — | Authenticated **versions** flow: commit → push conflict → pull/merge |
 | Paths | — | **/ade/studio/paths** create → persist → export |
+| Change reports | — | Publish → **Version** page change report; edit + template (**#2699–#2704**) |
 | AI | — | **Mocked** Ollama or dedicated **test env**; assert **SSE** chunks |
 
 **Consider creating an issue for:** **Test data seed** (project/version/branch) shared across E2E suites.
@@ -267,6 +305,8 @@ Implement and verify in this order so each step stays testable. **Issue → road
 
 **Paths (commercial):** 2639–2646, 2653, 2647–2652, 2654–2656.
 
+**Publication change reports (commercial):** 2699–2704 (CR-01–CR-06). Epic **#2698**. V2: **#2705**.
+
 **AI:** Use **Phase C** table; map **#257+** from `docs/PLANNED_FEATURE_ROADMAP_AI.md` to commercial issues before execution.
 
 ---
@@ -278,3 +318,4 @@ Update this file when:
 - GitHub **closes** or **rescopes** an issue.
 - You add **commercial** AI epics that replace the legacy **#257**-style numbering.
 - Paths routing or **ADE** layout changes (dashboard vs studio) stabilize.
+- **Change report** tickets (**#2698–#2705**) close or split; keep **`docs/CHANGE_REPORTS.md`** in sync.
