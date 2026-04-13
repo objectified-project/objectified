@@ -140,6 +140,66 @@ def test_redirect_preserves_include_sections_query():
     assert "successorResolution=none" in loc
 
 
+def test_by_version_exclude_sections():
+    row = _min_version("rev-1", "1.0.0")
+    with patch("app.versions_routes.db") as mdb:
+        mdb.get_version_by_version_id.return_value = row
+        r = client.get(
+            "/v1/versions/tn/proj-1/by-version/1.0.0",
+            params={"excludeSections": "governance,timestamps"},
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert "metadata" not in body and "lifecycle" not in body
+    assert "created_at" not in body
+    assert body["id"] == "rev-1"
+    assert body["version_id"] == "1.0.0"
+
+
+def test_by_version_include_sections_commit():
+    row = _min_version("rev-1", "1.0.0")
+    with patch("app.versions_routes.db") as mdb:
+        mdb.get_version_by_version_id.return_value = row
+        r = client.get(
+            "/v1/versions/tn/proj-1/by-version/1.0.0",
+            params={"includeSections": "commit"},
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body.keys()) >= {"id", "project_id", "version_id", "shortMessage"}
+    assert "metadata" not in body
+
+
+def test_by_version_invalid_sections_is_400():
+    row = _min_version("rev-1", "1.0.0")
+    with patch("app.versions_routes.db") as mdb:
+        mdb.get_version_by_version_id.return_value = row
+        r = client.get(
+            "/v1/versions/tn/proj-1/by-version/1.0.0",
+            params={"includeSections": "not-a-section"},
+        )
+    assert r.status_code == 400
+
+
+def test_by_version_successor_resolution_headers_preserved_with_section_filter():
+    """Successor-resolution headers from ``resolve`` mode are present on partial responses."""
+    va = _min_version("rev-a", "1.0.0")
+    vb = _min_version("rev-b", "1.0.1")
+    with patch("app.versions_routes.db") as mdb:
+        mdb.get_version_by_version_id.return_value = va
+        mdb.get_version_by_id.return_value = vb
+        mdb.resolve_successor_revision_chain.return_value = ("rev-b", ["rev-b"], "resolved", None)
+        r = client.get(
+            "/v1/versions/tn/proj-1/by-version/1.0.0",
+            params={"successorResolution": "resolve", "excludeSections": "timestamps"},
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert "created_at" not in body
+    assert body["id"] == "rev-b"
+    assert r.headers.get("x-objectified-successor-resolution-status") == "resolved"
+
+
 def test_filter_unit_covers_all_version_schema_keys():
     from app.models import VersionSchema
     from app.version_pull_payload import (

@@ -152,9 +152,13 @@ def _not_modified_revision_response(
 def _redirect_successor_resolution_none(request: Request, *, new_path: str) -> RedirectResponse:
     """307 with ``successorResolution=none``, preserving other query params (e.g. pull sections, #2591)."""
     p = urlparse(str(request.url))
-    q = dict(parse_qsl(p.query, keep_blank_values=True))
-    q["successorResolution"] = "none"
-    loc = urlunparse((p.scheme, p.netloc, new_path, p.params, urlencode(q), p.fragment))
+    q = [
+        (key, value)
+        for key, value in parse_qsl(p.query, keep_blank_values=True)
+        if key != "successorResolution"
+    ]
+    q.append(("successorResolution", "none"))
+    loc = urlunparse((p.scheme, p.netloc, new_path, p.params, urlencode(q, doseq=True), p.fragment))
     return RedirectResponse(loc, status_code=307)
 
 
@@ -175,13 +179,13 @@ def _version_pull_http_response(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     vs = VersionSchema(**version_row)
-    dump = vs.model_dump(by_alias=True, mode="json")
-    filtered = filter_version_pull_dump(dump, include_sections=inc, exclude_sections=exc)
     etag = _strong_etag_for_revision(etag_revision_id)
     response.headers["ETag"] = etag
     if inc is None and exc is None:
         return vs
-    return JSONResponse(content=filtered, headers={"ETag": etag})
+    dump = vs.model_dump(by_alias=True, mode="json")
+    filtered = filter_version_pull_dump(dump, include_sections=inc, exclude_sections=exc)
+    return JSONResponse(content=filtered, headers=dict(response.headers))
 
 
 def _workflow_audit_push(
@@ -501,7 +505,11 @@ async def list_versions(
     return [VersionSchema(**v) for v in versions]
 
 
-@router.get("/{tenant_slug}/{project_id}/{version_record_id}", response_model=VersionSchema)
+@router.get(
+    "/{tenant_slug}/{project_id}/{version_record_id}",
+    response_model=None,
+    responses={200: {"model": VersionSchema, "description": "Full VersionSchema, or a partial subset when includeSections/excludeSections are used (#2591)."}},
+)
 async def get_version(
     request: Request,
     response: Response,
@@ -588,6 +596,12 @@ async def get_version(
             status_code=404,
             detail=f"Version not found in project: {project_id}",
         )
+
+    # Validate section params early so we don't record a 200 audit that becomes a 400 (#2591).
+    try:
+        resolve_pull_sections(include_sections, exclude_sections)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     if_none_match = request.headers.get("if-none-match")
 
@@ -717,7 +731,11 @@ async def get_version(
     )
 
 
-@router.get("/{tenant_slug}/{project_id}/by-version/{version_id}", response_model=VersionSchema)
+@router.get(
+    "/{tenant_slug}/{project_id}/by-version/{version_id}",
+    response_model=None,
+    responses={200: {"model": VersionSchema, "description": "Full VersionSchema, or a partial subset when includeSections/excludeSections are used (#2591)."}},
+)
 async def get_version_by_version_id(
     request: Request,
     response: Response,
@@ -783,6 +801,12 @@ async def get_version_by_version_id(
         )
 
     version_record_id = str(version["id"])
+
+    # Validate section params early so we don't record a 200 audit that becomes a 400 (#2591).
+    try:
+        resolve_pull_sections(include_sections, exclude_sections)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     if_none_match = request.headers.get("if-none-match")
 
