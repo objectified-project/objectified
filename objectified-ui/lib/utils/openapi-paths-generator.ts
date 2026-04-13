@@ -220,6 +220,47 @@ export function buildParameterForOpenAPI(param: PathParameter): Record<string, u
 // =============================================================================
 
 /**
+ * Convert an InlineSchema to an OpenAPI schema object for export.
+ *
+ * - `$ref`-only schemas are passed through as `{ $ref }`.
+ * - Non-object types (array, string, number, integer, boolean, null) are
+ *   emitted directly with all relevant constraints preserved.
+ * - Object/untyped schemas with a `properties` array are delegated to
+ *   `buildSchemaFromInlineProperties` so the property tree is built correctly.
+ */
+function resolveInlineSchemaForExport(inline: InlineSchema): Record<string, unknown> {
+  // $ref-only schema — pass through directly
+  if (inline.$ref) {
+    return { $ref: inline.$ref };
+  }
+
+  // Non-object types — build from scalar fields, preserving constraints
+  if (inline.type && inline.type !== 'object') {
+    const schema: Record<string, unknown> = { type: inline.type };
+    if (inline.description) schema.description = inline.description;
+    if (inline.format) schema.format = inline.format;
+    if (inline.pattern) schema.pattern = inline.pattern;
+    if (inline.minLength !== undefined) schema.minLength = inline.minLength;
+    if (inline.maxLength !== undefined) schema.maxLength = inline.maxLength;
+    if (inline.minimum !== undefined) schema.minimum = inline.minimum;
+    if (inline.maximum !== undefined) schema.maximum = inline.maximum;
+    if (inline.enum) schema.enum = inline.enum;
+    if (inline.default !== undefined) schema.default = inline.default;
+    if (inline.type === 'array' && inline.items) {
+      if (inline.items.$ref) {
+        schema.items = { $ref: inline.items.$ref };
+      } else if (inline.items.type) {
+        schema.items = { type: inline.items.type };
+      }
+    }
+    return schema;
+  }
+
+  // Object type (or no explicit type) — use the property-tree builder
+  return buildSchemaFromInlineProperties(inline);
+}
+
+/**
  * Build OpenAPI response object from database response record
  */
 export function buildResponseForOpenAPI(response: ResponseInfo): Record<string, unknown> {
@@ -241,7 +282,7 @@ export function buildResponseForOpenAPI(response: ResponseInfo): Record<string, 
           $ref: `#/components/schemas/${contentType.class_name}`,
         };
       } else if (contentType.inline_schema) {
-        mediaTypeObject.schema = buildSchemaFromInlineProperties(contentType.inline_schema);
+        mediaTypeObject.schema = resolveInlineSchemaForExport(contentType.inline_schema);
       }
 
       // Add examples
@@ -263,11 +304,18 @@ export function buildResponseForOpenAPI(response: ResponseInfo): Record<string, 
         }
       }
 
-      content[contentType.media_type] = mediaTypeObject;
+      // Omit empty media-type entries (OpenAPI Media Type Object needs schema and/or examples)
+      if (Object.keys(mediaTypeObject).length > 0) {
+        content[contentType.media_type] = mediaTypeObject;
+      }
     }
 
-    result.content = content;
-  } else {
+    if (Object.keys(content).length > 0) {
+      result.content = content;
+    }
+  }
+
+  if (!result.content) {
     // Fallback: Single content type or legacy format
     let schema: Record<string, unknown> | null = null;
 
@@ -278,7 +326,7 @@ export function buildResponseForOpenAPI(response: ResponseInfo): Record<string, 
       };
     } else if (response.inline_schema) {
       // Inline schema
-      schema = buildSchemaFromInlineProperties(response.inline_schema);
+      schema = resolveInlineSchemaForExport(response.inline_schema);
     } else if (response.data) {
       // Legacy data format - extract schema from it
       const data = response.data;
@@ -585,6 +633,7 @@ export function transformRequestBody(rb: Record<string, unknown>): RequestBodyIn
  * Transform database response record to ResponseInfo
  */
 export function transformResponse(response: Record<string, unknown>): ResponseInfo {
+  const rawCts = response.content_types as unknown[] | undefined;
   return {
     id: response.id as string,
     status_code: response.status_code as string,
@@ -593,6 +642,9 @@ export function transformResponse(response: Record<string, unknown>): ResponseIn
     class_id: response.class_id as string | null,
     class_name: response.class_name as string | null,
     inline_schema: parseInlineSchema(response.inline_schema),
+    content_types: Array.isArray(rawCts)
+      ? rawCts.map(ct => transformContentType(ct as Record<string, unknown>))
+      : undefined,
   };
 }
 
@@ -608,6 +660,28 @@ export function transformParameter(param: Record<string, unknown>): PathParamete
     description: param.description as string | undefined,
     data: param.data ? (typeof param.data === 'string' ? JSON.parse(param.data) : param.data) as Record<string, unknown> : {},
   };
+}
+
+/**
+ * Recursively collect all `#/components/schemas/<name>` $ref values from an
+ * arbitrary JSON Schema object, including nested properties, allOf/oneOf/anyOf,
+ * items, additionalProperties, etc.
+ */
+function collectSchemaRefs(schema: unknown, out: Set<string>): void {
+  if (!schema || typeof schema !== 'object') return;
+  const obj = schema as Record<string, unknown>;
+  if (typeof obj.$ref === 'string') {
+    const m = obj.$ref.match(/#\/components\/schemas\/(.+)/);
+    if (m) out.add(m[1]);
+  }
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (Array.isArray(val)) {
+      for (const item of val) collectSchemaRefs(item, out);
+    } else if (val && typeof val === 'object') {
+      collectSchemaRefs(val, out);
+    }
+  }
 }
 
 /**
@@ -627,12 +701,21 @@ export function collectReferencedClassNames(paths: PathInfo[]): Set<string> {
         }
       }
 
-      // Check responses
+      // Check responses (top-level class, per-media-type class/$ref, legacy data.$ref)
       for (const response of operation.responses) {
         if (response.class_name) {
           classNames.add(response.class_name);
         }
-        // Also check legacy data.$ref format
+        if (response.content_types?.length) {
+          for (const ct of response.content_types) {
+            if (ct.class_name) {
+              classNames.add(ct.class_name);
+            }
+            if (ct.inline_schema) {
+              collectSchemaRefs(ct.inline_schema, classNames);
+            }
+          }
+        }
         if (response.data?.$ref) {
           const refPath = response.data.$ref as string;
           const match = refPath.match(/#\/components\/schemas\/(.+)/);

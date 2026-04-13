@@ -64,11 +64,8 @@ export interface PathResponseData {
 // Helper to get schema display text for primitives and arrays
 const getSchemaDisplayText = (schema: ContentTypeInfo['inline_schema'] | PathResponseData['inlineSchema']): { text: string; isObject: boolean } => {
   if (!schema) {
-    console.log('[PathResponseNode] getSchemaDisplayText: schema is null/undefined');
     return { text: '', isObject: false };
   }
-
-  console.log('[PathResponseNode] getSchemaDisplayText input:', JSON.stringify(schema));
 
   const schemaType = schema.type?.toLowerCase();
 

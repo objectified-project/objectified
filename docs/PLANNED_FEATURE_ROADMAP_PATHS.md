@@ -32,7 +32,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | P-08 | [#2647](https://github.com/KenSuenobu/objectified-commercial/issues/2647) **(shipped)** | Yes |
 | P-09 | [#2648](https://github.com/KenSuenobu/objectified-commercial/issues/2648) **(shipped)** | Yes |
 | P-10 | [#2649](https://github.com/KenSuenobu/objectified-commercial/issues/2649) | Yes |
-| P-11 | [#2650](https://github.com/KenSuenobu/objectified-commercial/issues/2650) | Yes |
+| P-11 | [#2650](https://github.com/KenSuenobu/objectified-commercial/issues/2650) **(shipped)** | Yes |
 | P-12 | [#2651](https://github.com/KenSuenobu/objectified-commercial/issues/2651) | Yes |
 | P-13 | [#2652](https://github.com/KenSuenobu/objectified-commercial/issues/2652) | Yes |
 | P-14 | [#2653](https://github.com/KenSuenobu/objectified-commercial/issues/2653) **(shipped)** | Yes |
@@ -79,7 +79,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 
 | # | Issue | MVP |
 |---|--------|-----|
-| 2650 | P-11 Responses + content map | Yes |
+| ~~2650~~ | ~~P-11 Responses + content map~~ **(shipped)** | Yes |
 | 2651 | P-12 allOf/anyOf/oneOf composer | Yes |
 | 2652 | P-13 Reuse / `$ref` pickers | Yes |
 
