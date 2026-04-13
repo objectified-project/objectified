@@ -3327,6 +3327,25 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
   /** Keyboard delete (Delete/Backspace): sync removed nodes to the API. Auxiliary nodes stay non-deletable. */
   const onNodesDelete = useCallback(
     async (deleted: Node[]) => {
+      /** Unlink `recordId` from every operation connected to `nodeId` via current edges. */
+      const unlinkFromConnectedOperations = async (
+        nodeId: string,
+        recordId: string,
+        unlinkFn: (operationId: string, recordId: string) => Promise<string>
+      ) => {
+        const connectedEdges = edges.filter((e) => e.source === nodeId || e.target === nodeId);
+        for (const edge of connectedEdges) {
+          const otherNodeId = edge.source === nodeId ? edge.target : edge.source;
+          const otherNode = nodes.find((n) => n.id === otherNodeId);
+          if (otherNode?.type === 'operation') {
+            const operationId = (otherNode.data as any)?.dbOperationId;
+            if (operationId) {
+              await unlinkFn(operationId, recordId);
+            }
+          }
+        }
+      };
+
       for (const node of deleted) {
         try {
           if (node.type === 'operation') {
@@ -3334,6 +3353,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
           } else if (node.type === 'parameter') {
             const pid = (node.data as { dbParameterId?: string })?.dbParameterId;
             if (pid) {
+              await unlinkFromConnectedOperations(node.id, pid, unlinkParameterFromOperation);
               const result = await deleteSharedPathParameter(pid);
               const parsed = JSON.parse(result);
               if (!parsed.success) {
@@ -3347,6 +3367,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
           } else if (node.type === 'response') {
             const rid = (node.data as { dbResponseId?: string })?.dbResponseId;
             if (rid) {
+              await unlinkFromConnectedOperations(node.id, rid, unlinkResponseFromOperation);
               const result = await deleteSharedPathResponse(rid);
               const parsed = JSON.parse(result);
               if (!parsed.success) {
@@ -3371,7 +3392,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         onRefresh();
       }
     },
-    [alertDialog, onRefresh]
+    [alertDialog, edges, nodes, onRefresh]
   );
 
   // Handle drop
