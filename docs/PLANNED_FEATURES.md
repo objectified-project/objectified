@@ -131,25 +131,24 @@ Implement and verify in this order so each step stays testable. **Issue → road
 
 | Order | Issue | ID |
 |------:|------|-----|
-| 1 | [#2640](https://github.com/KenSuenobu/objectified-commercial/issues/2640) | P-01 |
-| 2 | [#2641](https://github.com/KenSuenobu/objectified-commercial/issues/2641) | P-02 |
-| 3 | [#2642](https://github.com/KenSuenobu/objectified-commercial/issues/2642) | P-03 |
-| 4 | [#2643](https://github.com/KenSuenobu/objectified-commercial/issues/2643) | P-04 |
-| 5 | [#2644](https://github.com/KenSuenobu/objectified-commercial/issues/2644) | P-05 |
-| 6 | [#2645](https://github.com/KenSuenobu/objectified-commercial/issues/2645) | P-06 |
-| 7 | [#2646](https://github.com/KenSuenobu/objectified-commercial/issues/2646) | P-07 |
-| 8 | [#2653](https://github.com/KenSuenobu/objectified-commercial/issues/2653) | P-14 (OPTIONS first-class; sequenced after P-07 in dependency charts—keep graph order if conflicts) |
-| 9 | [#2647](https://github.com/KenSuenobu/objectified-commercial/issues/2647) | P-08 |
-| 10 | [#2648](https://github.com/KenSuenobu/objectified-commercial/issues/2648) | P-09 |
-| 11 | [#2649](https://github.com/KenSuenobu/objectified-commercial/issues/2649) | P-10 |
-| 12 | [#2650](https://github.com/KenSuenobu/objectified-commercial/issues/2650) | P-11 |
-| 13 | [#2651](https://github.com/KenSuenobu/objectified-commercial/issues/2651) | P-12 |
-| 14 | [#2652](https://github.com/KenSuenobu/objectified-commercial/issues/2652) | P-13 |
-| 15 | [#2654](https://github.com/KenSuenobu/objectified-commercial/issues/2654) | P-15 |
-| 16 | [#2655](https://github.com/KenSuenobu/objectified-commercial/issues/2655) | P-16 |
-| 17 | [#2656](https://github.com/KenSuenobu/objectified-commercial/issues/2656) | P-17 |
+| 1 | [#2641](https://github.com/KenSuenobu/objectified-commercial/issues/2641) | P-02 |
+| 2 | [#2642](https://github.com/KenSuenobu/objectified-commercial/issues/2642) | P-03 |
+| 3 | [#2643](https://github.com/KenSuenobu/objectified-commercial/issues/2643) | P-04 |
+| 4 | [#2644](https://github.com/KenSuenobu/objectified-commercial/issues/2644) | P-05 |
+| 5 | [#2645](https://github.com/KenSuenobu/objectified-commercial/issues/2645) | P-06 |
+| 6 | [#2646](https://github.com/KenSuenobu/objectified-commercial/issues/2646) | P-07 |
+| 7 | [#2653](https://github.com/KenSuenobu/objectified-commercial/issues/2653) | P-14 (OPTIONS first-class; sequenced after P-07 in dependency charts—keep graph order if conflicts) |
+| 8 | [#2647](https://github.com/KenSuenobu/objectified-commercial/issues/2647) | P-08 |
+| 9 | [#2648](https://github.com/KenSuenobu/objectified-commercial/issues/2648) | P-09 |
+| 10 | [#2649](https://github.com/KenSuenobu/objectified-commercial/issues/2649) | P-10 |
+| 11 | [#2650](https://github.com/KenSuenobu/objectified-commercial/issues/2650) | P-11 |
+| 12 | [#2651](https://github.com/KenSuenobu/objectified-commercial/issues/2651) | P-12 |
+| 13 | [#2652](https://github.com/KenSuenobu/objectified-commercial/issues/2652) | P-13 |
+| 14 | [#2654](https://github.com/KenSuenobu/objectified-commercial/issues/2654) | P-15 |
+| 15 | [#2655](https://github.com/KenSuenobu/objectified-commercial/issues/2655) | P-16 |
+| 16 | [#2656](https://github.com/KenSuenobu/objectified-commercial/issues/2656) | P-17 |
 
-**Shipped:** P-00 ([#2639](https://github.com/KenSuenobu/objectified-commercial/issues/2639)) — Studio header **Paths** link and Home four-wide grid with **Paths** beside **Designer**.
+**Shipped:** P-00 ([#2639](https://github.com/KenSuenobu/objectified-commercial/issues/2639)) — Studio header **Paths** link and Home four-wide grid with **Paths** beside **Designer**. P-01 ([#2640](https://github.com/KenSuenobu/objectified-commercial/issues/2640)) — Paths **PATH QUALITY** placeholder, **Canvas | Code** (Paths editor), **Canvas | Paths | Code** navigation when not on Paths.
 
 **Excluded from first MVP (roadmap):** [#2657](https://github.com/KenSuenobu/objectified-commercial/issues/2657) (P-18), [#2658](https://github.com/KenSuenobu/objectified-commercial/issues/2658)–[#2662](https://github.com/KenSuenobu/objectified-commercial/issues/2662) (V2-01 → V2-05).
 
