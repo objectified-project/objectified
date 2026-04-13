@@ -131,24 +131,25 @@ Implement and verify in this order so each step stays testable. **Issue → road
 
 | Order | Issue | ID |
 |------:|------|-----|
-| 1 | [#2639](https://github.com/KenSuenobu/objectified-commercial/issues/2639) | P-00 |
-| 2 | [#2640](https://github.com/KenSuenobu/objectified-commercial/issues/2640) | P-01 |
-| 3 | [#2641](https://github.com/KenSuenobu/objectified-commercial/issues/2641) | P-02 |
-| 4 | [#2642](https://github.com/KenSuenobu/objectified-commercial/issues/2642) | P-03 |
-| 5 | [#2643](https://github.com/KenSuenobu/objectified-commercial/issues/2643) | P-04 |
-| 6 | [#2644](https://github.com/KenSuenobu/objectified-commercial/issues/2644) | P-05 |
-| 7 | [#2645](https://github.com/KenSuenobu/objectified-commercial/issues/2645) | P-06 |
-| 8 | [#2646](https://github.com/KenSuenobu/objectified-commercial/issues/2646) | P-07 |
-| 9 | [#2653](https://github.com/KenSuenobu/objectified-commercial/issues/2653) | P-14 (OPTIONS first-class; sequenced after P-07 in dependency charts—keep graph order if conflicts) |
-| 10 | [#2647](https://github.com/KenSuenobu/objectified-commercial/issues/2647) | P-08 |
-| 11 | [#2648](https://github.com/KenSuenobu/objectified-commercial/issues/2648) | P-09 |
-| 12 | [#2649](https://github.com/KenSuenobu/objectified-commercial/issues/2649) | P-10 |
-| 13 | [#2650](https://github.com/KenSuenobu/objectified-commercial/issues/2650) | P-11 |
-| 14 | [#2651](https://github.com/KenSuenobu/objectified-commercial/issues/2651) | P-12 |
-| 15 | [#2652](https://github.com/KenSuenobu/objectified-commercial/issues/2652) | P-13 |
-| 16 | [#2654](https://github.com/KenSuenobu/objectified-commercial/issues/2654) | P-15 |
-| 17 | [#2655](https://github.com/KenSuenobu/objectified-commercial/issues/2655) | P-16 |
-| 18 | [#2656](https://github.com/KenSuenobu/objectified-commercial/issues/2656) | P-17 |
+| 1 | [#2640](https://github.com/KenSuenobu/objectified-commercial/issues/2640) | P-01 |
+| 2 | [#2641](https://github.com/KenSuenobu/objectified-commercial/issues/2641) | P-02 |
+| 3 | [#2642](https://github.com/KenSuenobu/objectified-commercial/issues/2642) | P-03 |
+| 4 | [#2643](https://github.com/KenSuenobu/objectified-commercial/issues/2643) | P-04 |
+| 5 | [#2644](https://github.com/KenSuenobu/objectified-commercial/issues/2644) | P-05 |
+| 6 | [#2645](https://github.com/KenSuenobu/objectified-commercial/issues/2645) | P-06 |
+| 7 | [#2646](https://github.com/KenSuenobu/objectified-commercial/issues/2646) | P-07 |
+| 8 | [#2653](https://github.com/KenSuenobu/objectified-commercial/issues/2653) | P-14 (OPTIONS first-class; sequenced after P-07 in dependency charts—keep graph order if conflicts) |
+| 9 | [#2647](https://github.com/KenSuenobu/objectified-commercial/issues/2647) | P-08 |
+| 10 | [#2648](https://github.com/KenSuenobu/objectified-commercial/issues/2648) | P-09 |
+| 11 | [#2649](https://github.com/KenSuenobu/objectified-commercial/issues/2649) | P-10 |
+| 12 | [#2650](https://github.com/KenSuenobu/objectified-commercial/issues/2650) | P-11 |
+| 13 | [#2651](https://github.com/KenSuenobu/objectified-commercial/issues/2651) | P-12 |
+| 14 | [#2652](https://github.com/KenSuenobu/objectified-commercial/issues/2652) | P-13 |
+| 15 | [#2654](https://github.com/KenSuenobu/objectified-commercial/issues/2654) | P-15 |
+| 16 | [#2655](https://github.com/KenSuenobu/objectified-commercial/issues/2655) | P-16 |
+| 17 | [#2656](https://github.com/KenSuenobu/objectified-commercial/issues/2656) | P-17 |
+
+**Shipped:** P-00 ([#2639](https://github.com/KenSuenobu/objectified-commercial/issues/2639)) — Studio header **Paths** link and Home four-wide grid with **Paths** beside **Designer**.
 
 **Excluded from first MVP (roadmap):** [#2657](https://github.com/KenSuenobu/objectified-commercial/issues/2657) (P-18), [#2658](https://github.com/KenSuenobu/objectified-commercial/issues/2658)–[#2662](https://github.com/KenSuenobu/objectified-commercial/issues/2662) (V2-01 → V2-05).
 
@@ -159,8 +160,6 @@ Implement and verify in this order so each step stays testable. **Issue → road
 - **Current route:** Paths live at **`/ade/studio/paths`** (`objectified-ui/src/app/ade/studio/paths/page.tsx`) with **sidebar + canvas + panels** and REST integration—see also `objectified-ui/docs/PATHS_IMPLEMENTATION_SUMMARY.md` (may be **ahead** or **divergent** from P-00–P-17 acceptance text).
 - **REST / DB:** `objectified-rest/src/app/paths_routes.py` and UI BFF routes back paths data; roadmap stresses mapping to **`odb.version_path`**, **`odb.path_operation`**, and related tables—**reconcile** any **stale internal docs** vs current **Postgres/REST** path.
 - **PATH QUALITY / OpenAPI 3.2:** P-16/P-17 require a clear **validation/export** story; `lib/db/helper-paths-export.ts` and OpenAPI generators are relevant—gaps should be **closed inside P-15–P-17**, not via silent one-off scripts.
-
-**Consider creating an issue for:** **navigation parity** if product expects **Paths** next to **Designer** on **dashboard** chrome (**#2639**) but routing remains **studio-only**.
 
 ### B.3 Testing checkpoint 1 — After P-03 (persist canvas JSON per version)
 

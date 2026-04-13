@@ -6,8 +6,7 @@ import {
   LayoutDashboard,
   Palette,
   Globe,
-  ArrowRightLeft,
-  Search,
+  Route,
   Shield,
   ClipboardList,
   HelpCircle,
@@ -38,16 +37,6 @@ const Ade = () => {
 
   const mainApps: AppTile[] = [
     {
-      id: 'control-panel',
-      name: 'Control Panel',
-      description: 'Manage tenants, projects, and settings',
-      icon: <LayoutDashboard className="w-8 h-8" />,
-      href: '/ade/dashboard',
-      enabled: true,
-      color: 'text-indigo-600 dark:text-indigo-400',
-      gradient: 'from-indigo-500 to-purple-600',
-    },
-    {
       id: 'studio',
       name: 'Data Designer',
       description: 'Design schemas and API specifications',
@@ -56,6 +45,26 @@ const Ade = () => {
       enabled: true,
       color: 'text-purple-600 dark:text-purple-400',
       gradient: 'from-purple-500 to-pink-600',
+    },
+    {
+      id: 'paths',
+      name: 'Paths',
+      description: 'Author OpenAPI paths and operations for your API',
+      icon: <Route className="w-8 h-8" />,
+      href: '/ade/studio/paths',
+      enabled: true,
+      color: 'text-amber-600 dark:text-amber-400',
+      gradient: 'from-amber-500 to-orange-600',
+    },
+    {
+      id: 'control-panel',
+      name: 'Control Panel',
+      description: 'Manage tenants, projects, and settings',
+      icon: <LayoutDashboard className="w-8 h-8" />,
+      href: '/ade/dashboard',
+      enabled: true,
+      color: 'text-indigo-600 dark:text-indigo-400',
+      gradient: 'from-indigo-500 to-purple-600',
     },
     {
       id: 'browser',
@@ -183,6 +192,8 @@ const Ade = () => {
   const renderAppTile = (tile: AppTile) => (
     <button
       key={tile.id}
+      type="button"
+      aria-label={tile.enabled ? `Open ${tile.name}` : `${tile.name} (coming soon)`}
       onClick={() => handleTileClick(tile)}
       disabled={!tile.enabled}
       className={cn(
@@ -255,8 +266,8 @@ const Ade = () => {
           </p>
         </div>
 
-        {/* Main Apps Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        {/* Main Apps Row — four-wide on large screens; Designer then Paths (issue #2639) */}
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {mainApps.map(renderAppTile)}
         </div>
 

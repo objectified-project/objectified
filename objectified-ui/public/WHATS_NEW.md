@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## UI:
+- **Paths navigation (#2639):** **Paths** appears in the main Studio nav **next to Designer** (tenant/project context preserved); **Home** uses a **four-column** app grid on large screens with a **Paths** card **immediately to the right of Data Designer**, linking to **`/ade/studio/paths`**
 - **Version merge (#738):** Branch merge **preview** and **apply** run through **objectified-rest** — **merge-base (LCA)** plus **three-way** `components.schemas` merge, structured conflict paths, **two parents** on the merge revision, **`baseRevisionId`** optimistic lock on the target tip; Studio API routes proxy to REST
 - **Canvas ↔ Code (#2595):** Switching to **Code** now **synchronously hides group floating toolbars** (including hover/settings/export), **clears flow selection**, and **blocks sidebar group delete row actions** while the Code tab is active so nothing in that stack can take a stray click during the transition
 - **Studio Code / GraphQL (#147):** GraphQL SDL in the Code tab is generated from a **Handlebars template** (`templates/graphql/graphql-schema.hbs`) instead of inlined string building, aligned with OpenAPI and Arazzo; template loader init is synchronous so tooling can import it safely

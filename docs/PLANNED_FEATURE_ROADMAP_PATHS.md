@@ -21,7 +21,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 
 | ID | Issue | MVP |
 |----|------|-----|
-| P-00 | [#2639](https://github.com/KenSuenobu/objectified-commercial/issues/2639) | Yes |
+| P-00 | [#2639](https://github.com/KenSuenobu/objectified-commercial/issues/2639) (shipped) | Yes |
 | P-01 | [#2640](https://github.com/KenSuenobu/objectified-commercial/issues/2640) | Yes |
 | P-02 | [#2641](https://github.com/KenSuenobu/objectified-commercial/issues/2641) | Yes |
 | P-03 | [#2642](https://github.com/KenSuenobu/objectified-commercial/issues/2642) | Yes |
@@ -52,7 +52,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 
 | # | Issue | MVP |
 |---|--------|-----|
-| 2639 | P-00 Navigation: header “Paths” + Home grid card | Yes |
+| ~~2639~~ | ~~P-00 Navigation: header “Paths” + Home grid card~~ **(shipped)** | Yes |
 | 2640 | P-01 Paths shell: header, PATH QUALITY placeholder, Canvas/Code | Yes |
 | 2641 | P-02 Canvas defaults parity with Designer | Yes |
 | 2642 | P-03 Persist canvas JSON per version | Yes |
@@ -203,9 +203,9 @@ Each issue is intentionally small enough to ship independently. After each issue
 
 ---
 
-### P-00 — Navigation: Studio header “Paths” link and Home grid card
+### P-00 — Navigation: Studio header “Paths” link and Home grid card ✅
 
-**Epic:** E1 · **GitHub:** [#2639](https://github.com/KenSuenobu/objectified-commercial/issues/2639) · **Labels:** `paths`, `mvp`, `ui`, `roadmap-paths`
+**Epic:** E1 · **GitHub:** [#2639](https://github.com/KenSuenobu/objectified-commercial/issues/2639) · **Labels:** `paths`, `mvp`, `ui`, `roadmap-paths` · **Status:** shipped
 
 **Title:** Add Paths navigation in Studio header and a four-wide Home card grid entry to the right of Designer
 
