@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useStudio } from '../StudioContext';
 import { Code2 } from 'lucide-react';
 import PathsSidebar from './components/PathsSidebar';
+import PathsHttpOperationPalette from './components/PathsHttpOperationPalette';
 import PathsCanvasView from './components/PathsCanvasView';
 import OperationPropertiesPanel from './components/OperationPropertiesPanel';
 import ParameterPropertiesPanel from './components/ParameterPropertiesPanel';
@@ -132,6 +133,8 @@ export default function PathsPage() {
             onPathSelect={handlePathSelect}
             onSecurityRefresh={handleCanvasRefresh}
           />
+
+          <PathsHttpOperationPalette />
 
           {/* Center Canvas */}
           <div className="flex-1 relative">
