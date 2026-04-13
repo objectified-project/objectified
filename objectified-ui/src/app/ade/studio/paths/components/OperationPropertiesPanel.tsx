@@ -205,7 +205,7 @@ export default function OperationPropertiesPanel({
           setDeprecated(meta.deprecated === true);
           const metaTags = meta.tags;
           if (Array.isArray(metaTags)) {
-            setTags(metaTags.map((t) => String(t).trim()).filter(Boolean));
+            setTags([...new Set(metaTags.map((t) => String(t).trim()).filter(Boolean))]);
           } else {
             setTags([]);
           }
@@ -376,6 +376,7 @@ export default function OperationPropertiesPanel({
 
     setIsSaving(true);
     setSaveStatus('idle');
+    const trimmedOperationIdName = operationIdName.trim();
     try {
       // Strip placeholder keys (__new__*) so we don't persist them
       const sanitizedSecurity =
@@ -423,9 +424,11 @@ export default function OperationPropertiesPanel({
         operationId,
         summary,
         description,
-        operationIdName,
+        trimmedOperationIdName,
         Object.keys(metadata).length > 0 ? metadata : undefined
       );
+      // Sync local state to the normalized (trimmed) value
+      setOperationIdName(trimmedOperationIdName);
       // Update loadedMetadata to reflect the saved state
       setLoadedMetadata(metadata);
       // Show "Saved" in button briefly
