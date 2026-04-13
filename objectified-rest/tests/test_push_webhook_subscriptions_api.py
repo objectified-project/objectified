@@ -62,9 +62,9 @@ def test_create_ok():
         assert body["url"] == "https://example.com/hook"
         mdb.create_push_webhook_subscription.assert_called_once()
         ca = mdb.create_push_webhook_subscription.call_args
-        assert ca[0][2] == "https://example.com/hook"  # normalized url
-        assert ca[0][3] == "https://example.com/hook"
-        assert ca[0][4] == "supersecretvaluehere"
+        assert ca[0][1] == "https://example.com/hook/"  # original url preserved
+        assert ca[0][2] == "https://example.com/hook"   # normalized url for dedup
+        assert ca[0][3] == "supersecretvaluehere"        # signing_secret
 
 
 def test_create_duplicate_409():
@@ -122,3 +122,42 @@ def test_normalize_rejects_userinfo():
         )
         assert r.status_code == 400
         mdb.create_push_webhook_subscription.assert_not_called()
+
+
+def test_get_single_ok():
+    with patch("app.push_webhook_subscriptions_routes.db") as mdb:
+        mdb.get_push_webhook_subscription.return_value = {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "url": "https://example.com/hook",
+            "active": True,
+            "signing_secret_ref": "22222222-2222-2222-2222-222222222222",
+            "created_at": None,
+            "updated_at": None,
+        }
+        r = client.get(
+            "/v1/push-webhook-subscriptions/tn/11111111-1111-1111-1111-111111111111"
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["id"] == "11111111-1111-1111-1111-111111111111"
+        assert body["signingSecretRef"] == "22222222-2222-2222-2222-222222222222"
+        assert "signingSecret" not in body
+
+
+def test_get_single_not_found():
+    with patch("app.push_webhook_subscriptions_routes.db") as mdb:
+        mdb.get_push_webhook_subscription.return_value = None
+        r = client.get(
+            "/v1/push-webhook-subscriptions/tn/00000000-0000-0000-0000-000000000000"
+        )
+        assert r.status_code == 404
+
+
+def test_update_not_found():
+    with patch("app.push_webhook_subscriptions_routes.db") as mdb:
+        mdb.update_push_webhook_subscription.return_value = None
+        r = client.patch(
+            "/v1/push-webhook-subscriptions/tn/00000000-0000-0000-0000-000000000000",
+            json={"active": False},
+        )
+        assert r.status_code == 404

@@ -104,7 +104,7 @@ async def create_push_webhook_subscription(
     try:
         row = db.create_push_webhook_subscription(
             tenant_id,
-            norm,
+            body.url,
             norm,
             body.signing_secret,
             active=body.active,
@@ -153,7 +153,7 @@ async def update_push_webhook_subscription(
     if body.url is not None:
         try:
             norm_val = normalize_push_webhook_url(body.url)
-            url_val = norm_val
+            url_val = body.url
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
 
