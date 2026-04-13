@@ -367,7 +367,6 @@ const StudioContent = () => {
   // Toggle click-to-focus mode (defined after useStudio to access setContextClickToFocusEnabled)
   const toggleClickToFocus = useCallback(() => {
     const newValue = !clickToFocusEnabled;
-    localStorage.setItem('clickToFocusEnabled', JSON.stringify(newValue));
     setContextClickToFocusEnabled(newValue);
     return newValue;
   }, [clickToFocusEnabled, setContextClickToFocusEnabled]);
@@ -3673,7 +3672,7 @@ const StudioContent = () => {
       return;
     }
 
-    // Calculate smart guides for alignment
+    // Calculate smart guides for alignment (#2641: shared math lives in lib/smart-alignment-guides.ts for Paths — keep in sync)
     const SNAP_THRESHOLD = 8; // pixels
     const newHorizontalGuides: Array<{ y: number; x1: number; x2: number }> = [];
     const newVerticalGuides: Array<{ x: number; y1: number; y2: number }> = [];
