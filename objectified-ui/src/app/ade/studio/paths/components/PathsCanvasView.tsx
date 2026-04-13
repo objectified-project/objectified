@@ -3153,6 +3153,25 @@ function PathsCanvasInner({
           return;
         }
 
+        // Prevent connecting request body to non-POST/PUT/PATCH operations
+        if (sourceNode?.type === 'requestBody' || targetNode?.type === 'requestBody') {
+          const operationNode = sourceNode?.type === 'operation' ? sourceNode
+            : targetNode?.type === 'operation' ? targetNode
+            : undefined;
+          // operationNode is always defined here because the guards above ensured the other
+          // node is an operation; this explicit check makes it unambiguous.
+          if (!operationNode) return;
+          const method = ((operationNode.data as any)?.operation as string | undefined)?.toUpperCase();
+          if (!method || !['POST', 'PUT', 'PATCH'].includes(method)) {
+            await alertDialog({
+              title: 'Invalid Connection',
+              message: 'Request bodies can only be linked to POST, PUT, or PATCH operations.',
+              variant: 'warning',
+            });
+            return;
+          }
+        }
+
         // Class <-> Response: show copy vs $ref dialog only; do not add an edge (schema is bound to response)
         if (
           (sourceNode?.type === 'class' && targetNode?.type === 'response') ||
@@ -3183,9 +3202,34 @@ function PathsCanvasInner({
       const targetNodeForEdge = nodes.find((n) => n.id === connection.target);
       const manualLabel = labelForManualConnection(sourceNodeForEdge, targetNodeForEdge);
 
+      // Derive a stable edge id matching the computed topology so that saved-only duplicates
+      // don't appear after a page reload (mergePathsCanvasLayout skips edges whose id already
+      // exists in the computed set).
+      let stableEdgeId: string | undefined;
+      {
+        const src = sourceNodeForEdge;
+        const tgt = targetNodeForEdge;
+        if (src?.type === 'operation' && tgt?.type === 'parameter') {
+          stableEdgeId = `edge-${(src.data as any)?.dbOperationId}-${(tgt.data as any)?.dbParameterId}`;
+        } else if (src?.type === 'parameter' && tgt?.type === 'operation') {
+          stableEdgeId = `edge-${(tgt.data as any)?.dbOperationId}-${(src.data as any)?.dbParameterId}`;
+        } else if (src?.type === 'operation' && tgt?.type === 'response') {
+          stableEdgeId = `edge-op-resp-${(src.data as any)?.dbOperationId}-${(tgt.data as any)?.dbResponseId}`;
+        } else if (src?.type === 'response' && tgt?.type === 'operation') {
+          stableEdgeId = `edge-op-resp-${(tgt.data as any)?.dbOperationId}-${(src.data as any)?.dbResponseId}`;
+        } else if (src?.type === 'operation' && tgt?.type === 'requestBody') {
+          // Always requestBody id first, then operation id — matches computed topology
+          stableEdgeId = `edge-rb-op-${(tgt.data as any)?.id}-${(src.data as any)?.dbOperationId}`;
+        } else if (src?.type === 'requestBody' && tgt?.type === 'operation') {
+          // Always requestBody id first, then operation id — matches computed topology
+          stableEdgeId = `edge-rb-op-${(src.data as any)?.id}-${(tgt.data as any)?.dbOperationId}`;
+        }
+      }
+
       // Add edge to UI first
       setEdges((eds) => addEdge({
         ...connection,
+        ...(stableEdgeId ? { id: stableEdgeId } : {}),
         type: edgeType,
         animated: edgeAnimation !== 'none',
         ...(manualLabel
@@ -3207,7 +3251,7 @@ function PathsCanvasInner({
         },
       }, eds));
 
-      // Save link to database if connecting operation to parameter or response (either direction)
+      // Save link to database if connecting an operation to a parameter, response, or request body (either direction)
       if (connection.source && connection.target) {
         const sourceNode = sourceNodeForEdge;
         const targetNode = targetNodeForEdge;
