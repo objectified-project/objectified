@@ -41,9 +41,11 @@ import {
 import { getClassesWithPropertiesAndTags } from '../../../../../../lib/db/helper';
 import {
   buildPropertyTreeFromInlineSchema,
+  getActiveCompositionKind,
   type InlineSchema,
   type PropertyTreeNode,
 } from '../../../../../../lib/utils/inline-schema-utils';
+import ResponseSchemaComposition from './ResponseSchemaComposition';
 
 // =============================================================================
 // TYPES
@@ -495,6 +497,13 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
   const handleAddProperty = async () => {
     if (!currentContentType || !newPropertyName) return;
 
+    if (currentContentType.inline_schema && getActiveCompositionKind(currentContentType.inline_schema)) {
+      window.alert(
+        'Remove schema composition (allOf/anyOf/oneOf) before adding inline properties, or apply an empty object schema first.'
+      );
+      return;
+    }
+
     try {
       await addPropertyToResponseInlineSchema(currentContentType.id, {
         name: newPropertyName,
@@ -866,6 +875,19 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
           {/* Inline Schema Mode */}
           {schemaMode === 'object' && (
             <div>
+              {!currentContentType.class_id && (
+                <ResponseSchemaComposition
+                  contentTypeId={currentContentType.id}
+                  inlineSchema={currentContentType.inline_schema}
+                  classes={classes.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))}
+                  isDark={isDark}
+                  onUpdated={async () => {
+                    await loadContentTypes();
+                    onUpdate();
+                  }}
+                />
+              )}
+
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-semibold">Properties</span>
                 <Button
@@ -873,6 +895,18 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
                   size="sm"
                   variant="outline"
                   onClick={() => setShowAddPropertyDialog(true)}
+                  disabled={
+                    !!(
+                      currentContentType.inline_schema &&
+                      getActiveCompositionKind(currentContentType.inline_schema)
+                    )
+                  }
+                  title={
+                    currentContentType.inline_schema &&
+                    getActiveCompositionKind(currentContentType.inline_schema)
+                      ? 'Clear schema composition before adding properties'
+                      : undefined
+                  }
                 >
                   <Plus size={16} className="mr-1.5" />
                   Add Property

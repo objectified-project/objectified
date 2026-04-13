@@ -28,7 +28,17 @@ def build_schema_from_inline_properties(inline_schema: Dict[str, Any]) -> Dict[s
         return {}
 
     schema: Dict[str, Any] = {}
-    properties = inline_schema.get('properties', [])
+    properties = inline_schema.get('properties') or []
+
+    # Composition-only: OpenAPI Schema Object with allOf / anyOf / oneOf (no inline property tree)
+    for key in ('allOf', 'anyOf', 'oneOf'):
+        branches = inline_schema.get(key)
+        if isinstance(branches, list) and len(branches) > 0 and len(properties) == 0:
+            out: Dict[str, Any] = {}
+            if inline_schema.get('description'):
+                out['description'] = inline_schema['description']
+            out[key] = branches
+            return out
 
     if not properties:
         return inline_schema

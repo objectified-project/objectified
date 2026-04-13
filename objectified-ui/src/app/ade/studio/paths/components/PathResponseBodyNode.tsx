@@ -6,9 +6,18 @@ import { FileJson, Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, Alert
 import { Handle, Position } from '@xyflow/react';
 import {
   buildPropertyTreeFromInlineSchema,
+  getActiveCompositionKind,
   type InlineSchema,
   type PropertyTreeNode,
 } from '../../../../../../lib/utils/inline-schema-utils';
+
+function compositionSummary(inline: InlineSchema | null | undefined): string | null {
+  const k = getActiveCompositionKind(inline ?? null);
+  if (!k || !inline) return null;
+  const arr = (inline as unknown as Record<string, unknown>)[k];
+  const n = Array.isArray(arr) ? arr.length : 0;
+  return `${k}${n ? `(${n})` : ''}`;
+}
 
 // =============================================================================
 // TYPES
@@ -71,6 +80,7 @@ function ContentTypeBadge({ content }: { content: ContentTypeInfo }) {
 
   const isReference = !!content.class_id;
   const propertyCount = content.inline_schema?.properties?.length || 0;
+  const comp = compositionSummary(content.inline_schema);
   const refLabel = isReference ? `$ref: ${content.class_name || 'Unknown'}` : null;
 
   return (
@@ -79,6 +89,11 @@ function ContentTypeBadge({ content }: { content: ContentTypeInfo }) {
         <>
           <Link2 className="w-3 h-3" />
           <span className="truncate max-w-[120px]" title={content.class_name || undefined}>{refLabel}</span>
+        </>
+      ) : comp ? (
+        <>
+          <Pencil className="w-3 h-3" />
+          <span className="truncate max-w-[120px]" title={comp}>{comp}</span>
         </>
       ) : (
         <>
@@ -632,12 +647,15 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
         {/* Header: status + schema summary so the attached schema is visible at a glance */}
         {(() => {
           const ct = data.contentTypes[selectedContentTypeIndex];
+          const compLabel = ct?.inline_schema ? compositionSummary(ct.inline_schema) : null;
           const schemaLabel = ct
             ? (ct.class_id
                 ? `$ref: ${ct.class_name || 'Unknown'}`
-                : (ct.inline_schema?.properties?.length ?? 0) > 0
-                  ? `${ct.inline_schema!.properties!.length} props`
-                  : 'Object')
+                : compLabel
+                  ? compLabel
+                  : (ct.inline_schema?.properties?.length ?? 0) > 0
+                    ? `${ct.inline_schema!.properties!.length} props`
+                    : 'Object')
             : null;
           return (
         <div className="p-3 bg-gradient-to-r from-emerald-500 to-green-600 rounded-t-xl">
