@@ -620,7 +620,7 @@ export default function RequestBodySection({
           await setContentTypeClassReference(contentId, classes[0].id);
         }
       }
-      await loadRequestBodyData();
+      onRefresh?.();
     } catch (error) {
       console.error('Error changing schema type:', error);
     }
@@ -629,7 +629,7 @@ export default function RequestBodySection({
   const handleClassChange = async (contentId: string, classId: string) => {
     try {
       await setContentTypeClassReference(contentId, classId);
-      await loadRequestBodyData();
+      onRefresh?.();
     } catch (error) {
       console.error('Error changing class reference:', error);
     }
@@ -690,7 +690,7 @@ export default function RequestBodySection({
         setNewMediaType('application/json');
         setNewContentSchemaType('inline');
         setNewContentClassId('');
-        await loadRequestBodyData();
+        onRefresh?.();
       } else {
         await alertDialog({
           title: 'Error',
@@ -744,7 +744,7 @@ export default function RequestBodySection({
         setNewPropertyName('');
         setNewPropertyType('string');
         setCurrentContentId(null);
-        await loadRequestBodyData();
+        onRefresh?.();
       } else {
         await alertDialog({
           title: 'Error',
@@ -773,7 +773,7 @@ export default function RequestBodySection({
       const data = JSON.parse(result);
 
       if (data.success) {
-        await loadRequestBodyData();
+        onRefresh?.();
       }
     } catch (error) {
       console.error('Error deleting property:', error);
