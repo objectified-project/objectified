@@ -2892,6 +2892,119 @@ class Database:
             conn.rollback()
             raise e
 
+    def get_path_canvas(self, version_id: str, path_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Load Paths React Flow canvas JSON for a version_path row (tenant-scoped).
+        Returns None if the path is missing or not under the given version.
+        """
+        path = self.get_path_by_id(path_id, tenant_id)
+        if not path or str(path["version_id"]) != str(version_id):
+            return None
+
+        query = """
+            SELECT canvas, updated_at
+            FROM odb.version_path_canvas
+            WHERE version_path_id = %s
+        """
+        rows = self.execute_query(query, (path_id,))
+        default_canvas = {
+            "nodes": [],
+            "edges": [],
+            "viewport": {"x": 0, "y": 0, "zoom": 1},
+        }
+        if not rows:
+            return {
+                **default_canvas,
+                "updated_at": None,
+            }
+
+        row = rows[0]
+        canvas = row["canvas"]
+        if isinstance(canvas, str):
+            canvas = json.loads(canvas)
+        if not isinstance(canvas, dict):
+            canvas = default_canvas
+        nodes = canvas.get("nodes")
+        edges = canvas.get("edges")
+        viewport = canvas.get("viewport")
+        if not isinstance(nodes, list):
+            nodes = []
+        if not isinstance(edges, list):
+            edges = []
+        if not isinstance(viewport, dict):
+            viewport = {"x": 0, "y": 0, "zoom": 1}
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "viewport": {
+                "x": float(viewport.get("x", 0)),
+                "y": float(viewport.get("y", 0)),
+                "zoom": float(viewport.get("zoom", 1)),
+            },
+            "updated_at": row.get("updated_at"),
+        }
+
+    def upsert_path_canvas(
+        self,
+        version_id: str,
+        path_id: str,
+        tenant_id: str,
+        canvas: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Insert or update Paths canvas JSON (last-write-wins). Returns None if path/version/tenant mismatch.
+        """
+        path = self.get_path_by_id(path_id, tenant_id)
+        if not path or str(path["version_id"]) != str(version_id):
+            return None
+
+        payload = {
+            "nodes": canvas.get("nodes") if isinstance(canvas.get("nodes"), list) else [],
+            "edges": canvas.get("edges") if isinstance(canvas.get("edges"), list) else [],
+            "viewport": canvas.get("viewport")
+            if isinstance(canvas.get("viewport"), dict)
+            else {"x": 0, "y": 0, "zoom": 1},
+        }
+        vp = payload["viewport"]
+        try:
+            payload["viewport"] = {
+                "x": float(vp.get("x", 0)),
+                "y": float(vp.get("y", 0)),
+                "zoom": float(vp.get("zoom", 1)),
+            }
+        except (TypeError, ValueError):
+            payload["viewport"] = {"x": 0, "y": 0, "zoom": 1}
+
+        query = """
+            INSERT INTO odb.version_path_canvas (version_path_id, canvas, updated_at)
+            VALUES (%s, %s::jsonb, CURRENT_TIMESTAMP)
+            ON CONFLICT (version_path_id) DO UPDATE SET
+                canvas = EXCLUDED.canvas,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING canvas, updated_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (path_id, Json(payload)))
+                result = cursor.fetchone()
+                conn.commit()
+                if not result:
+                    return None
+                out_canvas = result["canvas"]
+                if isinstance(out_canvas, str):
+                    out_canvas = json.loads(out_canvas)
+                return {
+                    "nodes": out_canvas.get("nodes", []),
+                    "edges": out_canvas.get("edges", []),
+                    "viewport": out_canvas.get("viewport", {"x": 0, "y": 0, "zoom": 1}),
+                    "updated_at": result.get("updated_at"),
+                }
+        except Exception as e:
+            conn.rollback()
+            raise e
+
     # ==================== Path Operation CRUD ====================
 
     def get_operation_by_id(self, operation_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:

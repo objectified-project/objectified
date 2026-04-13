@@ -1168,6 +1168,25 @@ class PathUpdateRequest(BaseModel):
         from_attributes = True
 
 
+class PathsCanvasViewport(BaseModel):
+    """React Flow viewport for Paths designer canvas (#2642)."""
+
+    x: float = 0
+    y: float = 0
+    zoom: float = 1
+
+
+class PathsCanvasPayload(BaseModel):
+    """Persisted React Flow graph snapshot (layout only; path/ops remain in OpenAPI tables)."""
+
+    nodes: List[Any] = Field(default_factory=list)
+    edges: List[Any] = Field(default_factory=list)
+    viewport: PathsCanvasViewport = Field(default_factory=PathsCanvasViewport)
+
+    class Config:
+        from_attributes = True
+
+
 class OperationSchema(BaseModel):
     """Pydantic model for a path operation."""
     id: str

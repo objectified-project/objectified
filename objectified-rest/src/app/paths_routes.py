@@ -13,6 +13,7 @@ from .models import (
     PathSchema,
     PathCreateRequest,
     PathUpdateRequest,
+    PathsCanvasPayload,
     OperationSchema,
     OperationCreateRequest,
     OperationUpdateRequest,
@@ -96,6 +97,59 @@ async def get_path(
     return {
         **path,
         "operations": operations
+    }
+
+
+@router.get("/{tenant_slug}/{version_id}/{path_id}/canvas")
+async def get_path_canvas(
+    tenant_slug: str,
+    version_id: str,
+    path_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> Dict[str, Any]:
+    """
+    Load persisted React Flow canvas (nodes, edges, viewport) for a path (#2642).
+    Tenant-safe; returns defaults when no row exists.
+    """
+    version = db.get_version_for_tenant(auth_data["tenant_id"], version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail=f"Version not found: {version_id}")
+
+    canvas = db.get_path_canvas(version_id, path_id, auth_data["tenant_id"])
+    if canvas is None:
+        raise HTTPException(status_code=404, detail=f"Path not found: {path_id}")
+
+    return {
+        "nodes": canvas["nodes"],
+        "edges": canvas["edges"],
+        "viewport": canvas["viewport"],
+        "updated_at": canvas.get("updated_at"),
+    }
+
+
+@router.put("/{tenant_slug}/{version_id}/{path_id}/canvas")
+async def put_path_canvas(
+    tenant_slug: str,
+    version_id: str,
+    path_id: str,
+    request: PathsCanvasPayload,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> Dict[str, Any]:
+    """Replace Paths canvas JSON for this path (last-write-wins, #2642)."""
+    version = db.get_version_for_tenant(auth_data["tenant_id"], version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail=f"Version not found: {version_id}")
+
+    body = request.model_dump()
+    updated = db.upsert_path_canvas(version_id, path_id, auth_data["tenant_id"], body)
+    if updated is None:
+        raise HTTPException(status_code=404, detail=f"Path not found: {path_id}")
+
+    return {
+        "nodes": updated["nodes"],
+        "edges": updated["edges"],
+        "viewport": updated["viewport"],
+        "updated_at": updated.get("updated_at"),
     }
 
 

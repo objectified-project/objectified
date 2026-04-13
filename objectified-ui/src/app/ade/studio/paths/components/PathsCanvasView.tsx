@@ -91,6 +91,12 @@ import {
   copyClassPropertiesToContentType,
   setResponseContentTypeClassReference,
 } from '../../../../../../lib/db/helper-shared-path-responses-content';
+import { getPathCanvas, putPathCanvas } from '../../../../../../lib/api/paths-client';
+import {
+  mergePathsCanvasLayout,
+  serializePathsCanvas,
+  type PathsCanvasBlob,
+} from '../lib/paths-canvas-persist';
 
 // Enhanced Operation Node Component with Schema Drop Zones - Vertical Layout
 function OperationNode({ data }: {
@@ -392,8 +398,12 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isDark, setIsDark] = useState(false);
-  const { screenToFlowPosition, getNodes, getViewport } = useReactFlow();
+  const { screenToFlowPosition, getNodes, getViewport, setViewport, fitView } = useReactFlow();
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuidesState>({ horizontal: [], vertical: [] });
+  const [canvasPersistReady, setCanvasPersistReady] = useState(false);
+  const canvasSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewportToApplyRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
+  const shouldFitAfterLoadRef = useRef(false);
 
   const canvasBackgroundStyle = React.useMemo(
     () => getCanvasBackgroundStyle(canvasBackground, isDark),
@@ -1935,8 +1945,11 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     if (!selectedPathId) {
       setNodes([]);
       setEdges([]);
+      setCanvasPersistReady(false);
       return;
     }
+
+    setCanvasPersistReady(false);
 
     console.log('[PathsCanvasView] useEffect triggered - loading nodes. refreshKey:', refreshKey);
 
@@ -2818,15 +2831,86 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         // Response body nodes are created for responses that have content types with inline schemas
         // These allow users to add/edit properties in the inline schema
 
-        setNodes([...operationNodes, ...allParameterNodes, ...allResponseNodes, ...allResponseBodyNodes, ...allClassNodes, ...allRequestBodyNodes]);
-        setEdges(allEdges);
+        const computedNodes = [
+          ...operationNodes,
+          ...allParameterNodes,
+          ...allResponseNodes,
+          ...allResponseBodyNodes,
+          ...allClassNodes,
+          ...allRequestBodyNodes,
+        ];
+
+        let blob: PathsCanvasBlob | null = null;
+        let canvasUpdatedAt: string | null | undefined;
+        if (selectedVersionId && selectedPathId) {
+          const canvasRes = await getPathCanvas(selectedVersionId, selectedPathId);
+          if (canvasRes.success && canvasRes.data) {
+            canvasUpdatedAt = canvasRes.data.updated_at;
+            blob = {
+              nodes: (canvasRes.data.nodes || []) as Record<string, unknown>[],
+              edges: (canvasRes.data.edges || []) as Record<string, unknown>[],
+              viewport: canvasRes.data.viewport || { x: 0, y: 0, zoom: 1 },
+            };
+          }
+        }
+
+        const merged = mergePathsCanvasLayout(computedNodes, allEdges, blob);
+        const noSavedCanvas =
+          canvasUpdatedAt == null &&
+          (!blob?.nodes?.length || blob.nodes.length === 0);
+        viewportToApplyRef.current = noSavedCanvas ? null : merged.viewport;
+        shouldFitAfterLoadRef.current = noSavedCanvas;
+
+        setNodes(merged.nodes);
+        setEdges(merged.edges);
+        setCanvasPersistReady(true);
       } catch (error) {
         console.error('Error loading operations and parameters:', error);
+        setCanvasPersistReady(false);
       }
     };
 
     loadOperationsAndParameters();
   }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, edgeStyling, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, handleAddRequestBodyContentType, handleUpdateRequestBodyDescription, handleUpdateRequestBodyExamples, handleUpdateRequestBodyEncoding, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleRequestBodyClassDrop, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
+
+  // Apply persisted viewport or initial fitView once after graph load (#2642).
+  useEffect(() => {
+    if (!canvasPersistReady || !selectedPathId) return;
+
+    const t = window.setTimeout(() => {
+      if (viewportToApplyRef.current) {
+        setViewport(viewportToApplyRef.current, { duration: 0 });
+        viewportToApplyRef.current = null;
+      } else if (shouldFitAfterLoadRef.current) {
+        shouldFitAfterLoadRef.current = false;
+        fitView({ padding: 0.2 });
+      }
+    }, 0);
+
+    return () => clearTimeout(t);
+  }, [canvasPersistReady, selectedPathId, setViewport, fitView]);
+
+  const schedulePersistPathsCanvas = useCallback(() => {
+    if (!canvasPersistReady || !selectedVersionId || !selectedPathId) return;
+    if (canvasSaveTimerRef.current) {
+      clearTimeout(canvasSaveTimerRef.current);
+    }
+    canvasSaveTimerRef.current = setTimeout(() => {
+      canvasSaveTimerRef.current = null;
+      const vp = getViewport();
+      const payload = serializePathsCanvas(nodes, edges, vp);
+      void putPathCanvas(selectedVersionId, selectedPathId, payload);
+    }, 650);
+  }, [canvasPersistReady, selectedVersionId, selectedPathId, getViewport, nodes, edges]);
+
+  useEffect(() => {
+    schedulePersistPathsCanvas();
+    return () => {
+      if (canvasSaveTimerRef.current) {
+        clearTimeout(canvasSaveTimerRef.current);
+      }
+    };
+  }, [schedulePersistPathsCanvas]);
 
   // Detect dark mode
   useEffect(() => {
@@ -3750,7 +3834,8 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         connectionLineStyle={{ stroke: edgeStyling.directColor, strokeWidth: 2 }}
         snapToGrid={snapToGrid}
         snapGrid={[gridSize, gridSize]}
-        fitView
+        fitView={false}
+        onMoveEnd={schedulePersistPathsCanvas}
         attributionPosition="bottom-left"
         className={isDark ? 'bg-gray-900' : ''}
         nodesDraggable={true}
