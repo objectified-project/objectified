@@ -21,6 +21,7 @@ import '@xyflow/react/dist/style.css';
 import { useStudio } from '../../StudioContext';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import { getCanvasBackgroundStyle } from '../../../../utils/canvas-background-style';
+import { computeAlignmentGuidesForNode } from '../../lib/smart-alignment-guides';
 import SmartEdge from '../../../../components/ade/studio/SmartEdge';
 import {
   getOperationsForPath,
@@ -378,7 +379,9 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     gridStyle,
     showGrid,
     snapToGrid,
+    smartGuidesEnabled,
     canvasBackground,
+    edgeStyling,
     edgeRouting,
     edgeAnimation,
     selectedVersionId,
@@ -389,7 +392,11 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isDark, setIsDark] = useState(false);
-  const { screenToFlowPosition, getNodes } = useReactFlow();
+  const { screenToFlowPosition, getNodes, getViewport } = useReactFlow();
+  const [alignmentGuides, setAlignmentGuides] = useState<{
+    horizontal: Array<{ y: number; x1: number; x2: number }>;
+    vertical: Array<{ x: number; y1: number; y2: number }>;
+  }>({ horizontal: [], vertical: [] });
 
   const canvasBackgroundStyle = React.useMemo(
     () => getCanvasBackgroundStyle(canvasBackground, isDark),
@@ -2241,7 +2248,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                 type: edgeType,
                 animated: edgeAnimation !== 'none',
                 style: {
-                  stroke: '#9ca3af',
+                  stroke: edgeStyling.directColor,
                   strokeWidth: 2,
                   strokeDasharray: edgeAnimation === 'dash' ? '5,5' : undefined,
                 },
@@ -2822,7 +2829,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     };
 
     loadOperationsAndParameters();
-  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, handleAddRequestBodyContentType, handleUpdateRequestBodyDescription, handleUpdateRequestBodyExamples, handleUpdateRequestBodyEncoding, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleRequestBodyClassDrop, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
+  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, edgeStyling, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, handleAddRequestBodyContentType, handleUpdateRequestBodyDescription, handleUpdateRequestBodyExamples, handleUpdateRequestBodyEncoding, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleRequestBodyClassDrop, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
 
   // Detect dark mode
   useEffect(() => {
@@ -2848,6 +2855,22 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
       case 'cross': return BackgroundVariant.Cross;
       default: return BackgroundVariant.Dots;
     }
+  }, []);
+
+  /** Smart alignment guides — same behavior categories as Designer; math in smart-alignment-guides.ts (#2641). */
+  const handlePathsNodeDrag = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (!smartGuidesEnabled) {
+        setAlignmentGuides({ horizontal: [], vertical: [] });
+        return;
+      }
+      setAlignmentGuides(computeAlignmentGuidesForNode(node, nodes));
+    },
+    [smartGuidesEnabled, nodes]
+  );
+
+  const handlePathsNodeDragStop = useCallback(() => {
+    setAlignmentGuides({ horizontal: [], vertical: [] });
   }, []);
 
   // Handle drag over
@@ -2992,7 +3015,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         type: edgeType,
         animated: edgeAnimation !== 'none',
         style: {
-          stroke: '#9ca3af',
+          stroke: edgeStyling.directColor,
           strokeWidth: 2,
           strokeDasharray: edgeAnimation === 'dash' ? '5,5' : undefined,
         },
@@ -3126,7 +3149,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         }
       }
     },
-    [setEdges, setNodes, nodes, alertDialog, edgeRouting, edgeAnimation, handleShowClassDropDialog, handleClassDropOnResponse, selectedPathId, selectedVersionId]
+    [setEdges, setNodes, nodes, alertDialog, edgeRouting, edgeAnimation, edgeStyling, handleShowClassDropDialog, handleClassDropOnResponse, selectedPathId, selectedVersionId]
   );
 
   // Handle deleting edges (unlinking parameters and responses from operations)
@@ -3719,9 +3742,15 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         onDrop={onDrop}
         onDragOver={onDragOver}
         onNodeClick={onNodeClick}
+        onNodeDrag={handlePathsNodeDrag}
+        onNodeDragStop={handlePathsNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        defaultEdgeOptions={{ zIndex: 0 }}
+        defaultEdgeOptions={{
+          zIndex: 0,
+          style: { stroke: edgeStyling.directColor, strokeWidth: 2 },
+        }}
+        connectionLineStyle={{ stroke: edgeStyling.directColor, strokeWidth: 2 }}
         snapToGrid={snapToGrid}
         snapGrid={[gridSize, gridSize]}
         fitView
@@ -3757,6 +3786,45 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               : '0 4px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
           }}
         />
+        {(alignmentGuides.horizontal.length > 0 || alignmentGuides.vertical.length > 0) && (() => {
+          const viewport = getViewport();
+          return (
+            <div
+              className="pointer-events-none absolute inset-0 z-[1000] overflow-hidden"
+            >
+              <svg className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
+                <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.zoom})`}>
+                  {alignmentGuides.horizontal.map((guide, index) => (
+                    <line
+                      key={`h-${index}`}
+                      x1={guide.x1}
+                      y1={guide.y}
+                      x2={guide.x2}
+                      y2={guide.y}
+                      stroke="#f472b6"
+                      strokeWidth={2 / viewport.zoom}
+                      strokeDasharray={`${6 / viewport.zoom} ${4 / viewport.zoom}`}
+                      style={{ filter: 'drop-shadow(0 0 2px rgba(244, 114, 182, 0.5))' }}
+                    />
+                  ))}
+                  {alignmentGuides.vertical.map((guide, index) => (
+                    <line
+                      key={`v-${index}`}
+                      x1={guide.x}
+                      y1={guide.y1}
+                      x2={guide.x}
+                      y2={guide.y2}
+                      stroke="#f472b6"
+                      strokeWidth={2 / viewport.zoom}
+                      strokeDasharray={`${6 / viewport.zoom} ${4 / viewport.zoom}`}
+                      style={{ filter: 'drop-shadow(0 0 2px rgba(244, 114, 182, 0.5))' }}
+                    />
+                  ))}
+                </g>
+              </svg>
+            </div>
+          );
+        })()}
       </ReactFlow>
 
       {/* Class Drop Choice Dialog */}

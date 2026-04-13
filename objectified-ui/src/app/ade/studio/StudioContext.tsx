@@ -1,6 +1,14 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, Dispatch, SetStateAction } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode, Dispatch, SetStateAction } from 'react';
+import { usePathname } from 'next/navigation';
+import {
+  getCachedInitialCanvasPrefsBundle,
+  getCanvasSurfaceFromPathname,
+  loadCanvasPrefsBundle,
+  studioCanvasPrefStorageKey,
+  type StudioCanvasSurface,
+} from './lib/studio-canvas-prefs-storage';
 import type { OverallSchemaQualityDetail } from '@/app/utils/overall-schema-quality';
 
 // Group style options
@@ -192,6 +200,12 @@ export const PATHS_VIEW_MODE_STORAGE_KEY = 'studio.paths.viewMode';
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
 
 export function StudioProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const canvasSurface: StudioCanvasSurface = useMemo(
+    () => getCanvasSurfaceFromPathname(pathname),
+    [pathname]
+  );
+
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [canvasRefreshKey, setCanvasRefreshKey] = useState<number>(0);
@@ -202,182 +216,89 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [hiddenClassIds, setHiddenClassIds] = useState<string[]>([]);
   const [createGroupFn, setCreateGroupFn] = useState<(() => void) | null>(null);
   const [createGroupAtPositionFn, setCreateGroupAtPositionFn] = useState<((position: { x: number; y: number }) => void) | null>(null);
-  const [clickToFocusEnabled, setClickToFocusEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('clickToFocusEnabled');
-      return saved ? JSON.parse(saved) : true; // Default to enabled
-    }
-    return true;
-  });
-  const [lodEnabled, setLodEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lodEnabled');
-      return saved ? JSON.parse(saved) : false; // Default to disabled
-    }
-    return false;
-  });
 
-  // Grid settings
-  const [gridSize, setGridSize] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('gridSize');
-      return saved ? parseInt(saved, 10) : 20; // Default to 20px
-    }
-    return 20;
-  });
+  /** Namespaced per-surface prefs — see lib/studio-canvas-prefs-storage.ts (#2641). */
+  const [clickToFocusEnabled, setClickToFocusEnabled] = useState<boolean>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).clickToFocusEnabled
+  );
+  const [lodEnabled, setLodEnabled] = useState<boolean>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).lodEnabled
+  );
 
-  const [snapToGrid, setSnapToGrid] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('snapToGrid');
-      return saved ? JSON.parse(saved) : true; // Default to enabled
-    }
-    return true;
-  });
+  const [gridSize, setGridSize] = useState<number>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).gridSize
+  );
 
-  const [gridStyle, setGridStyle] = useState<'dots' | 'lines' | 'cross'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('gridStyle');
-      return (saved as 'dots' | 'lines' | 'cross') || 'dots'; // Default to dots
-    }
-    return 'dots';
-  });
+  const [snapToGrid, setSnapToGrid] = useState<boolean>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).snapToGrid
+  );
 
-  const [showGrid, setShowGrid] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('showGrid');
-      return saved ? JSON.parse(saved) : true; // Default to visible
-    }
-    return true;
-  });
+  const [gridStyle, setGridStyle] = useState<'dots' | 'lines' | 'cross'>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).gridStyle
+  );
+
+  const [showGrid, setShowGrid] = useState<boolean>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).showGrid
+  );
 
   /** Temporary override for grid visibility during export (#407). Not persisted. */
   const [exportGridOverride, setExportGridOverride] = useState<boolean | null>(null);
 
-  const [smartGuidesEnabled, setSmartGuidesEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('smartGuidesEnabled');
-      return saved ? JSON.parse(saved) : true; // Default to enabled
-    }
-    return true;
-  });
-  const [autoSaveLayoutEnabled, setAutoSaveLayoutEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('autoSaveLayoutEnabled');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error('Failed to parse autoSaveLayoutEnabled from localStorage:', e);
-          return false;
-        }
-      }
-    }
-    return false;
-  });
-  const [autoSaveLayoutIntervalSeconds, setAutoSaveLayoutIntervalSecondsRaw] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('autoSaveLayoutIntervalSeconds');
-      const parsed = saved ? parseInt(saved, 10) : 30;
-      if (Number.isFinite(parsed)) {
-        return Math.min(300, Math.max(10, parsed));
-      }
-    }
-    return 30;
-  });
+  const [smartGuidesEnabled, setSmartGuidesEnabled] = useState<boolean>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).smartGuidesEnabled
+  );
+  const [autoSaveLayoutEnabled, setAutoSaveLayoutEnabled] = useState<boolean>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).autoSaveLayoutEnabled
+  );
+  const [autoSaveLayoutIntervalSeconds, setAutoSaveLayoutIntervalSecondsRaw] = useState<number>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).autoSaveLayoutIntervalSeconds
+  );
   const setAutoSaveLayoutIntervalSeconds = useCallback((seconds: number) => {
     setAutoSaveLayoutIntervalSecondsRaw(Math.min(300, Math.max(10, seconds)));
   }, []);
 
-  const [edgeStyling, setEdgeStyling] = useState<EdgeStylingOptions>(() => {
-    const defaults: EdgeStylingOptions = {
-      directReferences: 'solid' as const,
-      optionalReferences: 'dashed' as const,
-      weakReferences: 'dotted' as const,
-      bidirectional: 'double' as const,
-      directColor: '#64748b', // Slate (first color in palette)
-      optionalColor: '#f97316', // Orange
-      weakColor: '#8b5cf6', // Purple
-      bidirectionalColor: '#ec4899', // Pink
-      // Arrow styles - default to standard arrow
-      directArrowStyle: 'arrow' as const,
-      optionalArrowStyle: 'arrow' as const,
-      weakArrowStyle: 'arrow' as const,
-      bidirectionalArrowStyle: 'arrow' as const,
-    };
+  const [edgeStyling, setEdgeStyling] = useState<EdgeStylingOptions>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).edgeStyling
+  );
 
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('edgeStyling');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          // Merge with defaults to ensure all properties exist
-          return {
-            ...defaults,
-            ...parsed,
-          };
-        } catch (e) {
-          console.error('Failed to parse edge styling from localStorage:', e);
-          return defaults;
-        }
-      }
+  const [edgeRouting, setEdgeRouting] = useState<EdgeRoutingType>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).edgeRouting
+  );
+
+  const [edgeAnimation, setEdgeAnimation] = useState<EdgeAnimationType>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).edgeAnimation
+  );
+
+  const [canvasBackground, setCanvasBackground] = useState<CanvasBackgroundOptions>(
+    () => getCachedInitialCanvasPrefsBundle(typeof window !== 'undefined' ? window.location.pathname : null).canvasBackground
+  );
+
+  const prevCanvasSurfaceRef = useRef<StudioCanvasSurface | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (prevCanvasSurfaceRef.current === null) {
+      prevCanvasSurfaceRef.current = canvasSurface;
+      return;
     }
-    return defaults;
-  });
-
-  const [edgeRouting, setEdgeRouting] = useState<EdgeRoutingType>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('edgeRouting');
-      if (saved && ['straight', 'bezier', 'orthogonal', 'smart'].includes(saved)) {
-        return saved as EdgeRoutingType;
-      }
-    }
-    return 'bezier'; // Default to curved/bezier
-  });
-
-  const [edgeAnimation, setEdgeAnimation] = useState<EdgeAnimationType>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('edgeAnimation');
-      if (saved && ['none', 'flow', 'pulse', 'dash'].includes(saved)) {
-        return saved as EdgeAnimationType;
-      }
-    }
-    return 'none'; // Default to no animation
-  });
-
-  // Canvas background settings
-  const defaultCanvasBackground: CanvasBackgroundOptions = {
-    type: 'grid',
-    solidColor: '#f8fafc',
-    gridColor: '#6366f1',
-    gridOpacity: 0.15,
-    imageUrl: '',
-    imageOpacity: 0.5,
-    imageFit: 'cover',
-    gradientFrom: '#f8fafc',
-    gradientTo: '#e2e8f0',
-    gradientDirection: 'to-br',
-    textureType: 'noise',
-    textureOpacity: 0.1,
-    textureColor: '#64748b',
-    backgroundOpacity: 1,
-    backgroundBlur: 0,
-  };
-
-  const [canvasBackground, setCanvasBackground] = useState<CanvasBackgroundOptions>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('canvasBackground');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return { ...defaultCanvasBackground, ...parsed };
-        } catch (e) {
-          console.error('Failed to parse canvas background from localStorage:', e);
-          return defaultCanvasBackground;
-        }
-      }
-    }
-    return defaultCanvasBackground;
-  });
+    if (prevCanvasSurfaceRef.current === canvasSurface) return;
+    prevCanvasSurfaceRef.current = canvasSurface;
+    const bundle = loadCanvasPrefsBundle(canvasSurface);
+    queueMicrotask(() => {
+      setClickToFocusEnabled(bundle.clickToFocusEnabled);
+      setLodEnabled(bundle.lodEnabled);
+      setGridSize(bundle.gridSize);
+      setSnapToGrid(bundle.snapToGrid);
+      setGridStyle(bundle.gridStyle);
+      setShowGrid(bundle.showGrid);
+      setSmartGuidesEnabled(bundle.smartGuidesEnabled);
+      setAutoSaveLayoutEnabled(bundle.autoSaveLayoutEnabled);
+      setAutoSaveLayoutIntervalSecondsRaw(bundle.autoSaveLayoutIntervalSeconds);
+      setEdgeStyling(bundle.edgeStyling);
+      setEdgeRouting(bundle.edgeRouting);
+      setEdgeAnimation(bundle.edgeAnimation);
+      setCanvasBackground(bundle.canvasBackground);
+    });
+  }, [canvasSurface]);
 
   const [groups, setGroups] = useState<CanvasGroup[]>([]);
 
@@ -390,19 +311,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [schemaQualityDetail, setSchemaQualityDetail] = useState<OverallSchemaQualityDetail | null>(null);
   const [syncLocalDirty, setSyncLocalDirty] = useState(false);
 
-  const [pathsViewMode, setPathsViewModeState] = useState<'canvas' | 'code'>('canvas');
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+  const [pathsViewMode, setPathsViewModeState] = useState<'canvas' | 'code'>(() => {
+    if (typeof window === 'undefined') return 'canvas';
     try {
       const raw = sessionStorage.getItem(PATHS_VIEW_MODE_STORAGE_KEY);
-      if (raw === 'canvas' || raw === 'code') {
-        setPathsViewModeState(raw);
-      }
+      if (raw === 'canvas' || raw === 'code') return raw;
     } catch {
       /* ignore */
     }
-  }, []);
+    return 'canvas';
+  });
 
   const setPathsViewMode = useCallback((mode: 'canvas' | 'code') => {
     setPathsViewModeState(mode);
@@ -415,70 +333,125 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Persist grid settings to localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('gridSize', gridSize.toString());
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'gridSize'), gridSize.toString());
+    } catch {
+      /* ignore */
     }
-  }, [gridSize]);
+  }, [canvasSurface, gridSize]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('snapToGrid', JSON.stringify(snapToGrid));
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'snapToGrid'), JSON.stringify(snapToGrid));
+    } catch {
+      /* ignore */
     }
-  }, [snapToGrid]);
+  }, [canvasSurface, snapToGrid]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('gridStyle', gridStyle);
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'gridStyle'), gridStyle);
+    } catch {
+      /* ignore */
     }
-  }, [gridStyle]);
+  }, [canvasSurface, gridStyle]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('showGrid', JSON.stringify(showGrid));
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'showGrid'), JSON.stringify(showGrid));
+    } catch {
+      /* ignore */
     }
-  }, [showGrid]);
+  }, [canvasSurface, showGrid]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('smartGuidesEnabled', JSON.stringify(smartGuidesEnabled));
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'smartGuidesEnabled'), JSON.stringify(smartGuidesEnabled));
+    } catch {
+      /* ignore */
     }
-  }, [smartGuidesEnabled]);
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('autoSaveLayoutEnabled', JSON.stringify(autoSaveLayoutEnabled));
-    }
-  }, [autoSaveLayoutEnabled]);
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('autoSaveLayoutIntervalSeconds', String(autoSaveLayoutIntervalSeconds));
-    }
-  }, [autoSaveLayoutIntervalSeconds]);
+  }, [canvasSurface, smartGuidesEnabled]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('edgeStyling', JSON.stringify(edgeStyling));
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'clickToFocusEnabled'), JSON.stringify(clickToFocusEnabled));
+    } catch {
+      /* ignore */
     }
-  }, [edgeStyling]);
+  }, [canvasSurface, clickToFocusEnabled]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('edgeRouting', edgeRouting);
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'lodEnabled'), JSON.stringify(lodEnabled));
+    } catch {
+      /* ignore */
     }
-  }, [edgeRouting]);
+  }, [canvasSurface, lodEnabled]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('edgeAnimation', edgeAnimation);
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'autoSaveLayoutEnabled'), JSON.stringify(autoSaveLayoutEnabled));
+    } catch {
+      /* ignore */
     }
-  }, [edgeAnimation]);
+  }, [canvasSurface, autoSaveLayoutEnabled]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('canvasBackground', JSON.stringify(canvasBackground));
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(
+        studioCanvasPrefStorageKey(canvasSurface, 'autoSaveLayoutIntervalSeconds'),
+        String(autoSaveLayoutIntervalSeconds)
+      );
+    } catch {
+      /* ignore */
     }
-  }, [canvasBackground]);
+  }, [canvasSurface, autoSaveLayoutIntervalSeconds]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'edgeStyling'), JSON.stringify(edgeStyling));
+    } catch {
+      /* ignore */
+    }
+  }, [canvasSurface, edgeStyling]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'edgeRouting'), edgeRouting);
+    } catch {
+      /* ignore */
+    }
+  }, [canvasSurface, edgeRouting]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'edgeAnimation'), edgeAnimation);
+    } catch {
+      /* ignore */
+    }
+  }, [canvasSurface, edgeAnimation]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'canvasBackground'), JSON.stringify(canvasBackground));
+    } catch {
+      /* ignore */
+    }
+  }, [canvasSurface, canvasBackground]);
 
   const triggerCanvasRefresh = () => {
     setCanvasRefreshKey(prev => prev + 1);

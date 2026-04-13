@@ -131,34 +131,16 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     edgeAnimation: typeof edgeAnimation;
   }) => {
     setClickToFocusEnabled(settings.clickToFocusEnabled);
-    localStorage.setItem('clickToFocusEnabled', JSON.stringify(settings.clickToFocusEnabled));
-
     setSnapToGrid(settings.snapToGrid);
-    localStorage.setItem('snapToGrid', JSON.stringify(settings.snapToGrid));
-
     setSmartGuidesEnabled(settings.smartGuidesEnabled);
-    localStorage.setItem('smartGuidesEnabled', JSON.stringify(settings.smartGuidesEnabled));
-
     setShowGrid(settings.showGrid);
-    localStorage.setItem('showGrid', JSON.stringify(settings.showGrid));
-
     setGridSize(settings.gridSize);
-    localStorage.setItem('gridSize', String(settings.gridSize));
-
     setGridStyle(settings.gridStyle);
-    localStorage.setItem('gridStyle', settings.gridStyle);
-
     setCanvasBackground(settings.canvasBackground);
-    localStorage.setItem('canvasBackground', JSON.stringify(settings.canvasBackground));
-
     setEdgeStyling(settings.edgeStyling);
-    localStorage.setItem('edgeStyling', JSON.stringify(settings.edgeStyling));
-
     setEdgeRouting(settings.edgeRouting);
-    localStorage.setItem('edgeRouting', settings.edgeRouting);
-
     setEdgeAnimation(settings.edgeAnimation);
-    localStorage.setItem('edgeAnimation', settings.edgeAnimation);
+    /* Persistence: namespaced studio.designer.* / studio.paths.* via StudioContext (#2641). */
   }, [setClickToFocusEnabled, setSnapToGrid, setSmartGuidesEnabled, setShowGrid, setGridSize, setGridStyle, setCanvasBackground, setEdgeStyling, setEdgeRouting, setEdgeAnimation]);
 
   // Sync local state with context
