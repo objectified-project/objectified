@@ -764,5 +764,192 @@ describe('OpenAPI Paths Generator', () => {
 
       expect(collectReferencedClassNames(paths).has('ItemPage')).toBe(true);
     });
+
+    it('should collect $ref names nested inside allOf/oneOf/anyOf in content_type inline schemas', () => {
+      const paths: PathInfo[] = [
+        {
+          id: 'path-1',
+          pathname: '/nested',
+          operations: [
+            {
+              id: 'op-1',
+              operation: 'GET',
+              parameters: [],
+              responses: [
+                {
+                  id: 'r1',
+                  status_code: '200',
+                  description: 'OK',
+                  content_types: [
+                    {
+                      id: 'ct-1',
+                      media_type: 'application/json',
+                      inline_schema: {
+                        type: 'object',
+                        allOf: [
+                          { $ref: '#/components/schemas/BaseItem' },
+                          {
+                            type: 'object',
+                            properties: [
+                              {
+                                id: 'p1',
+                                name: 'extra',
+                                data: { $ref: '#/components/schemas/ExtraInfo' },
+                                parent_id: null,
+                              },
+                            ],
+                          },
+                        ],
+                        anyOf: [{ $ref: '#/components/schemas/VariantA' }],
+                      } as any,
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result = collectReferencedClassNames(paths);
+      expect(result.has('BaseItem')).toBe(true);
+      expect(result.has('ExtraInfo')).toBe(true);
+      expect(result.has('VariantA')).toBe(true);
+    });
+
+    it('should collect items.$ref nested inside array inline schema in content_types', () => {
+      const paths: PathInfo[] = [
+        {
+          id: 'path-1',
+          pathname: '/list',
+          operations: [
+            {
+              id: 'op-1',
+              operation: 'GET',
+              parameters: [],
+              responses: [
+                {
+                  id: 'r1',
+                  status_code: '200',
+                  description: 'OK',
+                  content_types: [
+                    {
+                      id: 'ct-1',
+                      media_type: 'application/json',
+                      inline_schema: {
+                        type: 'array',
+                        items: { $ref: '#/components/schemas/Widget' },
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      expect(collectReferencedClassNames(paths).has('Widget')).toBe(true);
+    });
+  });
+});
+
+describe('buildResponseForOpenAPI – inline schema pass-through', () => {
+  it('should emit $ref directly when inline_schema has a top-level $ref', () => {
+    const response: ResponseInfo = {
+      id: 'resp-ref',
+      status_code: '200',
+      description: 'OK',
+      content_types: [
+        {
+          id: 'ct1',
+          media_type: 'application/json',
+          inline_schema: { type: 'object', $ref: '#/components/schemas/Widget' } as any,
+        },
+      ],
+    };
+
+    const result = buildResponseForOpenAPI(response);
+    const content = result.content as Record<string, { schema: Record<string, unknown> }>;
+    expect(content['application/json'].schema).toEqual({ $ref: '#/components/schemas/Widget' });
+  });
+
+  it('should emit type:array with items.$ref when inline_schema is an array referencing a schema', () => {
+    const response: ResponseInfo = {
+      id: 'resp-arr',
+      status_code: '200',
+      description: 'OK',
+      content_types: [
+        {
+          id: 'ct1',
+          media_type: 'application/json',
+          inline_schema: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/Item' },
+          },
+        },
+      ],
+    };
+
+    const result = buildResponseForOpenAPI(response);
+    const content = result.content as Record<string, { schema: Record<string, unknown> }>;
+    expect(content['application/json'].schema).toEqual({
+      type: 'array',
+      items: { $ref: '#/components/schemas/Item' },
+    });
+  });
+
+  it('should emit type:string with format/enum constraints when inline_schema is a primitive', () => {
+    const response: ResponseInfo = {
+      id: 'resp-str',
+      status_code: '200',
+      description: 'OK',
+      content_types: [
+        {
+          id: 'ct1',
+          media_type: 'application/json',
+          inline_schema: {
+            type: 'string',
+            format: 'email',
+            minLength: 3,
+            maxLength: 254,
+          },
+        },
+      ],
+    };
+
+    const result = buildResponseForOpenAPI(response);
+    const content = result.content as Record<string, { schema: Record<string, unknown> }>;
+    expect(content['application/json'].schema).toEqual({
+      type: 'string',
+      format: 'email',
+      minLength: 3,
+      maxLength: 254,
+    });
+  });
+
+  it('should use buildSchemaFromInlineProperties for object inline_schema with properties array', () => {
+    const response: ResponseInfo = {
+      id: 'resp-obj',
+      status_code: '200',
+      description: 'OK',
+      content_types: [
+        {
+          id: 'ct1',
+          media_type: 'application/json',
+          inline_schema: {
+            type: 'object',
+            properties: [
+              { id: 'p1', name: 'id', data: { type: 'string' }, parent_id: null },
+            ],
+          },
+        },
+      ],
+    };
+
+    const result = buildResponseForOpenAPI(response);
+    const content = result.content as Record<string, { schema: Record<string, unknown> }>;
+    expect((content['application/json'].schema as any).type).toBe('object');
+    expect((content['application/json'].schema as any).properties).toHaveProperty('id');
   });
 });
