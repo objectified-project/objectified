@@ -21,7 +21,7 @@ import '@xyflow/react/dist/style.css';
 import { useStudio } from '../../StudioContext';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import { getCanvasBackgroundStyle } from '../../../../utils/canvas-background-style';
-import { computeAlignmentGuidesForNode } from '../../lib/smart-alignment-guides';
+import { computeAlignmentGuidesForNode, type AlignmentGuidesState } from '../../lib/smart-alignment-guides';
 import SmartEdge from '../../../../components/ade/studio/SmartEdge';
 import {
   getOperationsForPath,
@@ -393,10 +393,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isDark, setIsDark] = useState(false);
   const { screenToFlowPosition, getNodes, getViewport } = useReactFlow();
-  const [alignmentGuides, setAlignmentGuides] = useState<{
-    horizontal: Array<{ y: number; x1: number; x2: number }>;
-    vertical: Array<{ x: number; y1: number; y2: number }>;
-  }>({ horizontal: [], vertical: [] });
+  const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuidesState>({ horizontal: [], vertical: [] });
 
   const canvasBackgroundStyle = React.useMemo(
     () => getCanvasBackgroundStyle(canvasBackground, isDark),

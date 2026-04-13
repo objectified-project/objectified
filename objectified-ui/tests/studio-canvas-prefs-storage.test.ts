@@ -3,6 +3,7 @@
  */
 import {
   getCanvasSurfaceFromPathname,
+  getCachedInitialCanvasPrefsBundle,
   loadCanvasPrefsBundle,
   migrateLegacyCanvasPrefsToDesignerNamespace,
   resetCachedInitialCanvasPrefsBundleForTests,
@@ -36,6 +37,21 @@ describe('studio-canvas-prefs-storage', () => {
   it('seeds paths from designer when paths has no prefs', () => {
     localStorage.setItem(studioCanvasPrefStorageKey('designer', 'gridSize'), '32');
     seedPathsCanvasPrefsFromDesignerIfEmpty(localStorage);
+    expect(localStorage.getItem(studioCanvasPrefStorageKey('paths', 'gridSize'))).toBe('32');
+  });
+
+  it('does not seed paths on designer surface load, so paths gets current designer prefs on first paths visit', () => {
+    // Simulate: user opens Designer surface first (no prefs yet) — seeding should NOT happen
+    const designerBundle = getCachedInitialCanvasPrefsBundle('/ade/studio/editor', localStorage);
+    expect(designerBundle.gridSize).toBe(20); // default
+
+    // User then changes Designer settings (persisted externally)
+    localStorage.setItem(studioCanvasPrefStorageKey('designer', 'gridSize'), '32');
+
+    // First visit to Paths — seeding should happen now and pick up the updated Designer value
+    resetCachedInitialCanvasPrefsBundleForTests();
+    const pathsBundle = getCachedInitialCanvasPrefsBundle('/ade/studio/paths', localStorage);
+    expect(pathsBundle.gridSize).toBe(32);
     expect(localStorage.getItem(studioCanvasPrefStorageKey('paths', 'gridSize'))).toBe('32');
   });
 

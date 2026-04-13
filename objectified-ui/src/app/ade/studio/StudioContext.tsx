@@ -274,6 +274,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
   const prevCanvasSurfaceRef = useRef<StudioCanvasSurface | null>(null);
+  const isSurfaceSwitchingRef = useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (prevCanvasSurfaceRef.current === null) {
@@ -283,6 +284,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     if (prevCanvasSurfaceRef.current === canvasSurface) return;
     prevCanvasSurfaceRef.current = canvasSurface;
     const bundle = loadCanvasPrefsBundle(canvasSurface);
+    isSurfaceSwitchingRef.current = true;
     queueMicrotask(() => {
       setClickToFocusEnabled(bundle.clickToFocusEnabled);
       setLodEnabled(bundle.lodEnabled);
@@ -297,6 +299,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setEdgeRouting(bundle.edgeRouting);
       setEdgeAnimation(bundle.edgeAnimation);
       setCanvasBackground(bundle.canvasBackground);
+      isSurfaceSwitchingRef.current = false;
     });
   }, [canvasSurface]);
 
@@ -335,6 +338,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'gridSize'), gridSize.toString());
     } catch {
@@ -344,6 +348,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'snapToGrid'), JSON.stringify(snapToGrid));
     } catch {
@@ -353,6 +358,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'gridStyle'), gridStyle);
     } catch {
@@ -362,6 +368,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'showGrid'), JSON.stringify(showGrid));
     } catch {
@@ -371,6 +378,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'smartGuidesEnabled'), JSON.stringify(smartGuidesEnabled));
     } catch {
@@ -380,6 +388,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'clickToFocusEnabled'), JSON.stringify(clickToFocusEnabled));
     } catch {
@@ -389,6 +398,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'lodEnabled'), JSON.stringify(lodEnabled));
     } catch {
@@ -398,6 +408,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'autoSaveLayoutEnabled'), JSON.stringify(autoSaveLayoutEnabled));
     } catch {
@@ -407,6 +418,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(
         studioCanvasPrefStorageKey(canvasSurface, 'autoSaveLayoutIntervalSeconds'),
@@ -419,6 +431,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'edgeStyling'), JSON.stringify(edgeStyling));
     } catch {
@@ -428,6 +441,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'edgeRouting'), edgeRouting);
     } catch {
@@ -437,6 +451,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'edgeAnimation'), edgeAnimation);
     } catch {
@@ -446,6 +461,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isSurfaceSwitchingRef.current) return;
     try {
       localStorage.setItem(studioCanvasPrefStorageKey(canvasSurface, 'canvasBackground'), JSON.stringify(canvasBackground));
     } catch {

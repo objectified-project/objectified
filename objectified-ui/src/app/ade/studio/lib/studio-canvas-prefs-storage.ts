@@ -332,8 +332,10 @@ export function getCachedInitialCanvasPrefsBundle(
     return cachedInitialBundle;
   }
   migrateLegacyCanvasPrefsToDesignerNamespace(storage);
-  seedPathsCanvasPrefsFromDesignerIfEmpty(storage);
   const surface = getCanvasSurfaceFromPathname(pathname ?? window.location.pathname);
+  if (surface === 'paths') {
+    seedPathsCanvasPrefsFromDesignerIfEmpty(storage);
+  }
   cachedInitialBundle = loadCanvasPrefsBundle(surface, storage);
   return cachedInitialBundle;
 }
