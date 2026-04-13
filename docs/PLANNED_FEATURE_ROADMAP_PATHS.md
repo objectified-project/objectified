@@ -35,7 +35,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | P-11 | [#2650](https://github.com/KenSuenobu/objectified-commercial/issues/2650) | Yes |
 | P-12 | [#2651](https://github.com/KenSuenobu/objectified-commercial/issues/2651) | Yes |
 | P-13 | [#2652](https://github.com/KenSuenobu/objectified-commercial/issues/2652) | Yes |
-| P-14 | [#2653](https://github.com/KenSuenobu/objectified-commercial/issues/2653) | Yes |
+| P-14 | [#2653](https://github.com/KenSuenobu/objectified-commercial/issues/2653) **(shipped)** | Yes |
 | P-15 | [#2654](https://github.com/KenSuenobu/objectified-commercial/issues/2654) | Yes |
 | P-16 | [#2655](https://github.com/KenSuenobu/objectified-commercial/issues/2655) | Yes |
 | P-17 | [#2656](https://github.com/KenSuenobu/objectified-commercial/issues/2656) | Yes |
@@ -65,7 +65,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | ~~2644~~ | ~~P-05 Path nodes + persist `version_path` / `path_operation`~~ **(shipped)** | Yes |
 | ~~2645~~ | ~~P-06 Operation inspector (operationId, tags, …)~~ **(shipped)** | Yes |
 | ~~2646~~ | ~~P-07 Edges path/op/attachments~~ **(shipped)** | Yes |
-| 2653 | P-14 OPTIONS first-class | Yes |
+| ~~2653~~ | ~~P-14 OPTIONS first-class~~ **(shipped)** | Yes |
 
 **E3 — [#2635](https://github.com/KenSuenobu/objectified-commercial/issues/2635)**
 

@@ -352,10 +352,16 @@ export function buildOperationForOpenAPI(
       responses[response.status_code] = buildResponseForOpenAPI(response);
     }
   } else {
-    // Default response if none specified
-    responses['200'] = {
-      description: 'Successful response',
-    };
+    // Default response if none specified (OPTIONS: typical CORS preflight is 204 No Content)
+    if (operation.operation.toUpperCase() === 'OPTIONS') {
+      responses['204'] = {
+        description: 'No Content',
+      };
+    } else {
+      responses['200'] = {
+        description: 'Successful response',
+      };
+    }
   }
   result.responses = responses;
 
