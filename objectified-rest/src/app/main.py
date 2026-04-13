@@ -24,6 +24,7 @@ from .migration_plans_routes import router as migration_plans_router
 from .version_tags_routes import router as version_tags_router
 from .compatibility_routes import router as compatibility_router
 from .draft_lock_routes import router as draft_lock_router
+from .push_webhook_subscriptions_routes import router as push_webhook_subscriptions_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -92,6 +93,7 @@ app.include_router(paths_router)
 app.include_router(migration_plans_router)
 app.include_router(version_tags_router)
 app.include_router(draft_lock_router)
+app.include_router(push_webhook_subscriptions_router)
 
 
 @app.on_event("startup")

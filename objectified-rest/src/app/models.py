@@ -911,6 +911,57 @@ class VersionDraftLockStatusResponse(BaseModel):
     expires_at: Optional[datetime] = Field(default=None, serialization_alias="expiresAt")
 
 
+class PushWebhookSubscriptionCreateRequest(BaseModel):
+    """Create a push webhook subscription (#2587). Plaintext signing secret is write-only."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    url: str = Field(
+        ...,
+        min_length=8,
+        description="HTTPS webhook URL (validated server-side).",
+    )
+    signing_secret: str = Field(
+        ...,
+        min_length=8,
+        validation_alias=AliasChoices("signingSecret", "signing_secret"),
+        serialization_alias="signingSecret",
+        description="Shared secret for signing deliveries; never returned after create.",
+    )
+    active: bool = Field(default=True, description="Whether deliveries are enabled.")
+
+
+class PushWebhookSubscriptionUpdateRequest(BaseModel):
+    """Update URL, active flag, and/or rotate signing secret (#2587)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    url: Optional[str] = Field(
+        default=None,
+        description="New HTTPS URL (must remain unique per tenant).",
+    )
+    signing_secret: Optional[str] = Field(
+        default=None,
+        min_length=8,
+        validation_alias=AliasChoices("signingSecret", "signing_secret"),
+        serialization_alias="signingSecret",
+    )
+    active: Optional[bool] = None
+
+
+class PushWebhookSubscriptionResponse(BaseModel):
+    """Push webhook subscription — signing secret is never included; only signingSecretRef."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    url: str
+    active: bool
+    signing_secret_ref: str = Field(serialization_alias="signingSecretRef")
+    created_at: Optional[datetime] = Field(default=None, serialization_alias="createdAt")
+    updated_at: Optional[datetime] = Field(default=None, serialization_alias="updatedAt")
+
+
 class CompatibilityCheckResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
