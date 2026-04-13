@@ -88,25 +88,41 @@ export function getPathWithSampleValues(
 }
 
 /**
- * Check if a path template is valid (OpenAPI-style).
- * Invalid: empty/whitespace, does not start with /, unclosed or empty braces.
+ * Human-readable validation for OpenAPI path templates (leading slash, braces, unique `{param}` names).
+ * Returns `null` when valid.
  */
-export function isValidPath(pathname: string): boolean {
+export function getPathTemplateValidationError(pathname: string): string | null {
   const s = pathname.trim();
-  if (s.length === 0) return false;
-  if (s[0] !== '/') return false;
-  // Reject empty parameter {}
-  if (/\{\s*\}/.test(s)) return false;
-  // Unclosed brace: count { and }
+  if (s.length === 0) return 'Path cannot be empty.';
+  if (s[0] !== '/') return 'Path must start with /.';
+  if (/\{\s*\}/.test(s)) return 'Path parameters cannot be empty (use a name inside braces, e.g. {id}).';
   const open = (s.match(/\{/g) || []).length;
   const close = (s.match(/\}/g) || []).length;
-  if (open !== close) return false;
-  // No } before a matching {
+  if (open !== close) return 'Curly braces { } are not balanced.';
   let depth = 0;
   for (let i = 0; i < s.length; i++) {
     if (s[i] === '{') depth++;
     else if (s[i] === '}') depth--;
-    if (depth < 0) return false;
+    if (depth < 0) return 'Invalid order of braces in the path template.';
   }
-  return depth === 0;
+  if (depth !== 0) return 'Curly braces { } are not balanced.';
+
+  const names = extractPathParameters(s);
+  const seen = new Set<string>();
+  for (const raw of names) {
+    const name = raw.trim();
+    if (name.length === 0) return 'Path parameter names cannot be empty.';
+    if (seen.has(name)) {
+      return `Duplicate path parameter name: {${name}}. Each template variable must be unique.`;
+    }
+    seen.add(name);
+  }
+  return null;
+}
+
+/**
+ * Check if a path template is valid (OpenAPI-style).
+ */
+export function isValidPath(pathname: string): boolean {
+  return getPathTemplateValidationError(pathname) === null;
 }

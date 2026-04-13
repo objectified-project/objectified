@@ -30,6 +30,7 @@ from .models import (
     CopyClassToInlineSchemaRequest,
 )
 from .auth import validate_authentication
+from .path_template_validation import validate_openapi_path_template
 
 router = APIRouter(prefix="/v1/paths", tags=["paths"])
 
@@ -181,6 +182,11 @@ async def create_path(
         )
 
     try:
+        validate_openapi_path_template(request.pathname)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    try:
         path = db.create_path(
             version_id=version_id,
             pathname=request.pathname,
@@ -218,6 +224,12 @@ async def update_path(
         The updated path
     """
     updates = request.model_dump(exclude_unset=True)
+    if updates.get("pathname") is not None:
+        try:
+            validate_openapi_path_template(updates["pathname"])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+
     path = db.update_path(path_id, auth_data['tenant_id'], updates)
 
     if not path:

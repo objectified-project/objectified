@@ -83,6 +83,10 @@ export default function PathsPage() {
     setResponsePanelRefreshKey(prev => prev + 1);
   };
 
+  const handlePathnameUpdated = (nextPathname: string) => {
+    setSelectedPath((prev) => (prev ? { ...prev, pathname: nextPathname } : null));
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-50 dark:bg-gray-900">
       {/* Show message if no project/version selected */}
@@ -169,6 +173,7 @@ export default function PathsPage() {
               onResponseSelect={handleResponseSelect}
               refreshKey={canvasRefreshKey}
               onRefresh={handleCanvasRefresh}
+              onPathnameUpdated={handlePathnameUpdated}
             />
           </div>
 

@@ -25,9 +25,9 @@ import { computeAlignmentGuidesForNode, type AlignmentGuidesState } from '../../
 import SmartEdge from '../../../../components/ade/studio/SmartEdge';
 import {
   getOperationsForPath,
-  createOperation,
   deleteOperation,
 } from '../../../../../../lib/db/helper-path-operations';
+import { createOperation as createOperationViaApi } from '../../../../../../lib/api/paths-client';
 import {
   getPathById,
 } from '../../../../../../lib/db/helper-paths';
@@ -60,6 +60,7 @@ import PathClassNode, { PathClassNodeData } from './PathClassNode';
 import PathRequestBodyNode, { PathRequestBodyData } from './PathRequestBodyNode';
 import PathResponseBodyNode, { PathResponseBodyData } from './PathResponseBodyNode';
 import ClassDropChoiceDialog, { ClassDropAction } from '../../../../components/dialogs/ClassDropChoiceDialog';
+import PathTemplateNode from './PathTemplateNode';
 import { OPERATION_COLORS } from './paths-operation-colors';
 import { Trash2, Lock, Unlock, AlertTriangle, Eye, Copy, Check } from 'lucide-react';
 import {
@@ -337,6 +338,7 @@ function OperationNode({ data }: {
 }
 
 const nodeTypes = {
+  pathTemplate: PathTemplateNode,
   operation: OperationNode,
   parameter: PathParameterNode,
   response: PathResponseNode,
@@ -377,9 +379,19 @@ interface PathsCanvasInnerProps {
   onResponseSelect?: (response: { id: string; statusCode: string; description: string } | null) => void;
   refreshKey?: number;
   onRefresh?: () => void;
+  onPathnameUpdated?: (pathname: string) => void;
 }
 
-function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParameterSelect, onResponseSelect, refreshKey, onRefresh }: PathsCanvasInnerProps) {
+function PathsCanvasInner({
+  selectedPathId,
+  pathname,
+  onOperationSelect,
+  onParameterSelect,
+  onResponseSelect,
+  refreshKey,
+  onRefresh,
+  onPathnameUpdated,
+}: PathsCanvasInnerProps) {
   const {
     gridSize,
     gridStyle,
@@ -404,6 +416,10 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
   const canvasSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewportToApplyRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
   const shouldFitAfterLoadRef = useRef(false);
+  const onPathnameUpdatedRef = useRef(onPathnameUpdated);
+  useEffect(() => {
+    onPathnameUpdatedRef.current = onPathnameUpdated;
+  }, [onPathnameUpdated]);
 
   const canvasBackgroundStyle = React.useMemo(
     () => getCanvasBackgroundStyle(canvasBackground, isDark),
@@ -1956,6 +1972,30 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     const loadOperationsAndParameters = async () => {
       try {
         console.log('[PathsCanvasView] loadOperationsAndParameters starting...');
+        const pathResponse = await getPathById(selectedPathId);
+        const pathRow = JSON.parse(pathResponse);
+        if (!pathRow?.id) {
+          console.error('[PathsCanvasView] Path row missing for', selectedPathId);
+          setCanvasPersistReady(false);
+          return;
+        }
+
+        const pathNodeId = `path-node-${selectedPathId}`;
+        const pathTemplateNode: Node = {
+          id: pathNodeId,
+          type: 'pathTemplate',
+          position: { x: 120, y: 16 },
+          deletable: false,
+          data: {
+            versionPathId: selectedPathId,
+            versionId: selectedVersionId!,
+            pathname: pathRow.pathname || '/',
+            onPathnameSaved: (next: string) => {
+              onPathnameUpdatedRef.current?.(next);
+            },
+          },
+        };
+
         // Load operations
         const operationsResponse = await getOperationsForPath(selectedPathId);
         const operations = JSON.parse(operationsResponse);
@@ -2018,12 +2058,13 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             type: 'operation',
             position: { 
               x: startX + (index * spacingX),
-              y: 50 // All operations at the top
+              y: 220,
             },
           data: {
             operation: op.operation,
             color: OPERATION_COLORS[op.operation] || '#64748b',
             dbOperationId: op.id,
+            versionPathId: selectedPathId,
             operationId: operationIdMap.get(op.id), // OpenAPI operationId from description
             parameters: operationParamsMap.get(op.id) || [],
             security: operationSecurityMap.get(op.id),
@@ -2201,7 +2242,31 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         const allParamsData = JSON.parse(allParamsResponse);
 
         const allParameterNodes: Node[] = [];
-        const allEdges: Edge[] = [];
+        const pathToOpEdges: Edge[] = (operations as { id: string }[]).map((op) => {
+          const edgeType = edgeRouting === 'straight' ? 'straight'
+            : edgeRouting === 'bezier' ? 'default'
+            : edgeRouting === 'smart' ? 'smart'
+            : 'smoothstep';
+          return {
+            id: `edge-path-op-${selectedPathId}-${op.id}`,
+            source: pathNodeId,
+            sourceHandle: 'path-output',
+            target: op.id,
+            targetHandle: 'operation-input',
+            type: edgeType,
+            animated: edgeAnimation !== 'none',
+            style: {
+              stroke: edgeStyling.directColor,
+              strokeWidth: 2,
+              strokeDasharray: edgeAnimation === 'dash' ? '5,5' : undefined,
+            },
+            data: {
+              sourceNodeId: pathNodeId,
+              targetNodeId: op.id,
+            },
+          };
+        });
+        const allEdges: Edge[] = [...pathToOpEdges];
 
         if (allParamsData.success && allParamsData.parameters) {
           // Create nodes for all parameters - positioned BELOW operations
@@ -2835,6 +2900,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         // These allow users to add/edit properties in the inline schema
 
         const computedNodes = [
+          pathTemplateNode,
           ...operationNodes,
           ...allParameterNodes,
           ...allResponseNodes,
@@ -3582,26 +3648,51 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         });
 
         try {
-          // Get path pattern for generating operationId
-          let pathPattern: string | undefined;
-          try {
-            const pathResponse = await getPathById(selectedPathId);
-            const pathData = JSON.parse(pathResponse);
-            pathPattern = pathData?.pathname;
-          } catch (pathError) {
-            console.log('[onDrop] Could not fetch path pattern:', pathError);
+          if (!selectedVersionId) {
+            await alertDialog({
+              title: 'Error',
+              message: 'No version selected.',
+              variant: 'error',
+            });
+            return;
           }
 
-          // Save to database (also creates path_operation_description with operationId)
-          const result = await createOperation(
+          if (!selectedPathId) {
+            await alertDialog({
+              title: 'No Path Selected',
+              message: 'Please select a path from the sidebar before adding an operation.',
+              variant: 'warning',
+            });
+            return;
+          }
+
+          const result = await createOperationViaApi(
+            selectedVersionId,
             selectedPathId,
             dropData.operation,
-            { position },
-            pathPattern
+            { position }
           );
-          const savedOperation = JSON.parse(result);
 
-          // Get the generated operationId from the description
+          if (!result.success || !result.data) {
+            const errText = (result.error || '').toLowerCase();
+            if (errText.includes('already exists') || errText.includes('409')) {
+              await alertDialog({
+                title: 'Operation already exists',
+                message: `A ${dropData.operation} operation already exists for this path. Each method can only be used once per path template.`,
+                variant: 'warning',
+              });
+            } else {
+              await alertDialog({
+                title: 'Error',
+                message: result.error || 'Failed to add operation.',
+                variant: 'error',
+              });
+            }
+            return;
+          }
+
+          const savedOperation = result.data;
+
           let operationId: string | undefined;
           try {
             const descResponse = await getOperationDescription(savedOperation.id);
@@ -3611,7 +3702,6 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             console.log('[onDrop] Could not fetch operation description:', descError);
           }
 
-          // Add to canvas
           const newNode: Node = {
             id: savedOperation.id,
             type: 'operation',
@@ -3621,12 +3711,44 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               operation: savedOperation.operation,
               color: dropData.color,
               dbOperationId: savedOperation.id,
+              versionPathId: selectedPathId,
               operationId: operationId,
               parameters: [],
             },
           };
 
+          const pathNodeId = `path-node-${selectedPathId}`;
+          const dropEdgeType =
+            edgeRouting === 'straight'
+              ? 'straight'
+              : edgeRouting === 'bezier'
+                ? 'default'
+                : edgeRouting === 'smart'
+                  ? 'smart'
+                  : 'smoothstep';
+
           setNodes((nds) => [...nds, newNode]);
+          setEdges((eds) => [
+            ...eds,
+            {
+              id: `edge-path-op-${selectedPathId}-${savedOperation.id}`,
+              source: pathNodeId,
+              sourceHandle: 'path-output',
+              target: savedOperation.id,
+              targetHandle: 'operation-input',
+              type: dropEdgeType,
+              animated: edgeAnimation !== 'none',
+              style: {
+                stroke: edgeStyling.directColor,
+                strokeWidth: 2,
+                strokeDasharray: edgeAnimation === 'dash' ? '5,5' : undefined,
+              },
+              data: {
+                sourceNodeId: pathNodeId,
+                targetNodeId: savedOperation.id,
+              },
+            },
+          ]);
         } catch (error) {
           console.error('Error creating operation:', error);
           await alertDialog({
@@ -3764,7 +3886,22 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         // Class dropped on empty canvas: no longer creates a node (undo #372)
       }
     },
-    [screenToFlowPosition, getNodes, nodes, alertDialog, propertyDataToParameterSchema, updateSharedPathParameter, onRefresh, onParameterSelect]
+    [
+      screenToFlowPosition,
+      getNodes,
+      nodes,
+      alertDialog,
+      propertyDataToParameterSchema,
+      updateSharedPathParameter,
+      onRefresh,
+      onParameterSelect,
+      selectedVersionId,
+      selectedPathId,
+      setEdges,
+      edgeRouting,
+      edgeAnimation,
+      edgeStyling,
+    ]
   );
 
   return (
@@ -4005,6 +4142,7 @@ export default function PathsCanvasView({
   onResponseSelect,
   refreshKey,
   onRefresh,
+  onPathnameUpdated,
 }: {
   selectedPathId: string | null;
   pathname?: string | null;
@@ -4013,6 +4151,7 @@ export default function PathsCanvasView({
   onResponseSelect?: (response: { id: string; statusCode: string; description: string } | null) => void;
   refreshKey?: number;
   onRefresh?: () => void;
+  onPathnameUpdated?: (pathname: string) => void;
 }) {
   return (
     <ReactFlowProvider>
@@ -4024,6 +4163,7 @@ export default function PathsCanvasView({
         onResponseSelect={onResponseSelect}
         refreshKey={refreshKey}
         onRefresh={onRefresh}
+        onPathnameUpdated={onPathnameUpdated}
       />
     </ReactFlowProvider>
   );
