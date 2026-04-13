@@ -6,6 +6,7 @@ BEGIN
   CREATE TYPE odb.push_webhook_delivery_status AS ENUM (
     'pending',
     'retrying',
+    'processing',
     'delivered',
     'dead_letter'
   );

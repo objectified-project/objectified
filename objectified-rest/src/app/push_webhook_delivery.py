@@ -12,12 +12,13 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from .config import WEBHOOK_MAX_DELIVERY_ATTEMPTS
 from .database import Database
 from .push_webhook_crypto import decrypt_signing_secret
 
 logger = logging.getLogger(__name__)
 
-MAX_DELIVERY_ATTEMPTS = 4
+MAX_DELIVERY_ATTEMPTS = WEBHOOK_MAX_DELIVERY_ATTEMPTS
 # After attempts 1–3 fail, wait before attempts 2–4 (bounded backoff).
 BACKOFF_AFTER_FAILURE_SEC = (10, 60, 300)
 _RESPONSE_PREVIEW_LEN = 1024
@@ -69,7 +70,6 @@ def _finalize_dead_letter(
     database: Database,
     event_id: str,
     attempt_number: int,
-    prev_attempt_count: int,
     *,
     http_status: Optional[int],
     response_body_preview: Optional[str],
@@ -105,7 +105,6 @@ def deliver_one_due_event(database: Database, row: Dict[str, Any]) -> None:
             database,
             event_id,
             attempt_number,
-            prev_attempt_count,
             http_status=None,
             response_body_preview=None,
             error_message="subscription inactive",
@@ -125,7 +124,6 @@ def deliver_one_due_event(database: Database, row: Dict[str, Any]) -> None:
                 database,
                 event_id,
                 attempt_number,
-                prev_attempt_count,
                 http_status=None,
                 response_body_preview=None,
                 error_message=msg,
@@ -172,7 +170,6 @@ def deliver_one_due_event(database: Database, row: Dict[str, Any]) -> None:
             database,
             event_id,
             attempt_number,
-            prev_attempt_count,
             http_status=http_status,
             response_body_preview=preview,
             error_message=err_msg,
@@ -211,7 +208,41 @@ def process_due_push_webhook_deliveries(database: Database, max_events: int = 10
             break
         try:
             deliver_one_due_event(database, row)
-        except Exception:
+        except Exception as exc:
             logger.exception("push webhook delivery failed for event %s", row.get("event_id"))
+            # Persist a failed attempt so the event is not stuck in 'processing' and
+            # backoff / dead-letter logic still applies.
+            try:
+                prev_attempt_count = int(row.get("attempt_count", 0))
+                attempt_number = prev_attempt_count + 1
+                err_msg = f"internal delivery error: {type(exc).__name__}: {exc}"
+                if attempt_number >= MAX_DELIVERY_ATTEMPTS:
+                    _finalize_dead_letter(
+                        database,
+                        str(row.get("event_id", "")),
+                        attempt_number,
+                        http_status=None,
+                        response_body_preview=None,
+                        error_message=err_msg,
+                        latency_ms=0,
+                        reason=err_msg,
+                    )
+                else:
+                    database.finalize_push_webhook_delivery_attempt(
+                        str(row.get("event_id", "")),
+                        attempt_number=attempt_number,
+                        http_status=None,
+                        response_body_preview=None,
+                        error_message=err_msg,
+                        latency_ms=0,
+                        new_status="retrying",
+                        new_attempt_count=attempt_number,
+                        next_retry_at=_next_retry_utc(attempt_number),
+                        last_error=_truncate(err_msg, 2000),
+                    )
+            except Exception:
+                logger.exception(
+                    "failed to persist internal-error attempt for event %s", row.get("event_id")
+                )
         n += 1
     return n

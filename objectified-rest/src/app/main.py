@@ -8,7 +8,7 @@ import json
 import logging
 import yaml
 
-from .database import db
+from .database import db, Database
 from .openapi_generator import generate_openapi_spec, generate_class_openapi_spec
 from .arazzo_generator import generate_arazzo_spec, generate_class_arazzo_spec
 from .jsonschema_generator import generate_jsonschema_spec, generate_class_jsonschema_spec
@@ -28,6 +28,7 @@ from .compatibility_routes import router as compatibility_router
 from .draft_lock_routes import router as draft_lock_router
 from .push_webhook_delivery import process_due_push_webhook_deliveries
 from .push_webhook_subscriptions_routes import router as push_webhook_subscriptions_router
+from .push_webhook_crypto import validate_webhook_signing_key
 
 # Create FastAPI app
 app = FastAPI(
@@ -106,6 +107,7 @@ _webhook_delivery_task: asyncio.Task | None = None
 async def startup_event():
     """Connect to database on startup."""
     db.connect()
+    validate_webhook_signing_key()
     # Log data API routes so we can confirm POST /v1/data/{tenant_slug}/records is registered
     for route in app.routes:
         if hasattr(route, "path") and "data" in route.path and hasattr(route, "methods"):
@@ -116,7 +118,17 @@ async def startup_event():
         while True:
             await asyncio.sleep(15)
             try:
-                await asyncio.to_thread(process_due_push_webhook_deliveries, db)
+                def _run_in_thread() -> int:
+                    """Run delivery with a dedicated, thread-local DB connection."""
+                    thread_db = Database()
+                    try:
+                        return process_due_push_webhook_deliveries(thread_db)
+                    finally:
+                        thread_db.close()
+
+                await asyncio.to_thread(_run_in_thread)
+            except asyncio.CancelledError:
+                raise
             except Exception:
                 log.exception("push webhook delivery sweep")
 

@@ -62,3 +62,8 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# Maximum number of HTTP delivery attempts before an event is moved to dead-letter.
+# Shared by the delivery worker (push_webhook_delivery.py) and the DB query in database.py
+# to ensure the retry policy is defined in exactly one place (#2588).
+WEBHOOK_MAX_DELIVERY_ATTEMPTS: int = 4
+

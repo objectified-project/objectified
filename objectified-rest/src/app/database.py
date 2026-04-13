@@ -8,7 +8,7 @@ import numpy as np
 from psycopg2.extras import Json, RealDictCursor
 from psycopg2.extensions import register_adapter, AsIs, adapt
 from typing import Optional, List, Dict, Any, Tuple, Set
-from .config import settings
+from .config import settings, WEBHOOK_MAX_DELIVERY_ATTEMPTS
 from .jsonschema_generator import generate_class_jsonschema_spec
 from .revision_deprecation import coerce_metadata, effective_sunset_string, successor_revision_id_from_metadata
 from .revision_lifecycle import prepare_version_metadata_update, sql_effective_lifecycle_expr
@@ -5154,31 +5154,70 @@ class Database:
             raise e
 
     def get_next_due_push_webhook_delivery(self) -> Optional[Dict[str, Any]]:
-        """Return one due event joined with subscription URL and ciphertext, or None."""
-        q = """
-            SELECT
-              e.id AS event_id,
-              e.tenant_id,
-              e.subscription_id,
-              e.event_type,
-              e.payload,
-              e.status AS event_status,
-              e.attempt_count,
-              e.next_retry_at,
-              s.url AS subscription_url,
-              s.active AS subscription_active,
-              s.signing_secret_encrypted
-            FROM odb.push_webhook_delivery_events e
-            INNER JOIN odb.push_webhook_subscriptions s ON s.id = e.subscription_id AND s.deleted_at IS NULL
-            WHERE e.status IN ('pending', 'retrying')
-              AND e.next_retry_at IS NOT NULL
-              AND e.next_retry_at <= CURRENT_TIMESTAMP
-              AND e.attempt_count < 4
-            ORDER BY e.next_retry_at ASC
-            LIMIT 1
-        """
-        rows = self.execute_query(q, ())
-        return dict(rows[0]) if rows else None
+        """Atomically claim and return one due event joined with subscription URL and ciphertext, or None."""
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH next_event AS (
+                        SELECT e.id
+                        FROM odb.push_webhook_delivery_events e
+                        INNER JOIN odb.push_webhook_subscriptions s
+                          ON s.id = e.subscription_id
+                         AND s.deleted_at IS NULL
+                        WHERE e.status IN ('pending', 'retrying')
+                          AND e.next_retry_at IS NOT NULL
+                          AND e.next_retry_at <= CURRENT_TIMESTAMP
+                          AND e.attempt_count < %s
+                        ORDER BY e.next_retry_at ASC
+                        FOR UPDATE OF e SKIP LOCKED
+                        LIMIT 1
+                    ),
+                    claimed_event AS (
+                        UPDATE odb.push_webhook_delivery_events e
+                        SET status = 'processing',
+                            updated_at = CURRENT_TIMESTAMP
+                        FROM next_event ne
+                        WHERE e.id = ne.id
+                        RETURNING
+                          e.id AS event_id,
+                          e.tenant_id,
+                          e.subscription_id,
+                          e.event_type,
+                          e.payload,
+                          e.status AS event_status,
+                          e.attempt_count,
+                          e.next_retry_at
+                    )
+                    SELECT
+                      ce.event_id,
+                      ce.tenant_id,
+                      ce.subscription_id,
+                      ce.event_type,
+                      ce.payload,
+                      ce.event_status,
+                      ce.attempt_count,
+                      ce.next_retry_at,
+                      s.url AS subscription_url,
+                      s.active AS subscription_active,
+                      s.signing_secret_encrypted
+                    FROM claimed_event ce
+                    INNER JOIN odb.push_webhook_subscriptions s
+                      ON s.id = ce.subscription_id
+                     AND s.deleted_at IS NULL
+                    """,
+                    (WEBHOOK_MAX_DELIVERY_ATTEMPTS,),
+                )
+                row = cursor.fetchone()
+                if row:
+                    conn.commit()
+                    return dict(row)
+                conn.rollback()
+                return None
+        except Exception:
+            conn.rollback()
+            raise
 
     def finalize_push_webhook_delivery_attempt(
         self,
