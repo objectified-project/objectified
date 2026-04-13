@@ -34,6 +34,7 @@ import {
   linkResponseToOperation,
   unlinkResponseFromOperation,
 } from '../../../../../../lib/db/helper-shared-path-responses';
+import { operationHasLinkedRequestBody } from '../../../../../../lib/db/helper-shared-path-request-bodies';
 import { extractPathParameters } from '../../../../../../lib/utils/path-params';
 import SchemaBuilder from './SchemaBuilder';
 import ResponseSection from './ResponseSection';
@@ -133,6 +134,9 @@ export default function OperationPropertiesPanel({
 
   // Private (x-private) flag: hide operation from Swagger
   const [xPrivate, setXPrivate] = useState(false);
+
+  /** OPTIONS + linked request body: OpenAPI export omits requestBody; warn only. */
+  const [optionsRequestBodyLinked, setOptionsRequestBodyLinked] = useState(false);
 
   // External documentation (OpenAPI externalDocs)
   const [externalDocsUrl, setExternalDocsUrl] = useState('');
@@ -308,6 +312,34 @@ export default function OperationPropertiesPanel({
 
     loadResponses();
   }, [operationId]);
+
+  useEffect(() => {
+    if (!operationId || operation !== 'OPTIONS') {
+      setOptionsRequestBodyLinked(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await operationHasLinkedRequestBody(operationId);
+        const data = JSON.parse(raw) as { success?: boolean; linked?: boolean; error?: string };
+        if (!data.success) {
+          console.error('Error loading linked request body for OPTIONS operation:', data);
+          if (!cancelled) setOptionsRequestBodyLinked(false);
+          return;
+        }
+        if (!cancelled) {
+          setOptionsRequestBodyLinked(Boolean(data.linked));
+        }
+      } catch (error) {
+        console.error('Error loading linked request body for OPTIONS operation:', error);
+        if (!cancelled) setOptionsRequestBodyLinked(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [operationId, operation, refreshKey]);
 
   // Extract available path parameters from pathname
   useEffect(() => {
@@ -1157,6 +1189,17 @@ export default function OperationPropertiesPanel({
         /* Operation Details Form */
         <>
           <div className="flex-1 overflow-auto p-4 min-h-0">
+            {optionsRequestBodyLinked && operation === 'OPTIONS' && (
+              <div
+                className="mb-3 p-3 rounded-md border text-xs shrink-0 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200"
+                role="status"
+              >
+                <span className="font-semibold">Request body linked:</span>{' '}
+                OpenAPI usually documents OPTIONS without a request body (CORS preflight). Exported spec omits{' '}
+                <code className="font-mono text-[11px]">requestBody</code> for this method; unlink the body if that matches
+                your intent.
+              </div>
+            )}
             <Tabs defaultValue="general" className="flex flex-col gap-3 min-h-0">
               <TabsList className="w-full h-auto min-h-10 shrink-0 flex flex-wrap justify-start gap-1 p-1">
                 <TabsTrigger value="general" className="text-xs px-2 py-1.5">

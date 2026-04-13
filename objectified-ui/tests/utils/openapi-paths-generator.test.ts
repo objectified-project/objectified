@@ -304,6 +304,67 @@ describe('OpenAPI Paths Generator', () => {
 
       expect(result.deprecated).toBeUndefined();
     });
+
+    it('defaults OPTIONS to 204 when no responses are defined', () => {
+      const operation: OperationInfo = {
+        id: 'op-opt',
+        operation: 'OPTIONS',
+        parameters: [],
+        responses: [],
+      };
+
+      const result = buildOperationForOpenAPI(operation);
+
+      expect((result.responses as Record<string, unknown>)['204']).toEqual({ description: 'No Content' });
+    });
+
+    it('does not emit requestBody for OPTIONS even if present in data', () => {
+      const operation: OperationInfo = {
+        id: 'op-opt',
+        operation: 'OPTIONS',
+        parameters: [],
+        requestBody: {
+          id: 'rb-1',
+          name: 'Preflight',
+          required: false,
+          content_types: [
+            {
+              id: 'ct-1',
+              media_type: 'application/json',
+              inline_schema: {
+                type: 'object',
+                properties: [],
+              },
+            },
+          ],
+        },
+        responses: [],
+      };
+
+      const result = buildOperationForOpenAPI(operation);
+
+      expect(result.requestBody).toBeUndefined();
+    });
+
+    it('includes options on path item for OPTIONS operations', () => {
+      const path: PathInfo = {
+        id: 'path-cors',
+        pathname: '/resource',
+        operations: [
+          {
+            id: 'op-opt',
+            operation: 'OPTIONS',
+            parameters: [],
+            responses: [],
+          },
+        ],
+      };
+
+      const result = buildPathItemForOpenAPI(path);
+
+      expect(result.options).toBeDefined();
+      expect((result.options as Record<string, unknown>).responses).toBeDefined();
+    });
   });
 
   describe('buildPathItemForOpenAPI', () => {

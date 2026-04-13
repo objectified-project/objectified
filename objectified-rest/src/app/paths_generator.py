@@ -363,10 +363,15 @@ def build_operation_for_openapi(operation: Dict[str, Any], options: Optional[Dic
             status_code = response.get('status_code', '200')
             responses[status_code] = build_response_for_openapi(response)
     else:
-        # Default response if none specified
-        responses['200'] = {
-            'description': 'Successful response'
-        }
+        # Default response if none specified (OPTIONS: typical CORS preflight is 204 No Content)
+        if operation.get('operation', '').upper() == 'OPTIONS':
+            responses['204'] = {
+                'description': 'No Content',
+            }
+        else:
+            responses['200'] = {
+                'description': 'Successful response'
+            }
     result['responses'] = responses
 
     return result

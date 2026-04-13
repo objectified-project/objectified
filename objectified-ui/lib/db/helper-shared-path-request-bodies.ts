@@ -264,6 +264,27 @@ export async function unlinkRequestBodyFromOperation(operationId: string): Promi
 }
 
 /**
+ * Lightweight existence check: returns true if the operation has any linked request body.
+ * Uses SELECT 1 to avoid the heavy join/aggregate of getLinkedRequestBodyForOperation.
+ */
+export async function operationHasLinkedRequestBody(operationId: string): Promise<string> {
+  const query = `
+    SELECT 1
+    FROM odb.path_operation_request_body_link
+    WHERE path_operation_id = $1
+    LIMIT 1
+  `;
+
+  try {
+    const result = await connectionPool.query(query, [operationId]);
+    return JSON.stringify({ success: true, linked: result.rows.length > 0 });
+  } catch (error: any) {
+    console.error('Error checking linked request body existence:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
  * Get the linked request body for an operation (with full details)
  */
 export async function getLinkedRequestBodyForOperation(operationId: string): Promise<string> {
