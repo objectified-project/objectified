@@ -73,6 +73,13 @@ export interface ApiResponse<T = any> {
   error?: string;
 }
 
+export interface PathsCanvasBlob {
+  nodes: Record<string, unknown>[];
+  edges: Record<string, unknown>[];
+  viewport: { x: number; y: number; zoom: number };
+  updated_at?: string | null;
+}
+
 // ==================== Path CRUD ====================
 
 /**
@@ -205,6 +212,66 @@ export async function updatePath(
   } catch (error: any) {
     console.error('Error updating path:', error);
     return { success: false, error: error.message || 'Failed to update path' };
+  }
+}
+
+/**
+ * Load persisted Paths React Flow canvas for a version_path (#2642).
+ */
+export async function getPathCanvas(
+  versionId: string,
+  pathId: string
+): Promise<ApiResponse<PathsCanvasBlob>> {
+  try {
+    const response = await fetch(`/api/paths/${versionId}/${pathId}/canvas`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Failed to load canvas' }));
+      return { success: false, error: errorData.error || `HTTP ${response.status}` };
+    }
+
+    const data = await response.json();
+    const canvas = data.canvas ?? data;
+    return { success: true, data: canvas };
+  } catch (error: any) {
+    console.error('Error loading path canvas:', error);
+    return { success: false, error: error.message || 'Failed to load canvas' };
+  }
+}
+
+/**
+ * Save Paths React Flow canvas (last-write-wins, #2642).
+ */
+export async function putPathCanvas(
+  versionId: string,
+  pathId: string,
+  body: Omit<PathsCanvasBlob, 'updated_at'>
+): Promise<ApiResponse<PathsCanvasBlob>> {
+  try {
+    const response = await fetch(`/api/paths/${versionId}/${pathId}/canvas`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nodes: body.nodes,
+        edges: body.edges,
+        viewport: body.viewport,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Failed to save canvas' }));
+      return { success: false, error: errorData.error || `HTTP ${response.status}` };
+    }
+
+    const data = await response.json();
+    const canvas = data.canvas ?? data;
+    return { success: true, data: canvas };
+  } catch (error: any) {
+    console.error('Error saving path canvas:', error);
+    return { success: false, error: error.message || 'Failed to save canvas' };
   }
 }
 
