@@ -49,7 +49,7 @@ def compat_report_fingerprint(
     ).hexdigest()
 
 
-def rule_hits_from_findings(findings: List[CompatibilityFinding]) -> MappingProxyType:
+def rule_hits_from_findings(findings: List[CompatibilityFinding]) -> Mapping[str, int]:
     """Count findings per rule id (deterministic key order when serialized via sorted())."""
     hits: Dict[str, int] = {}
     for f in findings:
@@ -63,7 +63,7 @@ class CompatibilityCheckResult:
 
     overall: Overall
     findings: Tuple[CompatibilityFinding, ...]
-    rule_hits: MappingProxyType
+    rule_hits: Mapping[str, int]
     report_fingerprint: str
 
     @property
