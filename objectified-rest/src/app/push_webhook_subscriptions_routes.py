@@ -17,6 +17,9 @@ from pydantic import HttpUrl, TypeAdapter
 from .auth import validate_authentication
 from .database import db
 from .models import (
+    PushWebhookDeadLetterItem,
+    PushWebhookDeliveryAttemptItem,
+    PushWebhookDeliveryEventDetailResponse,
     PushWebhookSubscriptionCreateRequest,
     PushWebhookSubscriptionResponse,
     PushWebhookSubscriptionUpdateRequest,
@@ -74,6 +77,69 @@ def _duplicate_http() -> HTTPException:
             "code": "WEBHOOK_URL_DUPLICATE",
             "message": "A push webhook subscription with this normalized URL already exists for this tenant.",
         },
+    )
+
+
+@router.get("/{tenant_slug}/deliveries/dead-letter", response_model=List[PushWebhookDeadLetterItem])
+async def list_push_webhook_dead_letter_deliveries(
+    tenant_slug: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> List[PushWebhookDeadLetterItem]:
+    """List terminal dead-letter webhook deliveries for the tenant (#2588)."""
+    _ = tenant_slug
+    tenant_id = auth_data["tenant_id"]
+    rows = db.list_push_webhook_dead_letter_events(tenant_id)
+    return [
+        PushWebhookDeadLetterItem(
+            id=str(r["id"]),
+            subscription_id=str(r["subscription_id"]),
+            event_type=r["event_type"],
+            payload=dict(r["payload"]) if r.get("payload") is not None else {},
+            attempt_count=int(r["attempt_count"]),
+            last_error=r.get("last_error"),
+            created_at=r.get("created_at"),
+            updated_at=r.get("updated_at"),
+        )
+        for r in rows
+    ]
+
+
+@router.get("/{tenant_slug}/deliveries/{event_id}", response_model=PushWebhookDeliveryEventDetailResponse)
+async def get_push_webhook_delivery_detail(
+    tenant_slug: str,
+    event_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> PushWebhookDeliveryEventDetailResponse:
+    """Delivery event with full attempt history (#2588)."""
+    _ = tenant_slug
+    tenant_id = auth_data["tenant_id"]
+    ev = db.get_push_webhook_delivery_event(tenant_id, event_id)
+    if not ev:
+        raise HTTPException(status_code=404, detail="Webhook delivery event not found")
+    attempts_raw = db.list_push_webhook_delivery_attempts(event_id)
+    attempts = [
+        PushWebhookDeliveryAttemptItem(
+            attempt_number=int(a["attempt_number"]),
+            http_status=a.get("http_status"),
+            response_body_preview=a.get("response_body_preview"),
+            error_message=a.get("error_message"),
+            latency_ms=a.get("latency_ms"),
+            attempted_at=a.get("attempted_at"),
+        )
+        for a in attempts_raw
+    ]
+    return PushWebhookDeliveryEventDetailResponse(
+        id=str(ev["id"]),
+        subscription_id=str(ev["subscription_id"]),
+        event_type=ev["event_type"],
+        status=str(ev["status"]),
+        payload=dict(ev["payload"]) if ev.get("payload") is not None else {},
+        attempt_count=int(ev["attempt_count"]),
+        next_retry_at=ev.get("next_retry_at"),
+        last_error=ev.get("last_error"),
+        created_at=ev.get("created_at"),
+        updated_at=ev.get("updated_at"),
+        attempts=attempts,
     )
 
 

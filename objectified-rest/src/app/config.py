@@ -1,5 +1,6 @@
 from typing import Optional
-from pydantic import computed_field
+
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +31,15 @@ class Settings(BaseSettings):
     # Pre-commit policy default when project metadata omits maxCommitPayloadBytes (#2565)
     commit_policy_max_payload_bytes_default: int = 5_242_880
 
+    # Fernet key (url-safe base64) from `Fernet.generate_key()` — encrypts webhook signing secrets at rest (#2588)
+    webhook_signing_secret_encryption_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_WEBHOOK_SIGNING_SECRET_ENCRYPTION_KEY",
+            "webhook_signing_secret_encryption_key",
+        ),
+    )
+
     @property
     def effective_database_url(self) -> str:
         """Get the database URL, preferring DATABASE_URL over building from components."""
@@ -46,6 +56,7 @@ class Settings(BaseSettings):
         env_file=".env",
         case_sensitive=False,
         extra="ignore",
+        populate_by_name=True,
     )
 
 

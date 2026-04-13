@@ -3,8 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html
 from typing import Dict, Any, Optional
-import yaml
+import asyncio
 import json
+import logging
+import yaml
 
 from .database import db
 from .openapi_generator import generate_openapi_spec, generate_class_openapi_spec
@@ -24,6 +26,7 @@ from .migration_plans_routes import router as migration_plans_router
 from .version_tags_routes import router as version_tags_router
 from .compatibility_routes import router as compatibility_router
 from .draft_lock_routes import router as draft_lock_router
+from .push_webhook_delivery import process_due_push_webhook_deliveries
 from .push_webhook_subscriptions_routes import router as push_webhook_subscriptions_router
 
 # Create FastAPI app
@@ -96,6 +99,9 @@ app.include_router(draft_lock_router)
 app.include_router(push_webhook_subscriptions_router)
 
 
+_webhook_delivery_task: asyncio.Task | None = None
+
+
 @app.on_event("startup")
 async def startup_event():
     """Connect to database on startup."""
@@ -103,13 +109,32 @@ async def startup_event():
     # Log data API routes so we can confirm POST /v1/data/{tenant_slug}/records is registered
     for route in app.routes:
         if hasattr(route, "path") and "data" in route.path and hasattr(route, "methods"):
-            import logging
             logging.getLogger("uvicorn.error").info("Registered data route: %s %s", list(route.methods), route.path)
+
+    async def _webhook_delivery_sweep() -> None:
+        log = logging.getLogger(__name__)
+        while True:
+            await asyncio.sleep(15)
+            try:
+                await asyncio.to_thread(process_due_push_webhook_deliveries, db)
+            except Exception:
+                log.exception("push webhook delivery sweep")
+
+    global _webhook_delivery_task
+    _webhook_delivery_task = asyncio.create_task(_webhook_delivery_sweep())
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Close database connection on shutdown."""
+    global _webhook_delivery_task
+    if _webhook_delivery_task is not None:
+        _webhook_delivery_task.cancel()
+        try:
+            await _webhook_delivery_task
+        except asyncio.CancelledError:
+            pass
+        _webhook_delivery_task = None
     db.close()
 
 
