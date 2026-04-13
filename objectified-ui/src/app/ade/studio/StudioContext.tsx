@@ -182,7 +182,12 @@ interface StudioContextType {
   /** Canvas / studio edits not yet persisted (#2569). */
   syncLocalDirty: boolean;
   setSyncLocalDirty: (value: boolean) => void;
+  /** Paths editor: canvas vs code (sessionStorage `studio.paths.viewMode`; #2640 P-01). */
+  pathsViewMode: 'canvas' | 'code';
+  setPathsViewMode: (mode: 'canvas' | 'code') => void;
 }
+
+export const PATHS_VIEW_MODE_STORAGE_KEY = 'studio.paths.viewMode';
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
 
@@ -385,6 +390,31 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [schemaQualityDetail, setSchemaQualityDetail] = useState<OverallSchemaQualityDetail | null>(null);
   const [syncLocalDirty, setSyncLocalDirty] = useState(false);
 
+  const [pathsViewMode, setPathsViewModeState] = useState<'canvas' | 'code'>('canvas');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = sessionStorage.getItem(PATHS_VIEW_MODE_STORAGE_KEY);
+      if (raw === 'canvas' || raw === 'code') {
+        setPathsViewModeState(raw);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const setPathsViewMode = useCallback((mode: 'canvas' | 'code') => {
+    setPathsViewModeState(mode);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(PATHS_VIEW_MODE_STORAGE_KEY, mode);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
   // Persist grid settings to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -574,7 +604,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       schemaQualityDetail,
       setSchemaQualityDetail,
       syncLocalDirty,
-      setSyncLocalDirty
+      setSyncLocalDirty,
+      pathsViewMode,
+      setPathsViewMode
     }}>
       {children}
     </StudioContext.Provider>

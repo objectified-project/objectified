@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## UI:
+- **Paths studio shell (#2640):** On **`/ade/studio/paths`**, the studio sub-header shows **PATH QUALITY** (placeholder score until P-17), a **Canvas | Code** toggle for the Paths editor (session-persisted), and the same **project / version / canvas settings** pattern as Designer; **Paths** is also on the **Canvas | Paths | Code** switcher when you are not on the Paths route
 - **Paths navigation (#2639):** **Paths** appears in the main Studio nav **next to Designer** (tenant/project context preserved); **Home** uses a **four-column** app grid on large screens with a **Paths** card **immediately to the right of Data Designer**, linking to **`/ade/studio/paths`**
 - **Version merge (#738):** Branch merge **preview** and **apply** run through **objectified-rest** — **merge-base (LCA)** plus **three-way** `components.schemas` merge, structured conflict paths, **two parents** on the merge revision, **`baseRevisionId`** optimistic lock on the target tip; Studio API routes proxy to REST
 - **Canvas ↔ Code (#2595):** Switching to **Code** now **synchronously hides group floating toolbars** (including hover/settings/export), **clears flow selection**, and **blocks sidebar group delete row actions** while the Code tab is active so nothing in that stack can take a stray click during the transition

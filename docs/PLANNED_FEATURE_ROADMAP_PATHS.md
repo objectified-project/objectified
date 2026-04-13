@@ -22,7 +22,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | ID | Issue | MVP |
 |----|------|-----|
 | P-00 | [#2639](https://github.com/KenSuenobu/objectified-commercial/issues/2639) (shipped) | Yes |
-| P-01 | [#2640](https://github.com/KenSuenobu/objectified-commercial/issues/2640) | Yes |
+| P-01 | [#2640](https://github.com/KenSuenobu/objectified-commercial/issues/2640) (shipped) | Yes |
 | P-02 | [#2641](https://github.com/KenSuenobu/objectified-commercial/issues/2641) | Yes |
 | P-03 | [#2642](https://github.com/KenSuenobu/objectified-commercial/issues/2642) | Yes |
 | P-04 | [#2643](https://github.com/KenSuenobu/objectified-commercial/issues/2643) | Yes |
@@ -53,7 +53,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | # | Issue | MVP |
 |---|--------|-----|
 | ~~2639~~ | ~~P-00 Navigation: header “Paths” + Home grid card~~ **(shipped)** | Yes |
-| 2640 | P-01 Paths shell: header, PATH QUALITY placeholder, Canvas/Code | Yes |
+| ~~2640~~ | ~~P-01 Paths shell: header, PATH QUALITY placeholder, Canvas/Code~~ **(shipped)** | Yes |
 | 2641 | P-02 Canvas defaults parity with Designer | Yes |
 | 2642 | P-03 Persist canvas JSON per version | Yes |
 
@@ -216,9 +216,9 @@ Expose **Paths** next to **Designer** in the top Studio selector row (**“Paths
 
 ---
 
-### P-01 — Paths page shell: shared header, PATH QUALITY, Canvas/Code
+### P-01 — Paths page shell: shared header, PATH QUALITY, Canvas/Code ✅
 
-**Epic:** E1 · **Labels:** `paths`, `mvp`, `ui`
+**Epic:** E1 · **Labels:** `paths`, `mvp`, `ui` · **Status:** shipped
 
 **Title:** Paths Studio shell with project/version, settings, PATH QUALITY label, Canvas/Code toggle
 

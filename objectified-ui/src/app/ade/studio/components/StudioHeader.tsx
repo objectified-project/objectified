@@ -91,6 +91,8 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     triggerCanvasRefresh,
     triggerSidebarRefresh,
     syncLocalDirty,
+    pathsViewMode,
+    setPathsViewMode,
   } = useStudio();
 
   const { conflict, clearPushConflict } = usePushConflictBanner();
@@ -112,6 +114,8 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     : pathname?.includes('/paths')
       ? 'paths'
       : 'editor';
+
+  const isPathsRoute = viewMode === 'paths';
 
   // Handle settings save
   const handleSettingsSave = React.useCallback((settings: {
@@ -478,8 +482,26 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           />
         ) : null}
 
-        {/* Overall schema quality (#245) — live from Canvas; click for breakdown (#2548) */}
-        {localProjectId && localVersionId && (
+        {/* PATH QUALITY placeholder on Paths (#2640 P-01); schema quality on Designer/Code (#245, #2548) */}
+        {localProjectId && localVersionId && isPathsRoute && (
+          <div
+            role="status"
+            className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/90 dark:bg-gray-700/40 px-3 py-1 shadow-sm shrink-0"
+            title="Path quality scoring will be available in a future update."
+          >
+            <Gauge className="w-5 h-5 text-indigo-500 shrink-0" aria-hidden />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 leading-none">
+                PATH QUALITY
+              </span>
+              <span className="text-2xl font-bold tabular-nums leading-none text-gray-400 dark:text-gray-500">
+                —
+              </span>
+            </div>
+          </div>
+        )}
+
+        {localProjectId && localVersionId && !isPathsRoute && (
           <>
             {schemaQualityScore != null ? (
               <button
@@ -656,32 +678,72 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
             {/* Separator */}
             <div className="h-6 w-px bg-gray-200 dark:bg-gray-600" />
 
-            <ToggleGroup.Root
-              type="single"
-              value={viewMode}
-              onValueChange={handleViewModeChange}
-              className="inline-flex bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1 shadow-inner"
-            >
-              <ToggleGroup.Item
-                value="editor"
-                className="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            {isPathsRoute ? (
+              <ToggleGroup.Root
+                type="single"
+                value={pathsViewMode}
+                onValueChange={(value) => {
+                  if (value === 'canvas' || value === 'code') {
+                    setPathsViewMode(value);
+                  }
+                }}
+                className="inline-flex bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1 shadow-inner"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                </svg>
-                Canvas
-              </ToggleGroup.Item>
-              {/* Paths view disabled for now - selection removed; routes and code remain in place */}
-              <ToggleGroup.Item
-                value="code"
-                className="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                <ToggleGroup.Item
+                  value="canvas"
+                  className="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                  </svg>
+                  Canvas
+                </ToggleGroup.Item>
+                <ToggleGroup.Item
+                  value="code"
+                  className="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                  Code
+                </ToggleGroup.Item>
+              </ToggleGroup.Root>
+            ) : (
+              <ToggleGroup.Root
+                type="single"
+                value={viewMode}
+                onValueChange={handleViewModeChange}
+                className="inline-flex bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1 shadow-inner"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                </svg>
-                Code
-              </ToggleGroup.Item>
-            </ToggleGroup.Root>
+                <ToggleGroup.Item
+                  value="editor"
+                  className="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                  </svg>
+                  Canvas
+                </ToggleGroup.Item>
+                <ToggleGroup.Item
+                  value="paths"
+                  className="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  Paths
+                </ToggleGroup.Item>
+                <ToggleGroup.Item
+                  value="code"
+                  className="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                  Code
+                </ToggleGroup.Item>
+              </ToggleGroup.Root>
+            )}
 
             {/* Settings Button */}
             <div className="ml-auto">
