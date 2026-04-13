@@ -263,11 +263,18 @@ export function buildResponseForOpenAPI(response: ResponseInfo): Record<string, 
         }
       }
 
-      content[contentType.media_type] = mediaTypeObject;
+      // Omit empty media-type entries (OpenAPI Media Type Object needs schema and/or examples)
+      if (Object.keys(mediaTypeObject).length > 0) {
+        content[contentType.media_type] = mediaTypeObject;
+      }
     }
 
-    result.content = content;
-  } else {
+    if (Object.keys(content).length > 0) {
+      result.content = content;
+    }
+  }
+
+  if (!result.content) {
     // Fallback: Single content type or legacy format
     let schema: Record<string, unknown> | null = null;
 
@@ -585,6 +592,7 @@ export function transformRequestBody(rb: Record<string, unknown>): RequestBodyIn
  * Transform database response record to ResponseInfo
  */
 export function transformResponse(response: Record<string, unknown>): ResponseInfo {
+  const rawCts = response.content_types as unknown[] | undefined;
   return {
     id: response.id as string,
     status_code: response.status_code as string,
@@ -593,6 +601,9 @@ export function transformResponse(response: Record<string, unknown>): ResponseIn
     class_id: response.class_id as string | null,
     class_name: response.class_name as string | null,
     inline_schema: parseInlineSchema(response.inline_schema),
+    content_types: Array.isArray(rawCts)
+      ? rawCts.map(ct => transformContentType(ct as Record<string, unknown>))
+      : undefined,
   };
 }
 
@@ -627,12 +638,31 @@ export function collectReferencedClassNames(paths: PathInfo[]): Set<string> {
         }
       }
 
-      // Check responses
+      // Check responses (top-level class, per-media-type class/$ref, legacy data.$ref)
       for (const response of operation.responses) {
         if (response.class_name) {
           classNames.add(response.class_name);
         }
-        // Also check legacy data.$ref format
+        if (response.content_types?.length) {
+          for (const ct of response.content_types) {
+            if (ct.class_name) {
+              classNames.add(ct.class_name);
+            }
+            const inline = ct.inline_schema;
+            if (inline && typeof inline === 'object') {
+              const ref = (inline as { $ref?: string }).$ref;
+              if (ref) {
+                const m = ref.match(/#\/components\/schemas\/(.+)/);
+                if (m) classNames.add(m[1]);
+              }
+              const itemsRef = (inline as { items?: { $ref?: string } }).items?.$ref;
+              if (itemsRef) {
+                const m = itemsRef.match(/#\/components\/schemas\/(.+)/);
+                if (m) classNames.add(m[1]);
+              }
+            }
+          }
+        }
         if (response.data?.$ref) {
           const refPath = response.data.$ref as string;
           const match = refPath.match(/#\/components\/schemas\/(.+)/);

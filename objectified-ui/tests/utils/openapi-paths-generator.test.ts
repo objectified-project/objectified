@@ -232,6 +232,63 @@ describe('OpenAPI Paths Generator', () => {
 
       expect(result.description).toBe('404 response');
     });
+
+    it('should build per-media content map with multiple content types', () => {
+      const response: ResponseInfo = {
+        id: 'resp-multi',
+        status_code: '200',
+        description: 'OK',
+        content_types: [
+          {
+            id: 'ct-1',
+            media_type: 'application/json',
+            class_id: 'c1',
+            class_name: 'User',
+          },
+          {
+            id: 'ct-2',
+            media_type: 'application/xml',
+            class_id: 'c2',
+            class_name: 'User',
+          },
+        ],
+      };
+
+      const result = buildResponseForOpenAPI(response);
+
+      expect(result.description).toBe('OK');
+      const content = result.content as Record<string, { schema: { $ref: string } }>;
+      expect(content['application/json'].schema.$ref).toBe('#/components/schemas/User');
+      expect(content['application/xml'].schema.$ref).toBe('#/components/schemas/User');
+    });
+
+    it('should include response headers from data.headers (OpenAPI Header Object map)', () => {
+      const response: ResponseInfo = {
+        id: 'resp-h',
+        status_code: '200',
+        description: 'Paginated list',
+        class_name: 'ItemList',
+        class_id: 'c1',
+        data: {
+          headers: {
+            'X-Total-Count': {
+              description: 'Total items',
+              schema: { type: 'integer' },
+            },
+          },
+        },
+      };
+
+      const result = buildResponseForOpenAPI(response);
+
+      expect(result.headers).toEqual({
+        'X-Total-Count': {
+          description: 'Total items',
+          schema: { type: 'integer' },
+        },
+      });
+      expect(result.content).toBeDefined();
+    });
   });
 
   describe('buildOperationForOpenAPI', () => {
@@ -275,6 +332,40 @@ describe('OpenAPI Paths Generator', () => {
       expect(result.parameters).toHaveLength(1);
       expect(result.responses).toBeDefined();
       expect((result.responses as Record<string, unknown>)['200']).toBeDefined();
+    });
+
+    it('should build responses map with multiple status codes each having description and content', () => {
+      const operation: OperationInfo = {
+        id: 'op-multi',
+        operation: 'GET',
+        parameters: [],
+        responses: [
+          {
+            id: 'r-200',
+            status_code: '200',
+            description: 'Found',
+            content_types: [
+              { id: 'ct1', media_type: 'application/json', class_id: 'a', class_name: 'User' },
+            ],
+          },
+          {
+            id: 'r-404',
+            status_code: '404',
+            description: 'Not found',
+            content_types: [
+              { id: 'ct2', media_type: 'application/json', class_id: 'b', class_name: 'ErrorBody' },
+            ],
+          },
+        ],
+      };
+
+      const built = buildOperationForOpenAPI(operation);
+      const responses = built.responses as Record<string, Record<string, unknown>>;
+
+      expect(responses['200'].description).toBe('Found');
+      expect(responses['200'].content).toBeDefined();
+      expect(responses['404'].description).toBe('Not found');
+      expect(responses['404'].content).toBeDefined();
     });
 
     it('should build a POST operation with request body', () => {
@@ -639,6 +730,39 @@ describe('OpenAPI Paths Generator', () => {
       const result = collectReferencedClassNames(paths);
 
       expect(result.size).toBe(0);
+    });
+
+    it('should collect class names from response content_types when top-level class is unset', () => {
+      const paths: PathInfo[] = [
+        {
+          id: 'path-1',
+          pathname: '/items',
+          operations: [
+            {
+              id: 'op-1',
+              operation: 'GET',
+              parameters: [],
+              responses: [
+                {
+                  id: 'r1',
+                  status_code: '200',
+                  description: 'OK',
+                  content_types: [
+                    {
+                      id: 'ct-1',
+                      media_type: 'application/json',
+                      class_id: 'c1',
+                      class_name: 'ItemPage',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      expect(collectReferencedClassNames(paths).has('ItemPage')).toBe(true);
     });
   });
 });
