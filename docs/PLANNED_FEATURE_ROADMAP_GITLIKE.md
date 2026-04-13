@@ -636,6 +636,8 @@ Show compatibility report in commit/merge flow and require justification when ov
 - Override (when enabled) requires non-empty justification.
 - Override action is logged in audit trail.
 
+**Status:** Shipped — **ADE → Versions** uses **`CompatibilityReportPanel`** (severity → path); merge **override** requires **tenant admin** + **`compatGateOverrideReason`** when **`skipCompatGate`** and **`compatGateOnMerge`**; **`workflow_audit`** **`version.compat_gate_override`** (**#2590**); **Commit** dialog copy for post-commit **`schema.compatibility`** audit.
+
 ---
 
 ## P2-09: Pull Options for Headless/CI Clients

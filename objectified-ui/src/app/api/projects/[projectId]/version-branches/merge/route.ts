@@ -66,6 +66,8 @@ export async function POST(
     const targetBranchName = typeof body.targetBranchName === 'string' ? body.targetBranchName : '';
     const baseRevisionId = typeof body.baseRevisionId === 'string' ? body.baseRevisionId : '';
     const skipCompatGate = typeof body.skipCompatGate === 'boolean' ? body.skipCompatGate : false;
+    const compatGateOverrideReason =
+      typeof body.compatGateOverrideReason === 'string' ? body.compatGateOverrideReason : '';
     if (!sourceBranchName.trim() || !targetBranchName.trim() || !baseRevisionId.trim()) {
       return NextResponse.json(
         { success: false, error: 'sourceBranchName, targetBranchName, and baseRevisionId are required' },
@@ -81,6 +83,9 @@ export async function POST(
         targetBranchName: targetBranchName.trim(),
         baseRevisionId: baseRevisionId.trim(),
         skipCompatGate,
+        ...(skipCompatGate && compatGateOverrideReason.trim()
+          ? { compatGateOverrideReason: compatGateOverrideReason.trim() }
+          : {}),
       }),
     });
     const text = await response.text();
