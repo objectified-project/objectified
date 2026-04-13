@@ -5,34 +5,30 @@ Provides CRUD endpoints for managing versions within projects.
 All endpoints are tenant and project-scoped and require authentication via JWT token or API key.
 """
 
-import re
 import logging
+import re
 from datetime import date as date_cls
 from datetime import datetime
-from typing import Literal, Optional, List, Dict, Any
+from typing import Any, Dict, List, Literal, Optional
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
+from .auth import get_authenticated_user_id, validate_authentication
 from .branch_push_policy import effective_require_merge_path
+from .compatibility_engine import CompatibilityCheckEngine, compat_audit_detail, openapi_for_revision
 from .database import BranchNotFoundError, StaleHeadPushError, db
 from .models import (
-    VersionSchema,
+    SunsetTimelineEntryOut,
+    SunsetTimelineResponse,
     VersionCreateRequest,
     VersionForkRequest,
-    VersionUpdateRequest,
     VersionPublishRequest,
-    SunsetTimelineResponse,
-    SunsetTimelineEntryOut,
+    VersionSchema,
+    VersionUpdateRequest,
 )
-from .auth import validate_authentication, get_authenticated_user_id
-from .version_notes import (
-    CommitPolicyViolation,
-    commit_policy_http_exception,
-    effective_commit_policy,
-    enforce_max_commit_payload,
-    validate_version_notes,
-)
+from .published_immutability import IMMUTABLE_DETAIL, revision_is_published_immutable
 from .revision_deprecation import (
     coerce_metadata,
     parse_calendar_date,
@@ -44,9 +40,15 @@ from .revision_lifecycle import (
     LIFECYCLE_VALUES,
     effective_lifecycle,
 )
-from .published_immutability import IMMUTABLE_DETAIL, revision_is_published_immutable
-from .compatibility_engine import CompatibilityCheckEngine, compat_audit_detail, openapi_for_revision
 from .schema_compatibility import CompatibilityRules
+from .version_notes import (
+    CommitPolicyViolation,
+    commit_policy_http_exception,
+    effective_commit_policy,
+    enforce_max_commit_payload,
+    validate_version_notes,
+)
+from .version_pull_payload import filter_version_pull_dump, resolve_pull_sections
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
 
@@ -145,6 +147,41 @@ def _not_modified_revision_response(
     if extra_headers:
         headers.update(extra_headers)
     return Response(status_code=304, headers=headers)
+
+
+def _redirect_successor_resolution_none(request: Request, *, new_path: str) -> RedirectResponse:
+    """307 with ``successorResolution=none``, preserving other query params (e.g. pull sections, #2591)."""
+    p = urlparse(str(request.url))
+    q = dict(parse_qsl(p.query, keep_blank_values=True))
+    q["successorResolution"] = "none"
+    loc = urlunparse((p.scheme, p.netloc, new_path, p.params, urlencode(q), p.fragment))
+    return RedirectResponse(loc, status_code=307)
+
+
+def _version_pull_http_response(
+    version_row: Dict[str, Any],
+    *,
+    include_sections: Optional[str],
+    exclude_sections: Optional[str],
+    response: Response,
+    etag_revision_id: str,
+):
+    """
+    JSON body for GET version (pull). Same strong ETag as the full representation (#2568); the ETag
+    identifies the revision, not the selected field set (#2591).
+    """
+    try:
+        inc, exc = resolve_pull_sections(include_sections, exclude_sections)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    vs = VersionSchema(**version_row)
+    dump = vs.model_dump(by_alias=True, mode="json")
+    filtered = filter_version_pull_dump(dump, include_sections=inc, exclude_sections=exc)
+    etag = _strong_etag_for_revision(etag_revision_id)
+    response.headers["ETag"] = etag
+    if inc is None and exc is None:
+        return vs
+    return JSONResponse(content=filtered, headers={"ETag": etag})
 
 
 def _workflow_audit_push(
@@ -481,6 +518,23 @@ async def get_version(
         alias="auditSuccessorResolution",
         description="When true, emit version_protection_audit for successor resolution (#749).",
     ),
+    include_sections: Optional[str] = Query(
+        None,
+        alias="includeSections",
+        description=(
+            "Comma-separated pull payload sections to include (#2591). Always includes id, "
+            "project_id, and version_id. Mutually exclusive with excludeSections. "
+            "Sections: core, commit, publish, lineage, governance, creator, project, timestamps."
+        ),
+    ),
+    exclude_sections: Optional[str] = Query(
+        None,
+        alias="excludeSections",
+        description=(
+            "Comma-separated sections to omit from the pull body (#2591). Core identifiers "
+            "cannot be removed. Mutually exclusive with includeSections."
+        ),
+    ),
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ):
     """
@@ -491,6 +545,9 @@ async def get_version(
     Successor resolution (#749): when ``successorResolution`` is ``resolve`` or ``redirect``, follows
     ``metadata.successorRevisionId`` (#748) within the project until a revision has no successor, hits a
     protected branch tip / protected tag target (#504), or errors. Loops return 409 ``SUCCESSOR_CYCLE``.
+
+    Pull payload selection (#2591): ``includeSections`` / ``excludeSections`` reduce JSON size for CI;
+    the strong ETag still identifies the revision only (same as full body, #2568).
     """
     tenant_id = auth_data["tenant_id"]
     pull_actor = get_authenticated_user_id(auth_data)
@@ -546,7 +603,6 @@ async def get_version(
                 {"httpStatus": 304},
             )
             return _not_modified_revision_response(revision_id=etag_id)
-        response.headers["ETag"] = _strong_etag_for_revision(etag_id)
         _workflow_audit_pull(
             tenant_id,
             project_id,
@@ -555,7 +611,13 @@ async def get_version(
             pull_actor,
             {"httpStatus": 200},
         )
-        return VersionSchema(**version)
+        return _version_pull_http_response(
+            version,
+            include_sections=include_sections,
+            exclude_sections=exclude_sections,
+            response=response,
+            etag_revision_id=etag_id,
+        )
 
     final_id, hops, status, missing_id = db.resolve_successor_revision_chain(
         version_record_id,
@@ -625,11 +687,15 @@ async def get_version(
             etag_id = str(version["id"])
             if _if_none_match_matches_revision(etag_id, if_none_match):
                 return _not_modified_revision_response(revision_id=etag_id)
-            response.headers["ETag"] = _strong_etag_for_revision(etag_id)
-            return VersionSchema(**version)
+            return _version_pull_http_response(
+                version,
+                include_sections=include_sections,
+                exclude_sections=exclude_sections,
+                response=response,
+                etag_revision_id=etag_id,
+            )
         base = request.url.path.rstrip("/").rsplit("/", 1)[0]
-        loc = request.url.replace(path=f"{base}/{final_id}", query="successorResolution=none")
-        return RedirectResponse(str(loc), status_code=307)
+        return _redirect_successor_resolution_none(request, new_path=f"{base}/{final_id}")
 
     succ_headers = _successor_resolution_headers(
         requested_id=version_record_id,
@@ -642,8 +708,13 @@ async def get_version(
         return _not_modified_revision_response(revision_id=final_id, extra_headers=succ_headers)
     for k, v in succ_headers.items():
         response.headers[k] = v
-    response.headers["ETag"] = _strong_etag_for_revision(final_id)
-    return VersionSchema(**final_row)
+    return _version_pull_http_response(
+        final_row,
+        include_sections=include_sections,
+        exclude_sections=exclude_sections,
+        response=response,
+        etag_revision_id=final_id,
+    )
 
 
 @router.get("/{tenant_slug}/{project_id}/by-version/{version_id}", response_model=VersionSchema)
@@ -663,6 +734,23 @@ async def get_version_by_version_id(
         alias="auditSuccessorResolution",
         description="When true, emit version_protection_audit for successor resolution (#749).",
     ),
+    include_sections: Optional[str] = Query(
+        None,
+        alias="includeSections",
+        description=(
+            "Comma-separated pull payload sections to include (#2591). Always includes id, "
+            "project_id, and version_id. Mutually exclusive with excludeSections. "
+            "Sections: core, commit, publish, lineage, governance, creator, project, timestamps."
+        ),
+    ),
+    exclude_sections: Optional[str] = Query(
+        None,
+        alias="excludeSections",
+        description=(
+            "Comma-separated sections to omit from the pull body (#2591). Core identifiers "
+            "cannot be removed. Mutually exclusive with includeSections."
+        ),
+    ),
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ):
     """
@@ -670,6 +758,7 @@ async def get_version_by_version_id(
 
     Supports authentication via JWT token or API key.
     Successor resolution (#749) matches ``GET .../{version_record_id}``.
+    Pull payload selection (#2591) matches ``GET .../{version_record_id}``.
     """
     tenant_id = auth_data["tenant_id"]
     pull_actor = get_authenticated_user_id(auth_data)
@@ -709,7 +798,6 @@ async def get_version_by_version_id(
                 {"httpStatus": 304, "byVersionLine": True},
             )
             return _not_modified_revision_response(revision_id=etag_id)
-        response.headers["ETag"] = _strong_etag_for_revision(etag_id)
         _workflow_audit_pull(
             tenant_id,
             project_id,
@@ -718,7 +806,13 @@ async def get_version_by_version_id(
             pull_actor,
             {"httpStatus": 200, "byVersionLine": True},
         )
-        return VersionSchema(**version)
+        return _version_pull_http_response(
+            version,
+            include_sections=include_sections,
+            exclude_sections=exclude_sections,
+            response=response,
+            etag_revision_id=etag_id,
+        )
 
     final_id, hops, status, missing_id = db.resolve_successor_revision_chain(
         version_record_id,
@@ -788,14 +882,18 @@ async def get_version_by_version_id(
             etag_id = str(version["id"])
             if _if_none_match_matches_revision(etag_id, if_none_match):
                 return _not_modified_revision_response(revision_id=etag_id)
-            response.headers["ETag"] = _strong_etag_for_revision(etag_id)
-            return VersionSchema(**version)
+            return _version_pull_http_response(
+                version,
+                include_sections=include_sections,
+                exclude_sections=exclude_sections,
+                response=response,
+                etag_revision_id=etag_id,
+            )
         base = request.url.path.rstrip("/").rsplit("/", 1)[0]
-        loc = request.url.replace(
-            path=f"{base}/{final_row['version_id']}",
-            query="successorResolution=none",
+        return _redirect_successor_resolution_none(
+            request,
+            new_path=f"{base}/{final_row['version_id']}",
         )
-        return RedirectResponse(str(loc), status_code=307)
 
     succ_headers = _successor_resolution_headers(
         requested_id=version_record_id,
@@ -808,8 +906,13 @@ async def get_version_by_version_id(
         return _not_modified_revision_response(revision_id=final_id, extra_headers=succ_headers)
     for k, v in succ_headers.items():
         response.headers[k] = v
-    response.headers["ETag"] = _strong_etag_for_revision(final_id)
-    return VersionSchema(**final_row)
+    return _version_pull_http_response(
+        final_row,
+        include_sections=include_sections,
+        exclude_sections=exclude_sections,
+        response=response,
+        etag_revision_id=final_id,
+    )
 
 
 @router.post("/{tenant_slug}/{project_id}")
