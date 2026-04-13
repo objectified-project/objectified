@@ -24,7 +24,7 @@ import {
   deletePath as deletePathRest,
   createOperation as createOperationRest,
 } from '../../../../../../lib/api/paths-client';
-import { isValidPath } from '../../../../../../lib/utils/path-params';
+import { getPathTemplateValidationError, isValidPath } from '../../../../../../lib/utils/path-params';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { AVAILABLE_OPERATIONS } from './paths-operation-colors';
 import { parseOpenAPISpec } from '../../../../utils/openapi-import';
@@ -65,7 +65,7 @@ export default function PathsSidebar({
   onSecurityRefresh?: () => void;
 }) {
   const { selectedVersionId, selectedProjectId } = useStudio();
-  const { confirm: confirmDialog } = useDialog();
+  const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const isDark = useDarkMode();
   const [paths, setPaths] = useState<PathItem[]>([]);
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -217,6 +217,16 @@ export default function PathsSidebar({
   // Handle saving path (create or update)
   const handleSavePath = async () => {
     if (!selectedVersionId || !pathNameInput.trim()) return;
+
+    const templateError = getPathTemplateValidationError(pathNameInput.trim());
+    if (templateError) {
+      await alertDialog({
+        title: 'Invalid path template',
+        message: templateError,
+        variant: 'warning',
+      });
+      return;
+    }
 
     try {
       if (editingPath) {
