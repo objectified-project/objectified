@@ -37,6 +37,16 @@ const Ade = () => {
 
   const mainApps: AppTile[] = [
     {
+      id: 'control-panel',
+      name: 'Control Panel',
+      description: 'Manage tenants, projects, and settings',
+      icon: <LayoutDashboard className="w-8 h-8" />,
+      href: '/ade/dashboard',
+      enabled: true,
+      color: 'text-indigo-600 dark:text-indigo-400',
+      gradient: 'from-indigo-500 to-purple-600',
+    },
+    {
       id: 'studio',
       name: 'Data Designer',
       description: 'Design schemas and API specifications',
@@ -55,16 +65,6 @@ const Ade = () => {
       enabled: true,
       color: 'text-amber-600 dark:text-amber-400',
       gradient: 'from-amber-500 to-orange-600',
-    },
-    {
-      id: 'control-panel',
-      name: 'Control Panel',
-      description: 'Manage tenants, projects, and settings',
-      icon: <LayoutDashboard className="w-8 h-8" />,
-      href: '/ade/dashboard',
-      enabled: true,
-      color: 'text-indigo-600 dark:text-indigo-400',
-      gradient: 'from-indigo-500 to-purple-600',
     },
     {
       id: 'browser',
