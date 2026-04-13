@@ -755,6 +755,14 @@ async def version_branch_merge(
             )
         compat_gate_override_reason = (body.compat_gate_override_reason or "").strip()
         if not compat_gate_override_reason:
+            _workflow_audit_merge(
+                tenant_id,
+                project_id,
+                target_tip,
+                "failure",
+                creator_id,
+                {"httpStatus": 422, "reason": "compat_gate_skip_requires_reason"},
+            )
             raise HTTPException(
                 status_code=422,
                 detail="compatGateOverrideReason is required when skipCompatGate is true and compatGateOnMerge is enabled",
@@ -1074,7 +1082,11 @@ async def version_branch_merge(
                 },
             )
         except Exception:
-            pass
+            logger.warning(
+                "compatibility gate override audit failed for revision %s",
+                new_id,
+                exc_info=True,
+            )
 
     return {
         "success": True,
