@@ -61,7 +61,8 @@ def test_exclude_sections_omits_governance_and_timestamps():
         )
     assert r.status_code == 200
     body = r.json()
-    assert "metadata" not in body and "lifecycle" not in body
+    assert "metadata" not in body
+    assert "lifecycle" not in body
     assert "created_at" not in body
     assert body["id"] == "rev-1"
     assert body["version_id"] == "1.0.0"
@@ -150,7 +151,8 @@ def test_by_version_exclude_sections():
         )
     assert r.status_code == 200
     body = r.json()
-    assert "metadata" not in body and "lifecycle" not in body
+    assert "metadata" not in body
+    assert "lifecycle" not in body
     assert "created_at" not in body
     assert body["id"] == "rev-1"
     assert body["version_id"] == "1.0.0"
