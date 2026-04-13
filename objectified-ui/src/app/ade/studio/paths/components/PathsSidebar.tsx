@@ -268,7 +268,11 @@ export default function PathsSidebar({
       setAutoCreateCrud(false);
     } catch (error) {
       console.error('Error saving path:', error);
-      alert('Error saving path. Please try again.');
+      await alertDialog({
+        title: 'Error',
+        message: 'Error saving path. Please try again.',
+        variant: 'error',
+      });
     }
   };
 
@@ -295,7 +299,11 @@ export default function PathsSidebar({
       }
     } catch (error) {
       console.error('Error deleting path:', error);
-      alert('Error deleting path. Please try again.');
+      await alertDialog({
+        title: 'Error',
+        message: 'Error deleting path. Please try again.',
+        variant: 'error',
+      });
     }
   };
 

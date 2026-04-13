@@ -3657,6 +3657,15 @@ function PathsCanvasInner({
             return;
           }
 
+          if (!selectedPathId) {
+            await alertDialog({
+              title: 'No Path Selected',
+              message: 'Please select a path before adding an operation.',
+              variant: 'warning',
+            });
+            return;
+          }
+
           const result = await createOperationViaApi(
             selectedVersionId,
             selectedPathId,
