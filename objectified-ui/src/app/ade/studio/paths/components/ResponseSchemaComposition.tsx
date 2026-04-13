@@ -41,12 +41,12 @@ function branchesFromSchema(
   schema: InlineSchema | null | undefined,
   kind: CombinatorKind,
   classList: ClassOption[]
-): { classId: string }[] {
+): { id: string; classId: string }[] {
   if (!schema || kind === 'none') return [];
   const key = kind as 'allOf' | 'anyOf' | 'oneOf';
   const raw = schema[key];
   if (!Array.isArray(raw)) return [];
-  const out: { classId: string }[] = [];
+  const out: { id: string; classId: string }[] = [];
   for (const item of raw) {
     if (item && typeof item === 'object' && typeof (item as { $ref?: string }).$ref === 'string') {
       const ref = (item as { $ref: string }).$ref;
@@ -56,7 +56,7 @@ function branchesFromSchema(
         const found = classList.find((c) => c.name === name);
         if (found) classId = found.id;
       }
-      out.push({ classId });
+      out.push({ id: crypto.randomUUID(), classId });
     }
   }
   return out;
@@ -73,7 +73,7 @@ export default function ResponseSchemaComposition({
   const [combinator, setCombinator] = useState<CombinatorKind>(
     activeFromDb ?? 'none'
   );
-  const [branches, setBranches] = useState<{ classId: string }[]>([]);
+  const [branches, setBranches] = useState<{ id: string; classId: string }[]>([]);
 
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -172,19 +172,19 @@ export default function ResponseSchemaComposition({
     }
   };
 
-  const propertyCount = inlineSchema?.properties?.length ?? 0;
+  const propertyCount = Array.isArray(inlineSchema?.properties) ? inlineSchema.properties.length : 0;
   const disabled = propertyCount > 0;
 
   const handleAddBranch = () => {
-    setBranches((prev) => [...prev, { classId: '' }]);
+    setBranches((prev) => [...prev, { id: crypto.randomUUID(), classId: '' }]);
   };
 
-  const handleRemoveBranch = (index: number) => {
-    setBranches((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveBranch = (id: string) => {
+    setBranches((prev) => prev.filter((b) => b.id !== id));
   };
 
-  const handleBranchClass = (index: number, classId: string) => {
-    setBranches((prev) => prev.map((b, i) => (i === index ? { classId } : b)));
+  const handleBranchClass = (id: string, classId: string) => {
+    setBranches((prev) => prev.map((b) => (b.id === id ? { ...b, classId } : b)));
   };
 
   return (
@@ -227,7 +227,7 @@ export default function ResponseSchemaComposition({
             if ((v as CombinatorKind) === 'none') {
               setBranches([]);
             } else if (branches.length === 0) {
-              setBranches([{ classId: '' }]);
+              setBranches([{ id: crypto.randomUUID(), classId: '' }]);
             }
           }}
           disabled={disabled || saving}
@@ -252,8 +252,8 @@ export default function ResponseSchemaComposition({
           <Accordion.Root type="multiple" className="space-y-1">
             {branches.map((branch, index) => (
               <Accordion.Item
-                key={`branch-${index}`}
-                value={`branch-${index}`}
+                key={branch.id}
+                value={branch.id}
                 className={`rounded-md border overflow-hidden ${
                   isDark ? 'border-slate-600 bg-slate-900/40' : 'border-slate-200 bg-white'
                 }`}
@@ -278,7 +278,7 @@ export default function ResponseSchemaComposition({
                     <Select
                       value={branch.classId || '__pick__'}
                       onValueChange={(v) =>
-                        handleBranchClass(index, v === '__pick__' ? '' : v)
+                        handleBranchClass(branch.id, v === '__pick__' ? '' : v)
                       }
                       disabled={saving}
                     >
@@ -299,7 +299,7 @@ export default function ResponseSchemaComposition({
                       variant="ghost"
                       size="sm"
                       className="h-9 px-2 shrink-0"
-                      onClick={() => handleRemoveBranch(index)}
+                      onClick={() => handleRemoveBranch(branch.id)}
                       disabled={saving || branches.length <= 1}
                       aria-label={`Remove branch ${index + 1}`}
                     >

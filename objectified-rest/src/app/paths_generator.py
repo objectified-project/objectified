@@ -28,7 +28,8 @@ def build_schema_from_inline_properties(inline_schema: Dict[str, Any]) -> Dict[s
         return {}
 
     schema: Dict[str, Any] = {}
-    properties = inline_schema.get('properties') or []
+    raw_properties = inline_schema.get('properties')
+    properties = raw_properties if isinstance(raw_properties, list) else []
 
     # Composition-only: OpenAPI Schema Object with allOf / anyOf / oneOf (no inline property tree)
     for key in ('allOf', 'anyOf', 'oneOf'):
