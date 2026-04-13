@@ -6,6 +6,7 @@ All endpoints are tenant and project-scoped and require authentication via JWT t
 """
 
 import re
+import logging
 from datetime import date as date_cls
 from datetime import datetime
 from typing import Literal, Optional, List, Dict, Any
@@ -44,8 +45,12 @@ from .revision_lifecycle import (
     effective_lifecycle,
 )
 from .published_immutability import IMMUTABLE_DETAIL, revision_is_published_immutable
+from .compatibility_engine import CompatibilityCheckEngine, compat_audit_detail, openapi_for_revision
+from .schema_compatibility import CompatibilityRules
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
+
+logger = logging.getLogger(__name__)
 
 
 _DEFAULT_COMMIT_METADATA_MAX_CHARS = 10_000
@@ -1094,6 +1099,39 @@ async def create_version(
             creator_id,
             detail_ok,
         )
+
+        if parent_version_id:
+            try:
+                pver = db.get_version_by_id(parent_version_id, tenant_id)
+                if pver:
+                    push_spec_base = openapi_for_revision(pver, tenant_slug, tenant_id)
+                    push_spec_head = openapi_for_revision(version, tenant_slug, tenant_id)
+                    push_cr = CompatibilityCheckEngine.run(
+                        push_spec_base, push_spec_head, CompatibilityRules()
+                    )
+                    try:
+                        db.insert_workflow_audit(
+                            tenant_id,
+                            project_id,
+                            str(version["id"]),
+                            "schema.compatibility",
+                            "success",
+                            creator_id,
+                            compat_audit_detail(
+                                pipeline="version.push",
+                                base_revision_id=parent_version_id,
+                                head_revision_id=str(version["id"]),
+                                result=push_cr,
+                            ),
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                logger.warning(
+                    "post-push compatibility audit failed for revision %s",
+                    str(version.get("id")),
+                    exc_info=True,
+                )
 
         response_data = {**version}
         if copy_warning:

@@ -6,13 +6,19 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import re
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from .auth import validate_authentication, get_authenticated_user_id
-from .compatibility_routes import _fingerprint, _openapi_for_revision
+from .compatibility_engine import (
+    CompatibilityCheckEngine,
+    compat_audit_detail,
+    compat_report_fingerprint,
+    openapi_for_revision,
+)
 from .database import db
 from .models import (
     CompatibilityFindingOut,
@@ -29,11 +35,7 @@ from .models import (
     VersionSchema,
 )
 from .revision_deprecation import warnings_for_revision
-from .schema_compatibility import (
-    BREAKING_DOC_ISSUE_URL,
-    CompatibilityRules,
-    analyze_schema_compatibility,
-)
+from .schema_compatibility import BREAKING_DOC_ISSUE_URL, CompatibilityRules
 from .schema_merge import (
     _MISSING,
     classify_merge_diff_two_way,
@@ -54,6 +56,7 @@ from .published_immutability import IMMUTABLE_DETAIL, revision_is_published_immu
 
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
+logger = logging.getLogger(__name__)
 
 # Max UTF-8 size of serialized merged OpenAPI in merge-preview (dry-run only; avoids huge payloads).
 _MERGE_PREVIEW_MAX_JSON_BYTES = 512 * 1024
@@ -543,9 +546,9 @@ async def version_branch_merge_preview(
         on_failure_audit=None,
     )
 
-    base_spec = _openapi_for_revision(base_ver, tenant_slug, tenant_id)
-    source_spec = _openapi_for_revision(src_ver, tenant_slug, tenant_id)
-    target_spec = _openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
+    base_spec = openapi_for_revision(base_ver, tenant_slug, tenant_id)
+    source_spec = openapi_for_revision(src_ver, tenant_slug, tenant_id)
+    target_spec = openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
 
     b = _extract_schemas(base_spec)
     o = _extract_schemas(target_spec)
@@ -761,9 +764,9 @@ async def version_branch_merge(
         )
         raise HTTPException(status_code=404, detail="Merge base revision not found")
 
-    base_spec = _openapi_for_revision(base_ver, tenant_slug, tenant_id)
-    source_spec = _openapi_for_revision(src_ver, tenant_slug, tenant_id)
-    target_spec = _openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
+    base_spec = openapi_for_revision(base_ver, tenant_slug, tenant_id)
+    source_spec = openapi_for_revision(src_ver, tenant_slug, tenant_id)
+    target_spec = openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
 
     b = _extract_schemas(base_spec)
     o = _extract_schemas(target_spec)
@@ -818,12 +821,15 @@ async def version_branch_merge(
     gate = _tenant_compat_gate(project) and not body.skip_compat_gate
     if gate:
         merged_spec = _merge_openapi_components(target_spec, merged)
-        overall, _ = analyze_schema_compatibility(base_spec, merged_spec, CompatibilityRules())
-        if overall != "safe":
+        gate_result = CompatibilityCheckEngine.run(
+            base_spec, merged_spec, CompatibilityRules()
+        )
+        if gate_result.overall != "safe":
             d = {
                 "message": "Merge blocked by compatibility gate (compatGateOnMerge).",
                 "code": "MERGE_BLOCKED_BY_COMPAT_GATE",
-                "overall": overall,
+                "overall": gate_result.overall,
+                "ruleHits": dict(sorted(gate_result.rule_hits.items())),
             }
             _workflow_audit_merge(
                 tenant_id,
@@ -997,6 +1003,36 @@ async def version_branch_merge(
             "versionLine": full.get("version_id"),
         },
     )
+    try:
+        new_spec = openapi_for_revision(full, tenant_slug, tenant_id)
+        pre_merge_target_spec = openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
+        post_merge = CompatibilityCheckEngine.run(
+            pre_merge_target_spec, new_spec, CompatibilityRules()
+        )
+        try:
+            db.insert_workflow_audit(
+                tenant_id,
+                project_id,
+                new_id,
+                "schema.compatibility",
+                "success",
+                creator_id,
+                compat_audit_detail(
+                    pipeline="version.merge",
+                    base_revision_id=target_tip,
+                    head_revision_id=new_id,
+                    result=post_merge,
+                ),
+            )
+        except Exception:
+            pass
+    except Exception:
+        logger.warning(
+            "post-merge compatibility audit failed for revision %s",
+            new_id,
+            exc_info=True,
+        )
+
     return {
         "success": True,
         "version": VersionSchema.model_validate(full).model_dump(by_alias=True),
@@ -1025,8 +1061,8 @@ def _rollback_analyze(
         (overall, finding_out, dep_out, fp, doc_url, impact_summary)
     where ``impact_summary`` is ``None`` when *include_impact* is ``False``.
     """
-    tip_spec = _openapi_for_revision(head_ver, tenant_slug, tenant_id)
-    target_spec = _openapi_for_revision(target_ver, tenant_slug, tenant_id)
+    tip_spec = openapi_for_revision(head_ver, tenant_slug, tenant_id)
+    target_spec = openapi_for_revision(target_ver, tenant_slug, tenant_id)
     impact_summary: Optional[Dict[str, Any]] = None
     if include_impact:
         schema_diff = compare_schemas(tip_spec, target_spec)
@@ -1038,7 +1074,8 @@ def _rollback_analyze(
             **diff_counts,
             "changedEntityCount": changed_entity_count,
         }
-    overall, findings = analyze_schema_compatibility(tip_spec, target_spec, CompatibilityRules())
+    rb_result = CompatibilityCheckEngine.run(tip_spec, target_spec, CompatibilityRules())
+    overall = rb_result.overall
     finding_out = [
         CompatibilityFindingOut(
             id=f.id,
@@ -1047,7 +1084,7 @@ def _rollback_analyze(
             rule=f.rule,
             message=f.message,
         )
-        for f in findings
+        for f in rb_result.findings
     ]
     finding_dicts = [f.model_dump(by_alias=True) for f in finding_out]
     dep_out = []
@@ -1068,7 +1105,7 @@ def _rollback_analyze(
         )
     )
     dep_dicts = [w.model_dump(by_alias=True) for w in dep_out]
-    fp = _fingerprint(overall, finding_dicts, dep_dicts or None)
+    fp = compat_report_fingerprint(overall, finding_dicts, dep_dicts or None)
     doc_url = BREAKING_DOC_ISSUE_URL if overall == "breaking" else None
     return overall, finding_out, dep_out, fp, doc_url, impact_summary
 
