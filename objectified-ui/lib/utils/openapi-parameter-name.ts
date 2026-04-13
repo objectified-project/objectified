@@ -18,15 +18,15 @@ export function validateOpenApiParameterName(
   }
 
   if (inLocation === 'path') {
-    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
-      return 'Path parameter names may only contain letters, digits, and underscores.';
-    }
+    // OpenAPI only requires the name to be non-empty; path templates already use
+    // names verbatim (e.g. {user-id}), so no further character restrictions apply.
     return null;
   }
 
   if (inLocation === 'query') {
-    if (!/^[a-zA-Z0-9._~-]+$/.test(trimmed)) {
-      return 'Query parameter names may only contain letters, digits, and . _ ~ - (no spaces).';
+    // Only hard rule: whitespace is never valid in a query parameter name.
+    if (/\s/.test(trimmed)) {
+      return 'Query parameter names may not contain whitespace.';
     }
     return null;
   }

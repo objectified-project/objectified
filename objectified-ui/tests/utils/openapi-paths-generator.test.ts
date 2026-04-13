@@ -126,6 +126,37 @@ describe('OpenAPI Paths Generator', () => {
       expect(result.allowReserved).toBe(true);
     });
 
+    it('should NOT emit allowReserved for header or cookie parameters even if stored', () => {
+      const headerParam: PathParameter = {
+        id: 'h2',
+        name: 'X-Custom',
+        in_location: 'header',
+        data: { type: 'string', allowReserved: true },
+      };
+      const cookieParam: PathParameter = {
+        id: 'c2',
+        name: 'prefs',
+        in_location: 'cookie',
+        data: { type: 'string', allowReserved: true },
+      };
+      expect(buildParameterForOpenAPI(headerParam).allowReserved).toBeUndefined();
+      expect(buildParameterForOpenAPI(cookieParam).allowReserved).toBeUndefined();
+    });
+
+    it('should NOT emit allowReserved for inline-schema header params', () => {
+      const param: PathParameter = {
+        id: 'h-inline',
+        name: 'Authorization',
+        in_location: 'header',
+        data: {
+          schemaMode: 'inline',
+          inlineSchema: { type: 'string' },
+          allowReserved: true,
+        },
+      };
+      expect(buildParameterForOpenAPI(param).allowReserved).toBeUndefined();
+    });
+
     it('should use inline JSON Schema when schemaMode is inline', () => {
       const param: PathParameter = {
         id: 'param-inline',

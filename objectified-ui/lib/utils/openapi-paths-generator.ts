@@ -145,7 +145,7 @@ export function buildParameterForOpenAPI(param: PathParameter): Record<string, u
     if (data.explode !== undefined) {
       result.explode = data.explode;
     }
-    if (data.allowReserved === true) {
+    if (data.allowReserved === true && param.in_location === 'query') {
       result.allowReserved = true;
     }
     if (data.example !== undefined) {
@@ -176,8 +176,11 @@ export function buildParameterForOpenAPI(param: PathParameter): Record<string, u
     delete schemaData.allowEmptyValue;
   }
 
-  if (schemaData.allowReserved === true) {
+  if (schemaData.allowReserved === true && param.in_location === 'query') {
     result.allowReserved = true;
+    delete schemaData.allowReserved;
+  } else if (schemaData.allowReserved !== undefined) {
+    // Not a query param — discard the flag rather than emitting invalid OpenAPI
     delete schemaData.allowReserved;
   }
 
