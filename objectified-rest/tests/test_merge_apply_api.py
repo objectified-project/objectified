@@ -110,3 +110,58 @@ def test_merge_apply_blend_conflict_includes_unresolved_count():
     assert d["unresolvedCount"] == 3
     assert d["conflictPaths"] == blend_paths
     assert "3 unresolved conflict" in d["message"]
+
+
+def test_merge_skip_compat_gate_requires_tenant_admin_when_gate_on():
+    """#2590: breaking-glass skip of compat gate requires tenant admin + justification."""
+    _m0, m1, m2, m3, m4 = _merge_mocks()
+    p0 = patch(
+        "src.app.version_merge_routes.db.get_project_by_id",
+        return_value={"id": PID, "metadata": {"compatGateOnMerge": True}},
+    )
+    with (
+        p0,
+        m1,
+        m2,
+        m3,
+        m4,
+        patch("src.app.version_merge_routes.db.is_user_tenant_admin", return_value=False),
+    ):
+        r = client.post(
+            f"/v1/versions/acme/{PID}/version-branches/merge",
+            json={
+                "sourceBranchName": "src",
+                "targetBranchName": "tgt",
+                "baseRevisionId": "vt",
+                "skipCompatGate": True,
+            },
+        )
+    assert r.status_code == 403
+    assert "tenant administrator" in r.json()["detail"].lower()
+
+
+def test_merge_skip_compat_gate_requires_reason_when_gate_on():
+    _m0, m1, m2, m3, m4 = _merge_mocks()
+    p0 = patch(
+        "src.app.version_merge_routes.db.get_project_by_id",
+        return_value={"id": PID, "metadata": {"compatGateOnMerge": True}},
+    )
+    with (
+        p0,
+        m1,
+        m2,
+        m3,
+        m4,
+        patch("src.app.version_merge_routes.db.is_user_tenant_admin", return_value=True),
+    ):
+        r = client.post(
+            f"/v1/versions/acme/{PID}/version-branches/merge",
+            json={
+                "sourceBranchName": "src",
+                "targetBranchName": "tgt",
+                "baseRevisionId": "vt",
+                "skipCompatGate": True,
+            },
+        )
+    assert r.status_code == 422
+    assert "compatGateOverrideReason" in r.json()["detail"]

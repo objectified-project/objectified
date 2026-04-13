@@ -737,6 +737,29 @@ async def version_branch_merge(
         on_failure_audit=_workflow_audit_merge,
     )
 
+    gate_active = _tenant_compat_gate(project)
+    compat_gate_override_reason: Optional[str] = None
+    if gate_active and body.skip_compat_gate:
+        if not db.is_user_tenant_admin(tenant_id, creator_id):
+            _workflow_audit_merge(
+                tenant_id,
+                project_id,
+                target_tip,
+                "failure",
+                creator_id,
+                {"httpStatus": 403, "reason": "compat_gate_skip_requires_admin"},
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="skipCompatGate requires tenant administrator when compatGateOnMerge is enabled",
+            )
+        compat_gate_override_reason = (body.compat_gate_override_reason or "").strip()
+        if not compat_gate_override_reason:
+            raise HTTPException(
+                status_code=422,
+                detail="compatGateOverrideReason is required when skipCompatGate is true and compatGateOnMerge is enabled",
+            )
+
     merge_base_id = db.compute_merge_base_revision_id(source_tip, target_tip, tenant_id)
     if not merge_base_id:
         _workflow_audit_merge(
@@ -818,7 +841,7 @@ async def version_branch_merge(
             detail=d,
         )
 
-    gate = _tenant_compat_gate(project) and not body.skip_compat_gate
+    gate = gate_active and not body.skip_compat_gate
     if gate:
         merged_spec = _merge_openapi_components(target_spec, merged)
         gate_result = CompatibilityCheckEngine.run(
@@ -1032,6 +1055,26 @@ async def version_branch_merge(
             new_id,
             exc_info=True,
         )
+
+    if gate_active and body.skip_compat_gate and compat_gate_override_reason:
+        try:
+            db.insert_workflow_audit(
+                tenant_id,
+                project_id,
+                new_id,
+                "version.compat_gate_override",
+                "success",
+                creator_id,
+                {
+                    "pipeline": "version.merge",
+                    "sourceBranch": body.source_branch_name,
+                    "targetBranch": body.target_branch_name,
+                    "mergeBaseRevisionId": merge_base_id,
+                    "reason": compat_gate_override_reason,
+                },
+            )
+        except Exception:
+            pass
 
     return {
         "success": True,

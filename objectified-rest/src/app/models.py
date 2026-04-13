@@ -575,6 +575,14 @@ class VersionBranchMergeRequest(BaseModel):
         validation_alias=AliasChoices("skipCompatGate", "skip_compat_gate"),
         description="When true, skip optional project compatGateOnMerge check against merge result.",
     )
+    compat_gate_override_reason: Optional[str] = Field(
+        default=None,
+        max_length=2000,
+        validation_alias=AliasChoices(
+            "compatGateOverrideReason", "compat_gate_override_reason"
+        ),
+        description="Required when skipCompatGate is true and compatGateOnMerge is enabled (#2590).",
+    )
     override_published_immutability: bool = Field(
         default=False,
         validation_alias=AliasChoices(

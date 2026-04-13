@@ -79,6 +79,7 @@ import {
   type MergeConflictResolutionChoice,
 } from '../../../../../lib/version-merge';
 import { VersionMergeConflictList } from '../../../components/ade/dashboard/VersionMergeConflictList';
+import { CompatibilityReportPanel } from '../../../components/ade/dashboard/CompatibilityReportPanel';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -364,7 +365,10 @@ const Versions = () => {
     breakingChangeDocumentationIssueUrl?: string | null;
     tenantCompatGateActive?: boolean;
     mergeBlockedByCompatGate?: boolean;
+    ruleHits?: Record<string, number>;
   } | null>(null);
+  const [mergeCompatGateOverride, setMergeCompatGateOverride] = useState(false);
+  const [mergeCompatGateOverrideReason, setMergeCompatGateOverrideReason] = useState('');
 
   const [showRollbackDialog, setShowRollbackDialog] = useState(false);
   const [rollbackTargetVersion, setRollbackTargetVersion] = useState<Version | null>(null);
@@ -1925,12 +1929,17 @@ const Versions = () => {
             });
             const cd = await cr.json();
             if (cr.ok && cd.success === true && typeof cd.overall === 'string') {
+              const rh =
+                cd.ruleHits && typeof cd.ruleHits === 'object' && !Array.isArray(cd.ruleHits)
+                  ? (cd.ruleHits as Record<string, number>)
+                  : undefined;
               setMergeCompat({
                 overall: cd.overall,
                 findings: Array.isArray(cd.findings) ? cd.findings : [],
                 breakingChangeDocumentationIssueUrl: cd.breakingChangeDocumentationIssueUrl ?? null,
                 tenantCompatGateActive: Boolean(cd.tenantCompatGateActive),
                 mergeBlockedByCompatGate: Boolean(cd.mergeBlockedByCompatGate),
+                ruleHits: rh,
               });
             } else {
               setMergeCompat(null);
@@ -1973,6 +1982,12 @@ const Versions = () => {
       toast.error('Target branch not found in list — refresh branches');
       return;
     }
+    const skipCompatGateOverride =
+      Boolean(mergeCompat?.mergeBlockedByCompatGate) &&
+      effectiveIsAdmin &&
+      mergeCompatGateOverride &&
+      mergeCompatGateOverrideReason.trim().length > 0;
+
     setMergeApplyLoading(true);
     try {
       const r = await fetch(`/api/projects/${selectedProjectId}/version-branches/merge`, {
@@ -1982,6 +1997,12 @@ const Versions = () => {
           sourceBranchName: mergeSourceBranch.trim(),
           targetBranchName: mergeTargetBranch.trim(),
           baseRevisionId: target.tip_version_id,
+          ...(skipCompatGateOverride
+            ? {
+                skipCompatGate: true,
+                compatGateOverrideReason: mergeCompatGateOverrideReason.trim(),
+              }
+            : {}),
         }),
       });
       const d = await r.json();
@@ -2933,6 +2954,14 @@ const Versions = () => {
                   permissionDenied={branchPermissionDenied}
                 />
                 <Alert variant="info">Classes and properties will be copied from the selected revision.</Alert>
+                <Alert variant="default" role="note">
+                  <span className="font-medium text-sm">Compatibility</span>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
+                    After a successful commit, the service records a parent→head compatibility check in the workflow audit
+                    log. Use <strong>Merge branches</strong> on this page or <strong>Compare versions</strong> to review a
+                    full grouped report between two existing revisions before you integrate.
+                  </p>
+                </Alert>
               </>
             )}
             <div className="space-y-2">
@@ -4321,7 +4350,11 @@ const Versions = () => {
       <Dialog
         open={showMergeDialog}
         onOpenChange={(open) => {
-          if (!open) setMergeCompat(null);
+          if (!open) {
+            setMergeCompat(null);
+            setMergeCompatGateOverride(false);
+            setMergeCompatGateOverrideReason('');
+          }
           if (!mergePreviewLoading && !mergeApplyLoading) setShowMergeDialog(open);
         }}
       >
@@ -4394,36 +4427,64 @@ const Versions = () => {
                       : 'error'
                 }
               >
-                <span className="font-medium text-sm">Backward compatibility: {mergeCompat.overall}</span>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  Compares generated OpenAPI for <strong>target tip</strong> (base) vs <strong>source tip</strong> (head). Merge execution uses the three-way engine plus optional project compat gate on the merged result.
-                </p>
-                {mergeCompat.findings.length > 0 && (
-                  <ul className="mt-2 text-xs list-disc pl-4 max-h-36 overflow-y-auto space-y-0.5">
-                    {mergeCompat.findings.slice(0, 14).map((f) => (
-                      <li key={f.id ?? `${f.path}-${f.rule}-${f.message}`}>
-                        <span className="font-mono text-[11px]">{f.path}</span>
-                        {' — '}
-                        {f.message}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {mergeCompat.breakingChangeDocumentationIssueUrl && (
-                  <a
-                    href={mergeCompat.breakingChangeDocumentationIssueUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs underline mt-2 inline-block text-blue-600 dark:text-blue-400"
-                  >
-                    Breaking changes documentation (#746)
-                  </a>
-                )}
+                <span className="font-medium text-sm">Backward compatibility (target tip → source tip)</span>
+                <div className="mt-2">
+                  <CompatibilityReportPanel
+                    overall={mergeCompat.overall}
+                    findings={mergeCompat.findings}
+                    ruleHits={mergeCompat.ruleHits}
+                    docUrl={mergeCompat.breakingChangeDocumentationIssueUrl ?? undefined}
+                    intro={
+                      <span>
+                        Compares generated OpenAPI for <strong>target tip</strong> (base) vs <strong>source tip</strong> (head).
+                        Merge execution uses the three-way engine plus an optional project compatibility gate on the merged result.
+                      </span>
+                    }
+                  />
+                </div>
                 {mergeCompat.mergeBlockedByCompatGate && (
                   <p className="text-xs mt-2 text-amber-800 dark:text-amber-200">
-                    Project metadata enables compat gating — merge is blocked until compatibility is safe or policy is updated.
+                    Project metadata enables compat gating — merge is blocked until compatibility is safe, unless a tenant
+                    administrator overrides with a written justification (recorded in the workflow audit log).
                   </p>
                 )}
+                {mergeCompat.mergeBlockedByCompatGate && effectiveIsAdmin ? (
+                  <div className="mt-3 space-y-2 border-t border-amber-200/60 dark:border-amber-800/40 pt-3">
+                    <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={mergeCompatGateOverride}
+                        onChange={(e) => {
+                          setMergeCompatGateOverride(e.target.checked);
+                          if (!e.target.checked) {
+                            setMergeCompatGateOverrideReason('');
+                          }
+                        }}
+                        className="rounded border-gray-300 dark:border-gray-600 mt-0.5"
+                      />
+                      <span>
+                        Override compatibility gate (tenant admin) — required when the gate blocks merge due to unsafe
+                        target/source pair analysis
+                      </span>
+                    </label>
+                    {mergeCompatGateOverride ? (
+                      <div className="space-y-1">
+                        <Label htmlFor="merge-compat-override-reason">Justification *</Label>
+                        <Textarea
+                          id="merge-compat-override-reason"
+                          value={mergeCompatGateOverrideReason}
+                          onChange={(e) => setMergeCompatGateOverrideReason(e.target.value)}
+                          rows={3}
+                          placeholder="Explain why merge should proceed despite the compatibility gate (audit record)"
+                          className="text-sm"
+                          aria-invalid={
+                            mergeCompatGateOverride && mergeCompatGateOverrideReason.trim().length === 0
+                          }
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </Alert>
             )}
           </div>
@@ -4444,7 +4505,12 @@ const Versions = () => {
                 !mergeTargetBranch ||
                 !mergePreviewMatchesBranches ||
                 mergeHasEngineConflicts ||
-                mergeCompat?.mergeBlockedByCompatGate === true
+                (mergeCompat?.mergeBlockedByCompatGate === true &&
+                  !(
+                    effectiveIsAdmin &&
+                    mergeCompatGateOverride &&
+                    mergeCompatGateOverrideReason.trim().length > 0
+                  ))
               }
             >
               {mergeApplyLoading ? 'Merging…' : 'Apply merge'}
@@ -4525,27 +4591,18 @@ const Versions = () => {
                   <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                     Same compatibility rules as elsewhere (#506): rolling back can remove paths or fields consumers rely on.
                   </p>
-                  {(rollbackPreview.findings ?? []).length > 0 && (
-                    <ul className="mt-2 text-xs list-disc pl-4 max-h-36 overflow-y-auto space-y-0.5">
-                      {(rollbackPreview.findings ?? []).slice(0, 14).map((f) => (
-                        <li key={f.id ?? `${f.path}-${f.message}`}>
-                          <span className="font-mono text-[11px]">{f.path}</span>
-                          {' — '}
-                          {f.message}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {rollbackPreview.breakingChangeDocumentationIssueUrl ? (
-                    <a
-                      href={rollbackPreview.breakingChangeDocumentationIssueUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs underline mt-2 inline-block text-blue-600 dark:text-blue-400"
-                    >
-                      Breaking changes documentation (#746)
-                    </a>
-                  ) : null}
+                  <div className="mt-2">
+                    <CompatibilityReportPanel
+                      findings={(rollbackPreview.findings ?? []).map((f) => ({
+                        id: f.id,
+                        category: (f as { category?: string }).category,
+                        rule: f.rule ?? '—',
+                        path: f.path,
+                        message: f.message,
+                      }))}
+                      docUrl={rollbackPreview.breakingChangeDocumentationIssueUrl ?? undefined}
+                    />
+                  </div>
                 </Alert>
                 {rollbackPreview.rollbackBlockedByCompatGate ? (
                   <p className="text-xs text-amber-800 dark:text-amber-200">
