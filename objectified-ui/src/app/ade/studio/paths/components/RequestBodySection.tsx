@@ -442,8 +442,10 @@ export default function RequestBodySection({
   const [newPropertyType, setNewPropertyType] = useState('string');
   const [currentContentId, setCurrentContentId] = useState<string | null>(null);
 
-  // Load data
-  const loadData = useCallback(async () => {
+  // Load request-body / link data (does NOT include classes — see loadClasses below).
+  // Keeping this separate means a refreshKey bump only refetches the persisted
+  // request-body rows, not the full class list.
+  const loadRequestBodyData = useCallback(async () => {
     setIsLoading(true);
     try {
       // Load linked request body
@@ -471,29 +473,45 @@ export default function RequestBodySection({
       if (availableData.success) {
         setAvailableRequestBodies(availableData.requestBodies || []);
       }
-
-      // Load classes for reference selection
-      if (selectedVersionId) {
-        const classesResult = await getClassesWithPropertiesAndTags(selectedVersionId);
-        const classesData = JSON.parse(classesResult as string);
-        const uniqueClasses = classesData.reduce((acc: Array<{ id: string; name: string }>, cls: { id: string; name: string }) => {
-          if (!acc.find((c) => c.id === cls.id)) {
-            acc.push({ id: cls.id, name: cls.name });
-          }
-          return acc;
-        }, []);
-        setClasses(uniqueClasses);
-      }
     } catch (error) {
       console.error('Error loading request body data:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [operationId, versionPathId, selectedVersionId]);
+  }, [operationId, versionPathId]);
 
+  // Load classes for reference selection — only needs to run when the version changes.
+  const loadClasses = useCallback(async () => {
+    if (!selectedVersionId) return;
+    try {
+      const classesResult = await getClassesWithPropertiesAndTags(selectedVersionId);
+      const classesData = JSON.parse(classesResult as string);
+      const uniqueClasses = classesData.reduce(
+        (acc: Array<{ id: string; name: string }>, cls: { id: string; name: string }) => {
+          if (!acc.find((c) => c.id === cls.id)) {
+            acc.push({ id: cls.id, name: cls.name });
+          }
+          return acc;
+        },
+        []
+      );
+      setClasses(uniqueClasses);
+    } catch (error) {
+      console.error('Error loading classes:', error);
+    }
+  }, [selectedVersionId]);
+
+  // Reload request-body/link data whenever the operation/path changes OR when the
+  // parent signals a canvas refresh via refreshKey.  Classes are intentionally
+  // excluded here to avoid an extra round-trip on every canvas refresh.
   useEffect(() => {
-    loadData();
-  }, [loadData, refreshKey]);
+    loadRequestBodyData();
+  }, [loadRequestBodyData, refreshKey]);
+
+  // Classes only need to reload when the version changes.
+  useEffect(() => {
+    loadClasses();
+  }, [loadClasses]);
 
   // Handlers
   const handleCreateRequestBody = async () => {
@@ -531,7 +549,6 @@ export default function RequestBodySection({
         setNewName('');
         setNewDescription('');
         setNewRequired(true);
-        await loadData();
         onRefresh?.();
       } else {
         await alertDialog({
@@ -556,7 +573,6 @@ export default function RequestBodySection({
       const data = JSON.parse(result);
 
       if (data.success) {
-        await loadData();
         onRefresh?.();
       } else {
         await alertDialog({
@@ -587,7 +603,6 @@ export default function RequestBodySection({
 
       if (data.success) {
         setLinkedRequestBody(null);
-        await loadData();
         onRefresh?.();
       }
     } catch (error) {
@@ -605,7 +620,7 @@ export default function RequestBodySection({
           await setContentTypeClassReference(contentId, classes[0].id);
         }
       }
-      await loadData();
+      await loadRequestBodyData();
     } catch (error) {
       console.error('Error changing schema type:', error);
     }
@@ -614,7 +629,7 @@ export default function RequestBodySection({
   const handleClassChange = async (contentId: string, classId: string) => {
     try {
       await setContentTypeClassReference(contentId, classId);
-      await loadData();
+      await loadRequestBodyData();
     } catch (error) {
       console.error('Error changing class reference:', error);
     }
@@ -636,7 +651,6 @@ export default function RequestBodySection({
       const data = JSON.parse(result);
 
       if (data.success) {
-        await loadData();
         onRefresh?.();
       } else {
         await alertDialog({
@@ -676,7 +690,7 @@ export default function RequestBodySection({
         setNewMediaType('application/json');
         setNewContentSchemaType('inline');
         setNewContentClassId('');
-        await loadData();
+        await loadRequestBodyData();
       } else {
         await alertDialog({
           title: 'Error',
@@ -705,7 +719,6 @@ export default function RequestBodySection({
       const data = JSON.parse(result);
 
       if (data.success) {
-        await loadData();
         onRefresh?.();
       }
     } catch (error) {
@@ -731,7 +744,7 @@ export default function RequestBodySection({
         setNewPropertyName('');
         setNewPropertyType('string');
         setCurrentContentId(null);
-        await loadData();
+        await loadRequestBodyData();
       } else {
         await alertDialog({
           title: 'Error',
@@ -760,7 +773,7 @@ export default function RequestBodySection({
       const data = JSON.parse(result);
 
       if (data.success) {
-        await loadData();
+        await loadRequestBodyData();
       }
     } catch (error) {
       console.error('Error deleting property:', error);
@@ -798,7 +811,7 @@ export default function RequestBodySection({
           <div className="flex gap-1">
             <button
               type="button"
-              onClick={loadData}
+              onClick={loadRequestBodyData}
               className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
               title="Refresh"
             >
