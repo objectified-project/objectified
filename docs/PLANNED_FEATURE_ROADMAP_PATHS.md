@@ -73,7 +73,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 |---|--------|-----|
 | ~~2647~~ | ~~P-08 Path/query parameters + schema~~ **(shipped)** | Yes |
 | ~~2648~~ | ~~P-09 Request body + content types~~ **(shipped)** | Yes |
-| 2649 | P-10 Header/cookie parameters | Yes |
+| ~~2649~~ | ~~P-10 Header/cookie parameters~~ **(shipped)** | Yes |
 
 **E4 — [#2636](https://github.com/KenSuenobu/objectified-commercial/issues/2636)**
 
@@ -422,7 +422,7 @@ Model **Request Body Object** per operation using **`shared_path_request_body`**
 
 ---
 
-### P-10 — Headers & cookies (MVP subset)
+### P-10 — Headers & cookies (MVP subset) **(shipped)**
 
 **Epic:** E3 · **Labels:** `paths`, `mvp`, `openapi`
 
@@ -439,6 +439,8 @@ Extend P-08 so `in` supports **header** and **cookie** with OpenAPI-accurate fie
 Reuse shared parameter rows with `in_location` discriminant.
 
 **Database/API:** Existing `shared_path_parameter.in_location`.
+
+**Shipped in:** Path Designer palette (header/cookie drag chips), inspector serialization options per `in`, name validation, OpenAPI export (`allowReserved` for query).
 
 ---
 
