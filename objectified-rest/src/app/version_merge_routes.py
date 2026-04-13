@@ -7,7 +7,7 @@ from __future__ import annotations
 import copy
 import json
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -50,6 +50,7 @@ from .version_notes import (
     enforce_max_commit_payload,
     validate_version_notes,
 )
+from .published_immutability import IMMUTABLE_DETAIL, revision_is_published_immutable
 
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
@@ -159,6 +160,113 @@ def _workflow_audit_rollback(
         actor_id,
         detail,
     )
+
+
+def _merge_immutability_guard(
+    *,
+    tenant_id: str,
+    project_id: str,
+    src_ver: Dict[str, Any],
+    tgt_ver: Dict[str, Any],
+    actor_id: Optional[str],
+    override: bool,
+    override_reason: Optional[str],
+    audit_operation: str,
+    on_failure_audit: Optional[Callable[..., None]] = None,
+) -> None:
+    """Block merge on immutable published tips unless tenant admin override (#2586)."""
+    src_im = revision_is_published_immutable(src_ver)
+    tgt_im = revision_is_published_immutable(tgt_ver)
+    if not src_im and not tgt_im:
+        return
+    is_admin = bool(actor_id and db.is_user_tenant_admin(tenant_id, actor_id))
+    if override and not is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="overridePublishedImmutability requires tenant administrator",
+        )
+    if not (override and is_admin):
+        d = {
+            "message": IMMUTABLE_DETAIL["message"],
+            "code": "PUBLISHED_IMMUTABLE",
+        }
+        if on_failure_audit is not None:
+            on_failure_audit(
+                tenant_id,
+                project_id,
+                str(tgt_ver.get("id")),
+                "failure",
+                actor_id,
+                {"httpStatus": 409, "detail": d},
+            )
+        raise HTTPException(status_code=409, detail=d)
+    reason = (override_reason or "").strip() or None
+    # Preview endpoints are dry-runs with no DB writes; skip audit for overrides on preview.
+    if not audit_operation.endswith("_preview"):
+        db.insert_workflow_audit(
+            tenant_id,
+            project_id,
+            str(tgt_ver.get("id")),
+            "version.immutability_override",
+            "success",
+            actor_id,
+            {
+                "operation": audit_operation,
+                "sourceTipRevisionId": str(src_ver.get("id")),
+                "targetTipRevisionId": str(tgt_ver.get("id")),
+                "sourceImmutable": src_im,
+                "targetImmutable": tgt_im,
+                "reason": reason,
+            },
+        )
+
+
+def _rollback_immutability_guard(
+    *,
+    tenant_id: str,
+    project_id: str,
+    head_ver: Dict[str, Any],
+    head_tip: str,
+    actor_id: Optional[str],
+    override: bool,
+    override_reason: Optional[str],
+    operation: str = "rollback",
+) -> None:
+    """Block rollback when branch tip is immutable published unless tenant admin override (#2586)."""
+    if not revision_is_published_immutable(head_ver):
+        return
+    is_admin = bool(actor_id and db.is_user_tenant_admin(tenant_id, actor_id))
+    if override and not is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="overridePublishedImmutability requires tenant administrator",
+        )
+    if not (override and is_admin):
+        d = {
+            "message": IMMUTABLE_DETAIL["message"],
+            "code": "PUBLISHED_IMMUTABLE",
+        }
+        _workflow_audit_rollback(
+            tenant_id,
+            project_id,
+            head_tip,
+            "failure",
+            actor_id,
+            {"httpStatus": 409, "detail": d},
+        )
+        raise HTTPException(status_code=409, detail=d)
+    reason = (override_reason or "").strip() or None
+    # Preview endpoints are dry-runs; skip audit writes for override on preview.
+    if not operation.endswith("_preview"):
+        db.insert_workflow_audit(
+            tenant_id,
+            project_id,
+            head_tip,
+            "version.immutability_override",
+            "success",
+            actor_id,
+            {"operation": operation, "reason": reason},
+        )
 
 
 def _enrich_rollback_audit_detail(
@@ -423,6 +531,18 @@ async def version_branch_merge_preview(
     if not base_ver or not src_ver or not tgt_ver:
         raise HTTPException(status_code=404, detail="Revision not found for merge-base or tips")
 
+    _merge_immutability_guard(
+        tenant_id=tenant_id,
+        project_id=project_id,
+        src_ver=src_ver,
+        tgt_ver=tgt_ver,
+        actor_id=get_authenticated_user_id(auth_data),
+        override=bool(body.override_published_immutability),
+        override_reason=body.override_reason,
+        audit_operation="merge_preview",
+        on_failure_audit=None,
+    )
+
     base_spec = _openapi_for_revision(base_ver, tenant_slug, tenant_id)
     source_spec = _openapi_for_revision(src_ver, tenant_slug, tenant_id)
     target_spec = _openapi_for_revision(tgt_ver, tenant_slug, tenant_id)
@@ -602,20 +722,17 @@ async def version_branch_merge(
             {"httpStatus": 400, "reason": "branch_tip_project_mismatch"},
         )
         raise HTTPException(status_code=400, detail="Branch tips must belong to this project")
-    if src_ver.get("published") or tgt_ver.get("published"):
-        d = {"message": "Cannot merge published or frozen versions", "code": "PUBLISHED_VERSION"}
-        _workflow_audit_merge(
-            tenant_id,
-            project_id,
-            target_tip,
-            "failure",
-            creator_id,
-            {"httpStatus": 409, "detail": d},
-        )
-        raise HTTPException(
-            status_code=409,
-            detail=d,
-        )
+    _merge_immutability_guard(
+        tenant_id=tenant_id,
+        project_id=project_id,
+        src_ver=src_ver,
+        tgt_ver=tgt_ver,
+        actor_id=creator_id,
+        override=bool(body.override_published_immutability),
+        override_reason=body.override_reason,
+        audit_operation="merge",
+        on_failure_audit=_workflow_audit_merge,
+    )
 
     merge_base_id = db.compute_merge_base_revision_id(source_tip, target_tip, tenant_id)
     if not merge_base_id:
@@ -996,15 +1113,6 @@ def _rollback_validate_branch_and_revisions(
             detail="Branch tip already matches target revision; nothing to roll back.",
         )
 
-    if bool(head_ver.get("published")):
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "PUBLISHED_VERSION",
-                "message": "Cannot roll back a published branch tip; unpublish or use an admin workflow.",
-            },
-        )
-
     anc = db.collect_revision_ancestors(head_tip, tenant_id)
     if tgt_id not in anc:
         raise HTTPException(
@@ -1028,6 +1136,17 @@ async def version_branch_rollback_preview(
     tenant_id = auth_data["tenant_id"]
     _project, _branch, head_ver, target_ver, head_tip, tgt_id = _rollback_validate_branch_and_revisions(
         project_id, tenant_id, body.branch_name, body.target_revision_id
+    )
+
+    _rollback_immutability_guard(
+        tenant_id=tenant_id,
+        project_id=project_id,
+        head_ver=head_ver,
+        head_tip=head_tip,
+        actor_id=get_authenticated_user_id(auth_data),
+        override=bool(body.override_published_immutability),
+        override_reason=body.override_reason,
+        operation="rollback_preview",
     )
 
     overall, finding_out, dep_out, fp, doc_url, impact_summary = _rollback_analyze(
@@ -1088,6 +1207,16 @@ async def version_branch_rollback(
 
     project, branch, head_ver, target_ver, head_tip, tgt_id = _rollback_validate_branch_and_revisions(
         project_id, tenant_id, body.branch_name, body.target_revision_id
+    )
+
+    _rollback_immutability_guard(
+        tenant_id=tenant_id,
+        project_id=project_id,
+        head_ver=head_ver,
+        head_tip=head_tip,
+        actor_id=creator_id,
+        override=bool(body.override_published_immutability),
+        override_reason=body.override_reason,
     )
 
     base = (body.base_revision_id or "").strip()

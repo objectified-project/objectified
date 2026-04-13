@@ -43,6 +43,7 @@ from .revision_lifecycle import (
     LIFECYCLE_VALUES,
     effective_lifecycle,
 )
+from .published_immutability import IMMUTABLE_DETAIL, revision_is_published_immutable
 
 router = APIRouter(prefix="/v1/versions", tags=["versions"])
 
@@ -205,6 +206,49 @@ def bump_minor_version(version: str) -> str:
     if parsed:
         return f"{parsed['major']}.{parsed['minor'] + 1}.0"
     return '0.1.0'
+
+
+def _push_guard_published_immutable(
+    *,
+    tenant_id: str,
+    project_id: str,
+    parent_version_id: Optional[str],
+    creator_id: Optional[str],
+    override: bool,
+    override_reason: Optional[str],
+) -> None:
+    """Block push from an immutable published tip unless tenant admin override with audit (#2586)."""
+    if not parent_version_id:
+        return
+    base_ver = db.get_version_by_id(parent_version_id, tenant_id)
+    if not base_ver or not revision_is_published_immutable(base_ver):
+        return
+    is_admin = bool(creator_id and db.is_user_tenant_admin(tenant_id, creator_id))
+    if override and not is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="overridePublishedImmutability requires tenant administrator",
+        )
+    if not (override and is_admin):
+        _workflow_audit_push(
+            tenant_id,
+            project_id,
+            parent_version_id,
+            "failure",
+            creator_id,
+            {"httpStatus": 409, "detail": IMMUTABLE_DETAIL},
+        )
+        raise HTTPException(status_code=409, detail=IMMUTABLE_DETAIL)
+    reason = (override_reason or "").strip() or None
+    db.insert_workflow_audit(
+        tenant_id,
+        project_id,
+        parent_version_id,
+        "version.immutability_override",
+        "success",
+        creator_id,
+        {"operation": "push", "reason": reason},
+    )
 
 
 def _push_stale_head_detail(*, tenant_id: str, head_revision_id: str) -> Dict[str, Any]:
@@ -966,6 +1010,15 @@ async def create_version(
                 )
                 raise HTTPException(status_code=403, detail=merge_detail)
 
+        _push_guard_published_immutable(
+            tenant_id=tenant_id,
+            project_id=project_id,
+            parent_version_id=parent_version_id,
+            creator_id=creator_id,
+            override=bool(request.override_published_immutability),
+            override_reason=request.override_reason,
+        )
+
         copy_source_id: Optional[str] = None
         copy_warning: Optional[str] = None
         if request.source_version_id and request.source_version_id.strip():
@@ -1407,6 +1460,12 @@ async def publish_version(
     except CommitPolicyViolation as pe:
         raise commit_policy_http_exception(pe) from pe
 
+    pub_immutable = (
+        request.published_immutable
+        if request.published_immutable is not None
+        else True
+    )
+
     version = db.publish_version(
         version_record_id,
         auth_data["tenant_id"],
@@ -1414,6 +1473,7 @@ async def publish_version(
         visibility,
         description=merged_sm,
         change_log=merged_cl,
+        published_immutable=bool(pub_immutable),
     )
 
     if not version:

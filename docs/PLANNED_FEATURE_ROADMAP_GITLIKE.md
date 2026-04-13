@@ -560,6 +560,8 @@ Enforce immutability checks for commit/push/rollback on published versions.
 - Authorized override path is explicit and auditable.
 - Read operations remain unaffected.
 
+**Status:** Shipped — column **`versions.published_immutable`** (migration **`20260412-160000.sql`**; default **true** on publish via **`publishedImmutable`** on **`POST .../publish`**); **409** **`PUBLISHED_IMMUTABLE`** on push (immutable published tip), merge preview/apply, rollback preview/apply unless tenant admin sends **`overridePublishedImmutability`** + optional **`overrideReason`** → **`workflow_audit`** **`version.immutability_override`** (**#2586**).
+
 ---
 
 ## P2-05: Push Webhook Subscription CRUD
