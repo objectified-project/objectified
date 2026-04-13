@@ -98,6 +98,15 @@ import {
   serializePathsCanvas,
   type PathsCanvasBlob,
 } from '../lib/paths-canvas-persist';
+import {
+  labelPathToOperation,
+  labelOperationToParameter,
+  labelOperationToRequestBody,
+  labelOperationToResponse,
+  pathsCanvasEdgeLabelStyle,
+  pathsCanvasEdgeLabelBgStyle,
+  labelForManualConnection,
+} from '../lib/paths-canvas-edge-labels';
 
 // Enhanced Operation Node Component with Schema Drop Zones - Vertical Layout
 function OperationNode({ data }: {
@@ -2255,6 +2264,9 @@ function PathsCanvasInner({
             targetHandle: 'operation-input',
             type: edgeType,
             animated: edgeAnimation !== 'none',
+            label: labelPathToOperation(),
+            labelStyle: pathsCanvasEdgeLabelStyle,
+            labelBgStyle: pathsCanvasEdgeLabelBgStyle,
             style: {
               stroke: edgeStyling.directColor,
               strokeWidth: 2,
@@ -2263,6 +2275,7 @@ function PathsCanvasInner({
             data: {
               sourceNodeId: pathNodeId,
               targetNodeId: op.id,
+              semantic: 'path-has-operation' as const,
             },
           };
         });
@@ -2322,6 +2335,9 @@ function PathsCanvasInner({
                 targetHandle: 'parameter-input',
                 type: edgeType,
                 animated: edgeAnimation !== 'none',
+                label: labelOperationToParameter(),
+                labelStyle: pathsCanvasEdgeLabelStyle,
+                labelBgStyle: pathsCanvasEdgeLabelBgStyle,
                 style: {
                   stroke: edgeStyling.directColor,
                   strokeWidth: 2,
@@ -2330,6 +2346,7 @@ function PathsCanvasInner({
                 data: {
                   sourceNodeId: op.id,
                   targetNodeId: paramNodeId,
+                  semantic: 'operation-has-parameter' as const,
                 },
               });
             });
@@ -2696,7 +2713,7 @@ function PathsCanvasInner({
               targetHandle: 'response-input', // PathResponseBodyNode uses this
               type: edgeType,
               animated: edgeAnimation !== 'none',
-              label: contentTypeLabel,
+              label: contentTypeLabel || 'body',
               labelStyle: { fontSize: 10, fill: '#1e40af' },
               labelBgStyle: { fill: '#dbeafe', stroke: '#60a5fa' },
               style: {
@@ -2704,6 +2721,7 @@ function PathsCanvasInner({
                 strokeWidth: 2,
                 strokeDasharray: edgeAnimation === 'dash' ? '5,5' : undefined,
               },
+              data: { semantic: 'response-has-body' as const },
             });
           }
         });
@@ -2714,6 +2732,7 @@ function PathsCanvasInner({
           const responseNode = allResponseNodes.find((n) => n.id === responseNodeId);
           const responseContentTypes = (responseNode?.data as any)?.contentTypes;
           const contentTypeLabel = getContentTypeEdgeLabel(responseContentTypes);
+          const statusCode = String((responseNode?.data as { statusCode?: string })?.statusCode ?? '').trim() || '?';
 
           linkedOps.forEach((op) => {
             console.log('[PathsCanvasView] Creating edge from', op.id, 'to', responseNodeId);
@@ -2732,9 +2751,9 @@ function PathsCanvasInner({
               targetHandle: 'response-input',
               type: edgeType,
               animated: edgeAnimation !== 'none',
-              label: contentTypeLabel,
-              labelStyle: { fontSize: 10, fill: '#5b21b6' },
-              labelBgStyle: { fill: '#ede9fe', stroke: '#a78bfa' },
+              label: labelOperationToResponse(statusCode, contentTypeLabel),
+              labelStyle: pathsCanvasEdgeLabelStyle,
+              labelBgStyle: pathsCanvasEdgeLabelBgStyle,
               style: {
                 stroke: '#a78bfa',
                 strokeWidth: 2,
@@ -2743,6 +2762,7 @@ function PathsCanvasInner({
               data: {
                 sourceNodeId: op.id,
                 targetNodeId: responseNodeId,
+                semantic: 'operation-has-response' as const,
               },
             });
           });
@@ -2783,6 +2803,7 @@ function PathsCanvasInner({
                   data: {
                     sourceNodeId: responseNode.id,
                     targetNodeId: classNode.id,
+                    semantic: 'response-has-class' as const,
                   },
                 });
               }
@@ -2874,23 +2895,24 @@ function PathsCanvasInner({
 
             allEdges.push({
               id: `edge-rb-op-${linkedRbData.requestBody.id}-${op.id}`,
-              source: rbNodeId,
-              sourceHandle: 'request-body-output',
-              target: op.id,
-              targetHandle: 'operation-input',
+              source: op.id,
+              sourceHandle: 'operation-output',
+              target: rbNodeId,
+              targetHandle: 'request-body-input',
               type: edgeType,
               animated: edgeAnimation !== 'none',
-              label: contentTypeLabel,
-              labelStyle: { fontSize: 10, fill: '#5b21b6' },
-              labelBgStyle: { fill: '#ede9fe', stroke: '#8b5cf6' },
+              label: labelOperationToRequestBody(contentTypeLabel),
+              labelStyle: pathsCanvasEdgeLabelStyle,
+              labelBgStyle: pathsCanvasEdgeLabelBgStyle,
               style: {
                 stroke: '#8b5cf6',
                 strokeWidth: 2,
                 strokeDasharray: edgeAnimation === 'dash' ? '5,5' : undefined,
               },
               data: {
-                sourceNodeId: rbNodeId,
-                targetNodeId: op.id,
+                sourceNodeId: op.id,
+                targetNodeId: rbNodeId,
+                semantic: 'operation-has-request-body' as const,
               },
             });
           }
@@ -3083,9 +3105,8 @@ function PathsCanvasInner({
         const sourceNode = nodes.find(n => n.id === connection.source);
         const targetNode = nodes.find(n => n.id === connection.target);
 
-        // VALIDATION: Prevent invalid connections
-        // Operations should NOT connect to response body nodes or request body nodes
-        if (sourceNode?.type === 'operation' && (targetNode?.type === 'responseBody' || targetNode?.type === 'requestBody')) {
+        // VALIDATION: Prevent invalid connections to auxiliary schema nodes (not status / request body cards)
+        if (sourceNode?.type === 'operation' && targetNode?.type === 'responseBody') {
           await alertDialog({
             title: 'Invalid Connection',
             message: 'Operations can only connect to Response status codes (200, 404, etc.), not to schema nodes. The response node contains the schema reference.',
@@ -3093,9 +3114,8 @@ function PathsCanvasInner({
           });
           return;
         }
-        
-        // Also prevent reverse connection
-        if (targetNode?.type === 'operation' && (sourceNode?.type === 'responseBody' || sourceNode?.type === 'requestBody')) {
+
+        if (targetNode?.type === 'operation' && sourceNode?.type === 'responseBody') {
           await alertDialog({
             title: 'Invalid Connection',
             message: 'Operations can only connect to Response status codes (200, 404, etc.), not to schema nodes. The response node contains the schema reference.',
@@ -3133,6 +3153,25 @@ function PathsCanvasInner({
           return;
         }
 
+        // Prevent connecting request body to non-POST/PUT/PATCH operations
+        if (sourceNode?.type === 'requestBody' || targetNode?.type === 'requestBody') {
+          const operationNode = sourceNode?.type === 'operation' ? sourceNode
+            : targetNode?.type === 'operation' ? targetNode
+            : undefined;
+          // operationNode is always defined here because the guards above ensured the other
+          // node is an operation; this explicit check makes it unambiguous.
+          if (!operationNode) return;
+          const method = ((operationNode.data as any)?.operation as string | undefined)?.toUpperCase();
+          if (!method || !['POST', 'PUT', 'PATCH'].includes(method)) {
+            await alertDialog({
+              title: 'Invalid Connection',
+              message: 'Request bodies can only be linked to POST, PUT, or PATCH operations.',
+              variant: 'warning',
+            });
+            return;
+          }
+        }
+
         // Class <-> Response: show copy vs $ref dialog only; do not add an edge (schema is bound to response)
         if (
           (sourceNode?.type === 'class' && targetNode?.type === 'response') ||
@@ -3159,11 +3198,47 @@ function PathsCanvasInner({
         : edgeRouting === 'smart' ? 'smart'
         : 'smoothstep';
 
+      const sourceNodeForEdge = nodes.find((n) => n.id === connection.source);
+      const targetNodeForEdge = nodes.find((n) => n.id === connection.target);
+      const manualLabel = labelForManualConnection(sourceNodeForEdge, targetNodeForEdge);
+
+      // Derive a stable edge id matching the computed topology so that saved-only duplicates
+      // don't appear after a page reload (mergePathsCanvasLayout skips edges whose id already
+      // exists in the computed set).
+      let stableEdgeId: string | undefined;
+      {
+        const src = sourceNodeForEdge;
+        const tgt = targetNodeForEdge;
+        if (src?.type === 'operation' && tgt?.type === 'parameter') {
+          stableEdgeId = `edge-${(src.data as any)?.dbOperationId}-${(tgt.data as any)?.dbParameterId}`;
+        } else if (src?.type === 'parameter' && tgt?.type === 'operation') {
+          stableEdgeId = `edge-${(tgt.data as any)?.dbOperationId}-${(src.data as any)?.dbParameterId}`;
+        } else if (src?.type === 'operation' && tgt?.type === 'response') {
+          stableEdgeId = `edge-op-resp-${(src.data as any)?.dbOperationId}-${(tgt.data as any)?.dbResponseId}`;
+        } else if (src?.type === 'response' && tgt?.type === 'operation') {
+          stableEdgeId = `edge-op-resp-${(tgt.data as any)?.dbOperationId}-${(src.data as any)?.dbResponseId}`;
+        } else if (src?.type === 'operation' && tgt?.type === 'requestBody') {
+          // Always requestBody id first, then operation id — matches computed topology
+          stableEdgeId = `edge-rb-op-${(tgt.data as any)?.id}-${(src.data as any)?.dbOperationId}`;
+        } else if (src?.type === 'requestBody' && tgt?.type === 'operation') {
+          // Always requestBody id first, then operation id — matches computed topology
+          stableEdgeId = `edge-rb-op-${(src.data as any)?.id}-${(tgt.data as any)?.dbOperationId}`;
+        }
+      }
+
       // Add edge to UI first
       setEdges((eds) => addEdge({
         ...connection,
+        ...(stableEdgeId ? { id: stableEdgeId } : {}),
         type: edgeType,
         animated: edgeAnimation !== 'none',
+        ...(manualLabel
+          ? {
+              label: manualLabel.label,
+              labelStyle: pathsCanvasEdgeLabelStyle,
+              labelBgStyle: pathsCanvasEdgeLabelBgStyle,
+            }
+          : {}),
         style: {
           stroke: edgeStyling.directColor,
           strokeWidth: 2,
@@ -3172,18 +3247,20 @@ function PathsCanvasInner({
         data: {
           sourceNodeId: connection.source,
           targetNodeId: connection.target,
+          ...(manualLabel ? { semantic: manualLabel.semantic } : {}),
         },
       }, eds));
 
-      // Save link to database if connecting operation to parameter or response (either direction)
+      // Save link to database if connecting an operation to a parameter, response, or request body (either direction)
       if (connection.source && connection.target) {
-        const sourceNode = nodes.find(n => n.id === connection.source);
-        const targetNode = nodes.find(n => n.id === connection.target);
+        const sourceNode = sourceNodeForEdge;
+        const targetNode = targetNodeForEdge;
 
 
         let operationId: string | undefined;
         let parameterId: string | undefined;
         let responseId: string | undefined;
+        let requestBodyId: string | undefined;
 
         // Check if we're connecting operation to parameter (either direction)
         if (sourceNode?.type === 'operation' && targetNode?.type === 'parameter') {
@@ -3200,6 +3277,12 @@ function PathsCanvasInner({
         } else if (sourceNode?.type === 'response' && targetNode?.type === 'operation') {
           operationId = (targetNode.data as any)?.dbOperationId;
           responseId = (sourceNode.data as any)?.dbResponseId;
+        } else if (sourceNode?.type === 'operation' && targetNode?.type === 'requestBody') {
+          operationId = (sourceNode.data as any)?.dbOperationId;
+          requestBodyId = (targetNode.data as any)?.id;
+        } else if (sourceNode?.type === 'requestBody' && targetNode?.type === 'operation') {
+          operationId = (targetNode.data as any)?.dbOperationId;
+          requestBodyId = (sourceNode.data as any)?.id;
         }
 
         // Handle parameter linking
@@ -3296,6 +3379,33 @@ function PathsCanvasInner({
               !(e.source === connection.source && e.target === connection.target)
             ));
           }
+        } else if (operationId && requestBodyId) {
+          try {
+            const result = await linkRequestBodyToOperation(operationId, requestBodyId);
+            const parsed = JSON.parse(result);
+
+            if (!parsed.success) {
+              console.error('Failed to link request body to operation:', parsed.error);
+              await alertDialog({
+                title: 'Error',
+                message: parsed.error || 'Failed to link request body to operation',
+                variant: 'error',
+              });
+              setEdges((eds) => eds.filter((e) =>
+                !(e.source === connection.source && e.target === connection.target)
+              ));
+            }
+          } catch (error) {
+            console.error('Error linking request body to operation:', error);
+            await alertDialog({
+              title: 'Error',
+              message: 'Failed to link request body to operation',
+              variant: 'error',
+            });
+            setEdges((eds) => eds.filter((e) =>
+              !(e.source === connection.source && e.target === connection.target)
+            ));
+          }
         }
       }
     },
@@ -3312,6 +3422,7 @@ function PathsCanvasInner({
         let operationId: string | undefined;
         let parameterId: string | undefined;
         let responseId: string | undefined;
+        let requestBodyUnlinkOperationId: string | undefined;
 
         // Check if we're unlinking operation from parameter (either direction)
         if (sourceNode?.type === 'operation' && targetNode?.type === 'parameter') {
@@ -3328,6 +3439,10 @@ function PathsCanvasInner({
         } else if (sourceNode?.type === 'response' && targetNode?.type === 'operation') {
           operationId = (targetNode.data as any)?.dbOperationId;
           responseId = (sourceNode.data as any)?.dbResponseId;
+        } else if (sourceNode?.type === 'operation' && targetNode?.type === 'requestBody') {
+          requestBodyUnlinkOperationId = (sourceNode.data as any)?.dbOperationId;
+        } else if (sourceNode?.type === 'requestBody' && targetNode?.type === 'operation') {
+          requestBodyUnlinkOperationId = (targetNode.data as any)?.dbOperationId;
         }
 
         // Handle parameter unlinking
@@ -3383,6 +3498,22 @@ function PathsCanvasInner({
             }
           } catch (error) {
             console.error('Error unlinking response from operation:', error);
+          }
+        } else if (requestBodyUnlinkOperationId) {
+          try {
+            const result = await unlinkRequestBodyFromOperation(requestBodyUnlinkOperationId);
+            const parsed = JSON.parse(result);
+
+            if (!parsed.success) {
+              console.error('Failed to unlink request body from operation:', parsed.error);
+              await alertDialog({
+                title: 'Error',
+                message: parsed.error || 'Failed to unlink request body from operation',
+                variant: 'error',
+              });
+            }
+          } catch (error) {
+            console.error('Error unlinking request body from operation:', error);
           }
         }
       }
@@ -3738,6 +3869,9 @@ function PathsCanvasInner({
               targetHandle: 'operation-input',
               type: dropEdgeType,
               animated: edgeAnimation !== 'none',
+              label: labelPathToOperation(),
+              labelStyle: pathsCanvasEdgeLabelStyle,
+              labelBgStyle: pathsCanvasEdgeLabelBgStyle,
               style: {
                 stroke: edgeStyling.directColor,
                 strokeWidth: 2,
@@ -3746,6 +3880,7 @@ function PathsCanvasInner({
               data: {
                 sourceNodeId: pathNodeId,
                 targetNodeId: savedOperation.id,
+                semantic: 'path-has-operation' as const,
               },
             },
           ]);
