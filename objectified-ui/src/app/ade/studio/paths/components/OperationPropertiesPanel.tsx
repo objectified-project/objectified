@@ -34,7 +34,7 @@ import {
   linkResponseToOperation,
   unlinkResponseFromOperation,
 } from '../../../../../../lib/db/helper-shared-path-responses';
-import { getLinkedRequestBodyForOperation } from '../../../../../../lib/db/helper-shared-path-request-bodies';
+import { operationHasLinkedRequestBody } from '../../../../../../lib/db/helper-shared-path-request-bodies';
 import { extractPathParameters } from '../../../../../../lib/utils/path-params';
 import SchemaBuilder from './SchemaBuilder';
 import ResponseSection from './ResponseSection';
@@ -321,12 +321,18 @@ export default function OperationPropertiesPanel({
     let cancelled = false;
     (async () => {
       try {
-        const raw = await getLinkedRequestBodyForOperation(operationId);
-        const data = JSON.parse(raw) as { success?: boolean; requestBody?: unknown };
-        if (!cancelled) {
-          setOptionsRequestBodyLinked(Boolean(data.success && data.requestBody));
+        const raw = await operationHasLinkedRequestBody(operationId);
+        const data = JSON.parse(raw) as { success?: boolean; linked?: boolean; error?: string };
+        if (!data.success) {
+          console.error('Error loading linked request body for OPTIONS operation:', data);
+          if (!cancelled) setOptionsRequestBodyLinked(false);
+          return;
         }
-      } catch {
+        if (!cancelled) {
+          setOptionsRequestBodyLinked(Boolean(data.linked));
+        }
+      } catch (error) {
+        console.error('Error loading linked request body for OPTIONS operation:', error);
         if (!cancelled) setOptionsRequestBodyLinked(false);
       }
     })();
