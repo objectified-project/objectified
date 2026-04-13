@@ -11,16 +11,42 @@ import { useTheme } from '../../providers/ThemeProvider';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import { getTenantsForUser } from '../../../../lib/db/helper';
 import packageJson from '../../../../package.json';
+import { isDesignerStudioNavActive, isPathsStudioNavActive } from '../../../../lib/ade-studio-nav';
 
 // Import version from package.json
 const APP_VERSION = `03-2026-v${packageJson.version}`;
 
-type NavItem = { label: string; href: string; enabled?: boolean; opensNewBrowser?: boolean };
+type NavItem = {
+  label: string;
+  href: string;
+  enabled?: boolean;
+  opensNewBrowser?: boolean;
+  /** When set, overrides default prefix matching (e.g. Designer vs Paths under `/ade/studio`). */
+  isActive?: (pathname: string) => boolean;
+};
+
+function navItemIsActive(item: NavItem, pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (item.isActive) return item.isActive(pathname);
+  return (
+    pathname === item.href ||
+    (item.href !== "/ade" && pathname.startsWith(item.href + "/"))
+  );
+}
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/ade" },
   { label: "Control Panel", href: "/ade/dashboard" },
-  { label: "Designer", href: "/ade/studio" },
+  {
+    label: "Designer",
+    href: "/ade/studio",
+    isActive: isDesignerStudioNavActive,
+  },
+  {
+    label: "Paths",
+    href: "/ade/studio/paths",
+    isActive: isPathsStudioNavActive,
+  },
   // { label: "Database", href: "/ade/database", enabled: false },
   // { label: "Migration", href: "/ade/migration", enabled: false },
   // { label: "ETL", href: "/ade/etl", enabled: false },
@@ -105,11 +131,7 @@ const TopHeader = () => {
           className="m-0 inline-flex list-none items-center gap-2 p-0 text-[13px]"
         >
           {NAV_ITEMS.map((item) => {
-            // Check if current path matches or is a subdirectory of this nav item
-            // For exact matches, always activate
-            // For subdirectory matches, only activate if the path continues with a slash
-            const isActive = pathname === item.href ||
-                            (item.href !== '/ade' && pathname?.startsWith(item.href + '/'));
+            const isActive = navItemIsActive(item, pathname);
 
             return (
               <li key={item.href}>
@@ -125,6 +147,7 @@ const TopHeader = () => {
                     href={item.href}
                     target={item.opensNewBrowser ? '_blank' : undefined}
                     rel={item.opensNewBrowser ? 'noopener noreferrer' : undefined}
+                    aria-current={isActive ? 'page' : undefined}
                     className={`rounded-md px-2 py-1 text-[13px] text-slate-700 transition-colors hover:bg-slate-100 hover:text-indigo-600 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-indigo-400 ${
                       isActive ? 'bg-slate-200/80 font-medium text-slate-900 dark:bg-slate-700 dark:text-white' : ''
                     }`}
