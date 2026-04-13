@@ -1,6 +1,7 @@
 import psycopg2
 import json
 import logging
+import hashlib
 from datetime import datetime
 import bcrypt
 import numpy as np
@@ -4995,6 +4996,116 @@ class Database:
             raise e
         finally:
             conn.autocommit = prev_autocommit
+
+    @staticmethod
+    def hash_webhook_signing_secret(plain: str) -> str:
+        """Store bcrypt(SHA256(utf8(plain))) so long secrets are safe for bcrypt's 72-byte input limit."""
+        digest = hashlib.sha256(plain.encode("utf-8")).digest()
+        hashed = bcrypt.hashpw(digest, bcrypt.gensalt())
+        return hashed.decode("ascii")
+
+    def create_push_webhook_subscription(
+        self,
+        tenant_id: str,
+        url: str,
+        url_normalized: str,
+        signing_secret_plain: str,
+        active: bool = True,
+    ) -> Dict[str, Any]:
+        """Insert a push webhook row; returns public fields only (no hash)."""
+        secret_hash = self.hash_webhook_signing_secret(signing_secret_plain)
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO odb.push_webhook_subscriptions
+                      (tenant_id, url, url_normalized, active, signing_secret_hash)
+                    VALUES (%s::uuid, %s, %s, %s, %s)
+                    RETURNING id, url, active, signing_secret_ref, created_at, updated_at
+                    """,
+                    (tenant_id, url, url_normalized, active, secret_hash),
+                )
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row)
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def list_push_webhook_subscriptions(self, tenant_id: str) -> List[Dict[str, Any]]:
+        q = """
+            SELECT id, url, active, signing_secret_ref, created_at, updated_at
+            FROM odb.push_webhook_subscriptions
+            WHERE tenant_id = %s::uuid AND deleted_at IS NULL
+            ORDER BY created_at DESC
+        """
+        return self.execute_query(q, (tenant_id,))
+
+    def get_push_webhook_subscription(
+        self, tenant_id: str, subscription_id: str
+    ) -> Optional[Dict[str, Any]]:
+        q = """
+            SELECT id, url, active, signing_secret_ref, created_at, updated_at
+            FROM odb.push_webhook_subscriptions
+            WHERE tenant_id = %s::uuid AND id = %s::uuid AND deleted_at IS NULL
+        """
+        rows = self.execute_query(q, (tenant_id, subscription_id))
+        return rows[0] if rows else None
+
+    def update_push_webhook_subscription(
+        self,
+        tenant_id: str,
+        subscription_id: str,
+        url: Optional[str] = None,
+        url_normalized: Optional[str] = None,
+        active: Optional[bool] = None,
+        signing_secret_plain: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Update subscription fields. Returns public row or None if not found.
+        Raises ValueError if no updatable fields were provided.
+        """
+        sets: List[str] = []
+        params: List[Any] = []
+
+        if url is not None and url_normalized is not None:
+            sets.append("url = %s")
+            sets.append("url_normalized = %s")
+            params.extend([url, url_normalized])
+        elif url is not None or url_normalized is not None:
+            raise ValueError("url_and_normalized_together")
+
+        if active is not None:
+            sets.append("active = %s")
+            params.append(active)
+
+        if signing_secret_plain is not None:
+            sets.append("signing_secret_hash = %s")
+            params.append(self.hash_webhook_signing_secret(signing_secret_plain))
+
+        if not sets:
+            raise ValueError("no_updates")
+
+        sets.append("updated_at = CURRENT_TIMESTAMP")
+        params.extend([tenant_id, subscription_id])
+
+        q = f"""
+            UPDATE odb.push_webhook_subscriptions
+            SET {", ".join(sets)}
+            WHERE tenant_id = %s::uuid AND id = %s::uuid AND deleted_at IS NULL
+            RETURNING id, url, active, signing_secret_ref, created_at, updated_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, tuple(params))
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row) if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
 
 
 # Global database instance

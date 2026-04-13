@@ -579,6 +579,8 @@ Create subscription CRUD for push webhook endpoints with active/inactive control
 - URL validation and duplicate safeguards are enforced.
 - Secrets are stored via reference (not plaintext response).
 
+**Status:** Shipped — table **`odb.push_webhook_subscriptions`** (migration **`20260412-170000.sql`**); **GET/POST** **`/v1/push-webhook-subscriptions/{tenant_slug}`**, **GET/PATCH** **`/v1/push-webhook-subscriptions/{tenant_slug}/{subscription_id}`**; **signingSecret** on create/update only; responses include **signingSecretRef**; normalized HTTPS URLs; **409** **`WEBHOOK_URL_DUPLICATE`** on conflict (**#2587**).
+
 ---
 
 ## P2-06: Webhook Delivery Retry + Dead Letter Status
