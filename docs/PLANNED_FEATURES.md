@@ -64,7 +64,7 @@ Implement and verify in this order so each step stays testable. **Issue → road
 | — | [#2585](https://github.com/KenSuenobu/objectified-commercial/issues/2585) | P2-03 | Lock state in Studio header — **shipped** (**GET** `.../draft-lock` polling; chip + tooltip in **Studio** header) |
 | — | [#2586](https://github.com/KenSuenobu/objectified-commercial/issues/2586) | P2-04 | Published immutability — **shipped** (`versions.published_immutable`; push/merge/rollback **409** `PUBLISHED_IMMUTABLE`; tenant-admin **`overridePublishedImmutability`** + **`overrideReason`** → **`workflow_audit`** **`version.immutability_override`**) |
 | — | [#2587](https://github.com/KenSuenobu/objectified-commercial/issues/2587) | P2-05 | Push webhook CRUD — **shipped** (REST **`/v1/push-webhook-subscriptions/...`**; **signingSecret** write-only; **signingSecretRef** in responses; **409** **`WEBHOOK_URL_DUPLICATE`**; migration **`20260412-170000.sql`**) |
-| — | [#2588](https://github.com/KenSuenobu/objectified-commercial/issues/2588) | P2-06 | Webhook retry + DLQ |
+| — | [#2588](https://github.com/KenSuenobu/objectified-commercial/issues/2588) | P2-06 | Webhook retry + DLQ — **shipped** (delivery events/attempts, bounded backoff, dead-letter API; migration **`20260412-180000.sql`**) |
 | — | [#2589](https://github.com/KenSuenobu/objectified-commercial/issues/2589) | P2-07 | Compatibility engine |
 | — | [#2590](https://github.com/KenSuenobu/objectified-commercial/issues/2590) | P2-08 | Compatibility report UI |
 | — | [#2591](https://github.com/KenSuenobu/objectified-commercial/issues/2591) | P2-09 | Pull options for CI |

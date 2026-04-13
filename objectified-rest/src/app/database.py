@@ -8,10 +8,11 @@ import numpy as np
 from psycopg2.extras import Json, RealDictCursor
 from psycopg2.extensions import register_adapter, AsIs, adapt
 from typing import Optional, List, Dict, Any, Tuple, Set
-from .config import settings
+from .config import settings, WEBHOOK_MAX_DELIVERY_ATTEMPTS
 from .jsonschema_generator import generate_class_jsonschema_spec
 from .revision_deprecation import coerce_metadata, effective_sunset_string, successor_revision_id_from_metadata
 from .revision_lifecycle import prepare_version_metadata_update, sql_effective_lifecycle_expr
+from .push_webhook_crypto import encrypt_signing_secret
 
 _logger = logging.getLogger(__name__)
 
@@ -5014,17 +5015,18 @@ class Database:
     ) -> Dict[str, Any]:
         """Insert a push webhook row; returns public fields only (no hash)."""
         secret_hash = self.hash_webhook_signing_secret(signing_secret_plain)
+        secret_enc = encrypt_signing_secret(signing_secret_plain)
         conn = self.connect()
         try:
             with conn.cursor() as cursor:
                 cursor.execute(
                     """
                     INSERT INTO odb.push_webhook_subscriptions
-                      (tenant_id, url, url_normalized, active, signing_secret_hash)
-                    VALUES (%s::uuid, %s, %s, %s, %s)
+                      (tenant_id, url, url_normalized, active, signing_secret_hash, signing_secret_encrypted)
+                    VALUES (%s::uuid, %s, %s, %s, %s, %s)
                     RETURNING id, url, active, signing_secret_ref, created_at, updated_at
                     """,
-                    (tenant_id, url, url_normalized, active, secret_hash),
+                    (tenant_id, url, url_normalized, active, secret_hash, secret_enc),
                 )
                 row = cursor.fetchone()
                 conn.commit()
@@ -5083,6 +5085,8 @@ class Database:
         if signing_secret_plain is not None:
             sets.append("signing_secret_hash = %s")
             params.append(self.hash_webhook_signing_secret(signing_secret_plain))
+            sets.append("signing_secret_encrypted = %s")
+            params.append(encrypt_signing_secret(signing_secret_plain))
 
         if not sets:
             raise ValueError("no_updates")
@@ -5106,6 +5110,193 @@ class Database:
         except Exception as e:
             conn.rollback()
             raise e
+
+    def enqueue_push_webhook_delivery(
+        self,
+        tenant_id: str,
+        subscription_id: str,
+        event_type: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Queue one outbound delivery. Raises ValueError if subscription is missing or inactive."""
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, active FROM odb.push_webhook_subscriptions
+                    WHERE tenant_id = %s::uuid AND id = %s::uuid AND deleted_at IS NULL
+                    """,
+                    (tenant_id, subscription_id),
+                )
+                sub = cursor.fetchone()
+                if not sub:
+                    raise ValueError("subscription_not_found")
+                if not sub["active"]:
+                    raise ValueError("subscription_inactive")
+                cursor.execute(
+                    """
+                    INSERT INTO odb.push_webhook_delivery_events
+                      (tenant_id, subscription_id, event_type, payload, status, attempt_count, next_retry_at)
+                    VALUES (%s::uuid, %s::uuid, %s, %s::jsonb, 'pending', 0, CURRENT_TIMESTAMP)
+                    RETURNING id, tenant_id, subscription_id, event_type, status, attempt_count, next_retry_at, created_at
+                    """,
+                    (tenant_id, subscription_id, event_type, Json(payload)),
+                )
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row)
+        except ValueError:
+            conn.rollback()
+            raise
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def get_next_due_push_webhook_delivery(self) -> Optional[Dict[str, Any]]:
+        """Atomically claim and return one due event joined with subscription URL and ciphertext, or None."""
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH next_event AS (
+                        SELECT e.id
+                        FROM odb.push_webhook_delivery_events e
+                        INNER JOIN odb.push_webhook_subscriptions s
+                          ON s.id = e.subscription_id
+                         AND s.deleted_at IS NULL
+                        WHERE e.status IN ('pending', 'retrying')
+                          AND e.next_retry_at IS NOT NULL
+                          AND e.next_retry_at <= CURRENT_TIMESTAMP
+                          AND e.attempt_count < %s
+                        ORDER BY e.next_retry_at ASC
+                        FOR UPDATE OF e SKIP LOCKED
+                        LIMIT 1
+                    ),
+                    claimed_event AS (
+                        UPDATE odb.push_webhook_delivery_events e
+                        SET status = 'processing',
+                            updated_at = CURRENT_TIMESTAMP
+                        FROM next_event ne
+                        WHERE e.id = ne.id
+                        RETURNING
+                          e.id AS event_id,
+                          e.tenant_id,
+                          e.subscription_id,
+                          e.event_type,
+                          e.payload,
+                          e.status AS event_status,
+                          e.attempt_count,
+                          e.next_retry_at
+                    )
+                    SELECT
+                      ce.event_id,
+                      ce.tenant_id,
+                      ce.subscription_id,
+                      ce.event_type,
+                      ce.payload,
+                      ce.event_status,
+                      ce.attempt_count,
+                      ce.next_retry_at,
+                      s.url AS subscription_url,
+                      s.active AS subscription_active,
+                      s.signing_secret_encrypted
+                    FROM claimed_event ce
+                    INNER JOIN odb.push_webhook_subscriptions s
+                      ON s.id = ce.subscription_id
+                     AND s.deleted_at IS NULL
+                    """,
+                    (WEBHOOK_MAX_DELIVERY_ATTEMPTS,),
+                )
+                row = cursor.fetchone()
+                if row:
+                    conn.commit()
+                    return dict(row)
+                conn.rollback()
+                return None
+        except Exception:
+            conn.rollback()
+            raise
+
+    def finalize_push_webhook_delivery_attempt(
+        self,
+        event_id: str,
+        *,
+        attempt_number: int,
+        http_status: Optional[int],
+        response_body_preview: Optional[str],
+        error_message: Optional[str],
+        latency_ms: int,
+        new_status: str,
+        new_attempt_count: int,
+        next_retry_at: Optional[datetime],
+        last_error: Optional[str],
+    ) -> None:
+        """Insert one attempt row and update the parent event (single transaction)."""
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO odb.push_webhook_delivery_attempts
+                      (delivery_event_id, attempt_number, http_status, response_body_preview, error_message, latency_ms)
+                    VALUES (%s::uuid, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        event_id,
+                        attempt_number,
+                        http_status,
+                        response_body_preview,
+                        error_message,
+                        latency_ms,
+                    ),
+                )
+                cursor.execute(
+                    """
+                    UPDATE odb.push_webhook_delivery_events
+                    SET status = %s,
+                        attempt_count = %s,
+                        next_retry_at = %s,
+                        last_error = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s::uuid
+                    """,
+                    (new_status, new_attempt_count, next_retry_at, last_error, event_id),
+                )
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def list_push_webhook_dead_letter_events(self, tenant_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        q = """
+            SELECT id, subscription_id, event_type, payload, attempt_count, last_error, created_at, updated_at
+            FROM odb.push_webhook_delivery_events
+            WHERE tenant_id = %s::uuid AND status = 'dead_letter'
+            ORDER BY updated_at DESC
+            LIMIT %s
+        """
+        return self.execute_query(q, (tenant_id, limit))
+
+    def get_push_webhook_delivery_event(self, tenant_id: str, event_id: str) -> Optional[Dict[str, Any]]:
+        q = """
+            SELECT id, subscription_id, event_type, payload, status, attempt_count, next_retry_at, last_error,
+                   created_at, updated_at
+            FROM odb.push_webhook_delivery_events
+            WHERE tenant_id = %s::uuid AND id = %s::uuid
+        """
+        rows = self.execute_query(q, (tenant_id, event_id))
+        return dict(rows[0]) if rows else None
+
+    def list_push_webhook_delivery_attempts(self, delivery_event_id: str) -> List[Dict[str, Any]]:
+        q = """
+            SELECT attempt_number, http_status, response_body_preview, error_message, latency_ms, attempted_at
+            FROM odb.push_webhook_delivery_attempts
+            WHERE delivery_event_id = %s::uuid
+            ORDER BY attempt_number ASC
+        """
+        return self.execute_query(q, (delivery_event_id,))
 
 
 # Global database instance

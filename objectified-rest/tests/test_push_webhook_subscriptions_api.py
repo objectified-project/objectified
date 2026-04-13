@@ -161,3 +161,20 @@ def test_update_not_found():
             json={"active": False},
         )
         assert r.status_code == 404
+
+
+def test_dead_letter_deliveries_list():
+    with patch("app.push_webhook_subscriptions_routes.db") as mdb:
+        mdb.list_push_webhook_dead_letter_events.return_value = []
+        r = client.get("/v1/push-webhook-subscriptions/tn/deliveries/dead-letter")
+        assert r.status_code == 200
+        assert r.json() == []
+
+
+def test_delivery_detail_not_found():
+    with patch("app.push_webhook_subscriptions_routes.db") as mdb:
+        mdb.get_push_webhook_delivery_event.return_value = None
+        r = client.get(
+            "/v1/push-webhook-subscriptions/tn/deliveries/11111111-1111-1111-1111-111111111111"
+        )
+        assert r.status_code == 404

@@ -598,6 +598,8 @@ Implement retry scheduling, attempt tracking, and dead-letter terminal state.
 - Delivery attempt history is persisted per event.
 - Terminal failures are marked dead-letter and queryable.
 
+**Status:** Shipped — tables **`odb.push_webhook_delivery_events`**, **`odb.push_webhook_delivery_attempts`**; column **`signing_secret_encrypted`** (Fernet at rest when **`OBJECTIFIED_WEBHOOK_SIGNING_SECRET_ENCRYPTION_KEY`** is set); bounded backoff **10s / 60s / 300s** after failures (up to **4** attempts); background sweep in **objectified-rest**; **GET** **`/v1/push-webhook-subscriptions/{tenant_slug}/deliveries/dead-letter`**, **GET** **`.../deliveries/{event_id}`** (attempt history); migration **`20260412-180000.sql`** (**#2588**).
+
 ---
 
 ## P2-07: Compatibility Check Engine for Commit and Merge

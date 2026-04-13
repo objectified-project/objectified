@@ -962,6 +962,48 @@ class PushWebhookSubscriptionResponse(BaseModel):
     updated_at: Optional[datetime] = Field(default=None, serialization_alias="updatedAt")
 
 
+class PushWebhookDeadLetterItem(BaseModel):
+    """Terminal failed delivery (#2588)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    subscription_id: str = Field(serialization_alias="subscriptionId")
+    event_type: str = Field(serialization_alias="eventType")
+    payload: Dict[str, Any]
+    attempt_count: int = Field(serialization_alias="attemptCount")
+    last_error: Optional[str] = Field(default=None, serialization_alias="lastError")
+    created_at: Optional[datetime] = Field(default=None, serialization_alias="createdAt")
+    updated_at: Optional[datetime] = Field(default=None, serialization_alias="updatedAt")
+
+
+class PushWebhookDeliveryAttemptItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    attempt_number: int = Field(serialization_alias="attemptNumber")
+    http_status: Optional[int] = Field(default=None, serialization_alias="httpStatus")
+    response_body_preview: Optional[str] = Field(default=None, serialization_alias="responseBodyPreview")
+    error_message: Optional[str] = Field(default=None, serialization_alias="errorMessage")
+    latency_ms: Optional[int] = Field(default=None, serialization_alias="latencyMs")
+    attempted_at: Optional[datetime] = Field(default=None, serialization_alias="attemptedAt")
+
+
+class PushWebhookDeliveryEventDetailResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    subscription_id: str = Field(serialization_alias="subscriptionId")
+    event_type: str = Field(serialization_alias="eventType")
+    status: str
+    payload: Dict[str, Any]
+    attempt_count: int = Field(serialization_alias="attemptCount")
+    next_retry_at: Optional[datetime] = Field(default=None, serialization_alias="nextRetryAt")
+    last_error: Optional[str] = Field(default=None, serialization_alias="lastError")
+    created_at: Optional[datetime] = Field(default=None, serialization_alias="createdAt")
+    updated_at: Optional[datetime] = Field(default=None, serialization_alias="updatedAt")
+    attempts: List[PushWebhookDeliveryAttemptItem] = Field(default_factory=list)
+
+
 class CompatibilityCheckResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
