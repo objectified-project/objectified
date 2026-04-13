@@ -30,7 +30,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | P-06 | [#2645](https://github.com/KenSuenobu/objectified-commercial/issues/2645) **(shipped)** | Yes |
 | P-07 | [#2646](https://github.com/KenSuenobu/objectified-commercial/issues/2646) **(shipped)** | Yes |
 | P-08 | [#2647](https://github.com/KenSuenobu/objectified-commercial/issues/2647) **(shipped)** | Yes |
-| P-09 | [#2648](https://github.com/KenSuenobu/objectified-commercial/issues/2648) | Yes |
+| P-09 | [#2648](https://github.com/KenSuenobu/objectified-commercial/issues/2648) **(shipped)** | Yes |
 | P-10 | [#2649](https://github.com/KenSuenobu/objectified-commercial/issues/2649) | Yes |
 | P-11 | [#2650](https://github.com/KenSuenobu/objectified-commercial/issues/2650) | Yes |
 | P-12 | [#2651](https://github.com/KenSuenobu/objectified-commercial/issues/2651) | Yes |
@@ -72,7 +72,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | # | Issue | MVP |
 |---|--------|-----|
 | ~~2647~~ | ~~P-08 Path/query parameters + schema~~ **(shipped)** | Yes |
-| 2648 | P-09 Request body + content types | Yes |
+| ~~2648~~ | ~~P-09 Request body + content types~~ **(shipped)** | Yes |
 | 2649 | P-10 Header/cookie parameters | Yes |
 
 **E4 — [#2636](https://github.com/KenSuenobu/objectified-commercial/issues/2636)**

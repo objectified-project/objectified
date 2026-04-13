@@ -67,6 +67,8 @@ interface RequestBodySectionProps {
   operationId: string;
   versionPathId: string;
   onRefresh?: () => void;
+  /** When the Paths canvas (or parent) refreshes operation links, bump this to reload. */
+  refreshKey?: number;
 }
 
 // =============================================================================
@@ -413,6 +415,7 @@ export default function RequestBodySection({
   operationId,
   versionPathId,
   onRefresh,
+  refreshKey,
 }: RequestBodySectionProps) {
   const isDark = useDarkMode();
   const { alert: alertDialog, confirm: confirmDialog } = useDialog();
@@ -490,7 +493,7 @@ export default function RequestBodySection({
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, refreshKey]);
 
   // Handlers
   const handleCreateRequestBody = async () => {
