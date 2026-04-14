@@ -165,7 +165,7 @@ async def put_project_change_report_template_default(
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> Dict[str, str]:
     """
-    Set project-level template override. **JWT** — version **creator** or **tenant administrator**.
+    Set project-level template override. **JWT** — **project creator** or **tenant administrator**.
 
     ``templateVersionId: null`` clears the project override.
     """

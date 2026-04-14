@@ -113,10 +113,27 @@ _webhook_delivery_task: asyncio.Task | None = None
 async def startup_event():
     """Connect to database on startup."""
     db.connect()
+    _startup_log = logging.getLogger("uvicorn.error")
     try:
         db.ensure_system_change_report_template()
     except Exception as e:
-        logging.getLogger("uvicorn.error").warning("change report system template seed skipped: %s", e)
+        # Distinguish "schema not yet migrated" (expected pre-migration) from
+        # unexpected failures (permissions, connectivity, etc.).
+        _err_str = str(e).lower()
+        _schema_not_migrated = any(
+            token in _err_str
+            for token in ("undefined table", "does not exist", "undefinedtable", "42p01")
+        )
+        if _schema_not_migrated:
+            _startup_log.warning(
+                "change report system template seed skipped: migration 20260414-150000.sql "
+                "has not been applied — project and template endpoints require that migration: %s",
+                e,
+            )
+        else:
+            _startup_log.exception(
+                "change report system template seed failed with unexpected error: %s", e
+            )
     validate_webhook_signing_key()
     # Log data API routes so we can confirm POST /v1/data/{tenant_slug}/records is registered
     for route in app.routes:

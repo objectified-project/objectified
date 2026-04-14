@@ -1076,6 +1076,8 @@ class Database:
             pass  # Don't fail if we can't increment usage
 
     # ==================== Project CRUD Operations ====================
+    # NOTE: queries below select `change_report_template_version_id`, which requires
+    # migration 20260414-150000.sql. Ensure that migration is applied before deploying.
 
     def get_projects_for_tenant(self, tenant_id: str) -> List[Dict[str, Any]]:
         """Get all projects for a tenant."""

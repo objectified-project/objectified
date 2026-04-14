@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple
+from typing import Any, Dict, Mapping, Optional, Tuple
 
 import chevron
 
@@ -41,18 +41,6 @@ def bundled_system_template_row() -> Dict[str, Any]:
         "footnote_template": DEFAULT_FOOTNOTE_TEMPLATE,
         "owner_tenant_id": None,
     }
-
-
-def _get(
-    d: Mapping[str, Any],
-    *keys: str,
-) -> Any:
-    cur: Any = d
-    for k in keys:
-        if not isinstance(cur, Mapping):
-            return None
-        cur = cur.get(k)
-    return cur
 
 
 def build_render_metadata(
@@ -125,7 +113,7 @@ def build_mustache_context(
     counts = _counts(cm)
     ctx: Dict[str, Any] = {
         **meta,
-        "staticNote": md.get("staticFootnote") or md.get("staticNote") or "",
+        "staticNote": meta.get("staticFootnote") or md.get("staticNote") or "",
         "schemaVersion": cm.get("schemaVersion") or cm.get("schema_version") or "?",
         "schemas": schemas,
         "properties": properties,
