@@ -1,0 +1,25 @@
+{
+  "documentation": [],
+  "properties": [
+    {
+      "changeKind": "type_changed",
+      "detail": "'string' -> 'integer'",
+      "path": "/type",
+      "schemaName": "N"
+    }
+  ],
+  "references": [],
+  "relationships": [],
+  "schemaVersion": "1.0",
+  "schemas": {
+    "added": [],
+    "modified": [
+      {
+        "name": "N"
+      }
+    ],
+    "removed": []
+  },
+  "skipped": [],
+  "warnings": []
+}
