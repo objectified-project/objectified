@@ -29,6 +29,7 @@ from .draft_lock_routes import router as draft_lock_router
 from .push_webhook_delivery import process_due_push_webhook_deliveries
 from .push_webhook_subscriptions_routes import router as push_webhook_subscriptions_router
 from .push_webhook_crypto import validate_webhook_signing_key
+from .change_report_routes import router as change_report_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -98,6 +99,7 @@ app.include_router(migration_plans_router)
 app.include_router(version_tags_router)
 app.include_router(draft_lock_router)
 app.include_router(push_webhook_subscriptions_router)
+app.include_router(change_report_router)
 
 
 _webhook_delivery_task: asyncio.Task | None = None
