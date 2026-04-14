@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from .auth import get_authenticated_user_id, validate_authentication
@@ -28,6 +28,7 @@ from .models import (
     VersionSchema,
     VersionUpdateRequest,
 )
+from .publication_change_report import generate_change_report_on_publish
 from .published_immutability import IMMUTABLE_DETAIL, revision_is_published_immutable
 from .revision_deprecation import (
     coerce_metadata,
@@ -1824,6 +1825,7 @@ async def publish_version(
     tenant_slug: str,
     project_id: str,
     version_record_id: str,
+    background_tasks: BackgroundTasks,
     request: VersionPublishRequest = Body(default_factory=VersionPublishRequest),
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> VersionSchema:
@@ -1918,6 +1920,15 @@ async def publish_version(
             status_code=403,
             detail="Only the version creator or a tenant administrator can publish this version"
         )
+
+    background_tasks.add_task(
+        generate_change_report_on_publish,
+        tenant_slug=tenant_slug,
+        tenant_id=auth_data["tenant_id"],
+        project_id=project_id,
+        published_revision_id=version_record_id,
+        actor_id=user_id,
+    )
 
     return VersionSchema(**version)
 
