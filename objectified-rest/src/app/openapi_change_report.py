@@ -46,9 +46,10 @@ _REL_KEYS = frozenset({"allOf", "oneOf", "anyOf", "discriminator"})
 
 
 def _json_pointer_join(base: str, segment: str) -> str:
+    escaped_segment = segment.replace("~", "~0").replace("/", "~1")
     if base == "":
-        return f"/{segment}"
-    return f"{base}/{segment.replace('~', '~0').replace('/', '~1')}"
+        return f"/{escaped_segment}"
+    return f"{base}/{escaped_segment}"
 
 
 def sort_keys_deep(obj: Any) -> Any:
@@ -276,9 +277,19 @@ def _diff_json_schema_value(
                 pb, pc = base.get(k), cand.get(k)
                 np = _json_pointer_join(ptr, k)
                 if pb is None and pc is not None:
-                    _emit_doc(acc, "schema", np, k, "added", None, pc, schema_name=schema_name)
+                    if k in _DOC_KEYS:
+                        _emit_doc(acc, "schema", np, k, "added", None, pc, schema_name=schema_name)
+                    elif k in _REL_KEYS:
+                        _emit_rel(acc, schema_name, np, k, "added", None)
+                    else:
+                        _emit_prop(acc, schema_name, np, "added", None)
                 elif pb is not None and pc is None:
-                    _emit_doc(acc, "schema", np, k, "removed", pb, None, schema_name=schema_name)
+                    if k in _DOC_KEYS:
+                        _emit_doc(acc, "schema", np, k, "removed", pb, None, schema_name=schema_name)
+                    elif k in _REL_KEYS:
+                        _emit_rel(acc, schema_name, np, k, "removed", None)
+                    else:
+                        _emit_prop(acc, schema_name, np, "removed", None)
                 elif pb != pc:
                     _diff_json_schema_value(schema_name, pb, pc, np, k, k, acc, depth + 1)
             return
