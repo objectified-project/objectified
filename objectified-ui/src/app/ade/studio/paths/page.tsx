@@ -11,7 +11,7 @@ import ParameterPropertiesPanel from './components/ParameterPropertiesPanel';
 import ResponsePropertiesPanel from './components/ResponsePropertiesPanel';
 
 export default function PathsPage() {
-  const { selectedProjectId, selectedVersionId, pathsViewMode } = useStudio();
+  const { selectedProjectId, selectedVersionId, pathsViewMode, bumpPathsQualityRevision } = useStudio();
   const [activeTab, setActiveTab] = useState<'paths' | 'operations' | 'classes' | 'properties' | 'security' | 'servers'>('paths');
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<{ id: string; pathname: string } | null>(null);
@@ -39,6 +39,10 @@ export default function PathsPage() {
       setHelpDismissed(sessionStorage.getItem('paths-help-dismissed') === 'true');
     }
   }, []);
+
+  React.useEffect(() => {
+    bumpPathsQualityRevision();
+  }, [canvasRefreshKey, selectedProjectId, selectedVersionId, bumpPathsQualityRevision]);
 
   const handlePathSelect = (pathId: string | null, pathname?: string) => {
     setSelectedPathId(pathId);

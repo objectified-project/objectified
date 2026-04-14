@@ -415,6 +415,7 @@ function PathsCanvasInner({
     edgeAnimation,
     selectedVersionId,
     registerPathsCanvasFlush,
+    setFocusPathsCanvasNodeFn,
   } = useStudio();
 
   const { alert: alertDialog, confirm: confirmDialog } = useDialog();
@@ -422,8 +423,19 @@ function PathsCanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isDark, setIsDark] = useState(false);
-  const { screenToFlowPosition, getNodes, getViewport, setViewport, fitView } = useReactFlow();
+  const { screenToFlowPosition, getNodes, getNode, getViewport, setViewport, fitView } = useReactFlow();
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuidesState>({ horizontal: [], vertical: [] });
+
+  useEffect(() => {
+    const fn = (nodeId: string) => {
+      const n = getNode(nodeId);
+      if (n) {
+        fitView({ nodes: [n], padding: 0.32, duration: 280 });
+      }
+    };
+    setFocusPathsCanvasNodeFn(fn);
+    return () => setFocusPathsCanvasNodeFn(null);
+  }, [getNode, fitView, setFocusPathsCanvasNodeFn]);
   const [canvasPersistReady, setCanvasPersistReady] = useState(false);
   const canvasSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInFlightRef = useRef<Promise<unknown> | null>(null);

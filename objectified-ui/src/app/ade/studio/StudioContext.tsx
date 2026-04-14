@@ -196,6 +196,12 @@ interface StudioContextType {
   /** Registered by Paths canvas: flush debounced layout save before switching to Code (#2654). */
   registerPathsCanvasFlush: (fn: (() => Promise<void>) | null) => void;
   flushPathsCanvas: () => Promise<void>;
+  /** Bumped when Paths canvas/code data changes so PATH QUALITY can recompute (#2656). */
+  pathsQualityRevision: number;
+  bumpPathsQualityRevision: () => void;
+  /** Registered by Paths canvas: zoom to a node by React Flow id (DB operation id or path-node-*). */
+  focusPathsCanvasNodeFn: ((nodeId: string) => void) | null;
+  setFocusPathsCanvasNodeFn: (fn: ((nodeId: string) => void) | null) => void;
 }
 
 export const PATHS_VIEW_MODE_STORAGE_KEY = 'studio.paths.viewMode';
@@ -346,6 +352,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const flushPathsCanvas = useCallback(async () => {
     await pathsCanvasFlushFnRef.current?.();
   }, []);
+
+  const [pathsQualityRevision, setPathsQualityRevision] = useState(0);
+  const bumpPathsQualityRevision = useCallback(() => {
+    setPathsQualityRevision((n) => n + 1);
+  }, []);
+
+  const [focusPathsCanvasNodeFn, setFocusPathsCanvasNodeFn] = useState<((nodeId: string) => void) | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -608,7 +621,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       pathsViewMode,
       setPathsViewMode,
       registerPathsCanvasFlush,
-      flushPathsCanvas
+      flushPathsCanvas,
+      pathsQualityRevision,
+      bumpPathsQualityRevision,
+      focusPathsCanvasNodeFn,
+      setFocusPathsCanvasNodeFn
     }}>
       {children}
     </StudioContext.Provider>

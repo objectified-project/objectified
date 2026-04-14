@@ -17,6 +17,13 @@ import CanvasSettingsDialog from './CanvasSettingsDialog';
 import { cn } from '../../../../../lib/utils';
 import { getNumericScoreTier, NUMERIC_SCORE_TIER_LEGEND } from '@/app/utils/numeric-score-tier';
 import { OVERALL_SCHEMA_QUALITY_WEIGHTS } from '@/app/utils/overall-schema-quality';
+import {
+  computePathQuality,
+  pathQualityHasOperations,
+  PATH_QUALITY_WEIGHT_LABELS,
+  type PathQualityDetail,
+} from '@/app/utils/path-quality';
+import { loadPathsCodeSpec } from '../paths/lib/load-paths-code-spec';
 import RevisionDeprecationBanner from '@/app/components/ade/RevisionDeprecationBanner';
 import ServerAheadPushBanner from '@/app/components/ade/ServerAheadPushBanner';
 import { usePushConflictBanner } from '@/app/providers/PushConflictBannerProvider';
@@ -94,12 +101,19 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     pathsViewMode,
     setPathsViewMode,
     flushPathsCanvas,
+    pathsQualityRevision,
+    focusPathsCanvasNodeFn,
   } = useStudio();
 
   const { conflict, clearPushConflict } = usePushConflictBanner();
   const [pullReconcileLoading, setPullReconcileLoading] = React.useState(false);
 
   const [schemaQualityDialogOpen, setSchemaQualityDialogOpen] = React.useState(false);
+  const [pathQualityDialogOpen, setPathQualityDialogOpen] = React.useState(false);
+  const [pathQualityDetail, setPathQualityDetail] = React.useState<PathQualityDetail | null>(null);
+  const [pathQualityHasOps, setPathQualityHasOps] = React.useState(false);
+  const [pathQualityLoading, setPathQualityLoading] = React.useState(false);
+  const pathQualityDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [versions, setVersions] = React.useState<Version[]>([]);
@@ -117,6 +131,53 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
       : 'editor';
 
   const isPathsRoute = viewMode === 'paths';
+
+  React.useEffect(() => {
+    if (!isPathsRoute || !localProjectId || !localVersionId) {
+      setPathQualityDetail(null);
+      setPathQualityHasOps(false);
+      return;
+    }
+    if (pathQualityDebounceRef.current) {
+      clearTimeout(pathQualityDebounceRef.current);
+    }
+    pathQualityDebounceRef.current = setTimeout(() => {
+      void (async () => {
+        setPathQualityLoading(true);
+        try {
+          const project = projects.find((p) => p.id === localProjectId);
+          const version = versions.find((v) => v.id === localVersionId);
+          const { pathsObject, mergedSpecJson } = await loadPathsCodeSpec({
+            versionId: localVersionId,
+            projectName: project?.name || 'API',
+            versionLabel: version?.version_id || '1.0.0',
+            versionDescription: version?.description || '',
+          });
+          const merged = JSON.parse(mergedSpecJson) as Record<string, unknown>;
+          setPathQualityHasOps(pathQualityHasOperations(pathsObject));
+          setPathQualityDetail(computePathQuality(pathsObject, merged));
+        } catch (e) {
+          console.error('[StudioHeader] PATH QUALITY load failed:', e);
+          setPathQualityDetail(null);
+          setPathQualityHasOps(false);
+        } finally {
+          setPathQualityLoading(false);
+        }
+      })();
+    }, 400);
+    return () => {
+      if (pathQualityDebounceRef.current) {
+        clearTimeout(pathQualityDebounceRef.current);
+      }
+    };
+  }, [
+    isPathsRoute,
+    localProjectId,
+    localVersionId,
+    pathsQualityRevision,
+    projects,
+    versions,
+  ]);
 
   // Handle settings save
   const handleSettingsSave = React.useCallback((settings: {
@@ -465,23 +526,218 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           />
         ) : null}
 
-        {/* PATH QUALITY placeholder on Paths (#2640 P-01); schema quality on Designer/Code (#245, #2548) */}
+        {/* PATH QUALITY on Paths (#2656); schema quality on Designer/Code (#245, #2548) */}
         {localProjectId && localVersionId && isPathsRoute && (
-          <div
-            role="status"
-            className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/90 dark:bg-gray-700/40 px-3 py-1 shadow-sm shrink-0"
-            title="Path quality scoring will be available in a future update."
-          >
-            <Gauge className="w-5 h-5 text-indigo-500 shrink-0" aria-hidden />
-            <div className="flex flex-col min-w-0">
-              <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 leading-none">
-                PATH QUALITY
-              </span>
-              <span className="text-2xl font-bold tabular-nums leading-none text-gray-400 dark:text-gray-500">
-                —
-              </span>
-            </div>
-          </div>
+          <>
+            {pathQualityHasOps && pathQualityDetail ? (
+              <button
+                type="button"
+                onClick={() => setPathQualityDialogOpen(true)}
+                className={cn(
+                  'flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/90 dark:bg-gray-700/40 px-3 py-1 shadow-sm shrink-0 text-left hover:bg-gray-50 dark:hover:bg-gray-600/50 hover:border-indigo-300 dark:hover:border-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900 transition-colors',
+                  pathQualityLoading && 'opacity-70 pointer-events-none'
+                )}
+                title="PATH QUALITY (0–100). Click for weighted breakdown, issues list, and letter grade."
+                aria-label="PATH QUALITY details"
+              >
+                <Gauge className="w-5 h-5 text-indigo-500 shrink-0" aria-hidden />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 leading-none">
+                    PATH QUALITY
+                  </span>
+                  <span className="flex items-baseline gap-1.5">
+                    <span
+                      className={cn(
+                        'text-2xl font-bold tabular-nums leading-none',
+                        pathQualityDetail.tier.textClass
+                      )}
+                    >
+                      {pathQualityDetail.overall}
+                    </span>
+                    <span
+                      className={cn(
+                        'text-lg font-bold tabular-nums leading-none',
+                        pathQualityDetail.tier.textClass
+                      )}
+                      title={`Letter grade (${pathQualityDetail.tier.rangeLabel})`}
+                    >
+                      {pathQualityDetail.letterGrade}
+                    </span>
+                  </span>
+                </div>
+              </button>
+            ) : (
+              <div
+                role="status"
+                className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/90 dark:bg-gray-700/40 px-3 py-1 shadow-sm shrink-0"
+                title={
+                  pathQualityLoading
+                    ? 'Computing PATH QUALITY…'
+                    : 'Add at least one path operation to compute PATH QUALITY.'
+                }
+              >
+                <Gauge className="w-5 h-5 text-indigo-500 shrink-0" aria-hidden />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 leading-none">
+                    PATH QUALITY
+                  </span>
+                  <span className="text-2xl font-bold tabular-nums leading-none text-gray-400 dark:text-gray-500">
+                    {pathQualityLoading ? '…' : '—'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <Dialog.Root open={pathQualityDialogOpen} onOpenChange={setPathQualityDialogOpen}>
+              <Dialog.Portal>
+                <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[10000]" />
+                <Dialog.Content
+                  className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl z-[10001] w-full max-w-md max-h-[85vh] overflow-y-auto p-6 border border-gray-200 dark:border-gray-700"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                      <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        PATH QUALITY
+                      </Dialog.Title>
+                      <Dialog.Description className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Weighted rules over your exported OpenAPI paths: operationId, documentation, parameter typing,
+                        error responses, $ref resolution, response content, and duplicate operationIds. Recomputes when
+                        paths change (debounced).
+                      </Dialog.Description>
+                    </div>
+                    <Dialog.Close asChild>
+                      <button
+                        type="button"
+                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                        aria-label="Close"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </Dialog.Close>
+                  </div>
+
+                  {pathQualityDetail ? (
+                    <>
+                      <div className="flex items-center justify-between gap-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-800/50 mb-4">
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={cn('text-5xl font-bold tabular-nums', pathQualityDetail.tier.textClass)}
+                            title={`${pathQualityDetail.tier.shortLabel} (${pathQualityDetail.tier.rangeLabel})`}
+                          >
+                            {pathQualityDetail.letterGrade}
+                          </span>
+                          <div>
+                            <div className={cn('text-base font-semibold', pathQualityDetail.tier.textClass)}>
+                              {pathQualityDetail.tier.shortLabel} — {pathQualityDetail.tier.detailLabel}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              Letter grade · {pathQualityDetail.tier.rangeLabel}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={cn('text-3xl font-bold tabular-nums', pathQualityDetail.tier.textClass)}>
+                            {pathQualityDetail.overall}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">/ 100</div>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                        Default weights: operationId {PATH_QUALITY_WEIGHT_LABELS.operationId}, descriptions{' '}
+                        {PATH_QUALITY_WEIGHT_LABELS.descriptions}, parameter typing {PATH_QUALITY_WEIGHT_LABELS.parameterTyping}
+                        , error responses {PATH_QUALITY_WEIGHT_LABELS.errorResponses}, references{' '}
+                        {PATH_QUALITY_WEIGHT_LABELS.references}, response content {PATH_QUALITY_WEIGHT_LABELS.responseContent},
+                        duplicate operationIds {PATH_QUALITY_WEIGHT_LABELS.duplicateOperationIds}.
+                      </p>
+
+                      <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">Contributions</div>
+                      <table className="w-full text-xs text-left border-collapse mb-4">
+                        <thead>
+                          <tr className="border-b border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400">
+                            <th className="py-1.5 pr-2 font-medium">Factor</th>
+                            <th className="py-1.5 pr-2 font-medium text-right tabular-nums">Value</th>
+                            <th className="py-1.5 pr-2 font-medium text-right">Weight</th>
+                            <th className="py-1.5 font-medium text-right tabular-nums">Pts</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pathQualityDetail.rows.map((row) => (
+                            <tr key={row.id} className="border-b border-gray-100 dark:border-gray-700/80">
+                              <td className="py-1.5 pr-2 text-gray-800 dark:text-gray-200">{row.label}</td>
+                              <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700 dark:text-gray-300">
+                                {Math.round(row.value)}
+                              </td>
+                              <td className="py-1.5 pr-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
+                                {(row.effectiveWeight * 100).toFixed(0)}%
+                              </td>
+                              <td className="py-1.5 text-right tabular-nums font-medium text-gray-800 dark:text-gray-100">
+                                {row.contribution.toFixed(1)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">Issues</div>
+                      {pathQualityDetail.issues.length === 0 ? (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">No issues detected for current rules.</p>
+                      ) : (
+                        <ul className="space-y-1.5 mb-4 max-h-48 overflow-y-auto pr-1">
+                          {pathQualityDetail.issues.map((issue) => (
+                            <li key={issue.id}>
+                              <button
+                                type="button"
+                                disabled={!issue.focusNodeId || !focusPathsCanvasNodeFn}
+                                onClick={() => {
+                                  if (issue.focusNodeId && focusPathsCanvasNodeFn) {
+                                    focusPathsCanvasNodeFn(issue.focusNodeId);
+                                    setPathQualityDialogOpen(false);
+                                  }
+                                }}
+                                className={cn(
+                                  'w-full text-left text-xs rounded-lg px-2 py-1.5 border border-gray-200 dark:border-gray-600',
+                                  issue.focusNodeId && focusPathsCanvasNodeFn
+                                    ? 'hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer'
+                                    : 'opacity-80 cursor-default'
+                                )}
+                              >
+                                {issue.message}
+                                {issue.focusNodeId && focusPathsCanvasNodeFn ? (
+                                  <span className="block text-[10px] text-gray-400 mt-0.5">Click to focus on canvas</span>
+                                ) : null}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 px-3 py-2">
+                        <div className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                          Score guide
+                        </div>
+                        <ul className="space-y-1.5 text-xs text-gray-700 dark:text-gray-300">
+                          {NUMERIC_SCORE_TIER_LEGEND.map((row) => (
+                            <li key={row.band} className="flex items-start gap-2">
+                              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${row.barSolidClass}`} aria-hidden />
+                              <span>
+                                <span className="font-medium tabular-nums">{row.rangeLabel}:</span> {row.shortLabel} —{' '}
+                                {row.detailLabel}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      PATH QUALITY could not be computed. Ensure a project and version are selected.
+                    </p>
+                  )}
+                </Dialog.Content>
+              </Dialog.Portal>
+            </Dialog.Root>
+          </>
         )}
 
         {localProjectId && localVersionId && !isPathsRoute && (

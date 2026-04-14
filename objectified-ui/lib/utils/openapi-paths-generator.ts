@@ -376,6 +376,9 @@ export function buildOperationForOpenAPI(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
+  /** Stable DB id for PATH QUALITY focus + tooling (#2656); OpenAPI extension field. */
+  result['x-objectified-operation-id'] = operation.id;
+
   // Add operation metadata from description
   if (operation.description) {
     if (operation.description.summary) {
@@ -466,6 +469,9 @@ export function buildPathItemForOpenAPI(
   options: PathsGeneratorOptions = {}
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
+
+  /** Stable DB id for PATH QUALITY focus + tooling (#2656); OpenAPI extension field. */
+  result['x-objectified-path-id'] = path.id;
 
   // Add path-level summary and description
   if (path.summary) {
