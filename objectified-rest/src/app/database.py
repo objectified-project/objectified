@@ -5411,6 +5411,276 @@ class Database:
         """
         return self.execute_query(q, (delivery_event_id,))
 
+    def get_change_report_by_published_revision(
+        self,
+        published_revision_id: str,
+        tenant_id: str,
+        project_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        q = """
+            SELECT id, tenant_id, project_id, published_revision_id, baseline_revision_id,
+                   change_model_json, rendered_body, header_snapshot, footnote_snapshot,
+                   edited_rendered_body, edited_header_snapshot, edited_footnote_snapshot,
+                   edited_at, edited_by, template_version_id, rendered_at, regenerated_at,
+                   created_at, updated_at
+            FROM odb.change_reports
+            WHERE published_revision_id = %s::uuid
+              AND tenant_id = %s::uuid
+              AND project_id = %s::uuid
+            LIMIT 1
+        """
+        rows = self.execute_query(q, (published_revision_id, tenant_id, project_id))
+        return dict(rows[0]) if rows else None
+
+    def insert_change_report_if_absent(
+        self,
+        tenant_id: str,
+        project_id: str,
+        published_revision_id: str,
+        baseline_revision_id: Optional[str],
+        change_model_json: Dict[str, Any],
+        rendered_body: Optional[str] = None,
+        header_snapshot: Optional[str] = None,
+        footnote_snapshot: Optional[str] = None,
+        template_version_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Insert one row per published_revision_id or return the existing row unchanged
+        (change_model_json is immutable after the first insert).
+        """
+        has_render = bool(
+            rendered_body is not None or header_snapshot is not None or footnote_snapshot is not None
+        )
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO odb.change_reports (
+                        tenant_id, project_id, published_revision_id, baseline_revision_id,
+                        change_model_json, rendered_body, header_snapshot, footnote_snapshot,
+                        template_version_id, rendered_at
+                    ) VALUES (
+                        %s::uuid, %s::uuid, %s::uuid, %s::uuid,
+                        %s, %s, %s, %s, %s::uuid,
+                        CASE WHEN %s THEN CURRENT_TIMESTAMP ELSE NULL END
+                    )
+                    ON CONFLICT (published_revision_id) DO NOTHING
+                    RETURNING id, tenant_id, project_id, published_revision_id, baseline_revision_id,
+                              change_model_json, rendered_body, header_snapshot, footnote_snapshot,
+                              edited_rendered_body, edited_header_snapshot, edited_footnote_snapshot,
+                              edited_at, edited_by, template_version_id, rendered_at, regenerated_at,
+                              created_at, updated_at
+                    """,
+                    (
+                        tenant_id,
+                        project_id,
+                        published_revision_id,
+                        baseline_revision_id,
+                        Json(change_model_json),
+                        rendered_body,
+                        header_snapshot,
+                        footnote_snapshot,
+                        template_version_id if template_version_id else None,
+                        has_render,
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    cursor.execute(
+                        """
+                        SELECT id, tenant_id, project_id, published_revision_id, baseline_revision_id,
+                               change_model_json, rendered_body, header_snapshot, footnote_snapshot,
+                               edited_rendered_body, edited_header_snapshot, edited_footnote_snapshot,
+                               edited_at, edited_by, template_version_id, rendered_at, regenerated_at,
+                               created_at, updated_at
+                        FROM odb.change_reports
+                        WHERE published_revision_id = %s::uuid
+                        LIMIT 1
+                        """,
+                        (published_revision_id,),
+                    )
+                    row = cursor.fetchone()
+                conn.commit()
+                return dict(row) if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def patch_change_report_edits(
+        self,
+        published_revision_id: str,
+        tenant_id: str,
+        project_id: str,
+        user_id: str,
+        *,
+        clear_edits: bool = False,
+        set_edited_rendered_body: bool = False,
+        edited_rendered_body: Optional[str] = None,
+        set_edited_header: bool = False,
+        edited_header_snapshot: Optional[str] = None,
+        set_edited_footnote: bool = False,
+        edited_footnote_snapshot: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Update user edit snapshots; missing *_was_set flags leave columns unchanged."""
+        if clear_edits:
+            q = """
+                UPDATE odb.change_reports
+                SET edited_rendered_body = NULL,
+                    edited_header_snapshot = NULL,
+                    edited_footnote_snapshot = NULL,
+                    edited_at = NULL,
+                    edited_by = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE published_revision_id = %s::uuid
+                  AND tenant_id = %s::uuid
+                  AND project_id = %s::uuid
+                RETURNING id, tenant_id, project_id, published_revision_id, baseline_revision_id,
+                          change_model_json, rendered_body, header_snapshot, footnote_snapshot,
+                          edited_rendered_body, edited_header_snapshot, edited_footnote_snapshot,
+                          edited_at, edited_by, template_version_id, rendered_at, regenerated_at,
+                          created_at, updated_at
+            """
+            conn = self.connect()
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(q, (published_revision_id, tenant_id, project_id))
+                    row = cursor.fetchone()
+                    conn.commit()
+                    return dict(row) if row else None
+            except Exception as e:
+                conn.rollback()
+                raise e
+
+        assignments: List[str] = []
+        params: List[Any] = []
+        if set_edited_rendered_body:
+            assignments.append("edited_rendered_body = %s")
+            params.append(edited_rendered_body)
+        if set_edited_header:
+            assignments.append("edited_header_snapshot = %s")
+            params.append(edited_header_snapshot)
+        if set_edited_footnote:
+            assignments.append("edited_footnote_snapshot = %s")
+            params.append(edited_footnote_snapshot)
+        if not assignments:
+            return self.get_change_report_by_published_revision(
+                published_revision_id, tenant_id, project_id
+            )
+
+        assignments.append("edited_at = CURRENT_TIMESTAMP")
+        assignments.append("edited_by = %s::uuid")
+        params.append(user_id)
+        assignments.append("updated_at = CURRENT_TIMESTAMP")
+        params.extend([published_revision_id, tenant_id, project_id])
+
+        q = f"""
+            UPDATE odb.change_reports
+            SET {", ".join(assignments)}
+            WHERE published_revision_id = %s::uuid
+              AND tenant_id = %s::uuid
+              AND project_id = %s::uuid
+            RETURNING id, tenant_id, project_id, published_revision_id, baseline_revision_id,
+                      change_model_json, rendered_body, header_snapshot, footnote_snapshot,
+                      edited_rendered_body, edited_header_snapshot, edited_footnote_snapshot,
+                      edited_at, edited_by, template_version_id, rendered_at, regenerated_at,
+                      created_at, updated_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, tuple(params))
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row) if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def apply_change_report_regeneration(
+        self,
+        published_revision_id: str,
+        tenant_id: str,
+        project_id: str,
+        header_snapshot: str,
+        rendered_body: str,
+        footnote_snapshot: str,
+        discard_user_edits: bool,
+        template_version_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Re-run placeholder/template render: update rendered_* and regeneration timestamps."""
+        if discard_user_edits:
+            q = """
+                UPDATE odb.change_reports
+                SET rendered_body = %s,
+                    header_snapshot = %s,
+                    footnote_snapshot = %s,
+                    rendered_at = CURRENT_TIMESTAMP,
+                    regenerated_at = CURRENT_TIMESTAMP,
+                    edited_rendered_body = NULL,
+                    edited_header_snapshot = NULL,
+                    edited_footnote_snapshot = NULL,
+                    edited_at = NULL,
+                    edited_by = NULL,
+                    template_version_id = COALESCE(%s::uuid, template_version_id),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE published_revision_id = %s::uuid
+                  AND tenant_id = %s::uuid
+                  AND project_id = %s::uuid
+                RETURNING id, tenant_id, project_id, published_revision_id, baseline_revision_id,
+                          change_model_json, rendered_body, header_snapshot, footnote_snapshot,
+                          edited_rendered_body, edited_header_snapshot, edited_footnote_snapshot,
+                          edited_at, edited_by, template_version_id, rendered_at, regenerated_at,
+                          created_at, updated_at
+            """
+            params = (
+                rendered_body,
+                header_snapshot,
+                footnote_snapshot,
+                template_version_id if template_version_id else None,
+                published_revision_id,
+                tenant_id,
+                project_id,
+            )
+        else:
+            q = """
+                UPDATE odb.change_reports
+                SET rendered_body = %s,
+                    header_snapshot = %s,
+                    footnote_snapshot = %s,
+                    rendered_at = CURRENT_TIMESTAMP,
+                    regenerated_at = CURRENT_TIMESTAMP,
+                    template_version_id = COALESCE(%s::uuid, template_version_id),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE published_revision_id = %s::uuid
+                  AND tenant_id = %s::uuid
+                  AND project_id = %s::uuid
+                RETURNING id, tenant_id, project_id, published_revision_id, baseline_revision_id,
+                          change_model_json, rendered_body, header_snapshot, footnote_snapshot,
+                          edited_rendered_body, edited_header_snapshot, edited_footnote_snapshot,
+                          edited_at, edited_by, template_version_id, rendered_at, regenerated_at,
+                          created_at, updated_at
+            """
+            params = (
+                rendered_body,
+                header_snapshot,
+                footnote_snapshot,
+                template_version_id if template_version_id else None,
+                published_revision_id,
+                tenant_id,
+                project_id,
+            )
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, params)
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row) if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
+
 
 # Global database instance
 db = Database()
