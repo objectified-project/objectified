@@ -38,7 +38,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | P-14 | [#2653](https://github.com/KenSuenobu/objectified-commercial/issues/2653) **(shipped)** | Yes |
 | P-15 | [#2654](https://github.com/KenSuenobu/objectified-commercial/issues/2654) **(shipped)** | Yes |
 | P-16 | [#2655](https://github.com/KenSuenobu/objectified-commercial/issues/2655) **(shipped)** | Yes |
-| P-17 | [#2656](https://github.com/KenSuenobu/objectified-commercial/issues/2656) | Yes |
+| P-17 | [#2656](https://github.com/KenSuenobu/objectified-commercial/issues/2656) **(shipped)** | Yes |
 | P-18 | [#2657](https://github.com/KenSuenobu/objectified-commercial/issues/2657) | No (V2 / backlog) |
 | V2-01 | [#2658](https://github.com/KenSuenobu/objectified-commercial/issues/2658) | No |
 | V2-02 | [#2659](https://github.com/KenSuenobu/objectified-commercial/issues/2659) | No |
@@ -89,7 +89,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 |---|--------|-----|
 | ~~2654~~ | ~~P-15 Monaco Code mode + preview~~ **(shipped)** | Yes |
 | ~~2655~~ | ~~P-16 OpenAPI 3.2 export + validation gate~~ **(shipped)** | Yes |
-| 2656 | P-17 PATH QUALITY score + dialog | Yes |
+| ~~2656~~ | ~~P-17 PATH QUALITY score + dialog~~ **(shipped)** | Yes |
 
 **E6 — [#2638](https://github.com/KenSuenobu/objectified-commercial/issues/2638)**
 
@@ -570,7 +570,7 @@ If no stable OAS 3.2 validator exists in ecosystem at implementation time, ship 
 
 ---
 
-### P-17 — PATH QUALITY score & breakdown dialog
+### P-17 — PATH QUALITY score & breakdown dialog ✅
 
 **Epic:** E5 · **Labels:** `paths`, `mvp`, `ui`, `openapi`
 
