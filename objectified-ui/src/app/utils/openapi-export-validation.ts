@@ -35,6 +35,11 @@ const HTTP_METHODS = new Set([
   'trace',
 ]);
 
+/** Encode a string as a JSON Pointer segment (RFC 6901: `~` → `~0`, `/` → `~1`). */
+function encodeJsonPointerSegment(s: string): string {
+  return s.replace(/~/g, '~0').replace(/\//g, '~1');
+}
+
 function pathTemplateParamNames(pathKey: string): string[] {
   const re = /\{([^}]+)\}/g;
   const out: string[] = [];
@@ -162,7 +167,7 @@ export function validateOpenAPISemantics(spec: Record<string, unknown>): OpenAPI
           issues.push({
             severity: 'error',
             message: `Duplicate operationId "${oid}" (also used at ${prev}).`,
-            path: `/paths${pathKey}/${method}/operationId`,
+            path: `/paths/${encodeJsonPointerSegment(pathKey)}/${method}/operationId`,
           });
         } else {
           operationIds.set(oid, loc);
@@ -180,7 +185,7 @@ export function validateOpenAPISemantics(spec: Record<string, unknown>): OpenAPI
           issues.push({
             severity: 'error',
             message: `Path template "{${name}}" has no matching path parameter on ${method.toUpperCase()} ${pathKey}.`,
-            path: `/paths${pathKey}`,
+            path: `/paths/${encodeJsonPointerSegment(pathKey)}`,
           });
         }
       }
@@ -189,7 +194,7 @@ export function validateOpenAPISemantics(spec: Record<string, unknown>): OpenAPI
           issues.push({
             severity: 'error',
             message: `Path parameter "${name}" is not present in the path template ${pathKey}.`,
-            path: `/paths${pathKey}/${method}/parameters`,
+            path: `/paths/${encodeJsonPointerSegment(pathKey)}/${method}/parameters`,
           });
         }
       }
@@ -203,7 +208,7 @@ export function validateOpenAPISemantics(spec: Record<string, unknown>): OpenAPI
         issues.push({
           severity: 'warning',
           message: `Operation ${method.toUpperCase()} ${pathKey} has no summary or description.`,
-          path: `/paths${pathKey}/${method}`,
+          path: `/paths/${encodeJsonPointerSegment(pathKey)}/${method}`,
         });
       }
 
@@ -216,7 +221,7 @@ export function validateOpenAPISemantics(spec: Record<string, unknown>): OpenAPI
             issues.push({
               severity: 'warning',
               message: `Response ${code} for ${method.toUpperCase()} ${pathKey} has no description.`,
-              path: `/paths${pathKey}/${method}/responses/${code}`,
+              path: `/paths/${encodeJsonPointerSegment(pathKey)}/${method}/responses/${code}`,
             });
           }
         }
