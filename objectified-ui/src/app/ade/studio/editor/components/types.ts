@@ -9,7 +9,9 @@ export interface Project {
 export interface Version {
   id: string;
   version_id: string;
-  description: string;
+  /** DB / legacy field; REST often sends `shortMessage` instead. */
+  description?: string | null;
+  shortMessage?: string | null;
   published: boolean;
   /** ISO timestamp for timeline / sorting (#323) */
   created_at?: string;

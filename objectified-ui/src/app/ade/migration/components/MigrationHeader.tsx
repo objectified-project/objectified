@@ -7,6 +7,7 @@ import * as Select from '@radix-ui/react-select';
 import { useMigration } from '../MigrationContext';
 import RevisionDeprecationBanner from '@/app/components/ade/RevisionDeprecationBanner';
 import { isRevisionDeprecated } from '@/app/utils/revision-deprecation';
+import { formatVersionSelectorLabel } from '@/app/utils/version-display';
 
 interface Project {
   id: string;
@@ -17,7 +18,8 @@ interface Project {
 interface Version {
   id: string;
   version_id: string;
-  description: string;
+  description?: string | null;
+  shortMessage?: string | null;
   published: boolean;
   created_at?: string;
   metadata?: Record<string, unknown>;
@@ -110,8 +112,7 @@ export default function MigrationHeader() {
     setToVersionId(value);
   };
 
-  const versionOptionLabel = (version: Version) =>
-    `${version.published ? '🔒 ' : ''}${version.version_id} - ${version.description}`;
+  const versionOptionLabel = (version: Version) => formatVersionSelectorLabel(version);
 
   const fromVer = versions.find((x) => x.id === localFromVersionId);
   const toVer = versions.find((x) => x.id === localToVersionId);

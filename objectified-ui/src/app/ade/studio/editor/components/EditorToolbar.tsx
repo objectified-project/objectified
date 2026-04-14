@@ -6,6 +6,7 @@ import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import type { Project, Version, ViewMode } from './types';
+import { formatVersionSelectorLabel } from '@/app/utils/version-display';
 
 interface EditorToolbarProps {
   // Data
@@ -217,7 +218,7 @@ export function EditorToolbar({
                           <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                         </Select.ItemIndicator>
                         <Select.ItemText>
-                          {version.published ? '🔒 ' : ''}{version.version_id} - {version.description}
+                          {formatVersionSelectorLabel(version)}
                         </Select.ItemText>
                       </Select.Item>
                     ))

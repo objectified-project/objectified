@@ -82,6 +82,7 @@ import ReferenceDialog from '../../../components/ade/studio/ReferenceDialog';
 import TagManager from '../../../components/ade/studio/TagManager';
 import ClassEditDialog from '../../../components/ade/studio/ClassEditDialog';
 import ExportWizard from '../../../components/ade/studio/ExportWizard';
+import { formatVersionSelectorLabel } from '@/app/utils/version-display';
 import { generateOpenApiSpec } from '@/app/utils/openapi';
 import { generateArazzoSpec } from '@/app/utils/arazzo';
 import { generateJsonSchema } from '@/app/utils/jsonschema';
@@ -2750,6 +2751,36 @@ const StudioContent = () => {
       setProjectTags([]);
     }
   }, []);
+
+  const headerProjectSelectIdRef = useRef(selectedProjectId);
+  headerProjectSelectIdRef.current = selectedProjectId;
+  const headerVersionSelectIdRef = useRef(selectedVersionId);
+  headerVersionSelectIdRef.current = selectedVersionId;
+  const headerVersionsRef = useRef(versions);
+  headerVersionsRef.current = versions;
+
+  const handleHeaderProjectSelectChange = useCallback(
+    (value: string) => {
+      if (String(value) === String(headerProjectSelectIdRef.current ?? '')) return;
+      setContextProjectId(value);
+      setContextVersionId('');
+      setIsReadOnly(false);
+      setViewMode('canvas');
+      void loadProjectTags(value);
+    },
+    [setContextProjectId, setContextVersionId, setIsReadOnly, loadProjectTags]
+  );
+
+  const handleHeaderVersionSelectChange = useCallback(
+    (value: string) => {
+      if (String(value) === String(headerVersionSelectIdRef.current ?? '')) return;
+      setContextVersionId(value);
+      const version = headerVersionsRef.current.find((v) => String(v.id) === String(value));
+      setIsReadOnly(version?.published ?? false);
+      setViewMode('canvas');
+    },
+    [setContextVersionId, setIsReadOnly]
+  );
 
   // Handle class edit (double-click on node)
   const handleClassEdit = useCallback(async (classData: any) => {
@@ -7796,82 +7827,105 @@ const StudioContent = () => {
       {!canvasPresentationActive && (
       <div className="bg-gradient-to-r from-white via-slate-50 to-white dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 border-b border-gray-200/80 dark:border-gray-700/80 px-2 py-1.5 shadow-sm" style={{ position: 'fixed', top: 48, left: 0, right: 0, zIndex: 1000 }}>
         <div className="flex flex-wrap items-center gap-4 w-full">
-          {/* Project / version: native <select> (Radix controlled Select caused maximum update depth here). */}
           <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
-            <div className="relative min-w-[220px]">
-              <select
+            <Select.Root
+              value={projectSelectValue}
+              onValueChange={handleHeaderProjectSelectChange}
+              disabled={isLoadingProjects || !currentTenantId}
+            >
+              <Select.Trigger
                 aria-busy={isLoadingProjects}
-                className="w-full appearance-none bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm pl-9 pr-8 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                value={projectSelectValue ?? ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (!value) return;
-                  setContextProjectId(value);
-                  setContextVersionId('');
-                  setIsReadOnly(false);
-                  setViewMode('canvas');
-                  loadProjectTags(value);
-                }}
-                disabled={isLoadingProjects || !currentTenantId || projects.length === 0}
+                className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="">
-                  {isLoadingProjects ? 'Loading projects…' : projects.length === 0 ? 'No projects available' : 'Select project...'}
-                </option>
-                {projects.map((project) => (
-                  <option key={project.id} value={String(project.id)}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
                 {isLoadingProjects ? (
                   <Loader2 className="w-4 h-4 shrink-0 animate-spin text-indigo-500 dark:text-indigo-400" aria-hidden />
                 ) : (
                   <Folder className="w-4 h-4 text-gray-400 dark:text-gray-500" aria-hidden />
                 )}
-              </span>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden>
-                <ChevronDown className="w-4 h-4" />
-              </span>
-            </div>
+                <Select.Value placeholder={isLoadingProjects ? 'Loading projects…' : 'Select project...'} />
+                <Select.Icon className="ml-auto">
+                  <ChevronDown className="w-4 h-4 text-gray-400" aria-hidden />
+                </Select.Icon>
+              </Select.Trigger>
+              <Select.Portal>
+                <Select.Content
+                  className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]"
+                  position="popper"
+                  sideOffset={5}
+                >
+                  <Select.Viewport className="p-1">
+                    {projects.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No projects available</div>
+                    ) : (
+                      projects.map((project) => (
+                        <Select.Item
+                          key={project.id}
+                          value={String(project.id)}
+                          className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30"
+                        >
+                          <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                            <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                          </Select.ItemIndicator>
+                          <Select.ItemText>{project.name}</Select.ItemText>
+                        </Select.Item>
+                      ))
+                    )}
+                  </Select.Viewport>
+                </Select.Content>
+              </Select.Portal>
+            </Select.Root>
           </div>
 
           <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
-            <div className="relative min-w-[220px]" key={selectedProjectId || 'no-project'}>
-              <select
+            <Select.Root
+              key={selectedProjectId || 'no-project'}
+              value={versionSelectValue}
+              onValueChange={handleHeaderVersionSelectChange}
+              disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
+            >
+              <Select.Trigger
                 aria-busy={isLoadingVersions}
-                className="w-full appearance-none bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm pl-9 pr-8 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                value={versionSelectValue ?? ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (!value) return;
-                  setContextVersionId(value);
-                  const version = versions.find((v) => String(v.id) === String(value));
-                  setIsReadOnly(version?.published ?? false);
-                  setViewMode('canvas');
-                }}
-                disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
+                className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="">
-                  {isLoadingVersions ? 'Loading versions…' : versions.length === 0 ? 'No versions available' : 'Select version...'}
-                </option>
-                {versions.map((version) => (
-                  <option key={version.id} value={String(version.id)}>
-                    {`${version.published ? '🔒 ' : ''}${version.version_id} - ${version.description}`}
-                  </option>
-                ))}
-              </select>
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
                 {isLoadingVersions ? (
                   <Loader2 className="w-4 h-4 shrink-0 animate-spin text-indigo-500 dark:text-indigo-400" aria-hidden />
                 ) : (
                   <Tag className="w-4 h-4 text-gray-400 dark:text-gray-500" aria-hidden />
                 )}
-              </span>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden>
-                <ChevronDown className="w-4 h-4" />
-              </span>
-            </div>
+                <Select.Value placeholder={isLoadingVersions ? 'Loading versions…' : 'Select version...'} />
+                <Select.Icon className="ml-auto">
+                  <ChevronDown className="w-4 h-4 text-gray-400" aria-hidden />
+                </Select.Icon>
+              </Select.Trigger>
+              <Select.Portal>
+                <Select.Content
+                  className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]"
+                  position="popper"
+                  sideOffset={5}
+                >
+                  <Select.Viewport className="p-1">
+                    {versions.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No versions available</div>
+                    ) : (
+                      versions.map((version) => (
+                        <Select.Item
+                          key={version.id}
+                          value={String(version.id)}
+                          className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30"
+                        >
+                          <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                            <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                          </Select.ItemIndicator>
+                          <Select.ItemText>
+                            {formatVersionSelectorLabel(version)}
+                          </Select.ItemText>
+                        </Select.Item>
+                      ))
+                    )}
+                  </Select.Viewport>
+                </Select.Content>
+              </Select.Portal>
+            </Select.Root>
           </div>
 
           {/* View Switcher - Radix UI ToggleGroup */}

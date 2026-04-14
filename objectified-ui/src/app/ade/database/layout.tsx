@@ -5,13 +5,21 @@ import * as React from 'react';
 import { DatabaseProvider, useDatabase } from './DatabaseContext';
 import DatabaseHeader from './components/DatabaseHeader';
 import TablesSidebar from './components/TablesSidebar';
+import { ADE_SUBHEADER_RESERVE_PX } from '../constants/subheader-layout';
 
 function DatabaseLayoutInner({ children }: { children: React.ReactNode }) {
   const { selectedProjectId, selectedVersionId } = useDatabase();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 48px)' }}>
       <DatabaseHeader />
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', marginTop: 48 }}>
+      <div
+        style={{
+          display: 'flex',
+          flex: 1,
+          overflow: 'hidden',
+          marginTop: ADE_SUBHEADER_RESERVE_PX,
+        }}
+      >
         {selectedProjectId && selectedVersionId && <TablesSidebar />}
         <main
           style={{

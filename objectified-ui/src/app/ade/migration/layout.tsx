@@ -5,6 +5,7 @@ import * as React from 'react';
 import { MigrationProvider, useMigration } from './MigrationContext';
 import MigrationHeader from './components/MigrationHeader';
 import MigrationSidebar from './components/MigrationSidebar';
+import { ADE_SUBHEADER_RESERVE_PX } from '../constants/subheader-layout';
 
 function MigrationLayoutInner({ children }: { children: React.ReactNode }) {
   const { fromVersionId, toVersionId } = useMigration();
@@ -13,7 +14,14 @@ function MigrationLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 48px)' }}>
       <MigrationHeader />
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', marginTop: 48 }}>
+      <div
+        style={{
+          display: 'flex',
+          flex: 1,
+          overflow: 'hidden',
+          marginTop: ADE_SUBHEADER_RESERVE_PX,
+        }}
+      >
         {showSidebar && <MigrationSidebar />}
         <main
           style={{

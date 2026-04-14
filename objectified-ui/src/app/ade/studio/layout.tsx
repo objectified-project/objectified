@@ -21,6 +21,7 @@ import TagManager from '@/app/components/ade/studio/TagManager';
 import { getClassesForVersion, getTagsForProject } from '../../../../lib/db/helper';
 import { deleteClassWithSession } from '../../../../lib/api/rest-client';
 import * as Dialog from '@radix-ui/react-dialog';
+import { ADE_SUBHEADER_RESERVE_PX } from '../constants/subheader-layout';
 
 // Helper function to check permissions
 const checkPermissions = async (condition: boolean, message: string, alertDialog: any) => {
@@ -439,7 +440,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
           display: "flex",
           flex: 1,
           overflow: "hidden",
-          marginTop: canvasPresentationMode ? 0 : "48px",
+          marginTop: canvasPresentationMode ? 0 : `${ADE_SUBHEADER_RESERVE_PX}px`,
         }}
       >
         {/* Only show sidebar for canvas/editor view, not for code view */}

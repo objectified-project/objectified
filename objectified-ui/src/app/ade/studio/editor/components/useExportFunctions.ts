@@ -6,6 +6,7 @@ import { jsPDF } from 'jspdf';
 import { useReactFlow } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import type { Project, Version } from './types';
+import { getVersionRevisionNote } from '@/app/utils/version-display';
 
 interface UseExportFunctionsProps {
   projects: Project[];
@@ -712,7 +713,7 @@ export function useExportFunctions({
           projectName: selectedProject?.name || 'Unknown',
           projectSlug: selectedProject?.slug || '',
           versionId: selectedVersion?.version_id || '',
-          versionDescription: selectedVersion?.description || '',
+          versionDescription: selectedVersion ? getVersionRevisionNote(selectedVersion) : '',
           exportedAt: new Date().toISOString(),
           exportedBy: 'Objectified Studio',
         },

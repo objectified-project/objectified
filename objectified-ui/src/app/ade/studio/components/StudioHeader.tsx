@@ -4,7 +4,8 @@ import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import { toast } from 'sonner';
-import { Gauge, Settings, X } from 'lucide-react';
+import { Check, Gauge, Settings, X } from 'lucide-react';
+import * as Select from '@radix-ui/react-select';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { useStudio } from '../StudioContext';
@@ -27,6 +28,7 @@ import RevisionDeprecationBanner from '@/app/components/ade/RevisionDeprecationB
 import ServerAheadPushBanner from '@/app/components/ade/ServerAheadPushBanner';
 import { usePushConflictBanner } from '@/app/providers/PushConflictBannerProvider';
 import { isRevisionDeprecated } from '@/app/utils/revision-deprecation';
+import { formatVersionSelectorLabel } from '@/app/utils/version-display';
 import {
   countAuthoredRevisionsTowardHead,
   isRemoteHeadAheadOfSelection,
@@ -43,7 +45,8 @@ interface Project {
 interface Version {
   id: string;
   version_id: string;
-  description: string;
+  description?: string | null;
+  shortMessage?: string | null;
   published: boolean;
   metadata?: Record<string, unknown>;
   parent_version_id?: string | null;
@@ -424,31 +427,17 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   return (
     <div className="bg-gradient-to-r from-white via-slate-50 to-white dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 border-b border-gray-200/80 dark:border-gray-700/80 px-2 py-1.5 shadow-sm" style={{ position: 'fixed', top: 48, left: 0, right: 0, zIndex: 1000 }}>
       <div className="flex flex-wrap items-center gap-4 w-full">
-        {/* Project / version: native <select> — Radix controlled Select was causing maximum update depth in this header. */}
-        {/* Project Selector */}
+        {/* Project Selector — Radix Select aligned with DatabaseHeader; value/handler from context only */}
         <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
-          <div className="relative min-w-[220px]">
-            <select
+          <Select.Root
+            value={projectSelectValue}
+            onValueChange={handleProjectChange}
+            disabled={isLoadingProjects || !currentTenantId}
+          >
+            <Select.Trigger
               aria-busy={isLoadingProjects}
-              className="w-full appearance-none bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm pl-9 pr-8 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              value={projectSelectValue ?? ''}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!v) return;
-                handleProjectChange(v);
-              }}
-              disabled={isLoadingProjects || !currentTenantId || projects.length === 0}
+              className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">
-                {isLoadingProjects ? 'Loading projects…' : projects.length === 0 ? 'No projects available' : 'Select project...'}
-              </option>
-              {projects.map((project) => (
-                <option key={project.id} value={String(project.id)}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
               {isLoadingProjects ? (
                 <Spinner size="sm" className="shrink-0" aria-hidden />
               ) : (
@@ -456,39 +445,54 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
               )}
-            </span>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </span>
-          </div>
+              <Select.Value placeholder={isLoadingProjects ? 'Loading projects…' : 'Select project...'} />
+              <Select.Icon className="ml-auto">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </Select.Icon>
+            </Select.Trigger>
+            <Select.Portal>
+              <Select.Content
+                className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]"
+                position="popper"
+                sideOffset={5}
+              >
+                <Select.Viewport className="p-1">
+                  {projects.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No projects available</div>
+                  ) : (
+                    projects.map((project) => (
+                      <Select.Item
+                        key={project.id}
+                        value={String(project.id)}
+                        className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30"
+                      >
+                        <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                          <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                        </Select.ItemIndicator>
+                        <Select.ItemText>{project.name}</Select.ItemText>
+                      </Select.Item>
+                    ))
+                  )}
+                </Select.Viewport>
+              </Select.Content>
+            </Select.Portal>
+          </Select.Root>
         </div>
 
         {/* Version Selector */}
         <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
-          <div className="relative min-w-[220px]" key={selectedProjectId || 'no-project'}>
-            <select
+          <Select.Root
+            key={selectedProjectId || 'no-project'}
+            value={versionSelectValue}
+            onValueChange={handleVersionChange}
+            disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
+          >
+            <Select.Trigger
               aria-busy={isLoadingVersions}
-              className="w-full appearance-none bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm pl-9 pr-8 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              value={versionSelectValue ?? ''}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!v) return;
-                handleVersionChange(v);
-              }}
-              disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
+              className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">
-                {isLoadingVersions ? 'Loading versions…' : versions.length === 0 ? 'No versions available' : 'Select version...'}
-              </option>
-              {versions.map((version) => (
-                <option key={version.id} value={String(version.id)}>
-                  {`${version.published ? '🔒 ' : ''}${version.version_id} - ${version.description}`}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
               {isLoadingVersions ? (
                 <Spinner size="sm" className="shrink-0" aria-hidden />
               ) : (
@@ -496,13 +500,42 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
               )}
-            </span>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </span>
-          </div>
+              <Select.Value placeholder={isLoadingVersions ? 'Loading versions…' : 'Select version...'} />
+              <Select.Icon className="ml-auto">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </Select.Icon>
+            </Select.Trigger>
+            <Select.Portal>
+              <Select.Content
+                className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]"
+                position="popper"
+                sideOffset={5}
+              >
+                <Select.Viewport className="p-1">
+                  {versions.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No versions available</div>
+                  ) : (
+                    versions.map((version) => (
+                      <Select.Item
+                        key={version.id}
+                        value={String(version.id)}
+                        className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30"
+                      >
+                        <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                          <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                        </Select.ItemIndicator>
+                        <Select.ItemText>
+                          {formatVersionSelectorLabel(version)}
+                        </Select.ItemText>
+                      </Select.Item>
+                    ))
+                  )}
+                </Select.Viewport>
+              </Select.Content>
+            </Select.Portal>
+          </Select.Root>
         </div>
 
         {selectedProjectId && selectedVersionId ? (

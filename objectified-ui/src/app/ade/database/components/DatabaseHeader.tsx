@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { Check, Info } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import { useDatabase } from '../DatabaseContext';
+import { formatVersionSelectorLabel } from '@/app/utils/version-display';
 
 interface Project {
   id: string;
@@ -15,7 +16,8 @@ interface Project {
 interface Version {
   id: string;
   version_id: string;
-  description: string;
+  description?: string | null;
+  shortMessage?: string | null;
   published: boolean;
   created_at?: string;
 }
@@ -221,7 +223,7 @@ export default function DatabaseHeader() {
                           <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                         </Select.ItemIndicator>
                         <Select.ItemText>
-                          {version.published ? '🔒 ' : ''}{version.version_id} - {version.description}
+                          {formatVersionSelectorLabel(version)}
                         </Select.ItemText>
                       </Select.Item>
                     ))
