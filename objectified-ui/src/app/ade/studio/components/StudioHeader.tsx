@@ -93,6 +93,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     syncLocalDirty,
     pathsViewMode,
     setPathsViewMode,
+    flushPathsCanvas,
   } = useStudio();
 
   const { conflict, clearPushConflict } = usePushConflictBanner();
@@ -664,10 +665,18 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
               <ToggleGroup.Root
                 type="single"
                 value={pathsViewMode}
-                onValueChange={(value) => {
-                  if (value === 'canvas' || value === 'code') {
-                    setPathsViewMode(value);
+                onValueChange={async (value) => {
+                  if (value !== 'canvas' && value !== 'code') return;
+                  if (value === pathsViewMode) return;
+                  if (pathsViewMode === 'canvas' && value === 'code') {
+                    try {
+                      await flushPathsCanvas();
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : 'Could not save canvas layout before Code view');
+                      return;
+                    }
                   }
+                  setPathsViewMode(value);
                 }}
                 className="inline-flex bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1 shadow-inner"
               >

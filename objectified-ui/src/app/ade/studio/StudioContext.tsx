@@ -193,6 +193,9 @@ interface StudioContextType {
   /** Paths editor: canvas vs code (sessionStorage `studio.paths.viewMode`; #2640 P-01). */
   pathsViewMode: 'canvas' | 'code';
   setPathsViewMode: (mode: 'canvas' | 'code') => void;
+  /** Registered by Paths canvas: flush debounced layout save before switching to Code (#2654). */
+  registerPathsCanvasFlush: (fn: (() => Promise<void>) | null) => void;
+  flushPathsCanvas: () => Promise<void>;
 }
 
 export const PATHS_VIEW_MODE_STORAGE_KEY = 'studio.paths.viewMode';
@@ -334,6 +337,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         /* ignore */
       }
     }
+  }, []);
+
+  const pathsCanvasFlushFnRef = useRef<(() => Promise<void>) | null>(null);
+  const registerPathsCanvasFlush = useCallback((fn: (() => Promise<void>) | null) => {
+    pathsCanvasFlushFnRef.current = fn;
+  }, []);
+  const flushPathsCanvas = useCallback(async () => {
+    await pathsCanvasFlushFnRef.current?.();
   }, []);
 
   useEffect(() => {
@@ -595,7 +606,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       syncLocalDirty,
       setSyncLocalDirty,
       pathsViewMode,
-      setPathsViewMode
+      setPathsViewMode,
+      registerPathsCanvasFlush,
+      flushPathsCanvas
     }}>
       {children}
     </StudioContext.Provider>
