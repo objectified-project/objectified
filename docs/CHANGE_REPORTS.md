@@ -53,7 +53,7 @@ This document lists **epics**, **implementation tickets** (in **GitHub creation 
 | 3 | CR-03 | [#2701](https://github.com/KenSuenobu/objectified-commercial/issues/2701) Change report template system with header, body, and footnote rendering | **MVP** |
 | 4 | CR-04 | [#2702](https://github.com/KenSuenobu/objectified-commercial/issues/2702) Invoke change report generation from the publication workflow with baseline selection | **MVP** |
 | 5 | CR-05 | [#2703](https://github.com/KenSuenobu/objectified-commercial/issues/2703) Version page UI to view, edit, and regenerate publication change reports | **MVP** |
-| 6 | CR-06 | [#2704](https://github.com/KenSuenobu/objectified-commercial/issues/2704) Tests and release gate for publication change reports (golden fixtures, REST, E2E) | **MVP** |
+| 6 | CR-06 | ~~[#2704](https://github.com/KenSuenobu/objectified-commercial/issues/2704)~~ **Done** — golden `ChangeReportModel` + render snapshots, publish REST integration test, Playwright `e2e/change-report.spec.ts` (mocked APIs) | **MVP** |
 | 7 | CR-V2-01 | [#2705](https://github.com/KenSuenobu/objectified-commercial/issues/2705) Enterprise change reports: PDF export, approvals, and audit trail for report and template edits | **V2** |
 
 ---

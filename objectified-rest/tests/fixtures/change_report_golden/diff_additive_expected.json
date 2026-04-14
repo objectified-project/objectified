@@ -1,0 +1,18 @@
+{
+  "documentation": [],
+  "properties": [],
+  "references": [],
+  "relationships": [],
+  "schemaVersion": "1.0",
+  "schemas": {
+    "added": [
+      {
+        "name": "Pet"
+      }
+    ],
+    "modified": [],
+    "removed": []
+  },
+  "skipped": [],
+  "warnings": []
+}

@@ -1,0 +1,23 @@
+{
+  "documentation": [
+    {
+      "baselinePreview": "d0",
+      "candidatePreview": "d1",
+      "changeKind": "modified",
+      "field": "description",
+      "path": "/info/description",
+      "scope": "info"
+    }
+  ],
+  "properties": [],
+  "references": [],
+  "relationships": [],
+  "schemaVersion": "1.0",
+  "schemas": {
+    "added": [],
+    "modified": [],
+    "removed": []
+  },
+  "skipped": [],
+  "warnings": []
+}
