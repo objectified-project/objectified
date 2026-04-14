@@ -1,3 +1,5 @@
+'use server';
+
 import { getClassesWithPropertiesAndTags } from '../../../../../../lib/db/helper';
 import { loadPathsForOpenAPIExport } from '../../../../../../lib/db/helper-paths-export';
 import {
@@ -34,9 +36,18 @@ export async function loadPathsCodeSpec(options: {
     const pathsData = JSON.parse(pathsResult);
     if (pathsData.success && pathsData.paths && pathsData.paths.length > 0) {
       pathsObject = generatePathsForOpenAPI(pathsData.paths as PathInfo[]) as Record<string, unknown>;
+    } else if (pathsData.success) {
+      console.warn('[Paths Code] Paths loaded successfully but array is empty');
+      pathsObject['x-no-paths-found'] =
+        'No paths defined for this version. Navigate to the Paths tab to create paths with operations.';
+    } else {
+      console.error('[Paths Code] Failed to load paths:', pathsData.error);
     }
-  } catch {
-    /* keep empty paths */
+  } catch (pathsError) {
+    console.error('[Paths Code] Exception while loading paths:', pathsError);
+    if (pathsError instanceof Error) {
+      console.error('[Paths Code] Error stack:', pathsError.stack);
+    }
   }
 
   let securitySchemes: Record<string, unknown> = {};
@@ -45,8 +56,8 @@ export async function loadPathsCodeSpec(options: {
     if (schemes.length > 0) {
       securitySchemes = (await securitySchemesToOpenAPI(schemes)) as Record<string, unknown>;
     }
-  } catch {
-    /* omit */
+  } catch (schemesError) {
+    console.error('[Paths Code] Exception while loading security schemes:', schemesError);
   }
 
   let servers: Array<{ url: string; description?: string }> = [];
@@ -55,8 +66,8 @@ export async function loadPathsCodeSpec(options: {
     if (serverList.length > 0) {
       servers = await serversToOpenAPI(serverList);
     }
-  } catch {
-    /* omit */
+  } catch (serversError) {
+    console.error('[Paths Code] Exception while loading servers:', serversError);
   }
 
   const hasSecuritySchemes = Object.keys(securitySchemes).length > 0;

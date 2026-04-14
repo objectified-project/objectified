@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import YAML from 'yaml';
-import * as monaco from 'monaco-editor';
+import type { Monaco } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { useStudio } from '../../StudioContext';
 import { loadPathsCodeSpec } from '../lib/load-paths-code-spec';
@@ -51,6 +51,7 @@ export default function PathsCodeView({ refreshKey }: PathsCodeViewProps) {
 
   const pathsEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const mergedEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
   const pathsParseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mergedParseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -166,8 +167,8 @@ export default function PathsCodeView({ refreshKey }: PathsCodeViewProps) {
     pathsParseTimerRef.current = setTimeout(() => {
       const editorInst = pathsEditorRef.current;
       const model = editorInst?.getModel();
-      if (!model) return;
-      monaco.editor.setModelMarkers(model, 'paths-code-parse', markersForParsedText(pathsDisplay, codeFormat));
+      if (!model || !monacoRef.current) return;
+      monacoRef.current.editor.setModelMarkers(model, 'paths-code-parse', markersForParsedText(pathsDisplay, codeFormat));
     }, 320);
     return () => {
       if (pathsParseTimerRef.current) clearTimeout(pathsParseTimerRef.current);
@@ -179,8 +180,8 @@ export default function PathsCodeView({ refreshKey }: PathsCodeViewProps) {
     mergedParseTimerRef.current = setTimeout(() => {
       const editorInst = mergedEditorRef.current;
       const model = editorInst?.getModel();
-      if (!model) return;
-      monaco.editor.setModelMarkers(model, 'paths-code-parse', markersForParsedText(mergedDisplay, codeFormat));
+      if (!model || !monacoRef.current) return;
+      monacoRef.current.editor.setModelMarkers(model, 'paths-code-parse', markersForParsedText(mergedDisplay, codeFormat));
     }, 320);
     return () => {
       if (mergedParseTimerRef.current) clearTimeout(mergedParseTimerRef.current);
@@ -190,12 +191,14 @@ export default function PathsCodeView({ refreshKey }: PathsCodeViewProps) {
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
   const selectedVersion = versions.find((v) => v.id === selectedVersionId);
 
-  const onPathsMount = useCallback((ed: editor.IStandaloneCodeEditor) => {
+  const onPathsMount = useCallback((ed: editor.IStandaloneCodeEditor, monacoInstance: Monaco) => {
     pathsEditorRef.current = ed;
+    monacoRef.current = monacoInstance;
   }, []);
 
-  const onMergedMount = useCallback((ed: editor.IStandaloneCodeEditor) => {
+  const onMergedMount = useCallback((ed: editor.IStandaloneCodeEditor, monacoInstance: Monaco) => {
     mergedEditorRef.current = ed;
+    monacoRef.current = monacoInstance;
   }, []);
 
   return (

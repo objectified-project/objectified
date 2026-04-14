@@ -426,6 +426,7 @@ function PathsCanvasInner({
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuidesState>({ horizontal: [], vertical: [] });
   const [canvasPersistReady, setCanvasPersistReady] = useState(false);
   const canvasSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveInFlightRef = useRef<Promise<unknown> | null>(null);
   const viewportToApplyRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
   const shouldFitAfterLoadRef = useRef(false);
   const onPathnameUpdatedRef = useRef(onPathnameUpdated);
@@ -2978,7 +2979,11 @@ function PathsCanvasInner({
       canvasSaveTimerRef.current = null;
       const vp = getViewport();
       const payload = serializePathsCanvas(nodes, edges, vp);
-      void putPathCanvas(selectedVersionId, selectedPathId, payload);
+      const p = putPathCanvas(selectedVersionId, selectedPathId, payload);
+      saveInFlightRef.current = p;
+      p.finally(() => {
+        if (saveInFlightRef.current === p) saveInFlightRef.current = null;
+      });
     }, 650);
   }, [canvasPersistReady, selectedVersionId, selectedPathId, getViewport, nodes, edges]);
 
@@ -2987,6 +2992,11 @@ function PathsCanvasInner({
     if (canvasSaveTimerRef.current) {
       clearTimeout(canvasSaveTimerRef.current);
       canvasSaveTimerRef.current = null;
+    }
+    // Wait for any in-flight save to finish before sending the flush so an older
+    // request cannot overwrite the newer layout after us (last-write-wins API).
+    if (saveInFlightRef.current) {
+      await saveInFlightRef.current.catch(() => {/* ignore prior-save errors */});
     }
     const vp = getViewport();
     const payload = serializePathsCanvas(nodes, edges, vp);
