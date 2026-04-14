@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import DOMPurify from 'dompurify';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import Mustache from 'mustache';
 import { FileText, Loader2, RefreshCw, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -58,19 +59,16 @@ type TemplateSummary = {
   ownerTenantId?: string | null;
 };
 
-function SafeHtml({ html, className }: { html: string; className?: string }) {
-  const san = useMemo(
-    () => (html ? DOMPurify.sanitize(html, { USE_PROFILES: { html: true } }) : ''),
-    [html],
-  );
-  if (!html) {
+function SafeMarkdown({ content, className }: { content: string; className?: string }) {
+  if (!content) {
     return <p className="text-sm text-gray-500 dark:text-gray-400">—</p>;
   }
   return (
     <div
       className={`prose prose-sm dark:prose-invert max-w-none prose-headings:scroll-mt-4 ${className ?? ''}`}
-      dangerouslySetInnerHTML={{ __html: san }}
-    />
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    </div>
   );
 }
 
@@ -532,19 +530,19 @@ export function VersionChangeReportPanel({
                 <h3 id="cr-h" className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
                   Header
                 </h3>
-                <SafeHtml html={report.effectiveHeaderSnapshot ?? ''} />
+                <SafeMarkdown content={report.effectiveHeaderSnapshot ?? ''} />
               </section>
               <section aria-labelledby="cr-b">
                 <h3 id="cr-b" className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
                   Body
                 </h3>
-                <SafeHtml html={report.effectiveRenderedBody ?? ''} />
+                <SafeMarkdown content={report.effectiveRenderedBody ?? ''} />
               </section>
               <section aria-labelledby="cr-f">
                 <h3 id="cr-f" className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
                   Footnote
                 </h3>
-                <SafeHtml html={report.effectiveFootnoteSnapshot ?? ''} />
+                <SafeMarkdown content={report.effectiveFootnoteSnapshot ?? ''} />
               </section>
             </TabsContent>
             <TabsContent value="edit" className="pt-4 space-y-3" data-testid="change-report-edit">
@@ -689,15 +687,15 @@ export function VersionChangeReportPanel({
               {previewBlocks.err ? <Alert variant="error">{previewBlocks.err}</Alert> : null}
               <section>
                 <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">Header preview</h4>
-                <SafeHtml html={previewBlocks.h} />
+                <SafeMarkdown content={previewBlocks.h} />
               </section>
               <section>
                 <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">Body preview</h4>
-                <SafeHtml html={previewBlocks.b} />
+                <SafeMarkdown content={previewBlocks.b} />
               </section>
               <section>
                 <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">Footnote preview</h4>
-                <SafeHtml html={previewBlocks.f} />
+                <SafeMarkdown content={previewBlocks.f} />
               </section>
             </TabsContent>
           </Tabs>

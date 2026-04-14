@@ -2324,13 +2324,11 @@ const Versions = () => {
           <span className="text-xs font-medium text-gray-500 dark:text-gray-400 sr-only">Versions main view</span>
           <div
             className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 bg-gray-50 dark:bg-gray-900/50"
-            role="tablist"
             aria-label="Versions main view"
           >
             <button
               type="button"
-              role="tab"
-              aria-selected={versionsMainTab === 'timeline'}
+              aria-pressed={versionsMainTab === 'timeline'}
               data-testid="versions-tab-timeline"
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 versionsMainTab === 'timeline'
@@ -2346,8 +2344,7 @@ const Versions = () => {
             </button>
             <button
               type="button"
-              role="tab"
-              aria-selected={versionsMainTab === 'change-report'}
+              aria-pressed={versionsMainTab === 'change-report'}
               data-testid="versions-tab-change-report"
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 versionsMainTab === 'change-report'

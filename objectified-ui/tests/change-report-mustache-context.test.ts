@@ -1,5 +1,14 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { describe, it, expect } from '@jest/globals';
 import { buildMustacheContext } from '../lib/change-report-mustache-context';
-import sampleFixture from '../lib/change-report-sample-fixture.json';
+
+const sampleFixture = JSON.parse(
+  fs.readFileSync(
+    path.join(__dirname, '../lib/change-report-sample-fixture.json'),
+    'utf8',
+  ),
+) as Record<string, unknown>;
 
 describe('buildMustacheContext', () => {
   it('merges counts and schema buckets for preview', () => {
