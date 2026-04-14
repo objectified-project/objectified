@@ -4,8 +4,7 @@ import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import { toast } from 'sonner';
-import { Check, Gauge, Settings, X } from 'lucide-react';
-import * as Select from '@radix-ui/react-select';
+import { Gauge, Settings, X } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { useStudio } from '../StudioContext';
@@ -117,11 +116,15 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
 
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [versions, setVersions] = React.useState<Version[]>([]);
-  const [localProjectId, setLocalProjectId] = React.useState<string>(selectedProjectId || '');
-  const [localVersionId, setLocalVersionId] = React.useState<string>(selectedVersionId || '');
   const [isLoadingProjects, setIsLoadingProjects] = React.useState(false);
   const [isLoadingVersions, setIsLoadingVersions] = React.useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
+
+  /** Refs for Radix onValueChange guards (latest context ids without extra render loops). */
+  const selectedProjectIdRef = React.useRef(selectedProjectId);
+  selectedProjectIdRef.current = selectedProjectId;
+  const selectedVersionIdRef = React.useRef(selectedVersionId);
+  selectedVersionIdRef.current = selectedVersionId;
 
   // Determine current view mode from pathname
   const viewMode: ViewMode = pathname?.includes('/code')
@@ -133,7 +136,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   const isPathsRoute = viewMode === 'paths';
 
   React.useEffect(() => {
-    if (!isPathsRoute || !localProjectId || !localVersionId) {
+    if (!isPathsRoute || !selectedProjectId || !selectedVersionId) {
       setPathQualityDetail(null);
       setPathQualityHasOps(false);
       return;
@@ -145,10 +148,10 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
       void (async () => {
         setPathQualityLoading(true);
         try {
-          const project = projects.find((p) => p.id === localProjectId);
-          const version = versions.find((v) => v.id === localVersionId);
+          const project = projects.find((p) => p.id === selectedProjectId);
+          const version = versions.find((v) => v.id === selectedVersionId);
           const { pathsObject, mergedSpecJson } = await loadPathsCodeSpec({
-            versionId: localVersionId,
+            versionId: selectedVersionId,
             projectName: project?.name || 'API',
             versionLabel: version?.version_id || '1.0.0',
             versionDescription: version?.description || '',
@@ -172,8 +175,8 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     };
   }, [
     isPathsRoute,
-    localProjectId,
-    localVersionId,
+    selectedProjectId,
+    selectedVersionId,
     pathsQualityRevision,
     projects,
     versions,
@@ -205,15 +208,17 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     /* Persistence: namespaced studio.designer.* / studio.paths.* via StudioContext (#2641). */
   }, [setClickToFocusEnabled, setSnapToGrid, setSmartGuidesEnabled, setShowGrid, setGridSize, setGridStyle, setCanvasBackground, setEdgeStyling, setEdgeRouting, setEdgeAnimation]);
 
-  // Sync local state with context
-  React.useEffect(() => {
-    if (selectedProjectId !== localProjectId) {
-      setLocalProjectId(selectedProjectId || '');
-    }
-    if (selectedVersionId !== localVersionId) {
-      setLocalVersionId(selectedVersionId || '');
-    }
-  }, [selectedProjectId, selectedVersionId]);
+  const projectSelectValue = React.useMemo(() => {
+    if (!selectedProjectId) return undefined;
+    const match = projects.find((p) => String(p.id) === String(selectedProjectId));
+    return match !== undefined ? String(match.id) : undefined;
+  }, [selectedProjectId, projects]);
+
+  const versionSelectValue = React.useMemo(() => {
+    if (!selectedVersionId) return undefined;
+    const match = versions.find((v) => String(v.id) === String(selectedVersionId));
+    return match !== undefined ? String(match.id) : undefined;
+  }, [selectedVersionId, versions]);
 
   // Load projects on mount
   React.useEffect(() => {
@@ -244,42 +249,50 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     loadProjects();
   }, [currentTenantId]);
 
-  // Load versions when project changes and auto-select most recent
+  // Load versions when context project changes; prefer context version id when it exists in the list
   React.useEffect(() => {
+    let cancelled = false;
     const loadVersions = async () => {
-      if (!localProjectId) {
+      if (!selectedProjectId) {
         setVersions([]);
         return;
       }
       setIsLoadingVersions(true);
       try {
-        const response = await fetch(`/api/versions?projectId=${localProjectId}`);
+        const response = await fetch(`/api/versions?projectId=${selectedProjectId}`);
         if (!response.ok) {
           throw new Error(`Failed to fetch versions: ${response.statusText}`);
         }
         const result = await response.json();
+        if (cancelled) return;
         if (result.success && result.versions) {
-          setVersions(result.versions);
+          const list = result.versions as Version[];
+          setVersions(list);
 
-          // Auto-select the most recent version (first in the list)
-          if (result.versions.length > 0) {
-            const mostRecentVersion = result.versions[0];
-            setLocalVersionId(mostRecentVersion.id);
-            setContextVersionId(mostRecentVersion.id);
-            setIsReadOnly(mostRecentVersion.published ?? false);
+          if (list.length > 0) {
+            const ids = new Set(list.map((v) => String(v.id)));
+            const fromContext = selectedVersionIdRef.current;
+            const preferred =
+              fromContext && ids.has(String(fromContext)) ? fromContext : list[0].id;
+            const chosen = list.find((v) => String(v.id) === String(preferred))!;
+            setContextVersionId(chosen.id);
+            setIsReadOnly(chosen.published ?? false);
           }
         } else {
           throw new Error(result.error || 'Failed to load versions');
         }
       } catch (error) {
         console.error('Failed to load versions:', error);
-        setVersions([]);
+        if (!cancelled) setVersions([]);
       } finally {
-        setIsLoadingVersions(false);
+        if (!cancelled) setIsLoadingVersions(false);
       }
     };
-    loadVersions();
-  }, [localProjectId, setContextVersionId, setIsReadOnly]);
+    void loadVersions();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProjectId, setContextVersionId, setIsReadOnly]);
 
   // Load project tags when project changes
   const loadProjectTags = React.useCallback(async (projectId: string) => {
@@ -293,28 +306,34 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     }
   }, [onProjectTagsLoaded]);
 
-  // Handle project selection
-  const handleProjectChange = (value: string) => {
-    setLocalProjectId(value);
-    setContextProjectId(value);
-    setLocalVersionId('');
-    setContextVersionId('');
-    setIsReadOnly(false);
-    if (value) {
-      loadProjectTags(value);
-    }
-  };
+  const versionsRef = React.useRef(versions);
+  versionsRef.current = versions;
 
-  // Handle version selection
-  const handleVersionChange = (value: string) => {
-    setLocalVersionId(value);
-    setContextVersionId(value);
-    const version = versions.find(v => v.id === value);
-    setIsReadOnly(version?.published ?? false);
-  };
+  const handleProjectChange = React.useCallback(
+    (value: string) => {
+      if (String(value) === String(selectedProjectIdRef.current ?? '')) return;
+      setContextProjectId(value);
+      setContextVersionId('');
+      setIsReadOnly(false);
+      if (value) {
+        loadProjectTags(value);
+      }
+    },
+    [setContextProjectId, setContextVersionId, setIsReadOnly, loadProjectTags]
+  );
+
+  const handleVersionChange = React.useCallback(
+    (value: string) => {
+      if (String(value) === String(selectedVersionIdRef.current ?? '')) return;
+      setContextVersionId(value);
+      const version = versionsRef.current.find((v) => String(v.id) === String(value));
+      setIsReadOnly(version?.published ?? false);
+    },
+    [setContextVersionId, setIsReadOnly]
+  );
 
   const serverAheadForProject =
-    conflict && localProjectId && conflict.projectId === localProjectId ? conflict : null;
+    conflict && selectedProjectId && conflict.projectId === selectedProjectId ? conflict : null;
 
   const sessionUserId = (session?.user as { user_id?: string } | undefined)?.user_id;
 
@@ -329,22 +348,23 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   );
 
   const authoredRevisionCount = React.useMemo(
-    () => countAuthoredRevisionsTowardHead(syncVersionsForMetrics, localVersionId, sessionUserId),
-    [syncVersionsForMetrics, localVersionId, sessionUserId]
+    () =>
+      countAuthoredRevisionsTowardHead(syncVersionsForMetrics, selectedVersionId ?? '', sessionUserId),
+    [syncVersionsForMetrics, selectedVersionId, sessionUserId]
   );
 
   const serverHeadAheadOfSelection = React.useMemo(
-    () => isRemoteHeadAheadOfSelection(syncVersionsForMetrics, localVersionId),
-    [syncVersionsForMetrics, localVersionId]
+    () => isRemoteHeadAheadOfSelection(syncVersionsForMetrics, selectedVersionId ?? ''),
+    [syncVersionsForMetrics, selectedVersionId]
   );
 
   const showSyncServerAheadChip = Boolean(serverAheadForProject) || serverHeadAheadOfSelection;
 
   const handlePullReconcile = React.useCallback(async () => {
-    if (!localProjectId || !serverAheadForProject) return;
+    if (!selectedProjectId || !serverAheadForProject) return;
     setPullReconcileLoading(true);
     try {
-      const response = await fetch(`/api/versions?projectId=${encodeURIComponent(localProjectId)}`);
+      const response = await fetch(`/api/versions?projectId=${encodeURIComponent(selectedProjectId)}`);
       const result = await response.json();
       if (!response.ok || !result.success || !Array.isArray(result.versions)) {
         toast.error(typeof result.error === 'string' ? result.error : 'Could not refresh versions.');
@@ -359,7 +379,6 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
         toast.error('No versions available after pull. Please check your project.');
         return;
       }
-      setLocalVersionId(next.id);
       setContextVersionId(next.id);
       setIsReadOnly(next.published ?? false);
       clearPushConflict();
@@ -372,7 +391,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
       setPullReconcileLoading(false);
     }
   }, [
-    localProjectId,
+    selectedProjectId,
     serverAheadForProject,
     setContextVersionId,
     setIsReadOnly,
@@ -382,10 +401,10 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   ]);
 
   const handleOpenMergeFromBanner = React.useCallback(() => {
-    const pid = serverAheadForProject?.projectId ?? localProjectId;
+    const pid = serverAheadForProject?.projectId ?? selectedProjectId;
     if (!pid) return;
     router.push(`/ade/dashboard/versions?merge=1&projectId=${encodeURIComponent(pid)}`);
-  }, [serverAheadForProject?.projectId, localProjectId, router]);
+  }, [serverAheadForProject?.projectId, selectedProjectId, router]);
 
   // Handle view mode change
   const handleViewModeChange = (value: string) => {
@@ -407,109 +426,88 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   return (
     <div className="bg-gradient-to-r from-white via-slate-50 to-white dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 border-b border-gray-200/80 dark:border-gray-700/80 px-2 py-1.5 shadow-sm" style={{ position: 'fixed', top: 48, left: 0, right: 0, zIndex: 1000 }}>
       <div className="flex flex-wrap items-center gap-4 w-full">
+        {/* Project / version: native <select> — Radix controlled Select was causing maximum update depth in this header. */}
         {/* Project Selector */}
         <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
-          <Select.Root
-            value={localProjectId}
-            onValueChange={handleProjectChange}
-            disabled={isLoadingProjects || !currentTenantId}
-          >
-            <Select.Trigger
+          <div className="relative min-w-[220px]">
+            <select
               aria-busy={isLoadingProjects}
-              className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full appearance-none bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm pl-9 pr-8 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              value={projectSelectValue ?? ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                handleProjectChange(v);
+              }}
+              disabled={isLoadingProjects || !currentTenantId || projects.length === 0}
             >
+              <option value="">
+                {isLoadingProjects ? 'Loading projects…' : projects.length === 0 ? 'No projects available' : 'Select project...'}
+              </option>
+              {projects.map((project) => (
+                <option key={project.id} value={String(project.id)}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
               {isLoadingProjects ? (
                 <Spinner size="sm" className="shrink-0" aria-hidden />
               ) : (
-                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
               )}
-              <Select.Value placeholder={isLoadingProjects ? 'Loading projects…' : 'Select project...'} />
-              <Select.Icon className="ml-auto">
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </Select.Icon>
-            </Select.Trigger>
-            <Select.Portal>
-              <Select.Content className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]" position="popper" sideOffset={5}>
-                <Select.Viewport className="p-1">
-                  {projects.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No projects available</div>
-                  ) : (
-                    projects.map((project) => (
-                      <Select.Item
-                        key={project.id}
-                        value={project.id}
-                        className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30"
-                      >
-                        <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                          <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                        </Select.ItemIndicator>
-                        <Select.ItemText>{project.name}</Select.ItemText>
-                      </Select.Item>
-                    ))
-                  )}
-                </Select.Viewport>
-              </Select.Content>
-            </Select.Portal>
-          </Select.Root>
+            </span>
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </div>
         </div>
 
         {/* Version Selector */}
         <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
-          <Select.Root
-            value={localVersionId}
-            onValueChange={handleVersionChange}
-            disabled={isLoadingVersions || !localProjectId || versions.length === 0}
-          >
-            <Select.Trigger
+          <div className="relative min-w-[220px]" key={selectedProjectId || 'no-project'}>
+            <select
               aria-busy={isLoadingVersions}
-              className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full appearance-none bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm pl-9 pr-8 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              value={versionSelectValue ?? ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                handleVersionChange(v);
+              }}
+              disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
             >
+              <option value="">
+                {isLoadingVersions ? 'Loading versions…' : versions.length === 0 ? 'No versions available' : 'Select version...'}
+              </option>
+              {versions.map((version) => (
+                <option key={version.id} value={String(version.id)}>
+                  {`${version.published ? '🔒 ' : ''}${version.version_id} - ${version.description}`}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
               {isLoadingVersions ? (
                 <Spinner size="sm" className="shrink-0" aria-hidden />
               ) : (
-                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
               )}
-              <Select.Value placeholder={isLoadingVersions ? 'Loading versions…' : 'Select version...'} />
-              <Select.Icon className="ml-auto">
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </Select.Icon>
-            </Select.Trigger>
-            <Select.Portal>
-              <Select.Content className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]" position="popper" sideOffset={5}>
-                <Select.Viewport className="p-1">
-                  {versions.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No versions available</div>
-                  ) : (
-                    versions.map((version) => (
-                      <Select.Item
-                        key={version.id}
-                        value={version.id}
-                        className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30"
-                      >
-                        <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                          <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                        </Select.ItemIndicator>
-                        <Select.ItemText>
-                          {version.published ? '🔒 ' : ''}{version.version_id} - {version.description}
-                        </Select.ItemText>
-                      </Select.Item>
-                    ))
-                  )}
-                </Select.Viewport>
-              </Select.Content>
-            </Select.Portal>
-          </Select.Root>
+            </span>
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </div>
         </div>
 
-        {localProjectId && localVersionId ? (
+        {selectedProjectId && selectedVersionId ? (
           <StudioSyncStatusChips
             localDirty={syncLocalDirty}
             authoredRevisionCount={authoredRevisionCount}
@@ -517,17 +515,17 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           />
         ) : null}
 
-        {localProjectId && localVersionId ? (
+        {selectedProjectId && selectedVersionId ? (
           <DraftLockHeaderChip
-            projectId={localProjectId}
-            versionId={localVersionId}
-            published={versions.find((v) => v.id === localVersionId)?.published ?? true}
+            projectId={selectedProjectId}
+            versionId={selectedVersionId}
+            published={versions.find((v) => v.id === selectedVersionId)?.published ?? true}
             sessionUserId={sessionUserId}
           />
         ) : null}
 
         {/* PATH QUALITY on Paths (#2656); schema quality on Designer/Code (#245, #2548) */}
-        {localProjectId && localVersionId && isPathsRoute && (
+        {selectedProjectId && selectedVersionId && isPathsRoute && (
           <>
             {pathQualityHasOps && pathQualityDetail ? (
               <button
@@ -740,7 +738,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           </>
         )}
 
-        {localProjectId && localVersionId && !isPathsRoute && (
+        {selectedProjectId && selectedVersionId && !isPathsRoute && (
           <>
             {schemaQualityScore != null ? (
               <button
@@ -912,7 +910,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
         )}
 
         {/* View Switcher and Settings - only show when project and version selected */}
-        {localProjectId && localVersionId && (
+        {selectedProjectId && selectedVersionId && (
           <>
             {/* Separator */}
             <div className="h-6 w-px bg-gray-200 dark:bg-gray-600" />
@@ -1036,7 +1034,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
         </div>
       )}
       {(() => {
-        const v = versions.find((x) => x.id === localVersionId);
+        const v = versions.find((x) => x.id === selectedVersionId);
         if (!v || !isRevisionDeprecated(v.metadata)) return null;
         return (
           <RevisionDeprecationBanner

@@ -361,12 +361,14 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       if (isReadOnly) return;
       const group = groups.find(g => g.id === groupId);
       const classIds = group?.nodeIds ?? [];
-      const groupName = group?.name ?? 'this group';
       if (classIds.length === 0) return;
+
+      const resolvedName = group?.name?.trim();
+      if (!resolvedName) return;
 
       const confirmed = await confirmDialog({
         title: 'Delete All Classes in Group',
-        message: `Are you sure you want to delete all ${classIds.length} class${classIds.length === 1 ? '' : 'es'} in "${groupName}"? This action cannot be undone.`,
+        message: `Are you sure you want to delete all ${classIds.length} class${classIds.length === 1 ? '' : 'es'} in "${resolvedName}"? This action cannot be undone.`,
         variant: 'danger',
         confirmLabel: 'Delete All',
         cancelLabel: 'Cancel',
