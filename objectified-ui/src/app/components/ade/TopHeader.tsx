@@ -5,11 +5,12 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { usePathname } from 'next/navigation';
+import { ChevronDown, Check, Shield } from 'lucide-react';
 import WhatsNewDialog from './WhatsNewDialog';
 import ThemeSelector from './ThemeSelector';
 import { useTheme } from '../../providers/ThemeProvider';
 import { useDarkMode } from '../../hooks/useDarkMode';
-import { getTenantsForUser } from '../../../../lib/db/helper';
+import { getTenantsForUser, getTenantsAdministratedByUser } from '../../../../lib/db/helper';
 import packageJson from '../../../../package.json';
 import { isDesignerStudioNavActive, isPathsStudioNavActive } from '../../../../lib/ade-studio-nav';
 
@@ -34,6 +35,10 @@ function navItemIsActive(item: NavItem, pathname: string | null): boolean {
   );
 }
 
+type TenantRow = { id: string; name: string };
+
+type TenantAdminRow = { tenant_id: string; user_id: string };
+
 const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/ade" },
   { label: "Control Panel", href: "/ade/dashboard" },
@@ -55,13 +60,19 @@ const NAV_ITEMS: NavItem[] = [
 
 const TopHeader = () => {
   const [open, setOpen] = useState(false);
+  const [tenantMenuOpen, setTenantMenuOpen] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [currentTenantName, setCurrentTenantName] = useState<string>('');
+  const [userTenants, setUserTenants] = useState<TenantRow[]>([]);
+  const [adminTenantIds, setAdminTenantIds] = useState<Set<string>>(new Set());
+  const [isSwitchingTenant, setIsSwitchingTenant] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const { data: session } = useSession();
+  const tenantMenuRef = useRef<HTMLDivElement | null>(null);
+  const { data: session, update } = useSession();
   const pathname = usePathname();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
+  const currentUserId = (session?.user as { user_id?: string })?.user_id;
   const { currentTheme, isSystemTheme } = useTheme();
   const isDark = useDarkMode();
 
@@ -76,33 +87,62 @@ const TopHeader = () => {
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t)) return;
+      if (tenantMenuRef.current?.contains(t)) return;
+      setOpen(false);
+      setTenantMenuOpen(false);
     }
     document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
 
-  // Load current tenant name
   useEffect(() => {
-    const loadTenantName = async () => {
-      if (session && currentTenantId) {
-        try {
-          const userId = (session.user as any)?.user_id;
-          const result = await getTenantsForUser(userId);
-          const tenants = JSON.parse(result);
-          const currentTenant = tenants.find((t: any) => t.id === currentTenantId);
-          if (currentTenant) {
-            setCurrentTenantName(currentTenant.name);
-          }
-        } catch (error) {
-          console.error('Failed to load tenant name:', error);
+    const loadTenants = async () => {
+      if (!session?.user || !currentUserId) {
+        setUserTenants([]);
+        setAdminTenantIds(new Set());
+        setCurrentTenantName('');
+        return;
+      }
+      try {
+        const [tenantsJson, adminsJson] = await Promise.all([
+          getTenantsForUser(currentUserId),
+          getTenantsAdministratedByUser(currentUserId),
+        ]);
+        const tenants: TenantRow[] = JSON.parse(tenantsJson);
+        const adminRows: TenantAdminRow[] = JSON.parse(adminsJson);
+        const admins = new Set(
+          adminRows.filter((r) => r.user_id === currentUserId).map((r) => r.tenant_id)
+        );
+        tenants.sort((a, b) => a.name.localeCompare(b.name));
+        setUserTenants(tenants);
+        setAdminTenantIds(admins);
+        if (currentTenantId) {
+          const current = tenants.find((t) => t.id === currentTenantId);
+          setCurrentTenantName(current?.name ?? '');
+        } else {
+          setCurrentTenantName('');
         }
+      } catch (error) {
+        console.error('Failed to load tenants:', error);
       }
     };
-    loadTenantName();
-  }, [session, currentTenantId]);
+    loadTenants();
+  }, [session, currentUserId, currentTenantId]);
+
+  const handleSelectTenant = async (tenantId: string) => {
+    if (tenantId === currentTenantId || isSwitchingTenant) return;
+    setIsSwitchingTenant(true);
+    try {
+      await update({ current_tenant_id: tenantId });
+      setTenantMenuOpen(false);
+    } catch (error) {
+      console.error('Failed to switch tenant:', error);
+    } finally {
+      setIsSwitchingTenant(false);
+    }
+  };
 
 
   return (
@@ -161,11 +201,70 @@ const TopHeader = () => {
         </ul>
       </nav>
 
-      {/* Tenant Name Display */}
-      {currentTenantName && (
-        <div className="hidden items-center gap-2 rounded-lg border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50 px-3 py-1.5 dark:border-indigo-800/50 dark:from-indigo-900/20 dark:to-purple-900/20 md:flex">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-gradient-to-r from-indigo-500 to-purple-500" />
-          <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">{currentTenantName}</span>
+      {/* Tenant switcher */}
+      {userTenants.length > 0 && (
+        <div ref={tenantMenuRef} className="relative hidden md:block">
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={tenantMenuOpen}
+            aria-label="Switch tenant"
+            disabled={isSwitchingTenant}
+            onClick={() => {
+              setOpen(false);
+              setTenantMenuOpen((s) => !s);
+            }}
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50 px-3 py-1.5 transition-colors hover:from-indigo-100 hover:to-purple-100 disabled:cursor-wait disabled:opacity-70 dark:border-indigo-800/50 dark:from-indigo-900/20 dark:to-purple-900/20 dark:hover:from-indigo-900/35 dark:hover:to-purple-900/35"
+          >
+            <div className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-gradient-to-r from-indigo-500 to-purple-500" />
+            <span className="max-w-[200px] truncate text-sm font-medium text-indigo-700 dark:text-indigo-300">
+              {currentTenantName || 'Select tenant'}
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-indigo-600 transition-transform dark:text-indigo-400 ${tenantMenuOpen ? 'rotate-180' : ''}`}
+              aria-hidden
+            />
+          </button>
+          {tenantMenuOpen && (
+            <div
+              role="menu"
+              aria-label="Your tenants"
+              className="absolute right-0 z-[2001] mt-2 max-h-[min(70vh,24rem)] min-w-[260px] overflow-y-auto rounded-lg bg-white p-1 shadow-lg shadow-slate-900/15 dark:bg-slate-800 dark:shadow-gray-900/50"
+            >
+              {userTenants.map((t) => {
+                const isCurrent = t.id === currentTenantId;
+                const isAdmin = adminTenantIds.has(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="menuitem"
+                    disabled={isSwitchingTenant || isCurrent}
+                    onClick={() => handleSelectTenant(t.id)}
+                    className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm transition-colors ${
+                      isCurrent
+                        ? 'cursor-default bg-indigo-50 font-medium text-indigo-900 dark:bg-indigo-950/50 dark:text-indigo-100'
+                        : 'cursor-pointer text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                    } ${isSwitchingTenant && !isCurrent ? 'opacity-50' : ''}`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                    {isAdmin && (
+                      <span
+                        className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+                        title="You are an administrator of this tenant"
+                      >
+                        <Shield className="h-3.5 w-3.5" aria-hidden />
+                        Admin
+                      </span>
+                    )}
+                    {isCurrent && (
+                      <Check className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -174,7 +273,10 @@ const TopHeader = () => {
         <button
           aria-haspopup="menu"
           aria-expanded={open}
-          onClick={() => setOpen((s) => !s)}
+          onClick={() => {
+            setTenantMenuOpen(false);
+            setOpen((s) => !s);
+          }}
           className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-transparent px-2 py-1 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
         >
           <div
