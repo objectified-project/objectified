@@ -49,7 +49,7 @@ This document lists **epics**, **implementation tickets** (in **GitHub creation 
 | Order | Roadmap ID | Issue | MVP / V2 |
 |------:|------------|-------|----------|
 | 1 | CR-01 | [#2699](https://github.com/KenSuenobu/objectified-commercial/issues/2699) Semantic OpenAPI diff engine produces ChangeReportModel for publication change reports | **MVP** |
-| 2 | CR-02 | [#2700](https://github.com/KenSuenobu/objectified-commercial/issues/2700) Persist change report artifacts, edits, and template links per published revision | **MVP** |
+| 2 | CR-02 | ~~[#2700](https://github.com/KenSuenobu/objectified-commercial/issues/2700)~~ **Done** — `odb.change_reports`, `GET`/`PATCH`/`POST …/change-report/regenerate`, `objectified-rest/docs/CHANGE_REPORT_PERSISTENCE_API.md` | **MVP** |
 | 3 | CR-03 | [#2701](https://github.com/KenSuenobu/objectified-commercial/issues/2701) Change report template system with header, body, and footnote rendering | **MVP** |
 | 4 | CR-04 | [#2702](https://github.com/KenSuenobu/objectified-commercial/issues/2702) Invoke change report generation from the publication workflow with baseline selection | **MVP** |
 | 5 | CR-05 | [#2703](https://github.com/KenSuenobu/objectified-commercial/issues/2703) Version page UI to view, edit, and regenerate publication change reports | **MVP** |

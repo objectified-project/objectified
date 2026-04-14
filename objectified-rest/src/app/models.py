@@ -1513,3 +1513,74 @@ class ChangeReportModel(BaseModel):
     warnings: List[Dict[str, Any]]
     skipped: List[Dict[str, Any]]
 
+
+# ==================== Persisted change report per revision (CR-02, #2700) ====================
+
+
+class VersionChangeReportOut(BaseModel):
+    """Stored change report row plus effective (edited-over-rendered) snapshots."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    tenant_id: str = Field(serialization_alias="tenantId")
+    project_id: str = Field(serialization_alias="projectId")
+    published_revision_id: str = Field(serialization_alias="publishedRevisionId")
+    baseline_revision_id: Optional[str] = Field(None, serialization_alias="baselineRevisionId")
+    change_model_json: Dict[str, Any] = Field(serialization_alias="changeModelJson")
+    rendered_body: Optional[str] = Field(None, serialization_alias="renderedBody")
+    header_snapshot: Optional[str] = Field(None, serialization_alias="headerSnapshot")
+    footnote_snapshot: Optional[str] = Field(None, serialization_alias="footnoteSnapshot")
+    edited_rendered_body: Optional[str] = Field(None, serialization_alias="editedRenderedBody")
+    edited_header_snapshot: Optional[str] = Field(None, serialization_alias="editedHeaderSnapshot")
+    edited_footnote_snapshot: Optional[str] = Field(None, serialization_alias="editedFootnoteSnapshot")
+    effective_rendered_body: Optional[str] = Field(None, serialization_alias="effectiveRenderedBody")
+    effective_header_snapshot: Optional[str] = Field(None, serialization_alias="effectiveHeaderSnapshot")
+    effective_footnote_snapshot: Optional[str] = Field(None, serialization_alias="effectiveFootnoteSnapshot")
+    edited_at: Optional[str] = Field(None, serialization_alias="editedAt")
+    edited_by: Optional[str] = Field(None, serialization_alias="editedBy")
+    template_version_id: Optional[str] = Field(None, serialization_alias="templateVersionId")
+    rendered_at: Optional[str] = Field(None, serialization_alias="renderedAt")
+    regenerated_at: Optional[str] = Field(None, serialization_alias="regeneratedAt")
+    created_at: Optional[str] = Field(None, serialization_alias="createdAt")
+    updated_at: Optional[str] = Field(None, serialization_alias="updatedAt")
+
+
+class VersionChangeReportPatch(BaseModel):
+    """PATCH user edits as full snapshots per field (null in JSON clears that override)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    edited_rendered_body: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("editedRenderedBody", "edited_rendered_body"),
+    )
+    edited_header_snapshot: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("editedHeaderSnapshot", "edited_header_snapshot"),
+    )
+    edited_footnote_snapshot: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("editedFootnoteSnapshot", "edited_footnote_snapshot"),
+    )
+    clear_edits: Optional[bool] = Field(
+        None,
+        validation_alias=AliasChoices("clearEdits", "clear_edits"),
+        description="When true, remove all user edit snapshots and clear editedAt/editedBy.",
+    )
+
+
+class VersionChangeReportRegenerateRequest(BaseModel):
+    """Optional template selection; placeholder renderer used until CR-03."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    template_version_id: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("templateVersionId", "template_version_id"),
+    )
+    discard_user_edits: bool = Field(
+        True,
+        validation_alias=AliasChoices("discardUserEdits", "discard_user_edits"),
+    )
+

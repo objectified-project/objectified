@@ -217,7 +217,7 @@ Implement in this order so each step stays testable. **Issue → roadmap ID** fo
 | Order | Issue | ID | Notes |
 |------:|------|-----|--------|
 | 1 | [#2699](https://github.com/KenSuenobu/objectified-commercial/issues/2699) | CR-01 | Semantic OpenAPI diff → `ChangeReportModel` (schemas, properties, refs, relationships, docs) — **REST:** `POST /v1/openapi/change-report` in **objectified-rest** |
-| 2 | [#2700](https://github.com/KenSuenobu/objectified-commercial/issues/2700) | CR-02 | DB + REST: persist report, edits, template linkage per published revision |
+| 2 | ~~[#2700](https://github.com/KenSuenobu/objectified-commercial/issues/2700)~~ | ~~CR-02~~ **shipped** | DB + REST: `change_reports` table, version-scoped persistence API (see `objectified-rest/docs/CHANGE_REPORT_PERSISTENCE_API.md`) |
 | 3 | [#2701](https://github.com/KenSuenobu/objectified-commercial/issues/2701) | CR-03 | Template system (header / body / footnote) + safe rendering |
 | 4 | [#2702](https://github.com/KenSuenobu/objectified-commercial/issues/2702) | CR-04 | Publication workflow hook: baseline selection, generate on publish |
 | 5 | [#2703](https://github.com/KenSuenobu/objectified-commercial/issues/2703) | CR-05 | **Version** page: view / edit report + template + regenerate |

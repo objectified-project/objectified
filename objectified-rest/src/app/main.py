@@ -30,12 +30,13 @@ from .push_webhook_delivery import process_due_push_webhook_deliveries
 from .push_webhook_subscriptions_routes import router as push_webhook_subscriptions_router
 from .push_webhook_crypto import validate_webhook_signing_key
 from .change_report_routes import router as change_report_router
+from .version_change_report_routes import router as version_change_report_router
 
 # Create FastAPI app
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.24"
+    version="1.0.43"
 )
 
 
@@ -100,6 +101,7 @@ app.include_router(version_tags_router)
 app.include_router(draft_lock_router)
 app.include_router(push_webhook_subscriptions_router)
 app.include_router(change_report_router)
+app.include_router(version_change_report_router)
 
 
 _webhook_delivery_task: asyncio.Task | None = None
