@@ -4038,6 +4038,41 @@ class Database:
 
         return max(bases, key=created_at_key)
 
+    def get_prior_published_baseline_revision_id(
+        self, project_id: str, tenant_id: str, published_revision_id: str
+    ) -> Optional[str]:
+        """
+        Latest **published** ancestor of ``published_revision_id`` (excluding the revision itself),
+        ordered by ``published_at`` then ``created_at``.
+
+        Used as the default baseline for publication change reports (#2702). Revisions outside the
+        ancestor closure of ``parent_version_id`` / ``merge_parent_version_id`` are not considered
+        (named-branch isolation is a possible follow-up).
+        """
+        ancestors = self.collect_revision_ancestors(published_revision_id, tenant_id)
+        cand_ids = [str(a) for a in ancestors if str(a) != str(published_revision_id)]
+        if not cand_ids:
+            return None
+        placeholders = ",".join(["%s"] * len(cand_ids))
+        query = f"""
+            SELECT v.id
+            FROM odb.versions v
+            INNER JOIN odb.projects p ON v.project_id = p.id AND p.deleted_at IS NULL
+            WHERE v.project_id = %s
+              AND p.tenant_id = %s
+              AND v.deleted_at IS NULL
+              AND v.published = true
+              AND v.id IN ({placeholders})
+            ORDER BY v.published_at DESC NULLS LAST, v.created_at DESC
+            LIMIT 1
+        """
+        params = tuple([project_id, tenant_id, *cand_ids])
+        rows = self.execute_query(query, params)
+        if not rows:
+            return None
+        rid = rows[0].get("id")
+        return str(rid) if rid is not None else None
+
     def get_version_branch_by_name(
         self, project_id: str, tenant_id: str, name: str
     ) -> Optional[Dict[str, Any]]:

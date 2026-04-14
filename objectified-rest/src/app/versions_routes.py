@@ -28,6 +28,7 @@ from .models import (
     VersionSchema,
     VersionUpdateRequest,
 )
+from .publication_change_report import generate_change_report_on_publish
 from .published_immutability import IMMUTABLE_DETAIL, revision_is_published_immutable
 from .revision_deprecation import (
     coerce_metadata,
@@ -1918,6 +1919,14 @@ async def publish_version(
             status_code=403,
             detail="Only the version creator or a tenant administrator can publish this version"
         )
+
+    generate_change_report_on_publish(
+        tenant_slug=tenant_slug,
+        tenant_id=auth_data["tenant_id"],
+        project_id=project_id,
+        published_revision_id=version_record_id,
+        actor_id=user_id,
+    )
 
     return VersionSchema(**version)
 
