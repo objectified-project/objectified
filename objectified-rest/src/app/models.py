@@ -1462,3 +1462,54 @@ class WorkflowAuditPageResponse(BaseModel):
     items: List[WorkflowAuditEntryOut]
     pagination: WorkflowAuditPaginationOut
 
+
+# ==================== OpenAPI semantic change report (CR-01, #2699) ====================
+
+
+class OpenApiChangeReportRequest(BaseModel):
+    """Two resolved OpenAPI 3.x JSON documents for semantic comparison."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    baseline_open_api: Dict[str, Any] = Field(
+        ...,
+        validation_alias=AliasChoices("baselineOpenApi", "baseline_open_api"),
+        description="Older / baseline resolved OpenAPI JSON.",
+    )
+    candidate_open_api: Dict[str, Any] = Field(
+        ...,
+        validation_alias=AliasChoices("candidateOpenApi", "candidate_open_api"),
+        description="Newer / candidate resolved OpenAPI JSON.",
+    )
+
+
+class SchemasChangeSection(BaseModel):
+    """Component schema name changes (``components.schemas``)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    added: List[Dict[str, str]]
+    removed: List[Dict[str, str]]
+    modified: List[Dict[str, str]]
+
+
+class ChangeReportModel(BaseModel):
+    """
+    Versioned semantic diff between two resolved OpenAPI documents.
+    ``schemaVersion`` bumps when this JSON shape changes incompatibly.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    schema_version: str = Field(
+        serialization_alias="schemaVersion",
+        validation_alias=AliasChoices("schemaVersion", "schema_version"),
+    )
+    schemas: SchemasChangeSection
+    properties: List[Dict[str, Any]]
+    references: List[Dict[str, Any]]
+    relationships: List[Dict[str, Any]]
+    documentation: List[Dict[str, Any]]
+    warnings: List[Dict[str, Any]]
+    skipped: List[Dict[str, Any]]
+
