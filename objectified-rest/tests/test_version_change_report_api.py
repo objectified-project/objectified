@@ -184,7 +184,12 @@ def test_regenerate_ok():
         "header_snapshot": "Publication change report",
         "regenerated_at": datetime(2026, 4, 14, 13, 0, 0, tzinfo=timezone.utc),
     }
-    with patch("app.version_change_report_routes.db") as mdb:
+    with patch("app.version_change_report_routes.db") as mdb, patch(
+        "app.version_change_report_routes.resolve_effective_change_report_template",
+    ) as mres:
+        from app.change_report_render import bundled_system_template_row
+
+        mres.return_value = bundled_system_template_row()
         mdb.get_version_by_id.return_value = _MOCK_VERSION_PUBLISHED
         mdb.get_change_report_by_published_revision.return_value = _MOCK_ROW
         mdb.apply_change_report_regeneration.return_value = regen_row
@@ -209,7 +214,12 @@ def test_regenerate_keep_user_edits():
         "edited_rendered_body": "user override",
         "edited_header_snapshot": "user hdr",
     }
-    with patch("app.version_change_report_routes.db") as mdb:
+    with patch("app.version_change_report_routes.db") as mdb, patch(
+        "app.version_change_report_routes.resolve_effective_change_report_template",
+    ) as mres:
+        from app.change_report_render import bundled_system_template_row
+
+        mres.return_value = bundled_system_template_row()
         mdb.get_version_by_id.return_value = _MOCK_VERSION_PUBLISHED
         mdb.get_change_report_by_published_revision.return_value = existing
         mdb.apply_change_report_regeneration.return_value = regen_row
@@ -233,8 +243,18 @@ def test_placeholder_render_module():
     from app.change_report_render import placeholder_render_from_change_model
 
     h, b, f = placeholder_render_from_change_model(
-        {"schemaVersion": "1.0", "schemas": {"added": [{"name": "A"}], "removed": [], "modified": []}}
+        {
+            "schemaVersion": "1.0",
+            "schemas": {"added": [{"name": "A"}], "removed": [], "modified": []},
+            "properties": [],
+            "references": [],
+            "relationships": [],
+            "documentation": [],
+            "warnings": [],
+            "skipped": [],
+        }
     )
-    assert "Schema change summary" in b
-    assert h == "Publication change report"
-    assert "CR-03" in f
+    assert "`A`" in b or "A" in b
+    assert "Summary" in b
+    assert "Generator" in f
+    assert "#" in h

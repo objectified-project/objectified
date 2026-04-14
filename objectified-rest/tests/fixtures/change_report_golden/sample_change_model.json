@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0",
+  "schemas": {
+    "added": [{ "name": "Pet" }],
+    "removed": [{ "name": "OldThing" }],
+    "modified": [{ "name": "Box" }]
+  },
+  "properties": [
+    {
+      "schemaName": "Box",
+      "path": "/properties/x",
+      "changeKind": "removed"
+    }
+  ],
+  "references": [
+    {
+      "schemaName": "R",
+      "changeKind": "retargeted",
+      "baselineRef": "#/components/schemas/A",
+      "candidateRef": "#/components/schemas/B"
+    }
+  ],
+  "relationships": [
+    {
+      "schemaName": "X",
+      "path": "/allOf",
+      "kind": "composition",
+      "changeKind": "modified",
+      "detail": "detail"
+    }
+  ],
+  "documentation": [
+    {
+      "scope": "info",
+      "field": "description",
+      "changeKind": "modified",
+      "baselinePreview": "a",
+      "candidatePreview": "b"
+    }
+  ],
+  "warnings": [{ "code": "x", "message": "y", "path": "/p" }],
+  "skipped": [{ "reason": "callbacks_not_diffed_mvp", "path": "/callbacks" }]
+}

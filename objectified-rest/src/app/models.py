@@ -175,6 +175,10 @@ class ProjectSchema(BaseModel):
     slug: str
     enabled: bool = True
     metadata: Optional[Dict[str, Any]] = None
+    change_report_template_version_id: Optional[str] = Field(
+        None,
+        serialization_alias="changeReportTemplateVersionId",
+    )
     creator_name: Optional[str] = None
     creator_email: Optional[str] = None
     created_at: Optional[Union[datetime, str]] = None
@@ -202,6 +206,10 @@ class ProjectUpdateRequest(BaseModel):
     slug: Optional[str] = None
     enabled: Optional[bool] = None
     metadata: Optional[Dict[str, Any]] = None
+    change_report_template_version_id: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("changeReportTemplateVersionId", "change_report_template_version_id"),
+    )
 
     class Config:
         from_attributes = True
@@ -1571,7 +1579,7 @@ class VersionChangeReportPatch(BaseModel):
 
 
 class VersionChangeReportRegenerateRequest(BaseModel):
-    """Optional template selection; placeholder renderer used until CR-03."""
+    """Optional template version id; effective template resolved per CR-03."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -1582,5 +1590,59 @@ class VersionChangeReportRegenerateRequest(BaseModel):
     discard_user_edits: bool = Field(
         True,
         validation_alias=AliasChoices("discardUserEdits", "discard_user_edits"),
+    )
+
+
+# ==================== Change report templates (CR-03, #2701) ====================
+
+
+class ChangeReportTemplateVersionSummary(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    semver: str
+    owner_tenant_id: Optional[str] = Field(None, serialization_alias="ownerTenantId")
+    created_at: Optional[str] = Field(None, serialization_alias="createdAt")
+
+
+class ChangeReportTemplateVersionOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    semver: str
+    owner_tenant_id: Optional[str] = Field(None, serialization_alias="ownerTenantId")
+    header_template: str = Field(serialization_alias="headerTemplate")
+    body_template: str = Field(serialization_alias="bodyTemplate")
+    footnote_template: str = Field(serialization_alias="footnoteTemplate")
+    created_at: Optional[str] = Field(None, serialization_alias="createdAt")
+    created_by: Optional[str] = Field(None, serialization_alias="createdBy")
+
+
+class ChangeReportTemplateVersionCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    semver: str
+    header_template: str = Field(
+        ...,
+        validation_alias=AliasChoices("headerTemplate", "header_template"),
+    )
+    body_template: str = Field(
+        ...,
+        validation_alias=AliasChoices("bodyTemplate", "body_template"),
+    )
+    footnote_template: str = Field(
+        ...,
+        validation_alias=AliasChoices("footnoteTemplate", "footnote_template"),
+    )
+
+
+class ChangeReportTemplateDefaultPut(BaseModel):
+    """Set tenant or project default template pointer; null clears override."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    template_version_id: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("templateVersionId", "template_version_id"),
     )
 

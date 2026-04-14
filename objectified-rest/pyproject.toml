@@ -1,6 +1,6 @@
 [project]
 name = "objectified-rest"
-version = "1.0.43"
+version = "1.0.44"
 description = "REST API for serving OpenAPI specifications from the Objectified database"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,6 +33,7 @@ dependencies = [
     "pyjwt>=2.8.0",
     "numpy>=2.4.2",
     "pgvector>=0.4.2",
+    "chevron>=0.14.0",
 ]
 
 [project.optional-dependencies]

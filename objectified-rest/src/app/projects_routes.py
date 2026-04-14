@@ -249,6 +249,9 @@ async def update_project(
             updates['enabled'] = request.enabled
         if request.metadata is not None:
             updates['metadata'] = request.metadata
+        fs = getattr(request, "model_fields_set", set())
+        if "change_report_template_version_id" in fs:
+            updates["change_report_template_version_id"] = request.change_report_template_version_id
 
         # Update project
         project = db.update_project(

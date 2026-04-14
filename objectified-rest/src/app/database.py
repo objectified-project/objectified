@@ -1081,7 +1081,7 @@ class Database:
         """Get all projects for a tenant."""
         query = """
             SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
-                   p.enabled, p.metadata, p.created_at, p.updated_at,
+                   p.enabled, p.metadata, p.change_report_template_version_id, p.created_at, p.updated_at,
                    u.name as creator_name, u.email as creator_email
             FROM odb.projects p
             LEFT JOIN odb.users u ON p.creator_id = u.id
@@ -1094,7 +1094,7 @@ class Database:
         """Get a specific project by ID, ensuring it belongs to the tenant."""
         query = """
             SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
-                   p.enabled, p.metadata, p.created_at, p.updated_at,
+                   p.enabled, p.metadata, p.change_report_template_version_id, p.created_at, p.updated_at,
                    u.name as creator_name, u.email as creator_email
             FROM odb.projects p
             LEFT JOIN odb.users u ON p.creator_id = u.id
@@ -1107,7 +1107,7 @@ class Database:
         """Get a specific project by slug, ensuring it belongs to the tenant."""
         query = """
             SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
-                   p.enabled, p.metadata, p.created_at, p.updated_at,
+                   p.enabled, p.metadata, p.change_report_template_version_id, p.created_at, p.updated_at,
                    u.name as creator_name, u.email as creator_email
             FROM odb.projects p
             LEFT JOIN odb.users u ON p.creator_id = u.id
@@ -1132,7 +1132,7 @@ class Database:
             (tenant_id, creator_id, name, description, slug, metadata)
             VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id, tenant_id, creator_id, name, description, slug,
-                      enabled, metadata, created_at, updated_at
+                      enabled, metadata, change_report_template_version_id, created_at, updated_at
         """
         metadata_json = json.dumps(metadata) if metadata else '{}'
 
@@ -1183,6 +1183,9 @@ class Database:
         if 'metadata' in updates:
             update_fields.append("metadata = %s")
             params.append(json.dumps(updates['metadata']) if updates['metadata'] else '{}')
+        if 'change_report_template_version_id' in updates:
+            update_fields.append("change_report_template_version_id = %s")
+            params.append(updates['change_report_template_version_id'])
 
         if not update_fields:
             # Nothing to update, return current project
@@ -1197,7 +1200,7 @@ class Database:
             SET {', '.join(update_fields)}
             WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL
             RETURNING id, tenant_id, creator_id, name, description, slug,
-                      enabled, metadata, created_at, updated_at
+                      enabled, metadata, change_report_template_version_id, created_at, updated_at
         """
 
         conn = self.connect()
@@ -5682,6 +5685,134 @@ class Database:
         except Exception as e:
             conn.rollback()
             raise e
+
+    # ==================== Change report templates (CR-03, #2701) ====================
+
+    def ensure_system_change_report_template(self) -> None:
+        """Insert bundled system template row if missing (well-known id + semver 1.0.0)."""
+        from .change_report_default_templates import (
+            DEFAULT_BODY_TEMPLATE,
+            DEFAULT_FOOTNOTE_TEMPLATE,
+            DEFAULT_HEADER_TEMPLATE,
+            SYSTEM_TEMPLATE_ID,
+            SYSTEM_TEMPLATE_SEMVER,
+        )
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO odb.change_report_template_versions (
+                        id, owner_tenant_id, semver, header_template, body_template, footnote_template
+                    ) VALUES (%s::uuid, NULL, %s, %s, %s, %s)
+                    ON CONFLICT (id) DO NOTHING
+                    """,
+                    (
+                        SYSTEM_TEMPLATE_ID,
+                        SYSTEM_TEMPLATE_SEMVER,
+                        DEFAULT_HEADER_TEMPLATE,
+                        DEFAULT_BODY_TEMPLATE,
+                        DEFAULT_FOOTNOTE_TEMPLATE,
+                    ),
+                )
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def get_change_report_template_version_by_id(self, template_id: str) -> Optional[Dict[str, Any]]:
+        q = """
+            SELECT id, owner_tenant_id, semver, header_template, body_template, footnote_template,
+                   created_at, created_by
+            FROM odb.change_report_template_versions
+            WHERE id = %s::uuid
+            LIMIT 1
+        """
+        rows = self.execute_query(q, (template_id,))
+        return dict(rows[0]) if rows else None
+
+    def list_change_report_template_version_summaries(self, tenant_id: str) -> List[Dict[str, Any]]:
+        q = """
+            SELECT id, owner_tenant_id, semver, created_at
+            FROM odb.change_report_template_versions
+            WHERE owner_tenant_id IS NULL OR owner_tenant_id = %s::uuid
+            ORDER BY owner_tenant_id NULLS FIRST, semver ASC
+        """
+        return self.execute_query(q, (tenant_id,))
+
+    def insert_change_report_template_version(
+        self,
+        tenant_id: str,
+        semver: str,
+        header_template: str,
+        body_template: str,
+        footnote_template: str,
+        created_by: Optional[str],
+    ) -> Dict[str, Any]:
+        q = """
+            INSERT INTO odb.change_report_template_versions (
+                owner_tenant_id, semver, header_template, body_template, footnote_template, created_by
+            ) VALUES (%s::uuid, %s, %s, %s, %s, %s::uuid)
+            RETURNING id, owner_tenant_id, semver, header_template, body_template, footnote_template,
+                      created_at, created_by
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    q,
+                    (
+                        tenant_id,
+                        semver,
+                        header_template,
+                        body_template,
+                        footnote_template,
+                        created_by if created_by else None,
+                    ),
+                )
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row)
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def set_tenant_change_report_template_version(
+        self,
+        tenant_id: str,
+        template_version_id: Optional[str],
+    ) -> None:
+        q = """
+            UPDATE odb.tenants
+            SET change_report_template_version_id = %s::uuid,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s::uuid
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    q,
+                    (template_version_id if template_version_id else None, tenant_id),
+                )
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def get_tenant_change_report_template_version_id(self, tenant_id: str) -> Optional[str]:
+        q = """
+            SELECT change_report_template_version_id
+            FROM odb.tenants
+            WHERE id = %s::uuid
+            LIMIT 1
+        """
+        rows = self.execute_query(q, (tenant_id,))
+        if not rows:
+            return None
+        v = rows[0].get("change_report_template_version_id")
+        return str(v) if v is not None else None
 
 
 # Global database instance
