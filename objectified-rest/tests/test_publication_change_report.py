@@ -160,3 +160,61 @@ def test_generate_change_report_on_publish_failure_audits():
         )
         mdb.insert_workflow_audit.assert_called_once()
         assert mdb.insert_workflow_audit.call_args[0][4] == "failure"
+
+
+def test_generate_change_report_on_publish_missing_baseline_row():
+    """baseline_revision_id is non-null but the DB row is gone → distinct label + audit flags."""
+    ver = {"published": True, "version_id": "2.0.0", "published_at": None}
+    cand = {
+        "openapi": "3.1.0",
+        "info": {"title": "x", "version": "1"},
+        "paths": {},
+        "components": {"schemas": {}},
+    }
+
+    def _gv(vid, _tid):
+        if vid == "cand":
+            return ver
+        return None  # baseline row missing
+
+    with patch("app.publication_change_report.db") as mdb, patch(
+        "app.publication_change_report.openapi_for_revision", return_value=cand
+    ), patch(
+        "app.publication_change_report.build_change_report", return_value=dict(_MIN_CM)
+    ), patch(
+        "app.publication_change_report.render_from_template_row",
+        return_value=("h", "b", "f"),
+    ), patch(
+        "app.publication_change_report._resolve_template_row",
+        return_value={
+            "id": "00000000-0000-4000-a000-000000000001",
+            "header_template": "x",
+            "body_template": "y",
+            "footnote_template": "z",
+        },
+    ):
+        mdb.get_version_by_id.side_effect = _gv
+        mdb.get_project_by_id.return_value = {"name": "P"}
+        mdb.get_prior_published_baseline_revision_id.return_value = "ghost-base"
+
+        generate_change_report_on_publish(
+            tenant_slug="ten",
+            tenant_id="tid",
+            project_id="pid",
+            published_revision_id="cand",
+            actor_id="uid",
+        )
+
+        # stored_baseline_id should be None (row was missing)
+        call_kwargs = mdb.insert_change_report_if_absent.call_args[1]
+        assert call_kwargs["baseline_revision_id"] is None
+
+        # change model should NOT be marked as initial publication
+        cm = call_kwargs["change_model_json"]
+        assert "initialPublication" not in cm
+
+        # audit should record the requested baseline id and flag the missing row
+        audit_detail = mdb.insert_workflow_audit.call_args[0][6]
+        assert audit_detail.get("requestedBaselineRevisionId") == "ghost-base"
+        assert audit_detail.get("baselineLookupMissing") is True
+        assert audit_detail.get("baselineRevisionId") is None

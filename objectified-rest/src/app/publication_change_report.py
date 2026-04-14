@@ -105,9 +105,11 @@ def _generate_change_report_on_publish_impl(
     candidate_openapi = openapi_for_revision(version, tenant_slug, tenant_id)
 
     baseline_ver: Optional[Dict[str, Any]] = None
+    baseline_row_missing = False
     if baseline_revision_id:
         baseline_ver = db.get_version_by_id(baseline_revision_id, tenant_id)
         if not baseline_ver:
+            baseline_row_missing = True
             logger.warning(
                 "baseline revision %s not found; using empty baseline for change report",
                 baseline_revision_id,
@@ -129,6 +131,8 @@ def _generate_change_report_on_publish_impl(
 
     if baseline_ver:
         from_label = str(baseline_ver.get("version_id") or "—")
+    elif baseline_row_missing:
+        from_label = f"(unknown baseline {baseline_revision_id})"
     else:
         from_label = "Initial publication"
 
@@ -148,13 +152,23 @@ def _generate_change_report_on_publish_impl(
         tenant_id,
         project_id,
         published_revision_id,
-        stored_baseline_id,
-        change_model,
+        baseline_revision_id=stored_baseline_id,
+        change_model_json=change_model,
         rendered_body=body,
         header_snapshot=header,
         footnote_snapshot=footnote,
         template_version_id=tpl_id,
     )
+
+    audit_detail: Dict[str, Any] = {
+        "baselineRevisionId": stored_baseline_id,
+        "publishedRevisionId": published_revision_id,
+        "templateVersionId": tpl_id,
+        "initialPublication": bool(change_model.get("initialPublication")),
+    }
+    if baseline_row_missing:
+        audit_detail["requestedBaselineRevisionId"] = baseline_revision_id
+        audit_detail["baselineLookupMissing"] = True
 
     db.insert_workflow_audit(
         tenant_id,
@@ -163,10 +177,5 @@ def _generate_change_report_on_publish_impl(
         "schema.change_report.generated",
         "success",
         actor_id,
-        {
-            "baselineRevisionId": stored_baseline_id,
-            "publishedRevisionId": published_revision_id,
-            "templateVersionId": tpl_id,
-            "initialPublication": bool(change_model.get("initialPublication")),
-        },
+        audit_detail,
     )
