@@ -3246,6 +3246,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@seriousme/openapi-schema-validator@npm:^2.8.0":
+  version: 2.8.0
+  resolution: "@seriousme/openapi-schema-validator@npm:2.8.0"
+  dependencies:
+    ajv: "npm:^8.18.0"
+    ajv-draft-04: "npm:^1.0.0"
+    ajv-formats: "npm:^3.0.1"
+    js-yaml: "npm:^4.1.1"
+  bin:
+    bundle-api: bin/bundle-api-cli.js
+    validate-api: bin/validate-api-cli.js
+  checksum: 10c0/dda017da60a0d1d2d046b83ca213c16a2b650c9b26997fb9c7bae15bc33118cf297f6079cf2f679fd64740ec93ac58c65af94ed51a474265b25a862a77974680
+  languageName: node
+  linkType: hard
+
 "@sinclair/typebox@npm:^0.34.0":
   version: 0.34.49
   resolution: "@sinclair/typebox@npm:0.34.49"
@@ -4536,6 +4551,18 @@ __metadata:
   version: 7.1.4
   resolution: "agent-base@npm:7.1.4"
   checksum: 10c0/c2c9ab7599692d594b6a161559ada307b7a624fa4c7b03e3afdb5a5e31cd0e53269115b620fcab024c5ac6a6f37fa5eb2e004f076ad30f5f7e6b8b671f7b35fe
+  languageName: node
+  linkType: hard
+
+"ajv-draft-04@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "ajv-draft-04@npm:1.0.0"
+  peerDependencies:
+    ajv: ^8.5.0
+  peerDependenciesMeta:
+    ajv:
+      optional: true
+  checksum: 10c0/6044310bd38c17d77549fd326bd40ce1506fa10b0794540aa130180808bf94117fac8c9b448c621512bea60e4a947278f6a978e87f10d342950c15b33ddd9271
   languageName: node
   linkType: hard
 
@@ -10345,6 +10372,7 @@ __metadata:
     "@radix-ui/react-toggle-group": "npm:^1.1.11"
     "@radix-ui/react-tooltip": "npm:^1.2.8"
     "@radix-ui/themes": "npm:^3.3.0"
+    "@seriousme/openapi-schema-validator": "npm:^2.8.0"
     "@tailwindcss/postcss": "npm:^4.2.2"
     "@testing-library/dom": "npm:^10.4.1"
     "@testing-library/jest-dom": "npm:^6.9.1"

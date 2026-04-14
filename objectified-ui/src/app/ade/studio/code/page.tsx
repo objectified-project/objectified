@@ -10,6 +10,19 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import YAML from 'yaml';
 import { useStudio } from '../StudioContext';
 import { generateOpenApiSpec } from '../../../utils/openapi';
+import { STUDIO_EXPORT_OPENAPI_VERSION } from '../../../utils/openapi-versions';
+import { validateOpenAPIExport } from '../../../utils/openapi-export-validation';
+import type { OpenAPIExportValidationResult } from '../../../utils/openapi-export-validation';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/app/components/ui/AlertDialog';
 import { generateArazzoSpec } from '../../../utils/arazzo';
 import { generateJsonSchema } from '../../../utils/jsonschema';
 import { generateGraphQLSchema } from '../../../utils/graphql';
@@ -102,6 +115,15 @@ export default function CodePage() {
   const [asyncApiSpec, setAsyncApiSpec] = useState<string>('');
   const [codeCopied, setCodeCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExportValidating, setIsExportValidating] = useState(false);
+  const [exportGateOpen, setExportGateOpen] = useState(false);
+  const [exportGateMode, setExportGateMode] = useState<'block' | 'confirm'>('block');
+  const [exportGateResult, setExportGateResult] = useState<OpenAPIExportValidationResult | null>(null);
+  const [pendingExportDownload, setPendingExportDownload] = useState<{
+    content: string;
+    mimeType: string;
+    filename: string;
+  } | null>(null);
 
   // Check dark mode - prioritize localStorage, then fall back to system preference
   useEffect(() => {
@@ -234,8 +256,6 @@ export default function CodePage() {
           } else if (pathsData.success) {
             console.warn('[Code Tab] Paths loaded successfully but array is empty');
             console.warn('[Code Tab] To add paths: Navigate to the Paths tab and create paths with operations');
-            // Add a helpful comment in the paths object
-            pathsObject['x-no-paths-found'] = 'No paths defined for this version. Navigate to the Paths tab to create paths with operations.';
           } else {
             console.error('[Code Tab] Failed to load paths:', pathsData.error);
           }
@@ -277,6 +297,7 @@ export default function CodePage() {
           projectName: currentProject?.name || 'API',
           version: currentVersion?.version_id || '1.0.0',
           description: currentVersion?.description || '',
+          openapiVersion: STUDIO_EXPORT_OPENAPI_VERSION,
           servers: servers.length > 0 ? servers : undefined,
           tags: [], // Top-level tags; can be populated from version/project when available
           security: hasSecuritySchemes ? Object.keys(securitySchemes).map((name) => ({ [name]: [] })) : undefined,
@@ -372,66 +393,112 @@ export default function CodePage() {
     setTimeout(() => setCodeCopied(false), 2000);
   }, [getSpecContent]);
 
-  // Handle download
-  const handleDownload = useCallback(() => {
-    const content = getSpecContent();
-
-    // Handle GraphQL separately - always text/plain with .graphql extension
-    if (codeDisplayFormat === 'graphql') {
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-
-      const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'api';
-      const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
-      link.download = `${projectSlug}-${versionSlug}.graphql`;
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      return;
-    }
-
-    // Handle SQL DDL separately - always text/plain with .sql extension
-    if (codeDisplayFormat === 'sql') {
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-
-      const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'api';
-      const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
-      link.download = `${projectSlug}-${versionSlug}-${sqlDialect}.sql`;
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      return;
-    }
-
-    // Handle other formats (OpenAPI, AsyncAPI, Arazzo, JSON Schema)
-    const mimeType = codeFormat === 'json' ? 'application/json' : 'text/yaml';
-    const extension = codeFormat === 'json' ? 'json' : 'yaml';
-
-    const blob = new Blob([content], { type: mimeType });
+  const triggerBlobDownload = useCallback((downloadContent: string, mimeType: string, filename: string) => {
+    const blob = new Blob([downloadContent], { type: mimeType });
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement('a');
     link.href = url;
-
-    const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'api';
-    const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
-    const specType = codeDisplayFormat === 'openapi' ? 'openapi' : codeDisplayFormat === 'asyncapi' ? 'asyncapi' : codeDisplayFormat === 'arazzo' ? 'arazzo' : 'jsonschema';
-    link.download = `${projectSlug}-${versionSlug}-${specType}.${extension}`;
-
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [getSpecContent, codeFormat, codeDisplayFormat, selectedProject, selectedVersion, sqlDialect]);
+  }, []);
+
+  const handleDownload = useCallback(async () => {
+    const content = getSpecContent();
+    const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'api';
+    const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
+
+    if (codeDisplayFormat === 'graphql') {
+      triggerBlobDownload(content, 'text/plain', `${projectSlug}-${versionSlug}.graphql`);
+      return;
+    }
+
+    if (codeDisplayFormat === 'sql') {
+      triggerBlobDownload(content, 'text/plain', `${projectSlug}-${versionSlug}-${sqlDialect}.sql`);
+      return;
+    }
+
+    const mimeType = codeFormat === 'json' ? 'application/json' : 'text/yaml';
+    const extension = codeFormat === 'json' ? 'json' : 'yaml';
+    const specType =
+      codeDisplayFormat === 'openapi'
+        ? 'openapi'
+        : codeDisplayFormat === 'asyncapi'
+          ? 'asyncapi'
+          : codeDisplayFormat === 'arazzo'
+            ? 'arazzo'
+            : 'jsonschema';
+    const filename = `${projectSlug}-${versionSlug}-${specType}.${extension}`;
+
+    if (codeDisplayFormat === 'openapi') {
+      setIsExportValidating(true);
+      setPendingExportDownload(null);
+      try {
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = (codeFormat === 'json' ? JSON.parse(content) : YAML.parse(content)) as Record<string, unknown>;
+        } catch {
+          setExportGateMode('block');
+          setExportGateResult({
+            errors: [
+              {
+                severity: 'error',
+                message: 'Could not parse the preview as JSON or YAML for validation.',
+              },
+            ],
+            warnings: [],
+            schemaValidationCompleted: false,
+            validatorNote: '',
+          });
+          setExportGateOpen(true);
+          return;
+        }
+
+        const result = await validateOpenAPIExport(parsed);
+        if (result.errors.length > 0) {
+          setExportGateMode('block');
+          setExportGateResult(result);
+          setExportGateOpen(true);
+          return;
+        }
+        if (result.warnings.length > 0) {
+          setExportGateMode('confirm');
+          setExportGateResult(result);
+          setPendingExportDownload({ content, mimeType, filename });
+          setExportGateOpen(true);
+          return;
+        }
+        triggerBlobDownload(content, mimeType, filename);
+      } finally {
+        setIsExportValidating(false);
+      }
+      return;
+    }
+
+    triggerBlobDownload(content, mimeType, filename);
+  }, [
+    getSpecContent,
+    codeFormat,
+    codeDisplayFormat,
+    selectedProject,
+    selectedVersion,
+    sqlDialect,
+    triggerBlobDownload,
+  ]);
+
+  const confirmWarningExportDownload = useCallback(() => {
+    if (!pendingExportDownload) return;
+    triggerBlobDownload(
+      pendingExportDownload.content,
+      pendingExportDownload.mimeType,
+      pendingExportDownload.filename
+    );
+    setExportGateOpen(false);
+    setPendingExportDownload(null);
+    setExportGateResult(null);
+  }, [pendingExportDownload, triggerBlobDownload]);
 
   if (!selectedProjectId || !selectedVersionId) {
     return (
@@ -474,7 +541,7 @@ export default function CodePage() {
                 <div>
                   <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
                     {codeDisplayFormat === 'openapi'
-                      ? 'OpenAPI 3.1.0'
+                      ? 'OpenAPI 3.2.0'
                       : codeDisplayFormat === 'arazzo'
                       ? 'Arazzo v1.0.1'
                       : codeDisplayFormat === 'graphql'
@@ -626,12 +693,12 @@ export default function CodePage() {
               <Tooltip.Root>
                 <Tooltip.Trigger asChild>
                   <button
-                    onClick={handleDownload}
-                    disabled={isLoading}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40"
+                    onClick={() => void handleDownload()}
+                    disabled={isLoading || isExportValidating}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 disabled:opacity-60 disabled:pointer-events-none"
                   >
                     <Download size={16} />
-                    Download
+                    {isExportValidating ? 'Validating…' : 'Download'}
                   </button>
                 </Tooltip.Trigger>
                 <Tooltip.Portal>
@@ -639,7 +706,9 @@ export default function CodePage() {
                     className="bg-gray-900 dark:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg z-[10000]"
                     sideOffset={5}
                   >
-                    Download as {codeFormat.toUpperCase()} file
+                    {codeDisplayFormat === 'openapi'
+                      ? `Validate OpenAPI 3.2 and download as ${codeFormat.toUpperCase()}`
+                      : `Download as ${codeFormat.toUpperCase()} file`}
                     <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
                   </Tooltip.Content>
                 </Tooltip.Portal>
@@ -678,6 +747,86 @@ export default function CodePage() {
           )}
         </div>
       </div>
+
+      <AlertDialog
+        open={exportGateOpen}
+        onOpenChange={(open) => {
+          setExportGateOpen(open);
+          if (!open) {
+            setPendingExportDownload(null);
+            setExportGateResult(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-h-[85vh] flex flex-col max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {exportGateMode === 'confirm' ? 'Validation warnings' : 'Export blocked'}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-left">
+                {exportGateMode === 'block' && (
+                  <p>
+                    Fix the issues below before downloading. OpenAPI 3.2 structure is checked with{' '}
+                    <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">@seriousme/openapi-schema-validator</code>{' '}
+                    plus duplicate <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">operationId</code>, path
+                    parameters, and local <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">$ref</code>{' '}
+                    targets.
+                  </p>
+                )}
+                {exportGateMode === 'confirm' && exportGateResult && (
+                  <p>
+                    The document has warnings. You can still download the file. Validation uses{' '}
+                    <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">@seriousme/openapi-schema-validator</code>{' '}
+                    (OAS 3.2 JSON Schema) and Objectified semantic checks.
+                  </p>
+                )}
+                {exportGateResult?.errors && exportGateResult.errors.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">Errors</p>
+                    <ul className="text-xs max-h-32 overflow-y-auto space-y-1 list-disc pl-4 text-gray-800 dark:text-gray-200">
+                      {exportGateResult.errors.map((e, i) => (
+                        <li key={`e-${i}`}>
+                          {e.path ? <span className="text-gray-500 mr-1">{e.path}:</span> : null}
+                          {e.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {exportGateResult?.warnings && exportGateResult.warnings.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">Warnings</p>
+                    <ul className="text-xs max-h-32 overflow-y-auto space-y-1 list-disc pl-4 text-gray-800 dark:text-gray-200">
+                      {exportGateResult.warnings.map((w, i) => (
+                        <li key={`w-${i}`}>
+                          {w.path ? <span className="text-gray-500 mr-1">{w.path}:</span> : null}
+                          {w.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {exportGateResult?.validatorNote ? (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{exportGateResult.validatorNote}</p>
+                ) : null}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {exportGateMode === 'confirm' ? (
+              <>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction type="button" onClick={confirmWarningExportDownload}>
+                  Download anyway
+                </AlertDialogAction>
+              </>
+            ) : (
+              <AlertDialogCancel>Close</AlertDialogCancel>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Tooltip.Provider>
   );
 }

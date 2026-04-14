@@ -37,7 +37,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | P-13 | [#2652](https://github.com/KenSuenobu/objectified-commercial/issues/2652) **(shipped)** | Yes |
 | P-14 | [#2653](https://github.com/KenSuenobu/objectified-commercial/issues/2653) **(shipped)** | Yes |
 | P-15 | [#2654](https://github.com/KenSuenobu/objectified-commercial/issues/2654) **(shipped)** | Yes |
-| P-16 | [#2655](https://github.com/KenSuenobu/objectified-commercial/issues/2655) | Yes |
+| P-16 | [#2655](https://github.com/KenSuenobu/objectified-commercial/issues/2655) **(shipped)** | Yes |
 | P-17 | [#2656](https://github.com/KenSuenobu/objectified-commercial/issues/2656) | Yes |
 | P-18 | [#2657](https://github.com/KenSuenobu/objectified-commercial/issues/2657) | No (V2 / backlog) |
 | V2-01 | [#2658](https://github.com/KenSuenobu/objectified-commercial/issues/2658) | No |
@@ -88,7 +88,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | # | Issue | MVP |
 |---|--------|-----|
 | ~~2654~~ | ~~P-15 Monaco Code mode + preview~~ **(shipped)** | Yes |
-| 2655 | P-16 OpenAPI 3.2 export + validation gate | Yes |
+| ~~2655~~ | ~~P-16 OpenAPI 3.2 export + validation gate~~ **(shipped)** | Yes |
 | 2656 | P-17 PATH QUALITY score + dialog | Yes |
 
 **E6 — [#2638](https://github.com/KenSuenobu/objectified-commercial/issues/2638)**
@@ -547,7 +547,7 @@ Debounce parse; on success, optionally offer **apply** to canvas (V2 if risky fo
 
 ---
 
-### P-16 — OpenAPI 3.2 export & validation gate (MVP requirements)
+### P-16 — OpenAPI 3.2 export & validation gate (MVP requirements) **(shipped)**
 
 **Epic:** E5 · **Labels:** `paths`, `mvp`, `openapi`
 
@@ -555,6 +555,8 @@ Debounce parse; on success, optionally offer **apply** to canvas (V2 if risky fo
 
 **Description:**  
 Assemble **openapi: 3.2.x** document with **`paths`** built from normalized tables + **components** from version classes. Run a **validator** appropriate for OAS 3.2 (adapter or schema-based). **MVP must cover:** unique `operationId`, valid parameter `in` + `name`, consistent path templating, each operation’s **responses** minimally **documented** (allow warning), **content** maps for bodies/responses where required by spec.
+
+**Shipped (#2655):** Studio **Code** and **Paths → Code** merged specs use **`openapi: 3.2.0`**. Download validates with **`@seriousme/openapi-schema-validator`** plus semantic checks; errors block; warnings confirm; **`servers`** omitted when none configured.
 
 **Acceptance criteria:**
 - Download **JSON** and **YAML**.

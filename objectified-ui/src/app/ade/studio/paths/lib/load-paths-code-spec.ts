@@ -9,6 +9,7 @@ import {
 import { getServersForVersion, serversToOpenAPI } from '../../../../../../lib/db/helper-version-servers';
 import { generatePathsForOpenAPI, type PathInfo } from '../../../../../../lib/utils/openapi-paths-generator';
 import { generateOpenApiSpec } from '@/app/utils/openapi';
+import { STUDIO_EXPORT_OPENAPI_VERSION } from '@/app/utils/openapi-versions';
 
 export interface PathsCodeSpecResult {
   pathsObject: Record<string, unknown>;
@@ -38,8 +39,6 @@ export async function loadPathsCodeSpec(options: {
       pathsObject = generatePathsForOpenAPI(pathsData.paths as PathInfo[]) as Record<string, unknown>;
     } else if (pathsData.success) {
       console.warn('[Paths Code] Paths loaded successfully but array is empty');
-      pathsObject['x-no-paths-found'] =
-        'No paths defined for this version. Navigate to the Paths tab to create paths with operations.';
     } else {
       console.error('[Paths Code] Failed to load paths:', pathsData.error);
     }
@@ -77,6 +76,7 @@ export async function loadPathsCodeSpec(options: {
       projectName,
       version: versionLabel,
       description: versionDescription,
+      openapiVersion: STUDIO_EXPORT_OPENAPI_VERSION,
       servers: servers.length > 0 ? servers : undefined,
       tags: [],
       security: hasSecuritySchemes ? Object.keys(securitySchemes).map((name) => ({ [name]: [] })) : undefined,
