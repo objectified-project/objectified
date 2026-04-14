@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered, Search, GitCompareArrows } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered, Search, GitCompareArrows, FileText } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -80,6 +80,7 @@ import {
 } from '../../../../../lib/version-merge';
 import { VersionMergeConflictList } from '../../../components/ade/dashboard/VersionMergeConflictList';
 import { CompatibilityReportPanel } from '../../../components/ade/dashboard/CompatibilityReportPanel';
+import { VersionChangeReportPanel } from './VersionChangeReportPanel';
 import {
   dashboardContentStackClass,
   dashboardMainClass,
@@ -237,6 +238,9 @@ const Versions = () => {
   const [publishShortMessage, setPublishShortMessage] = useState('');
   const [publishChangelog, setPublishChangelog] = useState('');
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
+  /** Timeline vs publication change report (CR-05, #2703); gated by `NEXT_PUBLIC_CHANGE_REPORT_UI`. */
+  const [versionsMainTab, setVersionsMainTab] = useState<'timeline' | 'change-report'>('timeline');
+  const changeReportUiEnabled = process.env.NEXT_PUBLIC_CHANGE_REPORT_UI !== '0';
   const [versionId, setVersionId] = useState('');
   const [autoGenerate, setAutoGenerate] = useState(true);
   const [bumpStrategy, setBumpStrategy] = useState<'patch' | 'minor'>('patch');
@@ -2193,6 +2197,8 @@ const Versions = () => {
     }
   };
 
+  const showChangeReportTab = changeReportUiEnabled && Boolean(selectedProjectId);
+
   if (!session) {
     return (
       <div className="p-6">
@@ -2310,7 +2316,62 @@ const Versions = () => {
 
       <main className={dashboardMainClass}>
         <div className={dashboardContentStackClass}>
-      {selectedProjectId && versionTags.length > 0 && (
+      {showChangeReportTab ? (
+        <div
+          className={`${dashboardPanelClass} px-3 py-2 flex flex-wrap items-center gap-2`}
+          data-testid="versions-main-tab"
+        >
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 sr-only">Versions main view</span>
+          <div
+            className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 bg-gray-50 dark:bg-gray-900/50"
+            aria-label="Versions main view"
+          >
+            <button
+              type="button"
+              aria-pressed={versionsMainTab === 'timeline'}
+              data-testid="versions-tab-timeline"
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                versionsMainTab === 'timeline'
+                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+              onClick={() => setVersionsMainTab('timeline')}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <ScrollText className="h-4 w-4 shrink-0" aria-hidden />
+                Timeline
+              </span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={versionsMainTab === 'change-report'}
+              data-testid="versions-tab-change-report"
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                versionsMainTab === 'change-report'
+                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+              onClick={() => setVersionsMainTab('change-report')}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <FileText className="h-4 w-4 shrink-0" aria-hidden />
+                Change report
+              </span>
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {showChangeReportTab && versionsMainTab === 'change-report' ? (
+        <VersionChangeReportPanel
+          projectId={selectedProjectId}
+          versions={versions}
+          currentUserId={currentUserId}
+          effectiveIsAdmin={!!effectiveIsAdmin}
+        />
+      ) : null}
+
+      {(!showChangeReportTab || versionsMainTab === 'timeline') && selectedProjectId && versionTags.length > 0 && (
         <div className={dashboardPanelPaddedClass}>
           <div className="flex items-center gap-2 mb-3">
             <Tag className="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -2372,7 +2433,7 @@ const Versions = () => {
         </div>
       )}
 
-      {selectedProjectId && versionBranches.length > 0 && (
+      {(!showChangeReportTab || versionsMainTab === 'timeline') && selectedProjectId && versionBranches.length > 0 && (
         <div id="ade-named-branches-panel" className={dashboardPanelPaddedClass}>
           <div className="flex items-center gap-2 mb-3">
             <GitBranch className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
@@ -2424,7 +2485,8 @@ const Versions = () => {
       )}
 
       {/* Versions List */}
-      {versions.length === 0 ? (
+      {(!showChangeReportTab || versionsMainTab === 'timeline') ? (
+      versions.length === 0 ? (
         <EmptyState
           icon={<Package className="h-10 w-10" />}
           title="No Versions Yet"
@@ -2868,7 +2930,8 @@ const Versions = () => {
           </table>
         </div>
         </>
-      )}
+      )
+      ) : null}
         </div>
       </main>
 

@@ -102,6 +102,7 @@ This document lists **epics**, **implementation tickets** (in **GitHub creation 
 
 ### CR-05 — Version page UI ([#2703](https://github.com/KenSuenobu/objectified-commercial/issues/2703))
 
+- **Shipped (objectified-ui):** **ADE → Versions** — **Change report** tab (`VersionChangeReportPanel.tsx`), Next.js proxies under **`/api/versions/.../change-report`**, **template** routes, optional **`NEXT_PUBLIC_CHANGE_REPORT_UI=0`**.
 - **Component:** Storybook or shallow tests optional (if project uses them).
 - **E2E (Playwright):** Login → navigate to Version → report visible → edit save → reload verifies persistence.
 - **A11y:** Smoke keyboard navigation on tab panel.

@@ -1,0 +1,94 @@
+/**
+ * Client-side Mustache context for change report templates (mirrors objectified-rest
+ * `change_report_render.build_mustache_context` enough for preview in the ADE UI).
+ */
+
+export type ChangeModelJson = Record<string, unknown>;
+
+const GENERATOR_PREVIEW = 'objectified-ui/preview';
+
+function counts(cm: ChangeModelJson) {
+  const schemas = typeof cm.schemas === 'object' && cm.schemas !== null ? (cm.schemas as Record<string, unknown>) : {};
+  const added = Array.isArray(schemas.added) ? schemas.added : [];
+  const removed = Array.isArray(schemas.removed) ? schemas.removed : [];
+  const modified = Array.isArray(schemas.modified) ? schemas.modified : [];
+  const props = Array.isArray(cm.properties) ? cm.properties : [];
+  const refs = Array.isArray(cm.references) ? cm.references : [];
+  const rels = Array.isArray(cm.relationships) ? cm.relationships : [];
+  const docs = Array.isArray(cm.documentation) ? cm.documentation : [];
+  const warns = Array.isArray(cm.warnings) ? cm.warnings : [];
+  const skipped = Array.isArray(cm.skipped) ? cm.skipped : [];
+  return {
+    schemaCounts: {
+      added: added.length,
+      removed: removed.length,
+      modified: modified.length,
+    },
+    propertyCount: props.length,
+    referenceCount: refs.length,
+    relationshipCount: rels.length,
+    documentationCount: docs.length,
+    warningCount: warns.length,
+    skippedCount: skipped.length,
+  };
+}
+
+/**
+ * Build the merged Mustache context used by header, body, and footnote templates.
+ */
+export function buildMustacheContext(
+  changeModel: ChangeModelJson,
+  metadata?: Record<string, string> | null,
+): Record<string, unknown> {
+  const md = metadata ?? {};
+  const cm: ChangeModelJson = { ...changeModel };
+
+  const productName = md.productName ?? md.product_name ?? 'API';
+  const fromVersionLabel = md.fromVersionLabel ?? md.from_version_label ?? '—';
+  const toVersionLabel = md.toVersionLabel ?? md.to_version_label ?? '—';
+  const publishTimestamp = md.publishTimestamp ?? md.publish_timestamp ?? '—';
+  const staticFootnote = md.staticFootnote ?? md.static_footnote ?? '';
+
+  const meta = {
+    productName,
+    fromVersionLabel,
+    toVersionLabel,
+    publishTimestamp,
+    staticFootnote,
+  };
+
+  const schemas = typeof cm.schemas === 'object' && cm.schemas !== null ? cm.schemas : {};
+  const properties = Array.isArray(cm.properties) ? cm.properties : [];
+  const references = Array.isArray(cm.references) ? cm.references : [];
+  const relationships = Array.isArray(cm.relationships) ? cm.relationships : [];
+  const documentation = Array.isArray(cm.documentation) ? cm.documentation : [];
+  const warnings = Array.isArray(cm.warnings) ? cm.warnings : [];
+  const skipped = Array.isArray(cm.skipped) ? cm.skipped : [];
+
+  const schemaObj = schemas as Record<string, unknown>;
+  const schemaAdded = Array.isArray(schemaObj.added) ? schemaObj.added : [];
+  const schemaRemoved = Array.isArray(schemaObj.removed) ? schemaObj.removed : [];
+  const schemaModified = Array.isArray(schemaObj.modified) ? schemaObj.modified : [];
+
+  return {
+    ...meta,
+    staticNote: staticFootnote || md.staticNote || '',
+    schemaVersion: (cm.schemaVersion as string) ?? (cm.schema_version as string) ?? '?',
+    schemas,
+    properties,
+    references,
+    relationships,
+    documentation,
+    warnings,
+    skipped,
+    ...counts(cm),
+    generatorVersion: GENERATOR_PREVIEW,
+    schemaSection: schemaAdded.length > 0 || schemaRemoved.length > 0 || schemaModified.length > 0,
+    propertiesSection: properties.length > 0,
+    referencesSection: references.length > 0,
+    relationshipsSection: relationships.length > 0,
+    documentationSection: documentation.length > 0,
+    warningsSection: warnings.length > 0,
+    skippedSection: skipped.length > 0,
+  };
+}

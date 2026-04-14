@@ -220,7 +220,7 @@ Implement in this order so each step stays testable. **Issue → roadmap ID** fo
 | 2 | ~~[#2700](https://github.com/KenSuenobu/objectified-commercial/issues/2700)~~ | ~~CR-02~~ **shipped** | DB + REST: `change_reports` table, version-scoped persistence API (see `objectified-rest/docs/CHANGE_REPORT_PERSISTENCE_API.md`) |
 | 3 | ~~[#2701](https://github.com/KenSuenobu/objectified-commercial/issues/2701)~~ | ~~CR-03~~ **shipped** | Template system (Mustache header / body / footnote), tenant/project overrides — **`objectified-rest/docs/CHANGE_REPORT_TEMPLATES_API.md`**, migration **`20260414-150000.sql`** |
 | 4 | ~~[#2702](https://github.com/KenSuenobu/objectified-commercial/issues/2702)~~ | ~~CR-04~~ **shipped** | Publication workflow hook: baseline selection, generate on publish (**`app/publication_change_report.py`**, **`workflow_audit`** **`schema.change_report.generated`**) |
-| 5 | [#2703](https://github.com/KenSuenobu/objectified-commercial/issues/2703) | CR-05 | **Version** page: view / edit report + template + regenerate |
+| 5 | ~~[#2703](https://github.com/KenSuenobu/objectified-commercial/issues/2703)~~ | ~~CR-05~~ **shipped** | **ADE → Versions:** **Timeline | Change report** tab; view/edit persisted report (**`DOMPurify`** + **Mustache** preview); **Templates** dialog (create, project/tenant defaults); **Regenerate**; **`NEXT_PUBLIC_CHANGE_REPORT_UI=0`** to hide |
 | 6 | [#2704](https://github.com/KenSuenobu/objectified-commercial/issues/2704) | CR-06 | Golden fixtures, REST integration tests, Playwright E2E, release gate |
 
 **Excluded from minimal MVP (same epic, V2 enterprise):** [#2705](https://github.com/KenSuenobu/objectified-commercial/issues/2705) (CR-V2-01) — PDF export, approval workflow, extended audit trail.
