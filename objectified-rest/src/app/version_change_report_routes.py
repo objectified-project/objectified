@@ -9,7 +9,8 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from .auth import get_authenticated_user_id, validate_authentication
-from .change_report_render import placeholder_render_from_change_model
+from .change_report_render import render_from_template_row
+from .change_report_template_resolve import resolve_effective_change_report_template
 from .database import db
 from .models import (
     VersionChangeReportOut,
@@ -229,9 +230,10 @@ async def regenerate_version_change_report(
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> VersionChangeReportOut:
     """
-    Re-run rendering from stored ``changeModelJson`` using the current template pipeline.
+    Re-run rendering from stored ``changeModelJson`` using the Mustache template pipeline (CR-03).
 
-    Until CR-03, a **placeholder** renderer fills ``renderedBody`` / header / footnote.
+    Resolution order: optional ``templateVersionId`` in the body, then project default, tenant
+    default, then the system template (**1.0.0**).
 
     **Authorization:** Same as PATCH (creator or tenant admin, JWT required).
     """
@@ -270,10 +272,16 @@ async def regenerate_version_change_report(
     cm = existing.get("change_model_json")
     if not isinstance(cm, dict):
         raise HTTPException(status_code=500, detail="Stored change model is invalid")
-    header, rendered, footnote = placeholder_render_from_change_model(cm)
-    tpl = body.template_version_id
-    if "template_version_id" not in body.model_fields_set:
-        tpl = None
+    tpl: Optional[str] = None
+    if "template_version_id" in body.model_fields_set:
+        tpl = body.template_version_id
+    template_row = resolve_effective_change_report_template(
+        db,
+        tenant_id,
+        project_id,
+        tpl,
+    )
+    header, rendered, footnote = render_from_template_row(cm, template_row, metadata=None)
     row = db.apply_change_report_regeneration(
         version_record_id,
         tenant_id,
@@ -282,7 +290,7 @@ async def regenerate_version_change_report(
         rendered,
         footnote,
         discard_user_edits=body.discard_user_edits,
-        template_version_id=tpl,
+        template_version_id=_str_id(template_row.get("id")),
     )
     if not row:
         raise HTTPException(status_code=404, detail="Change report not found")

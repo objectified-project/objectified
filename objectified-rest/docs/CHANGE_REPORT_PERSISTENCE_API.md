@@ -78,7 +78,7 @@ Returns **404** if no row exists, **400** if the revision is not published.
 
 ### POST `/change-report/regenerate`
 
-Re-renders from stored `changeModelJson` using the template pipeline. Until **CR-03**, a **placeholder** renderer fills header/body/footnote.
+Re-renders from stored `changeModelJson` using the **Mustache** template pipeline (**CR-03**). See **`objectified-rest/docs/CHANGE_REPORT_TEMPLATES_API.md`**.
 
 ```json
 {

@@ -31,12 +31,13 @@ from .push_webhook_subscriptions_routes import router as push_webhook_subscripti
 from .push_webhook_crypto import validate_webhook_signing_key
 from .change_report_routes import router as change_report_router
 from .version_change_report_routes import router as version_change_report_router
+from .change_report_template_routes import router as change_report_template_router
 
 # Create FastAPI app
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.43"
+    version="1.0.44"
 )
 
 
@@ -102,6 +103,7 @@ app.include_router(draft_lock_router)
 app.include_router(push_webhook_subscriptions_router)
 app.include_router(change_report_router)
 app.include_router(version_change_report_router)
+app.include_router(change_report_template_router)
 
 
 _webhook_delivery_task: asyncio.Task | None = None
@@ -111,6 +113,27 @@ _webhook_delivery_task: asyncio.Task | None = None
 async def startup_event():
     """Connect to database on startup."""
     db.connect()
+    _startup_log = logging.getLogger("uvicorn.error")
+    try:
+        db.ensure_system_change_report_template()
+    except Exception as e:
+        # Distinguish "schema not yet migrated" (expected pre-migration) from
+        # unexpected failures (permissions, connectivity, etc.).
+        _err_str = str(e).lower()
+        _schema_not_migrated = any(
+            token in _err_str
+            for token in ("undefined table", "does not exist", "undefinedtable", "42p01")
+        )
+        if _schema_not_migrated:
+            _startup_log.warning(
+                "change report system template seed skipped: migration 20260414-150000.sql "
+                "has not been applied — project and template endpoints require that migration: %s",
+                e,
+            )
+        else:
+            _startup_log.exception(
+                "change report system template seed failed with unexpected error: %s", e
+            )
     validate_webhook_signing_key()
     # Log data API routes so we can confirm POST /v1/data/{tenant_slug}/records is registered
     for route in app.routes:
