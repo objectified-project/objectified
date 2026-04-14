@@ -414,6 +414,7 @@ function PathsCanvasInner({
     edgeRouting,
     edgeAnimation,
     selectedVersionId,
+    registerPathsCanvasFlush,
   } = useStudio();
 
   const { alert: alertDialog, confirm: confirmDialog } = useDialog();
@@ -2980,6 +2981,27 @@ function PathsCanvasInner({
       void putPathCanvas(selectedVersionId, selectedPathId, payload);
     }, 650);
   }, [canvasPersistReady, selectedVersionId, selectedPathId, getViewport, nodes, edges]);
+
+  const flushPathsCanvasNow = useCallback(async () => {
+    if (!canvasPersistReady || !selectedVersionId || !selectedPathId) return;
+    if (canvasSaveTimerRef.current) {
+      clearTimeout(canvasSaveTimerRef.current);
+      canvasSaveTimerRef.current = null;
+    }
+    const vp = getViewport();
+    const payload = serializePathsCanvas(nodes, edges, vp);
+    const res = await putPathCanvas(selectedVersionId, selectedPathId, payload);
+    if (!res.success) {
+      throw new Error(res.error || 'Failed to save canvas layout');
+    }
+  }, [canvasPersistReady, selectedVersionId, selectedPathId, getViewport, nodes, edges]);
+
+  useEffect(() => {
+    registerPathsCanvasFlush(flushPathsCanvasNow);
+    return () => {
+      registerPathsCanvasFlush(null);
+    };
+  }, [registerPathsCanvasFlush, flushPathsCanvasNow]);
 
   useEffect(() => {
     schedulePersistPathsCanvas();

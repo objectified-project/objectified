@@ -2,10 +2,10 @@
 
 import React, { useState } from 'react';
 import { useStudio } from '../StudioContext';
-import { Code2 } from 'lucide-react';
 import PathsSidebar from './components/PathsSidebar';
 import PathsHttpOperationPalette from './components/PathsHttpOperationPalette';
 import PathsCanvasView from './components/PathsCanvasView';
+import PathsCodeView from './components/PathsCodeView';
 import OperationPropertiesPanel from './components/OperationPropertiesPanel';
 import ParameterPropertiesPanel from './components/ParameterPropertiesPanel';
 import ResponsePropertiesPanel from './components/ResponsePropertiesPanel';
@@ -116,17 +116,7 @@ export default function PathsPage() {
         /* Three-Panel Layout: Sidebar | Canvas | Properties */
         <div className="flex-1 flex h-full overflow-hidden relative">
           {pathsViewMode === 'code' ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-gray-900 px-6 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-100 dark:bg-indigo-900/40">
-                <Code2 className="h-8 w-8 text-indigo-600 dark:text-indigo-400" aria-hidden />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Paths code view</h2>
-                <p className="mt-2 max-w-md text-sm text-gray-600 dark:text-gray-400">
-                  OpenAPI paths editing in code will connect here. For now, use <span className="font-medium text-gray-800 dark:text-gray-200">Canvas</span> in the studio header to design on the graph.
-                </p>
-              </div>
-            </div>
+            <PathsCodeView refreshKey={canvasRefreshKey} />
           ) : (
             <>
           {/* Left Sidebar */}

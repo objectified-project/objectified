@@ -36,7 +36,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 | P-12 | [#2651](https://github.com/KenSuenobu/objectified-commercial/issues/2651) **(shipped)** | Yes |
 | P-13 | [#2652](https://github.com/KenSuenobu/objectified-commercial/issues/2652) **(shipped)** | Yes |
 | P-14 | [#2653](https://github.com/KenSuenobu/objectified-commercial/issues/2653) **(shipped)** | Yes |
-| P-15 | [#2654](https://github.com/KenSuenobu/objectified-commercial/issues/2654) | Yes |
+| P-15 | [#2654](https://github.com/KenSuenobu/objectified-commercial/issues/2654) **(shipped)** | Yes |
 | P-16 | [#2655](https://github.com/KenSuenobu/objectified-commercial/issues/2655) | Yes |
 | P-17 | [#2656](https://github.com/KenSuenobu/objectified-commercial/issues/2656) | Yes |
 | P-18 | [#2657](https://github.com/KenSuenobu/objectified-commercial/issues/2657) | No (V2 / backlog) |
@@ -87,7 +87,7 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 
 | # | Issue | MVP |
 |---|--------|-----|
-| 2654 | P-15 Monaco Code mode + preview | Yes |
+| ~~2654~~ | ~~P-15 Monaco Code mode + preview~~ **(shipped)** | Yes |
 | 2655 | P-16 OpenAPI 3.2 export + validation gate | Yes |
 | 2656 | P-17 PATH QUALITY score + dialog | Yes |
 
