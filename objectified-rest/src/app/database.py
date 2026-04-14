@@ -5496,9 +5496,11 @@ class Database:
                                created_at, updated_at
                         FROM odb.change_reports
                         WHERE published_revision_id = %s::uuid
+                          AND tenant_id = %s::uuid
+                          AND project_id = %s::uuid
                         LIMIT 1
                         """,
-                        (published_revision_id,),
+                        (published_revision_id, tenant_id, project_id),
                     )
                     row = cursor.fetchone()
                 conn.commit()

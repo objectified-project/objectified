@@ -132,6 +132,51 @@ def test_patch_ok():
         mdb.patch_change_report_edits.assert_called_once()
 
 
+def test_patch_clear_edits():
+    cleared = {**_MOCK_ROW, "edited_rendered_body": None, "edited_header_snapshot": None, "edited_footnote_snapshot": None}
+    with patch("app.version_change_report_routes.db") as mdb:
+        mdb.get_version_by_id.return_value = _MOCK_VERSION_PUBLISHED
+        mdb.get_change_report_by_published_revision.return_value = {
+            **_MOCK_ROW,
+            "edited_rendered_body": "old edit",
+            "edited_header_snapshot": "old hdr",
+            "edited_footnote_snapshot": "old fn",
+        }
+        mdb.patch_change_report_edits.return_value = cleared
+        mdb.is_user_tenant_admin.return_value = False
+        r = client.patch(
+            "/v1/versions/tn/p1/v1/change-report",
+            json={"clearEdits": True},
+        )
+        assert r.status_code == 200
+        # All edited fields cleared; effective values fall back to rendered snapshots
+        assert r.json()["effectiveRenderedBody"] == "body"
+        call_kwargs = mdb.patch_change_report_edits.call_args
+        assert call_kwargs.kwargs.get("clear_edits") is True
+
+
+def test_patch_null_clears_individual_field():
+    after = {**_MOCK_ROW, "edited_rendered_body": None, "edited_header_snapshot": "kept hdr"}
+    with patch("app.version_change_report_routes.db") as mdb:
+        mdb.get_version_by_id.return_value = _MOCK_VERSION_PUBLISHED
+        mdb.get_change_report_by_published_revision.return_value = {
+            **_MOCK_ROW,
+            "edited_rendered_body": "old edit",
+            "edited_header_snapshot": "kept hdr",
+        }
+        mdb.patch_change_report_edits.return_value = after
+        mdb.is_user_tenant_admin.return_value = False
+        # Sending explicit null for editedRenderedBody should clear just that field
+        r = client.patch(
+            "/v1/versions/tn/p1/v1/change-report",
+            json={"editedRenderedBody": None},
+        )
+        assert r.status_code == 200
+        result = r.json()
+        assert result["effectiveRenderedBody"] == "body"  # falls back to rendered_body
+        assert result["effectiveHeaderSnapshot"] == "kept hdr"
+
+
 def test_regenerate_ok():
     regen_row = {
         **_MOCK_ROW,
@@ -147,6 +192,41 @@ def test_regenerate_ok():
         r = client.post("/v1/versions/tn/p1/v1/change-report/regenerate", json={})
         assert r.status_code == 200
         assert "new body" in r.json()["renderedBody"]
+
+
+def test_regenerate_keep_user_edits():
+    """discardUserEdits=false should preserve edited_* snapshot fields."""
+    regen_row = {
+        **_MOCK_ROW,
+        "rendered_body": "new body",
+        "header_snapshot": "Publication change report",
+        "edited_rendered_body": "user override",
+        "edited_header_snapshot": "user hdr",
+        "regenerated_at": datetime(2026, 4, 14, 13, 0, 0, tzinfo=timezone.utc),
+    }
+    existing = {
+        **_MOCK_ROW,
+        "edited_rendered_body": "user override",
+        "edited_header_snapshot": "user hdr",
+    }
+    with patch("app.version_change_report_routes.db") as mdb:
+        mdb.get_version_by_id.return_value = _MOCK_VERSION_PUBLISHED
+        mdb.get_change_report_by_published_revision.return_value = existing
+        mdb.apply_change_report_regeneration.return_value = regen_row
+        mdb.is_user_tenant_admin.return_value = False
+        r = client.post(
+            "/v1/versions/tn/p1/v1/change-report/regenerate",
+            json={"discardUserEdits": False},
+        )
+        assert r.status_code == 200
+        result = r.json()
+        # Effective values use the preserved user edits
+        assert result["effectiveRenderedBody"] == "user override"
+        assert result["effectiveHeaderSnapshot"] == "user hdr"
+        # Rendered body was updated by regeneration
+        assert result["renderedBody"] == "new body"
+        call_kwargs = mdb.apply_change_report_regeneration.call_args
+        assert call_kwargs.kwargs.get("discard_user_edits") is False
 
 
 def test_placeholder_render_module():
