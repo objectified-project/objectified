@@ -16,16 +16,20 @@ const W_REFS = 0.15;
 const W_RESPONSE_CONTENT = 0.1;
 const W_DUPLICATE_OP_IDS = 0.1;
 
-/** Human-readable weight labels for PATH QUALITY dialog (must match {@link computePathQuality}). */
+function formatWeightLabel(weight: number): string {
+  return `${weight * 100}%`;
+}
+
+/** Human-readable weight labels for PATH QUALITY dialog derived from {@link computePathQuality} weights. */
 export const PATH_QUALITY_WEIGHT_LABELS = {
-  operationId: '15%',
-  descriptions: '20%',
-  parameterTyping: '15%',
-  errorResponses: '15%',
-  references: '15%',
-  responseContent: '10%',
-  duplicateOperationIds: '10%',
-} as const;
+  operationId: formatWeightLabel(W_OPERATION_ID),
+  descriptions: formatWeightLabel(W_DESCRIPTIONS),
+  parameterTyping: formatWeightLabel(W_PARAM_TYPING),
+  errorResponses: formatWeightLabel(W_ERROR_RESPONSES),
+  references: formatWeightLabel(W_REFS),
+  responseContent: formatWeightLabel(W_RESPONSE_CONTENT),
+  duplicateOperationIds: formatWeightLabel(W_DUPLICATE_OP_IDS),
+};
 
 export interface PathQualityBreakdownRow {
   id:
@@ -86,9 +90,14 @@ function collectRefsFromValue(value: unknown, out: Set<string>): void {
   }
 }
 
+function decodeJsonPointerSegment(segment: string): string {
+  // RFC 6901: ~1 → '/', ~0 → '~' (in that order)
+  return segment.replace(/~1/g, '/').replace(/~0/g, '~');
+}
+
 function resolveInternalRef(ref: string, specRoot: Record<string, unknown>): boolean {
   if (!ref.startsWith('#/')) return true;
-  const parts = ref.slice(2).split('/').filter(Boolean);
+  const parts = ref.slice(2).split('/').filter(Boolean).map(decodeJsonPointerSegment);
   let cur: unknown = specRoot;
   for (const p of parts) {
     if (cur === null || typeof cur !== 'object') return false;
