@@ -48,49 +48,6 @@ This document defines **epics and ordered, single-scope issues** to deliver a **
 
 ### Epic feature charts (issues by number, MVP vs V2)
 
-**E1 — [#2633](https://github.com/KenSuenobu/objectified-commercial/issues/2633)**
-
-| # | Issue | MVP |
-|---|--------|-----|
-| ~~2639~~ | ~~P-00 Navigation: header “Paths” + Home grid card~~ **(shipped)** | Yes |
-| ~~2640~~ | ~~P-01 Paths shell: header, PATH QUALITY placeholder, Canvas/Code~~ **(shipped)** | Yes |
-| ~~2641~~ | ~~P-02 Canvas defaults parity with Designer~~ **(shipped)** | Yes |
-| ~~2642~~ | ~~P-03 Persist canvas JSON per version~~ **(shipped)** | Yes |
-
-**E2 — [#2634](https://github.com/KenSuenobu/objectified-commercial/issues/2634)**
-
-| # | Issue | MVP |
-|---|--------|-----|
-| ~~2643~~ | ~~P-04 Palette drag GET/PUT/PATCH/DELETE/OPTIONS~~ **(shipped)** | Yes |
-| ~~2644~~ | ~~P-05 Path nodes + persist `version_path` / `path_operation`~~ **(shipped)** | Yes |
-| ~~2645~~ | ~~P-06 Operation inspector (operationId, tags, …)~~ **(shipped)** | Yes |
-| ~~2646~~ | ~~P-07 Edges path/op/attachments~~ **(shipped)** | Yes |
-| ~~2653~~ | ~~P-14 OPTIONS first-class~~ **(shipped)** | Yes |
-
-**E3 — [#2635](https://github.com/KenSuenobu/objectified-commercial/issues/2635)**
-
-| # | Issue | MVP |
-|---|--------|-----|
-| ~~2647~~ | ~~P-08 Path/query parameters + schema~~ **(shipped)** | Yes |
-| ~~2648~~ | ~~P-09 Request body + content types~~ **(shipped)** | Yes |
-| ~~2649~~ | ~~P-10 Header/cookie parameters~~ **(shipped)** | Yes |
-
-**E4 — [#2636](https://github.com/KenSuenobu/objectified-commercial/issues/2636)**
-
-| # | Issue | MVP |
-|---|--------|-----|
-| ~~2650~~ | ~~P-11 Responses + content map~~ **(shipped)** | Yes |
-| ~~2651~~ | ~~P-12 allOf/anyOf/oneOf composer~~ **(shipped)** | Yes |
-| ~~2652~~ | ~~P-13 Reuse / `$ref` pickers~~ **(shipped)** | Yes |
-
-**E5 — [#2637](https://github.com/KenSuenobu/objectified-commercial/issues/2637)**
-
-| # | Issue | MVP |
-|---|--------|-----|
-| ~~2654~~ | ~~P-15 Monaco Code mode + preview~~ **(shipped)** | Yes |
-| ~~2655~~ | ~~P-16 OpenAPI 3.2 export + validation gate~~ **(shipped)** | Yes |
-| ~~2656~~ | ~~P-17 PATH QUALITY score + dialog~~ **(shipped)** | Yes |
-
 **E6 — [#2638](https://github.com/KenSuenobu/objectified-commercial/issues/2638)**
 
 | # | Issue | MVP |
