@@ -146,7 +146,7 @@ Implement and verify in this order so each step stays testable. **Issue → road
 | 12 | ~~[#2651](https://github.com/KenSuenobu/objectified-commercial/issues/2651)~~ **(shipped)** | P-12 |
 | 13 | [#2652](https://github.com/KenSuenobu/objectified-commercial/issues/2652) | P-13 |
 | 14 | [#2654](https://github.com/KenSuenobu/objectified-commercial/issues/2654) | P-15 |
-| 15 | [#2655](https://github.com/KenSuenobu/objectified-commercial/issues/2655) | P-16 |
+| ~~15~~ | ~~[#2655](https://github.com/KenSuenobu/objectified-commercial/issues/2655)~~ **(shipped)** | P-16 |
 | 16 | [#2656](https://github.com/KenSuenobu/objectified-commercial/issues/2656) | P-17 |
 
 **Shipped:** P-00 ([#2639](https://github.com/KenSuenobu/objectified-commercial/issues/2639)) — Studio header **Paths** link and Home four-wide grid with **Paths** beside **Designer**. P-01 ([#2640](https://github.com/KenSuenobu/objectified-commercial/issues/2640)) — Paths **PATH QUALITY** placeholder, **Canvas | Code** (Paths editor), **Canvas | Paths | Code** navigation when not on Paths. P-06 ([#2645](https://github.com/KenSuenobu/objectified-commercial/issues/2645)) — **Paths** operation inspector uses **Radix Tabs** (**General**, **Docs**, **Tags**, **Advanced**); **operationId** uniqueness enforced **per version** on save; **tags** and **Markdown** description preview; **deprecated** / **x-private** and existing advanced fields preserved. P-12 ([#2651](https://github.com/KenSuenobu/objectified-commercial/issues/2651)) — **Paths** response **inline** schemas support **allOf** / **anyOf** / **oneOf** composition with **$ref** to component classes, validation vs the **property** tree, and matching **OpenAPI** export.

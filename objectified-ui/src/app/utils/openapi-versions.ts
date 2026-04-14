@@ -28,19 +28,26 @@ export const OPENAPI_VERSIONS: Record<string, OpenAPIVersion> = {
       'Full JSON Schema vocabulary'
     ]
   },
-  // Add future versions here as they become available
-  // '3.2.0': {
-  //   version: '3.2.0',
-  //   templateFile: 'openapi-3.2.0-spec.hbs',
-  //   description: 'OpenAPI 3.2.0 specification',
-  //   supportedFeatures: [...]
-  // }
+  '3.2.0': {
+    version: '3.2.0',
+    templateFile: 'openapi/openapi-spec.hbs',
+    description: 'OpenAPI 3.2.0 specification (Studio export default for merged paths + components)',
+    supportedFeatures: [
+      'Paths + components export',
+      'JSON Schema 2020-12 (as in OAS 3.2)',
+      'Schema composition (allOf, anyOf, oneOf)',
+      'Nested properties'
+    ]
+  },
 };
 
 /**
- * Default OpenAPI version to use
+ * Default OpenAPI version for class-only and legacy callers
  */
 export const DEFAULT_OPENAPI_VERSION = '3.1.0';
+
+/** Studio merged export (paths + components) uses OpenAPI 3.2 (#2655). */
+export const STUDIO_EXPORT_OPENAPI_VERSION = '3.2.0';
 
 /**
  * Get configuration for a specific OpenAPI version
