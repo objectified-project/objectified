@@ -537,7 +537,7 @@ export default function TenantManagementClient() {
                                 }}
                               />
                               <div
-                                className="fixed w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20"
+                                className="fixed w-48 min-w-0 overflow-x-hidden bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20"
                                 style={{
                                   top: `${dropdownPosition.top}px`,
                                   right: `${dropdownPosition.right}px`
@@ -675,7 +675,7 @@ export default function TenantManagementClient() {
                                 }}
                               />
                               <div
-                                className="fixed w-52 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20"
+                                className="fixed w-52 min-w-0 overflow-x-hidden bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20"
                                 style={{
                                   top: `${dropdownPosition.top}px`,
                                   right: `${dropdownPosition.right}px`

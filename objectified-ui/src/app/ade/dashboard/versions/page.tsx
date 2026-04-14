@@ -200,6 +200,36 @@ function formatRevisionTimestampUtc(iso: string | undefined): string {
   return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
 }
 
+function getVersionActionsMenuMaxPx(): number {
+  return Math.min(window.innerHeight * 0.6, 24 * 16);
+}
+
+/** Fixed dropdown for row actions: stay inside the viewport (flip above or clamp when near the bottom). */
+function computeVersionActionsDropdownPosition(rect: DOMRect): { top?: number; bottom?: number; right: number } {
+  const right = window.innerWidth - rect.right;
+  const gap = 4;
+  const margin = 8;
+  const maxH = getVersionActionsMenuMaxPx();
+  const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
+  const spaceAbove = rect.top - gap - margin;
+
+  const preferBelow = spaceBelow >= maxH || spaceBelow >= spaceAbove;
+
+  if (preferBelow) {
+    let top = rect.bottom + gap;
+    if (top + maxH > window.innerHeight - margin) {
+      top = Math.max(margin, window.innerHeight - margin - maxH);
+    }
+    return { top, right };
+  }
+
+  const topIfAbove = rect.top - gap - maxH;
+  if (topIfAbove < margin) {
+    return { top: margin, right };
+  }
+  return { bottom: window.innerHeight - rect.top + gap, right };
+}
+
 interface VersionBranchRow {
   id: string;
   name: string;
@@ -261,7 +291,7 @@ const Versions = () => {
 
   // Dropdown state
   const [openVersionDropdown, setOpenVersionDropdown] = useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
 
   const [showOpenApiDialog, setShowOpenApiDialog] = useState(false);
   const [openApiSpec, setOpenApiSpec] = useState<string>('');
@@ -2723,10 +2753,9 @@ const Versions = () => {
                         onClick={(e) => {
                           e.stopPropagation();
                           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                          setDropdownPosition({
-                            top: rect.bottom + 4,
-                            right: window.innerWidth - rect.right
-                          });
+                          setDropdownPosition(
+                            openVersionDropdown === version.id ? null : computeVersionActionsDropdownPosition(rect),
+                          );
                           setOpenVersionDropdown(openVersionDropdown === version.id ? null : version.id);
                         }}
                         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-white"
@@ -2745,11 +2774,13 @@ const Versions = () => {
                             }}
                           />
                           <div
-                            className="fixed w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20"
+                            className="fixed w-56 min-w-0 max-h-[min(60vh,24rem)] overflow-x-hidden overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20"
                             style={{
-                              top: `${dropdownPosition.top}px`,
-                              right: `${dropdownPosition.right}px`
-                            }}>
+                              ...(dropdownPosition.top != null ? { top: `${dropdownPosition.top}px` } : {}),
+                              ...(dropdownPosition.bottom != null ? { bottom: `${dropdownPosition.bottom}px` } : {}),
+                              right: `${dropdownPosition.right}px`,
+                            }}
+                          >
                             <div className="py-1">
                               <button
                                 onClick={(e) => {
