@@ -12,7 +12,7 @@ import { buildSchemaScoreCompareRows } from '@/app/utils/schema-version-score-co
 export interface SchemaTimelineVersion {
   id: string;
   version_id: string;
-  description: string;
+  description?: string | null;
   published?: boolean;
   created_at?: string;
 }
