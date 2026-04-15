@@ -54,11 +54,25 @@ def test_prepare_rejects_invalid_token():
         prepare_version_metadata_update(None, {"lifecycle": "gamma"})
 
 
-def test_prepare_sunset_requires_successor():
-    with pytest.raises(ValueError, match="successorRevisionId"):
+def test_prepare_sunset_eol_without_successor():
+    """Sunset with no successor is valid pure end-of-life (#748)."""
+    out = prepare_version_metadata_update(
+        None,
+        {"lifecycle": "deprecated", "sunsetAt": "2026-12-01T00:00:00Z"},
+    )
+    assert out.get("sunsetAt")
+    assert out.get("successorRevisionId") is None
+
+
+def test_prepare_sunset_rejects_non_uuid_successor_when_set():
+    with pytest.raises(ValueError, match="successorRevisionId must be a UUID"):
         prepare_version_metadata_update(
             None,
-            {"lifecycle": "deprecated", "sunsetAt": "2026-12-01T00:00:00Z"},
+            {
+                "lifecycle": "deprecated",
+                "sunsetAt": "2026-12-01T00:00:00Z",
+                "successorRevisionId": "not-a-uuid",
+            },
         )
 
 

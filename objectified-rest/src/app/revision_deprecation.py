@@ -5,8 +5,9 @@ Stored in ``odb.versions.metadata`` as a shallow object. Keys (camelCase in API)
 
 - ``deprecated`` (bool): revision is deprecated for new consumer work.
 - ``deprecationMessage`` (str): human-readable explanation / what changed.
-- ``successorRevisionId`` (str): optional ``versions.id`` UUID of the replacement revision;
-  **required** when ``sunsetAt`` is set (#748). **GET** ``/v1/versions/{tenant}/{project}/{revisionId}`` supports
+- ``successorRevisionId`` (str): optional ``versions.id`` UUID of the replacement revision when migrating
+  consumers to another revision; omit for pure end-of-life (sunset with no successor) (#748). **GET**
+  ``/v1/versions/{tenant}/{project}/{revisionId}`` supports
   ``successorResolution=none|resolve|redirect`` (#749): follows this pointer (cycle-safe; missing-target and
   protected-ref rules documented on the route).
 - ``sunsetAt`` (str): optional instant in **UTC** (ISO 8601, e.g. ``2026-12-01T00:00:00Z`` or calendar day
@@ -247,8 +248,10 @@ def normalize_deprecation_metadata_for_storage(metadata: Dict[str, Any]) -> Dict
 
 def validate_deprecation_schedule(metadata: Dict[str, Any]) -> None:
     """
-    Rules (#748): if a sunset is set, the revision must be deprecated and must name a successor.
+    Rules (#748): if a sunset is set, the revision must be deprecated (or archived for audit).
+    ``successorRevisionId`` is optional: omit for end-of-life with no replacement revision.
     If ``deprecatedAt`` and sunset are both set, sunset must be on or after deprecatedAt.
+    When a successor is present, it must be a UUID.
     """
     from .revision_lifecycle import (  # local: avoid import cycle with revision_lifecycle
         LIFECYCLE_ARCHIVED,
@@ -268,11 +271,10 @@ def validate_deprecation_schedule(metadata: Dict[str, Any]) -> None:
         )
 
     succ = m.get("successorRevisionId") or m.get("successor_revision_id")
-    if not (isinstance(succ, str) and succ.strip()):
-        raise ValueError("sunsetAt requires successorRevisionId (replacement revision in this project)")
-    succ_id = succ.strip()
-    if not is_uuid_string(succ_id):
-        raise ValueError("successorRevisionId must be a UUID")
+    if isinstance(succ, str) and succ.strip():
+        succ_id = succ.strip()
+        if not is_uuid_string(succ_id):
+            raise ValueError("successorRevisionId must be a UUID")
 
     dep_at_s = effective_deprecated_at_string(m)
     if dep_at_s:

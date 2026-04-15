@@ -95,6 +95,9 @@ import {
   dashboardTrHoverClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
 
+/** Radix Select cannot use empty string as a value; maps to no successor in metadata. */
+const SUCCESSOR_SELECT_NONE = '__none__';
+
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
   loading: () => (
@@ -263,6 +266,7 @@ const Versions = () => {
   const [versions, setVersions] = useState<Version[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showSunsetScheduleDialog, setShowSunsetScheduleDialog] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [publishVersionId, setPublishVersionId] = useState<string | null>(null);
   const [publishVisibility, setPublishVisibility] = useState<'private' | 'public'>('private');
@@ -908,6 +912,51 @@ const Versions = () => {
     }
   };
 
+  const populateVersionEditForm = useCallback(
+    (version: Version, options?: { defaultSuccessorRevisionId?: string | null }) => {
+      const meta = version.metadata ?? {};
+      setEditDeprecationMessage(
+        typeof meta.deprecationMessage === 'string'
+          ? meta.deprecationMessage
+          : typeof meta.message === 'string'
+            ? meta.message
+            : '',
+      );
+      const sunsetRaw =
+        typeof meta.sunsetAt === 'string'
+          ? meta.sunsetAt
+          : typeof meta.sunsetDate === 'string'
+            ? meta.sunsetDate
+            : typeof meta.sunset_date === 'string'
+              ? meta.sunset_date
+              : '';
+      setEditSunsetLocal(sunsetRaw ? utcIsoToDatetimeLocalValue(sunsetRaw) : '');
+      const fromMetaSuccessor =
+        typeof meta.successorRevisionId === 'string'
+          ? meta.successorRevisionId
+          : typeof meta.successor_revision_id === 'string'
+            ? meta.successor_revision_id
+            : '';
+      let successor = fromMetaSuccessor;
+      if (
+        !successor.trim() &&
+        options?.defaultSuccessorRevisionId &&
+        options.defaultSuccessorRevisionId !== version.id
+      ) {
+        successor = options.defaultSuccessorRevisionId;
+      }
+      setEditSuccessorRevisionId(successor);
+      setEditPublishedMetadataOnly(Boolean(version.published && effectiveIsAdmin));
+      setSelectedVersion(version);
+      setVersionId(version.version_id);
+      setDescription(version.shortMessage || '');
+      setChangeLog(version.changelog || '');
+      setEnabled(version.enabled);
+      setEditLifecycle(version.lifecycle ?? 'stable');
+    },
+    [effectiveIsAdmin],
+  );
+
   const handleEditClick = (version: Version) => {
     if (version.published && !effectiveIsAdmin) {
       setErrorMessage('Cannot edit published version');
@@ -918,93 +967,68 @@ const Versions = () => {
       toast.warning('Archived revisions are read-only.');
       return;
     }
-    const meta = version.metadata ?? {};
-    setEditDeprecationMessage(
-      typeof meta.deprecationMessage === 'string' ? meta.deprecationMessage
-        : typeof meta.message === 'string' ? meta.message
-        : ''
-    );
-    const sunsetRaw =
-      typeof meta.sunsetAt === 'string'
-        ? meta.sunsetAt
-        : typeof meta.sunsetDate === 'string'
-          ? meta.sunsetDate
-          : typeof meta.sunset_date === 'string'
-            ? meta.sunset_date
-            : '';
-    setEditSunsetLocal(sunsetRaw ? utcIsoToDatetimeLocalValue(sunsetRaw) : '');
-    setEditSuccessorRevisionId(
-      typeof meta.successorRevisionId === 'string' ? meta.successorRevisionId
-        : typeof meta.successor_revision_id === 'string' ? meta.successor_revision_id
-        : ''
-    );
-    setEditPublishedMetadataOnly(Boolean(version.published && effectiveIsAdmin));
-    setSelectedVersion(version); setVersionId(version.version_id);
-    setDescription(version.shortMessage || ''); setChangeLog(version.changelog || '');
-    setEnabled(version.enabled); setEditLifecycle(lc);
-    setErrorMessage(''); setShowEditDialog(true);
+    populateVersionEditForm(version);
+    setErrorMessage('');
+    setShowSunsetScheduleDialog(false);
+    setShowEditDialog(true);
   };
 
-  const handleEditSubmit = async () => {
-    if (!selectedVersion) return;
-    if (!editPublishedMetadataOnly) {
-      const notesCheck = validateVersionNotesClient(description, changeLog);
-      if (!notesCheck.ok) {
-        setErrorMessage(notesCheck.error);
-        return;
-      }
+  const handleOpenSunsetSchedule = (version: Version) => {
+    if (version.published && !effectiveIsAdmin) {
+      toast.error('Only a tenant admin can set sunset metadata on a published revision.');
+      return;
     }
-    const isArchived = (selectedVersion.lifecycle ?? 'stable') === 'archived';
-    if (isArchived && !effectiveIsAdmin) return;
-    if (editSunsetLocal.trim()) {
-      if (editLifecycle !== 'deprecated') {
-        setErrorMessage('Set lifecycle to Deprecated when scheduling a sunset.');
-        return;
-      }
-      if (!editSuccessorRevisionId.trim()) {
-        setErrorMessage('Successor revision is required when a sunset is set.');
-        return;
-      }
+    const lc = version.lifecycle ?? 'stable';
+    if (lc === 'archived' && !effectiveIsAdmin) {
+      toast.warning('Archived revisions are read-only.');
+      return;
     }
-    setIsLoading(true); setErrorMessage('');
-    try {
-      const prevMeta = { ...(selectedVersion.metadata ?? {}) };
-      const metadata: Record<string, unknown> = { ...prevMeta };
-      metadata.lifecycle = editLifecycle;
-      if (editDeprecationMessage.trim()) {
-        metadata.deprecationMessage = editDeprecationMessage.trim();
-      } else {
-        delete metadata.deprecationMessage;
-      }
-      if (editSunsetLocal.trim()) {
-        const iso = localDatetimeLocalToUtcIso(editSunsetLocal.trim());
-        if (!iso) {
-          setErrorMessage('Invalid sunset date/time');
-          setIsLoading(false);
-          return;
-        }
-        metadata.sunsetAt = iso;
-      } else {
-        metadata.sunsetAt = null;
-        metadata.sunsetDate = null;
-      }
-      if (editSuccessorRevisionId.trim()) {
-        metadata.successorRevisionId = editSuccessorRevisionId.trim();
-      } else {
-        metadata.successorRevisionId = null;
-      }
+    const headId = projectHeadRevisionId(versions);
+    populateVersionEditForm(version, { defaultSuccessorRevisionId: headId });
+    setErrorMessage('');
+    setShowEditDialog(false);
+    setShowSunsetScheduleDialog(true);
+  };
 
-      const body: Record<string, unknown> = {
-        projectId: selectedProjectId,
-      };
-      if (editPublishedMetadataOnly) {
-        body.metadata = metadata;
-      } else {
-        body.shortMessage = description.trim();
-        body.changelog = changeLog.trim() || null;
-        body.enabled = enabled;
-        body.metadata = metadata;
+  const performVersionUpdateSave = async (): Promise<boolean> => {
+    if (!selectedVersion) return false;
+    const prevMeta = { ...(selectedVersion.metadata ?? {}) };
+    const metadata: Record<string, unknown> = { ...prevMeta };
+    metadata.lifecycle = editLifecycle;
+    if (editDeprecationMessage.trim()) {
+      metadata.deprecationMessage = editDeprecationMessage.trim();
+    } else {
+      delete metadata.deprecationMessage;
+    }
+    if (editSunsetLocal.trim()) {
+      const iso = localDatetimeLocalToUtcIso(editSunsetLocal.trim());
+      if (!iso) {
+        setErrorMessage('Invalid sunset date/time');
+        return false;
       }
+      metadata.sunsetAt = iso;
+    } else {
+      metadata.sunsetAt = null;
+      metadata.sunsetDate = null;
+    }
+    if (editSuccessorRevisionId.trim()) {
+      metadata.successorRevisionId = editSuccessorRevisionId.trim();
+    } else {
+      metadata.successorRevisionId = null;
+    }
+
+    const body: Record<string, unknown> = {
+      projectId: selectedProjectId,
+    };
+    if (editPublishedMetadataOnly) {
+      body.metadata = metadata;
+    } else {
+      body.shortMessage = description.trim();
+      body.changelog = changeLog.trim() || null;
+      body.enabled = enabled;
+      body.metadata = metadata;
+    }
+    try {
       const res = await fetch(`/api/versions/${selectedVersion.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -1012,13 +1036,72 @@ const Versions = () => {
       });
       const data = await res.json();
       if (data.success) {
-        setShowEditDialog(false);
         await loadVersions();
-      } else {
-        setErrorMessage(typeof data.error === 'string' ? data.error : 'Failed to update version');
+        return true;
       }
+      setErrorMessage(typeof data.error === 'string' ? data.error : 'Failed to update version');
+      return false;
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'An error occurred');
+      return false;
+    }
+  };
+
+  const runEditVersionValidations = (options?: { requireSunsetDatetime?: boolean }): boolean => {
+    if (!selectedVersion) return false;
+    if (!editPublishedMetadataOnly) {
+      const notesCheck = validateVersionNotesClient(description, changeLog);
+      if (!notesCheck.ok) {
+        setErrorMessage(notesCheck.error);
+        return false;
+      }
+    }
+    const isArchived = (selectedVersion.lifecycle ?? 'stable') === 'archived';
+    if (isArchived && !effectiveIsAdmin) return false;
+    if (options?.requireSunsetDatetime) {
+      if (!editSunsetLocal.trim()) {
+        setErrorMessage('Sunset date and time are required.');
+        return false;
+      }
+      const isoProbe = localDatetimeLocalToUtcIso(editSunsetLocal.trim());
+      if (!isoProbe) {
+        setErrorMessage('Invalid sunset date/time');
+        return false;
+      }
+    }
+    if (editSunsetLocal.trim()) {
+      if (editLifecycle !== 'deprecated') {
+        setErrorMessage('Set lifecycle to Deprecated when scheduling a sunset.');
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleEditSubmit = async () => {
+    if (!selectedVersion) return;
+    if (!runEditVersionValidations()) return;
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      const ok = await performVersionUpdateSave();
+      if (ok) setShowEditDialog(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSunsetScheduleSubmit = async () => {
+    if (!selectedVersion) return;
+    if (!runEditVersionValidations({ requireSunsetDatetime: true })) return;
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      const ok = await performVersionUpdateSave();
+      if (ok) {
+        setShowSunsetScheduleDialog(false);
+        toast.success('Sunset schedule saved.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1341,6 +1424,51 @@ const Versions = () => {
 
   /** Latest revision by `created_at` in the loaded list — used as “current” for compare (#2580). */
   const headRevisionId = useMemo(() => projectHeadRevisionId(versions), [versions]);
+
+  /** Other revisions in the same project (for successor picker — labels are version IDs, values are revision UUIDs). */
+  const successorCandidates = useMemo(() => {
+    const sv = selectedVersion;
+    if (!sv) return [];
+    return versions
+      .filter((v) => v.project_id === sv.project_id && v.id !== sv.id)
+      .sort((a, b) => b.version_id.localeCompare(a.version_id, undefined, { numeric: true }));
+  }, [versions, selectedVersion]);
+
+  const renderSuccessorRevisionField = (htmlId: string) => {
+    const tid = editSuccessorRevisionId.trim();
+    const orphan = tid && !successorCandidates.some((v) => v.id === tid) ? tid : null;
+    const selectValue = tid ? tid : SUCCESSOR_SELECT_NONE;
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={htmlId}>Successor revision</Label>
+        <Select
+          value={selectValue}
+          onValueChange={(v) => setEditSuccessorRevisionId(v === SUCCESSOR_SELECT_NONE ? '' : v)}
+          disabled={isLoading}
+        >
+          <SelectTrigger id={htmlId} className="w-full">
+            <SelectValue placeholder="Choose a revision" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={SUCCESSOR_SELECT_NONE}>No successor (end of life)</SelectItem>
+            {orphan ? (
+              <SelectItem value={orphan}>Other revision ({orphan.slice(0, 8)}…)</SelectItem>
+            ) : null}
+            {successorCandidates.map((v) => (
+              <SelectItem key={v.id} value={v.id}>
+                v{v.version_id}
+                {v.published ? ' · published' : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Optional. Pick the replacement by version label (stored as the successor revision id), or leave as end of life with no
+          successor.
+        </p>
+      </div>
+    );
+  };
 
   const handleCompareVersions = async () => {
     await runCompareBetween(compareVersion1Id, compareVersion2Id);
@@ -1762,7 +1890,14 @@ const Versions = () => {
     switch (action) {
       case 'view': await handleViewOpenApi(version); break;
       case 'relationshipGraph': await handleShowRelationshipGraph(version); break;
-      case 'edit': if (!isPublished) handleEditClick(version); else setErrorMessage('Cannot edit published version'); break;
+      case 'edit':
+        if (!isPublished) handleEditClick(version);
+        else if (effectiveIsAdmin) handleEditClick(version);
+        else setErrorMessage('Cannot edit published version');
+        break;
+      case 'scheduleSunset':
+        handleOpenSunsetSchedule(version);
+        break;
       case 'publish': if (canPub) handlePublishClick(version.id); else toast.warning('Only owner or admin can publish'); break;
       case 'unpublish': if (canUnpub) await handleUnpublish(version.id); else toast.warning('Only owner or admin can unpublish'); break;
       case 'freezeSchema': if (canModify(version)) await handleFreezeSchema(version); else toast.warning('Only owner or admin can freeze schema'); break;
@@ -2998,12 +3133,36 @@ const Versions = () => {
                                 Tag this revision
                               </button>
                               <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenVersionDropdown(null);
+                                  handleRowAction('scheduleSunset', version);
+                                }}
+                                disabled={
+                                  (!!version.published && !effectiveIsAdmin) ||
+                                  ((version.lifecycle ?? 'stable') === 'archived' && !effectiveIsAdmin)
+                                }
+                                title={
+                                  version.published && !effectiveIsAdmin
+                                    ? 'Only a tenant admin can set sunset on a published revision'
+                                    : (version.lifecycle ?? 'stable') === 'archived' && !effectiveIsAdmin
+                                      ? 'Archived revisions are read-only'
+                                      : 'Deprecation, sunset instant, and successor revision'
+                                }
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Sun className="w-4 h-4 text-amber-500 shrink-0" aria-hidden />
+                                Schedule sunset (EOL)…
+                              </button>
+                              <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setOpenVersionDropdown(null);
                                   handleRowAction('edit', version);
                                 }}
-                                disabled={!!version.published}
+                                disabled={!!version.published && !effectiveIsAdmin}
+                                title={version.published && !effectiveIsAdmin ? 'Only a tenant admin can edit a published revision' : undefined}
                                 className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <Edit2 className="w-4 h-4 text-blue-500" />
@@ -3339,20 +3498,11 @@ const Versions = () => {
                 disabled={isLoading}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Requires lifecycle Deprecated and a successor revision. Cleared if empty.
+                Requires lifecycle Deprecated when set. Successor is optional (end of life with no replacement is valid). Cleared
+                if empty.
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="successor-rev">Successor revision ID</Label>
-              <Input
-                id="successor-rev"
-                value={editSuccessorRevisionId}
-                onChange={(e) => setEditSuccessorRevisionId(e.target.value)}
-                disabled={isLoading}
-                placeholder="UUID of replacement revision in this project"
-                className="font-mono text-sm"
-              />
-            </div>
+            {renderSuccessorRevisionField('successor-rev')}
             <div className="space-y-2">
               <Label>Revision note *</Label>
               <Input
@@ -3388,6 +3538,106 @@ const Versions = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isLoading}>Cancel</Button>
             <Button onClick={handleEditSubmit} disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Changes'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showSunsetScheduleDialog}
+        onOpenChange={(open) => {
+          if (isLoading) return;
+          setShowSunsetScheduleDialog(open);
+          if (!open) setErrorMessage('');
+        }}
+      >
+        <DialogContent className="max-w-lg" aria-describedby="sunset-schedule-desc">
+          <DialogHeader>
+            <DialogTitle>Schedule sunset (EOL)</DialogTitle>
+            <DialogDescription id="sunset-schedule-desc">
+              Set lifecycle to Deprecated, enter a required sunset date and time (stored in UTC), and optionally the successor
+              revision (by version label) consumers should migrate to—or leave no successor for a pure end-of-life. Entries
+              appear on the{' '}
+              <Link
+                href="/ade/dashboard/versions/sunset-timeline"
+                className="text-indigo-600 dark:text-indigo-400 underline underline-offset-2"
+              >
+                sunset timeline
+              </Link>
+              .
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
+            {selectedVersion && editPublishedMetadataOnly && (
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Published revision — only deprecation and sunset metadata can be changed here.
+              </p>
+            )}
+            {selectedVersion && (
+              <div className="space-y-2">
+                <Label>Revision</Label>
+                <Input value={`v${selectedVersion.version_id}`} readOnly disabled className="font-mono" />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Lifecycle</Label>
+              <Select value={editLifecycle} onValueChange={setEditLifecycle} disabled={isLoading}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stable">Stable</SelectItem>
+                  <SelectItem value="beta">Beta</SelectItem>
+                  <SelectItem value="deprecated">Deprecated</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                A sunset date requires <span className="font-medium">Deprecated</span>.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sunset-schedule-deprecation-msg">Deprecation message</Label>
+              <Textarea
+                id="sunset-schedule-deprecation-msg"
+                value={editDeprecationMessage}
+                onChange={(e) => setEditDeprecationMessage(e.target.value)}
+                rows={2}
+                disabled={isLoading}
+                placeholder="Why this revision is deprecated (optional)"
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sunset-schedule-local">
+                Sunset date and time <span className="text-red-600 dark:text-red-400">*</span>
+                <span className="sr-only"> (required)</span>
+              </Label>
+              <Input
+                id="sunset-schedule-local"
+                type="datetime-local"
+                value={editSunsetLocal}
+                onChange={(e) => setEditSunsetLocal(e.target.value)}
+                disabled={isLoading}
+                required
+                aria-required
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Required. Local time is converted to UTC for storage. To clear a sunset, use Edit version from the row menu.
+              </p>
+            </div>
+            {renderSuccessorRevisionField('sunset-schedule-successor')}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSunsetScheduleDialog(false)} disabled={isLoading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSunsetScheduleSubmit}
+              disabled={isLoading || !editSunsetLocal.trim()}
+            >
+              {isLoading ? 'Saving…' : 'Save'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
