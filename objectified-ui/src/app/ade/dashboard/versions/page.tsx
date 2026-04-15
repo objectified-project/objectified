@@ -40,6 +40,7 @@ import {
 } from '../../../../../lib/db/helper';
 import { generateOpenApiSpec } from '../../../utils/openapi';
 import YAML from 'yaml';
+import { Markdown } from '@/app/components/ui/Markdown';
 import { diffLines, Change } from 'diff';
 import {
   compareSchemas,
@@ -267,6 +268,21 @@ const Versions = () => {
   const [publishVisibility, setPublishVisibility] = useState<'private' | 'public'>('private');
   const [publishShortMessage, setPublishShortMessage] = useState('');
   const [publishChangelog, setPublishChangelog] = useState('');
+  /** Publication change report baseline (CR): mirrors REST publish-preview / publish bodies. */
+  const [publishChangeReportBaselineMode, setPublishChangeReportBaselineMode] = useState<
+    'auto' | 'initial' | 'manual'
+  >('auto');
+  const [publishManualBaselineRevisionId, setPublishManualBaselineRevisionId] = useState('');
+  const [publishPreviewLoading, setPublishPreviewLoading] = useState(false);
+  const [publishPreviewError, setPublishPreviewError] = useState<string | null>(null);
+  const [publishPreview, setPublishPreview] = useState<{
+    headerSnapshot: string;
+    renderedBody: string;
+    footnoteSnapshot: string;
+    initialPublication?: boolean;
+    fromVersionLabel?: string;
+    toVersionLabel?: string;
+  } | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
   /** Timeline vs publication change report (CR-05, #2703); gated by `NEXT_PUBLIC_CHANGE_REPORT_UI`. */
   const [versionsMainTab, setVersionsMainTab] = useState<'timeline' | 'change-report'>('timeline');
@@ -1016,8 +1032,100 @@ const Versions = () => {
     setPublishVisibility('private');
     setPublishShortMessage(ver.shortMessage?.trim() ?? '');
     setPublishChangelog(ver.changelog?.trim() ?? '');
+    setPublishChangeReportBaselineMode('auto');
+    setPublishManualBaselineRevisionId('');
+    setPublishPreview(null);
+    setPublishPreviewError(null);
     setShowPublishDialog(true);
   };
+
+  const publishManualBaselineOptions = useMemo(() => {
+    if (!publishVersionId) return [];
+    const subject = versions.find((x) => x.id === publishVersionId);
+    if (!subject) return [];
+    return versions
+      .filter((v) => v.published && v.project_id === subject.project_id && v.id !== publishVersionId)
+      .sort((a, b) => b.version_id.localeCompare(a.version_id, undefined, { numeric: true }));
+  }, [versions, publishVersionId]);
+
+  const loadPublishPreview = useCallback(async () => {
+    if (!changeReportUiEnabled || !publishVersionId) return;
+    const version = versions.find((v) => v.id === publishVersionId);
+    if (!version) return;
+    if (publishChangeReportBaselineMode === 'manual' && !publishManualBaselineRevisionId.trim()) {
+      setPublishPreview(null);
+      setPublishPreviewError(null);
+      return;
+    }
+    setPublishPreviewLoading(true);
+    setPublishPreviewError(null);
+    try {
+      const body: Record<string, unknown> = {
+        projectId: version.project_id,
+        changeReportBaselineMode: publishChangeReportBaselineMode,
+      };
+      if (publishChangeReportBaselineMode === 'manual') {
+        body.changeReportBaselineRevisionId = publishManualBaselineRevisionId.trim();
+      }
+      const res = await fetch(
+        `/api/versions/${encodeURIComponent(publishVersionId)}/change-report/publish-preview`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      );
+      const json = (await res.json()) as {
+        success?: boolean;
+        error?: string;
+        preview?: {
+          headerSnapshot?: string;
+          renderedBody?: string;
+          footnoteSnapshot?: string;
+          initialPublication?: boolean;
+          fromVersionLabel?: string;
+          toVersionLabel?: string;
+        };
+      };
+      if (!json.success || !json.preview) {
+        setPublishPreview(null);
+        setPublishPreviewError(typeof json.error === 'string' ? json.error : 'Preview failed');
+        return;
+      }
+      const p = json.preview;
+      setPublishPreview({
+        headerSnapshot: p.headerSnapshot ?? '',
+        renderedBody: p.renderedBody ?? '',
+        footnoteSnapshot: p.footnoteSnapshot ?? '',
+        initialPublication: p.initialPublication,
+        fromVersionLabel: p.fromVersionLabel,
+        toVersionLabel: p.toVersionLabel,
+      });
+    } catch (e) {
+      setPublishPreview(null);
+      setPublishPreviewError(e instanceof Error ? e.message : 'Preview failed');
+    } finally {
+      setPublishPreviewLoading(false);
+    }
+  }, [
+    changeReportUiEnabled,
+    publishVersionId,
+    versions,
+    publishChangeReportBaselineMode,
+    publishManualBaselineRevisionId,
+  ]);
+
+  useEffect(() => {
+    if (!showPublishDialog || !publishVersionId || !changeReportUiEnabled) return;
+    void loadPublishPreview();
+  }, [showPublishDialog, publishVersionId, changeReportUiEnabled, loadPublishPreview]);
+
+  useEffect(() => {
+    if (publishChangeReportBaselineMode !== 'manual' || publishManualBaselineOptions.length === 0) return;
+    if (!publishManualBaselineOptions.some((o) => o.id === publishManualBaselineRevisionId)) {
+      setPublishManualBaselineRevisionId(publishManualBaselineOptions[0].id);
+    }
+  }, [publishChangeReportBaselineMode, publishManualBaselineOptions, publishManualBaselineRevisionId]);
 
   const handlePublishConfirm = async () => {
     if (!publishVersionId) return;
@@ -1031,6 +1139,17 @@ const Versions = () => {
       await alertDialog({ message: notesCheck.error, variant: 'error' });
       return;
     }
+    if (
+      changeReportUiEnabled &&
+      publishChangeReportBaselineMode === 'manual' &&
+      !publishManualBaselineRevisionId.trim()
+    ) {
+      await alertDialog({
+        message: 'Select a published revision to compare against, or choose another baseline mode.',
+        variant: 'error',
+      });
+      return;
+    }
     try {
       const res = await fetch(`/api/versions/${publishVersionId}/publish`, {
         method: 'POST',
@@ -1040,6 +1159,14 @@ const Versions = () => {
           visibility: publishVisibility,
           shortMessage: publishShortMessage.trim(),
           changelog: publishChangelog.trim() || null,
+          ...(changeReportUiEnabled
+            ? {
+                changeReportBaselineMode: publishChangeReportBaselineMode,
+                ...(publishChangeReportBaselineMode === 'manual' && publishManualBaselineRevisionId.trim()
+                  ? { changeReportBaselineRevisionId: publishManualBaselineRevisionId.trim() }
+                  : {}),
+              }
+            : {}),
         }),
       });
       const response = await res.json();
@@ -2774,7 +2901,7 @@ const Versions = () => {
                             }}
                           />
                           <div
-                            className="fixed w-56 min-w-0 max-h-[min(60vh,24rem)] overflow-x-hidden overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20"
+                            className="fixed min-w-80 w-max max-w-[min(24rem,calc(100vw-1rem))] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20"
                             style={{
                               ...(dropdownPosition.top != null ? { top: `${dropdownPosition.top}px` } : {}),
                               ...(dropdownPosition.bottom != null ? { bottom: `${dropdownPosition.bottom}px` } : {}),
@@ -3267,7 +3394,7 @@ const Versions = () => {
 
       {/* Publish Version Dialog */}
       <Dialog open={showPublishDialog} onOpenChange={(open) => { setShowPublishDialog(open); if (!open) setPublishVersionId(null); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className={changeReportUiEnabled ? 'max-w-2xl max-h-[90vh] overflow-y-auto' : 'max-w-lg'}>
           <DialogHeader>
             <DialogTitle>Publish Version</DialogTitle>
             <DialogDescription>
@@ -3308,6 +3435,99 @@ const Versions = () => {
                 className="font-mono text-sm"
               />
             </div>
+            {changeReportUiEnabled && (
+              <div className="space-y-3 rounded-lg border border-indigo-200/80 bg-indigo-50/50 p-4 dark:border-indigo-800/60 dark:bg-indigo-950/20">
+                <div>
+                  <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">Publication change report</h3>
+                  <p className="text-xs text-indigo-800/90 dark:text-indigo-200/90 mt-1">
+                    A change report is generated when you publish. Choose what to compare this revision against, then review the draft below.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="publish-cr-baseline-mode">Compare against</Label>
+                  <Select
+                    value={publishChangeReportBaselineMode}
+                    onValueChange={(v) => {
+                      setPublishChangeReportBaselineMode(v as 'auto' | 'initial' | 'manual');
+                      if (v !== 'manual') setPublishManualBaselineRevisionId('');
+                    }}
+                  >
+                    <SelectTrigger id="publish-cr-baseline-mode">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Automatic (recommended prior published revision)</SelectItem>
+                      <SelectItem value="initial">Initial publication report only (no prior baseline)</SelectItem>
+                      <SelectItem value="manual" disabled={publishManualBaselineOptions.length === 0}>
+                        Choose a published revision…
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {publishManualBaselineOptions.length === 0 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      No other published revisions in this project — use &quot;Initial publication report only&quot; or Automatic.
+                    </p>
+                  )}
+                </div>
+                {publishChangeReportBaselineMode === 'manual' && publishManualBaselineOptions.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="publish-cr-baseline-pick">Published revision</Label>
+                    <Select
+                      value={publishManualBaselineRevisionId}
+                      onValueChange={setPublishManualBaselineRevisionId}
+                    >
+                      <SelectTrigger id="publish-cr-baseline-pick">
+                        <SelectValue placeholder="Select revision…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {publishManualBaselineOptions.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            v{v.version_id}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => void loadPublishPreview()} disabled={publishPreviewLoading}>
+                    {publishPreviewLoading ? 'Loading preview…' : 'Refresh preview'}
+                  </Button>
+                  {publishPreview && (
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                      {publishPreview.initialPublication
+                        ? 'Initial publication report'
+                        : `Diff: ${publishPreview.fromVersionLabel ?? '—'} → ${publishPreview.toVersionLabel ?? '—'}`}
+                    </span>
+                  )}
+                </div>
+                {publishPreviewError && (
+                  <Alert variant="warning" className="text-sm">
+                    {publishPreviewError}
+                  </Alert>
+                )}
+                {publishPreviewLoading && !publishPreview && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Generating preview…</p>
+                )}
+                {publishPreview && (
+                  <div className="max-h-[min(320px,40vh)] overflow-y-auto rounded-md border border-gray-200 bg-white p-3 text-left dark:border-gray-700 dark:bg-gray-900/80">
+                    <Markdown
+                      variant="default"
+                      className="border-b border-gray-100 pb-3 mb-3 dark:border-gray-800"
+                    >
+                      {publishPreview.headerSnapshot || '—'}
+                    </Markdown>
+                    <Markdown
+                      variant="default"
+                      className="border-b border-gray-100 pb-3 mb-3 dark:border-gray-800"
+                    >
+                      {publishPreview.renderedBody || '—'}
+                    </Markdown>
+                    <Markdown variant="default">{publishPreview.footnoteSnapshot || '—'}</Markdown>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowPublishDialog(false); setPublishVersionId(null); }}>Cancel</Button>

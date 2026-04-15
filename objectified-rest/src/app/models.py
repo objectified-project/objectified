@@ -731,6 +731,73 @@ class VersionPublishRequest(BaseModel):
         validation_alias=AliasChoices("publishedImmutable", "published_immutable"),
         description="If true (default), published revision rejects git-like writes unless admin override (#2586).",
     )
+    change_report_baseline_mode: Literal["auto", "initial", "manual"] = Field(
+        default="auto",
+        validation_alias=AliasChoices("changeReportBaselineMode", "change_report_baseline_mode"),
+        description="How to choose the baseline for the publication change report: auto (prior published ancestor), initial (empty baseline), or manual.",
+    )
+    change_report_baseline_revision_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("changeReportBaselineRevisionId", "change_report_baseline_revision_id"),
+        description="Required when changeReportBaselineMode is manual: published revision to diff from.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_change_report_manual_baseline(self) -> "VersionPublishRequest":
+        if self.change_report_baseline_mode == "manual":
+            bid = (self.change_report_baseline_revision_id or "").strip()
+            if not bid:
+                raise ValueError(
+                    "changeReportBaselineRevisionId is required when changeReportBaselineMode is manual"
+                )
+            self.change_report_baseline_revision_id = bid
+        return self
+
+
+class VersionPublishChangeReportPreviewRequest(BaseModel):
+    """Preview publication change report before publishing (same baseline fields as publish)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    change_report_baseline_mode: Literal["auto", "initial", "manual"] = Field(
+        default="auto",
+        validation_alias=AliasChoices("changeReportBaselineMode", "change_report_baseline_mode"),
+    )
+    change_report_baseline_revision_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("changeReportBaselineRevisionId", "change_report_baseline_revision_id"),
+    )
+
+    @model_validator(mode="after")
+    def _validate_preview_manual_baseline(self) -> "VersionPublishChangeReportPreviewRequest":
+        if self.change_report_baseline_mode == "manual":
+            bid = (self.change_report_baseline_revision_id or "").strip()
+            if not bid:
+                raise ValueError(
+                    "changeReportBaselineRevisionId is required when changeReportBaselineMode is manual"
+                )
+            self.change_report_baseline_revision_id = bid
+        return self
+
+
+class VersionPublishChangeReportPreviewOut(BaseModel):
+    """Draft change report Mustache output for pre-publish preview."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    header_snapshot: str = Field(serialization_alias="headerSnapshot")
+    rendered_body: str = Field(serialization_alias="renderedBody")
+    footnote_snapshot: str = Field(serialization_alias="footnoteSnapshot")
+    change_model_json: Dict[str, Any] = Field(serialization_alias="changeModelJson")
+    baseline_revision_id: Optional[str] = Field(None, serialization_alias="baselineRevisionId")
+    template_version_id: Optional[str] = Field(None, serialization_alias="templateVersionId")
+    from_version_label: str = Field(serialization_alias="fromVersionLabel")
+    to_version_label: str = Field(serialization_alias="toVersionLabel")
+    initial_publication: bool = Field(
+        default=False,
+        serialization_alias="initialPublication",
+        validation_alias=AliasChoices("initialPublication", "initial_publication"),
+    )
 
 
 class CompatibilityRulesPayload(BaseModel):

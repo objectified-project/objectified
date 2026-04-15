@@ -28,7 +28,10 @@ from .models import (
     VersionSchema,
     VersionUpdateRequest,
 )
-from .publication_change_report import generate_change_report_on_publish
+from .publication_change_report import (
+    generate_change_report_on_publish,
+    validate_manual_baseline_revision,
+)
 from .published_immutability import IMMUTABLE_DETAIL, revision_is_published_immutable
 from .revision_deprecation import (
     coerce_metadata,
@@ -1905,6 +1908,14 @@ async def publish_version(
         else True
     )
 
+    if request.change_report_baseline_mode == "manual" and request.change_report_baseline_revision_id:
+        validate_manual_baseline_revision(
+            auth_data["tenant_id"],
+            project_id,
+            version_record_id,
+            request.change_report_baseline_revision_id,
+        )
+
     version = db.publish_version(
         version_record_id,
         auth_data["tenant_id"],
@@ -1928,6 +1939,8 @@ async def publish_version(
         project_id=project_id,
         published_revision_id=version_record_id,
         actor_id=user_id,
+        change_report_baseline_mode=request.change_report_baseline_mode,
+        change_report_baseline_revision_id=request.change_report_baseline_revision_id,
     )
 
     return VersionSchema(**version)

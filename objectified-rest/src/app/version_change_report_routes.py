@@ -16,7 +16,10 @@ from .models import (
     VersionChangeReportOut,
     VersionChangeReportPatch,
     VersionChangeReportRegenerateRequest,
+    VersionPublishChangeReportPreviewOut,
+    VersionPublishChangeReportPreviewRequest,
 )
+from .publication_change_report import preview_change_report_before_publish
 
 router = APIRouter(prefix="/v1/versions", tags=["version-change-report"])
 
@@ -295,3 +298,54 @@ async def regenerate_version_change_report(
     if not row:
         raise HTTPException(status_code=404, detail="Change report not found")
     return _row_to_out(row)
+
+
+@router.post(
+    "/{tenant_slug}/{project_id}/{version_record_id}/change-report/publish-preview",
+    response_model=VersionPublishChangeReportPreviewOut,
+)
+async def preview_change_report_for_publish(
+    tenant_slug: str,
+    project_id: str,
+    version_record_id: str,
+    body: VersionPublishChangeReportPreviewRequest = Body(
+        default_factory=VersionPublishChangeReportPreviewRequest
+    ),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> VersionPublishChangeReportPreviewOut:
+    """
+    Preview the publication change report that would be generated after publish, without persisting.
+
+    Same baseline options as ``POST …/publish`` (``changeReportBaselineMode`` / ``changeReportBaselineRevisionId``).
+    Requires JWT; same authorization as publishing (revision creator or tenant admin).
+    """
+    user_id = get_authenticated_user_id(auth_data)
+    if not user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Preview requires user authentication (JWT)",
+        )
+    tenant_id = auth_data["tenant_id"]
+    version = db.get_version_by_id(version_record_id, tenant_id)
+    if not version:
+        raise HTTPException(status_code=404, detail=f"Version not found: {version_record_id}")
+    if version["project_id"] != project_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version not found in project: {project_id}",
+        )
+    if not _can_edit_change_report(version, user_id, tenant_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the version creator or a tenant administrator can publish this revision",
+        )
+
+    raw = preview_change_report_before_publish(
+        tenant_slug=tenant_slug,
+        tenant_id=tenant_id,
+        project_id=project_id,
+        candidate_revision_id=version_record_id,
+        baseline_mode=body.change_report_baseline_mode,
+        baseline_revision_id=body.change_report_baseline_revision_id,
+    )
+    return VersionPublishChangeReportPreviewOut(**raw)

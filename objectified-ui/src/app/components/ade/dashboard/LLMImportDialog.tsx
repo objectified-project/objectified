@@ -17,8 +17,7 @@ import {
 } from '../../../components/ui/Dialog';
 import { Button } from '../../../components/ui/Button';
 import * as Select from '@radix-ui/react-select';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { Markdown } from '@/app/components/ui/Markdown';
 
 export interface LLMChatPanelProps {
   tenantId: string;
@@ -207,12 +206,12 @@ export const LLMChatPanel = forwardRef<{ abort: () => void } | null, LLMChatPane
     return match ? match[1].trim() : null;
   };
 
-  // Render message content with markdown formatting
+  // Render message content with markdown formatting (shared <Markdown> + chat-specific components)
   const renderMessageContent = (content: string, isStreaming: boolean = false) => {
     return (
-      <div className="prose prose-sm dark:prose-invert max-w-none">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
+      <div>
+        <Markdown
+          variant="default"
           components={{
             // Customize code blocks
             code: ({ node, className, children, ...props }: any) => {
@@ -327,9 +326,10 @@ export const LLMChatPanel = forwardRef<{ abort: () => void } | null, LLMChatPane
               <hr className="my-4 border-gray-300 dark:border-gray-600" />
             ),
           }}
+          fallback={null}
         >
           {content}
-        </ReactMarkdown>
+        </Markdown>
         {isStreaming && (
           <span className="inline-block w-2 h-4 ml-1 bg-gray-900 dark:bg-white animate-pulse align-middle" />
         )}

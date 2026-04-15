@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { Markdown, MARKDOWN_EMPTY_EM_DASH } from '@/app/components/ui/Markdown';
 import Mustache from 'mustache';
 import { FileText, Loader2, RefreshCw, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -60,15 +59,10 @@ type TemplateSummary = {
 };
 
 function SafeMarkdown({ content, className }: { content: string; className?: string }) {
-  if (!content) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400">—</p>;
-  }
   return (
-    <div
-      className={`prose prose-sm dark:prose-invert max-w-none prose-headings:scroll-mt-4 ${className ?? ''}`}
-    >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-    </div>
+    <Markdown variant="default" className={className} fallback={MARKDOWN_EMPTY_EM_DASH}>
+      {content}
+    </Markdown>
   );
 }
 

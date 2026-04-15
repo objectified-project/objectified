@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../../ui/Dialog';
+import { Markdown } from '../../ui/Markdown';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Label } from '../../ui/Label';
@@ -1571,7 +1572,9 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                             </pre>
                           </div>
                         ) : (
-                          <pre className="text-sm whitespace-pre-wrap font-sans">{message.content}</pre>
+                          <Markdown variant="default" fallback={null}>
+                            {message.content}
+                          </Markdown>
                         )}
                       </div>
                       {message.role === 'assistant' && hasClassDef && (
@@ -1610,7 +1613,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     <Bot className="h-5 w-5 text-white" />
                   </div>
                   <div className="px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white">
-                    <pre className="text-sm whitespace-pre-wrap font-sans">{aiStreamingContent}<span className="inline-block w-2 h-4 ml-1 bg-gray-900 dark:bg-white animate-pulse align-middle" /></pre>
+                    <Markdown variant="default" fallback={null}>
+                      {aiStreamingContent}
+                    </Markdown>
+                    <span className="inline-block w-2 h-4 ml-1 bg-gray-900 dark:bg-white animate-pulse align-middle" />
                   </div>
                 </div>
               )}

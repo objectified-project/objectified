@@ -47,8 +47,7 @@ import { ExtensionsEditor } from '../../../../components/ade/studio/ExtensionsEd
 import { useStudio } from '../../StudioContext';
 import { getSecuritySchemesForVersion } from '../../../../../../lib/db/helper-security-schemes';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/Tabs';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { Markdown } from '@/app/components/ui/Markdown';
 
 interface OperationPropertiesPanelProps {
   operationId: string | null;
@@ -1590,11 +1589,9 @@ export default function OperationPropertiesPanel({
                       isDark ? 'border-slate-600 bg-slate-900/80' : 'border-slate-200 bg-white'
                     }`}
                   >
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {description.trim() ? description : '*No description yet.*'}
-                      </ReactMarkdown>
-                    </div>
+                    <Markdown variant="default">
+                      {description.trim() ? description : '*No description yet.*'}
+                    </Markdown>
                   </div>
                 </div>
               </TabsContent>
