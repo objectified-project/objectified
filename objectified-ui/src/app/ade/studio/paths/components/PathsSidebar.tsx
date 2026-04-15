@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, AlertTriangle, FileUp } from 'lucide-react';
+import { Plus, Pencil, Trash2, AlertTriangle, FileUp, ChevronRight, ChevronDown } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Select,
@@ -23,11 +23,13 @@ import {
   updatePath as updatePathRest,
   deletePath as deletePathRest,
   createOperation as createOperationRest,
+  getOperationsForPath,
+  type OperationData,
 } from '../../../../../../lib/api/paths-client';
 import { getSharedPathParameters } from '../../../../../../lib/db/helper-shared-path-parameters';
 import { getPathParameterCoverageError, getPathTemplateValidationError, isValidPath } from '../../../../../../lib/utils/path-params';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
-import { AVAILABLE_OPERATIONS } from './paths-operation-colors';
+import { AVAILABLE_OPERATIONS, OPERATION_COLORS } from './paths-operation-colors';
 import { parseOpenAPISpec } from '../../../../utils/openapi-import';
 import { importPathsFromOpenAPIForVersion } from '../../../../../../lib/db/import-openapi-paths-security';
 
@@ -57,12 +59,15 @@ export default function PathsSidebar({
   onTabChange,
   selectedPathId,
   onPathSelect,
+  onOperationFocus,
   onSecurityRefresh,
 }: {
   activeTab: 'paths' | 'operations' | 'classes' | 'properties' | 'security' | 'servers';
   onTabChange: (tab: 'paths' | 'operations' | 'classes' | 'properties' | 'security' | 'servers') => void;
   selectedPathId: string | null;
   onPathSelect: (pathId: string | null, pathname?: string) => void;
+  /** Select path, open operation panel, and zoom the Paths canvas to this operation. */
+  onOperationFocus?: (pathId: string, pathname: string, operation: { id: string; operation: string }) => void;
   onSecurityRefresh?: () => void;
 }) {
   const { selectedVersionId, selectedProjectId } = useStudio();
@@ -88,6 +93,38 @@ export default function PathsSidebar({
   const [importOpenAPIError, setImportOpenAPIError] = useState('');
   const [importOpenAPILoading, setImportOpenAPILoading] = useState(false);
 
+  /** Paths tab: which path rows are expanded to show operations. */
+  const [expandedPathIds, setExpandedPathIds] = useState<Record<string, boolean>>({});
+  const [operationsByPathId, setOperationsByPathId] = useState<Record<string, OperationData[]>>({});
+  const [operationsLoadingPathId, setOperationsLoadingPathId] = useState<string | null>(null);
+
+  const togglePathExpanded = React.useCallback(
+    (pathId: string) => {
+      setExpandedPathIds((prev) => {
+        const willOpen = !prev[pathId];
+        if (willOpen && selectedVersionId) {
+          void (async () => {
+            setOperationsLoadingPathId(pathId);
+            try {
+              const res = await getOperationsForPath(selectedVersionId, pathId);
+              if (res.success && res.data) {
+                setOperationsByPathId((p) => ({ ...p, [pathId]: res.data! }));
+              } else {
+                setOperationsByPathId((p) => ({ ...p, [pathId]: [] }));
+              }
+            } catch {
+              setOperationsByPathId((p) => ({ ...p, [pathId]: [] }));
+            } finally {
+              setOperationsLoadingPathId((cur) => (cur === pathId ? null : cur));
+            }
+          })();
+        }
+        return { ...prev, [pathId]: willOpen };
+      });
+    },
+    [selectedVersionId]
+  );
+
   // Load paths
   useEffect(() => {
     if (!selectedVersionId) {
@@ -112,6 +149,12 @@ export default function PathsSidebar({
     };
 
     loadPaths();
+  }, [selectedVersionId]);
+
+  useEffect(() => {
+    setExpandedPathIds({});
+    setOperationsByPathId({});
+    setOperationsLoadingPathId(null);
   }, [selectedVersionId]);
 
   // Load classes and properties
@@ -556,63 +599,134 @@ export default function PathsSidebar({
 
                       return filteredPaths.map((path) => {
                         const invalid = !isValidPath(path.pathname);
+                        const expanded = Boolean(expandedPathIds[path.id]);
+                        const pathOps = operationsByPathId[path.id] ?? [];
+                        const loadingOps = operationsLoadingPathId === path.id;
                         return (
                       <div
                         key={path.id}
-                        onClick={() => onPathSelect(path.id, path.pathname)}
-                        className={`relative flex items-center justify-between px-3 py-2 rounded border cursor-pointer transition-all duration-150 ${
+                        className={`relative flex flex-col rounded border transition-all duration-150 ${
                           invalid
                             ? 'border-2 border-red-600 ring-2 ring-red-500/60 bg-red-500/15 dark:bg-red-500/20 dark:ring-red-400/50'
                             : selectedPathId === path.id
-                              ? 'border-2 border-indigo-500 bg-indigo-500/20 hover:bg-indigo-500/30'
+                              ? 'border-2 border-indigo-500 bg-indigo-500/20'
                               : isDark
-                                ? 'border-gray-700 bg-gray-700/30 hover:bg-gray-700/50'
-                                : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                                ? 'border-gray-700 bg-gray-700/30'
+                                : 'border-gray-200 bg-gray-50'
                         }`}
                         title={invalid ? 'Invalid path: must start with / and use valid {param} placeholders' : undefined}
                       >
                         {invalid && (
-                          <div className="absolute top-1 right-1 flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white shadow ring-2 ring-red-400/80" title="Path is misconfigured">
+                          <div className="absolute top-1 right-8 z-10 flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white shadow ring-2 ring-red-400/80" title="Path is misconfigured">
                             <AlertTriangle className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden />
                           </div>
                         )}
-                        <div className="flex-1 min-w-0">
-                          <span className={`text-sm truncate block ${
-                            selectedPathId === path.id 
-                              ? 'text-indigo-600 dark:text-indigo-400 font-semibold' 
-                              : 'text-gray-700 dark:text-gray-300'
-                          }`}>
-                            {path.pathname}
-                          </span>
-                        </div>
-                        <div className={`flex gap-1 shrink-0 ${invalid ? 'pl-6' : ''}`}>
+                        <div className="flex items-center gap-0.5 px-2 py-2">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleEditPath(path);
+                              togglePathExpanded(path.id);
                             }}
-                            className={`p-1 rounded transition-colors ${
-                              isDark ? 'text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-500/10'
+                            className={`shrink-0 rounded p-1 transition-colors ${
+                              isDark ? 'text-slate-400 hover:bg-gray-600/60' : 'text-slate-500 hover:bg-gray-200/90'
                             }`}
-                            aria-label="Edit path"
+                            aria-expanded={expanded}
+                            aria-label={expanded ? 'Collapse operations' : 'Expand operations'}
                           >
-                            <Pencil className="w-4 h-4" />
+                            {expanded ? <ChevronDown className="h-4 w-4" aria-hidden /> : <ChevronRight className="h-4 w-4" aria-hidden />}
                           </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeletePath(path);
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                onPathSelect(path.id, path.pathname);
+                              }
                             }}
-                            className={`p-1 rounded transition-colors ${
-                              isDark ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-500 hover:text-red-600 hover:bg-red-500/10'
-                            }`}
-                            aria-label="Delete path"
+                            onClick={() => onPathSelect(path.id, path.pathname)}
+                            className={`min-w-0 flex-1 cursor-pointer rounded px-1 py-0.5 text-left ${
+                              selectedPathId === path.id
+                                ? 'text-indigo-600 dark:text-indigo-400'
+                                : 'text-gray-700 dark:text-gray-300'
+                            } ${isDark ? 'hover:bg-gray-700/40' : 'hover:bg-gray-100/90'}`}
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                            <span className={`block truncate text-sm ${selectedPathId === path.id ? 'font-semibold' : ''}`}>
+                              {path.pathname}
+                            </span>
+                          </div>
+                          <div className={`flex shrink-0 gap-1 ${invalid ? 'pl-4' : ''}`}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditPath(path);
+                              }}
+                              className={`rounded p-1 transition-colors ${
+                                isDark ? 'text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-500/10'
+                              }`}
+                              aria-label="Edit path"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePath(path);
+                              }}
+                              className={`rounded p-1 transition-colors ${
+                                isDark ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-500 hover:text-red-600 hover:bg-red-500/10'
+                              }`}
+                              aria-label="Delete path"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
+                        {expanded && (
+                          <div
+                            className={`border-t px-2 pb-2 pt-1 ${isDark ? 'border-gray-600/60' : 'border-gray-200/90'}`}
+                          >
+                            {loadingOps && (
+                              <p className="px-2 py-1 text-[10px] text-gray-500 dark:text-gray-400">Loading operations…</p>
+                            )}
+                            {!loadingOps && pathOps.length === 0 && (
+                              <p className="px-2 py-1 text-[10px] text-gray-500 dark:text-gray-400">No operations yet</p>
+                            )}
+                            {!loadingOps &&
+                              pathOps.map((op) => {
+                                const method = op.operation.toUpperCase();
+                                const color = OPERATION_COLORS[method] ?? '#64748b';
+                                return (
+                                  <button
+                                    key={op.id}
+                                    type="button"
+                                    disabled={!onOperationFocus}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onOperationFocus?.(path.id, path.pathname, {
+                                        id: op.id,
+                                        operation: op.operation,
+                                      });
+                                    }}
+                                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                      isDark ? 'text-gray-200 hover:bg-gray-700/80' : 'text-gray-800 hover:bg-gray-100'
+                                    }`}
+                                    title={`Focus ${method} on canvas`}
+                                  >
+                                    <span
+                                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm"
+                                      style={{ backgroundColor: color }}
+                                    >
+                                      {method}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                          </div>
+                        )}
                       </div>
                     ); });
                     })()}

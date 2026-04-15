@@ -676,7 +676,7 @@ export default function ParameterPropertiesPanel({
 
   return (
     <div
-      className={`w-[320px] h-full flex flex-col border-l ${
+      className={`w-[360px] h-full flex flex-col border-l ${
         isDark ? 'border-slate-700 bg-gradient-to-b from-slate-800 to-slate-900' : 'border-slate-200 bg-gradient-to-b from-white to-slate-50'
       }`}
     >

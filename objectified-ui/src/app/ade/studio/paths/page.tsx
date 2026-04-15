@@ -32,6 +32,8 @@ export default function PathsPage() {
   const [canvasRefreshKey, setCanvasRefreshKey] = useState(0);
   const [helpDismissed, setHelpDismissed] = useState(false);
   const [responsePanelRefreshKey, setResponsePanelRefreshKey] = useState(0);
+  /** Zoom Paths canvas to this node id after load (e.g. sidebar operation click). */
+  const [pathsCanvasPendingFocusNodeId, setPathsCanvasPendingFocusNodeId] = useState<string | null>(null);
 
   // Check if help was dismissed
   React.useEffect(() => {
@@ -50,7 +52,20 @@ export default function PathsPage() {
     setSelectedOperation(null);
     setSelectedParameter(null);
     setSelectedResponse(null);
+    setPathsCanvasPendingFocusNodeId(null);
   };
+
+  const handleOperationFocusFromSidebar = React.useCallback(
+    (pathId: string, pathname: string, operation: { id: string; operation: string }) => {
+      setSelectedPathId(pathId);
+      setSelectedPath({ id: pathId, pathname });
+      setSelectedParameter(null);
+      setSelectedResponse(null);
+      setSelectedOperation(operation);
+      setPathsCanvasPendingFocusNodeId(operation.id);
+    },
+    []
+  );
 
   const handleOperationSelect = (operation: { id: string; operation: string } | null) => {
     setSelectedOperation(operation);
@@ -129,6 +144,7 @@ export default function PathsPage() {
             onTabChange={(tab) => setActiveTab(tab)}
             selectedPathId={selectedPathId}
             onPathSelect={handlePathSelect}
+            onOperationFocus={handleOperationFocusFromSidebar}
             onSecurityRefresh={handleCanvasRefresh}
           />
 
@@ -168,6 +184,8 @@ export default function PathsPage() {
               refreshKey={canvasRefreshKey}
               onRefresh={handleCanvasRefresh}
               onPathnameUpdated={handlePathnameUpdated}
+              pendingFocusNodeId={pathsCanvasPendingFocusNodeId}
+              onPendingFocusComplete={() => setPathsCanvasPendingFocusNodeId(null)}
             />
           </div>
 

@@ -391,6 +391,9 @@ interface PathsCanvasInnerProps {
   refreshKey?: number;
   onRefresh?: () => void;
   onPathnameUpdated?: (pathname: string) => void;
+  /** When set (e.g. from sidebar), zoom to this node id after it exists on the canvas. */
+  pendingFocusNodeId?: string | null;
+  onPendingFocusComplete?: () => void;
 }
 
 function PathsCanvasInner({
@@ -402,6 +405,8 @@ function PathsCanvasInner({
   refreshKey,
   onRefresh,
   onPathnameUpdated,
+  pendingFocusNodeId,
+  onPendingFocusComplete,
 }: PathsCanvasInnerProps) {
   const {
     gridSize,
@@ -436,6 +441,28 @@ function PathsCanvasInner({
     setFocusPathsCanvasNodeFn(fn);
     return () => setFocusPathsCanvasNodeFn(null);
   }, [getNode, fitView, setFocusPathsCanvasNodeFn]);
+
+  const appliedPendingFocusRef = useRef<string | null>(null);
+  /** Sidebar: zoom to an operation after the graph loads or switches path. */
+  useEffect(() => {
+    if (!pendingFocusNodeId) {
+      appliedPendingFocusRef.current = null;
+      return;
+    }
+    const n = getNode(pendingFocusNodeId);
+    if (n) {
+      if (appliedPendingFocusRef.current !== pendingFocusNodeId) {
+        appliedPendingFocusRef.current = pendingFocusNodeId;
+        fitView({ nodes: [n], padding: 0.32, duration: 280 });
+        onPendingFocusComplete?.();
+      }
+      return;
+    }
+    const t = window.setTimeout(() => {
+      onPendingFocusComplete?.();
+    }, 3500);
+    return () => clearTimeout(t);
+  }, [nodes, pendingFocusNodeId, getNode, fitView, onPendingFocusComplete]);
   const [canvasPersistReady, setCanvasPersistReady] = useState(false);
   const canvasSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInFlightRef = useRef<Promise<unknown> | null>(null);
@@ -4407,6 +4434,8 @@ export default function PathsCanvasView({
   refreshKey,
   onRefresh,
   onPathnameUpdated,
+  pendingFocusNodeId,
+  onPendingFocusComplete,
 }: {
   selectedPathId: string | null;
   pathname?: string | null;
@@ -4416,6 +4445,8 @@ export default function PathsCanvasView({
   refreshKey?: number;
   onRefresh?: () => void;
   onPathnameUpdated?: (pathname: string) => void;
+  pendingFocusNodeId?: string | null;
+  onPendingFocusComplete?: () => void;
 }) {
   return (
     <ReactFlowProvider>
@@ -4428,6 +4459,8 @@ export default function PathsCanvasView({
         refreshKey={refreshKey}
         onRefresh={onRefresh}
         onPathnameUpdated={onPathnameUpdated}
+        pendingFocusNodeId={pendingFocusNodeId}
+        onPendingFocusComplete={onPendingFocusComplete}
       />
     </ReactFlowProvider>
   );

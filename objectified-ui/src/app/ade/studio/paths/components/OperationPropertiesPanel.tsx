@@ -63,6 +63,10 @@ interface OperationPropertiesPanelProps {
 // View modes for the panel
 type ViewMode = 'operation' | 'add-parameter' | 'add-response';
 
+/** Underline tab strip — overrides default `Tabs` segmented control styling for operation details. */
+const OPERATION_DETAIL_TAB_TRIGGER_CLASS =
+  'shrink-0 whitespace-nowrap rounded-none border-0 border-b-2 border-transparent bg-transparent px-2 py-1.5 text-xs font-medium text-slate-600 shadow-none ring-offset-0 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 data-[state=active]:border-indigo-600 data-[state=active]:bg-transparent data-[state=active]:text-indigo-700 data-[state=active]:shadow-none dark:data-[state=active]:border-indigo-500 dark:data-[state=active]:text-indigo-300';
+
 export default function OperationPropertiesPanel({
   operationId,
   operation,
@@ -1038,7 +1042,7 @@ export default function OperationPropertiesPanel({
 
   return (
     <div
-      className="w-80 h-full flex flex-col border-l"
+      className="w-[360px] h-full flex flex-col border-l"
       style={{
         borderColor: isDark ? '#334155' : '#e2e8f0',
         background: isDark
@@ -1503,10 +1507,10 @@ export default function OperationPropertiesPanel({
       ) : (
         /* Operation Details Form */
         <>
-          <div className="flex-1 overflow-auto p-4 min-h-0">
+          <div className="flex min-h-0 flex-1 flex-col px-4 pt-4">
             {optionsRequestBodyLinked && operation === 'OPTIONS' && (
               <div
-                className="mb-3 p-3 rounded-md border text-xs shrink-0 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200"
+                className="mb-3 shrink-0 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs dark:border-amber-800 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
                 role="status"
               >
                 <span className="font-semibold">Request body linked:</span>{' '}
@@ -1515,22 +1519,23 @@ export default function OperationPropertiesPanel({
                 your intent.
               </div>
             )}
-            <Tabs defaultValue="general" className="flex flex-col gap-3 min-h-0">
-              <TabsList className="w-full h-auto min-h-10 shrink-0 flex flex-wrap justify-start gap-1 p-1">
-                <TabsTrigger value="general" className="text-xs px-2 py-1.5">
+            <Tabs defaultValue="general" className="flex min-h-0 flex-1 flex-col">
+              <TabsList className="flex h-auto w-full min-w-0 shrink-0 flex-nowrap items-center justify-start gap-0 overflow-x-auto rounded-none border-0 border-b border-slate-200 bg-transparent p-0 dark:border-slate-700">
+                <TabsTrigger value="general" className={OPERATION_DETAIL_TAB_TRIGGER_CLASS}>
                   General
                 </TabsTrigger>
-                <TabsTrigger value="docs" className="text-xs px-2 py-1.5">
+                <TabsTrigger value="docs" className={OPERATION_DETAIL_TAB_TRIGGER_CLASS}>
                   Docs
                 </TabsTrigger>
-                <TabsTrigger value="tags" className="text-xs px-2 py-1.5">
+                <TabsTrigger value="tags" className={OPERATION_DETAIL_TAB_TRIGGER_CLASS}>
                   Tags
                 </TabsTrigger>
-                <TabsTrigger value="advanced" className="text-xs px-2 py-1.5">
+                <TabsTrigger value="advanced" className={OPERATION_DETAIL_TAB_TRIGGER_CLASS}>
                   Advanced
                 </TabsTrigger>
               </TabsList>
 
+              <div className="min-h-0 flex-1 overflow-y-auto pb-4 pt-2 [-webkit-overflow-scrolling:touch]">
               <TabsContent value="general" className="mt-0 flex flex-col gap-4 outline-none">
                 <div>
                   <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -2115,12 +2120,13 @@ export default function OperationPropertiesPanel({
                 )}
               </div>
               </TabsContent>
+              </div>
             </Tabs>
           </div>
 
           {/* Footer with Save button */}
           <div
-            className={`p-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}
+            className={`shrink-0 border-t p-4 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}
           >
             <Button
               className={`w-full text-white ${
