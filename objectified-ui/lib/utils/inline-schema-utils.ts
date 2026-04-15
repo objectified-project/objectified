@@ -362,6 +362,12 @@ function buildSchemaFromTree(
 function buildPropertySchema(node: PropertyTreeNode): Record<string, any> {
   const data = node.data || {};
   const schema: Record<string, any> = { ...data };
+  // Internal DB fields must not appear in exported OpenAPI schema objects
+  delete schema.id;
+  delete schema.parent_id;
+  delete schema.propertyRef;
+  delete schema.schemaMode;
+  delete schema.inlineSchema;
 
   // Add description if present and not already in data
   if (node.description && !schema.description) {

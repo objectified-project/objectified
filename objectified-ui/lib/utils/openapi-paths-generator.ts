@@ -163,6 +163,8 @@ export function buildParameterForOpenAPI(param: PathParameter): Record<string, u
   delete schemaData.schemaMode;
   delete schemaData.inlineSchema;
   delete schemaData.propertyRef;
+  delete schemaData.id;
+  delete schemaData.parent_id;
 
   // Handle deprecated
   if (schemaData.deprecated) {
@@ -376,9 +378,6 @@ export function buildOperationForOpenAPI(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
-  /** Stable DB id for PATH QUALITY focus + tooling (#2656); OpenAPI extension field. */
-  result['x-objectified-operation-id'] = operation.id;
-
   // Add operation metadata from description
   if (operation.description) {
     if (operation.description.summary) {
@@ -469,9 +468,6 @@ export function buildPathItemForOpenAPI(
   options: PathsGeneratorOptions = {}
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-
-  /** Stable DB id for PATH QUALITY focus + tooling (#2656); OpenAPI extension field. */
-  result['x-objectified-path-id'] = path.id;
 
   // Add path-level summary and description
   if (path.summary) {

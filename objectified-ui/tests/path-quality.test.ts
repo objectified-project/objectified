@@ -15,9 +15,7 @@ describe('path-quality', () => {
   it('scores a minimal valid operation highly', () => {
     const paths = {
       '/pets': {
-        'x-objectified-path-id': 'path-1',
         get: {
-          'x-objectified-operation-id': 'op-1',
           operationId: 'listPets',
           summary: 'List pets',
           responses: {
@@ -44,9 +42,7 @@ describe('path-quality', () => {
   it('flags missing operationId and missing error response', () => {
     const paths = {
       '/x': {
-        'x-objectified-path-id': 'p1',
         post: {
-          'x-objectified-operation-id': 'o1',
           summary: 'Do thing',
           responses: {
             '200': {
@@ -60,15 +56,12 @@ describe('path-quality', () => {
     const d = computePathQuality(paths, { openapi: '3.1.0', paths, components: {} });
     expect(d.issues.some((i) => i.message.includes('operationId'))).toBe(true);
     expect(d.issues.some((i) => i.message.includes('4xx/5xx'))).toBe(true);
-    expect(d.issues.some((i) => i.focusNodeId === 'o1')).toBe(true);
   });
 
   it('detects broken schema $ref against merged spec', () => {
     const paths = {
       '/a': {
-        'x-objectified-path-id': 'p1',
         get: {
-          'x-objectified-operation-id': 'o1',
           operationId: 'getA',
           summary: 'A',
           responses: {
@@ -96,9 +89,7 @@ describe('path-quality', () => {
   it('resolves valid $ref in merged spec', () => {
     const paths = {
       '/a': {
-        'x-objectified-path-id': 'p1',
         get: {
-          'x-objectified-operation-id': 'o1',
           operationId: 'getA',
           summary: 'A',
           responses: {

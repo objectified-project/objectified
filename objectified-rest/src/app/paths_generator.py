@@ -55,6 +55,8 @@ def build_schema_from_inline_properties(inline_schema: Dict[str, Any]) -> Dict[s
 
         prop_data = prop.get('data', {})
         prop_schema = dict(prop_data)
+        prop_schema.pop('id', None)
+        prop_schema.pop('parent_id', None)
 
         # Handle required
         if prop_schema.get('required') is True:
@@ -112,6 +114,8 @@ def build_parameter_for_openapi(param: Dict[str, Any]) -> Dict[str, Any]:
 
     # Build schema from data (excluding non-schema fields)
     schema_data = dict(data)
+    schema_data.pop('id', None)
+    schema_data.pop('parent_id', None)
     schema_data.pop('required', None)
 
     # Handle deprecated
