@@ -33,7 +33,16 @@ export const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
     const isCompact = variant === 'compact';
 
     return (
-      <div ref={ref} className={cn('relative', className)} {...props}>
+      <div
+        ref={ref}
+        className={cn(
+          'relative overflow-hidden',
+          // Decorative orbs use negative offsets; clip them so ancestors with overflow-y-auto
+          // (e.g. dashboard main) do not show spurious scrollbars around short empty states.
+          className
+        )}
+        {...props}
+      >
         {showOrbs && !isCompact && (
           <>
             <div className="absolute -top-10 -left-10 h-40 w-40 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 opacity-60 blur-3xl dark:from-blue-900/20 dark:to-indigo-900/20" />
