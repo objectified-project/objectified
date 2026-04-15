@@ -219,6 +219,7 @@ import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
 import SchemaTimelinePanel from '../components/SchemaTimelinePanel';
 import SchemaVersionScoringPanel from '../components/SchemaVersionScoringPanel';
+import { DesignerCanvasGitMenu } from '../components/DesignerCanvasGitMenu';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 import {
   loadPresentationBookmarks,
@@ -9386,9 +9387,10 @@ const StudioContent = () => {
               ) : null;
             })()}
 
-            {/* Layout Control Button */}
+            {/* Branch, layout, and export — one toolbar (top-right) */}
             {!canvasPresentationActive && (
-            <Panel position="top-right" className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80" style={{ marginRight: '60px' }}>
+            <Panel position="top-right" className="flex items-center gap-1.5 z-[1002] border-0 bg-transparent p-0 shadow-none">
+              <DesignerCanvasGitMenu versions={versions} setVersions={setVersions} />
               <div className="relative" ref={layoutDropdownRef}>
                 <input
                   ref={layoutJsonImportInputRef}
@@ -9400,10 +9402,10 @@ const StudioContent = () => {
                 />
                 <button
                   onClick={() => setLayoutDropdownOpen(!layoutDropdownOpen)}
-                  className={`p-2 text-sm font-medium rounded-lg border transition-all duration-200 shadow-sm hover:shadow-md ${
+                  className={`p-2 text-sm font-medium rounded-lg border backdrop-blur-md transition-all duration-200 shadow-md hover:shadow-lg ${
                     showDependencyOverlay
-                      ? 'border-indigo-300 dark:border-indigo-600 bg-indigo-50/80 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50'
-                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50'
+                      ? 'border-indigo-300/70 dark:border-indigo-500/45 bg-indigo-50/55 dark:bg-indigo-950/35 text-indigo-800 dark:text-indigo-200 hover:bg-indigo-100/60 dark:hover:bg-indigo-900/45 hover:border-indigo-400/80 dark:hover:border-indigo-400/50'
+                      : 'border-gray-200/55 dark:border-gray-600/45 bg-white/45 dark:bg-gray-900/40 text-gray-800 dark:text-gray-200 hover:bg-white/65 dark:hover:bg-gray-900/55 hover:border-indigo-300/60 dark:hover:border-indigo-500/45'
                   }`}
                   title="Layout options"
                 >
@@ -10135,18 +10137,10 @@ const StudioContent = () => {
                   </div>
                 )}
               </div>
-            </Panel>
-            )}
-
-            {/* Export Button Panel */}
-            {!canvasPresentationActive && (
-            <Panel
-              position="top-right"
-              className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80"
-            >
               <button
+                type="button"
                 onClick={() => setExportWizardOpen(true)}
-                className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                className="p-2 text-sm font-medium rounded-lg border border-gray-200/55 dark:border-gray-600/45 bg-white/45 dark:bg-gray-900/40 text-gray-800 dark:text-gray-200 backdrop-blur-md transition-all duration-200 shadow-md hover:shadow-lg hover:bg-white/65 dark:hover:bg-gray-900/55 hover:border-indigo-300/60 dark:hover:border-indigo-500/45"
                 title="Export canvas"
               >
                 <Download className="w-5 h-5" />
@@ -10154,17 +10148,17 @@ const StudioContent = () => {
             </Panel>
             )}
 
-            {/* Schema Metrics & Memory Profiler buttons - next to map controls (bottom-left) */}
+            {/* Schema Metrics & Memory Profiler — floating glass chips (match top-right toolbar) */}
             {!canvasPresentationActive && (
             <Panel
               position="bottom-left"
-              className="flex items-center gap-1 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80"
+              className="flex items-center gap-1.5 border-0 bg-transparent p-0 shadow-none"
               style={{ marginBottom: '15px', marginLeft: '52px' }}
             >
               {!schemaMetricsOpen && (
                 <button
                   onClick={() => setSchemaMetricsOpen(true)}
-                  className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  className="p-2 text-sm font-medium rounded-lg border border-gray-200/55 dark:border-gray-600/45 bg-white/45 dark:bg-gray-900/40 text-gray-800 dark:text-gray-200 backdrop-blur-md transition-all duration-200 shadow-md hover:shadow-lg hover:bg-white/65 dark:hover:bg-gray-900/55 hover:border-indigo-300/60 dark:hover:border-indigo-500/45"
                   title="Schema Metrics"
                 >
                   <BarChart3 className="w-5 h-5" />
@@ -10173,7 +10167,7 @@ const StudioContent = () => {
               {!schemaTimelineOpen && (
                 <button
                   onClick={() => setSchemaTimelineOpen(true)}
-                  className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  className="p-2 text-sm font-medium rounded-lg border border-gray-200/55 dark:border-gray-600/45 bg-white/45 dark:bg-gray-900/40 text-gray-800 dark:text-gray-200 backdrop-blur-md transition-all duration-200 shadow-md hover:shadow-lg hover:bg-white/65 dark:hover:bg-gray-900/55 hover:border-indigo-300/60 dark:hover:border-indigo-500/45"
                   title="Schema timeline — evolution across versions"
                 >
                   <TrendingUp className="w-5 h-5" />
@@ -10182,7 +10176,7 @@ const StudioContent = () => {
               {!schemaVersionScoringOpen && (
                 <button
                   onClick={() => setSchemaVersionScoringOpen(true)}
-                  className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  className="p-2 text-sm font-medium rounded-lg border border-gray-200/55 dark:border-gray-600/45 bg-white/45 dark:bg-gray-900/40 text-gray-800 dark:text-gray-200 backdrop-blur-md transition-all duration-200 shadow-md hover:shadow-lg hover:bg-white/65 dark:hover:bg-gray-900/55 hover:border-indigo-300/60 dark:hover:border-indigo-500/45"
                   title="Version scoring — per-schema breakdown with gauges"
                 >
                   <Gauge className="w-5 h-5" />
@@ -10191,7 +10185,7 @@ const StudioContent = () => {
               {!memoryProfilerOpen && (
                 <button
                   onClick={() => setMemoryProfilerOpen(true)}
-                  className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  className="p-2 text-sm font-medium rounded-lg border border-gray-200/55 dark:border-gray-600/45 bg-white/45 dark:bg-gray-900/40 text-gray-800 dark:text-gray-200 backdrop-blur-md transition-all duration-200 shadow-md hover:shadow-lg hover:bg-white/65 dark:hover:bg-gray-900/55 hover:border-indigo-300/60 dark:hover:border-indigo-500/45"
                   title="Memory Profiler"
                 >
                   <Activity className="w-5 h-5" />
