@@ -265,6 +265,7 @@ const Versions = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [versions, setVersions] = useState<Version[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createDialogMode, setCreateDialogMode] = useState<'commit' | 'new-version'>('commit');
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showSunsetScheduleDialog, setShowSunsetScheduleDialog] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
@@ -746,8 +747,20 @@ const Versions = () => {
   };
 
   const handleCreateClick = () => {
+    setCreateDialogMode('commit');
     setVersionId(''); setAutoGenerate(true); setBumpStrategy('patch');
     setNextAutoVersion(calculateNextVersion('patch')); setDescription('');
+    setChangeLog(''); setCommitExternalRef(''); setEnabled(true); setSourceVersionId('');
+    setCopySourceBranchKey('blank');
+    setErrorMessage(''); setBranchListError(null);
+    void loadBranches();
+    setShowCreateDialog(true);
+  };
+
+  const handleNewVersionClick = () => {
+    setCreateDialogMode('new-version');
+    setVersionId(''); setAutoGenerate(true); setBumpStrategy('minor');
+    setNextAutoVersion(calculateNextVersion('minor')); setDescription('');
     setChangeLog(''); setCommitExternalRef(''); setEnabled(true); setSourceVersionId('');
     setCopySourceBranchKey('blank');
     setErrorMessage(''); setBranchListError(null);
@@ -896,12 +909,13 @@ const Versions = () => {
       clearPushConflict();
       await loadVersions();
       const v = json.version;
+      const successNoun = createDialogMode === 'new-version' ? 'Version created' : 'Revision committed';
       if (v && typeof v.copied_classes === 'number' && v.copied_classes > 0) {
-        toast.success(`Revision committed. Copied ${v.copied_classes} class(es).`);
+        toast.success(`${successNoun}. Copied ${v.copied_classes} class(es).`);
       } else if (v?.copy_warning) {
-        toast.warning(`Revision committed, but: ${v.copy_warning}`);
+        toast.warning(`${successNoun}, but: ${v.copy_warning}`);
       } else {
-        toast.success('Revision committed.');
+        toast.success(`${successNoun}.`);
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'An error occurred';
@@ -2584,7 +2598,16 @@ const Versions = () => {
                 <GitMerge className="h-4 w-4 mr-2" />
                 Merge branches
               </Button>
-              <Button onClick={handleCreateClick} disabled={!selectedProjectId} title="Create a new schema revision (commit)">
+              <Button
+                variant="secondary"
+                onClick={handleNewVersionClick}
+                disabled={!selectedProjectId}
+                title="Start a new version (fresh release line, defaults to a minor bump)"
+              >
+                <GitFork className="h-4 w-4 mr-2" />
+                New Version
+              </Button>
+              <Button onClick={handleCreateClick} disabled={!selectedProjectId || versions.length === 0} title={versions.length === 0 ? 'No versions yet — use New Version to create the first one' : 'Create a new schema revision (commit)'}>
                 <Plus className="h-4 w-4 mr-2" />
                 Commit
               </Button>
@@ -2884,12 +2907,23 @@ const Versions = () => {
                 merge_parent_version_id: v.merge_parent_version_id ?? null,
                 created_at: v.created_at,
                 shortMessage: v.shortMessage,
+                commitMessage: v.message ?? null,
+                authorName: v.author ?? v.creator_name ?? null,
+                creatorId: v.creator_id ?? null,
               }))}
               branches={versionBranches.map((b) => ({
                 id: b.id,
                 name: b.name,
                 tip_version_id: b.tip_version_id,
               }))}
+              tags={versionTags.map((t) => ({
+                id: t.id,
+                name: t.name,
+                version_id: t.version_id,
+                immutable: t.immutable,
+                protected: t.protected,
+              }))}
+              headRevisionId={headRevisionId}
               windowSize={historyGraphWindowSize}
               onWindowSizeIncrease={setHistoryGraphWindowSize}
               onCompareToPrimaryParent={handleHistoryGraphCompareToParent}
@@ -3256,9 +3290,11 @@ const Versions = () => {
       <Dialog open={showCreateDialog} onOpenChange={(open) => !isLoading && setShowCreateDialog(open)}>
         <DialogContent className="max-w-xl" aria-describedby="commit-dialog-desc">
           <DialogHeader>
-            <DialogTitle>Commit</DialogTitle>
+            <DialogTitle>{createDialogMode === 'new-version' ? 'New Version' : 'Commit'}</DialogTitle>
             <DialogDescription id="commit-dialog-desc">
-              Create a new schema revision for this project. Message is required; add an external reference when linking to a ticket or issue.
+              {createDialogMode === 'new-version'
+                ? 'Start a new schema version for this project. Pick a bump strategy (defaults to minor), then describe the release.'
+                : 'Create a new schema revision for this project. Message is required; add an external reference when linking to a ticket or issue.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -3433,7 +3469,9 @@ const Versions = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={isLoading}>Cancel</Button>
             <Button onClick={handleCreateSubmit} disabled={isLoading || !createCommitFormValid}>
-              {isLoading ? 'Committing…' : 'Commit'}
+              {isLoading
+                ? (createDialogMode === 'new-version' ? 'Creating…' : 'Committing…')
+                : (createDialogMode === 'new-version' ? 'Create Version' : 'Commit')}
             </Button>
           </DialogFooter>
         </DialogContent>

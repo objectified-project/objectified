@@ -86,15 +86,41 @@ class Database:
             self.connection.close()
 
     def execute_query(self, query: str, params: tuple = None) -> List[Dict[str, Any]]:
-        """Execute a SELECT query and return results."""
+        """Execute a SELECT query and return results.
+
+        Commits on success so the shared connection returns to IDLE. Leaving
+        reads in "idle in transaction" holds locks, blocks VACUUM, and causes
+        subsequent writers that toggle ``conn.autocommit`` to crash with
+        ``set_session cannot be used inside a transaction``.
+        """
         conn = self.connect()
         try:
             with conn.cursor() as cursor:
                 cursor.execute(query, params)
-                return cursor.fetchall()
+                rows = cursor.fetchall()
+            conn.commit()
+            return rows
         except Exception as e:
             conn.rollback()
             raise e
+
+    def _begin_tx(self, conn) -> bool:
+        """Flush any dangling transaction, then enter manual-commit mode.
+
+        Psycopg2 implements ``conn.autocommit = X`` via ``set_session``, which
+        raises when the connection is not IDLE. Any prior statement on the
+        shared connection (direct ``conn.cursor()`` usage that didn't commit)
+        can leave us in ``INTRANS`` or ``INERROR``. Rolling back first is safe
+        and idempotent and restores a clean starting point for the new tx.
+
+        Returns the previous autocommit value so the caller can restore it
+        in ``finally``.
+        """
+        if conn.info.transaction_status != psycopg2.extensions.TRANSACTION_STATUS_IDLE:
+            conn.rollback()
+        prev = conn.autocommit
+        conn.autocommit = False
+        return prev
 
     def get_version_by_slugs(self, tenant_slug: str, project_slug: str, version_id: str) -> Optional[Dict[str, Any]]:
         """Get version information by tenant, project, and version slugs."""
@@ -4437,11 +4463,10 @@ class Database:
         base = (client_base_revision_id or "").strip()
         src = (source_version_id or "").strip() or None
         conn = self.connect()
-        prev_autocommit = conn.autocommit
         copied_count = 0
         new_id: Optional[str] = None
+        prev_autocommit = self._begin_tx(conn)
         try:
-            conn.autocommit = False
             with conn.cursor() as cursor:
                 if branch_row is not None:
                     bid = str(branch_row["id"])
@@ -4849,9 +4874,8 @@ class Database:
             ValueError: ``version_not_found`` or ``published_version``.
         """
         conn = self.connect()
-        prev_autocommit = conn.autocommit
+        prev_autocommit = self._begin_tx(conn)
         try:
-            conn.autocommit = False
             with conn.cursor() as cursor:
                 vrow = self._draft_lock_version_row_for_update(
                     cursor, tenant_id, project_id, version_record_id
@@ -4976,9 +5000,8 @@ class Database:
             ValueError: ``version_not_found`` or ``published_version``.
         """
         conn = self.connect()
-        prev_autocommit = conn.autocommit
+        prev_autocommit = self._begin_tx(conn)
         try:
-            conn.autocommit = False
             with conn.cursor() as cursor:
                 vrow = self._draft_lock_version_row_for_update(
                     cursor, tenant_id, project_id, version_record_id
@@ -5058,9 +5081,8 @@ class Database:
             ``released``, ``not_found`` (no lock row), or ``forbidden`` (another user holds the lock).
         """
         conn = self.connect()
-        prev_autocommit = conn.autocommit
+        prev_autocommit = self._begin_tx(conn)
         try:
-            conn.autocommit = False
             with conn.cursor() as cursor:
                 vrow = self._draft_lock_version_row_for_update(
                     cursor, tenant_id, project_id, version_record_id
@@ -5120,9 +5142,8 @@ class Database:
             ValueError: ``version_not_found``.
         """
         conn = self.connect()
-        prev_autocommit = conn.autocommit
+        prev_autocommit = self._begin_tx(conn)
         try:
-            conn.autocommit = False
             with conn.cursor() as cursor:
                 vrow = self._draft_lock_version_row_for_update(
                     cursor, tenant_id, project_id, version_record_id

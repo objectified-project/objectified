@@ -7,131 +7,31 @@ import {
   BackgroundVariant,
   Controls,
   MiniMap,
+  type Edge,
   type Node,
-  type NodeProps,
+  type OnEdgesChange,
+  type OnNodesChange,
   useEdgesState,
   useNodesState,
-  Handle,
-  Position,
+  useReactFlow,
+  ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { ChevronDown, GitBranch, GitMerge } from 'lucide-react';
+import { Crosshair, Locate } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
+import RevisionHistoryNode from './RevisionHistoryNode';
 import {
   buildLayoutedHistoryGraph,
   HISTORY_WINDOW_STEP,
   MAX_HISTORY_GRAPH_NODES,
   expandVersionsForWindow,
   filterVersionsBySelectedBranches,
+  laneColorForBranchIndex,
   type RevisionNodeData,
   type VersionHistoryBranchMeta,
+  type VersionHistoryTag,
   type VersionHistoryVertex,
 } from './version-history-dag';
-
-function RevisionHistoryNode({ id, data, selected }: NodeProps<Node<RevisionNodeData>>) {
-  const { isMerge, isBranchTip, branchNamesForTip, tipAccentClass, layoutDirection, onBranchFromRevision } = data;
-  const horizontal = layoutDirection === 'LR';
-
-  const hoverTitle =
-    isBranchTip && branchNamesForTip.length > 0
-      ? `Branch tip: ${branchNamesForTip.join(', ')}`
-      : isMerge
-        ? 'Merge revision (two parents)'
-        : undefined;
-
-  const leftAccent = isBranchTip && tipAccentClass ? `border-l-4 ${tipAccentClass} pl-2` : '';
-
-  let surface: string;
-  if (selected) {
-    surface =
-      'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500 dark:border-indigo-400 dark:bg-indigo-950/50 dark:ring-indigo-400';
-  } else if (isMerge) {
-    surface =
-      'border-2 border-violet-400 bg-violet-50/90 dark:border-violet-500 dark:bg-violet-950/40' +
-      (isBranchTip ? ' ring-2 ring-emerald-500/70 dark:ring-emerald-500/60' : '');
-  } else if (isBranchTip) {
-    surface =
-      'border border-emerald-600/40 bg-white ring-2 ring-emerald-500/75 dark:border-emerald-500/50 dark:bg-gray-900 dark:ring-emerald-500/70';
-  } else {
-    surface = 'border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900';
-  }
-
-  return (
-    <div title={hoverTitle} className={`rounded-lg border px-3 py-2 shadow-sm min-w-[11rem] max-w-[14rem] transition-colors ${surface} ${leftAccent}`.trim()}>
-      {horizontal ? (
-        <>
-          <Handle type="target" position={Position.Left} className="opacity-0" />
-          <Handle type="source" position={Position.Right} className="opacity-0" />
-        </>
-      ) : (
-        <>
-          <Handle type="target" position={Position.Top} className="opacity-0" />
-          <Handle type="source" position={Position.Bottom} className="opacity-0" />
-        </>
-      )}
-      <div className="flex items-start gap-2">
-        <div className="flex flex-col gap-0.5 shrink-0 mt-0.5" aria-hidden>
-          {isMerge ? <GitMerge className="h-4 w-4 text-violet-600 dark:text-violet-400" /> : <span className="h-4 w-4 block" />}
-          {isBranchTip ? <GitBranch className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : null}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-1">
-            <div className="font-mono text-sm font-semibold text-gray-900 dark:text-gray-50 truncate min-w-0">
-              v{data.versionString}
-            </div>
-            {onBranchFromRevision ? (
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger asChild>
-                  <button
-                    type="button"
-                    className="shrink-0 inline-flex items-center gap-0.5 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-                    title="Branch actions"
-                    onClick={(e) => e.stopPropagation()}
-                    onPointerDown={(e) => e.stopPropagation()}
-                  >
-                    Branch
-                    <ChevronDown className="h-3 w-3 opacity-70" aria-hidden />
-                  </button>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content
-                    className="z-[100] min-w-[10rem] rounded-md border border-gray-200 bg-white p-1 text-sm shadow-md dark:border-gray-600 dark:bg-gray-900"
-                    sideOffset={4}
-                    align="end"
-                    onPointerDownOutside={(e) => e.stopPropagation()}
-                  >
-                    <DropdownMenu.Item
-                      className="cursor-pointer rounded px-2 py-1.5 outline-none hover:bg-gray-100 dark:hover:bg-gray-800"
-                      onSelect={() => onBranchFromRevision(id)}
-                    >
-                      Branch from here
-                    </DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
-            ) : null}
-          </div>
-          {isMerge ? (
-            <div className="text-[10px] uppercase tracking-wide text-violet-800 dark:text-violet-200 font-semibold mt-0.5">
-              Merge commit
-            </div>
-          ) : null}
-          {isBranchTip && branchNamesForTip.length > 0 ? (
-            <div className="text-[10px] font-medium text-emerald-800 dark:text-emerald-200 mt-0.5 truncate" title={branchNamesForTip.join(', ')}>
-              Tip: {branchNamesForTip.join(', ')}
-            </div>
-          ) : null}
-          {data.shortMessage ? (
-            <div className="text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5" title={data.shortMessage}>
-              {data.shortMessage}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const nodeTypes = { revisionHistory: RevisionHistoryNode };
 
@@ -140,6 +40,8 @@ export type VersionHistoryGraphPanelProps = {
   versions: VersionHistoryVertex[];
   /** Named branches for tips, lane labels, and optional subgraph filter (#744) */
   branches?: VersionHistoryBranchMeta[];
+  /** Tags pinned to specific revisions, rendered as pills on the commit nodes. */
+  tags?: VersionHistoryTag[];
   windowSize: number;
   onWindowSizeIncrease: (nextSize: number) => void;
   /** Primary parent → this revision (OpenAPI compare) */
@@ -148,16 +50,129 @@ export type VersionHistoryGraphPanelProps = {
   onViewSpec: (revisionId: string) => void;
   /** Create a named branch from this revision (#2571) */
   onBranchFromRevision?: (revisionId: string) => void;
+  /** Canvas-only: switch the editor to this revision. When omitted the menu item is hidden. */
+  onCheckoutRevision?: (revisionId: string) => void;
+  /** Current HEAD revision id — powers the "Center on HEAD" button. */
+  headRevisionId?: string | null;
+  /** Currently selected revision (canvas pinned / table row) — powers "Center on selected". */
+  selectedRevisionId?: string | null;
 };
+
+type GraphCanvasProps = {
+  nodes: Node<RevisionNodeData>[];
+  edges: Edge[];
+  keyValue: string;
+  onNodesChange: OnNodesChange<Node<RevisionNodeData>>;
+  onEdgesChange: OnEdgesChange<Edge>;
+  onNodeClick: (e: React.MouseEvent, node: Node) => void;
+  headRevisionId?: string | null;
+  selectedRevisionId?: string | null;
+};
+
+function GraphCanvas({
+  nodes,
+  edges,
+  keyValue,
+  onNodesChange,
+  onEdgesChange,
+  onNodeClick,
+  headRevisionId,
+  selectedRevisionId,
+}: GraphCanvasProps) {
+  const { setCenter, getNode, fitView } = useReactFlow();
+
+  const centerOn = useCallback(
+    (id: string | null | undefined) => {
+      if (!id) return;
+      const n = getNode(id);
+      if (!n) return;
+      const width = n.width ?? 200;
+      const height = n.height ?? 52;
+      setCenter(n.position.x + width / 2, n.position.y + height / 2, { zoom: 1.2, duration: 400 });
+    },
+    [getNode, setCenter]
+  );
+
+  return (
+    <>
+      <div className="absolute top-2 right-2 z-10 flex gap-1.5">
+        <Button
+          type="button"
+          variant="secondary"
+          className="!px-2 !py-1 text-xs"
+          title="Fit all revisions in view"
+          onClick={() => fitView({ padding: 0.2, maxZoom: 1.35, duration: 400 })}
+        >
+          <Crosshair className="h-3.5 w-3.5" aria-hidden />
+          <span className="ml-1">Fit all</span>
+        </Button>
+        {headRevisionId ? (
+          <Button
+            type="button"
+            variant="secondary"
+            className="!px-2 !py-1 text-xs"
+            title="Center on current HEAD revision"
+            onClick={() => centerOn(headRevisionId)}
+          >
+            <Locate className="h-3.5 w-3.5" aria-hidden />
+            <span className="ml-1">HEAD</span>
+          </Button>
+        ) : null}
+        {selectedRevisionId && selectedRevisionId !== headRevisionId ? (
+          <Button
+            type="button"
+            variant="secondary"
+            className="!px-2 !py-1 text-xs"
+            title="Center on selected revision"
+            onClick={() => centerOn(selectedRevisionId)}
+          >
+            <Locate className="h-3.5 w-3.5" aria-hidden />
+            <span className="ml-1">Selected</span>
+          </Button>
+        ) : null}
+      </div>
+      <ReactFlow
+        key={keyValue}
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable
+        fitView
+        fitViewOptions={{ padding: 0.2, maxZoom: 1.35 }}
+        minZoom={0.15}
+        maxZoom={1.75}
+        proOptions={{ hideAttribution: true }}
+        className="bg-slate-50 dark:bg-gray-950"
+      >
+        <Background variant={BackgroundVariant.Dots} gap={14} size={1} />
+        <Controls />
+        <MiniMap
+          className="!bg-white/90 dark:!bg-gray-900/90"
+          maskColor="rgba(0,0,0,0.12)"
+          nodeStrokeWidth={2}
+        />
+      </ReactFlow>
+    </>
+  );
+}
 
 export default function VersionHistoryGraphPanel({
   versions,
   branches = [],
+  tags = [],
   windowSize,
   onWindowSizeIncrease,
   onCompareToPrimaryParent,
   onViewSpec,
   onBranchFromRevision,
+  onCheckoutRevision,
+  headRevisionId,
+  selectedRevisionId,
 }: VersionHistoryGraphPanelProps) {
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>(() => branches.map((b) => b.id));
 
@@ -169,8 +184,16 @@ export default function VersionHistoryGraphPanel({
   const expanded = useMemo(() => expandVersionsForWindow(branchFiltered, windowSize), [branchFiltered, windowSize]);
 
   const { nodes: layoutNodes, edges: layoutEdges } = useMemo(
-    () => buildLayoutedHistoryGraph(expanded, { branches, onBranchFromRevision }),
-    [expanded, branches, onBranchFromRevision]
+    () =>
+      buildLayoutedHistoryGraph(expanded, {
+        branches,
+        tags,
+        onBranchFromRevision,
+        onCheckoutRevision,
+        onViewSpec,
+        onCompareToPrimaryParent,
+      }),
+    [expanded, branches, tags, onBranchFromRevision, onCheckoutRevision, onViewSpec, onCompareToPrimaryParent]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutNodes);
@@ -246,10 +269,11 @@ export default function VersionHistoryGraphPanel({
 
       {branches.length > 0 ? (
         <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center gap-2 bg-white dark:bg-gray-800/80">
-          <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Branches</span>
+          <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Lanes</span>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter graph by named branch">
-            {branches.map((b) => {
+            {branches.map((b, idx) => {
               const on = selectedBranchIds.includes(b.id);
+              const color = laneColorForBranchIndex(idx);
               return (
                 <button
                   key={b.id}
@@ -257,12 +281,16 @@ export default function VersionHistoryGraphPanel({
                   aria-pressed={on}
                   title={on ? `Hide history for ${b.name}` : `Show history for ${b.name}`}
                   onClick={() => toggleBranch(b.id)}
-                  className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${
+                  className={`inline-flex items-center gap-1.5 text-xs rounded-full px-2.5 py-1 border transition-colors ${
                     on
                       ? 'border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-100 dark:border-emerald-600'
                       : 'border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400'
                   }`}
                 >
+                  <span
+                    className={`inline-block h-2 w-2 rounded-full ${color.dot} ${on ? '' : 'opacity-40'}`}
+                    aria-hidden
+                  />
                   {b.name}
                 </button>
               );
@@ -276,7 +304,7 @@ export default function VersionHistoryGraphPanel({
         </div>
       ) : null}
 
-      <div className="w-full h-[min(420px,55vh)] min-h-[280px]">
+      <div className="relative w-full h-[min(420px,55vh)] min-h-[280px]">
         {selectionBlocksGraph ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500 dark:text-gray-400 px-4 text-center">
             Select at least one branch to show the graph, or use &quot;Select all&quot;.
@@ -286,32 +314,18 @@ export default function VersionHistoryGraphPanel({
             No revisions to graph.
           </div>
         ) : (
-          <ReactFlow
-            key={`${expanded.map((v) => v.id).join('|')}-${windowSize}-${[...selectedBranchIds].sort().join(',')}`}
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onNodeClick={onNodeClick}
-            nodesDraggable={false}
-            nodesConnectable={false}
-            elementsSelectable
-            fitView
-            fitViewOptions={{ padding: 0.2, maxZoom: 1.35 }}
-            minZoom={0.15}
-            maxZoom={1.75}
-            proOptions={{ hideAttribution: true }}
-            className="bg-slate-50 dark:bg-gray-950"
-          >
-            <Background variant={BackgroundVariant.Dots} gap={14} size={1} />
-            <Controls />
-            <MiniMap
-              className="!bg-white/90 dark:!bg-gray-900/90"
-              maskColor="rgba(0,0,0,0.12)"
-              nodeStrokeWidth={2}
+          <ReactFlowProvider>
+            <GraphCanvas
+              nodes={nodes}
+              edges={edges}
+              keyValue={`${expanded.map((v) => v.id).join('|')}-${windowSize}-${[...selectedBranchIds].sort().join(',')}`}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onNodeClick={onNodeClick}
+              headRevisionId={headRevisionId}
+              selectedRevisionId={selectedRevisionId}
             />
-          </ReactFlow>
+          </ReactFlowProvider>
         )}
       </div>
     </div>

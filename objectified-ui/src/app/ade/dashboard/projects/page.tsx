@@ -717,7 +717,7 @@ const Projects = () => {
                 Design with AI
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="manual" className="mt-4 flex-1 min-h-0">
+            <TabsContent value="manual" className="mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
           {errorMessage && <Alert variant="error" className="mb-4">{errorMessage}</Alert>}
           <div className="mb-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 p-4">
             <div className="flex items-start gap-3">
@@ -963,10 +963,11 @@ const Projects = () => {
 
       {/* Edit Project Dialog */}
       <Dialog open={showEditDialog} onOpenChange={(open) => !isLoading && setShowEditDialog(open)}>
-        <DialogContent className="max-w-4xl" aria-describedby={undefined}>
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" aria-describedby={undefined}>
+          <DialogHeader className="shrink-0">
             <DialogTitle>Edit Project</DialogTitle>
           </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
           {errorMessage && <Alert variant="error" className="mt-4">{errorMessage}</Alert>}
           {selectedProject && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
@@ -1148,7 +1149,8 @@ const Projects = () => {
               </div>
             </div>
           </div>
-          <DialogFooter className="mt-6">
+          </div>
+          <DialogFooter className="mt-6 shrink-0">
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isLoading}>Cancel</Button>
             <Button onClick={handleEditSubmit} disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Changes'}</Button>
           </DialogFooter>

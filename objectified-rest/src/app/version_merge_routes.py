@@ -910,9 +910,8 @@ async def version_branch_merge(
         short_msg = raw_msg
 
     conn = db.connect()
-    prev_autocommit = conn.autocommit
+    prev_autocommit = db._begin_tx(conn)
     try:
-        conn.autocommit = False
         with conn.cursor() as cursor:
             cursor.execute(
                 """
@@ -1466,9 +1465,8 @@ async def version_branch_rollback(
     rb_meta = {"rollback": rb_rollback}
 
     conn = db.connect()
-    prev_autocommit = conn.autocommit
+    prev_autocommit = db._begin_tx(conn)
     try:
-        conn.autocommit = False
         with conn.cursor() as cursor:
             cursor.execute(
                 """
