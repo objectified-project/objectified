@@ -144,18 +144,22 @@ const Tooltip = ({ title, children, arrow, ...rest }: any) => (
     </TooltipPrimitive.Root>
   </TooltipPrimitive.Provider>
 );
-const TextField = ({ label, value, onChange, fullWidth, size, error, helperText, placeholder, disabled, multiline, rows, select, SelectProps, InputProps, slotProps, sx, children, ...rest }: any) => {
-  const inputProps = InputProps || slotProps?.input || {};
-  const startAdornment = inputProps.startAdornment;
-  const endAdornment = inputProps.endAdornment;
+const TextField = ({ label, value, onChange, fullWidth, size, error, helperText, placeholder, disabled, multiline, rows, select, SelectProps, InputProps, inputProps: innerInputProps, slotProps, sx, children, ...rest }: any) => {
+  const adornmentProps = InputProps || slotProps?.input || {};
+  const startAdornment = adornmentProps.startAdornment;
+  const endAdornment = adornmentProps.endAdornment;
+  // MUI-style `inputProps` forwards HTML attributes (min/max/step/maxLength/...)
+  // to the underlying <input>. Spreading via `...rest` would leak the prop
+  // to the DOM, so we destructure it out and apply it directly here.
+  const innerHtmlProps = innerInputProps || slotProps?.htmlInput || {};
   const style = { width: fullWidth ? '100%' : undefined, ...sxToStyle(sx) };
   const inputClass = `px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm ${fullWidth ? 'w-full min-w-0' : ''}`;
   const el = select ? (
-    <select value={value ?? ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange?.(e)} className={inputClass} disabled={disabled} style={{ minHeight: size === 'small' ? 32 : 40 }} {...rest}>
+    <select value={value ?? ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange?.(e)} className={inputClass} disabled={disabled} style={{ minHeight: size === 'small' ? 32 : 40 }} {...rest} {...innerHtmlProps}>
       {children}
     </select>
   ) : multiline ? (
-    <textarea value={value ?? ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange?.(e)} placeholder={placeholder} disabled={disabled} rows={rows || 3} className={inputClass} {...rest} />
+    <textarea value={value ?? ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange?.(e)} placeholder={placeholder} disabled={disabled} rows={rows || 3} className={inputClass} {...rest} {...innerHtmlProps} />
   ) : (
     <input
       type="text"
@@ -165,6 +169,7 @@ const TextField = ({ label, value, onChange, fullWidth, size, error, helperText,
       disabled={disabled}
       className={inputClass}
       {...rest}
+      {...innerHtmlProps}
     />
   );
   return (

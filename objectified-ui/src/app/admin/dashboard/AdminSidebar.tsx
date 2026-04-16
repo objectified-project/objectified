@@ -12,35 +12,84 @@ import {
   Activity,
   Building2,
   Package,
+  LayoutGrid,
 } from 'lucide-react';
+import SidebarShell, { SidebarSectionLabel } from '../../components/sidebar/SidebarShell';
+import SidebarDensityToggle from '../../components/sidebar/SidebarDensityToggle';
+import { sidebarTheme, useSidebarTokens } from '../../components/sidebar/sidebar-theme';
 
-interface SidebarItemProps {
+interface AdminMenuItem {
+  id: string;
+  path: string;
   icon: React.ReactNode;
   title: string;
-  active?: boolean;
-  onClick: () => void;
 }
 
-const SidebarItem: React.FC<SidebarItemProps> = ({ icon, title, active, onClick }) => (
-  <button
-    onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-left ${
-      active
-        ? 'bg-red-600 text-white'
-        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-    }`}
-  >
-    <div className={`flex-shrink-0 ${active ? 'text-white' : 'text-gray-400'}`}>
-      {icon}
-    </div>
-    <span className="font-medium text-sm">{title}</span>
-  </button>
-);
+const OVERVIEW: AdminMenuItem = {
+  id: 'overview',
+  path: '/admin/dashboard',
+  icon: <LayoutGrid className="w-4 h-4" />,
+  title: 'Overview',
+};
+
+const MANAGEMENT_ITEMS: AdminMenuItem[] = [
+  { id: 'users', path: '/admin/dashboard/users', icon: <Users className="w-4 h-4" />, title: 'User Management' },
+  { id: 'tenants', path: '/admin/dashboard/tenants', icon: <Building2 className="w-4 h-4" />, title: 'Tenant Management' },
+  { id: 'templates', path: '/admin/dashboard/templates', icon: <Package className="w-4 h-4" />, title: 'Property Templates' },
+  { id: 'payments', path: '/admin/dashboard/payments', icon: <CreditCard className="w-4 h-4" />, title: 'Payment Management' },
+  { id: 'database', path: '/admin/dashboard/database', icon: <Database className="w-4 h-4" />, title: 'Database Administration' },
+  { id: 'monitoring', path: '/admin/dashboard/monitoring', icon: <Activity className="w-4 h-4" />, title: 'System Monitoring' },
+  { id: 'settings', path: '/admin/dashboard/settings', icon: <Settings className="w-4 h-4" />, title: 'System Configuration' },
+];
+
+function NavItem({
+  item,
+  active,
+  onClick,
+}: {
+  item: AdminMenuItem;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const tokens = useSidebarTokens();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'group relative w-full flex items-center gap-2.5 rounded-md text-left transition-colors',
+        tokens.rowPaddingX,
+        tokens.rowPaddingY,
+        tokens.rowText,
+        active
+          ? `${sidebarTheme.rowSelected} font-medium`
+          : `${sidebarTheme.textSecondary} hover:${sidebarTheme.textPrimary.replace('text-', 'text-')} ${sidebarTheme.hover}`,
+      ].join(' ')}
+    >
+      {active && (
+        <span
+          className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-r bg-indigo-500"
+          aria-hidden
+        />
+      )}
+      <span
+        className={[
+          'shrink-0 flex items-center justify-center',
+          active ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300',
+        ].join(' ')}
+      >
+        {item.icon}
+      </span>
+      <span className="truncate">{item.title}</span>
+    </button>
+  );
+}
 
 export default function AdminSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const tokens = useSidebarTokens();
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -55,104 +104,57 @@ export default function AdminSidebar() {
     }
   };
 
-  const menuItems = [
-    {
-      id: 'users',
-      path: '/admin/dashboard/users',
-      icon: <Users className="w-5 h-5" />,
-      title: 'User Management',
-    },
-    {
-      id: 'tenants',
-      path: '/admin/dashboard/tenants',
-      icon: <Building2 className="w-5 h-5" />,
-      title: 'Tenant Management',
-    },
-    {
-      id: 'templates',
-      path: '/admin/dashboard/templates',
-      icon: <Package className="w-5 h-5" />,
-      title: 'Property Templates',
-    },
-    {
-      id: 'payments',
-      path: '/admin/dashboard/payments',
-      icon: <CreditCard className="w-5 h-5" />,
-      title: 'Payment Management',
-    },
-    {
-      id: 'database',
-      path: '/admin/dashboard/database',
-      icon: <Database className="w-5 h-5" />,
-      title: 'Database Administration',
-    },
-    {
-      id: 'monitoring',
-      path: '/admin/dashboard/monitoring',
-      icon: <Activity className="w-5 h-5" />,
-      title: 'System Monitoring',
-    },
-    {
-      id: 'settings',
-      path: '/admin/dashboard/settings',
-      icon: <Settings className="w-5 h-5" />,
-      title: 'System Configuration',
-    }
-  ];
-
   return (
-    <aside className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
-      {/* Sidebar Header */}
-      <div className="p-4 border-b border-gray-700">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-red-600 rounded-lg">
-            <Shield className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-sm font-bold text-white">Super Admin</h1>
-            <p className="text-xs text-gray-400">Objectified</p>
-          </div>
+    <SidebarShell
+      icon={<Shield />}
+      title="Super Admin"
+      subtitle="Objectified Console"
+      width={264}
+      footer={
+        <div className="flex items-center justify-between gap-2">
+          <SidebarDensityToggle />
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className={[
+              'flex items-center gap-1.5 rounded-md transition-colors',
+              tokens.rowPaddingY,
+              'px-2.5 text-[12.5px] font-medium',
+              'text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400',
+              'hover:bg-rose-50 dark:hover:bg-rose-950/30',
+              'border border-transparent hover:border-rose-200 dark:hover:border-rose-900/60',
+              'disabled:opacity-50 disabled:cursor-not-allowed',
+            ].join(' ')}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            {isLoggingOut ? 'Signing out…' : 'Sign out'}
+          </button>
         </div>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        <SidebarItem
-          icon={<Shield className="w-5 h-5" />}
-          title="Overview"
-          active={pathname === '/admin/dashboard'}
-          onClick={() => router.push('/admin/dashboard')}
+      }
+    >
+      <nav className={[tokens.sectionPadding, 'flex flex-col', tokens.rowGap].join(' ')}>
+        <NavItem
+          item={OVERVIEW}
+          active={pathname === OVERVIEW.path}
+          onClick={() => router.push(OVERVIEW.path)}
         />
 
-        <div className="pt-4 pb-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4">
-            Management
-          </p>
+        <div className="pt-3 pb-1">
+          <SidebarSectionLabel>Management</SidebarSectionLabel>
         </div>
 
-        {menuItems.map((item) => (
-          <SidebarItem
-            key={item.id}
-            icon={item.icon}
-            title={item.title}
-            active={pathname === item.path}
-            onClick={() => router.push(item.path)}
-          />
-        ))}
+        <div className={['flex flex-col', tokens.rowGap].join(' ')}>
+          {MANAGEMENT_ITEMS.map((item) => (
+            <NavItem
+              key={item.id}
+              item={item}
+              active={pathname === item.path}
+              onClick={() => router.push(item.path)}
+            />
+          ))}
+        </div>
       </nav>
-
-      {/* Sidebar Footer */}
-      <div className="p-4 border-t border-gray-700">
-        <button
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-          className="w-full flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50 text-sm"
-        >
-          <LogOut className="w-4 h-4" />
-          {isLoggingOut ? 'Logging out...' : 'Logout'}
-        </button>
-      </div>
-    </aside>
+    </SidebarShell>
   );
 }
-

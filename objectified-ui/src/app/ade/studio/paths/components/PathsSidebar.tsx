@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, AlertTriangle, FileUp, ChevronRight, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, AlertTriangle, FileUp, ChevronRight, ChevronDown, Route, Search } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Select,
@@ -32,6 +32,9 @@ import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { AVAILABLE_OPERATIONS, OPERATION_COLORS } from './paths-operation-colors';
 import { parseOpenAPISpec } from '../../../../utils/openapi-import';
 import { importPathsFromOpenAPIForVersion } from '../../../../../../lib/db/import-openapi-paths-security';
+import SidebarShell, { SidebarSectionLabel } from '../../../../components/sidebar/SidebarShell';
+import SidebarDensityToggle from '../../../../components/sidebar/SidebarDensityToggle';
+import { sidebarTheme, useSidebarTokens } from '../../../../components/sidebar/sidebar-theme';
 
 interface ClassItem {
   id: string;
@@ -73,6 +76,7 @@ export default function PathsSidebar({
   const { selectedVersionId, selectedProjectId } = useStudio();
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const isDark = useDarkMode();
+  const tokens = useSidebarTokens();
   const [paths, setPaths] = useState<PathItem[]>([]);
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [properties, setProperties] = useState<PropertyItem[]>([]);
@@ -464,41 +468,67 @@ export default function PathsSidebar({
     { value: 'servers' as const, label: 'Servers' },
   ];
 
-  return (
-    <div
-      className={`w-[280px] h-full shrink-0 flex flex-col relative border-r ${
-        isDark ? 'border-slate-700' : 'border-slate-200'
-      }`}
-      style={{
-        background: isDark
-          ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
-          : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-        boxShadow: isDark
-          ? '4px 0 24px rgba(0, 0, 0, 0.3)'
-          : '4px 0 24px rgba(0, 0, 0, 0.06)',
-      }}
-    >
-      {/* Section Dropdown */}
-        <div
-          className={`px-4 py-3 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}
-        >
-          <Select value={activeTab} onValueChange={handleTabChange}>
-            <SelectTrigger className="h-9 text-[0.8125rem] w-full">
-              <SelectValue placeholder="Section" />
-            </SelectTrigger>
-            <SelectContent>
-              {TAB_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+  const activeTabLabel = TAB_OPTIONS.find((opt) => opt.value === activeTab)?.label ?? 'Section';
 
+  return (
+    <SidebarShell
+      icon={<Route />}
+      title="API Designer"
+      subtitle={activeTabLabel}
+      width={280}
+      bodyScroll={activeTab !== 'properties'}
+      toolbar={
+        <Select value={activeTab} onValueChange={handleTabChange}>
+          <SelectTrigger className="h-8 text-[12.5px] w-full">
+            <SelectValue placeholder="Section" />
+          </SelectTrigger>
+          <SelectContent>
+            {TAB_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      }
+      footer={
+        <div className="flex items-center justify-between gap-2">
+          <SidebarDensityToggle />
+          {activeTab === 'paths' && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleImportFromOpenAPI}
+                className={[
+                  'flex items-center gap-1.5 rounded-md text-[12px] font-medium transition-colors',
+                  'px-2.5 py-1.5 border',
+                  isDark
+                    ? 'text-slate-200 bg-slate-900 hover:bg-slate-800 border-slate-700'
+                    : 'text-slate-700 bg-white hover:bg-slate-50 border-slate-200',
+                ].join(' ')}
+                aria-label="Import from OpenAPI"
+                title="Import paths from an OpenAPI specification"
+              >
+                <FileUp className="w-3.5 h-3.5" />
+                Import
+              </button>
+              <button
+                type="button"
+                onClick={handleAddPath}
+                className="flex items-center justify-center w-8 h-8 rounded-md text-white transition-colors bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:ring-offset-2 dark:focus:ring-offset-slate-950"
+                aria-label="Add path"
+                title="Add a new path"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      }
+    >
         {/* Content Area */}
         <div
-          className={`flex-1 p-4 flex flex-col ${activeTab === 'properties' ? 'overflow-hidden' : 'overflow-auto'}`}
+          className={`flex-1 ${tokens.sectionPadding} flex flex-col ${activeTab === 'properties' ? 'overflow-hidden' : ''}`}
         >
           {isLoading ? (
             <div className="flex justify-center py-8">
@@ -508,36 +538,37 @@ export default function PathsSidebar({
             <>
               {/* Operations Tab Content */}
               {activeTab === 'operations' && (
-                <div className="flex flex-col gap-4">
-                  <div className="mb-2 px-1">
-                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                      Drag to Canvas
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1 px-1">
-                    Drag an operation onto a path on the canvas to add it.
+                <div className="flex flex-col gap-3">
+                  <SidebarSectionLabel>HTTP Operations</SidebarSectionLabel>
+                  <p className={['text-[11px] -mt-1 px-1', sidebarTheme.textSecondary].join(' ')}>
+                    Drag any operation onto a path on the canvas to attach it.
                   </p>
-                  <div className="flex flex-col gap-1">
+                  <div className={['flex flex-col', tokens.rowGap].join(' ')}>
                     {AVAILABLE_OPERATIONS.map((operation) => (
                       <div
                         key={operation.id}
                         draggable
                         onDragStart={(e) => handleOperationDragStart(e, operation)}
-                        className={`px-3 py-2 rounded border cursor-grab transition-all duration-150 hover:-translate-y-px hover:shadow active:cursor-grabbing ${
-                          isDark
-                            ? 'border-gray-700 bg-gray-700/30 hover:bg-gray-700/50'
-                            : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
-                        }`}
+                        className={[
+                          'group flex items-center gap-2.5 rounded-md border cursor-grab transition-colors active:cursor-grabbing',
+                          tokens.rowPaddingX,
+                          tokens.rowPaddingY,
+                          sidebarTheme.borderSoft,
+                          sidebarTheme.hover,
+                          'hover:border-slate-300 dark:hover:border-slate-700',
+                        ].join(' ')}
                       >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full shrink-0"
-                            style={{ backgroundColor: operation.color }}
-                          />
-                          <span className="text-sm font-medium" style={{ color: operation.color }}>
-                            {operation.label}
-                          </span>
-                        </div>
+                        <span
+                          className="shrink-0 w-2 h-2 rounded-full"
+                          style={{ backgroundColor: operation.color }}
+                          aria-hidden
+                        />
+                        <span
+                          className={['font-semibold tracking-wide', tokens.rowText].join(' ')}
+                          style={{ color: operation.color }}
+                        >
+                          {operation.label}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -546,30 +577,25 @@ export default function PathsSidebar({
 
               {/* Paths Tab Content */}
               {activeTab === 'paths' && (
-                <div className="flex flex-col gap-4">
-                  {/* Paths List Section */}
+                <div className="flex flex-col gap-3">
                   <div>
-                    <div className="mb-2 px-1 flex justify-between items-center">
-                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                        Paths
-                      </span>
-                      <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                        {paths.length} total
-                      </span>
-                    </div>
+                    <SidebarSectionLabel trailing={`${paths.length} total`}>
+                      Paths
+                    </SidebarSectionLabel>
 
                     {/* Search Input */}
-                    <div className="mb-3">
+                    <div className="mb-3 relative">
+                      <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                       <input
                         type="text"
                         value={pathSearch}
                         onChange={(e) => setPathSearch(e.target.value)}
-                        placeholder="Filter paths..."
-                        className={`w-full px-2.5 py-1.5 text-xs rounded-md border transition-colors ${
-                          isDark
-                            ? 'bg-slate-800 border-slate-600 text-slate-200 placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                            : 'bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                        }`}
+                        placeholder="Filter paths…"
+                        className={[
+                          'w-full pl-7 pr-2 text-[12.5px] rounded-md border transition-colors',
+                          tokens.inputPaddingY,
+                          sidebarTheme.inputBase,
+                        ].join(' ')}
                       />
                     </div>
 
@@ -597,44 +623,49 @@ export default function PathsSidebar({
                         );
                       }
 
-                      return filteredPaths.map((path) => {
+                      return (
+                        <ul className={['flex flex-col', tokens.rowGap].join(' ')}>
+                          {filteredPaths.map((path) => {
                         const invalid = !isValidPath(path.pathname);
                         const expanded = Boolean(expandedPathIds[path.id]);
                         const pathOps = operationsByPathId[path.id] ?? [];
                         const loadingOps = operationsLoadingPathId === path.id;
+                        const selected = selectedPathId === path.id;
                         return (
+                      <li key={path.id}>
                       <div
-                        key={path.id}
-                        className={`relative flex flex-col rounded border transition-all duration-150 ${
+                        className={[
+                          'group relative flex flex-col rounded-md transition-colors',
                           invalid
-                            ? 'border-2 border-red-600 ring-2 ring-red-500/60 bg-red-500/15 dark:bg-red-500/20 dark:ring-red-400/50'
-                            : selectedPathId === path.id
-                              ? 'border-2 border-indigo-500 bg-indigo-500/20'
-                              : isDark
-                                ? 'border-gray-700 bg-gray-700/30'
-                                : 'border-gray-200 bg-gray-50'
-                        }`}
+                            ? 'border border-rose-300 dark:border-rose-900/70 bg-rose-50/60 dark:bg-rose-950/30'
+                            : selected
+                              ? `${sidebarTheme.rowSelected} ${sidebarTheme.rowSelectedRing}`
+                              : `border ${sidebarTheme.borderSoft} ${sidebarTheme.hover}`,
+                        ].join(' ')}
                         title={invalid ? 'Invalid path: must start with / and use valid {param} placeholders' : undefined}
                       >
-                        {invalid && (
-                          <div className="absolute top-1 right-8 z-10 flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white shadow ring-2 ring-red-400/80" title="Path is misconfigured">
-                            <AlertTriangle className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden />
-                          </div>
+                        {selected && !invalid && (
+                          <span
+                            className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-r bg-indigo-500"
+                            aria-hidden
+                          />
                         )}
-                        <div className="flex items-center gap-0.5 px-2 py-2">
+                        <div className={['flex items-center gap-0.5', tokens.rowPaddingX, tokens.rowPaddingY].join(' ')}>
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               togglePathExpanded(path.id);
                             }}
-                            className={`shrink-0 rounded p-1 transition-colors ${
-                              isDark ? 'text-slate-400 hover:bg-gray-600/60' : 'text-slate-500 hover:bg-gray-200/90'
-                            }`}
+                            className={[
+                              'shrink-0 rounded p-1 transition-colors',
+                              sidebarTheme.textTertiary,
+                              'hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60',
+                            ].join(' ')}
                             aria-expanded={expanded}
                             aria-label={expanded ? 'Collapse operations' : 'Expand operations'}
                           >
-                            {expanded ? <ChevronDown className="h-4 w-4" aria-hidden /> : <ChevronRight className="h-4 w-4" aria-hidden />}
+                            {expanded ? <ChevronDown className="h-3.5 w-3.5" aria-hidden /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden />}
                           </button>
                           <div
                             role="button"
@@ -646,29 +677,30 @@ export default function PathsSidebar({
                               }
                             }}
                             onClick={() => onPathSelect(path.id, path.pathname)}
-                            className={`min-w-0 flex-1 cursor-pointer rounded px-1 py-0.5 text-left ${
-                              selectedPathId === path.id
-                                ? 'text-indigo-600 dark:text-indigo-400'
-                                : 'text-gray-700 dark:text-gray-300'
-                            } ${isDark ? 'hover:bg-gray-700/40' : 'hover:bg-gray-100/90'}`}
+                            className={[
+                              'min-w-0 flex-1 cursor-pointer rounded px-1 py-0.5 text-left font-mono',
+                              tokens.rowText,
+                              selected ? 'font-semibold' : sidebarTheme.textPrimary,
+                            ].join(' ')}
                           >
-                            <span className={`block truncate text-sm ${selectedPathId === path.id ? 'font-semibold' : ''}`}>
-                              {path.pathname}
-                            </span>
+                            <span className="block truncate">{path.pathname}</span>
                           </div>
-                          <div className={`flex shrink-0 gap-1 ${invalid ? 'pl-4' : ''}`}>
+                          {invalid && (
+                            <span className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded text-rose-600 dark:text-rose-400" title="Path is misconfigured">
+                              <AlertTriangle className="w-3.5 h-3.5" strokeWidth={2.25} aria-hidden />
+                            </span>
+                          )}
+                          <div className="flex shrink-0 gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleEditPath(path);
                               }}
-                              className={`rounded p-1 transition-colors ${
-                                isDark ? 'text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-500/10'
-                              }`}
+                              className="rounded p-1 transition-colors text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
                               aria-label="Edit path"
                             >
-                              <Pencil className="h-4 w-4" />
+                              <Pencil className="h-3.5 w-3.5" />
                             </button>
                             <button
                               type="button"
@@ -676,18 +708,16 @@ export default function PathsSidebar({
                                 e.stopPropagation();
                                 handleDeletePath(path);
                               }}
-                              className={`rounded p-1 transition-colors ${
-                                isDark ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-500 hover:text-red-600 hover:bg-red-500/10'
-                              }`}
+                              className="rounded p-1 transition-colors text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                               aria-label="Delete path"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         </div>
                         {expanded && (
                           <div
-                            className={`border-t px-2 pb-2 pt-1 ${isDark ? 'border-gray-600/60' : 'border-gray-200/90'}`}
+                            className={['border-t px-2 pb-2 pt-1.5', sidebarTheme.borderSoft].join(' ')}
                           >
                             {loadingOps && (
                               <p className="px-2 py-1 text-[10px] text-gray-500 dark:text-gray-400">Loading operations…</p>
@@ -711,13 +741,16 @@ export default function PathsSidebar({
                                         operation: op.operation,
                                       });
                                     }}
-                                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                                      isDark ? 'text-gray-200 hover:bg-gray-700/80' : 'text-gray-800 hover:bg-gray-100'
-                                    }`}
+                                    className={[
+                                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                                      tokens.rowText,
+                                      sidebarTheme.textPrimary,
+                                      sidebarTheme.hover,
+                                    ].join(' ')}
                                     title={`Focus ${method} on canvas`}
                                   >
                                     <span
-                                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm"
+                                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold text-white"
                                       style={{ backgroundColor: color }}
                                     >
                                       {method}
@@ -728,7 +761,10 @@ export default function PathsSidebar({
                           </div>
                         )}
                       </div>
-                    ); });
+                      </li>
+                    ); })}
+                        </ul>
+                      );
                     })()}
                   </div>
                 </div>
@@ -738,22 +774,23 @@ export default function PathsSidebar({
               {activeTab === 'classes' && (
                 <div className="flex flex-col h-full gap-0">
                   {/* Search Input */}
-                  <div className="shrink-0 mb-3">
+                  <div className="shrink-0 mb-3 relative">
+                    <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                     <input
                       type="text"
                       value={classSearch}
                       onChange={(e) => setClassSearch(e.target.value)}
-                      placeholder="Filter classes..."
-                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                        isDark
-                          ? 'bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500'
-                          : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                      }`}
+                      placeholder="Filter classes…"
+                      className={[
+                        'w-full pl-7 pr-2 text-[12.5px] rounded-md border transition-colors',
+                        tokens.inputPaddingY,
+                        sidebarTheme.inputBase,
+                      ].join(' ')}
                     />
                   </div>
 
                   {/* Scrollable classes list */}
-                  <div className="flex-1 overflow-y-auto flex flex-col gap-3">
+                  <div className={['flex-1 overflow-y-auto flex flex-col', tokens.rowGap].join(' ')}>
                     {(() => {
                       const filteredClasses = classSearch.trim()
                         ? classes.filter(cls =>
@@ -764,20 +801,21 @@ export default function PathsSidebar({
                       if (classes.length === 0) {
                         return (
                           <div
-                            className={`py-6 px-4 text-center rounded border border-dashed ${
-                              isDark ? 'border-slate-700' : 'border-slate-200'
-                            }`}
+                            className={[
+                              'py-6 px-3 text-center rounded-md border border-dashed',
+                              sidebarTheme.borderSoft,
+                              sidebarTheme.textSecondary,
+                              'text-[12px]',
+                            ].join(' ')}
                           >
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              No classes found. Create classes in the main Studio editor.
-                            </span>
+                            No classes found. Create classes in the main Studio editor.
                           </div>
                         );
                       }
 
                       if (filteredClasses.length === 0) {
                         return (
-                          <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
+                          <span className={['text-[12px] px-2 py-1', sidebarTheme.textSecondary].join(' ')}>
                             No classes match &quot;{classSearch}&quot;
                           </span>
                         );
@@ -785,16 +823,11 @@ export default function PathsSidebar({
 
                       return (
                         <>
-                          <div className="px-1 mb-1 flex justify-between items-center shrink-0">
-                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              Classes
-                            </span>
-                            {classSearch.trim() && (
-                              <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                                {filteredClasses.length} / {classes.length}
-                              </span>
-                            )}
-                          </div>
+                          <SidebarSectionLabel
+                            trailing={classSearch.trim() ? `${filteredClasses.length} / ${classes.length}` : 'Drag to canvas'}
+                          >
+                            Classes
+                          </SidebarSectionLabel>
                           {filteredClasses.map((cls) => {
                             const handleClassDragStart = (e: React.DragEvent) => {
                               e.dataTransfer.effectAllowed = 'copy';
@@ -810,27 +843,26 @@ export default function PathsSidebar({
                                 key={cls.id}
                                 draggable
                                 onDragStart={handleClassDragStart}
-                                className={`px-4 py-3 rounded-lg border text-sm cursor-grab transition-all duration-200 relative ${
-                                  isDark
-                                    ? 'border-slate-600 bg-slate-800/80 text-slate-200 shadow shadow-black/30 hover:bg-slate-700/60 hover:-translate-y-px hover:shadow-lg hover:border-indigo-500 active:cursor-grabbing active:translate-y-0'
-                                    : 'border-slate-300 bg-white/90 text-slate-800 shadow hover:bg-slate-50 hover:-translate-y-px hover:shadow-md hover:border-indigo-400 active:cursor-grabbing active:translate-y-0'
-                                }`}
-                                style={{
-                                  background: isDark
-                                    ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%)'
-                                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                                }}
+                                className={[
+                                  'group flex items-center gap-2.5 rounded-md border cursor-grab transition-colors active:cursor-grabbing',
+                                  tokens.rowPaddingX,
+                                  tokens.rowPaddingY,
+                                  sidebarTheme.borderSoft,
+                                  sidebarTheme.surface,
+                                  sidebarTheme.hover,
+                                  'hover:border-indigo-300 dark:hover:border-indigo-800',
+                                ].join(' ')}
                               >
-                                <div className="flex items-center gap-3">
-                                  <div
-                                    className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_8px_rgba(99,102,241,0.4)]"
-                                    style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-semibold text-sm truncate">{cls.name}</div>
-                                    <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
-                                      Class Schema
-                                    </div>
+                                <span
+                                  className="shrink-0 w-1.5 h-1.5 rounded-full bg-indigo-500"
+                                  aria-hidden
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className={['font-medium truncate', tokens.rowText, sidebarTheme.textPrimary].join(' ')}>
+                                    {cls.name}
+                                  </div>
+                                  <div className={['text-[10.5px] mt-0.5', sidebarTheme.textTertiary].join(' ')}>
+                                    Class schema
                                   </div>
                                 </div>
                               </div>
@@ -847,45 +879,44 @@ export default function PathsSidebar({
               {activeTab === 'properties' && (
                 <div className="flex flex-col h-full gap-0">
                   {/* Search Input - Fixed at top */}
-                  <div className="shrink-0 mb-3">
+                  <div className="shrink-0 mb-3 relative">
+                    <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                     <input
                       type="text"
-                      placeholder="Search properties..."
+                      placeholder="Search properties…"
                       value={propertySearch}
                       onChange={(e) => setPropertySearch(e.target.value)}
-                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                        isDark
-                          ? 'bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500'
-                          : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                      }`}
+                      className={[
+                        'w-full pl-7 pr-2 text-[12.5px] rounded-md border transition-colors',
+                        tokens.inputPaddingY,
+                        sidebarTheme.inputBase,
+                      ].join(' ')}
                     />
                   </div>
 
                   {/* Scrollable properties list */}
-                  <div className="flex-1 overflow-y-auto flex flex-col gap-3">
+                  <div className={['flex-1 overflow-y-auto flex flex-col', tokens.rowGap].join(' ')}>
                     {properties.length === 0 ? (
                       <div
-                        className={`py-6 px-4 text-center rounded border border-dashed ${
-                          isDark ? 'border-slate-700' : 'border-slate-200'
-                        }`}
+                        className={[
+                          'py-6 px-3 text-center rounded-md border border-dashed',
+                          sidebarTheme.borderSoft,
+                          sidebarTheme.textSecondary,
+                          'text-[12px]',
+                        ].join(' ')}
                       >
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          No properties found. Create properties in the main Studio editor.
-                        </span>
+                        No properties found. Create properties in the main Studio editor.
                       </div>
                     ) : (
                       <>
-                        <div className="px-1 mb-1 flex justify-between items-center shrink-0">
-                          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider" title="Drag to canvas or onto path variables for type binding">
-                            Drag to Canvas / Path Variables
-                          </span>
-                          <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                            {properties.filter(p =>
-                              p.name.toLowerCase().includes(propertySearch.toLowerCase()) ||
-                              (p.data?.type && p.data.type.toLowerCase().includes(propertySearch.toLowerCase()))
-                            ).length} / {properties.length}
-                          </span>
-                        </div>
+                        <SidebarSectionLabel
+                          trailing={`${properties.filter(p =>
+                            p.name.toLowerCase().includes(propertySearch.toLowerCase()) ||
+                            (p.data?.type && p.data.type.toLowerCase().includes(propertySearch.toLowerCase()))
+                          ).length} / ${properties.length}`}
+                        >
+                          <span title="Drag to canvas or onto path variables for type binding">Properties</span>
+                        </SidebarSectionLabel>
                         {properties
                           .filter(prop =>
                             prop.name.toLowerCase().includes(propertySearch.toLowerCase()) ||
@@ -939,40 +970,35 @@ export default function PathsSidebar({
                             key={prop.id}
                             draggable
                             onDragStart={handlePropertyDragStart}
-                            className={`px-4 py-3 rounded-lg border text-sm cursor-grab transition-all duration-200 relative ${
-                              isDark
-                                ? 'border-slate-600 hover:border-violet-500 active:cursor-grabbing active:translate-y-0'
-                                : 'border-slate-300 hover:border-violet-400 active:cursor-grabbing active:translate-y-0'
-                            } hover:-translate-y-px hover:shadow-md`}
-                            style={{
-                              background: isDark
-                                ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%)'
-                                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                              color: isDark ? '#e2e8f0' : '#1e293b',
-                              boxShadow: isDark ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                            }}
+                            className={[
+                              'group flex items-center gap-2.5 rounded-md border cursor-grab transition-colors active:cursor-grabbing',
+                              tokens.rowPaddingX,
+                              tokens.rowPaddingY,
+                              sidebarTheme.borderSoft,
+                              sidebarTheme.surface,
+                              sidebarTheme.hover,
+                              'hover:border-violet-300 dark:hover:border-violet-800',
+                            ].join(' ')}
                           >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className="w-1.5 h-1.5 rounded shrink-0 shadow-[0_0_6px_rgba(139,92,246,0.4)]"
-                                style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)' }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="font-medium text-sm truncate">{prop.name}</span>
-                                  {isOptional && (
-                                    <span
-                                      className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded ${
-                                        isDark ? 'bg-slate-400/25 text-slate-400' : 'bg-slate-400/20 text-slate-500'
-                                      }`}
-                                    >
-                                      optional
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 font-mono">
-                                  {typeDisplay}
-                                </div>
+                            <span
+                              className="shrink-0 w-1.5 h-1.5 rounded-full bg-violet-500"
+                              aria-hidden
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={['font-medium truncate', tokens.rowText, sidebarTheme.textPrimary].join(' ')}>
+                                  {prop.name}
+                                </span>
+                                {isOptional && (
+                                  <span
+                                    className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                                  >
+                                    optional
+                                  </span>
+                                )}
+                              </div>
+                              <div className={['text-[10.5px] mt-0.5 font-mono', sidebarTheme.textTertiary].join(' ')}>
+                                {typeDisplay}
                               </div>
                             </div>
                           </div>
@@ -996,33 +1022,6 @@ export default function PathsSidebar({
             </>
           )}
         </div>
-
-        {/* Paths actions (Paths Tab Only) - Bottom */}
-        {activeTab === 'paths' && (
-          <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={handleImportFromOpenAPI}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                isDark
-                  ? 'text-slate-200 bg-slate-700 hover:bg-slate-600 border border-slate-600'
-                  : 'text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200'
-              }`}
-              aria-label="Import from OpenAPI"
-            >
-              <FileUp className="w-4 h-4" />
-              Import from OpenAPI
-            </button>
-            <button
-              type="button"
-              onClick={handleAddPath}
-              className="flex items-center justify-center w-10 h-10 rounded-full text-white shadow-lg transition-all hover:shadow-xl bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-              aria-label="Add path"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </div>
-        )}
 
       {/* Add/Edit Path Dialog */}
       <Dialog.Root open={pathDialogOpen} onOpenChange={setPathDialogOpen}>
@@ -1217,7 +1216,7 @@ export default function PathsSidebar({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </div>
+    </SidebarShell>
   );
 }
 

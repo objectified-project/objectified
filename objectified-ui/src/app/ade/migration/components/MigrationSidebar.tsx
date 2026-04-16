@@ -1,7 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { useMigration, type MigrationTableRow } from '../MigrationContext';
+import { GitCompareArrows, AlertCircle, CheckCircle2, Search } from 'lucide-react';
+import { useMigration } from '../MigrationContext';
+import SidebarShell, { SidebarSectionLabel } from '../../../components/sidebar/SidebarShell';
+import SidebarDensityToggle from '../../../components/sidebar/SidebarDensityToggle';
+import { sidebarTheme, useSidebarTokens } from '../../../components/sidebar/sidebar-theme';
 
 /** Normalize object for comparison by sorting keys (so key order doesn't affect equality). */
 function normalizeForCompare(value: unknown): unknown {
@@ -20,9 +24,22 @@ function schemaEquals(a: Record<string, unknown>, b: Record<string, unknown>): b
 }
 
 export default function MigrationSidebar() {
-  const { selectedProjectId, fromVersionId, toVersionId, fromTables, toTables, setFromTables, setToTables, selectedClassName, setSelectedClassName, ruleCountsVersion } = useMigration();
+  const {
+    selectedProjectId,
+    fromVersionId,
+    toVersionId,
+    fromTables,
+    toTables,
+    setFromTables,
+    setToTables,
+    selectedClassName,
+    setSelectedClassName,
+    ruleCountsVersion,
+  } = useMigration();
+  const tokens = useSidebarTokens();
   const [loading, setLoading] = React.useState(false);
   const [ruleCounts, setRuleCounts] = React.useState<Record<string, number>>({});
+  const [filter, setFilter] = React.useState('');
 
   React.useEffect(() => {
     if (!fromVersionId || !toVersionId || fromVersionId === toVersionId) {
@@ -91,7 +108,7 @@ export default function MigrationSidebar() {
       existing.toSchema = row.schema;
       byName.set(row.class_name, existing);
     }
-    for (const [name, entry] of byName) {
+    for (const [, entry] of byName) {
       const inFrom = entry.fromSchema !== undefined;
       const inTo = entry.toSchema !== undefined;
       if (!inFrom || !inTo) {
@@ -105,56 +122,130 @@ export default function MigrationSidebar() {
       .sort((a, b) => a.class_name.localeCompare(b.class_name));
   }, [fromTables, toTables]);
 
+  const filteredList = React.useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return combinedList;
+    return combinedList.filter((row) => row.class_name.toLowerCase().includes(q));
+  }, [combinedList, filter]);
+
+  const diffCount = combinedList.filter((c) => c.hasDifference).length;
+
   return (
-    <aside
-      className="border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex flex-col overflow-hidden"
-      style={{ width: 280, minWidth: 280 }}
+    <SidebarShell
+      icon={<GitCompareArrows />}
+      title="Classes"
+      subtitle={
+        loading
+          ? 'Loading…'
+          : combinedList.length === 0
+            ? 'No classes in either version'
+            : `${combinedList.length} class${combinedList.length === 1 ? '' : 'es'} · ${diffCount} differ`
+      }
+      toolbar={
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+          <input
+            type="text"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filter classes…"
+            className={[
+              'w-full pl-7 pr-2 text-[12.5px] rounded-md border transition-colors',
+              tokens.inputPaddingY,
+              sidebarTheme.inputBase,
+            ].join(' ')}
+          />
+        </div>
+      }
+      footer={<SidebarDensityToggle />}
     >
-      <div className="p-2 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Classes</h2>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          From and to versions combined. Different color = schema differs.
-        </p>
-      </div>
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className={tokens.sectionPadding}>
         {loading ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400">Loading classes...</div>
+          <div className={['py-2', sidebarTheme.textSecondary, 'text-[12.5px]'].join(' ')}>Loading classes…</div>
         ) : combinedList.length === 0 ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400">No classes in either version.</div>
+          <div
+            className={[
+              'rounded-md border border-dashed py-6 px-3 text-center',
+              sidebarTheme.borderSoft,
+              sidebarTheme.textSecondary,
+              'text-[12px]',
+            ].join(' ')}
+          >
+            No classes in either version.
+          </div>
+        ) : filteredList.length === 0 ? (
+          <div className={['py-2 text-[12px]', sidebarTheme.textSecondary].join(' ')}>
+            No classes match &quot;{filter}&quot;
+          </div>
         ) : (
-          <ul className="space-y-1">
-            {combinedList.map(({ class_name, hasDifference }) => {
-              const isSelected = selectedClassName === class_name;
-              const count = ruleCounts[class_name] ?? 0;
-              return (
-                <li key={class_name}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedClassName(class_name)}
-                    className={`flex items-center w-full text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-                      isSelected
-                        ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200 border border-indigo-200/80 dark:border-indigo-700/50'
-                        : hasDifference
-                          ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 border border-amber-200/60 dark:border-amber-700/50 hover:bg-amber-100 dark:hover:bg-amber-900/30'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <span className="font-medium truncate flex-1 min-w-0">{class_name}</span>
-                    {count > 0 && (
+          <>
+            <SidebarSectionLabel
+              trailing={filter ? `${filteredList.length} / ${combinedList.length}` : undefined}
+            >
+              Schema diff
+            </SidebarSectionLabel>
+            <ul className={['flex flex-col', tokens.rowGap].join(' ')}>
+              {filteredList.map(({ class_name, hasDifference }) => {
+                const isSelected = selectedClassName === class_name;
+                const count = ruleCounts[class_name] ?? 0;
+                return (
+                  <li key={class_name}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedClassName(class_name)}
+                      className={[
+                        'group relative flex items-center w-full text-left rounded-md transition-colors',
+                        tokens.rowPaddingX,
+                        tokens.rowPaddingY,
+                        tokens.rowText,
+                        isSelected
+                          ? `${sidebarTheme.rowSelected} ${sidebarTheme.rowSelectedRing} font-medium`
+                          : `${sidebarTheme.textPrimary} ${sidebarTheme.hover}`,
+                      ].join(' ')}
+                    >
+                      {isSelected && (
+                        <span
+                          className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-r bg-indigo-500"
+                          aria-hidden
+                        />
+                      )}
                       <span
-                        className="shrink-0 ml-2 px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
-                        title={`${count} rule${count === 1 ? '' : 's'} for this class`}
+                        className={[
+                          'shrink-0 mr-2 flex items-center justify-center w-4 h-4',
+                          hasDifference
+                            ? 'text-amber-500 dark:text-amber-400'
+                            : 'text-emerald-500 dark:text-emerald-400',
+                        ].join(' ')}
+                        title={hasDifference ? 'Schema differs between versions' : 'Schemas match'}
                       >
-                        {count}
+                        {hasDifference ? (
+                          <AlertCircle className="w-3.5 h-3.5" />
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        )}
                       </span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                      <span className="font-medium truncate flex-1 min-w-0">{class_name}</span>
+                      {count > 0 && (
+                        <span
+                          className={[
+                            'shrink-0 ml-2 px-1.5 py-0.5 rounded text-[10.5px] font-semibold tabular-nums',
+                            isSelected
+                              ? 'bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300',
+                          ].join(' ')}
+                          title={`${count} rule${count === 1 ? '' : 's'} for this class`}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </div>
-    </aside>
+    </SidebarShell>
   );
 }
