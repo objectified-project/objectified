@@ -387,87 +387,98 @@ export default function ExportWizard({
   );
 
   useEffect(() => {
-    // Any change invalidates the previous preview and cancels in-flight work.
+    // Cancel in-flight image preview work.
     previewRequestIdRef.current += 1;
     setIsGeneratingPreview(false);
-    setPreviewDataUrl(null);
-    setPreviewText(null);
-    setIsPreviewStale(true);
-  }, [open, selectedFormat, options]);
+
+    if (!open) {
+      setPreviewDataUrl(null);
+      setPreviewText(null);
+      setIsPreviewStale(true);
+      return;
+    }
+
+    const isImageExportFormat = ['png', 'jpeg', 'svg', 'pdf'].includes(selectedFormat);
+
+    if (isImageExportFormat) {
+      // Raster/vector/PDF: preview only after "Generate preview" (heavy canvas capture).
+      setPreviewDataUrl(null);
+      setPreviewText(null);
+      setIsPreviewStale(true);
+    } else {
+      // JSON, Mermaid, PlantUML, GraphML, DOT: instant text preview (no button).
+      setPreviewDataUrl(null);
+      const nodeIdSet =
+        options.exportRange === 'groups' && options.selectedGroupIds.length > 0
+          ? getNodeIdsForGroups(options.selectedGroupIds)
+          : undefined;
+      setPreviewText(generateTextExport(selectedFormat, nodeIdSet));
+      setIsPreviewStale(false);
+    }
+  }, [open, selectedFormat, options, generateTextExport, getNodeIdsForGroups]);
 
   const generatePreview = useCallback(async (requestId: number) => {
     const isCurrent = () => open && previewRequestIdRef.current === requestId;
     const viewportElement = getViewportElement();
     const paneElement = getPaneElement();
 
-    // For image formats, generate a preview image (full canvas, viewport, or groups)
-    if (['png', 'jpeg', 'svg', 'pdf'].includes(selectedFormat)) {
-      const isViewport = options.exportRange === 'viewport';
-      const isGroups =
-        options.exportRange === 'groups' && options.selectedGroupIds.length > 0;
-      const captureElement = isViewport ? paneElement : viewportElement;
-      if (!captureElement) {
-        if (isCurrent()) setPreviewDataUrl(null);
-        return;
-      }
-
-      try {
-        const dataUrl = await withGridOverride(options.includeGrid, async () => {
-          const capture = async () => {
-            const bg = options.includeBackground
-              ? (isDark ? '#111827' : options.backgroundColor)
-              : 'transparent';
-            return toPng(captureElement, {
-              backgroundColor: bg,
-              quality: 0.5, // Lower quality for preview
-              pixelRatio: 1,
-              filter: options.includeUiElements ? undefined : imageExportFilter,
-            });
-          };
-          if (isViewport) {
-            return capture();
-          }
-          if (isGroups) {
-            return withGroupsView(options.selectedGroupIds, capture);
-          }
-          return withFullCanvasView(capture);
-        });
-        if (!isCurrent()) return;
-        let finalDataUrl = dataUrl;
-        if (options.includeTimestampAndMetadata) {
-          try {
-            finalDataUrl = await drawTimestampAndMetadataOnImage(
-              dataUrl,
-              projectName,
-              versionId,
-              1,
-              { mime: 'image/png' }
-            );
-          } catch {
-            // keep original preview on error
-          }
-        }
-        if (!isCurrent()) return;
-        setPreviewDataUrl(finalDataUrl);
-        setPreviewText(null);
-      } catch (error) {
-        console.error('Error generating preview:', error);
-        if (isCurrent()) setPreviewDataUrl(null);
-      }
-    } else {
-      // For text-based formats, generate full preview text for Monaco (optionally filtered by groups)
+    const isViewport = options.exportRange === 'viewport';
+    const isGroups =
+      options.exportRange === 'groups' && options.selectedGroupIds.length > 0;
+    const captureElement = isViewport ? paneElement : viewportElement;
+    if (!captureElement) {
       if (isCurrent()) setPreviewDataUrl(null);
-      const nodeIdSet =
-        options.exportRange === 'groups' && options.selectedGroupIds.length > 0
-          ? getNodeIdsForGroups(options.selectedGroupIds)
-          : undefined;
-      const text = generateTextExport(selectedFormat, nodeIdSet);
-      if (isCurrent()) setPreviewText(text);
+      return;
     }
-  }, [open, selectedFormat, options, isDark, projectName, versionId, getViewportElement, getPaneElement, imageExportFilter, withFullCanvasView, withGroupsView, withGridOverride, getNodeIdsForGroups, generateTextExport]);
+
+    try {
+      const dataUrl = await withGridOverride(options.includeGrid, async () => {
+        const capture = async () => {
+          const bg = options.includeBackground
+            ? (isDark ? '#111827' : options.backgroundColor)
+            : 'transparent';
+          return toPng(captureElement, {
+            backgroundColor: bg,
+            quality: 0.5, // Lower quality for preview
+            pixelRatio: 1,
+            filter: options.includeUiElements ? undefined : imageExportFilter,
+          });
+        };
+        if (isViewport) {
+          return capture();
+        }
+        if (isGroups) {
+          return withGroupsView(options.selectedGroupIds, capture);
+        }
+        return withFullCanvasView(capture);
+      });
+      if (!isCurrent()) return;
+      let finalDataUrl = dataUrl;
+      if (options.includeTimestampAndMetadata) {
+        try {
+          finalDataUrl = await drawTimestampAndMetadataOnImage(
+            dataUrl,
+            projectName,
+            versionId,
+            1,
+            { mime: 'image/png' }
+          );
+        } catch {
+          // keep original preview on error
+        }
+      }
+      if (!isCurrent()) return;
+      setPreviewDataUrl(finalDataUrl);
+      setPreviewText(null);
+    } catch (error) {
+      console.error('Error generating preview:', error);
+      if (isCurrent()) setPreviewDataUrl(null);
+    }
+  }, [open, selectedFormat, options, isDark, projectName, versionId, getViewportElement, getPaneElement, imageExportFilter, withFullCanvasView, withGroupsView, withGridOverride]);
 
   const handleGeneratePreview = useCallback(async () => {
     if (!open) return;
+    if (!['png', 'jpeg', 'svg', 'pdf'].includes(selectedFormat)) return;
     const requestId = (previewRequestIdRef.current += 1);
     setIsPreviewStale(false);
     setIsGeneratingPreview(true);
@@ -484,7 +495,7 @@ export default function ExportWizard({
         setIsGeneratingPreview(false);
       }
     }
-  }, [open, generatePreview]);
+  }, [open, selectedFormat, generatePreview]);
 
   type ClassProperty = { name: string; data?: { type?: string } };
   type ClassNodeData = { name?: string; properties?: ClassProperty[] };
@@ -921,7 +932,9 @@ export default function ExportWizard({
                     <div className="text-gray-400 dark:text-gray-500 flex flex-col items-center gap-2">
                       <Eye className="w-8 h-8" />
                       <span className="text-sm">
-                        {isPreviewStale ? 'Click “Generate preview” to create a preview.' : 'No preview available.'}
+                        {isImageFormat && isPreviewStale
+                          ? 'Click “Generate preview” to create a preview.'
+                          : 'No preview available.'}
                       </span>
                     </div>
                   )}
@@ -1231,23 +1244,26 @@ export default function ExportWizard({
               >
                 Close
               </button>
-              <button
-                onClick={handleGeneratePreview}
-                disabled={!open || isGeneratingPreview || isExporting}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isGeneratingPreview ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-gray-400/50 dark:border-gray-300/50 border-t-gray-700 dark:border-t-white rounded-full animate-spin" />
-                    <span>Generating…</span>
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-4 h-4" />
-                    <span>Generate preview</span>
-                  </>
-                )}
-              </button>
+              {isImageFormat && (
+                <button
+                  type="button"
+                  onClick={handleGeneratePreview}
+                  disabled={!open || isGeneratingPreview || isExporting}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isGeneratingPreview ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-gray-400/50 dark:border-gray-300/50 border-t-gray-700 dark:border-t-white rounded-full animate-spin" />
+                      <span>Generating…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-4 h-4" />
+                      <span>Generate preview</span>
+                    </>
+                  )}
+                </button>
+              )}
               <button
                 onClick={handleExport}
                 disabled={isExporting || !canExportGroups}
