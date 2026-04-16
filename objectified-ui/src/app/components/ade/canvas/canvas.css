@@ -1,0 +1,269 @@
+/* =============================================================================
+   Canvas design tokens + react-flow overrides
+   - Tokens power shared primitives in `src/app/components/ade/canvas/`
+   - Overrides tighten the default react-flow chrome to match the new node look
+   ========================================================================== */
+
+:root {
+  /* Surfaces */
+  --node-surface: #ffffff;
+  --node-surface-muted: #f8fafc;
+  --node-surface-strong: #f1f5f9;
+  --node-surface-elevated: rgba(255, 255, 255, 0.85);
+
+  /* Borders + separators */
+  --node-border: #e2e8f0;
+  --node-border-strong: #cbd5e1;
+  --node-border-muted: #eef2f7;
+
+  /* Typography */
+  --node-text: #0f172a;
+  --node-text-muted: #475569;
+  --node-text-subtle: #94a3b8;
+  --node-text-inverted: #f8fafc;
+
+  /* Accents (role-specific) */
+  --node-accent: #6366f1;           /* indigo 500 */
+  --node-accent-group: #6366f1;
+  --node-accent-ref: #6366f1;
+  --node-accent-comp-all: #3b82f6;  /* blue 500 */
+  --node-accent-comp-any: #f59e0b;  /* amber 500 */
+  --node-accent-comp-one: #8b5cf6;  /* violet 500 */
+  --node-accent-from: #6366f1;
+  --node-accent-to: #10b981;
+  --node-accent-rule: #64748b;
+  --node-accent-path: #6366f1;
+  --node-accent-param: #0ea5e9;     /* sky 500 */
+  --node-accent-request: #6366f1;
+  --node-accent-2xx: #10b981;
+  --node-accent-3xx: #0ea5e9;
+  --node-accent-4xx: #f59e0b;
+  --node-accent-5xx: #ef4444;
+  --node-accent-revision: #6366f1;
+
+  /* State colors */
+  --node-danger: #dc2626;
+  --node-warning: #f59e0b;
+  --node-success: #10b981;
+
+  /* Interactive row tints */
+  --node-row-hover: rgba(99, 102, 241, 0.06);
+
+  /* Shadows */
+  --node-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04);
+  --node-shadow-md: 0 2px 6px -1px rgba(15, 23, 42, 0.10), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
+  --node-shadow-lg: 0 8px 22px -6px rgba(15, 23, 42, 0.18), 0 4px 10px -4px rgba(15, 23, 42, 0.10);
+
+  /* Type-chip role colors (chip bg + text) */
+  --node-chip-ref-bg: rgba(99, 102, 241, 0.10);
+  --node-chip-ref-text: #4f46e5;
+  --node-chip-array-bg: rgba(14, 165, 233, 0.10);
+  --node-chip-array-text: #0369a1;
+  --node-chip-comp-bg: rgba(245, 158, 11, 0.12);
+  --node-chip-comp-text: #b45309;
+  --node-chip-prim-bg: rgba(100, 116, 139, 0.10);
+  --node-chip-prim-text: #475569;
+  --node-chip-unassigned-bg: rgba(239, 68, 68, 0.10);
+  --node-chip-unassigned-text: #b91c1c;
+}
+
+.dark,
+[data-theme="dark"],
+[data-theme="blueprint"],
+[data-theme="solarized"],
+[data-theme="nord"],
+[data-theme="darcula"],
+[data-theme="high-contrast"] {
+  --node-surface: #111827;
+  --node-surface-muted: #0f172a;
+  --node-surface-strong: #1e293b;
+  --node-surface-elevated: rgba(15, 23, 42, 0.82);
+
+  --node-border: #334155;
+  --node-border-strong: #475569;
+  --node-border-muted: #1f2937;
+
+  --node-text: #e2e8f0;
+  --node-text-muted: #94a3b8;
+  --node-text-subtle: #64748b;
+
+  --node-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 1px rgba(0, 0, 0, 0.25);
+  --node-shadow-md: 0 3px 8px -1px rgba(0, 0, 0, 0.45), 0 2px 4px -2px rgba(0, 0, 0, 0.30);
+  --node-shadow-lg: 0 10px 28px -8px rgba(0, 0, 0, 0.55), 0 4px 12px -4px rgba(0, 0, 0, 0.35);
+
+  --node-row-hover: rgba(148, 163, 184, 0.10);
+
+  --node-chip-ref-bg: rgba(99, 102, 241, 0.22);
+  --node-chip-ref-text: #a5b4fc;
+  --node-chip-array-bg: rgba(14, 165, 233, 0.22);
+  --node-chip-array-text: #7dd3fc;
+  --node-chip-comp-bg: rgba(245, 158, 11, 0.22);
+  --node-chip-comp-text: #fbbf24;
+  --node-chip-prim-bg: rgba(148, 163, 184, 0.16);
+  --node-chip-prim-text: #cbd5e1;
+  --node-chip-unassigned-bg: rgba(239, 68, 68, 0.22);
+  --node-chip-unassigned-text: #fca5a5;
+}
+
+[data-theme="high-contrast"] {
+  --node-surface: #0a0a0a;
+  --node-surface-muted: #161616;
+  --node-surface-strong: #1f1f1f;
+  --node-border: #ffffff;
+  --node-border-strong: #ffffff;
+  --node-text: #ffffff;
+  --node-text-muted: #e5e5e5;
+}
+
+/* ============================================================================
+   react-flow chrome polish
+   ========================================================================== */
+
+/* Default handle appearance (node-specific handles override inline). */
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+  background: var(--node-text-subtle);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
+  transition: transform 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.dark .react-flow__handle,
+[data-theme="dark"] .react-flow__handle,
+[data-theme="blueprint"] .react-flow__handle,
+[data-theme="solarized"] .react-flow__handle,
+[data-theme="nord"] .react-flow__handle,
+[data-theme="darcula"] .react-flow__handle,
+[data-theme="high-contrast"] .react-flow__handle {
+  border-color: #0f172a;
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--node-accent) 22%, transparent),
+              0 1px 3px rgba(15, 23, 42, 0.25);
+}
+
+.react-flow__handle-connecting {
+  background: var(--node-accent);
+}
+
+.react-flow__handle-valid {
+  background: var(--node-success);
+}
+
+/* Edges: crisper default stroke + smoother selection. */
+.react-flow__edge-path {
+  stroke-width: 1.5;
+  transition: stroke-width 0.12s ease, stroke 0.12s ease;
+}
+
+.react-flow__edge:hover .react-flow__edge-path,
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 2;
+}
+
+/* Canvas edge text now reads as a soft label, not a hard black. */
+.react-flow__edge-text {
+  font-family: var(--app-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  fill: var(--node-text-muted);
+  pointer-events: none;
+}
+
+.react-flow__edge-textbg {
+  fill: var(--node-surface-muted);
+  stroke: var(--node-border);
+  stroke-width: 1;
+}
+
+/* Connection line (while dragging a new edge). */
+.react-flow__connectionline {
+  stroke: var(--node-accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  opacity: 0.85;
+}
+
+/* Controls panel (zoom / fit-view / lock). */
+.react-flow__controls {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--node-shadow-md);
+  border: 1px solid var(--node-border);
+  background: var(--node-surface);
+}
+
+.react-flow__controls-button {
+  background: var(--node-surface);
+  color: var(--node-text-muted);
+  border: none;
+  border-bottom: 1px solid var(--node-border-muted);
+  width: 28px;
+  height: 28px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--node-surface-muted);
+  color: var(--node-text);
+}
+
+.react-flow__controls-button svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+/* Minimap */
+.react-flow__minimap {
+  background: var(--node-surface);
+  border: 1px solid var(--node-border);
+  border-radius: 8px;
+  box-shadow: var(--node-shadow-md);
+}
+
+.react-flow__minimap-mask {
+  fill: color-mix(in srgb, var(--node-accent) 10%, transparent);
+  stroke: var(--node-accent);
+  stroke-width: 1;
+}
+
+/* Attribution pill */
+.react-flow__attribution {
+  background: transparent !important;
+  font-size: 10px;
+  color: var(--node-text-subtle);
+}
+
+.react-flow__attribution a {
+  color: var(--node-text-muted);
+}
+
+/* Selection marquee */
+.react-flow__selection {
+  background: color-mix(in srgb, var(--node-accent) 8%, transparent);
+  border: 1px dashed var(--node-accent);
+}
+
+/* Panels floating inside canvas */
+.react-flow__panel {
+  background: transparent;
+}
+
+/* Node resizer handles */
+.react-flow__resize-control.handle {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 2px !important;
+  background: var(--node-accent) !important;
+  border: 1.5px solid var(--node-surface) !important;
+}

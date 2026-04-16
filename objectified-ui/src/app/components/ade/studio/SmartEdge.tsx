@@ -161,11 +161,11 @@ const SmartEdge: React.FC<EdgeProps> = ({
         style={{ cursor: 'pointer' }}
       />
       {label && (
-        <g transform={`translate(${labelX}, ${labelY})`}>
+        <g transform={`translate(${labelX}, ${labelY})`} style={{ pointerEvents: 'none' }}>
           {(() => {
             const text = label as string;
-            const w = Math.max(80, Math.min(200, text.length * 6.5));
-            const h = 20;
+            const w = Math.max(56, Math.min(180, text.length * 6.2 + 14));
+            const h = 18;
             return (
               <>
                 <rect
@@ -174,13 +174,28 @@ const SmartEdge: React.FC<EdgeProps> = ({
                   width={w}
                   height={h}
                   rx={4}
-                  style={labelBgStyle}
+                  style={
+                    labelBgStyle ?? {
+                      fill: 'var(--node-surface-muted)',
+                      stroke: 'var(--node-border)',
+                      strokeWidth: 1,
+                    }
+                  }
                 />
                 <text
                   x={0}
-                  y={4}
+                  y={3}
                   textAnchor="middle"
-                  style={labelStyle}
+                  style={
+                    labelStyle ?? {
+                      fill: 'var(--node-text-muted)',
+                      fontSize: 10,
+                      fontWeight: 500,
+                      letterSpacing: '-0.01em',
+                      fontFamily:
+                        'var(--app-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+                    }
+                  }
                   className="react-flow__edge-text"
                 >
                   {text}

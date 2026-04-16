@@ -83,18 +83,44 @@ function MigrationRuleEdge({
               onAddRule?.();
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            className={`h-full flex items-center justify-center rounded border min-w-[20px] px-1 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:ring-offset-1 dark:focus:ring-offset-gray-800 ${
-              isPassthrough
-                ? 'border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                : 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
-            }`}
             aria-label={isPassthrough ? 'Add migration rule (passthrough)' : `Edit rule: ${label}`}
             title={isPassthrough ? 'Passthrough: no rule applied. Click to add a rule.' : (label ?? '')}
+            style={{
+              height: '100%',
+              minWidth: '20px',
+              padding: '0 6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              transition: 'background-color 0.12s ease, border-color 0.12s ease',
+              border: isPassthrough
+                ? '1px dashed var(--node-border)'
+                : `1px solid ${'var(--node-accent-rule)'}`,
+              background: isPassthrough
+                ? 'var(--node-surface)'
+                : 'color-mix(in srgb, var(--node-accent-rule) 14%, var(--node-surface))',
+              color: isPassthrough ? 'var(--node-text-muted)' : 'var(--node-accent-rule)',
+              fontFamily: 'var(--app-font-mono, monospace)',
+              fontSize: '11px',
+              fontWeight: 600,
+              lineHeight: 1,
+            }}
           >
             {isPassthrough ? (
-              <Plus className="w-3 h-3 shrink-0" strokeWidth={2.5} />
+              <Plus size={12} strokeWidth={2.5} style={{ flexShrink: 0 }} />
             ) : (
-              <span className="truncate text-xs font-medium">{label}</span>
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                {label}
+              </span>
             )}
           </button>
         </foreignObject>

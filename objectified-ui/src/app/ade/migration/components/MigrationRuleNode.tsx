@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { openRuleDialogRef } from '../openRuleDialogRef';
+import { accentVar } from '../../../components/ade/canvas/canvas-theme';
 
 export interface MigrationRuleNodeData {
   ruleKey: string;
@@ -10,6 +11,9 @@ export interface MigrationRuleNodeData {
   sourceProp: string;
   outputProperties: string[];
 }
+
+const FROM_ACCENT = accentVar('from');
+const TO_ACCENT = accentVar('to');
 
 function MigrationRuleNode(props: NodeProps) {
   const data = props.data as unknown as MigrationRuleNodeData;
@@ -23,15 +27,31 @@ function MigrationRuleNode(props: NodeProps) {
 
   return (
     <div
-      className="rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 shadow h-5 min-w-[120px] overflow-hidden relative z-10"
+      style={{
+        position: 'relative',
+        zIndex: 10,
+        height: '22px',
+        minWidth: '128px',
+        background: 'var(--node-surface-muted)',
+        border: '1px solid var(--node-border)',
+        borderLeft: `3px solid ${accentVar('rule')}`,
+        borderRadius: '4px',
+        boxShadow: 'var(--node-shadow-sm)',
+        overflow: 'hidden',
+      }}
     >
       <Handle
         type="target"
         position={Position.Left}
         id="input"
-        className="!w-2.5 !h-2.5 !border-2 !border-white !rounded-full !min-w-0 !min-h-0"
         style={{
-          background: 'rgb(99, 102, 241)',
+          background: FROM_ACCENT,
+          width: 9,
+          height: 9,
+          minWidth: 0,
+          minHeight: 0,
+          border: '1.5px solid var(--node-surface)',
+          borderRadius: '50%',
           left: -10,
           top: '50%',
           transform: 'translateY(-50%)',
@@ -50,10 +70,42 @@ function MigrationRuleNode(props: NodeProps) {
           e.stopPropagation();
         }}
         onMouseDown={(e) => e.stopPropagation()}
-        className="absolute inset-0 flex items-center justify-center px-2 text-xs font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer nodrag nopan pointer-events-auto"
+        className="nodrag nopan"
         title="Edit rule"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '0 8px',
+          fontSize: '11px',
+          fontWeight: 500,
+          color: 'var(--node-text)',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          pointerEvents: 'auto',
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = 'var(--node-row-hover)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+        }}
       >
-        <span className="truncate block w-full text-center">{ruleName || 'Rule'}</span>
+        <span
+          style={{
+            display: 'block',
+            width: '100%',
+            textAlign: 'center',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {ruleName || 'Rule'}
+        </span>
       </button>
       {outputProperties.map((propName, i) => {
         const topPct = outputCount === 1 ? 50 : (100 * (i + 1)) / (outputCount + 1);
@@ -63,9 +115,14 @@ function MigrationRuleNode(props: NodeProps) {
             type="source"
             position={Position.Right}
             id={`out-${propName}`}
-            className="!w-2.5 !h-2.5 !border-2 !border-white !rounded-full !min-w-0 !min-h-0"
             style={{
-              background: 'rgb(16, 185, 129)',
+              background: TO_ACCENT,
+              width: 9,
+              height: 9,
+              minWidth: 0,
+              minHeight: 0,
+              border: '1.5px solid var(--node-surface)',
+              borderRadius: '50%',
               right: -10,
               top: `${topPct}%`,
               transform: 'translateY(-50%)',

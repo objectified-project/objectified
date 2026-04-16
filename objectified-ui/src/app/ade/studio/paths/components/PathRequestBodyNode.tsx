@@ -2,9 +2,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, AlertCircle, Sparkles } from 'lucide-react';
-import { Handle, Position } from '@xyflow/react';
+import { Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, AlertCircle, Sparkles, FileInput } from 'lucide-react';
+import { Position } from '@xyflow/react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { NodeCard } from '../../../../components/ade/canvas/NodeCard';
+import { NodeHeader } from '../../../../components/ade/canvas/NodeHeader';
+import { NodeHandleDot } from '../../../../components/ade/canvas/NodeHandleDot';
+import { NodeBadge } from '../../../../components/ade/canvas/NodeBadge';
 import {
   buildPropertyTreeFromInlineSchema,
   buildSchemaFromInlineProperties,
@@ -1058,51 +1062,80 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
           : 'Object')
     : null;
 
+  const requestAccent = '#6366f1';
   return (
     <>
-      <Handle
+      <NodeHandleDot
         type="target"
         position={Position.Top}
         id="request-body-input"
         isConnectable={false}
-        className="!w-3 !h-2 !rounded-t-md !rounded-b-none bg-indigo-500 !cursor-not-allowed opacity-50"
+        color={requestAccent}
+        style={{ cursor: 'not-allowed', opacity: 0.55 }}
       />
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-indigo-500 dark:border-indigo-600 min-w-[320px] max-w-[400px]">
-        {/* Header: Request + schema summary (same layout as response body node) */}
-        <div className="p-3 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 flex-wrap">
-              {data.required && (
-                <div className="px-2 py-0.5 rounded text-white text-xs font-bold bg-red-500/90">
-                  REQ
-                </div>
-              )}
-              <span className="text-white font-semibold text-sm">Request</span>
+      <NodeCard role="request" minWidth={320} maxWidth={400} customBorderColor={requestAccent}>
+        <NodeHeader
+          role="request"
+          customBackground={requestAccent}
+          customTextColor="#ffffff"
+          icon={<FileInput size={14} />}
+          iconSize={26}
+          compact
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              {data.required && <NodeBadge variant="overlay">REQ</NodeBadge>}
+              <span style={{ fontWeight: 600 }}>Request</span>
               {schemaLabel && (
-                <span className="text-indigo-100 text-xs font-medium truncate max-w-[140px]" title={`Schema: ${schemaLabel}`}>
+                <span
+                  title={`Schema: ${schemaLabel}`}
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    opacity: 0.9,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '160px',
+                    fontFamily: 'var(--app-font-mono, monospace)',
+                  }}
+                >
                   → {schemaLabel}
                 </span>
               )}
             </div>
-            {data.onDelete && (
+          }
+          subtitle={
+            data.description && !data.onDescriptionChange ? (
+              <span title={data.description}>{data.description}</span>
+            ) : undefined
+          }
+          badges={
+            data.onDelete && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   data.onDelete?.();
                 }}
-                className="p-1 hover:bg-white/20 rounded transition-colors"
                 title="Delete request body"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '4px',
+                  background: 'rgba(255, 255, 255, 0.16)',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  border: 'none',
+                }}
               >
-                <Trash2 className="w-4 h-4 text-white" />
+                <Trash2 size={13} />
               </button>
-            )}
-          </div>
-          {/* Show truncated description in header only when description is not editable (no onDescriptionChange) */}
-          {data.description && !data.onDescriptionChange && (
-            <p className="text-xs text-indigo-50 mt-1 truncate" title={data.description}>{data.description}</p>
-          )}
-        </div>
+            )
+          }
+        />
 
         {/* Description: editable when onDescriptionChange is provided */}
         {data.onDescriptionChange && (
@@ -1236,13 +1269,13 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
             )}
           </div>
         </div>
-      </div>
+      </NodeCard>
 
-      <Handle
+      <NodeHandleDot
         type="source"
         position={Position.Bottom}
         id="request-body-output"
-        className="!w-3 !h-2 !rounded-b-md !rounded-t-none bg-indigo-500"
+        color={requestAccent}
       />
     </>
   );

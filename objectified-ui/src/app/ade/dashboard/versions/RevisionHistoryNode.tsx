@@ -15,6 +15,7 @@
 import React, { useState } from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { NodeCard } from '../../../components/ade/canvas/NodeCard';
 import {
   ChevronDown,
   GitBranch,
@@ -152,29 +153,33 @@ export default function RevisionHistoryNode({ id, data, selected }: NodeProps<No
   const horizontal = layoutDirection === 'LR';
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const leftAccent = isBranchTip && tipAccentClass ? `border-l-4 ${tipAccentClass} pl-2` : '';
-
-  let surface: string;
-  if (selected) {
-    surface =
-      'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500 dark:border-indigo-400 dark:bg-indigo-950/50 dark:ring-indigo-400';
-  } else if (isMerge) {
-    surface =
-      'border-2 border-violet-400 bg-violet-50/90 dark:border-violet-500 dark:bg-violet-950/40' +
-      (isBranchTip ? ' ring-2 ring-emerald-500/70 dark:ring-emerald-500/60' : '');
-  } else if (isBranchTip) {
-    surface =
-      'border border-emerald-600/40 bg-white ring-2 ring-emerald-500/75 dark:border-emerald-500/50 dark:bg-gray-900 dark:ring-emerald-500/70';
-  } else {
-    surface = 'border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900';
-  }
+  const customBorderColor = isMerge
+    ? '#8b5cf6'
+    : isBranchTip
+    ? '#10b981'
+    : undefined;
+  const borderWidth = isMerge ? 2 : 1;
+  const customBackground = isMerge
+    ? 'color-mix(in srgb, #8b5cf6 8%, var(--node-surface))'
+    : undefined;
+  const heatmapTint = !selected && isBranchTip && !isMerge ? 'rgba(16, 185, 129, 0.10)' : undefined;
+  const warning = !selected && isBranchTip && isMerge;
 
   const hoverTitle = buildHoverTitle(data);
 
   return (
-    <div
+    <NodeCard
+      role="revision"
+      selected={selected}
       title={hoverTitle}
-      className={`rounded-lg border px-3 py-2 shadow-sm min-w-[11.5rem] max-w-[15rem] transition-colors ${surface} ${leftAccent}`.trim()}
+      minWidth={184}
+      maxWidth={240}
+      customBorderColor={customBorderColor}
+      borderWidth={borderWidth}
+      customBackground={customBackground}
+      heatmapTint={heatmapTint}
+      warning={warning}
+      style={{ padding: '8px 12px' }}
     >
       {horizontal ? (
         <>
@@ -187,6 +192,21 @@ export default function RevisionHistoryNode({ id, data, selected }: NodeProps<No
           <Handle type="source" position={Position.Bottom} className="opacity-0" />
         </>
       )}
+      {isBranchTip && tipAccentClass ? (
+        <span
+          aria-hidden
+          className={tipAccentClass}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: '4px',
+            borderTopLeftRadius: '8px',
+            borderBottomLeftRadius: '8px',
+          }}
+        />
+      ) : null}
       <div className="flex items-start gap-2">
         <div className="flex flex-col items-center gap-1 shrink-0 mt-1" aria-hidden>
           <span
@@ -254,6 +274,6 @@ export default function RevisionHistoryNode({ id, data, selected }: NodeProps<No
           )}
         </div>
       </div>
-    </div>
+    </NodeCard>
   );
 }

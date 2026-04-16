@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import { toast } from 'sonner';
-import { Check, Gauge, Settings, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Gauge, Settings, X } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -122,6 +122,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   const [isLoadingProjects, setIsLoadingProjects] = React.useState(false);
   const [isLoadingVersions, setIsLoadingVersions] = React.useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
+  const [deprecatedRevisionOpen, setDeprecatedRevisionOpen] = React.useState(false);
 
   /** Refs for Radix onValueChange guards (latest context ids without extra render loops). */
   const selectedProjectIdRef = React.useRef(selectedProjectId);
@@ -222,6 +223,22 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     const match = versions.find((v) => String(v.id) === String(selectedVersionId));
     return match !== undefined ? String(match.id) : undefined;
   }, [selectedVersionId, versions]);
+
+  const selectedVersion = React.useMemo(() => {
+    if (!selectedVersionId) return null;
+    return versions.find((v) => v.id === selectedVersionId) ?? null;
+  }, [selectedVersionId, versions]);
+
+  const selectedVersionDeprecated = React.useMemo(
+    () => Boolean(selectedVersion && isRevisionDeprecated(selectedVersion.metadata)),
+    [selectedVersion]
+  );
+
+  React.useEffect(() => {
+    if (!selectedVersionDeprecated) {
+      setDeprecatedRevisionOpen(false);
+    }
+  }, [selectedVersionDeprecated]);
 
   // Load projects on mount
   React.useEffect(() => {
@@ -538,6 +555,29 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           </Select.Root>
         </div>
 
+        {selectedProjectId && selectedVersionId && selectedVersionDeprecated ? (
+          <button
+            type="button"
+            onClick={() => setDeprecatedRevisionOpen((open) => !open)}
+            aria-expanded={deprecatedRevisionOpen}
+            aria-controls="studio-deprecated-revision-panel"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300/80 bg-amber-50 px-2.5 py-2 text-amber-900 shadow-sm transition-all hover:border-amber-400 hover:bg-amber-100 dark:border-amber-700/80 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:border-amber-600 dark:hover:bg-amber-900/60"
+            title={deprecatedRevisionOpen ? 'Hide deprecated revision details' : 'Show deprecated revision details'}
+          >
+            <span
+              className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-600 text-[10px] font-bold leading-none text-white dark:bg-amber-500 dark:text-amber-950"
+              aria-hidden
+            >
+              !
+            </span>
+            {deprecatedRevisionOpen ? (
+              <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            )}
+          </button>
+        ) : null}
+
         {selectedProjectId && selectedVersionId ? (
           <StudioSyncStatusChips
             localDirty={syncLocalDirty}
@@ -550,7 +590,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           <DraftLockHeaderChip
             projectId={selectedProjectId}
             versionId={selectedVersionId}
-            published={versions.find((v) => v.id === selectedVersionId)?.published ?? true}
+            published={selectedVersion?.published ?? true}
             sessionUserId={sessionUserId}
           />
         ) : null}
@@ -1045,6 +1085,16 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           </>
         )}
       </div>
+      {selectedVersionDeprecated && deprecatedRevisionOpen && selectedVersion ? (
+        <div id="studio-deprecated-revision-panel" className="mt-2 w-full min-w-0 px-1">
+          <RevisionDeprecationBanner
+            roleLabel="Studio"
+            versionLabel={selectedVersion.version_id}
+            metadata={selectedVersion.metadata}
+            className="rounded-lg border border-amber-300/80 dark:border-amber-700/80"
+          />
+        </div>
+      ) : null}
       {serverAheadForProject && (
         <div className="mt-2 w-full min-w-0 px-1">
           <ServerAheadPushBanner
@@ -1055,17 +1105,6 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           />
         </div>
       )}
-      {(() => {
-        const v = versions.find((x) => x.id === selectedVersionId);
-        if (!v || !isRevisionDeprecated(v.metadata)) return null;
-        return (
-          <RevisionDeprecationBanner
-            roleLabel="Studio"
-            versionLabel={v.version_id}
-            metadata={v.metadata}
-          />
-        );
-      })()}
     </div>
   );
 }

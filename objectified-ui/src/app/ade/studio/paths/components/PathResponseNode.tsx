@@ -4,8 +4,12 @@
 
 import React from 'react';
 import { Check, AlertTriangle, X, Activity, Trash2, Unlink } from 'lucide-react';
-import { Handle, Position } from '@xyflow/react';
+import { Position } from '@xyflow/react';
 import { getHttpStatusDescription } from '../../../../../../lib/utils/http-status-codes';
+import { NodeCard } from '@/app/components/ade/canvas/NodeCard';
+import { NodeHeader } from '@/app/components/ade/canvas/NodeHeader';
+import { NodeHandleDot } from '@/app/components/ade/canvas/NodeHandleDot';
+import { accentVar, type NodeAccentRole } from '@/app/components/ade/canvas/canvas-theme';
 
 export interface ContentTypeInfo {
   id: string;
@@ -29,14 +33,18 @@ export interface PathResponseData {
   description?: string;
   dbResponseId?: string;
   operationId?: string;
-  schemaMode?: 'class' | 'object' | 'primitive' | 'array'; // Explicit schema mode
-  linkedOperations?: Array<{ id: string; operation: string }>; // Operations this response is linked to
+  schemaMode?: 'class' | 'object' | 'primitive' | 'array';
+  linkedOperations?: Array<{ id: string; operation: string }>;
   onDelete?: () => void;
-  onUnlink?: (operationId: string) => void; // Unlink from a specific operation
+  onUnlink?: (operationId: string) => void;
   onClassDrop?: (responseId: string, classData: any) => void;
-  onPropertyDrop?: (responseId: string, propertyData: any) => void; // NEW: Handle property drops
-  onClassUnlink?: (responseId: string) => void; // Unlink attached class from response
-  onSchemaTypeChange?: (responseId: string, schemaMode: 'object' | 'primitive' | 'array', schemaType?: string) => void;
+  onPropertyDrop?: (responseId: string, propertyData: any) => void;
+  onClassUnlink?: (responseId: string) => void;
+  onSchemaTypeChange?: (
+    responseId: string,
+    schemaMode: 'object' | 'primitive' | 'array',
+    schemaType?: string
+  ) => void;
   attachedClassId?: string;
   attachedClassName?: string;
   contentTypes?: ContentTypeInfo[];
@@ -49,9 +57,11 @@ export interface PathResponseData {
     enum?: (string | number | boolean | null)[];
     default?: unknown;
   } | null;
-  /** Response headers (OpenAPI: name, description, schema) */
-  headers?: Array<{ name: string; description?: string; schema?: { type?: string; format?: string } }>;
-  /** Response links (OpenAPI 3.1 Link Object - response-driven navigation) */
+  headers?: Array<{
+    name: string;
+    description?: string;
+    schema?: { type?: string; format?: string };
+  }>;
   links?: Array<{
     name: string;
     operationId?: string;
@@ -61,21 +71,17 @@ export interface PathResponseData {
   }>;
 }
 
-// Helper to get schema display text for primitives and arrays
-const getSchemaDisplayText = (schema: ContentTypeInfo['inline_schema'] | PathResponseData['inlineSchema']): { text: string; isObject: boolean } => {
-  if (!schema) {
-    return { text: '', isObject: false };
-  }
-
+const getSchemaDisplayText = (
+  schema: ContentTypeInfo['inline_schema'] | PathResponseData['inlineSchema']
+): { text: string; isObject: boolean } => {
+  if (!schema) return { text: '', isObject: false };
   const schemaType = schema.type?.toLowerCase();
 
-  // Check for $ref (class reference)
   if (schema.$ref) {
     const className = schema.$ref.split('/').pop() || 'Reference';
     return { text: className, isObject: true };
   }
 
-  // Handle array types
   if (schemaType === 'array' && schema.items) {
     if (schema.items.$ref) {
       const itemClass = schema.items.$ref.split('/').pop() || 'Object';
@@ -85,48 +91,36 @@ const getSchemaDisplayText = (schema: ContentTypeInfo['inline_schema'] | PathRes
     return { text: `${itemType}[]`, isObject: false };
   }
 
-  // Handle object type
   if (schemaType === 'object') {
     const propCount = Array.isArray(schema.properties) ? schema.properties.length : 0;
     return { text: propCount > 0 ? `Object (${propCount} props)` : 'Object', isObject: true };
   }
 
-  // Handle primitive types with optional format
   if (schemaType && ['string', 'number', 'integer', 'boolean', 'null'].includes(schemaType)) {
     let text = schemaType;
-    if (schema.format) {
-      text = `${schemaType} (${schema.format})`;
-    }
+    if (schema.format) text = `${schemaType} (${schema.format})`;
     return { text, isObject: false };
   }
 
   return { text: '', isObject: false };
 };
 
-// Section 2.6.1 Color designations: response nodes are color-coded by status code family
-const STATUS_COLOR_2XX = { headerBg: 'bg-green-500', borderColor: 'border-green-500', color: '#22c55e', icon: '✓', iconComponent: Check };
-const STATUS_COLOR_3XX = { headerBg: 'bg-blue-500', borderColor: 'border-blue-500', color: '#3b82f6', icon: '→', iconComponent: Activity };
-const STATUS_COLOR_4XX = { headerBg: 'bg-yellow-500', borderColor: 'border-yellow-500', color: '#eab308', icon: '⚠', iconComponent: AlertTriangle };
-const STATUS_COLOR_5XX = { headerBg: 'bg-red-500', borderColor: 'border-red-500', color: '#ef4444', icon: '✕', iconComponent: X };
-const STATUS_COLOR_DEFAULT = { headerBg: 'bg-gray-500', borderColor: 'border-gray-500', color: '#6b7280', icon: '∿', iconComponent: Activity };
-
-const getStatusConfig = (statusCode: string) => {
+// Map status code family to an accent role + icon.
+const statusMeta = (statusCode: string): { role: NodeAccentRole; Icon: React.FC<{ size?: number; strokeWidth?: number }> } => {
   const code = statusCode.toLowerCase();
-  const firstChar = code.charAt(0);
-
-  if (code === 'default') return STATUS_COLOR_DEFAULT;
-
-  switch (firstChar) {
-    case '2': return STATUS_COLOR_2XX;  // 2XX Success – Green (200 OK, 201 Created, 204 No Content)
-    case '3': return STATUS_COLOR_3XX;  // 3XX Redirect – Blue (301, 302, 304 Not Modified)
-    case '4': return STATUS_COLOR_4XX;  // 4XX Client – Yellow (400, 401, 403, 404, 422)
-    case '5': return STATUS_COLOR_5XX;  // 5XX Server – Red (500, 502, 503, 504)
-    default:  return STATUS_COLOR_DEFAULT;
+  if (code === 'default') return { role: 'revision', Icon: Activity };
+  switch (code.charAt(0)) {
+    case '2': return { role: 'status-2xx', Icon: Check };
+    case '3': return { role: 'status-3xx', Icon: Activity };
+    case '4': return { role: 'status-4xx', Icon: AlertTriangle };
+    case '5': return { role: 'status-5xx', Icon: X };
+    default:  return { role: 'revision', Icon: Activity };
   }
 };
 
 export default function PathResponseNode({ data }: { data: PathResponseData }) {
-  const config = getStatusConfig(data.statusCode);
+  const { role, Icon } = statusMeta(data.statusCode);
+  const accent = accentVar(role);
   const [dragOver, setDragOver] = React.useState(false);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -135,13 +129,11 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
     setDragOver(true);
     e.dataTransfer.dropEffect = 'copy';
   };
-
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setDragOver(false);
   };
-
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -149,106 +141,158 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
 
     const dataStr = e.dataTransfer.getData('application/json');
     if (!dataStr || !data.dbResponseId) return;
-
     try {
       const dropData = JSON.parse(dataStr);
-      
-      // Handle class drops
-      if (dropData.type === 'class' && data.onClassDrop) {
-        data.onClassDrop(data.dbResponseId, dropData);
-      }
-      
-      // Handle property drops - NEW FUNCTIONALITY
-      if (dropData.type === 'property' && data.onPropertyDrop) {
-        data.onPropertyDrop(data.dbResponseId, dropData);
-      }
+      if (dropData.type === 'class' && data.onClassDrop) data.onClassDrop(data.dbResponseId, dropData);
+      if (dropData.type === 'property' && data.onPropertyDrop) data.onPropertyDrop(data.dbResponseId, dropData);
     } catch (error) {
       console.error('PathResponseNode: Error parsing drop data:', error);
     }
   };
 
-  // Get description text - use provided description or auto-populate from status code
-  const getDescription = () => {
-    if (data.description) return data.description;
-    return getHttpStatusDescription(data.statusCode);
-  };
+  const getDescription = () => data.description || getHttpStatusDescription(data.statusCode);
 
-  // Determine what content to show
   const hasContentTypes = data.contentTypes && data.contentTypes.length > 0;
-  // Check if content types have actual schema data
-  const hasContentTypesWithSchema = hasContentTypes && data.contentTypes!.some(ct =>
-    ct.class_name || ct.class_id || (ct.inline_schema && (ct.inline_schema.type || ct.inline_schema.$ref))
-  );
-  const hasInlineSchema = data.inlineSchema && (
-    (data.inlineSchema.properties?.length ?? 0) > 0 ||
-    data.inlineSchema.type ||
-    data.inlineSchema.$ref
-  );
+  const hasContentTypesWithSchema =
+    hasContentTypes &&
+    data.contentTypes!.some(
+      (ct) =>
+        ct.class_name ||
+        ct.class_id ||
+        (ct.inline_schema && (ct.inline_schema.type || ct.inline_schema.$ref))
+    );
+  const hasInlineSchema =
+    data.inlineSchema &&
+    ((data.inlineSchema.properties?.length ?? 0) > 0 ||
+      data.inlineSchema.type ||
+      data.inlineSchema.$ref);
   const hasAttachedClass = !!data.attachedClassName;
   const hasHeaders = data.headers && data.headers.length > 0;
   const hasLinks = data.links && data.links.length > 0;
 
-  // For primitive/array types, prioritize inlineSchema display
-  const showInlineSchemaFirst = hasInlineSchema && !hasAttachedClass &&
+  const showInlineSchemaFirst =
+    hasInlineSchema &&
+    !hasAttachedClass &&
     data.inlineSchema?.type &&
     ['string', 'number', 'integer', 'boolean', 'null', 'array'].includes(data.inlineSchema.type);
 
+  const sectionLabelStyle: React.CSSProperties = {
+    fontSize: '9px',
+    fontWeight: 600,
+    color: 'var(--node-text-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    marginTop: '10px',
+    marginBottom: '3px',
+  };
+
+  const treeLineStyle: React.CSSProperties = {
+    fontSize: '10px',
+    color: 'var(--node-text-muted)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+  };
+
   return (
     <>
-      {/* Connection handle at TOP */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="response-input"
-        className="!w-3 !h-2 !rounded-t-md !rounded-b-none"
-        style={{ backgroundColor: config.color }}
-      />
+      <NodeHandleDot type="target" position={Position.Top} id="response-input" color={accent} />
 
-      <div 
-        className={`bg-white dark:bg-gray-800 rounded-lg border-2 ${config.borderColor} shadow-lg min-w-[200px] max-w-[280px] cursor-pointer relative ${
-          dragOver ? 'ring-2 ring-indigo-500 ring-offset-2' : ''
-        }`}
-        onDragOver={(e) => { e.stopPropagation(); handleDragOver(e); }}
-        onDragLeave={(e) => { e.stopPropagation(); handleDragLeave(e); }}
-        onDrop={(e) => { e.stopPropagation(); handleDrop(e); }}
+      <NodeCard
+        role={role}
+        minWidth={220}
+        maxWidth={300}
+        onDragOver={(e) => {
+          e.stopPropagation();
+          handleDragOver(e);
+        }}
+        onDragLeave={(e) => {
+          e.stopPropagation();
+          handleDragLeave(e);
+        }}
+        onDrop={(e) => {
+          e.stopPropagation();
+          handleDrop(e);
+        }}
+        isValidDropTarget={dragOver}
       >
-        {/* Header - Status code + description + status icon + delete (separated to avoid overlap) */}
-        <div className={`${config.headerBg} text-white px-3 py-2 rounded-t-md flex items-center justify-between gap-2`}>
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-bold text-sm shrink-0">{data.statusCode}</span>
-            <span className="text-xs opacity-90 truncate">{getDescription()}</span>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-lg" aria-hidden>{config.icon}</span>
-            {data.onDelete && (
-              <button
-                onClick={(e) => { e.stopPropagation(); data.onDelete?.(); }}
-                className="rounded p-1 text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-white/50"
-                title="Delete response"
+        <NodeHeader
+          role={role}
+          customBackground={accent}
+          customTextColor="#ffffff"
+          icon={<Icon size={14} strokeWidth={2.5} />}
+          iconSize={26}
+          title={
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', minWidth: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '-0.02em', flexShrink: 0, fontFamily: 'var(--app-font-mono, monospace)' }}>
+                {data.statusCode}
+              </span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  opacity: 0.88,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 500,
+                }}
               >
-                <Trash2 size={12} />
+                {getDescription()}
+              </span>
+            </div>
+          }
+          badges={
+            data.onDelete ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onDelete?.();
+                }}
+                title="Delete response"
+                aria-label="Delete response"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.18)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '3px',
+                  borderRadius: '4px',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.12s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.32)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.18)';
+                }}
+              >
+                <Trash2 size={11} />
               </button>
-            )}
-          </div>
-        </div>
+            ) : undefined
+          }
+        />
 
-        {/* Content type map with schema bindings */}
-        <div className="p-3">
-          <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-1.5">Content type map:</div>
+        <div style={{ padding: '10px 12px' }}>
+          <div style={sectionLabelStyle}>Content type map</div>
 
-          {/* Priority 1: Primitive/Array types from inlineSchema */}
           {showInlineSchemaFirst ? (
             (() => {
               const schemaDisplay = getSchemaDisplayText(data.inlineSchema);
               return (
-                <div className="text-[10px]">
-                  <div className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
-                    <span className="text-gray-400">○</span>
-                    <span className="font-mono">application/json</span>
+                <div>
+                  <div style={treeLineStyle}>
+                    <span style={{ color: 'var(--node-text-subtle)' }}>○</span>
+                    <span style={{ fontFamily: 'var(--app-font-mono, monospace)', fontSize: '10px' }}>
+                      application/json
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1.5 ml-3 mt-0.5 text-gray-600 dark:text-gray-400">
-                    <span className="text-gray-400">└─</span>
-                    <span className="font-medium text-amber-600 dark:text-amber-400 font-mono">
+                  <div style={{ ...treeLineStyle, marginLeft: '10px', marginTop: '2px' }}>
+                    <span style={{ color: 'var(--node-text-subtle)' }}>└─</span>
+                    <span style={{ fontFamily: 'var(--app-font-mono, monospace)', color: '#b45309', fontWeight: 600 }}>
                       {schemaDisplay.text || data.inlineSchema?.type}
                     </span>
                   </div>
@@ -256,36 +300,37 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
               );
             })()
           ) : hasContentTypesWithSchema ? (
-            <div className="space-y-1.5">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {data.contentTypes!.map((ct) => {
                 const schemaDisplay = getSchemaDisplayText(ct.inline_schema);
                 const hasSchema = ct.class_name || schemaDisplay.text;
-
                 return (
-                  <div key={ct.id} className="text-[10px]">
-                    <div className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
-                      <span className="text-gray-400">○</span>
-                      <span className="font-mono">{ct.media_type}</span>
+                  <div key={ct.id}>
+                    <div style={treeLineStyle}>
+                      <span style={{ color: 'var(--node-text-subtle)' }}>○</span>
+                      <span style={{ fontFamily: 'var(--app-font-mono, monospace)', fontSize: '10px' }}>
+                        {ct.media_type}
+                      </span>
                     </div>
                     {hasSchema && (
-                      <div className="flex items-center gap-1.5 ml-3 mt-0.5 text-gray-600 dark:text-gray-400">
-                        <span className="text-gray-400">└─</span>
+                      <div style={{ ...treeLineStyle, marginLeft: '10px', marginTop: '2px' }}>
+                        <span style={{ color: 'var(--node-text-subtle)' }}>└─</span>
                         {ct.class_name ? (
                           <>
-                            <span className="text-gray-400">{'{ }'}</span>
-                            <span className="font-medium text-indigo-600 dark:text-indigo-400">
+                            <span style={{ color: 'var(--node-text-subtle)' }}>{'{ }'}</span>
+                            <span style={{ color: 'var(--node-accent)', fontWeight: 600 }}>
                               {ct.class_name}
                             </span>
                           </>
                         ) : schemaDisplay.isObject ? (
                           <>
-                            <span className="text-gray-400">{'{ }'}</span>
-                            <span className="font-medium text-green-600 dark:text-green-400">
+                            <span style={{ color: 'var(--node-text-subtle)' }}>{'{ }'}</span>
+                            <span style={{ color: 'var(--node-success)', fontWeight: 600 }}>
                               {schemaDisplay.text}
                             </span>
                           </>
                         ) : (
-                          <span className="font-medium text-amber-600 dark:text-amber-400 font-mono">
+                          <span style={{ fontFamily: 'var(--app-font-mono, monospace)', color: '#b45309', fontWeight: 600 }}>
                             {schemaDisplay.text}
                           </span>
                         )}
@@ -299,28 +344,31 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
             (() => {
               const schemaDisplay = getSchemaDisplayText(data.inlineSchema);
               return (
-                <div className="text-[10px]">
-                  <div className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
-                    <span className="text-gray-400">○</span>
-                    <span className="font-mono">application/json</span>
+                <div>
+                  <div style={treeLineStyle}>
+                    <span style={{ color: 'var(--node-text-subtle)' }}>○</span>
+                    <span style={{ fontFamily: 'var(--app-font-mono, monospace)', fontSize: '10px' }}>
+                      application/json
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1.5 ml-3 mt-0.5 text-gray-600 dark:text-gray-400">
-                    <span className="text-gray-400">└─</span>
+                  <div style={{ ...treeLineStyle, marginLeft: '10px', marginTop: '2px' }}>
+                    <span style={{ color: 'var(--node-text-subtle)' }}>└─</span>
                     {schemaDisplay.isObject ? (
                       <>
-                        <span className="text-gray-400">{'{ }'}</span>
-                        <span className="font-medium text-green-600 dark:text-green-400">
-                          {schemaDisplay.text || `Object (${data.inlineSchema?.properties?.length || 0} props)`}
+                        <span style={{ color: 'var(--node-text-subtle)' }}>{'{ }'}</span>
+                        <span style={{ color: 'var(--node-success)', fontWeight: 600 }}>
+                          {schemaDisplay.text ||
+                            `Object (${data.inlineSchema?.properties?.length || 0} props)`}
                         </span>
                       </>
                     ) : schemaDisplay.text ? (
-                      <span className="font-medium text-amber-600 dark:text-amber-400 font-mono">
+                      <span style={{ fontFamily: 'var(--app-font-mono, monospace)', color: '#b45309', fontWeight: 600 }}>
                         {schemaDisplay.text}
                       </span>
                     ) : (
                       <>
-                        <span className="text-gray-400">{'{ }'}</span>
-                        <span className="font-medium text-green-600 dark:text-green-400">
+                        <span style={{ color: 'var(--node-text-subtle)' }}>{'{ }'}</span>
+                        <span style={{ color: 'var(--node-success)', fontWeight: 600 }}>
                           Object ({data.inlineSchema?.properties?.length || 0} props)
                         </span>
                       </>
@@ -330,24 +378,44 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
               );
             })()
           ) : hasAttachedClass ? (
-            <div className="text-[10px]">
-              <div className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
-                <span className="text-gray-400">○</span>
-                <span className="font-mono">application/json</span>
+            <div>
+              <div style={treeLineStyle}>
+                <span style={{ color: 'var(--node-text-subtle)' }}>○</span>
+                <span style={{ fontFamily: 'var(--app-font-mono, monospace)', fontSize: '10px' }}>
+                  application/json
+                </span>
               </div>
-              <div className="flex items-center justify-between ml-3 mt-0.5">
-                <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
-                  <span className="text-gray-400">└─</span>
-                  <span className="text-gray-400">{'{ }'}</span>
-                  <span className="font-medium text-indigo-600 dark:text-indigo-400">
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginLeft: '10px',
+                  marginTop: '2px',
+                }}
+              >
+                <div style={treeLineStyle}>
+                  <span style={{ color: 'var(--node-text-subtle)' }}>└─</span>
+                  <span style={{ color: 'var(--node-text-subtle)' }}>{'{ }'}</span>
+                  <span style={{ color: 'var(--node-accent)', fontWeight: 600 }}>
                     {data.attachedClassName}
                   </span>
                 </div>
                 {data.onClassUnlink && data.dbResponseId && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); data.onClassUnlink?.(data.dbResponseId!); }}
-                    className="text-gray-400 hover:text-red-500 transition-colors p-0.5"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      data.onClassUnlink?.(data.dbResponseId!);
+                    }}
                     title={`Unlink ${data.attachedClassName} from response`}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      color: 'var(--node-text-subtle)',
+                    }}
                   >
                     <Unlink size={10} />
                   </button>
@@ -355,24 +423,50 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
               </div>
             </div>
           ) : (
-            <div className={`text-[10px] ${dragOver ? 'text-indigo-600 dark:text-indigo-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+            <div
+              style={{
+                fontSize: '10px',
+                color: dragOver ? 'var(--node-accent)' : 'var(--node-text-subtle)',
+                fontWeight: dragOver ? 500 : 400,
+              }}
+            >
               {dragOver ? 'Drop to set schema' : 'Drop class or property to set schema'}
             </div>
           )}
 
-          {/* Linked Operations Section */}
           {data.linkedOperations && data.linkedOperations.length > 0 && (
             <>
-              <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mt-3 mb-1">Linked to:</div>
-              <div className="space-y-1">
+              <div style={sectionLabelStyle}>Linked to</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {data.linkedOperations.map((op) => (
-                  <div key={op.id} className="flex items-center justify-between text-[10px] bg-gray-50 dark:bg-gray-700/50 rounded px-2 py-1">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">{op.operation}</span>
+                  <div
+                    key={op.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '10px',
+                      background: 'var(--node-surface-muted)',
+                      borderRadius: '4px',
+                      padding: '3px 8px',
+                    }}
+                  >
+                    <span style={{ fontWeight: 500, color: 'var(--node-text)' }}>{op.operation}</span>
                     {data.onUnlink && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); data.onUnlink?.(op.id); }}
-                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          data.onUnlink?.(op.id);
+                        }}
                         title={`Unlink from ${op.operation}`}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '1px',
+                          color: 'var(--node-text-subtle)',
+                        }}
                       >
                         <Unlink size={10} />
                       </button>
@@ -383,78 +477,97 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
             </>
           )}
 
-          {/* Headers Section */}
-          {hasHeaders && (
-            <>
-              <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mt-3 mb-1">Headers:</div>
-              <div className="space-y-0.5">
-                {data.headers!.map((header, idx) => (
-                  <div key={idx} className="text-[10px] text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
-                    <span className="font-mono">{header.name}</span>
-                    {header.schema?.type && (
-                      <span className="text-gray-500 dark:text-gray-500 font-mono">({header.schema.type}{header.schema.format ? `, ${header.schema.format}` : ''})</span>
+          <div style={sectionLabelStyle}>Headers</div>
+          {hasHeaders ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              {data.headers!.map((header, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    fontSize: '10px',
+                    color: 'var(--node-text-muted)',
+                    display: 'flex',
+                    gap: '5px',
+                    alignItems: 'center',
+                  }}
+                >
+                  <span style={{ fontFamily: 'var(--app-font-mono, monospace)' }}>{header.name}</span>
+                  {header.schema?.type && (
+                    <span style={{ color: 'var(--node-text-subtle)', fontFamily: 'var(--app-font-mono, monospace)' }}>
+                      ({header.schema.type}
+                      {header.schema.format ? `, ${header.schema.format}` : ''})
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: '10px', color: 'var(--node-text-subtle)', fontStyle: 'italic' }}>
+              (none)
+            </div>
+          )}
+
+          <div style={sectionLabelStyle}>Links</div>
+          {hasLinks ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              {data.links!.map((link, idx) => (
+                <div key={idx} style={{ fontSize: '10px', color: 'var(--node-text-muted)' }}>
+                  <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: 'var(--app-font-mono, monospace)' }}>{link.name}</span>
+                    {(link.operationId || link.operationRef) && (
+                      <span
+                        style={{
+                          color: 'var(--node-text-subtle)',
+                          fontFamily: 'var(--app-font-mono, monospace)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: '130px',
+                        }}
+                      >
+                        → {link.operationId || link.operationRef}
+                      </span>
                     )}
                   </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {!hasHeaders && (
-            <>
-              <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mt-3 mb-1">Headers:</div>
-              <div className="text-[10px] text-gray-400 dark:text-gray-500 italic">(none)</div>
-            </>
-          )}
-
-          {/* Links (response-driven navigation) Section (#400) */}
-          {hasLinks && (
-            <>
-              <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mt-3 mb-1">Links:</div>
-              <div className="space-y-0.5">
-                {data.links!.map((link, idx) => (
-                  <div key={idx} className="text-[10px] text-gray-600 dark:text-gray-400">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-mono">{link.name}</span>
-                      {(link.operationId || link.operationRef) && (
-                        <span className="text-gray-500 dark:text-gray-500 font-mono truncate max-w-[120px]">
-                          → {link.operationId || link.operationRef}
-                        </span>
-                      )}
+                  {link.parameters && Object.keys(link.parameters).length > 0 && (
+                    <div
+                      title={Object.entries(link.parameters)
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(', ')}
+                      style={{
+                        marginLeft: '8px',
+                        fontSize: '9px',
+                        color: 'var(--node-text-subtle)',
+                        fontFamily: 'var(--app-font-mono, monospace)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {Object.entries(link.parameters)
+                        .slice(0, 2)
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(', ')}
+                      {Object.keys(link.parameters).length > 2 ? '…' : ''}
                     </div>
-                    {link.parameters && Object.keys(link.parameters).length > 0 && (
-                      <div className="ml-2 mt-0.5 text-[9px] text-gray-500 dark:text-gray-500 font-mono truncate" title={Object.entries(link.parameters).map(([k, v]) => `${k}: ${v}`).join(', ')}>
-                        {Object.entries(link.parameters).slice(0, 2).map(([k, v]) => `${k}: ${v}`).join(', ')}
-                        {Object.keys(link.parameters).length > 2 ? '…' : ''}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {!hasLinks && (
-            <>
-              <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mt-3 mb-1">Links:</div>
-              <div className="text-[10px] text-gray-400 dark:text-gray-500 italic">(none)</div>
-            </>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: '10px', color: 'var(--node-text-subtle)', fontStyle: 'italic' }}>
+              (none)
+            </div>
           )}
         </div>
-      </div>
+      </NodeCard>
 
-      {/* Output handle at BOTTOM */}
-      <Handle
+      <NodeHandleDot
         type="source"
         position={Position.Bottom}
         id="response-class-output"
-        className="!w-3 !h-2 !rounded-b-md !rounded-t-none"
-        style={{
-          backgroundColor: config.color,
-          opacity: data.attachedClassId ? 1 : 0.6,
-        }}
+        color={accent}
+        style={{ opacity: data.attachedClassId ? 1 : 0.6 }}
       />
     </>
   );
 }
-

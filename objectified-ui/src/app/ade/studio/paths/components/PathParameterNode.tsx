@@ -1,11 +1,12 @@
 // Path Parameter Node Component for React Flow Canvas
-// Plan 2.4: Small chips/tags color-coded by parameter location (PLANNED_FEATURE_ROADMAP_PATHS.md)
+// Plan 2.4: Small chips/tags color-coded by parameter location.
 'use client';
 
 import React from 'react';
 import { Trash2, Braces } from 'lucide-react';
-import { Handle, Position } from '@xyflow/react';
+import { Position } from '@xyflow/react';
 import type { ParamSerializationStyle } from '../../../../../../lib/utils/openapi-parameter-style';
+import { NodeHandleDot } from '@/app/components/ade/canvas/NodeHandleDot';
 
 export type { ParamSerializationStyle } from '../../../../../../lib/utils/openapi-parameter-style';
 
@@ -18,55 +19,79 @@ export interface PathParameterData {
   type?: string;
   format?: string;
   defaultValue?: string | number | boolean;
-  /** Serialization style (default form) */
   style?: ParamSerializationStyle;
-  /** Explode arrays/objects (OpenAPI 3.0) */
   explode?: boolean;
   dbParameterId?: string;
   operationId?: string;
   onDelete?: () => void;
 }
 
-// Plan 2.4: Color and icon per location (Query=Blue/? , Path=Green/{} , Header=H , Cookie=C)
+// Color-per-location — the chip uses a tinted surface + the role color for border/text.
 const LOCATION_CONFIG = {
   path: {
-    color: '#22c55e',
-    bgClass: 'bg-green-50 dark:bg-green-950/40 border-green-500/60',
-    textClass: 'text-green-700 dark:text-green-300',
+    color: '#16a34a',
+    bg: 'color-mix(in srgb, #16a34a 10%, var(--node-surface))',
+    border: 'color-mix(in srgb, #16a34a 45%, transparent)',
+    text: '#15803d',
     icon: 'braces' as const,
   },
   query: {
-    color: '#3b82f6',
-    bgClass: 'bg-blue-50 dark:bg-blue-950/40 border-blue-500/60',
-    textClass: 'text-blue-700 dark:text-blue-300',
+    color: '#2563eb',
+    bg: 'color-mix(in srgb, #2563eb 10%, var(--node-surface))',
+    border: 'color-mix(in srgb, #2563eb 45%, transparent)',
+    text: '#1d4ed8',
     icon: 'query' as const,
   },
   header: {
-    color: '#a855f7',
-    bgClass: 'bg-purple-50 dark:bg-purple-950/40 border-purple-500/60',
-    textClass: 'text-purple-700 dark:text-purple-300',
+    color: '#9333ea',
+    bg: 'color-mix(in srgb, #9333ea 10%, var(--node-surface))',
+    border: 'color-mix(in srgb, #9333ea 45%, transparent)',
+    text: '#7e22ce',
     icon: 'header' as const,
   },
   cookie: {
-    color: '#f97316',
-    bgClass: 'bg-orange-50 dark:bg-orange-950/40 border-orange-500/60',
-    textClass: 'text-orange-700 dark:text-orange-300',
+    color: '#ea580c',
+    bg: 'color-mix(in srgb, #ea580c 10%, var(--node-surface))',
+    border: 'color-mix(in srgb, #ea580c 45%, transparent)',
+    text: '#c2410c',
     icon: 'cookie' as const,
   },
 };
 
-function LocationIcon({ location }: { location: keyof typeof LOCATION_CONFIG }) {
-  const config = LOCATION_CONFIG[location];
-  if (config.icon === 'braces') {
-    return <Braces className={`w-3.5 h-3.5 shrink-0 ${config.textClass}`} strokeWidth={2.5} />;
+function LocationIcon({
+  location,
+  color,
+}: {
+  location: keyof typeof LOCATION_CONFIG;
+  color: string;
+}) {
+  const icon = LOCATION_CONFIG[location].icon;
+  if (icon === 'braces') {
+    return <Braces size={12} strokeWidth={2.5} style={{ color, flexShrink: 0 }} />;
   }
-  if (config.icon === 'query') {
-    return <span className={`font-mono font-bold text-sm ${config.textClass}`}>?</span>;
+  if (icon === 'query') {
+    return (
+      <span
+        style={{
+          fontFamily: 'var(--app-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+          fontWeight: 700,
+          fontSize: '12px',
+          color,
+          lineHeight: 1,
+        }}
+      >
+        ?
+      </span>
+    );
   }
-  if (config.icon === 'header') {
-    return <span className={`font-sans font-bold text-xs uppercase ${config.textClass}`}>H</span>;
+  if (icon === 'header') {
+    return (
+      <span style={{ fontWeight: 700, fontSize: '10px', letterSpacing: '0.04em', color }}>H</span>
+    );
   }
-  return <span className={`font-sans font-bold text-xs uppercase ${config.textClass}`}>C</span>;
+  return (
+    <span style={{ fontWeight: 700, fontSize: '10px', letterSpacing: '0.04em', color }}>C</span>
+  );
 }
 
 export default function PathParameterNode({ data }: { data: PathParameterData }) {
@@ -74,9 +99,10 @@ export default function PathParameterNode({ data }: { data: PathParameterData })
 
   const typeString = data.format
     ? `${data.type || 'string'} (${data.format})`
-    : (data.type || 'string');
+    : data.type || 'string';
   const requiredString = data.required ? 'required' : 'optional';
-  const hasDefault = data.defaultValue !== undefined && data.defaultValue !== null && data.defaultValue !== '';
+  const hasDefault =
+    data.defaultValue !== undefined && data.defaultValue !== null && data.defaultValue !== '';
 
   const tooltipLines = [
     `${data.name} · ${typeString} · ${requiredString}`,
@@ -89,47 +115,101 @@ export default function PathParameterNode({ data }: { data: PathParameterData })
 
   return (
     <>
-      <Handle
+      <NodeHandleDot
         type="target"
         position={Position.Top}
         id="parameter-input"
-        className="!w-2.5 !h-1.5 !rounded-t !rounded-b-none"
-        style={{ backgroundColor: config.color }}
+        color={config.color}
+        size={7}
       />
 
       <div
-        className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 shadow-sm min-w-0 max-w-[200px] cursor-pointer relative ${config.bgClass}`}
         title={tooltipLines.join('\n')}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '3px 8px',
+          borderRadius: '6px',
+          background: config.bg,
+          border: `1px solid ${config.border}`,
+          maxWidth: '200px',
+          cursor: 'pointer',
+          boxShadow: 'var(--node-shadow-sm)',
+        }}
       >
-        <LocationIcon location={data.inLocation} />
-        <span className={`font-medium text-xs truncate ${config.textClass}`}>
+        <LocationIcon location={data.inLocation} color={config.color} />
+        <span
+          style={{
+            fontSize: '11px',
+            fontWeight: 500,
+            color: config.text,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            letterSpacing: '-0.01em',
+          }}
+        >
           {data.name}
         </span>
         {data.required && (
-          <span className="shrink-0 text-[10px] text-red-500 dark:text-red-400 font-medium" title="required">*</span>
+          <span
+            aria-label="required"
+            title="required"
+            style={{
+              color: 'var(--node-danger)',
+              fontSize: '11px',
+              fontWeight: 700,
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >
+            *
+          </span>
         )}
         {data.onDelete && (
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               data.onDelete?.();
             }}
-            className="ml-0.5 rounded p-0.5 opacity-70 hover:opacity-100 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 z-10"
             title="Delete parameter"
+            aria-label="Delete parameter"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '2px',
+              borderRadius: '3px',
+              color: 'var(--node-text-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: 0.7,
+              transition: 'opacity 0.12s ease, color 0.12s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.color = 'var(--node-danger)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.7';
+              e.currentTarget.style.color = 'var(--node-text-subtle)';
+            }}
           >
             <Trash2 size={10} />
           </button>
         )}
       </div>
 
-      <Handle
+      <NodeHandleDot
         type="source"
         position={Position.Bottom}
         id="parameter-output"
-        className="!w-2.5 !h-1.5 !rounded-b !rounded-t-none"
-        style={{ backgroundColor: config.color }}
+        color={config.color}
+        size={7}
       />
     </>
   );
 }
-

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./components/ade/canvas/canvas.css";
 
 /* Configure dark mode to use .dark class on html element */
 @custom-variant dark (&:where(.dark, .dark *));

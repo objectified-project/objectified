@@ -172,6 +172,13 @@ import { useDialog } from '../../providers/DialogProvider';
 import * as Popover from '@radix-ui/react-popover';
 import { cn } from '../../../../../lib/utils';
 import { tagInlineColors } from '@/app/utils/tag-color-tokens';
+import { NodeCard } from '../canvas/NodeCard';
+import { NodeHeader } from '../canvas/NodeHeader';
+import { NodeHandleDot } from '../canvas/NodeHandleDot';
+import { NodeBadge } from '../canvas/NodeBadge';
+import { NodeTypeChip } from '../canvas/NodeTypeChip';
+import { PropertyRow } from '../canvas/PropertyRow';
+import { accentVar } from '../canvas/canvas-theme';
 
 // Icon options for class nodes - curated list organized by category
 const NODE_ICON_OPTIONS: Array<{ name: string; icon: LucideIcon; category: string }> = [
@@ -409,19 +416,6 @@ function normalizeHex(hex: string): string {
   const rgb = hexToRgb(hex);
   if (!rgb) return '#6366f1';
   return rgbToHex(rgb.r, rgb.g, rgb.b);
-}
-/** Invert a hex color (for selection highlight when node has custom color) */
-function invertHex(hex: string): string {
-  const rgb = hexToRgb(normalizeHex(hex));
-  if (!rgb) return '#6366f1';
-  return rgbToHex(255 - rgb.r, 255 - rgb.g, 255 - rgb.b);
-}
-/** Relative luminance (0–1); use to pick light vs dark text on a background */
-function luminance(hex: string): number {
-  const rgb = hexToRgb(normalizeHex(hex));
-  if (!rgb) return 0;
-  const [r, g, b] = [rgb.r, rgb.g, rgb.b].map(c => c / 255);
-  return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 /** Build full ClassNode theme from a single primary (header/border) color */
 function themeFromPrimaryColor(primaryHex: string): Omit<ClassNodeTheme, 'icon'> {
@@ -1130,55 +1124,21 @@ function ClassNode({ id, data, selected }: NodeProps) {
 
   const { topLevel, childMap } = buildPropertyHierarchy();
 
-  // When selected and node has a custom color, use inverted color so selection stands out
-  const hasThemeOverride = !!(typedData.theme?.borderColor || typedData.theme?.headerGradient);
-  const selectionAccent = selected
-    ? (hasThemeOverride && typedData.theme?.borderColor
-        ? invertHex(typedData.theme.borderColor)
-        : '#6366f1')
-    : null;
-
-  // Determine header accent color based on state and custom theme
-  const getHeaderGradient = () => {
-    if (selected && selectionAccent) return `linear-gradient(135deg, ${selectionAccent} 0%, ${darkenHex(selectionAccent, 0.18)} 100%)`;
-    if (typedData.theme?.headerGradient) return typedData.theme.headerGradient;
-    if (dragTarget === 'node') return 'linear-gradient(135deg, #059669 0%, #047857 100%)';
-    if (selected) return 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)';
-    return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
-  };
-
-  // Get custom colors from theme or defaults; when selected with theme override use inverted for border
-  const baseBorderColor = typedData.theme?.borderColor || (selected ? '#6366f1' : '#e2e8f0');
-  const borderColor = selected && selectionAccent ? selectionAccent : baseBorderColor;
-  const backgroundColor = typedData.theme?.backgroundColor || 'white';
-  const borderWidth = Math.min(5, Math.max(1, typedData.theme?.borderWidth ?? 1.5));
+  // Theme pass-through (custom user-chosen colors/borders). The NodeCard primitive
+  // owns default surfaces, selection glow, drop overlays, and warning rings.
+  const customBorderColor = typedData.theme?.borderColor || undefined;
+  const customBackground = typedData.theme?.backgroundColor || undefined;
+  const customHeaderBackground = typedData.theme?.headerGradient || undefined;
+  const customHeaderTextColor = typedData.theme?.headerTextColor || undefined;
+  const customTextColor = typedData.theme?.textColor || undefined;
+  const borderWidth = Math.min(5, Math.max(1, typedData.theme?.borderWidth ?? 1));
   const borderStyle = typedData.theme?.borderStyle ?? 'solid';
-  const textColor = typedData.theme?.textColor || '#1e293b';
-  const themeHeaderTextColor = typedData.theme?.headerTextColor || 'white';
-  // When selected with inverted accent, ensure header text contrasts (inverted color can be light)
-  const headerTextColor =
-    selected && selectionAccent && luminance(selectionAccent) > 0.6
-      ? '#1e293b'
-      : themeHeaderTextColor;
 
   const isDropTarget = dragTarget === 'node' || dragTarget === 'property';
-  const showValidDropOverlay = isDropTarget && !invalidDropReason;
+  const isValidDropTarget = isDropTarget && !invalidDropReason;
 
-  // #548: Circular dependency – add warning ring (amber) to node border
-  const defaultShadow = '0 2px 12px -2px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.04)';
-  const circularRingShadow =
-    typedData.inCircularDependency && !selected
-      ? `0 0 0 2px #f59e0b, ${defaultShadow}`
-      : undefined;
-
-  // Selection glow: use selection accent RGB when custom theme, else default indigo
-  const selectionGlowRgb = selectionAccent ? hexToRgb(selectionAccent) : { r: 99, g: 102, b: 241 };
-  const selectionShadow = selectionGlowRgb
-    ? `0 0 0 2px ${borderColor}, 0 8px 24px -8px rgba(${selectionGlowRgb.r}, ${selectionGlowRgb.g}, ${selectionGlowRgb.b}, 0.35)`
-    : `0 0 0 2px ${borderColor}, 0 8px 24px -8px rgba(99, 102, 241, 0.35)`;
-
-  // #560: Heatmap overlay color (cool = low, warm = high). Value 0–1 → blue/green to orange/red.
-  const heatmapOverlayStyle: React.CSSProperties | null =
+  // Heatmap tint (cool -> warm by value) — rendered by NodeCard as a full-card overlay.
+  const heatmapTint =
     typedData.heatmapMode && typedData.heatmapMode !== 'off' && typeof typedData.heatmapValue === 'number'
       ? (() => {
           const v = Math.max(0, Math.min(1, typedData.heatmapValue));
@@ -1186,15 +1146,15 @@ function ClassNode({ id, data, selected }: NodeProps) {
           const r = Math.round(59 + (239 - 59) * v);
           const g = Math.round(130 + (68 - 130) * v);
           const b = Math.round(246 + (68 - 246) * v);
-          return {
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-            borderRadius: '10px',
-            background: `rgba(${r}, ${g}, ${b}, ${opacity})`,
-          };
+          return `rgba(${r}, ${g}, ${b}, ${opacity})`;
         })()
-      : null;
+      : undefined;
+
+  const propCount = (typedData.properties || []).length;
+  const relCount = typedData.relationshipCount ?? 0;
+  const headerBadgeVariant: 'overlay' | 'neutral' = customHeaderBackground ? 'overlay' : 'neutral';
+  const headerInfoVariant: 'overlay' | 'info' = customHeaderBackground ? 'overlay' : 'info';
+  const headerWarnVariant: 'overlay' | 'warning' = customHeaderBackground ? 'overlay' : 'warning';
 
   return (
     <div
@@ -1526,175 +1486,88 @@ function ClassNode({ id, data, selected }: NodeProps) {
           </div>
         </div>
       )}
-    <div
-      ref={nodeRef}
+    <NodeCard
+      innerRef={nodeRef}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onDoubleClick={handleDoubleClick}
-      style={{
-        borderRadius: '10px',
-        border: `${borderWidth}px ${borderStyle} ${borderColor}`,
-        background: backgroundColor,
-        minWidth: '280px',
-        maxWidth: '420px',
-        boxShadow: selected
-          ? selectionShadow
-          : invalidDropReason
-          ? '0 0 0 2px #dc2626, 0 8px 24px -8px rgba(220, 38, 38, 0.3)'
-          : dragTarget === 'node'
-          ? '0 0 0 2px #10b981, 0 8px 24px -8px rgba(16, 185, 129, 0.25)'
-          : circularRingShadow ?? defaultShadow,
-        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-        overflow: 'hidden',
-        cursor: 'pointer',
-        color: textColor,
-        fontSize: '12px',
-        position: 'relative',
-      }}
       title={typedData.heatmapLabel}
+      selected={selected}
+      customBorderColor={customBorderColor}
+      borderWidth={borderWidth}
+      borderStyle={borderStyle}
+      customBackground={customBackground}
+      isValidDropTarget={isValidDropTarget}
+      invalidDropReason={invalidDropReason}
+      warning={!!(typedData.inCircularDependency && !selected)}
+      heatmapTint={heatmapTint}
+      style={{ cursor: 'pointer', color: customTextColor }}
     >
-      {/* #560: Heatmap overlay (cool → warm by metric value) */}
-      {heatmapOverlayStyle && <div style={{ ...heatmapOverlayStyle, zIndex: 0 }} aria-hidden />}
-      {/* #479: Invalid drop indicator - entire node; shows when drop would be duplicate or read-only */}
-      {invalidDropReason && (
-        <div
-          className="pointer-events-none absolute inset-0 rounded-[10px] border-2 border-dashed border-red-500 bg-red-50/40 dark:bg-red-950/30"
-          style={{ zIndex: 11 }}
-          title={invalidDropReason}
-          aria-hidden
-        >
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '8px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              background: 'rgba(220, 38, 38, 0.95)',
-              color: 'white',
-              fontSize: '11px',
-              padding: '4px 10px',
-              borderRadius: '6px',
-              whiteSpace: 'nowrap',
-              maxWidth: '90%',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            }}
-          >
-            {invalidDropReason}
-          </div>
-        </div>
-      )}
-      {/* #477: Dropzone highlight overlay - visual cue for valid drop target */}
-      {showValidDropOverlay && (
-        <div
-          className="pointer-events-none absolute inset-0 rounded-[10px] border-2 border-dashed border-blue-400 bg-blue-50/30 dark:bg-blue-950/20"
-          style={{ zIndex: 10 }}
-          aria-hidden
-        />
-      )}
-      {/* Target handle at the top */}
-      <Handle
+      <NodeHandleDot
         type="target"
         position={Position.Top}
-        style={{
-          background: selected ? '#6366f1' : '#94a3b8',
-          width: '8px',
-          height: '8px',
-          border: '2px solid white',
-          borderRadius: '50%',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
-          transition: 'background 0.2s ease',
-        }}
-        isConnectable={true}
+        color={selected ? accentVar('default') : 'var(--node-text-subtle)'}
       />
 
-      {/* Header */}
-      <div
-        style={{
-          background: getHeaderGradient(),
-          padding: '8px 12px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '8px',
-          position: 'relative',
-        }}
-      >
-        {/* Subtle pattern overlay */}
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'radial-gradient(circle at 100% 0%, rgba(255,255,255,0.08) 0%, transparent 50%)',
-          pointerEvents: 'none',
-        }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, position: 'relative', zIndex: 1 }}>
-          {/* Class icon */}
-          <div style={{
-            width: '24px',
-            height: '24px',
-            borderRadius: '6px',
-            background: 'rgba(255, 255, 255, 0.18)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '10px',
-            fontWeight: 700,
-            color: headerTextColor,
-            flexShrink: 0,
-            letterSpacing: '-0.3px',
-          }}>
-            {(() => {
-              const IconComponent = getIconComponent();
-              if (IconComponent) {
-                return <IconComponent size={14} strokeWidth={2.5} />;
-              }
-              return typedData.name.substring(0, 2).toUpperCase();
-            })()}
-          </div>
-
-          <div style={{ flex: 1, minWidth: 0, textAlign: typedData.theme?.labelTextAlign ?? 'left' }}>
-            <div style={{
-              fontSize: `${typedData.theme?.labelFontSize ?? 13}px`,
-              fontFamily: typedData.theme?.labelFontFamily ?? 'inherit',
-              fontWeight: typedData.theme?.labelFontWeight === 'bold' ? 600 : (typedData.theme?.labelFontWeight === 'normal' ? 400 : 600),
-              fontStyle: typedData.theme?.labelFontStyle ?? 'normal',
-              color: headerTextColor,
-              letterSpacing: '-0.01em',
-              overflow: 'hidden',
-              textOverflow: typedData.theme?.labelMultiLine ? 'clip' : 'ellipsis',
-              whiteSpace: typedData.theme?.labelMultiLine ? 'normal' : 'nowrap',
-              wordBreak: typedData.theme?.labelMultiLine ? 'break-word' : undefined,
-              textDecoration: typedData.schema?.deprecated ? 'line-through' : 'none',
-              opacity: typedData.schema?.deprecated ? 0.7 : 1,
-              lineHeight: 1.3,
-            }}>
+      <NodeHeader
+        role="default"
+        customAccent={customBorderColor}
+        customBackground={customHeaderBackground}
+        customTextColor={customHeaderTextColor}
+        textAlign={typedData.theme?.labelTextAlign ?? 'left'}
+        icon={(() => {
+          const IconComp = getIconComponent();
+          if (IconComp) return <IconComp size={14} strokeWidth={2.5} />;
+          return <span>{typedData.name.substring(0, 2).toUpperCase()}</span>;
+        })()}
+        title={
+          <>
+            <div
+              style={{
+                fontSize: `${typedData.theme?.labelFontSize ?? 13}px`,
+                fontFamily: typedData.theme?.labelFontFamily ?? 'inherit',
+                fontWeight:
+                  typedData.theme?.labelFontWeight === 'bold'
+                    ? 600
+                    : typedData.theme?.labelFontWeight === 'normal'
+                    ? 400
+                    : 600,
+                fontStyle: typedData.theme?.labelFontStyle ?? 'normal',
+                letterSpacing: '-0.01em',
+                overflow: 'hidden',
+                textOverflow: typedData.theme?.labelMultiLine ? 'clip' : 'ellipsis',
+                whiteSpace: typedData.theme?.labelMultiLine ? 'normal' : 'nowrap',
+                wordBreak: typedData.theme?.labelMultiLine ? 'break-word' : undefined,
+                textDecoration: typedData.schema?.deprecated ? 'line-through' : 'none',
+                opacity: typedData.schema?.deprecated ? 0.7 : 1,
+                lineHeight: 1.3,
+              }}
+            >
               {typedData.name}
             </div>
-
-            {/* Tags inline with name */}
             {showTags && typedData.tags && typedData.tags.length > 0 && (
-              <div style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '3px',
-                marginTop: '3px',
-                opacity: tagsOpacity,
-                transition: 'opacity 0.2s ease'
-              }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '3px',
+                  marginTop: '3px',
+                  opacity: tagsOpacity,
+                  transition: 'opacity 0.2s ease',
+                }}
+              >
                 {typedData.tags.map((tag) => {
                   const colors = tagInlineColors(tag.tag_color);
                   return (
                     <span
                       key={tag.id}
                       style={{
-                        fontSize: '8px',
-                        padding: '1px 5px',
+                        fontSize: '9px',
+                        padding: '1px 6px',
                         borderRadius: '3px',
                         background: colors.bg,
-                        color: 'white',
+                        color: '#ffffff',
                         fontWeight: 500,
                         border: `1px solid ${colors.border}`,
                         whiteSpace: 'nowrap',
@@ -1707,127 +1580,84 @@ function ClassNode({ id, data, selected }: NodeProps) {
                 })}
               </div>
             )}
-          </div>
-        </div>
+          </>
+        }
+        badges={
+          <>
+            {typedData.inCircularDependency && (
+              <NodeBadge variant={headerWarnVariant} title="Part of a circular dependency">
+                <AlertTriangle size={10} strokeWidth={2.5} />
+              </NodeBadge>
+            )}
+            {typedData.dependencyDepthLabel != null && (
+              <NodeBadge
+                variant={headerInfoVariant}
+                title={`Dependency depth: ${typedData.dependencyDepthLabel} degree`}
+              >
+                <Layers size={10} strokeWidth={2.5} />
+                {typedData.dependencyDepthLabel}
+              </NodeBadge>
+            )}
+            {typedData.impactSource && (
+              <NodeBadge variant={headerWarnVariant} title="Selected for impact analysis (changing this class affects others)">
+                Changed
+              </NodeBadge>
+            )}
+            {typedData.impactAffected && (
+              <NodeBadge variant={headerInfoVariant} title="Affected by the selected class change">
+                Affected
+              </NodeBadge>
+            )}
+            <NodeBadge variant={headerBadgeVariant} title={`${propCount} propert${propCount === 1 ? 'y' : 'ies'}`}>
+              <List size={10} strokeWidth={2.5} />
+              {propCount}
+            </NodeBadge>
+            {relCount > 0 && (
+              <NodeBadge variant={headerInfoVariant} title={`${relCount} relationship${relCount === 1 ? '' : 's'}`}>
+                <Link2 size={10} strokeWidth={2.5} />
+                {relCount}
+              </NodeBadge>
+            )}
+          </>
+        }
+      />
 
-        {/* #559: Per-node metrics badges (property count, relationship count) */}
-        {/* #548: Circular dependency warning badge */}
-        {(() => {
-          const propCount = (typedData.properties || []).length;
-          const relCount = typedData.relationshipCount ?? 0;
-          const badgeStyle: React.CSSProperties = {
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '3px',
-            padding: '2px 6px',
-            borderRadius: '4px',
-            background: 'rgba(255, 255, 255, 0.2)',
-            color: headerTextColor,
-            fontSize: '10px',
-            fontWeight: 600,
-            lineHeight: 1.2,
-            flexShrink: 0,
-          };
-          return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative', zIndex: 1 }}>
-              {typedData.inCircularDependency && (
-                <span
-                  style={{
-                    ...badgeStyle,
-                    background: 'rgba(245, 158, 11, 0.9)',
-                    color: '#fff',
-                  }}
-                  title="Part of a circular dependency"
-                >
-                  <AlertTriangle size={10} strokeWidth={2.5} />
-                </span>
-              )}
-              {typedData.dependencyDepthLabel != null && (
-                <span
-                  style={{
-                    ...badgeStyle,
-                    background: 'rgba(99, 102, 241, 0.85)',
-                    color: '#fff',
-                  }}
-                  title={`Dependency depth: ${typedData.dependencyDepthLabel} degree`}
-                >
-                  <Layers size={10} strokeWidth={2.5} />
-                  {typedData.dependencyDepthLabel}
-                </span>
-              )}
-              {typedData.impactSource && (
-                <span
-                  style={{
-                    ...badgeStyle,
-                    background: 'rgba(245, 158, 11, 0.9)',
-                    color: '#fff',
-                  }}
-                  title="Selected for impact analysis (changing this class affects others)"
-                >
-                  Changed
-                </span>
-              )}
-              {typedData.impactAffected && (
-                <span
-                  style={{
-                    ...badgeStyle,
-                    background: 'rgba(59, 130, 246, 0.85)',
-                    color: '#fff',
-                  }}
-                  title="Affected by the selected class change"
-                >
-                  Affected
-                </span>
-              )}
-              <span style={badgeStyle} title={`${propCount} propert${propCount === 1 ? 'y' : 'ies'}`}>
-                <List size={10} strokeWidth={2.5} />
-                {propCount}
-              </span>
-              {relCount > 0 && (
-                <span style={badgeStyle} title={`${relCount} relationship${relCount === 1 ? '' : 's'}`}>
-                  <Link2 size={10} strokeWidth={2.5} />
-                  {relCount}
-                </span>
-              )}
-            </div>
-          );
-        })()}
-
-      </div>
-
-      {/* Description / Drop zone */}
+      {/* Description / drop hint */}
       {showDescription && (
         <div
           style={{
-            padding: '6px 12px',
+            padding: '5px 12px',
             fontSize: '11px',
-            color: invalidDropReason ? '#b91c1c' : dragTarget === 'node' ? '#059669' : '#64748b',
-            lineHeight: '1.4',
-            background: invalidDropReason
-              ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
-              : dragTarget === 'node'
-              ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
-              : '#f8fafc',
-            borderBottom: `1px solid ${invalidDropReason ? '#fecaca' : dragTarget === 'node' ? '#a7f3d0' : '#e2e8f0'}`,
-            textAlign: (dragTarget === 'node' || invalidDropReason) ? 'center' : 'left',
-            fontWeight: (dragTarget === 'node' || invalidDropReason) ? 500 : 400,
-            minHeight: '28px',
+            color:
+              dragTarget === 'node' && !invalidDropReason
+                ? 'var(--node-success)'
+                : 'var(--node-text-muted)',
+            lineHeight: 1.4,
+            background:
+              dragTarget === 'node' && !invalidDropReason
+                ? 'color-mix(in srgb, var(--node-success) 10%, transparent)'
+                : 'var(--node-surface-muted)',
+            borderBottom: '1px solid var(--node-border-muted)',
+            minHeight: '24px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: (dragTarget === 'node' || invalidDropReason) ? 'center' : 'flex-start',
+            justifyContent: dragTarget === 'node' && !invalidDropReason ? 'center' : 'flex-start',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             opacity: descriptionOpacity,
-            transition: 'all 0.2s ease',
-            fontStyle: typedData.description && !invalidDropReason ? 'normal' : 'italic',
+            transition: 'all 0.18s ease',
+            fontStyle: typedData.description ? 'normal' : 'italic',
+            fontWeight: dragTarget === 'node' && !invalidDropReason ? 500 : 400,
           }}
         >
-          {invalidDropReason ? `⚠ ${invalidDropReason}` : dragTarget === 'node' ? '✨ Drop here' : (typedData.description || 'No description')}
+          {dragTarget === 'node' && !invalidDropReason
+            ? 'Drop here'
+            : (typedData.description || 'No description')}
         </div>
       )}
 
-      {/* Collapsed view: show references only so edges and ref info are preserved */}
+      {/* Collapsed: references-only mini-list (edges + ref info preserved) */}
       {!showProperties && (() => {
         const allProps = typedData.properties || [];
         const refProps = allProps.filter((p: ClassProperty) => hasRef(p));
@@ -1836,11 +1666,20 @@ function ClassNode({ id, data, selected }: NodeProps) {
           <div
             style={{
               padding: '6px 0 4px 0',
-              borderTop: '1px solid #f1f5f9',
-              background: 'rgba(248, 250, 252, 0.6)',
+              borderTop: '1px solid var(--node-border-muted)',
+              background: 'var(--node-surface-muted)',
             }}
           >
-            <div style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', padding: '0 10px 4px 10px', letterSpacing: '0.02em' }}>
+            <div
+              style={{
+                fontSize: '10px',
+                fontWeight: 600,
+                color: 'var(--node-text-muted)',
+                padding: '0 10px 4px 10px',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
               References
             </div>
             {refProps.map((p) => (
@@ -1848,40 +1687,33 @@ function ClassNode({ id, data, selected }: NodeProps) {
                 key={p.id}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 36px',
+                  gridTemplateColumns: '1fr auto',
                   alignItems: 'center',
-                  padding: '3px 10px',
+                  padding: '4px 10px',
                   minHeight: '24px',
                   position: 'relative',
-                  gap: '4px',
+                  gap: '8px',
                 }}
               >
                 <span
                   style={{
                     fontSize: '11px',
-                    color: '#475569',
+                    color: 'var(--node-text-muted)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                   }}
-                  title={`${p.name} → ${getPropertyType(p)}`}
+                  title={`${p.name} -> ${getPropertyType(p)}`}
                 >
                   {p.name}
-                  <span style={{ color: '#94a3b8', marginLeft: '4px' }}>{'\u2192'}</span>
-                  <span style={{ fontFamily: 'monospace', fontSize: '10px', color: '#6366f1' }}>{getPropertyType(p)}</span>
+                  <span style={{ color: 'var(--node-text-subtle)', margin: '0 4px' }}>{'\u2192'}</span>
                 </span>
-                <Handle
+                <NodeTypeChip label={getPropertyType(p)} dense />
+                <NodeHandleDot
                   type="source"
                   position={Position.Right}
                   id={`prop-${p.id}`}
-                  style={{
-                    background: '#6366f1',
-                    width: '8px',
-                    height: '8px',
-                    border: '2px solid white',
-                    borderRadius: '50%',
-                    boxShadow: '0 1px 3px rgba(99, 102, 241, 0.25)',
-                  }}
+                  role="ref"
                   isConnectable={!typedData.isReadOnly}
                 />
               </div>
@@ -1892,334 +1724,238 @@ function ClassNode({ id, data, selected }: NodeProps) {
 
       {/* Properties */}
       {showProperties && (
-        <div style={{
-          padding: '0',
-          opacity: propertiesOpacity,
-          transition: 'opacity 0.2s ease'
-        }}>
-          {(topLevel.length > 0 ? topLevel : []).length > 0 || (ghostPreview && ghostPreview.parentId === null && !invalidDropReason) ? (
-          <>
-          {ghostPreview && ghostPreview.parentId === null && renderGhostPreviewRow('root-ghost-preview')}
-          {topLevel.flatMap((prop, idx) => {
-            let rowIndex = 0;
-            const totalTopLevel = topLevel.length;
-            const renderProperty = (p: ClassProperty, depth: number, isLast: boolean = false): React.JSX.Element[] => {
-              const container = isInlineObjectContainer(p);
-              const children = childMap.get(p.id) || [];
-              const isExpanded = expandedProperties.has(p.id);
-              const draggedOver = dragOverPropertyId === p.id;
-              const childOfDragged = isDescendantOfDraggedProperty(p.id, dragOverPropertyId);
-              const isInDropZone = draggedOver || childOfDragged;
-              const isInvalidDropZone = isInDropZone && !!invalidDropReason;
-              const currentIndex = rowIndex++;
-              const isRequired = p.data?.required;
-              const isDeprecated = parseData(p)?.deprecated;
-              const canShowPropertyActions =
-                !typedData.isReadOnly && !!(typedData.onPropertyEdit || typedData.onPropertyDelete);
-              const showPropertyRowActions = canShowPropertyActions && hoveredPropertyRowId === p.id;
+        <div
+          style={{
+            padding: 0,
+            opacity: propertiesOpacity,
+            transition: 'opacity 0.2s ease',
+          }}
+        >
+          {topLevel.length > 0 || (ghostPreview && ghostPreview.parentId === null && !invalidDropReason) ? (
+            <>
+              {ghostPreview && ghostPreview.parentId === null && renderGhostPreviewRow('root-ghost-preview')}
+              {topLevel.flatMap((prop, idx) => {
+                const totalTopLevel = topLevel.length;
+                const renderProperty = (
+                  p: ClassProperty,
+                  depth: number,
+                  isLast: boolean = false
+                ): React.JSX.Element[] => {
+                  const container = isInlineObjectContainer(p);
+                  const children = childMap.get(p.id) || [];
+                  const isExpanded = expandedProperties.has(p.id);
+                  const draggedOver = dragOverPropertyId === p.id;
+                  const childOfDragged = isDescendantOfDraggedProperty(p.id, dragOverPropertyId);
+                  const isInDropZone = draggedOver || childOfDragged;
+                  const isInvalidDropZone = isInDropZone && !!invalidDropReason;
+                  const isRequired = p.data?.required;
+                  const parsed = parseData(p);
+                  const isDeprecated = !!parsed?.deprecated;
+                  const deprecationMessage =
+                    typeof parsed?.deprecationMessage === 'string' ? parsed.deprecationMessage : undefined;
+                  const canShowPropertyActions =
+                    !typedData.isReadOnly && !!(typedData.onPropertyEdit || typedData.onPropertyDelete);
+                  const showPropertyRowActions =
+                    canShowPropertyActions && hoveredPropertyRowId === p.id;
 
-              const row: React.JSX.Element[] = [];
-              row.push(
-                <div
-                  key={p.id}
-                  onDragOver={!typedData.isReadOnly ? (e) => handlePropertyDragOver(e, p.id, container) : undefined}
-                  onDragLeave={!typedData.isReadOnly ? (e) => handlePropertyDragLeave(e, p.id, container) : undefined}
-                  onDrop={container && !typedData.isReadOnly ? (e) => handlePropertyDrop(e, p.id) : undefined}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '16px 1fr auto',
-                    alignItems: 'center',
-                    padding: '5px 10px',
-                    paddingLeft: `${10 + depth * 14}px`,
-                    background: isInvalidDropZone
-                      ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
-                      : isInDropZone
-                      ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
-                      : 'transparent',
-                    borderBottom: !isLast ? '1px solid #f1f5f9' : 'none',
-                    position: 'relative',
-                    gap: '4px',
-                    transition: 'background 0.12s ease',
-                    cursor: 'default',
-                    minHeight: '28px',
-                  }}
-                  onMouseEnter={(e) => {
-                    setHoveredPropertyRowId(p.id);
-                    if (!isInDropZone) {
-                      e.currentTarget.style.background = '#f8fafc';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    setHoveredPropertyRowId((prev) => (prev === p.id ? null : prev));
-                    if (!isInDropZone) {
-                      e.currentTarget.style.background = 'transparent';
-                    }
-                  }}
-                >
-                  <div style={{ width: '14px', display: 'flex', alignItems: 'center' }}>
-                    {container && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); togglePropertyExpansion(p.id); }}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '1px',
-                          borderRadius: '3px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#94a3b8',
-                          transition: 'all 0.12s ease',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#e2e8f0';
-                          e.currentTarget.style.color = '#475569';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'transparent';
-                          e.currentTarget.style.color = '#94a3b8';
-                        }}
-                        title={isExpanded ? 'Collapse' : 'Expand'}
-                      >
-                        {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                      </button>
-                    )}
-                  </div>
+                  const rowElements: React.JSX.Element[] = [];
+                  rowElements.push(
+                    <PropertyRow
+                      key={p.id}
+                      depth={depth}
+                      container={container}
+                      expanded={isExpanded}
+                      onToggleExpanded={() => togglePropertyExpansion(p.id)}
+                      name={p.name}
+                      required={!!isRequired}
+                      deprecated={isDeprecated}
+                      deprecationMessage={deprecationMessage}
+                      childCount={children.length}
+                      isValidDropZone={isInDropZone && !isInvalidDropZone}
+                      isInvalidDropZone={isInvalidDropZone}
+                      last={isLast}
+                      onMouseEnter={() => setHoveredPropertyRowId(p.id)}
+                      onMouseLeave={() =>
+                        setHoveredPropertyRowId((prev) => (prev === p.id ? null : prev))
+                      }
+                      onDragOver={
+                        !typedData.isReadOnly
+                          ? (e) => handlePropertyDragOver(e, p.id, container)
+                          : undefined
+                      }
+                      onDragLeave={
+                        !typedData.isReadOnly
+                          ? (e) => handlePropertyDragLeave(e, p.id, container)
+                          : undefined
+                      }
+                      onDrop={
+                        container && !typedData.isReadOnly
+                          ? (e) => handlePropertyDrop(e, p.id)
+                          : undefined
+                      }
+                      right={
+                        showPropertyRowActions ? (
+                          <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
+                            {typedData.onPropertyEdit && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  typedData.onPropertyEdit!(typedData.id, p);
+                                }}
+                                aria-label="Edit property"
+                                title="Edit property"
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: '3px',
+                                  borderRadius: '3px',
+                                  color: 'var(--node-text-subtle)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.12s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background =
+                                    'color-mix(in srgb, var(--node-accent) 14%, transparent)';
+                                  e.currentTarget.style.color = 'var(--node-accent)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'transparent';
+                                  e.currentTarget.style.color = 'var(--node-text-subtle)';
+                                }}
+                              >
+                                <Edit size={11} />
+                              </button>
+                            )}
+                            {typedData.onPropertyDelete && (
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const confirmed = await confirmDialog({
+                                    title: 'Remove Property',
+                                    message: `Remove "${p.name}" from this class?`,
+                                    variant: 'warning',
+                                    confirmLabel: 'Remove',
+                                    cancelLabel: 'Cancel',
+                                  });
+                                  if (confirmed) typedData.onPropertyDelete!(typedData.id, p.id);
+                                }}
+                                aria-label="Remove property from class"
+                                title="Remove property from class"
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: '3px',
+                                  borderRadius: '3px',
+                                  color: 'var(--node-text-subtle)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.12s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background =
+                                    'color-mix(in srgb, var(--node-danger) 14%, transparent)';
+                                  e.currentTarget.style.color = 'var(--node-danger)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'transparent';
+                                  e.currentTarget.style.color = 'var(--node-text-subtle)';
+                                }}
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <NodeTypeChip label={getPropertyType(p)} />
+                        )
+                      }
+                    >
+                      {hasRef(p) && (
+                        <NodeHandleDot
+                          type="source"
+                          position={Position.Right}
+                          id={`prop-${p.id}`}
+                          role="ref"
+                          isConnectable={!typedData.isReadOnly}
+                        />
+                      )}
+                    </PropertyRow>
+                  );
 
-                  <div
-                    style={{
-                      fontWeight: 500,
-                      color: isDeprecated ? '#94a3b8' : '#1e293b',
-                      fontSize: '11px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      textDecoration: isDeprecated ? 'line-through' : 'none',
-                      letterSpacing: '-0.01em',
-                    }}
-                    title={isDeprecated ? (parseData(p)?.deprecationMessage || 'Deprecated') : undefined}
-                  >
-                    {isRequired && (
-                      <span style={{
-                        color: '#ef4444',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        lineHeight: 1,
-                      }}>*</span>
-                    )}
-                    <span>{p.name}</span>
-                    {children.length > 0 && (
-                      <span style={{
-                        color: '#94a3b8',
-                        fontSize: '9px',
-                        fontWeight: 500,
-                        background: '#f1f5f9',
-                        padding: '0px 4px',
-                        borderRadius: '8px',
-                        lineHeight: 1.4,
-                      }}>
-                        {children.length}
-                      </span>
-                    )}
-                  </div>
+                  if (ghostPreview && ghostPreview.parentId === p.id && !invalidDropReason) {
+                    rowElements.push(
+                      renderGhostPreviewRow(
+                        `${p.id}-ghost-preview`,
+                        `${10 + (depth + 1) * 14}px`
+                      ) as React.JSX.Element
+                    );
+                  }
 
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      alignItems: 'center',
-                      gap: '4px',
-                      minWidth: 0,
-                    }}
-                  >
-                    {showPropertyRowActions ? (
-                      <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
-                        {typedData.onPropertyEdit && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); typedData.onPropertyEdit!(typedData.id, p); }}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: '3px',
-                              borderRadius: '3px',
-                              color: '#94a3b8',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.12s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#e0e7ff';
-                              e.currentTarget.style.color = '#6366f1';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'transparent';
-                              e.currentTarget.style.color = '#94a3b8';
-                            }}
-                            type="button"
-                            aria-label="Edit property"
-                            title="Edit property"
-                          >
-                            <Edit size={11} />
-                          </button>
-                        )}
-                        {typedData.onPropertyDelete && (
-                          <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              const confirmed = await confirmDialog({
-                                title: 'Remove Property',
-                                message: `Remove "${p.name}" from this class?`,
-                                variant: 'warning',
-                                confirmLabel: 'Remove',
-                                cancelLabel: 'Cancel',
-                              });
-                              if (confirmed) typedData.onPropertyDelete!(typedData.id, p.id);
-                            }}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: '3px',
-                              borderRadius: '3px',
-                              color: '#94a3b8',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.12s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#fee2e2';
-                              e.currentTarget.style.color = '#ef4444';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'transparent';
-                              e.currentTarget.style.color = '#94a3b8';
-                            }}
-                            type="button"
-                            aria-label="Remove property from class"
-                            title="Remove property from class"
-                          >
-                            <Trash2 size={11} />
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          fontSize: '9px',
-                          color: '#64748b',
-                          fontFamily: '"SF Mono", Monaco, "Cascadia Code", monospace',
-                          whiteSpace: 'nowrap',
-                          background: '#f1f5f9',
-                          padding: '1px 6px',
-                          borderRadius: '3px',
-                          fontWeight: 500,
-                          letterSpacing: '-0.02em',
-                        }}
-                      >
-                        {getPropertyType(p)}
-                      </div>
-                    )}
-                  </div>
+                  if (container && isExpanded && children.length > 0) {
+                    children.forEach((c, childIdx) =>
+                      rowElements.push(...renderProperty(c, depth + 1, childIdx === children.length - 1))
+                    );
+                  }
 
-                  {/* Property reference handle: only show for properties with $ref */}
-                  {hasRef(p) && (
-                    <Handle
-                      type="source"
-                      position={Position.Right}
-                      id={`prop-${p.id}`}
-                      style={{
-                        background: '#6366f1',
-                        width: '8px',
-                        height: '8px',
-                        border: '2px solid white',
-                        borderRadius: '50%',
-                        boxShadow: '0 1px 3px rgba(99, 102, 241, 0.25)',
-                      }}
-                      isConnectable={!typedData.isReadOnly}
-                    />
-                  )}
-                </div>
-              );
+                  return rowElements;
+                };
 
-              if (ghostPreview && ghostPreview.parentId === p.id && !invalidDropReason) {
-                row.push(
-                  renderGhostPreviewRow(`${p.id}-ghost-preview`, `${10 + (depth + 1) * 14}px`) as React.JSX.Element
-                );
-              }
-
-              if (container && isExpanded && children.length > 0) {
-                children.forEach((c, childIdx) => row.push(...renderProperty(c, depth + 1, childIdx === children.length - 1)));
-              }
-
-              return row;
-            };
-
-            return renderProperty(prop, 0, idx === totalTopLevel - 1);
-          })}
-          </>
-        ) : (
-          <div style={{
-            padding: '10px 12px',
-            textAlign: 'center',
-            color: '#94a3b8',
-            fontSize: '11px',
-            fontStyle: 'italic',
-            background: '#fafafa',
-          }}>
-            No properties
-          </div>
-        )}
+                return renderProperty(prop, 0, idx === totalTopLevel - 1);
+              })}
+            </>
+          ) : (
+            <div
+              style={{
+                padding: '10px 12px',
+                textAlign: 'center',
+                color: 'var(--node-text-subtle)',
+                fontSize: '11px',
+                fontStyle: 'italic',
+                background: 'var(--node-surface-muted)',
+              }}
+            >
+              No properties
+            </div>
+          )}
         </div>
       )}
 
-      {/* Bottom handle for composition relationships */}
+      {/* Bottom composition handle (allOf/anyOf/oneOf) */}
       {typedData.schema && (() => {
-        const schema = typeof (typedData.schema as any) === 'string' ? JSON.parse(typedData.schema as any) : (typedData.schema as any);
+        const schema =
+          typeof (typedData.schema as any) === 'string'
+            ? JSON.parse(typedData.schema as any)
+            : (typedData.schema as any);
         const hasComposition =
           (schema?.allOf && Array.isArray(schema.allOf) && schema.allOf.some((it: any) => it.$ref)) ||
           (schema?.anyOf && Array.isArray(schema.anyOf) && schema.anyOf.some((it: any) => it.$ref)) ||
           (schema?.oneOf && Array.isArray(schema.oneOf) && schema.oneOf.some((it: any) => it.$ref));
 
-        let handleColor = '#94a3b8';
-        let shadowColor = 'rgba(0, 0, 0, 0.1)';
-        if (schema?.allOf && schema.allOf.length > 0) {
-          handleColor = '#3b82f6';
-          shadowColor = 'rgba(59, 130, 246, 0.3)';
-        } else if (schema?.anyOf && schema.anyOf.length > 0) {
-          handleColor = '#f97316';
-          shadowColor = 'rgba(249, 115, 22, 0.3)';
-        } else if (schema?.oneOf && schema.oneOf.length > 0) {
-          handleColor = '#a855f7';
-          shadowColor = 'rgba(168, 85, 247, 0.3)';
-        }
+        let compRole: 'comp-all' | 'comp-any' | 'comp-one' | 'default' = 'default';
+        if (schema?.allOf && schema.allOf.length > 0) compRole = 'comp-all';
+        else if (schema?.anyOf && schema.anyOf.length > 0) compRole = 'comp-any';
+        else if (schema?.oneOf && schema.oneOf.length > 0) compRole = 'comp-one';
 
         return hasComposition ? (
-          <Handle
+          <NodeHandleDot
             key="comp-bottom"
             type="source"
             position={Position.Bottom}
             id="comp-bottom"
-            style={{
-              background: handleColor,
-              width: '10px',
-              height: '10px',
-              border: '2px solid white',
-              borderRadius: '50%',
-              boxShadow: `0 1px 4px ${shadowColor}`,
-              transition: 'all 0.15s ease',
-            }}
+            role={compRole}
+            size={10}
             isConnectable={false}
           />
         ) : null;
       })()}
-    </div>
+    </NodeCard>
     </div>
   );
 }

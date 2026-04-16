@@ -1,18 +1,20 @@
 'use client';
 
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Position, NodeProps } from '@xyflow/react';
+import { NodeCard } from '../canvas/NodeCard';
+import { NodeHeader } from '../canvas/NodeHeader';
+import { NodeHandleDot } from '../canvas/NodeHandleDot';
+import { NodeBadge } from '../canvas/NodeBadge';
 
 export interface PathNodeData {
   label: string;
   nodeType: 'path' | 'method' | 'parameter' | 'response';
   color?: string;
-  // Database IDs
-  dbPathId?: string; // ID in odb.api_paths
-  dbOperationId?: string; // ID in odb.path_operations
-  connectedPathId?: string; // For method nodes: which path they're connected to
-  pendingDbSave?: boolean; // Flag for nodes that need to be saved to DB
-  // Path-specific data
+  dbPathId?: string;
+  dbOperationId?: string;
+  connectedPathId?: string;
+  pendingDbSave?: boolean;
   path?: string;
   summary?: string;
   description?: string;
@@ -20,14 +22,12 @@ export interface PathNodeData {
   deprecated?: boolean;
   pathVariables?: PathVariable[];
   externalDocs?: ExternalDocs;
-  // Method-specific data
   method?: string;
   operationId?: string;
   parameters?: any[];
   responses?: any[];
-  requestBody?: string; // Schema name for request body
-  security?: string; // Security scheme name
-  // Allow additional properties
+  requestBody?: string;
+  security?: string;
   [key: string]: unknown;
 }
 
@@ -44,7 +44,6 @@ export interface PathVariable {
   example?: string;
 }
 
-// Helper function to extract path variables from a path pattern
 export function extractPathVariables(path: string): string[] {
   const regex = /\{([^}]+)\}/g;
   const variables: string[] = [];
@@ -55,232 +54,327 @@ export function extractPathVariables(path: string): string[] {
   return variables;
 }
 
-// Method color mapping - Updated to match section 9.3.1 specification
 const METHOD_COLORS: Record<string, string> = {
-  GET: '#48BB78',
-  POST: '#4299E1',
-  PUT: '#ED8936',
-  DELETE: '#F56565',
-  PATCH: '#9F7AEA',
-  HEAD: '#718096',
-  OPTIONS: '#718096',
+  GET: '#16a34a',
+  POST: '#2563eb',
+  PUT: '#ea580c',
+  DELETE: '#dc2626',
+  PATCH: '#9333ea',
+  HEAD: '#64748b',
+  OPTIONS: '#64748b',
+};
+
+const SECTION_LABEL: React.CSSProperties = {
+  fontSize: '9px',
+  fontWeight: 600,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: 'var(--node-text-muted)',
+  marginBottom: '3px',
+};
+
+const PANEL_BOX: React.CSSProperties = {
+  border: '1px solid var(--node-border-muted)',
+  borderRadius: '6px',
+  padding: '6px 8px',
+  minHeight: '28px',
+  background: 'var(--node-surface)',
 };
 
 const PathNode: React.FC<NodeProps> = ({ data, selected }) => {
   const nodeData = data as unknown as PathNodeData;
   const { nodeType, label, color, path, method } = nodeData;
 
-  // Determine the background color based on node type
-  const getBackgroundStyle = () => {
-    if (nodeType === 'method' && method) {
-      return { background: METHOD_COLORS[method] || '#6b7280' };
-    }
-    if (nodeType === 'path') {
-      return { background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' };
-    }
-    if (color) {
-      // Parse Tailwind color class to actual color
-      const colorMap: Record<string, string> = {
-        'bg-green-500': '#22c55e',
-        'bg-blue-500': '#3b82f6',
-        'bg-orange-500': '#f97316',
-        'bg-red-500': '#ef4444',
-        'bg-purple-500': '#a855f7',
-        'bg-gray-500': '#6b7280',
-        'bg-yellow-500': '#eab308',
-      };
-      return { background: colorMap[color] || '#6366f1' };
-    }
-    return { background: '#6366f1' };
-  };
-
-  // Extract path variables for display
-  const pathVars = path ? extractPathVariables(path) : [];
-
-  // Method nodes have a completely different structure - colored header only
   if (nodeType === 'method') {
-    const methodColor = METHOD_COLORS[method || ''] || '#6b7280';
+    const methodColor = METHOD_COLORS[method || ''] || '#64748b';
     const needsRequestBody = method && ['POST', 'PUT', 'PATCH'].includes(method);
-
     return (
       <>
-        <Handle
-          type="target"
-          position={Position.Top}
-          className="!w-3 !h-2 !rounded-t-md !rounded-b-none"
-          style={{ backgroundColor: methodColor }}
-        />
-
-        <div
-          className={`bg-white dark:bg-gray-800 rounded-xl border-2 shadow-xl min-w-[220px] max-w-[280px] cursor-pointer ${
-            selected ? 'ring-2 ring-indigo-400 ring-offset-2 dark:ring-offset-gray-900' : ''
-          }`}
-          style={{ borderColor: methodColor }}
+        <NodeHandleDot type="target" position={Position.Top} color={methodColor} />
+        <NodeCard
+          role="path"
+          selected={selected}
+          customBorderColor={methodColor}
+          borderWidth={2}
+          minWidth={220}
+          maxWidth={300}
         >
-          {/* Header - Only this part has color */}
-          <div
-            className="text-white px-4 py-3 rounded-t-xl"
-            style={{ backgroundColor: methodColor }}
-          >
-            <div className="text-xs font-medium opacity-90">HTTP Method</div>
-            <div className="font-bold text-lg">{method || label}</div>
-            {nodeData.operationId && (
-              <div className="text-xs opacity-80 font-mono mt-1">{nodeData.operationId}</div>
-            )}
-          </div>
-
-          {/* Content - White/dark background */}
-          <div className="p-3 space-y-3">
-            {/* Request Section (for POST/PUT/PATCH) */}
+          <NodeHeader
+            role="path"
+            customBackground={methodColor}
+            customTextColor="#ffffff"
+            icon={
+              <span style={{ fontSize: '10px', fontWeight: 700 }}>
+                {(method || label || 'M').substring(0, 2).toUpperCase()}
+              </span>
+            }
+            iconSize={28}
+            title={
+              <>
+                <div style={{ fontSize: '10px', fontWeight: 600, opacity: 0.88, letterSpacing: '0.04em' }}>
+                  HTTP METHOD
+                </div>
+                <div style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '-0.01em' }}>
+                  {method || label}
+                </div>
+                {nodeData.operationId && (
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      opacity: 0.8,
+                      fontFamily: 'var(--app-font-mono, monospace)',
+                      marginTop: '2px',
+                    }}
+                  >
+                    {nodeData.operationId}
+                  </div>
+                )}
+              </>
+            }
+          />
+          <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {needsRequestBody && (
               <div>
-                <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Request</div>
-                <div className="border border-gray-200 dark:border-gray-700 rounded-md px-2 py-2 min-h-[32px]">
+                <div style={SECTION_LABEL}>Request</div>
+                <div style={PANEL_BOX}>
                   {nodeData.requestBody ? (
-                    <div className="text-[10px] text-gray-700 dark:text-gray-300">{nodeData.requestBody}</div>
+                    <div style={{ fontSize: '10px', color: 'var(--node-text)' }}>{nodeData.requestBody}</div>
                   ) : (
-                    <div className="text-[10px] text-gray-400 dark:text-gray-500 italic">(No request body)</div>
+                    <div
+                      style={{
+                        fontSize: '10px',
+                        color: 'var(--node-text-subtle)',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      (No request body)
+                    </div>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Parameters Section */}
             <div>
-              <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Parameters</div>
-              <div className="border border-gray-200 dark:border-gray-700 rounded-md px-2 py-2 min-h-[32px] space-y-1">
-                {nodeData.parameters && Array.isArray(nodeData.parameters) && nodeData.parameters.length > 0 ? (
+              <div style={SECTION_LABEL}>Parameters</div>
+              <div style={{ ...PANEL_BOX, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {nodeData.parameters &&
+                Array.isArray(nodeData.parameters) &&
+                nodeData.parameters.length > 0 ? (
                   nodeData.parameters.map((param: any, idx: number) => (
-                    <div key={idx} className="flex items-center gap-1.5">
-                      <span className="text-gray-400 dark:text-gray-500 text-[10px] font-mono">
-                        {param.in === 'path' ? ':' : param.in === 'query' ? '?' : param.in === 'header' ? 'H' : '🍪'}
+                    <div
+                      key={idx}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10px' }}
+                    >
+                      <span
+                        style={{
+                          color: 'var(--node-text-subtle)',
+                          fontFamily: 'var(--app-font-mono, monospace)',
+                          width: '10px',
+                        }}
+                      >
+                        {param.in === 'path'
+                          ? ':'
+                          : param.in === 'query'
+                          ? '?'
+                          : param.in === 'header'
+                          ? 'H'
+                          : 'C'}
                       </span>
-                      <span className="text-gray-700 dark:text-gray-300 text-[10px] font-mono">{param.name}</span>
-                      {param.required && <span className="text-red-500 text-[8px]">*</span>}
+                      <span
+                        style={{ color: 'var(--node-text)', fontFamily: 'var(--app-font-mono, monospace)' }}
+                      >
+                        {param.name}
+                      </span>
+                      {param.required && (
+                        <span
+                          style={{ color: 'var(--node-danger)', fontSize: '10px', fontWeight: 700 }}
+                          title="required"
+                        >
+                          *
+                        </span>
+                      )}
                     </div>
                   ))
                 ) : (
-                  <div className="text-[10px] text-gray-400 dark:text-gray-500 italic">(No parameters)</div>
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      color: 'var(--node-text-subtle)',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    (No parameters)
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Responses Section */}
             <div>
-              <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Responses</div>
-              <div className="border border-gray-200 dark:border-gray-700 rounded-md px-2 py-2 min-h-[32px] space-y-1">
-                {nodeData.responses && Array.isArray(nodeData.responses) && nodeData.responses.length > 0 ? (
+              <div style={SECTION_LABEL}>Responses</div>
+              <div style={{ ...PANEL_BOX, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {nodeData.responses &&
+                Array.isArray(nodeData.responses) &&
+                nodeData.responses.length > 0 ? (
                   nodeData.responses.map((response: any, idx: number) => (
-                    <div key={idx} className="flex items-center gap-1.5">
-                      <span className="text-gray-500 dark:text-gray-400 font-mono text-[10px] min-w-[28px]">{response.status || response.statusCode}</span>
-                      <span className="text-gray-700 dark:text-gray-300 text-[10px]">{response.schema || response.description || 'Response'}</span>
+                    <div
+                      key={idx}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px' }}
+                    >
+                      <span
+                        style={{
+                          color: 'var(--node-text-muted)',
+                          fontFamily: 'var(--app-font-mono, monospace)',
+                          minWidth: '28px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {response.status || response.statusCode}
+                      </span>
+                      <span style={{ color: 'var(--node-text)' }}>
+                        {response.schema || response.description || 'Response'}
+                      </span>
                     </div>
                   ))
                 ) : (
-                  <div className="text-[10px] text-gray-400 dark:text-gray-500 italic">(No responses)</div>
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      color: 'var(--node-text-subtle)',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    (No responses)
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Security Footer */}
             {nodeData.security && (
-              <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-                  <span>🔐</span>
-                  <span className="text-[10px]">{nodeData.security}</span>
-                </div>
+              <div
+                style={{
+                  paddingTop: '6px',
+                  borderTop: '1px solid var(--node-border-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '10px',
+                  color: 'var(--node-text-muted)',
+                }}
+              >
+                <span aria-hidden>🔐</span>
+                <span>{nodeData.security}</span>
               </div>
             )}
           </div>
-        </div>
-
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="!w-3 !h-2 !rounded-b-md !rounded-t-none"
-          style={{ backgroundColor: methodColor }}
-        />
+        </NodeCard>
+        <NodeHandleDot type="source" position={Position.Bottom} color={methodColor} />
       </>
     );
   }
 
-  // For other node types (path, parameter, response) - use original design
+  // For other node types (path, parameter, response), use a compact chip.
+  const chipAccent = (() => {
+    if (nodeType === 'path') return 'var(--node-accent-path)';
+    if (color) {
+      const colorMap: Record<string, string> = {
+        'bg-green-500': '#16a34a',
+        'bg-blue-500': '#2563eb',
+        'bg-orange-500': '#ea580c',
+        'bg-red-500': '#dc2626',
+        'bg-purple-500': '#9333ea',
+        'bg-gray-500': '#64748b',
+        'bg-yellow-500': '#eab308',
+      };
+      return colorMap[color] || 'var(--node-accent)';
+    }
+    return 'var(--node-accent)';
+  })();
+
+  const pathVars = path ? extractPathVariables(path) : [];
+
   return (
-    <div
-      className={`rounded-lg shadow-lg transition-all ${
-        selected ? 'ring-2 ring-indigo-400 ring-offset-2 dark:ring-offset-gray-900' : ''
-      } ${nodeData.deprecated ? 'opacity-75' : ''}`}
-      style={{
-        ...getBackgroundStyle(),
-        minWidth: 150,
-        padding: '10px 14px',
-      }}
-    >
-      {/* Input handle - top (for parameter, response nodes) */}
+    <>
       {(nodeType === 'parameter' || nodeType === 'response') && (
-        <Handle
-          type="target"
-          position={Position.Top}
-          className="!bg-white !border-2 !border-gray-400 !w-3 !h-3"
-        />
+        <NodeHandleDot type="target" position={Position.Top} color={chipAccent} />
       )}
 
-      {/* Node content */}
-      <div className="text-white">
-        {nodeType === 'path' && (
-          <>
-            <div className="text-xs font-medium opacity-80 mb-1 flex items-center gap-2">
-              PATH
-              {nodeData.deprecated && (
-                <span className="px-1.5 py-0.5 bg-red-500/80 text-white text-[10px] font-bold rounded uppercase">
-                  Deprecated
-                </span>
+      <NodeCard
+        role={nodeType === 'path' ? 'path' : 'default'}
+        selected={selected}
+        customBorderColor={chipAccent}
+        borderWidth={1}
+        minWidth={150}
+        maxWidth={280}
+        style={{ opacity: nodeData.deprecated ? 0.75 : 1 }}
+      >
+        <NodeHeader
+          role={nodeType === 'path' ? 'path' : 'default'}
+          customBackground={chipAccent}
+          customTextColor="#ffffff"
+          compact
+          title={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div
+                style={{
+                  fontSize: '9px',
+                  fontWeight: 600,
+                  opacity: 0.9,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {nodeType}
+                {nodeType === 'path' && nodeData.deprecated && (
+                  <span style={{ marginLeft: '6px' }}>
+                    <NodeBadge variant="overlay">Deprecated</NodeBadge>
+                  </span>
+                )}
+              </div>
+              <div
+                style={{
+                  fontSize: nodeType === 'path' ? '12px' : '12px',
+                  fontWeight: nodeType === 'response' ? 700 : 600,
+                  fontFamily:
+                    nodeType === 'path'
+                      ? 'var(--app-font-mono, monospace)'
+                      : 'inherit',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  textDecoration: nodeData.deprecated ? 'line-through' : 'none',
+                }}
+              >
+                {path || label}
+              </div>
+              {nodeType === 'path' && pathVars.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '3px' }}>
+                  {pathVars.map((v) => (
+                    <span
+                      key={v}
+                      style={{
+                        fontSize: '10px',
+                        padding: '1px 6px',
+                        background: 'rgba(255, 255, 255, 0.22)',
+                        borderRadius: '3px',
+                        fontFamily: 'var(--app-font-mono, monospace)',
+                        textDecoration: nodeData.deprecated ? 'line-through' : 'none',
+                      }}
+                    >
+                      {v}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
-            <div className={`font-mono text-sm font-semibold truncate max-w-[200px] ${nodeData.deprecated ? 'line-through decoration-2' : ''}`}>
-              {path || label}
-            </div>
-            {pathVars.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {pathVars.map((v) => (
-                  <span
-                    key={v}
-                    className={`px-1.5 py-0.5 bg-white/20 rounded text-xs font-mono ${nodeData.deprecated ? 'line-through' : ''}`}
-                  >
-                    {v}
-                  </span>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {nodeType === 'parameter' && (
-          <>
-            <div className="text-xs font-medium opacity-80 mb-1">PARAM</div>
-            <div className="font-medium text-sm">{label}</div>
-          </>
-        )}
-
-        {nodeType === 'response' && (
-          <>
-            <div className="text-xs font-medium opacity-80 mb-1">RESPONSE</div>
-            <div className="font-bold text-sm">{label}</div>
-          </>
-        )}
-      </div>
-
-      {/* Output handle - bottom (for path, parameter nodes) */}
-      {(nodeType === 'path' || nodeType === 'parameter') && (
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="!bg-white !border-2 !border-gray-400 !w-3 !h-3"
+          }
         />
+      </NodeCard>
+
+      {(nodeType === 'path' || nodeType === 'parameter') && (
+        <NodeHandleDot type="source" position={Position.Bottom} color={chipAccent} />
       )}
-    </div>
+    </>
   );
 };
 
 export default memo(PathNode);
-

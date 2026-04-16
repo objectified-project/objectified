@@ -79,27 +79,44 @@ const EdgeWithWideHit: React.FC<EdgeProps> = ({
         strokeWidth={HIT_AREA_STROKE}
         style={{ cursor: 'pointer' }}
       />
-      {label != null && typeof label === 'string' && (
-        <g transform={`translate(${labelX}, ${labelY})`}>
-          <rect
-            x={-Math.max(80, Math.min(200, label.length * 6.5)) / 2}
-            y={-10}
-            width={Math.max(80, Math.min(200, label.length * 6.5))}
-            height={20}
-            rx={4}
-            style={labelBgStyle ?? { fill: 'white', fillOpacity: 0.95 }}
-          />
-          <text
-            x={0}
-            y={4}
-            textAnchor="middle"
-            style={labelStyle ?? { fill: '#374151', fontSize: 10, fontWeight: 600 }}
-            className="react-flow__edge-text"
-          >
-            {label}
-          </text>
-        </g>
-      )}
+      {label != null && typeof label === 'string' && (() => {
+        const width = Math.max(56, Math.min(180, label.length * 6.2 + 14));
+        return (
+          <g transform={`translate(${labelX}, ${labelY})`} style={{ pointerEvents: 'none' }}>
+            <rect
+              x={-width / 2}
+              y={-9}
+              width={width}
+              height={18}
+              rx={4}
+              style={
+                labelBgStyle ?? {
+                  fill: 'var(--node-surface-muted)',
+                  stroke: 'var(--node-border)',
+                  strokeWidth: 1,
+                }
+              }
+            />
+            <text
+              x={0}
+              y={3}
+              textAnchor="middle"
+              style={
+                labelStyle ?? {
+                  fill: 'var(--node-text-muted)',
+                  fontSize: 10,
+                  fontWeight: 500,
+                  letterSpacing: '-0.01em',
+                  fontFamily: 'var(--app-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+                }
+              }
+              className="react-flow__edge-text"
+            >
+              {label}
+            </text>
+          </g>
+        );
+      })()}
     </>
   );
 };

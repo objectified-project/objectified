@@ -1,10 +1,17 @@
 'use client';
 
 import React, { memo, useState, useEffect, useCallback } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Position, type NodeProps } from '@xyflow/react';
 import { updatePath } from '../../../../../../lib/api/paths-client';
 import { getSharedPathParameters } from '../../../../../../lib/db/helper-shared-path-parameters';
-import { getPathParameterCoverageError, getPathTemplateValidationError } from '../../../../../../lib/utils/path-params';
+import {
+  getPathParameterCoverageError,
+  getPathTemplateValidationError,
+} from '../../../../../../lib/utils/path-params';
+import { Route } from 'lucide-react';
+import { NodeCard } from '@/app/components/ade/canvas/NodeCard';
+import { NodeHeader } from '@/app/components/ade/canvas/NodeHeader';
+import { NodeHandleDot } from '@/app/components/ade/canvas/NodeHandleDot';
 
 export interface PathTemplateNodeData {
   versionPathId: string;
@@ -69,18 +76,28 @@ function PathTemplateNode({ data, selected }: NodeProps) {
   }, [value, d]);
 
   return (
-    <div
-      className={`rounded-xl border-2 shadow-xl min-w-[280px] max-w-[360px] bg-white dark:bg-gray-800 ${
-        selected ? 'ring-2 ring-indigo-400 ring-offset-2 dark:ring-offset-gray-900' : ''
-      } border-indigo-500`}
-    >
-      <div className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-3 py-2 rounded-t-lg">
-        <div className="text-xs font-medium opacity-90">Path template</div>
-      </div>
-      <div className="p-3 space-y-2">
+    <NodeCard role="path" selected={selected} minWidth={280} maxWidth={360}>
+      <NodeHeader
+        role="path"
+        icon={<Route size={14} strokeWidth={2.5} />}
+        title={
+          <div
+            style={{
+              fontSize: '10px',
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--node-text-muted)',
+            }}
+          >
+            Path template
+          </div>
+        }
+      />
+      <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <label
           htmlFor={`path-template-input-${d.versionPathId}`}
-          className="block text-xs font-medium text-gray-600 dark:text-gray-400"
+          style={{ fontSize: '10px', fontWeight: 600, color: 'var(--node-text-muted)', letterSpacing: '0.02em' }}
         >
           OpenAPI path
         </label>
@@ -100,23 +117,37 @@ function PathTemplateNode({ data, selected }: NodeProps) {
             }
           }}
           disabled={saving}
-          className="w-full font-mono text-sm px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
           spellCheck={false}
           autoComplete="off"
+          style={{
+            width: '100%',
+            fontFamily: 'var(--app-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+            fontSize: '12px',
+            padding: '6px 8px',
+            borderRadius: '6px',
+            border: `1px solid ${error ? 'var(--node-danger)' : 'var(--node-border)'}`,
+            background: 'var(--node-surface)',
+            color: 'var(--node-text)',
+            outline: 'none',
+          }}
         />
-        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-        {saving && <p className="text-xs text-gray-500 dark:text-gray-400">Saving…</p>}
-        <p className="text-[10px] text-gray-500 dark:text-gray-400">
+        {error && (
+          <p style={{ fontSize: '10px', color: 'var(--node-danger)', margin: 0 }}>{error}</p>
+        )}
+        {saving && (
+          <p style={{ fontSize: '10px', color: 'var(--node-text-muted)', margin: 0 }}>Saving...</p>
+        )}
+        <p style={{ fontSize: '10px', color: 'var(--node-text-subtle)', margin: 0, lineHeight: 1.4 }}>
           Start with /; use {'{name}'} for parameters. Names must be unique.
         </p>
       </div>
-      <Handle
+      <NodeHandleDot
         type="source"
         position={Position.Bottom}
         id="path-output"
-        className="!bg-indigo-500 !border-2 !border-white dark:!border-gray-800 !w-3 !h-3"
+        role="path"
       />
-    </div>
+    </NodeCard>
   );
 }
 

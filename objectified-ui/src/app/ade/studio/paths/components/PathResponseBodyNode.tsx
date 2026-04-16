@@ -2,8 +2,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FileJson, Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, AlertCircle } from 'lucide-react';
-import { Handle, Position } from '@xyflow/react';
+import { FileJson, Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, AlertCircle, FileOutput } from 'lucide-react';
+import { Position } from '@xyflow/react';
+import { NodeCard } from '../../../../components/ade/canvas/NodeCard';
+import { NodeHeader } from '../../../../components/ade/canvas/NodeHeader';
+import { NodeHandleDot } from '../../../../components/ade/canvas/NodeHandleDot';
+import { accentVar, type NodeAccentRole } from '../../../../components/ade/canvas/canvas-theme';
 import {
   buildPropertyTreeFromInlineSchema,
   getActiveCompositionKind,
@@ -566,14 +570,15 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
 
   const currentContent = data.contentTypes[selectedContentTypeIndex];
 
-  const getStatusCodeColor = () => {
+  const statusRole: NodeAccentRole = (() => {
     const code = data.status_code;
-    if (code.startsWith('2')) return 'bg-green-500';
-    if (code.startsWith('3')) return 'bg-blue-500';
-    if (code.startsWith('4')) return 'bg-orange-500';
-    if (code.startsWith('5')) return 'bg-red-500';
-    return 'bg-gray-500';
-  };
+    if (code.startsWith('2')) return 'status-2xx';
+    if (code.startsWith('3')) return 'status-3xx';
+    if (code.startsWith('4')) return 'status-4xx';
+    if (code.startsWith('5')) return 'status-5xx';
+    return 'response';
+  })();
+  const responseAccent = accentVar(statusRole);
 
   // Handle drag for empty state (no content types)
   const handleEmptyDragEnter = (e: React.DragEvent) => {
@@ -632,61 +637,96 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
     }
   };
 
+  const ctSel = data.contentTypes[selectedContentTypeIndex];
+  const compLabel = ctSel?.inline_schema ? compositionSummary(ctSel.inline_schema) : null;
+  const schemaLabel = ctSel
+    ? (ctSel.class_id
+        ? `$ref: ${ctSel.class_name || 'Unknown'}`
+        : compLabel
+          ? compLabel
+          : (ctSel.inline_schema?.properties?.length ?? 0) > 0
+            ? `${ctSel.inline_schema!.properties!.length} props`
+            : 'Object')
+    : null;
+
   return (
     <>
       {/* Input handle at TOP - connects from parent response (not from operations) */}
-      <Handle
+      <NodeHandleDot
         type="target"
         position={Position.Top}
         id="response-input"
         isConnectable={false}
-        className="!w-3 !h-2 !rounded-t-md !rounded-b-none bg-emerald-500 !cursor-not-allowed opacity-50"
+        color={responseAccent}
+        style={{ cursor: 'not-allowed', opacity: 0.55 }}
       />
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-emerald-500 dark:border-emerald-600 min-w-[320px] max-w-[400px]">
-        {/* Header: status + schema summary so the attached schema is visible at a glance */}
-        {(() => {
-          const ct = data.contentTypes[selectedContentTypeIndex];
-          const compLabel = ct?.inline_schema ? compositionSummary(ct.inline_schema) : null;
-          const schemaLabel = ct
-            ? (ct.class_id
-                ? `$ref: ${ct.class_name || 'Unknown'}`
-                : compLabel
-                  ? compLabel
-                  : (ct.inline_schema?.properties?.length ?? 0) > 0
-                    ? `${ct.inline_schema!.properties!.length} props`
-                    : 'Object')
-            : null;
-          return (
-        <div className="p-3 bg-gradient-to-r from-emerald-500 to-green-600 rounded-t-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className={`px-2 py-0.5 rounded text-white text-xs font-bold ${getStatusCodeColor()}`}>
+      <NodeCard role={statusRole} minWidth={320} maxWidth={400} customBorderColor={responseAccent}>
+        <NodeHeader
+          role={statusRole}
+          customBackground={responseAccent}
+          customTextColor="#ffffff"
+          icon={<FileOutput size={14} />}
+          iconSize={26}
+          compact
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  fontFamily: 'var(--app-font-mono, monospace)',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  background: 'rgba(0, 0, 0, 0.2)',
+                }}
+              >
                 {data.status_code}
-              </div>
-              <span className="text-white font-semibold text-sm">Response</span>
+              </span>
+              <span style={{ fontWeight: 600 }}>Response</span>
               {schemaLabel && (
-                <span className="text-emerald-100 text-xs font-medium truncate max-w-[140px]" title={`Schema: ${schemaLabel}`}>
+                <span
+                  title={`Schema: ${schemaLabel}`}
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    opacity: 0.9,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '160px',
+                    fontFamily: 'var(--app-font-mono, monospace)',
+                  }}
+                >
                   → {schemaLabel}
                 </span>
               )}
             </div>
-            {data.onDelete && (
+          }
+          subtitle={data.description ? <span>{data.description}</span> : undefined}
+          badges={
+            data.onDelete && (
               <button
                 onClick={data.onDelete}
-                className="p-1 hover:bg-white/20 rounded transition-colors"
                 title="Delete response"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '4px',
+                  background: 'rgba(255, 255, 255, 0.16)',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  border: 'none',
+                }}
               >
-                <Trash2 className="w-4 h-4 text-white" />
+                <Trash2 size={13} />
               </button>
-            )}
-          </div>
-          {data.description && (
-            <p className="text-xs text-emerald-50 mt-1 truncate">{data.description}</p>
-          )}
-        </div>
-          );
-        })()}
+            )
+          }
+        />
 
         {/* Content Type Tabs */}
         {data.contentTypes.length > 1 && (
@@ -780,15 +820,15 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
             </button>
           )}
         </div>
-      </div>
+      </NodeCard>
 
-      {/* Output handle at BOTTOM - not connectable manually */}
-      <Handle
+      <NodeHandleDot
         type="source"
         position={Position.Bottom}
         id="response-output"
         isConnectable={false}
-        className="!w-3 !h-2 !rounded-b-md !rounded-t-none bg-emerald-500 !cursor-not-allowed opacity-50"
+        color={responseAccent}
+        style={{ cursor: 'not-allowed', opacity: 0.55 }}
       />
     </>
   );

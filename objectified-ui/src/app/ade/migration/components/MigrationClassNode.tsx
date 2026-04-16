@@ -2,6 +2,10 @@
 
 import * as React from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { NodeCard } from '../../../components/ade/canvas/NodeCard';
+import { NodeHeader } from '../../../components/ade/canvas/NodeHeader';
+import { accentVar, type NodeAccentRole } from '../../../components/ade/canvas/canvas-theme';
 
 export interface MigrationClassNodeData {
   className: string;
@@ -13,44 +17,113 @@ function MigrationClassNode(props: NodeProps) {
   const data = props.data as unknown as MigrationClassNodeData;
   const { className, properties, side } = data;
   const isFrom = side === 'from';
+  const role: NodeAccentRole = isFrom ? 'from' : 'to';
+  const accent = accentVar(role);
 
   return (
-    <div
-      className={`rounded-lg border-2 shadow-md min-w-[200px] max-w-[280px] overflow-hidden ${
-        isFrom
-          ? 'border-indigo-300 dark:border-indigo-600 bg-indigo-50/80 dark:bg-indigo-900/20'
-          : 'border-emerald-300 dark:border-emerald-600 bg-emerald-50/80 dark:bg-emerald-900/20'
-      }`}
-    >
-      <div
-        className={`px-3 py-2 text-sm font-semibold border-b ${
-          isFrom
-            ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-900 dark:text-indigo-100 border-indigo-200 dark:border-indigo-800'
-            : 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-900 dark:text-emerald-100 border-emerald-200 dark:border-emerald-800'
-        }`}
-      >
-        {isFrom ? 'From' : 'To'}: {className}
-      </div>
-      <div className="px-3 py-2 overflow-hidden">
+    <NodeCard role={role} minWidth={210} maxWidth={290} selected={props.selected}>
+      <NodeHeader
+        role={role}
+        icon={isFrom ? <ArrowRight size={14} strokeWidth={2.5} /> : <ArrowLeft size={14} strokeWidth={2.5} />}
+        iconSize={26}
+        compact
+        title={
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
+            <span
+              style={{
+                fontSize: '9px',
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--node-text-muted)',
+                flexShrink: 0,
+              }}
+            >
+              {isFrom ? 'From' : 'To'}
+            </span>
+            <span
+              style={{
+                fontSize: '13px',
+                fontWeight: 600,
+                color: 'var(--node-text)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title={className}
+            >
+              {className}
+            </span>
+          </div>
+        }
+      />
+      <div style={{ padding: '6px 10px 8px' }}>
         {properties.length === 0 ? (
-          <p className="text-xs text-gray-500 dark:text-gray-400 italic">No properties</p>
+          <p
+            style={{
+              fontSize: '11px',
+              color: 'var(--node-text-subtle)',
+              fontStyle: 'italic',
+              margin: 0,
+            }}
+          >
+            No properties
+          </p>
         ) : (
-          <ul className="space-y-2.5 text-xs text-gray-700 dark:text-gray-300">
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column' }}>
             {properties.map((p) => (
-              <li key={p.name} className="relative flex items-baseline justify-between gap-3 min-h-[1.25rem]">
-                <span className="font-medium text-gray-900 dark:text-gray-100 truncate">{p.name}</span>
+              <li
+                key={p.name}
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  minHeight: '22px',
+                  padding: '3px 2px',
+                  borderBottom: '1px solid var(--node-border-muted)',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: 'var(--node-text)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={p.name}
+                >
+                  {p.name}
+                </span>
                 {p.type != null && p.type !== '' ? (
-                  <span className="text-gray-500 dark:text-gray-400 shrink-0">{p.type}</span>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      color: 'var(--node-text-muted)',
+                      fontFamily: 'var(--app-font-mono, monospace)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {p.type}
+                  </span>
                 ) : (
-                  <span className="shrink-0" />
+                  <span style={{ flexShrink: 0 }} />
                 )}
                 <Handle
                   type={isFrom ? 'source' : 'target'}
                   position={isFrom ? Position.Right : Position.Left}
                   id={`prop-${p.name}`}
-                  className="!w-2 !h-2 !border-2 !border-white !rounded-full !min-w-0 !min-h-0"
                   style={{
-                    background: isFrom ? 'rgb(99, 102, 241)' : 'rgb(16, 185, 129)',
+                    background: accent,
+                    width: 9,
+                    height: 9,
+                    minWidth: 0,
+                    minHeight: 0,
+                    border: '1.5px solid var(--node-surface)',
+                    borderRadius: '50%',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     [isFrom ? 'right' : 'left']: -16,
@@ -62,7 +135,7 @@ function MigrationClassNode(props: NodeProps) {
           </ul>
         )}
       </div>
-    </div>
+    </NodeCard>
   );
 }
 

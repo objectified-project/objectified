@@ -3,7 +3,11 @@
 
 import React from 'react';
 import { Layers, Trash2 } from 'lucide-react';
-import { Handle, Position } from '@xyflow/react';
+import { Position } from '@xyflow/react';
+import { NodeCard } from '@/app/components/ade/canvas/NodeCard';
+import { NodeHeader } from '@/app/components/ade/canvas/NodeHeader';
+import { NodeHandleDot } from '@/app/components/ade/canvas/NodeHandleDot';
+import { NodeBadge } from '@/app/components/ade/canvas/NodeBadge';
 
 export interface PathClassNodeData {
   className: string;
@@ -15,62 +19,66 @@ export interface PathClassNodeData {
 
 export default function PathClassNode({ data }: { data: PathClassNodeData }) {
   return (
-    <>
-      {/* Input handle at TOP - receives FROM responses for vertical flow */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="class-input"
-        className="!w-3 !h-2 !rounded-t-md !rounded-b-none bg-indigo-500"
-      />
+    <div className="relative group">
+      {data.onDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onDelete?.();
+          }}
+          className="absolute -top-2 -right-2 z-20 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-md bg-rose-500 hover:bg-rose-600 text-white"
+          title="Remove class from canvas"
+          aria-label="Remove class from canvas"
+        >
+          <Trash2 size={12} />
+        </button>
+      )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl border-2 border-indigo-500 shadow-xl min-w-[200px] max-w-[300px] cursor-pointer relative group">
-        {/* Delete button */}
-        {data.onDelete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              data.onDelete?.();
-            }}
-            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600 z-20"
-            title="Remove class from canvas"
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
+      <NodeCard role="default" minWidth={220} maxWidth={300}>
+        <NodeHandleDot type="target" position={Position.Top} id="class-input" role="default" />
 
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-3 rounded-t-xl flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
-            <Layers className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium opacity-90">Class Schema</div>
-            <div className="font-bold text-sm truncate">{data.className}</div>
-          </div>
+        <NodeHeader
+          role="default"
+          icon={<Layers size={14} strokeWidth={2.5} />}
+          iconSize={26}
+          title={
+            <div
+              style={{
+                fontSize: '13px',
+                fontWeight: 600,
+                letterSpacing: '-0.01em',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                lineHeight: 1.3,
+              }}
+            >
+              {data.className}
+            </div>
+          }
+          badges={<NodeBadge variant="info">Class</NodeBadge>}
+        />
+
+        <div
+          style={{
+            padding: '8px 12px',
+            fontSize: '11px',
+            lineHeight: 1.45,
+            color: data.description ? 'var(--node-text-muted)' : 'var(--node-text-subtle)',
+            fontStyle: data.description ? 'normal' : 'italic',
+            background: 'var(--node-surface)',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {data.description || 'No description'}
         </div>
 
-        {/* Content */}
-        <div className="p-3">
-          {data.description ? (
-            <div className="text-xs text-gray-700 dark:text-gray-300 line-clamp-2">
-              {data.description}
-            </div>
-          ) : (
-            <div className="text-xs text-gray-400 dark:text-gray-500 italic">
-              No description
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Output handle at BOTTOM - for vertical flow consistency */}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        id="class-output"
-        className="!w-3 !h-2 !rounded-b-md !rounded-t-none bg-indigo-500"
-      />
-    </>
+        <NodeHandleDot type="source" position={Position.Bottom} id="class-output" role="default" />
+      </NodeCard>
+    </div>
   );
 }

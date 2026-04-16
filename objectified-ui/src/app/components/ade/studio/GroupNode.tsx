@@ -366,16 +366,16 @@ const GroupNode = memo((props: NodeProps) => {
         minHeight={150}
         isVisible={selected && !groupData.isReadOnly && !isCollapsed}
         lineClassName="!border-indigo-400"
-        handleClassName="!w-3 !h-3 !bg-indigo-500 !border-2 !border-white !rounded"
+        handleClassName="!w-2.5 !h-2.5 !bg-indigo-500 !border-[1.5px] !border-white !rounded-[2px]"
       />
 
       <div
         data-testid="group-node-surface"
         className={`
-          relative w-full h-full rounded-2xl border-2 transition-all duration-200
+          relative w-full h-full rounded-xl border-2 transition-all duration-200
           ${borderStyleClass} ${presetBorderClass} ${shadowClass}
           ${selected ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-900' : ''}
-          ${groupData.isHighlighted ? 'ring-4 ring-green-500 ring-offset-4 dark:ring-offset-gray-900 scale-[1.02] border-green-500 dark:border-green-400' : ''}
+          ${groupData.isHighlighted ? 'ring-4 ring-emerald-500 ring-offset-4 dark:ring-offset-gray-900 scale-[1.01] border-emerald-500 dark:border-emerald-400' : ''}
         `}
         style={{
           minWidth: isCollapsed ? COLLAPSED_GROUP_FRAME_WIDTH : 200,
@@ -386,12 +386,12 @@ const GroupNode = memo((props: NodeProps) => {
         onMouseEnter={() => setIsFrameHovered(true)}
         onMouseLeave={() => setIsFrameHovered(false)}
       >
-        {/* Group Header */}
+        {/* Group Header: compact title pill floating above frame */}
         <div
           className={`
-            absolute -top-3 left-4 px-3 py-1 rounded-lg border ${shadowClass || 'shadow-sm'}
+            absolute -top-3 left-4 px-2.5 py-0.5 rounded-md border ${shadowClass || 'shadow-sm'}
             ${presetBorderClass} ${textColorClass}
-            flex items-center gap-2 cursor-move
+            flex items-center gap-1.5 cursor-move
           `}
           style={{
             backgroundColor: `${frameHex}${Math.round(Math.min(styleOptions.opacity + 0.3, 1) * 255).toString(16).padStart(2, '0')}`,
@@ -465,8 +465,8 @@ const GroupNode = memo((props: NodeProps) => {
             </div>
           ) : (
             <>
-              <span className="text-sm font-semibold">{groupData.name}</span>
-              <span className="text-xs opacity-70">({nodeCount})</span>
+              <span className="text-xs font-semibold tracking-tight">{groupData.name}</span>
+              <span className="text-[10px] opacity-70 font-medium tabular-nums">{nodeCount}</span>
             </>
           )}
         </div>
