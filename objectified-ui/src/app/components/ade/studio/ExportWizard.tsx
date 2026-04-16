@@ -232,9 +232,11 @@ export default function ExportWizard({
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('png');
   const [options, setOptions] = useState<ExportOptions>(defaultOptions);
   const [isExporting, setIsExporting] = useState(false);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState<string | null>(null);
-  const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isPreviewStale, setIsPreviewStale] = useState(true);
+  const previewRequestIdRef = useRef(0);
 
   const { fitView, fitBounds, getViewport, setViewport } = useReactFlow();
   const { setExportGridOverride } = useStudio();
@@ -350,95 +352,6 @@ export default function ExportWizard({
     return true;
   }, []);
 
-  // Generate preview when format or options change
-  useEffect(() => {
-    if (!open) return;
-
-    // Clear previous timeout
-    if (previewTimeoutRef.current) {
-      clearTimeout(previewTimeoutRef.current);
-    }
-
-    // Debounce preview generation
-    previewTimeoutRef.current = setTimeout(() => {
-      generatePreview();
-    }, 300);
-
-    return () => {
-      if (previewTimeoutRef.current) {
-        clearTimeout(previewTimeoutRef.current);
-      }
-    };
-  }, [open, selectedFormat, options]);
-
-  const generatePreview = useCallback(async () => {
-    const viewportElement = getViewportElement();
-    const paneElement = getPaneElement();
-
-    // For image formats, generate a preview image (full canvas, viewport, or groups)
-    if (['png', 'jpeg', 'svg', 'pdf'].includes(selectedFormat)) {
-      const isViewport = options.exportRange === 'viewport';
-      const isGroups =
-        options.exportRange === 'groups' && options.selectedGroupIds.length > 0;
-      const captureElement = isViewport ? paneElement : viewportElement;
-      if (!captureElement) {
-        setPreviewDataUrl(null);
-        return;
-      }
-
-      try {
-        const dataUrl = await withGridOverride(options.includeGrid, async () => {
-          const capture = async () => {
-            const bg = options.includeBackground
-              ? (isDark ? '#111827' : options.backgroundColor)
-              : 'transparent';
-            return toPng(captureElement, {
-              backgroundColor: bg,
-              quality: 0.5, // Lower quality for preview
-              pixelRatio: 1,
-              filter: options.includeUiElements ? undefined : imageExportFilter,
-            });
-          };
-          if (isViewport) {
-            return capture();
-          }
-          if (isGroups) {
-            return withGroupsView(options.selectedGroupIds, capture);
-          }
-          return withFullCanvasView(capture);
-        });
-        let finalDataUrl = dataUrl;
-        if (options.includeTimestampAndMetadata) {
-          try {
-            finalDataUrl = await drawTimestampAndMetadataOnImage(
-              dataUrl,
-              projectName,
-              versionId,
-              1,
-              { mime: 'image/png' }
-            );
-          } catch {
-            // keep original preview on error
-          }
-        }
-        setPreviewDataUrl(finalDataUrl);
-        setPreviewText(null);
-      } catch (error) {
-        console.error('Error generating preview:', error);
-        setPreviewDataUrl(null);
-      }
-    } else {
-      // For text-based formats, generate full preview text for Monaco (optionally filtered by groups)
-      setPreviewDataUrl(null);
-      const nodeIdSet =
-        options.exportRange === 'groups' && options.selectedGroupIds.length > 0
-          ? getNodeIdsForGroups(options.selectedGroupIds)
-          : undefined;
-      const text = generateTextExport(selectedFormat, nodeIdSet);
-      setPreviewText(text);
-    }
-  }, [selectedFormat, options, isDark, projectName, versionId, getViewportElement, getPaneElement, imageExportFilter, nodes, edges, withFullCanvasView, withGroupsView, withGridOverride, getNodeIdsForGroups]);
-
   const generateTextExport = useCallback(
     (format: ExportFormat, limitToNodeIds?: Set<string>): string => {
       let classNodes = nodes.filter((n) => n.type !== 'groupNode');
@@ -473,18 +386,124 @@ export default function ExportWizard({
     [nodes, edges]
   );
 
+  useEffect(() => {
+    // Any change invalidates the previous preview and cancels in-flight work.
+    previewRequestIdRef.current += 1;
+    setIsGeneratingPreview(false);
+    setPreviewDataUrl(null);
+    setPreviewText(null);
+    setIsPreviewStale(true);
+  }, [open, selectedFormat, options]);
+
+  const generatePreview = useCallback(async (requestId: number) => {
+    const isCurrent = () => open && previewRequestIdRef.current === requestId;
+    const viewportElement = getViewportElement();
+    const paneElement = getPaneElement();
+
+    // For image formats, generate a preview image (full canvas, viewport, or groups)
+    if (['png', 'jpeg', 'svg', 'pdf'].includes(selectedFormat)) {
+      const isViewport = options.exportRange === 'viewport';
+      const isGroups =
+        options.exportRange === 'groups' && options.selectedGroupIds.length > 0;
+      const captureElement = isViewport ? paneElement : viewportElement;
+      if (!captureElement) {
+        if (isCurrent()) setPreviewDataUrl(null);
+        return;
+      }
+
+      try {
+        const dataUrl = await withGridOverride(options.includeGrid, async () => {
+          const capture = async () => {
+            const bg = options.includeBackground
+              ? (isDark ? '#111827' : options.backgroundColor)
+              : 'transparent';
+            return toPng(captureElement, {
+              backgroundColor: bg,
+              quality: 0.5, // Lower quality for preview
+              pixelRatio: 1,
+              filter: options.includeUiElements ? undefined : imageExportFilter,
+            });
+          };
+          if (isViewport) {
+            return capture();
+          }
+          if (isGroups) {
+            return withGroupsView(options.selectedGroupIds, capture);
+          }
+          return withFullCanvasView(capture);
+        });
+        if (!isCurrent()) return;
+        let finalDataUrl = dataUrl;
+        if (options.includeTimestampAndMetadata) {
+          try {
+            finalDataUrl = await drawTimestampAndMetadataOnImage(
+              dataUrl,
+              projectName,
+              versionId,
+              1,
+              { mime: 'image/png' }
+            );
+          } catch {
+            // keep original preview on error
+          }
+        }
+        if (!isCurrent()) return;
+        setPreviewDataUrl(finalDataUrl);
+        setPreviewText(null);
+      } catch (error) {
+        console.error('Error generating preview:', error);
+        if (isCurrent()) setPreviewDataUrl(null);
+      }
+    } else {
+      // For text-based formats, generate full preview text for Monaco (optionally filtered by groups)
+      if (isCurrent()) setPreviewDataUrl(null);
+      const nodeIdSet =
+        options.exportRange === 'groups' && options.selectedGroupIds.length > 0
+          ? getNodeIdsForGroups(options.selectedGroupIds)
+          : undefined;
+      const text = generateTextExport(selectedFormat, nodeIdSet);
+      if (isCurrent()) setPreviewText(text);
+    }
+  }, [open, selectedFormat, options, isDark, projectName, versionId, getViewportElement, getPaneElement, imageExportFilter, withFullCanvasView, withGroupsView, withGridOverride, getNodeIdsForGroups, generateTextExport]);
+
+  const handleGeneratePreview = useCallback(async () => {
+    if (!open) return;
+    const requestId = (previewRequestIdRef.current += 1);
+    setIsPreviewStale(false);
+    setIsGeneratingPreview(true);
+    setPreviewDataUrl(null);
+    setPreviewText(null);
+
+    // Ensure the spinner renders before heavy preview work begins.
+    await new Promise((r) => setTimeout(r, 0));
+
+    try {
+      await generatePreview(requestId);
+    } finally {
+      if (open && previewRequestIdRef.current === requestId) {
+        setIsGeneratingPreview(false);
+      }
+    }
+  }, [open, generatePreview]);
+
+  type ClassProperty = { name: string; data?: { type?: string } };
+  type ClassNodeData = { name?: string; properties?: ClassProperty[] };
+
+  const getClassNodeData = (node: Node): ClassNodeData =>
+    (node.data ?? {}) as ClassNodeData;
+
   // Generate Mermaid diagram
   const generateMermaid = (classNodes: Node[], edges: Edge[]): string => {
     let mermaid = 'classDiagram\n';
 
     classNodes.forEach(node => {
-      const data = node.data as any;
+      const data = getClassNodeData(node);
       const className = data.name || node.id;
       mermaid += `  class ${className} {\n`;
 
-      const properties = data.properties || [];
-      properties.forEach((prop: any) => {
-        const propType = prop.data?.type || 'any';
+      const properties = data.properties ?? [];
+      properties.forEach((prop) => {
+        const propType = prop.data?.type ?? 'any';
         mermaid += `    +${propType} ${prop.name}\n`;
       });
 
@@ -495,8 +514,8 @@ export default function ExportWizard({
       const sourceNode = classNodes.find(n => n.id === edge.source);
       const targetNode = classNodes.find(n => n.id === edge.target);
       if (sourceNode && targetNode) {
-        const sourceName = (sourceNode.data as any).name || sourceNode.id;
-        const targetName = (targetNode.data as any).name || targetNode.id;
+        const sourceName = getClassNodeData(sourceNode).name || sourceNode.id;
+        const targetName = getClassNodeData(targetNode).name || targetNode.id;
         mermaid += `  ${sourceName} --> ${targetName}\n`;
       }
     });
@@ -509,13 +528,13 @@ export default function ExportWizard({
     let uml = '@startuml\n\n';
 
     classNodes.forEach(node => {
-      const data = node.data as any;
+      const data = getClassNodeData(node);
       const className = data.name || node.id;
       uml += `class ${className} {\n`;
 
-      const properties = data.properties || [];
-      properties.forEach((prop: any) => {
-        const propType = prop.data?.type || 'any';
+      const properties = data.properties ?? [];
+      properties.forEach((prop) => {
+        const propType = prop.data?.type ?? 'any';
         uml += `  +${prop.name}: ${propType}\n`;
       });
 
@@ -526,8 +545,8 @@ export default function ExportWizard({
       const sourceNode = classNodes.find(n => n.id === edge.source);
       const targetNode = classNodes.find(n => n.id === edge.target);
       if (sourceNode && targetNode) {
-        const sourceName = (sourceNode.data as any).name || sourceNode.id;
-        const targetName = (targetNode.data as any).name || targetNode.id;
+        const sourceName = getClassNodeData(sourceNode).name || sourceNode.id;
+        const targetName = getClassNodeData(targetNode).name || targetNode.id;
         uml += `${sourceName} --> ${targetName}\n`;
       }
     });
@@ -543,7 +562,7 @@ export default function ExportWizard({
     xml += '  <graph id="G" edgedefault="directed">\n';
 
     classNodes.forEach(node => {
-      const data = node.data as any;
+      const data = getClassNodeData(node);
       xml += `    <node id="${node.id}">\n`;
       xml += `      <data key="label">${data.name || node.id}</data>\n`;
       xml += '    </node>\n';
@@ -565,10 +584,12 @@ export default function ExportWizard({
     dot += '  node [shape=record];\n\n';
 
     classNodes.forEach(node => {
-      const data = node.data as any;
+      const data = getClassNodeData(node);
       const className = data.name || node.id;
-      const properties = data.properties || [];
-      const propStr = properties.map((p: any) => `${p.name}: ${p.data?.type || 'any'}`).join('\\l');
+      const properties = data.properties ?? [];
+      const propStr = properties
+        .map((p) => `${p.name}: ${p.data?.type ?? 'any'}`)
+        .join('\\l');
       dot += `  "${node.id}" [label="{${className}|${propStr}\\l}"];\n`;
     });
 
@@ -866,7 +887,12 @@ export default function ExportWizard({
               {/* Preview */}
               <div className="flex-1 p-4 overflow-hidden">
                 <div className="h-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center">
-                  {previewDataUrl ? (
+                  {isGeneratingPreview ? (
+                    <div className="text-gray-400 dark:text-gray-500 flex flex-col items-center gap-2">
+                      <div className="w-8 h-8 border-2 border-gray-300/60 dark:border-gray-600/60 border-t-gray-600 dark:border-t-gray-200 rounded-full animate-spin" />
+                      <span className="text-sm">Generating preview...</span>
+                    </div>
+                  ) : previewDataUrl ? (
                     <img
                       src={previewDataUrl}
                       alt="Export preview"
@@ -894,7 +920,9 @@ export default function ExportWizard({
                   ) : (
                     <div className="text-gray-400 dark:text-gray-500 flex flex-col items-center gap-2">
                       <Eye className="w-8 h-8" />
-                      <span className="text-sm">Generating preview...</span>
+                      <span className="text-sm">
+                        {isPreviewStale ? 'Click “Generate preview” to create a preview.' : 'No preview available.'}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -1145,7 +1173,12 @@ export default function ExportWizard({
                         </label>
                         <select
                           value={options.pageSize}
-                          onChange={(e) => setOptions(prev => ({ ...prev, pageSize: e.target.value as any }))}
+                          onChange={(e) =>
+                            setOptions((prev) => ({
+                              ...prev,
+                              pageSize: e.target.value as ExportOptions['pageSize'],
+                            }))
+                          }
                           className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         >
                           <option value="auto">Auto (fit content)</option>
@@ -1161,7 +1194,12 @@ export default function ExportWizard({
                         </label>
                         <select
                           value={options.orientation}
-                          onChange={(e) => setOptions(prev => ({ ...prev, orientation: e.target.value as any }))}
+                          onChange={(e) =>
+                            setOptions((prev) => ({
+                              ...prev,
+                              orientation: e.target.value as ExportOptions['orientation'],
+                            }))
+                          }
                           className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         >
                           <option value="landscape">Landscape</option>
@@ -1192,6 +1230,23 @@ export default function ExportWizard({
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               >
                 Close
+              </button>
+              <button
+                onClick={handleGeneratePreview}
+                disabled={!open || isGeneratingPreview || isExporting}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isGeneratingPreview ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-gray-400/50 dark:border-gray-300/50 border-t-gray-700 dark:border-t-white rounded-full animate-spin" />
+                    <span>Generating…</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4" />
+                    <span>Generate preview</span>
+                  </>
+                )}
               </button>
               <button
                 onClick={handleExport}
