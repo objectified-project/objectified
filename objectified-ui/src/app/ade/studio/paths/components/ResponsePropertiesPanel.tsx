@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { X, Save, Plus, Trash2, FileJson, Link2, LayoutList } from 'lucide-react';
+import { Save, Plus, Trash2, FileJson, Link2, LayoutList, MessageSquareReply } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
+import PropertiesPanelShell from './PropertiesPanelShell';
+import PropertiesPanelSection from './PropertiesPanelSection';
+import { STATUS_ROLE_CHIP, statusRoleForCode } from './paths-theme';
 import { Textarea } from '../../../../components/ui/Textarea';
 import { Input } from '../../../../components/ui/Input';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
@@ -202,7 +205,6 @@ export default function ResponsePropertiesPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
-  const refreshCounterRef = useRef(0);
   const previousSchemaRef = useRef<any>(null); // Store previous schema for rollback on cancel
 
   // Load response data when responseId changes
@@ -554,7 +556,7 @@ export default function ResponsePropertiesPanel({
         hasResponseInlineSchema = schema?.type === 'object' && 
           schema?.properties && 
           schema.properties.length > 0;
-      } catch (e) {
+      } catch {
         // Ignore parse errors
       }
     }
@@ -720,7 +722,7 @@ export default function ResponsePropertiesPanel({
       } else {
         await alertDialog({ message: parsed.error || 'Failed to add content type', variant: 'error' });
       }
-    } catch (e) {
+    } catch {
       await alertDialog({ message: 'Failed to add content type', variant: 'error' });
     } finally {
       setIsSavingContentType(false);
@@ -733,7 +735,7 @@ export default function ResponsePropertiesPanel({
       await deleteResponseContentType(contentTypeId);
       await reloadContentTypes();
       setSelectedContentTypeIndex((i) => Math.max(0, i - 1));
-    } catch (e) {
+    } catch {
       await alertDialog({ message: 'Failed to delete content type', variant: 'error' });
     }
   };
@@ -751,7 +753,7 @@ export default function ResponsePropertiesPanel({
       const parsed = JSON.parse(result);
       if (!parsed.success) await alertDialog({ message: parsed.error || 'Failed to set class', variant: 'error' });
       else await reloadContentTypes();
-    } catch (e) {
+    } catch {
       await alertDialog({ message: 'Failed to update schema binding', variant: 'error' });
     }
   };
@@ -762,7 +764,7 @@ export default function ResponsePropertiesPanel({
       const parsed = JSON.parse(result);
       if (!parsed.success) await alertDialog({ message: parsed.error || 'Failed to update examples', variant: 'error' });
       else await reloadContentTypes();
-    } catch (e) {
+    } catch {
       await alertDialog({ message: 'Failed to update examples', variant: 'error' });
     }
   };
@@ -916,49 +918,55 @@ export default function ResponsePropertiesPanel({
     }
   };
 
-  return (
-    <div
-      className={`w-[360px] h-full flex flex-col overflow-hidden border-l ${
-        isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-      }`}
-    >
-      {/* Header */}
-      <div
-        className={`p-4 border-b flex justify-between items-center ${
-          isDark ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-slate-50'
-        }`}
-      >
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Response Properties</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            {getHttpStatusDescription(statusCodeEdit) ? `${statusCodeEdit} – ${getHttpStatusDescription(statusCodeEdit)}` : `Status: ${statusCodeEdit}`}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-          aria-label="Close"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+  const statusSubtitle = getHttpStatusDescription(statusCodeEdit)
+    ? `${statusCodeEdit} – ${getHttpStatusDescription(statusCodeEdit)}`
+    : `Status: ${statusCodeEdit}`;
 
+  return (
+    <PropertiesPanelShell
+      icon={<MessageSquareReply />}
+      title="Response Properties"
+      subtitle={statusSubtitle}
+      onClose={onClose}
+      bodyScroll={false}
+      footer={
+        <Button
+          type="button"
+          variant={saveStatus === 'saved' ? 'success' : 'default'}
+          className="w-full"
+          onClick={handleSave}
+          disabled={isSaving || !responseId}
+        >
+          <Save className="w-4 h-4" />
+          {isSaving ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : 'Save Changes'}
+        </Button>
+      }
+    >
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-4">
-          {/* Response status (capture value): specific code, range (2XX, 4XX), or default catch-all */}
+        <div className="flex flex-col gap-2.5">
+          <PropertiesPanelSection title="Status" defaultOpen>
+            <div className="flex flex-col gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Response status (capture value)
             </label>
-            <Input
-              list="response-status-codes"
-              value={statusCodeEdit}
-              onChange={(e) => setStatusCodeEdit(e.target.value)}
-              placeholder="e.g. 200, 2XX, default"
-              className="text-sm font-mono"
-            />
+            <div className="flex items-center gap-2">
+              <span
+                className={`px-2 py-0.5 rounded font-mono text-xs font-semibold tabular-nums ${
+                  STATUS_ROLE_CHIP[statusRoleForCode(statusCodeEdit)]
+                }`}
+              >
+                {statusCodeEdit || '—'}
+              </span>
+              <Input
+                list="response-status-codes"
+                value={statusCodeEdit}
+                onChange={(e) => setStatusCodeEdit(e.target.value)}
+                placeholder="e.g. 200, 2XX, default"
+                className="flex-1 text-sm font-mono"
+              />
+            </div>
             <datalist id="response-status-codes">
               {STATUS_RANGE_AND_DEFAULT.map((c) => (
                 <option key={c} value={c} />
@@ -981,7 +989,6 @@ export default function ResponsePropertiesPanel({
             </p>
           </div>
 
-          {/* Description */}
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Description
@@ -994,24 +1001,27 @@ export default function ResponsePropertiesPanel({
               className="text-sm resize-none"
             />
           </div>
+            </div>
+          </PropertiesPanelSection>
 
-          {/* Content type map: schema binding per content type */}
-          <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                Content type map (schema bindings)
-              </label>
+          <PropertiesPanelSection
+            title="Content types"
+            count={contentTypes.length}
+            defaultOpen={contentTypes.length > 0}
+            actions={
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-7 text-xs"
+                className="h-7 px-2 text-xs text-indigo-600 dark:text-indigo-400"
                 onClick={() => setShowAddContentType(true)}
               >
-                <Plus className="w-3 h-3 mr-1" />
-                Add type
+                <Plus className="w-3.5 h-3.5" />
+                Add
               </Button>
-            </div>
+            }
+          >
+          <div>
             <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
               Map each media type to a schema (class reference or inline).
             </p>
@@ -1028,19 +1038,26 @@ export default function ResponsePropertiesPanel({
                       <TabsTrigger key={ct.id} value={String(idx)} className="flex items-center gap-1.5 text-xs">
                         <FileJson className="w-3 h-3" />
                         {ct.media_type}
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteContentType(ct.id); }}
-                          className="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 hover:text-red-600"
-                          aria-label="Remove content type"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
                       </TabsTrigger>
                     ))}
                   </TabsList>
                   {contentTypes.map((ct, idx) => (
                     <TabsContent key={ct.id} value={String(idx)} className="mt-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono text-slate-600 dark:text-slate-300">
+                          {ct.media_type}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                          onClick={() => handleDeleteContentType(ct.id)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Remove
+                        </Button>
+                      </div>
                       <div>
                         <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 block mb-1">
                           Schema binding (reuse class)
@@ -1207,9 +1224,9 @@ export default function ResponsePropertiesPanel({
               </div>
             )}
           </div>
+          </PropertiesPanelSection>
 
-          {/* Response Schema Builder */}
-          <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+          <PropertiesPanelSection title="Schema" defaultOpen>
             {isLoading ? (
               <div className="py-4 text-center">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Loading schema...</span>
@@ -1223,15 +1240,14 @@ export default function ResponsePropertiesPanel({
                 allowInline={true}
               />
             )}
-          </div>
+          </PropertiesPanelSection>
 
-          {/* Response Headers + Header templates (#401) */}
-          <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                Response headers
-              </label>
-              <div className="flex items-center gap-1.5">
+          <PropertiesPanelSection
+            title="Headers"
+            count={headers.length}
+            defaultOpen={headers.length > 0}
+            actions={
+              <>
                 <Select
                   value=""
                   onValueChange={(value) => {
@@ -1242,9 +1258,9 @@ export default function ResponsePropertiesPanel({
                     if (toAdd.length > 0) setHeaders([...headers, ...toAdd]);
                   }}
                 >
-                  <SelectTrigger className="h-7 w-[140px] text-xs" aria-label="Add from template">
+                  <SelectTrigger className="h-7 w-[130px] text-xs" aria-label="Add from template">
                     <LayoutList className="w-3 h-3 mr-1 shrink-0" />
-                    <SelectValue placeholder="Add from template" />
+                    <SelectValue placeholder="Template" />
                   </SelectTrigger>
                   <SelectContent>
                     {HEADER_TEMPLATES.map((t) => (
@@ -1256,16 +1272,18 @@ export default function ResponsePropertiesPanel({
                 </Select>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="h-7 text-xs"
+                  className="h-7 px-2 text-xs text-indigo-600 dark:text-indigo-400"
                   onClick={() => setHeaders([...headers, { name: '' }])}
                 >
-                  <Plus className="w-3 h-3 mr-1" />
-                  Add header
+                  <Plus className="w-3.5 h-3.5" />
+                  Add
                 </Button>
-              </div>
-            </div>
+              </>
+            }
+          >
+          <div>
             <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
               Headers returned with this response. Use templates for pagination, rate limiting, or CORS.
             </p>
@@ -1349,25 +1367,27 @@ export default function ResponsePropertiesPanel({
               )}
             </div>
           </div>
+          </PropertiesPanelSection>
 
-          {/* Response links (HATEOAS navigation) */}
-          <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-            <div className="flex items-center justify-between mb-2">
-              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
-                <Link2 className="w-3.5 h-3.5" />
-                Links (HATEOAS)
-              </label>
+          <PropertiesPanelSection
+            title="Links (HATEOAS)"
+            count={links.length}
+            defaultOpen={links.length > 0}
+            icon={<Link2 />}
+            actions={
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-7 text-xs"
+                className="h-7 px-2 text-xs text-indigo-600 dark:text-indigo-400"
                 onClick={() => setLinks([...links, { name: '' }])}
               >
-                <Plus className="w-3 h-3 mr-1" />
-                Add link
+                <Plus className="w-3.5 h-3.5" />
+                Add
               </Button>
-            </div>
+            }
+          >
+          <div>
             <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
               Response-driven navigation: link relations to other operations (operationId or operationRef). Use parameters to pass values (e.g. <code className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1 rounded">$request.path.id</code>, <code className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1 rounded">$response.body#/uuid</code>).
             </p>
@@ -1505,23 +1525,11 @@ export default function ResponsePropertiesPanel({
               )}
             </div>
           </div>
+          </PropertiesPanelSection>
 
-          {/* Save Button */}
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="default"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:bg-slate-600 dark:disabled:bg-slate-700"
-              onClick={handleSave}
-              disabled={isSaving || !responseId}
-            >
-              <Save className="w-4 h-4 mr-2" />
-              {isSaving ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save Changes'}
-            </Button>
-          </div>
         </div>
       </div>
-    </div>
+    </PropertiesPanelShell>
   );
 }
 

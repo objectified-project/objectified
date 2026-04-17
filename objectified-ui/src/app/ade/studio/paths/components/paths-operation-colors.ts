@@ -24,10 +24,6 @@ export const OPERATION_COLORS: Record<string, string> = {
 
 export const OPERATION_IDS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 
-/** P-04: Methods shown on the always-visible Paths canvas palette (fast drag-drop). */
-export const PALETTE_HTTP_METHODS = ['GET', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
-export type PaletteHttpMethod = (typeof PALETTE_HTTP_METHODS)[number];
-
 /** Label and color for sidebar and dropdowns (Section 2.2.1) */
 export const AVAILABLE_OPERATIONS = OPERATION_IDS.map((id) => ({
   id,

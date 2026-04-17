@@ -6,6 +6,8 @@ import * as Tabs from '@radix-ui/react-tabs';
 import { Search, Plus, Pencil, Trash2, FileX, Upload, Library, ChevronDown, ChevronUp, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
+import SidebarDensityToggle from '@/app/components/sidebar/SidebarDensityToggle';
+import { sidebarTheme, useSidebarTokens } from '@/app/components/sidebar/sidebar-theme';
 
 export interface ClassItem {
   id: string;
@@ -110,6 +112,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
 }) => {
   // Dark mode detection using shared hook
   const isDark = useDarkMode();
+  const tokens = useSidebarTokens();
 
   const [currentTab, setCurrentTab] = useState<'classes' | 'properties' | 'groups'>('classes');
   const [classesSearchQuery, setClassesSearchQuery] = useState('');
@@ -295,22 +298,22 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
         )}
 
         <Tabs.Root value={currentTab} onValueChange={handleTabChange} className="flex flex-col flex-1 min-h-0">
-          <Tabs.List className="flex border-b min-h-[44px] shrink-0" style={{ borderColor: isDark ? '#334155' : '#e2e8f0' }}>
+          <Tabs.List className={['flex border-b shrink-0', tokens.headerHeight, sidebarTheme.borderSoft].join(' ')}>
             <Tabs.Trigger
               value="classes"
-              className="flex-1 min-h-[44px] text-xs font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent"
+              className={['flex-1 font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent', tokens.rowText].join(' ')}
             >
               Classes
             </Tabs.Trigger>
             <Tabs.Trigger
               value="properties"
-              className="flex-1 min-h-[44px] text-xs font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent"
+              className={['flex-1 font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent', tokens.rowText].join(' ')}
             >
               Properties
             </Tabs.Trigger>
             <Tabs.Trigger
               value="groups"
-              className="flex-1 min-h-[44px] text-xs font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent"
+              className={['flex-1 font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent', tokens.rowText].join(' ')}
             >
               Groups
             </Tabs.Trigger>
@@ -327,7 +330,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                     placeholder="Search classes..."
                     value={classesSearchQuery}
                     onChange={(e) => setClassesSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 rounded-lg text-sm border bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:bg-white dark:focus:bg-slate-800"
+                    className={['w-full pl-9 pr-3 rounded-lg text-sm border focus:bg-white dark:focus:bg-slate-800', tokens.inputPaddingY, sidebarTheme.inputBase].join(' ')}
                   />
                 </div>
               </div>
@@ -353,11 +356,11 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                     {filteredClasses.map((classItem) => {
                       const isHidden = hiddenClassIds.includes(classItem.id);
                       return (
-                      <li key={classItem.id} className="mb-1 flex items-stretch rounded-lg group">
+                      <li key={classItem.id} className={['mb-1 flex items-stretch rounded-lg group', tokens.rowText].join(' ')}>
                         <button
                           type="button"
                           onClick={() => handleClassSelect(classItem)}
-                          className={`flex-1 text-left rounded-lg px-3 py-2 transition-all min-w-0 ${
+                          className={`flex-1 text-left rounded-lg transition-all min-w-0 ${tokens.rowPaddingX} ${tokens.rowPaddingY} ${
                             selectedClassId === classItem.id
                               ? 'bg-indigo-500/10 border-l-[3px] border-indigo-500 hover:bg-indigo-500/15'
                               : 'hover:bg-indigo-500/5 border-l-[3px] border-transparent'
@@ -465,7 +468,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                     placeholder="Search properties..."
                     value={propertiesSearchQuery}
                     onChange={(e) => setPropertiesSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 rounded-lg text-sm border bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:bg-white dark:focus:bg-slate-800"
+                    className={['w-full pl-9 pr-3 rounded-lg text-sm border focus:bg-white dark:focus:bg-slate-800', tokens.inputPaddingY, sidebarTheme.inputBase].join(' ')}
                   />
                 </div>
               </div>
@@ -480,7 +483,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                       e.dataTransfer.effectAllowed = 'copy';
                       e.dataTransfer.setData('application/json', JSON.stringify({ type: 'new-reference' }));
                     }}
-                    className="flex items-center justify-between px-4 py-3 rounded-lg border-2 border-dashed border-green-500/40 bg-green-500/10 cursor-grab hover:border-green-500 hover:bg-green-500/15 hover:-translate-y-px hover:shadow-lg hover:shadow-green-500/20 active:cursor-grabbing active:scale-[0.98] transition-all"
+                    className={['flex items-center justify-between rounded-lg border-2 border-dashed border-green-500/40 bg-green-500/10 cursor-grab hover:border-green-500 hover:bg-green-500/15 hover:-translate-y-px hover:shadow-lg hover:shadow-green-500/20 active:cursor-grabbing active:scale-[0.98] transition-all', tokens.rowPaddingX, tokens.rowPaddingY].join(' ')}
                     title="Drag to create a new reference on a class or inside an object"
                   >
                     <span className="text-sm font-semibold text-green-700 dark:text-green-400">+ New Reference</span>
@@ -522,7 +525,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                               e.dataTransfer.setData('application/json', JSON.stringify({ type: 'property', property: propertyItem }));
                             }}
                             onClick={() => handlePropertySelect(propertyItem)}
-                            className={`flex items-center gap-2 px-4 py-3 mb-1 mx-1 rounded-lg transition-all cursor-${isReadOnly ? 'default' : 'grab'} active:cursor-grabbing active:scale-[0.98] ${
+                            className={`flex items-center gap-2 ${tokens.rowPaddingX} ${tokens.rowPaddingY} mb-1 mx-1 rounded-lg transition-all ${tokens.rowText} cursor-${isReadOnly ? 'default' : 'grab'} active:cursor-grabbing active:scale-[0.98] ${
                               selectedPropertyId === propertyItem.id ? 'bg-indigo-500/10 border-l-[3px] border-indigo-500 hover:bg-indigo-500/15' : 'border-l-[3px] border-transparent hover:bg-indigo-500/5 hover:translate-x-0.5'
                             }`}
                           >
@@ -657,7 +660,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                     placeholder="Search groups..."
                     value={groupsSearchQuery}
                     onChange={(e) => setGroupsSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 rounded-lg text-sm border bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:bg-white dark:focus:bg-slate-800"
+                    className={['w-full pl-9 pr-3 rounded-lg text-sm border focus:bg-white dark:focus:bg-slate-800', tokens.inputPaddingY, sidebarTheme.inputBase].join(' ')}
                   />
                 </div>
               </div>
@@ -673,7 +676,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                       e.dataTransfer.setData('application/json', JSON.stringify({ type: 'new-group' }));
                       e.dataTransfer.setData('application/x-objectified-drag-type', 'new-group');
                     }}
-                    className="flex items-center justify-between px-4 py-3 rounded-lg border-2 border-dashed border-violet-500/40 bg-violet-500/10 cursor-grab hover:border-violet-500 hover:bg-violet-500/15 hover:-translate-y-px hover:shadow-lg hover:shadow-violet-500/20 active:cursor-grabbing active:scale-[0.98] transition-all"
+                    className={['flex items-center justify-between rounded-lg border-2 border-dashed border-violet-500/40 bg-violet-500/10 cursor-grab hover:border-violet-500 hover:bg-violet-500/15 hover:-translate-y-px hover:shadow-lg hover:shadow-violet-500/20 active:cursor-grabbing active:scale-[0.98] transition-all', tokens.rowPaddingX, tokens.rowPaddingY].join(' ')}
                     title="Drag to create a new group on the canvas"
                   >
                     <span className="text-sm font-semibold text-violet-600 dark:text-violet-400">+ New Group</span>
@@ -725,7 +728,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                               <button
                                 type="button"
                                 onClick={() => callbacks.onGroupSelect?.(group.id)}
-                                className="flex min-w-0 flex-1 items-center gap-3 rounded-r-lg py-2 pl-1 pr-3 text-left transition-all hover:bg-violet-500/5"
+                                className={['flex min-w-0 flex-1 items-center gap-3 rounded-r-lg text-left transition-all hover:bg-violet-500/5', tokens.rowPaddingY, tokens.rowPaddingX, tokens.rowText].join(' ')}
                               >
                                 <span
                                   className="h-3 w-3 shrink-0 rounded"
@@ -816,6 +819,9 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
               </div>
             </div>
           </Tabs.Content>
+          <div className={['border-t px-3 py-2', sidebarTheme.borderSoft].join(' ')}>
+            <SidebarDensityToggle />
+          </div>
         </Tabs.Root>
       </div>
     </aside>

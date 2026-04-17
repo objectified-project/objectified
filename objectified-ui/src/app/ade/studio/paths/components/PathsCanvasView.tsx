@@ -58,7 +58,7 @@ import {
 } from '../../../../../../lib/db/helper-shared-path-responses';
 import PathParameterNode from './PathParameterNode';
 import PathResponseNode from './PathResponseNode';
-import PathClassNode, { PathClassNodeData } from './PathClassNode';
+import PathClassNode from './PathClassNode';
 import PathRequestBodyNode, { PathRequestBodyData } from './PathRequestBodyNode';
 import PathResponseBodyNode, { PathResponseBodyData } from './PathResponseBodyNode';
 import ClassDropChoiceDialog, { ClassDropAction } from '../../../../components/dialogs/ClassDropChoiceDialog';
@@ -78,17 +78,14 @@ import {
   updateSharedPathRequestBody,
   addRequestBodyContentType,
   addPropertyToInlineSchema,
-  updateInlineSchemaProperty,
   deleteInlineSchemaProperty,
   convertClassToInlineSchema,
   updateRequestBodyContentType,
   copyClassPropertiesToRequestBodyContentType,
 } from '../../../../../../lib/db/helper-shared-path-request-bodies';
 import {
-  getResponseContentTypes,
   addResponseContentType,
   addPropertyToResponseInlineSchema,
-  updateResponseInlineSchemaProperty,
   deleteResponseInlineSchemaProperty,
   deleteResponseContentType,
   copyClassPropertiesToContentType,
@@ -716,7 +713,7 @@ function PathsCanvasInner({
                 responseHasInlineProperties = schema?.type === 'object' && 
                   schema?.properties && 
                   schema.properties.length > 0;
-              } catch (e) {
+              } catch {
                 // Ignore parse errors
               }
             }
@@ -2077,8 +2074,8 @@ function PathsCanvasInner({
                 operationPrivateMap.set(op.id, true);
               }
             }
-          } catch (descError) {
-            console.log('[PathsCanvasView] No description found for operation:', op.id);
+          } catch {
+            // No description found for this operation
           }
         }
 
@@ -2524,7 +2521,7 @@ function PathsCanvasInner({
                     parameters: link?.parameters && typeof link.parameters === 'object' ? link.parameters : undefined,
                   }));
                 }
-              } catch (_) {
+              } catch {
                 // ignore
               }
             }
@@ -2622,7 +2619,7 @@ function PathsCanvasInner({
                 responseInlineSchema = typeof response.inline_schema === 'string'
                   ? JSON.parse(response.inline_schema)
                   : response.inline_schema;
-              } catch (e) {
+              } catch {
                 // Ignore parse errors
               }
             }
@@ -2801,7 +2798,6 @@ function PathsCanvasInner({
         allResponseNodes.forEach((responseNode) => {
           const responseData = responseNode.data as any;
           if (responseData.attachedClassId) {
-            const classNodeId = `class-${responseData.attachedClassId}`;
             const classNode = classNodesMap.get(responseData.attachedClassId);
             
             if (classNode) {
@@ -3951,18 +3947,31 @@ function PathsCanvasInner({
           });
         }
       } else if (dropData.type === 'parameter') {
-        const inLoc = dropData.inLocation as 'header' | 'cookie' | undefined;
+        const rawLoc = dropData.inLocation;
+        const VALID_LOCATIONS = ['query', 'path', 'header', 'cookie'] as const;
+        type ParamLoc = typeof VALID_LOCATIONS[number];
+        const inLoc: ParamLoc | undefined = VALID_LOCATIONS.includes(rawLoc as ParamLoc)
+          ? (rawLoc as ParamLoc)
+          : undefined;
+        // OpenAPI 3.1 default name per location (matches the Parameters section
+        // chips in the sidebar).
+        const DEFAULT_NAME: Record<ParamLoc, string> = {
+          query: 'q',
+          path: 'id',
+          header: 'Authorization',
+          cookie: 'session',
+        };
         const suggested =
           typeof dropData.suggestedName === 'string' && dropData.suggestedName.trim()
             ? dropData.suggestedName.trim()
-            : inLoc === 'cookie'
-              ? 'session'
-              : 'Authorization';
-        if (inLoc !== 'header' && inLoc !== 'cookie') {
+            : inLoc
+              ? DEFAULT_NAME[inLoc]
+              : 'param';
+        if (!inLoc) {
           await alertDialog({
             title: 'Add Parameter',
             message:
-              'Drag a Header or Cookie chip from the left palette onto an operation, or use Add Parameter in Operation Details.',
+              'Drag a Query, Path, Header, or Cookie chip from the Operations sidebar onto an operation, or use Add Parameter in Operation Details.',
             variant: 'info',
           });
           return;
@@ -4004,10 +4013,19 @@ function PathsCanvasInner({
             finalName = `${suggested}_${suffix}`;
             suffix += 1;
           }
-          const schemaData: Record<string, unknown> =
-            inLoc === 'header'
-              ? { type: 'string', required: false, style: 'simple', explode: false }
-              : { type: 'string', required: false, style: 'form', explode: false };
+          // OpenAPI 3.1 default style/explode per location. Path params are
+          // always required; the others default to optional and let the user
+          // flip that in the Parameter panel.
+          const STYLE_DEFAULTS: Record<ParamLoc, { style: string; explode: boolean; required: boolean }> = {
+            query:  { style: 'form',   explode: true,  required: false },
+            path:   { style: 'simple', explode: false, required: true },
+            header: { style: 'simple', explode: false, required: false },
+            cookie: { style: 'form',   explode: false, required: false },
+          };
+          const schemaData: Record<string, unknown> = {
+            type: 'string',
+            ...STYLE_DEFAULTS[inLoc],
+          };
           const paramResult = await createSharedPathParameter(
             selectedPathId,
             finalName,
@@ -4156,7 +4174,7 @@ function PathsCanvasInner({
                   }
                 }
               }
-            } catch (_) {}
+            } catch {}
           }
         }
         
@@ -4364,14 +4382,8 @@ function PathsCanvasInner({
           />
         )}
         <Controls
-          className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 rounded-xl shadow-xl overflow-hidden"
-          style={{
-            borderRadius: '12px',
-            overflow: 'hidden',
-            boxShadow: isDark 
-              ? '0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)'
-              : '0 4px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
-          }}
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden"
+          style={{ borderRadius: '6px', overflow: 'hidden', boxShadow: 'none' }}
         />
         {(alignmentGuides.horizontal.length > 0 || alignmentGuides.vertical.length > 0) && (() => {
           const viewport = getViewport();
@@ -4388,10 +4400,9 @@ function PathsCanvasInner({
                       y1={guide.y}
                       x2={guide.x2}
                       y2={guide.y}
-                      stroke="#f472b6"
-                      strokeWidth={2 / viewport.zoom}
-                      strokeDasharray={`${6 / viewport.zoom} ${4 / viewport.zoom}`}
-                      style={{ filter: 'drop-shadow(0 0 2px rgba(244, 114, 182, 0.5))' }}
+                      stroke={isDark ? '#818cf8' : '#4f46e5'}
+                      strokeWidth={1 / viewport.zoom}
+                      strokeDasharray={`${4 / viewport.zoom} ${3 / viewport.zoom}`}
                     />
                   ))}
                   {alignmentGuides.vertical.map((guide, index) => (
@@ -4401,10 +4412,9 @@ function PathsCanvasInner({
                       y1={guide.y1}
                       x2={guide.x}
                       y2={guide.y2}
-                      stroke="#f472b6"
-                      strokeWidth={2 / viewport.zoom}
-                      strokeDasharray={`${6 / viewport.zoom} ${4 / viewport.zoom}`}
-                      style={{ filter: 'drop-shadow(0 0 2px rgba(244, 114, 182, 0.5))' }}
+                      stroke={isDark ? '#818cf8' : '#4f46e5'}
+                      strokeWidth={1 / viewport.zoom}
+                      strokeDasharray={`${4 / viewport.zoom} ${3 / viewport.zoom}`}
                     />
                   ))}
                 </g>

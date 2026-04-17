@@ -856,7 +856,7 @@ class Database:
     def get_operations_for_path(self, version_path_id: str) -> List[Dict[str, Any]]:
         """Get all operations for a specific path."""
         query = """
-            SELECT id, operation, metadata
+            SELECT id, version_path_id, operation, metadata, created_at, updated_at
             FROM odb.path_operation
             WHERE version_path_id = %s
             ORDER BY CASE operation

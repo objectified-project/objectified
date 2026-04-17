@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Hash, Sparkles, Search, Shield, User, Loader2, Database, X, Save } from 'lucide-react';
+import { Hash, Sparkles, Search, Shield, User, Loader2, Database, Save } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
+import PropertiesPanelShell from './PropertiesPanelShell';
+import PropertiesPanelSection from './PropertiesPanelSection';
 import { Input } from '../../../../components/ui/Input';
 import { Label } from '../../../../components/ui/Label';
 import { Checkbox } from '../../../../components/ui/Checkbox';
@@ -674,35 +676,41 @@ export default function ParameterPropertiesPanel({
 
   if (!parameterId) return null;
 
-  return (
-    <div
-      className={`w-[360px] h-full flex flex-col border-l ${
-        isDark ? 'border-slate-700 bg-gradient-to-b from-slate-800 to-slate-900' : 'border-slate-200 bg-gradient-to-b from-white to-slate-50'
-      }`}
-    >
-      {/* Header */}
-      <div className={`p-4 border-b flex justify-between items-center ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-        <div className="flex items-center gap-2">
-          <Hash size={20} className={isDark ? 'text-violet-400' : 'text-violet-600'} />
-          <div>
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">
-              Parameter Details
-            </span>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              {name}
-            </div>
-          </div>
-        </div>
-        <button
+  const parameterFooter = !isLoading ? (
+    <div className="flex flex-col gap-2">
+      <Button
+        type="button"
+        variant={saveStatus === 'saved' ? 'success' : 'default'}
+        onClick={handleSave}
+        disabled={isSaving || !name.trim()}
+        className="w-full"
+      >
+        <Save className="w-4 h-4" />
+        {isSaving ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : 'Save Changes'}
+      </Button>
+      {operationId && (
+        <Button
           type="button"
-          onClick={onClose}
-          className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-slate-500 dark:text-slate-400"
-          aria-label="Close"
+          variant="outline"
+          onClick={handleDelete}
+          className="w-full text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40 border-rose-200 dark:border-rose-900/60"
         >
-          <X size={18} />
-        </button>
-      </div>
+          Unlink Parameter
+        </Button>
+      )}
+    </div>
+  ) : undefined;
 
+  return (
+    <>
+    <PropertiesPanelShell
+      icon={<Hash />}
+      title="Parameter Details"
+      subtitle={name ? <span className="font-mono">{name}</span> : null}
+      onClose={onClose}
+      bodyScroll={false}
+      footer={parameterFooter}
+    >
       {/* Content */}
       {isLoading ? (
         <div className="p-6 flex justify-center">
@@ -711,7 +719,9 @@ export default function ParameterPropertiesPanel({
       ) : (
         <>
           <div className="flex-1 overflow-auto p-4">
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2.5">
+              <PropertiesPanelSection title="Identity" defaultOpen>
+                <div className="flex flex-col gap-3">
               {/* Parameter Name */}
               <div>
                 <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
@@ -804,6 +814,11 @@ export default function ParameterPropertiesPanel({
                 )}
               </div>
 
+                </div>
+              </PropertiesPanelSection>
+
+              <PropertiesPanelSection title="Serialization" defaultOpen={false}>
+                <div className="flex flex-col gap-3">
               {/* Serialization style — OpenAPI Parameter Object; allowed values depend on `in` */}
               <div>
                 <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
@@ -867,6 +882,11 @@ export default function ParameterPropertiesPanel({
                 </div>
               )}
 
+                </div>
+              </PropertiesPanelSection>
+
+              <PropertiesPanelSection title="Documentation" defaultOpen>
+                <div className="flex flex-col gap-3">
               {/* Summary */}
               <div>
                 <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
@@ -894,47 +914,50 @@ export default function ParameterPropertiesPanel({
                 />
               </div>
 
-              {/* Schema Section */}
-              <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 block">
-                  Schema Definition
-                </Label>
+                </div>
+              </PropertiesPanelSection>
 
+              <PropertiesPanelSection title="Schema" defaultOpen>
+                <div>
                 <div
-                  className={`flex rounded-md border overflow-hidden mb-3 text-xs ${
-                    isDark ? 'border-slate-600' : 'border-slate-300'
+                  className={`inline-flex items-center rounded-md border p-0.5 mb-3 text-xs ${
+                    isDark ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-slate-50'
                   }`}
                   role="group"
                   aria-label="Schema editor mode"
                 >
                   <button
                     type="button"
-                    className={`flex-1 px-2 py-1.5 font-medium transition-colors ${
+                    className={`px-2.5 py-1 rounded-sm font-medium transition-colors ${
                       schemaMode === 'form'
-                        ? 'bg-violet-600 text-white'
+                        ? isDark
+                          ? 'bg-slate-800 text-indigo-300 shadow-sm'
+                          : 'bg-white text-indigo-600 shadow-sm'
                         : isDark
-                          ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                          : 'bg-white text-slate-700 hover:bg-slate-50'
+                          ? 'text-slate-400 hover:text-slate-200'
+                          : 'text-slate-600 hover:text-slate-900'
                     }`}
                     onClick={() => setSchemaMode('form')}
                   >
-                    Form builder
+                    Form
                   </button>
                   <button
                     type="button"
-                    className={`flex-1 px-2 py-1.5 font-medium transition-colors border-l ${
+                    className={`px-2.5 py-1 rounded-sm font-medium transition-colors ${
                       schemaMode === 'inline'
-                        ? 'bg-violet-600 text-white border-violet-500'
+                        ? isDark
+                          ? 'bg-slate-800 text-indigo-300 shadow-sm'
+                          : 'bg-white text-indigo-600 shadow-sm'
                         : isDark
-                          ? 'bg-slate-800 text-slate-300 border-slate-600 hover:bg-slate-700'
-                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                          ? 'text-slate-400 hover:text-slate-200'
+                          : 'text-slate-600 hover:text-slate-900'
                     }`}
                     onClick={() => {
                       setSchemaMode('inline');
                       setPropertyRef(null);
                     }}
                   >
-                    Inline JSON Schema
+                    JSON Schema
                   </button>
                 </div>
 
@@ -1207,35 +1230,14 @@ export default function ParameterPropertiesPanel({
                     </p>
                   </div>
                 )}
-              </div>
+                </div>
+              </PropertiesPanelSection>
             </div>
           </div>
 
-          {/* Footer with Save and Delete buttons */}
-          <div className={`p-4 border-t flex flex-col gap-2 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-            <Button
-              type="button"
-              variant="default"
-              onClick={handleSave}
-              disabled={isSaving || !name.trim()}
-              className={`w-full ${saveStatus === 'saved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-violet-600 hover:bg-violet-700'} disabled:opacity-50 disabled:bg-slate-600 dark:disabled:bg-slate-700`}
-            >
-              <Save className="w-4 h-4 mr-2" />
-              {isSaving ? 'Saving...' : saveStatus === 'saved' ? 'Saved ✓' : 'Save Changes'}
-            </Button>
-            {operationId && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleDelete}
-                className="w-full border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-              >
-                Unlink Parameter
-              </Button>
-            )}
-          </div>
         </>
       )}
+    </PropertiesPanelShell>
 
       {/* Primitive template selection dialog (REST service primitives) */}
       <Dialog.Root
@@ -1372,7 +1374,6 @@ export default function ParameterPropertiesPanel({
                 size="sm"
                 disabled={!selectedPrimitive}
                 onClick={() => selectedPrimitive && applyPrimitiveToParameter(selectedPrimitive)}
-                className="bg-violet-600 hover:bg-violet-700"
               >
                 Apply primitive
               </Button>
@@ -1380,7 +1381,7 @@ export default function ParameterPropertiesPanel({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </div>
+    </>
   );
 }
 

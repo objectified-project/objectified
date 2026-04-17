@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, Plus, Trash2, ArrowLeft, Lock, Unlock, ExternalLink, ListChecks } from 'lucide-react';
+import { Save, Plus, Trash2, ArrowLeft, Lock, Unlock, ExternalLink, ListChecks, Zap, X } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
+import PropertiesPanelShell from './PropertiesPanelShell';
+import PropertiesPanelSection from './PropertiesPanelSection';
+import { PARAM_LOCATION_CHIP, STATUS_ROLE_CHIP, statusRoleForCode } from './paths-theme';
 import { Input } from '../../../../components/ui/Input';
 import { Label } from '../../../../components/ui/Label';
 import { Checkbox } from '../../../../components/ui/Checkbox';
@@ -125,7 +128,6 @@ export default function OperationPropertiesPanel({
   const [unsecured, setUnsecured] = useState(false);
   /** Optional documentation describing how security applies to this operation (emitted as x-security-description). */
   const [securityDescription, setSecurityDescription] = useState('');
-  const [loadedMetadata, setLoadedMetadata] = useState<Record<string, unknown>>({});
 
   // Deprecated flag state
   const [deprecated, setDeprecated] = useState(false);
@@ -168,7 +170,6 @@ export default function OperationPropertiesPanel({
       setSecurity([]);
       setUnsecured(false);
       setSecurityDescription('');
-      setLoadedMetadata({});
       setDeprecated(false);
       setTags([]);
       setTagDraft('');
@@ -188,7 +189,6 @@ export default function OperationPropertiesPanel({
       setSecurity([]);
       setUnsecured(false);
       setSecurityDescription('');
-      setLoadedMetadata({});
       setDeprecated(false);
       setTags([]);
       setTagDraft('');
@@ -210,7 +210,6 @@ export default function OperationPropertiesPanel({
               ? JSON.parse(desc.metadata)
               : desc.metadata
             : {};
-          setLoadedMetadata(meta);
           const sec = meta.security;
           // Explicit security: [] = unsecured (public); undefined = inherit; array with items = secured
           if (Array.isArray(sec) && sec.length === 0) {
@@ -519,8 +518,6 @@ export default function OperationPropertiesPanel({
       );
       // Sync local state to the normalized (trimmed) value
       setOperationIdName(trimmedOperationIdName);
-      // Update loadedMetadata to reflect the saved state
-      setLoadedMetadata(metadata);
       // Show "Saved" in button briefly
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
@@ -1040,65 +1037,32 @@ export default function OperationPropertiesPanel({
 
   if (!operationId) return null;
 
-  return (
-    <div
-      className="w-[360px] h-full flex flex-col border-l"
-      style={{
-        borderColor: isDark ? '#334155' : '#e2e8f0',
-        background: isDark
-          ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
-          : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-      }}
-    >
-      {/* Header */}
-      <div
-        className={`p-4 border-b flex justify-between items-center ${
-          isDark ? 'border-slate-700' : 'border-slate-200'
-        }`}
-      >
-        {viewMode === 'add-parameter' || viewMode === 'add-response' ? (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleBackToOperation}
-              className={`p-1 rounded transition-colors ${
-                isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-100'
-              }`}
-              aria-label="Back to operation"
-            >
-              <ArrowLeft className="w-[18px] h-[18px]" />
-            </button>
-            <div>
-              <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                {viewMode === 'add-parameter' ? 'Add Parameter' : 'Add Response'}
-              </span>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                {operation} {pathname}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div>
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">
-              Operation Details
-            </span>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {operation} {pathname}
-            </div>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={onClose}
-          className={`p-1 rounded transition-colors ${
-            isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-100'
-          }`}
-          aria-label="Close panel"
-        >
-          <X className="w-[18px] h-[18px]" />
-        </button>
-      </div>
+  const headerTitle =
+    viewMode === 'add-parameter' ? 'Add Parameter'
+    : viewMode === 'add-response' ? 'Add Response'
+    : 'Operation Details';
+  const isAddView = viewMode === 'add-parameter' || viewMode === 'add-response';
 
+  return (
+    <PropertiesPanelShell
+      icon={<Zap />}
+      title={headerTitle}
+      subtitle={<><span className="font-semibold">{operation}</span> {pathname}</>}
+      onClose={onClose}
+      headerLeading={
+        isAddView ? (
+          <button
+            type="button"
+            onClick={handleBackToOperation}
+            className="p-1.5 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
+            aria-label="Back to operation"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+        ) : undefined
+      }
+      bodyScroll={false}
+    >
       {/* Content */}
       {isLoading ? (
         <div className="p-6 flex justify-center">
@@ -1267,7 +1231,7 @@ export default function OperationPropertiesPanel({
           >
             {responseAttachMode === 'reuse' ? (
               <Button
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full"
                 onClick={handleLinkExistingResponse}
                 disabled={isSaving || !reuseResponseId}
               >
@@ -1276,7 +1240,7 @@ export default function OperationPropertiesPanel({
               </Button>
             ) : (
               <Button
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full"
                 onClick={handleSaveResponse}
                 disabled={isSaving || !newResponseStatusCode.trim()}
               >
@@ -1485,7 +1449,7 @@ export default function OperationPropertiesPanel({
           >
             {paramAttachMode === 'reuse' ? (
               <Button
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full"
                 onClick={handleLinkExistingParameter}
                 disabled={isSaving || !reuseParamId}
               >
@@ -1494,7 +1458,7 @@ export default function OperationPropertiesPanel({
               </Button>
             ) : (
               <Button
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full"
                 onClick={handleSaveParameter}
                 disabled={isSaving || !newParamName.trim()}
               >
@@ -1531,7 +1495,7 @@ export default function OperationPropertiesPanel({
                   Tags
                 </TabsTrigger>
                 <TabsTrigger value="advanced" className={OPERATION_DETAIL_TAB_TRIGGER_CLASS}>
-                  Advanced
+                  Schema &amp; Security
                 </TabsTrigger>
               </TabsList>
 
@@ -1646,68 +1610,23 @@ export default function OperationPropertiesPanel({
                 </div>
               </TabsContent>
 
-              <TabsContent value="advanced" className="mt-0 flex flex-col gap-4 outline-none">
-                <label className="flex items-center gap-2 cursor-pointer w-fit">
-                  <Checkbox
-                    checked={xPrivate}
-                    onCheckedChange={(checked) => setXPrivate(checked === true)}
-                  />
-                  <span
-                    className={`text-xs flex items-center gap-1 ${xPrivate ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}
-                  >
-                    <Lock className="w-3.5 h-3.5" />
-                    Hidden from public docs (x-private)
-                  </span>
-                </label>
-
-              {/* Custom x-* extensions */}
-              <div className="mt-4">
-                <ExtensionsEditor
-                  value={extensions as Record<string, any>}
-                  onChange={setExtensions as (v: Record<string, any>) => void}
-                  size="small"
-                />
-              </div>
-
-              {/* External documentation (OpenAPI externalDocs) */}
-              <div className="mt-4">
-                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1.5">
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  External documentation
-                </Label>
-                <Input
-                  type="url"
-                  className="w-full text-sm mb-2"
-                  placeholder="https://docs.example.com/..."
-                  value={externalDocsUrl}
-                  onChange={(e) => setExternalDocsUrl(e.target.value)}
-                />
-                <Textarea
-                  rows={2}
-                  className="w-full text-sm"
-                  placeholder="Brief description of external docs (optional)"
-                  value={externalDocsDescription}
-                  onChange={(e) => setExternalDocsDescription(e.target.value)}
-                />
-              </div>
-
-              {/* Parameters Section */}
-              <div className="mt-4">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Parameters
-                  </Label>
+              <TabsContent value="advanced" className="mt-0 flex flex-col gap-2.5 outline-none">
+              <PropertiesPanelSection
+                title="Parameters"
+                count={parameters.length}
+                defaultOpen={parameters.length > 0}
+                actions={
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={handleAddParameterClick}
-                    className="text-indigo-600 dark:text-indigo-400 text-xs hover:bg-indigo-500/10"
+                    className="h-7 px-2 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10"
                   >
-                    <Plus className="w-4 h-4" />
-                    Add Parameter
+                    <Plus className="w-3.5 h-3.5" />
+                    Add
                   </Button>
-                </div>
-
+                }
+              >
                 {parametersLoading ? (
                   <div className="py-4 text-center">
                     <span className="text-xs text-gray-500 dark:text-gray-400">Loading parameters...</span>
@@ -1741,18 +1660,11 @@ export default function OperationPropertiesPanel({
                         </div>
                         <div className="flex items-center gap-1">
                           <span
-                            className="px-2 py-0.5 rounded text-[10px] font-semibold text-white"
-                            style={{
-                              backgroundColor:
-                                param.in_location === 'path' ? '#8b5cf6' :
-                                param.in_location === 'query' ? '#3b82f6' :
-                                param.in_location === 'header' ? '#f59e0b' :
-                                '#10b981',
-                            }}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${
+                              PARAM_LOCATION_CHIP[param.in_location as keyof typeof PARAM_LOCATION_CHIP] ?? PARAM_LOCATION_CHIP.query
+                            }`}
                           >
-                            {param.in_location === 'path' ? '/' :
-                             param.in_location === 'query' ? '?' :
-                             param.in_location === 'header' ? 'H' : 'C'}
+                            {param.in_location}
                           </span>
                           <button
                             type="button"
@@ -1767,41 +1679,42 @@ export default function OperationPropertiesPanel({
                     ))}
                   </div>
                 )}
-              </div>
+              </PropertiesPanelSection>
 
-              {/* Request body: shared_path_request_body + content rows + operation link (#2648); OPTIONS optional (#2653 warn-only vs export) */}
               {['POST', 'PUT', 'PATCH', 'OPTIONS'].includes(operation) && operationId && versionPathId && (
-                <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <PropertiesPanelSection
+                  title="Request body"
+                  defaultOpen={parameters.length === 0}
+                >
                   <RequestBodySection
                     operationId={operationId}
                     versionPathId={versionPathId}
                     onRefresh={onRefresh}
                     refreshKey={refreshKey}
                   />
-                </div>
+                </PropertiesPanelSection>
               )}
 
-              {/* Responses Section */}
-              <div className="mt-4">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Responses
-                  </Label>
-                  <div className="flex items-center gap-1.5">
+              <PropertiesPanelSection
+                title="Responses"
+                count={responses.length}
+                defaultOpen={responses.length > 0}
+                actions={
+                  <>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={handleAddDefaultResponse}
                       disabled={isSaving || responses.some((r) => r.status_code === 'default')}
-                      className="text-slate-600 dark:text-slate-400 text-xs hover:bg-slate-500/10 disabled:opacity-50"
+                      className="h-7 px-2 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-500/10 disabled:opacity-50"
                       title={
                         responses.some((r) => r.status_code === 'default')
                           ? 'Default (catch-all) response already added'
                           : 'Add default response for catch-all error handling'
                       }
                     >
-                      <ListChecks className="w-4 h-4" />
-                      Add default
+                      <ListChecks className="w-3.5 h-3.5" />
+                      Default
                     </Button>
                     <Button
                       size="sm"
@@ -1812,14 +1725,14 @@ export default function OperationPropertiesPanel({
                         setReuseResponseId('');
                         setViewMode('add-response');
                       }}
-                      className="text-indigo-600 dark:text-indigo-400 text-xs hover:bg-indigo-500/10"
+                      className="h-7 px-2 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10"
                     >
-                      <Plus className="w-4 h-4" />
-                      Add Response
+                      <Plus className="w-3.5 h-3.5" />
+                      Add
                     </Button>
-                  </div>
-                </div>
-
+                  </>
+                }
+              >
                 {responsesLoading ? (
                   <div className="py-4 text-center">
                     <span className="text-xs text-gray-500 dark:text-gray-400">Loading responses...</span>
@@ -1851,16 +1764,9 @@ export default function OperationPropertiesPanel({
                         >
                           <div className="flex items-center gap-2">
                             <div
-                              className="px-3 py-1 rounded text-xs font-bold text-white"
-                              style={{
-                                backgroundColor:
-                                  response.status_code === 'default' ? '#64748b' :
-                                  response.status_code.startsWith('2') ? '#10b981' :
-                                  response.status_code.startsWith('3') ? '#3b82f6' :
-                                  response.status_code.startsWith('4') ? '#f59e0b' :
-                                  response.status_code.startsWith('5') ? '#ef4444' :
-                                  '#64748b',
-                              }}
+                              className={`px-2 py-0.5 rounded font-mono text-xs font-semibold tabular-nums ${
+                                STATUS_ROLE_CHIP[statusRoleForCode(response.status_code)]
+                              }`}
                             >
                               {response.status_code}
                             </div>
@@ -1904,26 +1810,27 @@ export default function OperationPropertiesPanel({
                     ))}
                   </div>
                 )}
-              </div>
+              </PropertiesPanelSection>
 
-              {/* Security Section: OR = alternative requirements, AND = schemes within a requirement */}
-              <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                    <Lock size={14} className="text-amber-500" />
-                    Security
-                  </Label>
-                  {!unsecured && (
+              <PropertiesPanelSection
+                title="Security"
+                count={unsecured ? undefined : security.length}
+                defaultOpen={security.length > 0 || unsecured}
+                icon={<Lock />}
+                actions={
+                  !unsecured ? (
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={handleAddSecurity}
-                      className="text-indigo-600 dark:text-indigo-400 text-xs hover:bg-indigo-500/10"
+                      className="h-7 px-2 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10"
                     >
-                      Add requirement (OR)
+                      <Plus className="w-3.5 h-3.5" />
+                      Add OR
                     </Button>
-                  )}
-                </div>
+                  ) : null
+                }
+              >
                 <label className="flex items-center gap-2 mb-3 cursor-pointer">
                   <Checkbox
                     checked={unsecured}
@@ -2118,32 +2025,80 @@ export default function OperationPropertiesPanel({
                     ))}
                   </div>
                 )}
-              </div>
+              </PropertiesPanelSection>
+
+              <PropertiesPanelSection
+                title="Metadata"
+                defaultOpen={false}
+                description="Visibility, OpenAPI extensions, and external documentation."
+              >
+                <div className="flex flex-col gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer w-fit">
+                    <Checkbox
+                      checked={xPrivate}
+                      onCheckedChange={(checked) => setXPrivate(checked === true)}
+                    />
+                    <span
+                      className={`text-xs flex items-center gap-1 ${xPrivate ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      Hidden from public docs (x-private)
+                    </span>
+                  </label>
+
+                  <div>
+                    <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Custom extensions
+                    </Label>
+                    <ExtensionsEditor
+                      value={extensions as Record<string, any>}
+                      onChange={setExtensions as (v: Record<string, any>) => void}
+                      size="small"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1.5">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      External documentation
+                    </Label>
+                    <Input
+                      type="url"
+                      className="w-full text-sm mb-2"
+                      placeholder="https://docs.example.com/..."
+                      value={externalDocsUrl}
+                      onChange={(e) => setExternalDocsUrl(e.target.value)}
+                    />
+                    <Textarea
+                      rows={2}
+                      className="w-full text-sm"
+                      placeholder="Brief description of external docs (optional)"
+                      value={externalDocsDescription}
+                      onChange={(e) => setExternalDocsDescription(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </PropertiesPanelSection>
               </TabsContent>
               </div>
             </Tabs>
           </div>
 
           {/* Footer with Save button */}
-          <div
-            className={`shrink-0 border-t p-4 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}
-          >
+          <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 px-3 py-2.5">
             <Button
-              className={`w-full text-white ${
-                saveStatus === 'saved'
-                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600'
-                  : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
-              } disabled:opacity-60 disabled:cursor-not-allowed`}
+              className="w-full"
+              variant={saveStatus === 'saved' ? 'success' : 'default'}
               onClick={handleSaveOperation}
               disabled={isSaving}
             >
               <Save className="w-4 h-4" />
-              {isSaving ? 'Saving...' : saveStatus === 'saved' ? 'Saved ✓' : 'Save'}
+              {isSaving ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : 'Save'}
             </Button>
           </div>
         </>
       )}
-    </div>
+    </PropertiesPanelShell>
   );
 }
 

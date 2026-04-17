@@ -3,13 +3,14 @@
 'use client';
 
 import React from 'react';
-import { Check, AlertTriangle, X, Activity, Trash2, Unlink } from 'lucide-react';
+import { Check, AlertTriangle, X, Activity, Trash2, Unlink, CornerDownRight } from 'lucide-react';
 import { Position } from '@xyflow/react';
 import { getHttpStatusDescription } from '../../../../../../lib/utils/http-status-codes';
 import { NodeCard } from '@/app/components/ade/canvas/NodeCard';
 import { NodeHeader } from '@/app/components/ade/canvas/NodeHeader';
 import { NodeHandleDot } from '@/app/components/ade/canvas/NodeHandleDot';
 import { accentVar, type NodeAccentRole } from '@/app/components/ade/canvas/canvas-theme';
+import { NODE_ATTACH_MIN_WIDTH_PX, NODE_ATTACH_MAX_WIDTH_PX } from './paths-theme';
 
 export interface ContentTypeInfo {
   id: string;
@@ -200,8 +201,8 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
 
       <NodeCard
         role={role}
-        minWidth={220}
-        maxWidth={300}
+        minWidth={NODE_ATTACH_MIN_WIDTH_PX}
+        maxWidth={NODE_ATTACH_MAX_WIDTH_PX}
         onDragOver={(e) => {
           e.stopPropagation();
           handleDragOver(e);
@@ -291,7 +292,7 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
                     </span>
                   </div>
                   <div style={{ ...treeLineStyle, marginLeft: '10px', marginTop: '2px' }}>
-                    <span style={{ color: 'var(--node-text-subtle)' }}>└─</span>
+                    <CornerDownRight size={10} style={{ color: 'var(--node-text-subtle)', marginRight: '2px', flexShrink: 0 }} />
                     <span style={{ fontFamily: 'var(--app-font-mono, monospace)', color: '#b45309', fontWeight: 600 }}>
                       {schemaDisplay.text || data.inlineSchema?.type}
                     </span>
@@ -314,7 +315,7 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
                     </div>
                     {hasSchema && (
                       <div style={{ ...treeLineStyle, marginLeft: '10px', marginTop: '2px' }}>
-                        <span style={{ color: 'var(--node-text-subtle)' }}>└─</span>
+                        <CornerDownRight size={10} style={{ color: 'var(--node-text-subtle)', marginRight: '2px', flexShrink: 0 }} />
                         {ct.class_name ? (
                           <>
                             <span style={{ color: 'var(--node-text-subtle)' }}>{'{ }'}</span>
@@ -352,7 +353,7 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
                     </span>
                   </div>
                   <div style={{ ...treeLineStyle, marginLeft: '10px', marginTop: '2px' }}>
-                    <span style={{ color: 'var(--node-text-subtle)' }}>└─</span>
+                    <CornerDownRight size={10} style={{ color: 'var(--node-text-subtle)', marginRight: '2px', flexShrink: 0 }} />
                     {schemaDisplay.isObject ? (
                       <>
                         <span style={{ color: 'var(--node-text-subtle)' }}>{'{ }'}</span>
@@ -395,7 +396,7 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
                 }}
               >
                 <div style={treeLineStyle}>
-                  <span style={{ color: 'var(--node-text-subtle)' }}>└─</span>
+                  <CornerDownRight size={10} style={{ color: 'var(--node-text-subtle)', marginRight: '2px', flexShrink: 0 }} />
                   <span style={{ color: 'var(--node-text-subtle)' }}>{'{ }'}</span>
                   <span style={{ color: 'var(--node-accent)', fontWeight: 600 }}>
                     {data.attachedClassName}

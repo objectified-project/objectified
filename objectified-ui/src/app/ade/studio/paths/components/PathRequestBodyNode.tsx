@@ -6,6 +6,7 @@ import { Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, AlertCircle, Sp
 import { Position } from '@xyflow/react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { NodeCard } from '../../../../components/ade/canvas/NodeCard';
+import { NODE_BODY_MIN_WIDTH_PX, NODE_BODY_MAX_WIDTH_PX } from './paths-theme';
 import { NodeHeader } from '../../../../components/ade/canvas/NodeHeader';
 import { NodeHandleDot } from '../../../../components/ade/canvas/NodeHandleDot';
 import { NodeBadge } from '../../../../components/ade/canvas/NodeBadge';
@@ -1074,7 +1075,7 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
         style={{ cursor: 'not-allowed', opacity: 0.55 }}
       />
 
-      <NodeCard role="request" minWidth={320} maxWidth={400} customBorderColor={requestAccent}>
+      <NodeCard role="request" minWidth={NODE_BODY_MIN_WIDTH_PX} maxWidth={NODE_BODY_MAX_WIDTH_PX} customBorderColor={requestAccent}>
         <NodeHeader
           role="request"
           customBackground={requestAccent}

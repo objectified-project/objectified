@@ -8,6 +8,7 @@ import { NodeCard } from '@/app/components/ade/canvas/NodeCard';
 import { NodeHeader } from '@/app/components/ade/canvas/NodeHeader';
 import { NodeHandleDot } from '@/app/components/ade/canvas/NodeHandleDot';
 import { NodeBadge } from '@/app/components/ade/canvas/NodeBadge';
+import { NODE_ATTACH_MIN_WIDTH_PX, NODE_ATTACH_MAX_WIDTH_PX } from './paths-theme';
 
 export interface PathClassNodeData {
   className: string;
@@ -35,7 +36,7 @@ export default function PathClassNode({ data }: { data: PathClassNodeData }) {
         </button>
       )}
 
-      <NodeCard role="default" minWidth={220} maxWidth={300}>
+      <NodeCard role="default" minWidth={NODE_ATTACH_MIN_WIDTH_PX} maxWidth={NODE_ATTACH_MAX_WIDTH_PX}>
         <NodeHandleDot type="target" position={Position.Top} id="class-input" role="default" />
 
         <NodeHeader

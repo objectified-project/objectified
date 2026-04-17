@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { FileJson, Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, AlertCircle, FileOutput } from 'lucide-react';
 import { Position } from '@xyflow/react';
 import { NodeCard } from '../../../../components/ade/canvas/NodeCard';
+import { NODE_BODY_MIN_WIDTH_PX, NODE_BODY_MAX_WIDTH_PX } from './paths-theme';
 import { NodeHeader } from '../../../../components/ade/canvas/NodeHeader';
 import { NodeHandleDot } from '../../../../components/ade/canvas/NodeHandleDot';
 import { accentVar, type NodeAccentRole } from '../../../../components/ade/canvas/canvas-theme';
@@ -661,7 +662,7 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
         style={{ cursor: 'not-allowed', opacity: 0.55 }}
       />
 
-      <NodeCard role={statusRole} minWidth={320} maxWidth={400} customBorderColor={responseAccent}>
+      <NodeCard role={statusRole} minWidth={NODE_BODY_MIN_WIDTH_PX} maxWidth={NODE_BODY_MAX_WIDTH_PX} customBorderColor={responseAccent}>
         <NodeHeader
           role={statusRole}
           customBackground={responseAccent}

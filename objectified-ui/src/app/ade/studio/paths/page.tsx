@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { useStudio } from '../StudioContext';
 import PathsSidebar from './components/PathsSidebar';
-import PathsHttpOperationPalette from './components/PathsHttpOperationPalette';
 import PathsCanvasView from './components/PathsCanvasView';
 import PathsCodeView from './components/PathsCodeView';
 import OperationPropertiesPanel from './components/OperationPropertiesPanel';
@@ -147,8 +146,6 @@ export default function PathsPage() {
             onOperationFocus={handleOperationFocusFromSidebar}
             onSecurityRefresh={handleCanvasRefresh}
           />
-
-          <PathsHttpOperationPalette />
 
           {/* Center Canvas */}
           <div className="flex-1 relative">

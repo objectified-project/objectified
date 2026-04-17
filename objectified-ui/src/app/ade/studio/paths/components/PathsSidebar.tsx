@@ -30,11 +30,56 @@ import { getSharedPathParameters } from '../../../../../../lib/db/helper-shared-
 import { getPathParameterCoverageError, getPathTemplateValidationError, isValidPath } from '../../../../../../lib/utils/path-params';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { AVAILABLE_OPERATIONS, OPERATION_COLORS } from './paths-operation-colors';
+import type { ParameterLocation } from './paths-theme';
 import { parseOpenAPISpec } from '../../../../utils/openapi-import';
 import { importPathsFromOpenAPIForVersion } from '../../../../../../lib/db/import-openapi-paths-security';
 import SidebarShell, { SidebarSectionLabel } from '../../../../components/sidebar/SidebarShell';
 import SidebarDensityToggle from '../../../../components/sidebar/SidebarDensityToggle';
 import { sidebarTheme, useSidebarTokens } from '../../../../components/sidebar/sidebar-theme';
+
+/**
+ * Draggable parameter chips shown in the Operations tab. Dropping one onto an
+ * operation node creates a shared path parameter and links it to that
+ * operation; the user can rename and fine-tune in the Parameter Properties
+ * panel. `dot` is a Tailwind bg class that matches the location role color in
+ * `PARAM_LOCATION_CHIP` for visual consistency across the Paths surface.
+ */
+const PARAMETER_CHIPS: {
+  inLocation: ParameterLocation;
+  label: string;
+  suggestedName: string;
+  dot: string;
+  hint: string;
+}[] = [
+  {
+    inLocation: 'query',
+    label: 'Query',
+    suggestedName: 'q',
+    dot: 'bg-sky-500 dark:bg-sky-400',
+    hint: 'Querystring parameter (e.g. ?page=1). Drop onto an operation.',
+  },
+  {
+    inLocation: 'path',
+    label: 'Path',
+    suggestedName: 'id',
+    dot: 'bg-indigo-500 dark:bg-indigo-400',
+    hint: 'Path parameter. Typically derived from /{placeholder} in the pathname — drop onto an operation to add one manually.',
+  },
+  {
+    inLocation: 'header',
+    label: 'Header',
+    suggestedName: 'Authorization',
+    dot: 'bg-violet-500 dark:bg-violet-400',
+    hint: 'Header parameter (e.g. Authorization, X-Request-ID). Drop onto an operation.',
+  },
+  {
+    inLocation: 'cookie',
+    label: 'Cookie',
+    suggestedName: 'session',
+    dot: 'bg-amber-500 dark:bg-amber-400',
+    hint: 'Cookie parameter (e.g. session). Drop onto an operation. Browser cookie rules may differ from the exported spec.',
+  },
+];
 
 interface ClassItem {
   id: string;
@@ -388,6 +433,21 @@ export default function PathsSidebar({
     }));
   };
 
+  // Handle dragging a parameter chip to the canvas. The drop target (operation
+  // node) wires the parameter up server-side; suggestedName is a sensible
+  // default that the Parameter Properties panel lets the user rename.
+  const handleParameterDragStart = (
+    event: React.DragEvent,
+    chip: typeof PARAMETER_CHIPS[0],
+  ) => {
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('application/json', JSON.stringify({
+      type: 'parameter',
+      inLocation: chip.inLocation,
+      suggestedName: chip.suggestedName,
+    }));
+  };
+
   const handleTabChange = (value: string) => {
     onTabChange(value as 'paths' | 'operations' | 'classes' | 'properties' | 'security' | 'servers');
   };
@@ -538,39 +598,81 @@ export default function PathsSidebar({
             <>
               {/* Operations Tab Content */}
               {activeTab === 'operations' && (
-                <div className="flex flex-col gap-3">
-                  <SidebarSectionLabel>HTTP Operations</SidebarSectionLabel>
-                  <p className={['text-[11px] -mt-1 px-1', sidebarTheme.textSecondary].join(' ')}>
-                    Drag any operation onto a path on the canvas to attach it.
-                  </p>
-                  <div className={['flex flex-col', tokens.rowGap].join(' ')}>
-                    {AVAILABLE_OPERATIONS.map((operation) => (
-                      <div
-                        key={operation.id}
-                        draggable
-                        onDragStart={(e) => handleOperationDragStart(e, operation)}
-                        className={[
-                          'group flex items-center gap-2.5 rounded-md border cursor-grab transition-colors active:cursor-grabbing',
-                          tokens.rowPaddingX,
-                          tokens.rowPaddingY,
-                          sidebarTheme.borderSoft,
-                          sidebarTheme.hover,
-                          'hover:border-slate-300 dark:hover:border-slate-700',
-                        ].join(' ')}
-                      >
-                        <span
-                          className="shrink-0 w-2 h-2 rounded-full"
-                          style={{ backgroundColor: operation.color }}
-                          aria-hidden
-                        />
-                        <span
-                          className={['font-semibold tracking-wide', tokens.rowText].join(' ')}
-                          style={{ color: operation.color }}
+                <div className="flex flex-col gap-5">
+                  <div className="flex flex-col gap-3">
+                    <SidebarSectionLabel>HTTP Operations</SidebarSectionLabel>
+                    <p className={['text-[11px] -mt-1 px-1', sidebarTheme.textSecondary].join(' ')}>
+                      Drag any operation onto a path on the canvas to attach it.
+                    </p>
+                    <div className={['flex flex-col', tokens.rowGap].join(' ')}>
+                      {AVAILABLE_OPERATIONS.map((operation) => (
+                        <div
+                          key={operation.id}
+                          draggable
+                          onDragStart={(e) => handleOperationDragStart(e, operation)}
+                          className={[
+                            'group flex items-center gap-2.5 rounded-md border cursor-grab transition-colors active:cursor-grabbing',
+                            tokens.rowPaddingX,
+                            tokens.rowPaddingY,
+                            sidebarTheme.borderSoft,
+                            sidebarTheme.hover,
+                            'hover:border-slate-300 dark:hover:border-slate-700',
+                          ].join(' ')}
                         >
-                          {operation.label}
-                        </span>
-                      </div>
-                    ))}
+                          <span
+                            className="shrink-0 w-2 h-2 rounded-full"
+                            style={{ backgroundColor: operation.color }}
+                            aria-hidden
+                          />
+                          <span
+                            className={['font-semibold tracking-wide', tokens.rowText].join(' ')}
+                            style={{ color: operation.color }}
+                          >
+                            {operation.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <SidebarSectionLabel>Parameters</SidebarSectionLabel>
+                    <p className={['text-[11px] -mt-1 px-1', sidebarTheme.textSecondary].join(' ')}>
+                      Drag a parameter chip onto an operation to attach it. Edit name, type, and rules in the Parameter panel.
+                    </p>
+                    <div className={['flex flex-col', tokens.rowGap].join(' ')}>
+                      {PARAMETER_CHIPS.map((chip) => (
+                        <div
+                          key={chip.inLocation}
+                          draggable
+                          onDragStart={(e) => handleParameterDragStart(e, chip)}
+                          title={chip.hint}
+                          className={[
+                            'group flex items-center gap-2.5 rounded-md border cursor-grab transition-colors active:cursor-grabbing',
+                            tokens.rowPaddingX,
+                            tokens.rowPaddingY,
+                            sidebarTheme.borderSoft,
+                            sidebarTheme.hover,
+                            'hover:border-slate-300 dark:hover:border-slate-700',
+                          ].join(' ')}
+                        >
+                          <span
+                            className={['shrink-0 w-2 h-2 rounded-full', chip.dot].join(' ')}
+                            aria-hidden
+                          />
+                          <span
+                            className={['font-semibold tracking-wide uppercase', tokens.rowText, sidebarTheme.textPrimary].join(' ')}
+                          >
+                            {chip.label}
+                          </span>
+                          <span
+                            className={['ml-auto truncate text-[11px]', sidebarTheme.textTertiary].join(' ')}
+                          >
+                            in: {chip.inLocation}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
