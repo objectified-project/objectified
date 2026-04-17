@@ -1,12 +1,30 @@
-import { getPublicTenants } from "../../lib/db/helper";
-import { HomeClient } from "./HomeClient";
+import {
+  getPublicTenants,
+  getRecentlyPublishedVersions,
+  getMostVersionedProjects,
+  getNewestTenants,
+  getDirectoryStats,
+} from '../../lib/db/helper';
+import { HomeClient } from './HomeClient';
 
-// Disable static caching to always fetch fresh data
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  const tenants = await getPublicTenants();
+  const [tenants, recentVersions, popularProjects, newestTenants, stats] = await Promise.all([
+    getPublicTenants(),
+    getRecentlyPublishedVersions(8),
+    getMostVersionedProjects(8),
+    getNewestTenants(8),
+    getDirectoryStats(),
+  ]);
 
-  return <HomeClient tenants={tenants} />;
+  return (
+    <HomeClient
+      tenants={tenants}
+      recentVersions={recentVersions}
+      popularProjects={popularProjects}
+      newestTenants={newestTenants}
+      stats={stats}
+    />
+  );
 }
-

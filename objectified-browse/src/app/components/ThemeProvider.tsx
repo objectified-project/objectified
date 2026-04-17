@@ -101,19 +101,18 @@ export const specThemes: Record<SpecTheme, {
   },
 };
 
+function readStoredTheme<T extends string>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback;
+  const value = window.localStorage.getItem(key) as T | null;
+  return value ?? fallback;
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('system');
-  const [specTheme, setSpecThemeState] = useState<SpecTheme>('default');
+  const [theme, setThemeState] = useState<Theme>(() => readStoredTheme<Theme>('theme', 'system'));
+  const [specTheme, setSpecThemeState] = useState<SpecTheme>(() =>
+    readStoredTheme<SpecTheme>('specTheme', 'default')
+  );
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
-
-  useEffect(() => {
-    // Load saved preferences
-    const savedTheme = localStorage.getItem('theme') as Theme | null;
-    const savedSpecTheme = localStorage.getItem('specTheme') as SpecTheme | null;
-
-    if (savedTheme) setThemeState(savedTheme);
-    if (savedSpecTheme) setSpecThemeState(savedSpecTheme);
-  }, []);
 
   useEffect(() => {
     const updateResolvedTheme = () => {
