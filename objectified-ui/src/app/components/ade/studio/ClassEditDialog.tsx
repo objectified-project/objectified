@@ -32,6 +32,21 @@ import ConditionalSchemaBuilder, {
   conditionalRulesToJsonSchema,
   jsonSchemaToConditionalRules
 } from './ConditionalSchemaBuilder';
+import {
+  FormSection,
+  FormSubsection,
+  FormFieldGroup,
+  FormGrid,
+  FormEmptyState,
+  FormToggleCard,
+  FormViewModeToggle,
+  FormSectionNav,
+  FormWizardStepper,
+  FormWizardControls,
+  useFormScrollSpy,
+  scrollToSection,
+  useFormViewMode,
+} from './form';
 
 // Custom hook for dark mode detection - prioritizes localStorage, then system preference
 const useDarkMode = () => {
@@ -149,6 +164,51 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
   ),
 });
 
+/**
+ * Canonical ordering of class-edit sections.
+ * Each entry maps a stable section `id` (used by the scroll-spy, sidebar
+ * nav, and changed-indicator) to its wizard step. Keep this list in sync
+ * with both the render order and the `CLASS_WIZARD_STEPS` below.
+ */
+const CLASS_SECTION_ORDER = [
+  'basics',
+  'object-constraints',
+  'additional-props',
+  'unevaluated-props',
+  'composition',
+  'pattern-props',
+  'dependent-schemas',
+  'dependent-required',
+  'conditional',
+  'examples',
+  'xml',
+  'schema-metadata',
+  'external-docs',
+  'extensions',
+] as const;
+
+type ClassSectionId = typeof CLASS_SECTION_ORDER[number];
+
+const CLASS_WIZARD_STEPS: Array<{ id: string; label: string; sections: ClassSectionId[] }> = [
+  { id: 'basics', label: 'Basics', sections: ['basics'] },
+  {
+    id: 'validation',
+    label: 'Validation',
+    sections: ['object-constraints', 'additional-props', 'unevaluated-props'],
+  },
+  { id: 'composition', label: 'Composition', sections: ['composition'] },
+  {
+    id: 'dynamic',
+    label: 'Dynamic Properties',
+    sections: ['pattern-props', 'dependent-schemas', 'dependent-required', 'conditional'],
+  },
+  {
+    id: 'documentation',
+    label: 'Documentation',
+    sections: ['examples', 'xml', 'schema-metadata', 'external-docs', 'extensions'],
+  },
+];
+
 interface ClassEditDialogProps {
   open: boolean;
   onClose: () => void;
@@ -184,6 +244,26 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   const [saving, setSaving] = useState(false);
   const [openApiDoc, setOpenApiDoc] = useState<any>(null);
   const [loadingOpenApiDoc, setLoadingOpenApiDoc] = useState(false);
+
+  // View-mode state: `guided` shows one wizard step at a time, `advanced`
+  // shows all sections with a sticky sidebar nav. Preference is persisted
+  // per-user in sessionStorage so power users stay in Advanced mode.
+  const [viewMode, setViewMode] = useFormViewMode(
+    'ade.class-edit.view-mode',
+    editingClassData ? 'advanced' : 'guided',
+  );
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const advancedScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Scroll-spy follows the user's position in Advanced mode so the sidebar
+  // highlights the section currently in view. Disabled in Guided mode where
+  // only one step's sections are rendered at a time.
+  const { activeId: activeSectionId } = useFormScrollSpy({
+    sectionIds: CLASS_SECTION_ORDER as unknown as string[],
+    containerRef: advancedScrollRef,
+    disabled: viewMode !== 'advanced',
+    rootMarginTop: 24,
+  });
 
   // AI Assistant (Create Class) chat mode
   const [showAIChatMode, setShowAIChatMode] = useState(false);
@@ -243,36 +323,46 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     error: ''
   });
 
-  /** Sections that differ from defaults (empty/new class state) - for visual highlight */
-  const changedSections = useMemo(() => {
+  /**
+   * Per-section "changed" indicator used by the sidebar nav dot and the
+   * FormSection edge stripe. Keys map 1:1 to CLASS_SECTION_ORDER.
+   */
+  const changedSections = useMemo<Record<ClassSectionId, boolean>>(() => {
     const d = formData;
     const apType = d.additionalPropertiesType;
     const upType = d.unevaluatedPropertiesType;
-    const apTypeWithNonString = apType === 'type' && d.additionalPropertiesInlineType !== 'string';
-    const upTypeWithNonString = upType === 'type' && d.additionalPropertiesInlineType !== 'string';
-    const apChanged = apType !== 'default' || d.additionalPropertiesSchema !== '' || apTypeWithNonString;
-    const upChanged = upType !== 'default' || d.unevaluatedPropertiesSchema !== '' || upTypeWithNonString;
+    const apNonDefaultType = apType === 'type' && d.additionalPropertiesInlineType !== 'string';
+    const upNonDefaultType = upType === 'type' && d.unevaluatedPropertiesInlineType !== 'string';
+    const apChanged = apType !== 'default' || d.additionalPropertiesSchema !== '' || apNonDefaultType;
+    const upChanged = upType !== 'default' || d.unevaluatedPropertiesSchema !== '' || upNonDefaultType;
     return {
-      basicInfo: d.description.trim() !== '' || d.deprecated || d.deprecationMessage.trim() !== '' || d.selectedTags.length > 0,
-      propertyValidation: apChanged || upChanged || d.patternProperties.length > 0,
-      composition: d.allOf.length > 0 || d.anyOf.length > 0 || d.oneOf.length > 0
-        || d.discriminatorProperty.trim() !== '' || !d.discriminatorUseAuto || Object.keys(d.discriminatorMapping).length > 0,
-      conditionalSchema: d.conditionalRules.length > 0,
-      patternProperties: d.patternProperties.length > 0,
-      dependentSchemas: Object.keys(d.dependentSchemas).length > 0,
-      dependentRequired: d.dependentRequired.length > 0,
-      objectConstraints: d.minProperties.trim() !== '' || d.maxProperties.trim() !== '',
+      basics:
+        d.description.trim() !== '' ||
+        d.deprecated ||
+        d.deprecationMessage.trim() !== '' ||
+        d.selectedTags.length > 0,
+      'object-constraints': d.minProperties.trim() !== '' || d.maxProperties.trim() !== '',
+      'additional-props': apChanged,
+      'unevaluated-props': upChanged,
+      composition:
+        d.allOf.length > 0 ||
+        d.anyOf.length > 0 ||
+        d.oneOf.length > 0 ||
+        d.discriminatorProperty.trim() !== '' ||
+        !d.discriminatorUseAuto ||
+        Object.keys(d.discriminatorMapping).length > 0,
+      'pattern-props': d.patternProperties.length > 0,
+      'dependent-schemas': Object.keys(d.dependentSchemas).length > 0,
+      'dependent-required': d.dependentRequired.length > 0,
+      conditional: d.conditionalRules.length > 0,
       examples: d.examples.length > 0,
       xml: d.xmlName.trim() !== '' || d.xmlNamespace.trim() !== '' || d.xmlPrefix.trim() !== '',
-      schemaMetadata: d.schemaId.trim() !== '' || d.schemaAnchor.trim() !== '' || d.schemaComment.trim() !== '',
-      externalDocs: d.externalDocsUrl.trim() !== '' || d.externalDocsDescription.trim() !== '',
+      'schema-metadata':
+        d.schemaId.trim() !== '' || d.schemaAnchor.trim() !== '' || d.schemaComment.trim() !== '',
+      'external-docs': d.externalDocsUrl.trim() !== '' || d.externalDocsDescription.trim() !== '',
       extensions: Object.keys(d.extensions).length > 0,
     };
   }, [formData]);
-
-  const sectionHighlightClass = 'ring-2 ring-amber-600/70 dark:ring-amber-500/70 ring-offset-2 ring-offset-white dark:ring-offset-gray-800 rounded-lg';
-  const sectionHighlightBg = 'bg-amber-100 dark:bg-amber-900/40';
-  const sectionHighlightBgOverAlternate = 'bg-amber-100 dark:bg-amber-900/50';
 
   // Reset view and form when dialog opens
   useEffect(() => {
@@ -284,6 +374,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       setAiInput('');
       setAiCreateError('');
       setNewDependentSchemaProperty('');
+      setCurrentStepIndex(0);
 
       if (editingClassData) {
         // Edit mode - populate form with existing class data
@@ -1484,11 +1575,6 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 </span>
               )}
             </div>
-            {!showAIChatMode && (
-              <p className="text-xs text-amber-700 dark:text-amber-300 shrink-0 max-w-md sm:text-right">
-                Amber-highlighted sections indicate values that differ from defaults.
-              </p>
-            )}
           </div>
         </DialogHeader>
 
@@ -1676,20 +1762,72 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           {/* Edit Tab */}
           <TabsContent value="edit" className="flex-1 flex flex-col overflow-hidden mt-0 p-0">
             {formData.error && <Alert variant="error" className="m-4 mb-0">{formData.error}</Alert>}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 divide-x divide-gray-200 dark:divide-gray-700 overflow-hidden min-h-0">
-              {/* LEFT COLUMN - Essential/Common Fields */}
-              <div className="flex flex-col overflow-y-auto min-h-0">
 
-              {/* SECTION 1: Basic Information */}
-              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.basicInfo ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
-                <div className="flex items-center gap-2 mb-4">
-                  <FileText size={18} className="text-indigo-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Basic Information</h3>
-                </div>
+            {/* View-mode toolbar — the toggle is intentionally the only
+                control here; guided mode's stepper renders immediately below
+                and advanced mode uses the sidebar nav for context. */}
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/60 px-6 py-2.5 dark:border-slate-800 dark:bg-slate-900/40 shrink-0">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">
+                {viewMode === 'guided' ? 'Wizard' : 'All sections'}
+              </span>
+              <FormViewModeToggle value={viewMode} onChange={setViewMode} />
+            </div>
+            {viewMode === 'guided' && (
+              <FormWizardStepper
+                steps={CLASS_WIZARD_STEPS.map((step, idx) => ({
+                  id: step.id,
+                  label: step.label,
+                  complete: idx < currentStepIndex,
+                }))}
+                currentIndex={currentStepIndex}
+                onStepSelect={setCurrentStepIndex}
+              />
+            )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="className">Class Name *</Label>
+            {/* Body: sidebar nav + scrolling sections (advanced), or single-pane (guided) */}
+            <div className="flex-1 flex overflow-hidden min-h-0">
+              {viewMode === 'advanced' && (
+                <FormSectionNav
+                  title="Sections"
+                  items={[
+                    { id: 'basics', label: 'Basic Information', icon: <FileText className="h-3.5 w-3.5" />, group: 'Basics', changed: changedSections.basics },
+                    { id: 'object-constraints', label: 'Object Constraints', icon: <Settings className="h-3.5 w-3.5" />, group: 'Validation', changed: changedSections['object-constraints'] },
+                    { id: 'additional-props', label: 'Additional Properties', icon: <Layers className="h-3.5 w-3.5" />, group: 'Validation', changed: changedSections['additional-props'] },
+                    { id: 'unevaluated-props', label: 'Unevaluated Properties', icon: <Layers className="h-3.5 w-3.5" />, group: 'Validation', changed: changedSections['unevaluated-props'] },
+                    { id: 'composition', label: 'Composition', icon: <GitBranch className="h-3.5 w-3.5" />, group: 'Composition', changed: changedSections.composition },
+                    { id: 'pattern-props', label: 'Pattern Properties', icon: <Regex className="h-3.5 w-3.5" />, group: 'Dynamic Properties', changed: changedSections['pattern-props'] },
+                    { id: 'dependent-schemas', label: 'Dependent Schemas', icon: <Link className="h-3.5 w-3.5" />, group: 'Dynamic Properties', changed: changedSections['dependent-schemas'] },
+                    { id: 'dependent-required', label: 'Dependent Required', icon: <ListChecks className="h-3.5 w-3.5" />, group: 'Dynamic Properties', changed: changedSections['dependent-required'] },
+                    { id: 'conditional', label: 'Conditional Schema', icon: <GitBranch className="h-3.5 w-3.5" />, group: 'Dynamic Properties', changed: changedSections.conditional },
+                    { id: 'examples', label: 'Examples', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', changed: changedSections.examples },
+                    { id: 'xml', label: 'XML Representation', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', changed: changedSections.xml },
+                    { id: 'schema-metadata', label: 'Schema Metadata', icon: <FileText className="h-3.5 w-3.5" />, group: 'Documentation', changed: changedSections['schema-metadata'] },
+                    { id: 'external-docs', label: 'External Docs', icon: <ExternalLink className="h-3.5 w-3.5" />, group: 'Documentation', changed: changedSections['external-docs'] },
+                    { id: 'extensions', label: 'Extensions', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', changed: changedSections.extensions },
+                  ]}
+                  activeId={activeSectionId}
+                  onSelect={(id) => scrollToSection(advancedScrollRef.current, id, 24)}
+                  className="h-full"
+                />
+              )}
+
+              <div
+                ref={advancedScrollRef}
+                className="flex-1 overflow-y-auto min-h-0"
+              >
+
+              {/* SECTION: Basic Information */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('basics')) && (
+              <FormSection
+                id="basics"
+                icon={<FileText size={16} />}
+                eyebrow="Identity"
+                title="Basic Information"
+                description="Name, description, tags, and deprecation metadata."
+                changed={changedSections.basics}
+              >
+                <FormGrid cols={3} gap="md">
+                  <FormFieldGroup label="Class Name" htmlFor="className" required helper="PascalCase recommended">
                     <Input
                       id="className"
                       autoFocus
@@ -1698,10 +1836,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                       placeholder="e.g., UserAccount"
                       disabled={isReadOnly}
                     />
-                    <p className="text-xs text-gray-500">PascalCase recommended</p>
-                  </div>
-                  <div className="md:col-span-2 space-y-2">
-                    <Label htmlFor="description">Description</Label>
+                  </FormFieldGroup>
+                  <FormFieldGroup label="Description" htmlFor="description" className="md:col-span-2">
                     <Textarea
                       id="description"
                       value={formData.description}
@@ -1710,13 +1846,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                       disabled={isReadOnly}
                       rows={2}
                     />
-                  </div>
-                </div>
+                  </FormFieldGroup>
+                </FormGrid>
 
                 {/* Tags */}
                 {projectId && projectTags && projectTags.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <Label>Tags</Label>
+                  <FormFieldGroup label="Tags">
                     <div className="flex flex-wrap gap-2 p-2 border border-gray-200 dark:border-gray-700 rounded-md min-h-[38px]">
                       {formData.selectedTags.map((tagId) => {
                         const tag = projectTags.find((t: any) => t.id === tagId);
@@ -1758,48 +1893,79 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                         </Select>
                       )}
                     </div>
-                  </div>
+                  </FormFieldGroup>
                 )}
 
-                {/* Deprecation Status - compact */}
-                <div className={`mt-4 p-3 rounded-lg border flex items-start gap-4 ${formData.deprecated ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700' : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'}`}>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="deprecated"
-                      checked={formData.deprecated}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, deprecated: !!checked }))}
-                      disabled={isReadOnly}
-                    />
-                    <label htmlFor="deprecated" className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer flex items-center gap-1">
-                      <AlertTriangle size={14} className={formData.deprecated ? 'text-amber-500' : 'text-gray-400'} />
-                      Deprecated
-                    </label>
-                  </div>
-                  {formData.deprecated && (
+                <FormToggleCard
+                  id="deprecated"
+                  icon={<AlertTriangle className="h-3.5 w-3.5" />}
+                  accent="amber"
+                  label="Deprecated"
+                  description="Mark this class as deprecated. Consumers will see a warning."
+                  checked={formData.deprecated}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, deprecated: checked }))}
+                  disabled={isReadOnly}
+                  stack={formData.deprecated}
+                  trailing={formData.deprecated ? (
                     <Input
                       value={formData.deprecationMessage}
                       onChange={(e) => setFormData(prev => ({ ...prev, deprecationMessage: e.target.value }))}
                       placeholder="Deprecation message (e.g., Use NewClass instead)"
                       disabled={isReadOnly}
-                      className="flex-1 h-8 text-sm"
+                      className="h-8 text-sm"
                     />
-                  )}
-                </div>
-              </div>
+                  ) : undefined}
+                />
+              </FormSection>
+              )}
 
-              {/* SECTION 2: Property Validation */}
-              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.propertyValidation ? `${sectionHighlightBgOverAlternate} ${sectionHighlightClass}` : isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
-                <div className="flex items-center gap-2 mb-4">
-                  <Settings size={18} className="text-indigo-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Property Validation</h3>
-                </div>
+              {/* SECTION: Object Constraints */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('object-constraints')) && (
+              <FormSection
+                id="object-constraints"
+                icon={<Settings size={16} />}
+                eyebrow="Validation"
+                title="Object Constraints"
+                description="Limits on the number of properties an instance of this class may contain."
+                badge={<Badge variant="secondary" className="text-xs">OpenAPI 3.1</Badge>}
+                changed={changedSections['object-constraints']}
+              >
+                <FormGrid cols={2} gap="md">
+                  <FormFieldGroup label="Min Properties" helper="Minimum number of properties required">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.minProperties}
+                      onChange={(e) => setFormData(prev => ({ ...prev, minProperties: e.target.value }))}
+                      placeholder="e.g., 1"
+                      disabled={isReadOnly}
+                    />
+                  </FormFieldGroup>
+                  <FormFieldGroup label="Max Properties" helper="Maximum number of properties allowed">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formData.maxProperties}
+                      onChange={(e) => setFormData(prev => ({ ...prev, maxProperties: e.target.value }))}
+                      placeholder="e.g., 10"
+                      disabled={isReadOnly}
+                    />
+                  </FormFieldGroup>
+                </FormGrid>
+              </FormSection>
+              )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Additional Properties */}
-                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <h4 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Additional Properties</h4>
-                    <p className="text-xs text-gray-500 mb-3">Controls validation for properties not defined in the schema</p>
-                    <div className="space-y-2">
+              {/* SECTION: Additional Properties */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('additional-props')) && (
+              <FormSection
+                id="additional-props"
+                icon={<Layers size={16} />}
+                eyebrow="Validation"
+                title="Additional Properties"
+                description="Controls validation for properties not defined in the schema."
+                changed={changedSections['additional-props']}
+              >
+                <div className="space-y-2">
                       {(['default', 'allow', 'disallow', 'type', 'schema'] as const).map((value) => (
                         <label key={value} className="flex items-center gap-2 cursor-pointer">
                           <input
@@ -1869,14 +2035,21 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                           </Select>
                         </div>
                       )}
-                    </div>
-                  </div>
+                </div>
+              </FormSection>
+              )}
 
-                  {/* Unevaluated Properties */}
-                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <h4 className="text-sm font-semibold mb-1 text-gray-900 dark:text-gray-100">Unevaluated Properties</h4>
-                    <p className="text-xs text-gray-500 mb-3">For properties not matched by allOf/oneOf/anyOf subschemas</p>
-                    <div className="space-y-2">
+              {/* SECTION: Unevaluated Properties */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('unevaluated-props')) && (
+              <FormSection
+                id="unevaluated-props"
+                icon={<Layers size={16} />}
+                eyebrow="Validation"
+                title="Unevaluated Properties"
+                description="For properties not matched by allOf / oneOf / anyOf subschemas."
+                changed={changedSections['unevaluated-props']}
+              >
+                <div className="space-y-2">
                       {(['default', 'allow', 'disallow', 'type', 'schema'] as const).map((value) => (
                         <label key={value} className="flex items-center gap-2 cursor-pointer">
                           <input
@@ -1946,23 +2119,27 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                           </Select>
                         </div>
                       )}
-                    </div>
-                  </div>
                 </div>
-              </div>
+              </FormSection>
+              )}
 
-              {/* SECTION 3: Composition & Inheritance */}
-              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.composition ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
-                <div className="flex items-center gap-2 mb-4">
-                  <Layers size={18} className="text-indigo-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Composition & Inheritance</h3>
-                </div>
-                <p className="text-sm text-gray-500 mb-4">Define relationships with other classes using OpenAPI composition keywords.</p>
-
+              {/* SECTION: Composition & Inheritance */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('composition')) && (
+              <FormSection
+                id="composition"
+                icon={<GitBranch size={16} />}
+                eyebrow="Composition"
+                title="Composition & Inheritance"
+                description="Define relationships with other classes using OpenAPI composition keywords."
+                changed={changedSections.composition}
+              >
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {/* allOf */}
-                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-indigo-900/30 border-indigo-700' : 'bg-indigo-50 border-indigo-200'}`}>
-                    <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>allOf (Inheritance)</h4>
+                  <FormSubsection
+                    accent="indigo"
+                    icon={<Layers className="h-4 w-4" />}
+                    title="allOf (Inheritance)"
+                    description="Must match ALL listed schemas."
+                  >
                     <MultiSelect
                       options={availableClasses}
                       value={formData.allOf}
@@ -1971,12 +2148,14 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                       disabled={isReadOnly}
                       colorScheme="indigo"
                     />
-                    <p className="text-xs text-gray-500 mt-2">Must match ALL listed schemas</p>
-                  </div>
+                  </FormSubsection>
 
-                  {/* anyOf */}
-                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-amber-900/30 border-amber-700' : 'bg-amber-50 border-amber-200'}`}>
-                    <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>anyOf (Alternatives)</h4>
+                  <FormSubsection
+                    accent="amber"
+                    icon={<Layers className="h-4 w-4" />}
+                    title="anyOf (Alternatives)"
+                    description="Must match AT LEAST one schema."
+                  >
                     <MultiSelect
                       options={availableClasses}
                       value={formData.anyOf}
@@ -1985,12 +2164,14 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                       disabled={isReadOnly}
                       colorScheme="amber"
                     />
-                    <p className="text-xs text-gray-500 mt-2">Must match AT LEAST one schema</p>
-                  </div>
+                  </FormSubsection>
 
-                  {/* oneOf */}
-                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-purple-900/30 border-purple-700' : 'bg-purple-50 border-purple-200'}`}>
-                    <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>oneOf (Exclusive)</h4>
+                  <FormSubsection
+                    accent="purple"
+                    icon={<Layers className="h-4 w-4" />}
+                    title="oneOf (Exclusive)"
+                    description="Must match EXACTLY one schema."
+                  >
                     <MultiSelect
                       options={availableClasses}
                       value={formData.oneOf}
@@ -1999,15 +2180,18 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                       disabled={isReadOnly}
                       colorScheme="purple"
                     />
-                    <p className="text-xs text-gray-500 mt-2">Must match EXACTLY one schema</p>
-                  </div>
+                  </FormSubsection>
                 </div>
 
                 {/* Discriminator */}
                 {(formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0) && (
-                  <div className="mt-4 p-4 bg-gray-50 dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
-                    <h4 className="text-sm font-semibold mb-2 text-gray-900 dark:text-gray-100">Discriminator Configuration</h4>
-                    <p className="text-xs text-gray-500 mb-3">Helps tools understand which schema variant to use for polymorphic types</p>
+                  <FormSubsection
+                    tone="subtle"
+                    accent="indigo"
+                    icon={<GitBranch className="h-4 w-4" />}
+                    title="Discriminator Configuration"
+                    description="Helps tools understand which schema variant to use for polymorphic types."
+                  >
                     <div className="space-y-3">
                       <div className="space-y-1">
                         <Label>Discriminator Property</Label>
@@ -2119,39 +2303,39 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                         </>
                       )}
                     </div>
-                  </div>
+                  </FormSubsection>
                 )}
-              </div>
-              </div>
+              </FormSection>
+              )}
 
-              {/* RIGHT COLUMN - Advanced/Optional Fields */}
-              <div className="flex flex-col overflow-y-auto min-h-0">
-              {/* Pattern Properties */}
-              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.patternProperties ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Regex size={18} className="text-indigo-500" />
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Pattern Properties</h3>
-                  </div>
-                  {!isReadOnly && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setFormData(prev => ({
-                        ...prev,
-                        patternProperties: [...prev.patternProperties, { pattern: '', schemaType: 'string', schemaRef: '' }]
-                      }))}
-                    >
-                      <Plus size={14} className="mr-1" /> Add Pattern
-                    </Button>
-                  )}
-                </div>
-                <p className="text-sm text-gray-500 mb-4">Define regex patterns that map dynamic property names to schemas.</p>
-
+              {/* SECTION: Pattern Properties */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('pattern-props')) && (
+              <FormSection
+                id="pattern-props"
+                icon={<Regex size={16} />}
+                eyebrow="Dynamic Properties"
+                title="Pattern Properties"
+                description="Define regex patterns that map dynamic property names to schemas."
+                changed={changedSections['pattern-props']}
+                action={!isReadOnly ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setFormData(prev => ({
+                      ...prev,
+                      patternProperties: [...prev.patternProperties, { pattern: '', schemaType: 'string', schemaRef: '' }]
+                    }))}
+                  >
+                    <Plus size={14} className="mr-1" /> Add Pattern
+                  </Button>
+                ) : undefined}
+              >
                 {formData.patternProperties.length === 0 ? (
-                  <div className="p-6 text-center bg-gray-50 dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
-                    <p className="text-sm text-gray-500">No pattern properties defined.</p>
-                  </div>
+                  <FormEmptyState
+                    icon={<Regex className="h-5 w-5" />}
+                    title="No pattern properties defined"
+                    description="Add a regex pattern to validate properties whose names are not known in advance."
+                  />
                 ) : (
                   <div className="space-y-3">
                     {formData.patternProperties.map((patternProp, index) => (
@@ -2238,18 +2422,19 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     ))}
                   </div>
                 )}
-              </div>
+              </FormSection>
+              )}
 
-              {/* Dependent Schemas */}
-              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.dependentSchemas ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Link size={18} className="text-indigo-500" />
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Dependent Schemas</h3>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-500 mb-4">Define conditional validation: when a property has a specific value, apply additional constraints.</p>
-
+              {/* SECTION: Dependent Schemas */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('dependent-schemas')) && (
+              <FormSection
+                id="dependent-schemas"
+                icon={<Link size={16} />}
+                eyebrow="Dynamic Properties"
+                title="Dependent Schemas"
+                description="Apply additional constraints conditionally when a property has a specific value."
+                changed={changedSections['dependent-schemas']}
+              >
                 {!isReadOnly && (
                   <div className="flex gap-2 mb-4 w-full">
                     <Input
@@ -2306,10 +2491,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 )}
 
                 {Object.keys(formData.dependentSchemas).length === 0 ? (
-                  <div className="p-6 text-center bg-gray-50 dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
-                    <p className="text-sm text-gray-500">No dependent schemas defined.</p>
-                    <p className="text-xs text-gray-400 mt-1">Add conditional validation rules based on property values.</p>
-                  </div>
+                  <FormEmptyState
+                    icon={<Link className="h-5 w-5" />}
+                    title="No dependent schemas defined"
+                    description="Add conditional validation rules based on property values."
+                  />
                 ) : (
                   <div className="space-y-4">
                     {Object.entries(formData.dependentSchemas).map(([triggerProp, depSchema]: [string, any]) => {
@@ -2533,34 +2719,37 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     })}
                   </div>
                 )}
-              </div>
+              </FormSection>
+              )}
 
-              {/* Dependent Required */}
-              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.dependentRequired ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <ListChecks size={18} className="text-indigo-500" />
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Dependent Required</h3>
-                  </div>
-                  {!isReadOnly && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setFormData(prev => ({
-                        ...prev,
-                        dependentRequired: [...prev.dependentRequired, { triggerProperty: '', requiredProperties: [] }]
-                      }))}
-                    >
-                      <Plus size={14} className="mr-1" /> Add Rule
-                    </Button>
-                  )}
-                </div>
-                <p className="text-sm text-gray-500 mb-4">When a trigger property is present, other properties become required.</p>
-
+              {/* SECTION: Dependent Required */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('dependent-required')) && (
+              <FormSection
+                id="dependent-required"
+                icon={<ListChecks size={16} />}
+                eyebrow="Dynamic Properties"
+                title="Dependent Required"
+                description="When a trigger property is present, other properties become required."
+                changed={changedSections['dependent-required']}
+                action={!isReadOnly ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setFormData(prev => ({
+                      ...prev,
+                      dependentRequired: [...prev.dependentRequired, { triggerProperty: '', requiredProperties: [] }]
+                    }))}
+                  >
+                    <Plus size={14} className="mr-1" /> Add Rule
+                  </Button>
+                ) : undefined}
+              >
                 {formData.dependentRequired.length === 0 ? (
-                  <div className="p-6 text-center bg-gray-50 dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
-                    <p className="text-sm text-gray-500">No dependent required rules defined.</p>
-                  </div>
+                  <FormEmptyState
+                    icon={<ListChecks className="h-5 w-5" />}
+                    title="No dependent required rules defined"
+                    description="Add a rule to make additional properties required when a trigger property is present."
+                  />
                 ) : (
                   <div className="space-y-3">
                     {formData.dependentRequired.map((depReq, index) => (
@@ -2611,85 +2800,47 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     ))}
                   </div>
                 )}
-              </div>
+              </FormSection>
+              )}
 
-              {/* Conditional Schema */}
-              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.conditionalSchema ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
+              {/* SECTION: Conditional Schema */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('conditional')) && (
+              <FormSection
+                id="conditional"
+                icon={<GitBranch size={16} />}
+                eyebrow="Dynamic Properties"
+                title="Conditional Schema"
+                description="Apply branching validation rules using if / then / else."
+                changed={changedSections.conditional}
+              >
                 <ConditionalSchemaBuilder
                   rules={formData.conditionalRules}
                   onChange={(rules) => setFormData(prev => ({ ...prev, conditionalRules: rules }))}
                   availableProperties={editingClassData?.properties?.map((p: any) => p.name) || []}
                   disabled={isReadOnly}
                   renderHeader={(addRule) => (
-                    <div className="flex items-center justify-between gap-2 mb-4">
-                      <div className="flex items-center gap-2">
-                        <GitBranch size={18} className="text-indigo-500" />
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Conditional Schema (if/then/else)</h3>
-                      </div>
+                    <div className="flex items-center justify-end mb-3">
                       <Button type="button" variant="outline" size="sm" onClick={addRule} disabled={isReadOnly}>
                         <Plus size={14} className="mr-1" /> Add Rule
                       </Button>
                     </div>
                   )}
                 />
-              </div>
+              </FormSection>
+              )}
 
-              {/* Documentation & Extensions */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2 mb-4">
-                  <ExternalLink size={18} className="text-indigo-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Documentation & Extensions</h3>
-                </div>
-
-                <div className="space-y-4">
-                  {/* Object Constraints */}
-                  <div className={`p-4 rounded-lg border ${changedSections.objectConstraints ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Settings size={16} className="text-indigo-500" />
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Object Constraints</h4>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">OpenAPI 3.1</Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label>Min Properties</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={formData.minProperties}
-                          onChange={(e) => setFormData(prev => ({ ...prev, minProperties: e.target.value }))}
-                          placeholder="e.g., 1"
-                          disabled={isReadOnly}
-                        />
-                        <p className="text-xs text-gray-500">Minimum number of properties required</p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Max Properties</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={formData.maxProperties}
-                          onChange={(e) => setFormData(prev => ({ ...prev, maxProperties: e.target.value }))}
-                          placeholder="e.g., 10"
-                          disabled={isReadOnly}
-                        />
-                        <p className="text-xs text-gray-500">Maximum number of properties allowed</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Class Examples */}
-                  <div className={`p-4 rounded-lg border ${changedSections.examples ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Code size={16} className="text-indigo-500" />
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Examples</h4>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">JSON Schema</Badge>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">Add example instances of this class schema (JSON format)</p>
-                    <div className="space-y-2">
+              {/* SECTION: Examples */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('examples')) && (
+              <FormSection
+                id="examples"
+                icon={<Code size={16} />}
+                eyebrow="Documentation"
+                title="Examples"
+                description="Add example instances of this class schema (JSON format)."
+                badge={<Badge variant="secondary" className="text-xs">JSON Schema</Badge>}
+                changed={changedSections.examples}
+              >
+                <div className="space-y-2">
                       {formData.examples.map((example, index) => (
                         <div key={index} className="flex gap-2">
                           <Input
@@ -2724,139 +2875,155 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                       >
                         <Plus size={16} className="mr-1" /> Add Example
                       </Button>
-                    </div>
-                  </div>
+                </div>
+              </FormSection>
+              )}
 
-                  {/* XML Object */}
-                  <div className={`p-4 rounded-lg border ${changedSections.xml ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-orange-200 dark:border-orange-900'}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Code size={16} className="text-orange-500" />
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">XML Representation</h4>
-                      </div>
-                      <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">OpenAPI 3.1</Badge>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">Configure how this class is serialized to XML format</p>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <Label>XML Name</Label>
-                        <Input
-                          value={formData.xmlName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, xmlName: e.target.value }))}
-                          placeholder="e.g., CustomName"
-                          disabled={isReadOnly}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Namespace</Label>
-                        <Input
-                          value={formData.xmlNamespace}
-                          onChange={(e) => setFormData(prev => ({ ...prev, xmlNamespace: e.target.value }))}
-                          placeholder="http://example.com/ns"
-                          disabled={isReadOnly}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Prefix</Label>
-                        <Input
-                          value={formData.xmlPrefix}
-                          onChange={(e) => setFormData(prev => ({ ...prev, xmlPrefix: e.target.value }))}
-                          placeholder="e.g., ns1"
-                          disabled={isReadOnly}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Schema Metadata */}
-                  <div className={`p-4 rounded-lg border ${changedSections.schemaMetadata ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <FileText size={16} className="text-indigo-500" />
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Schema Metadata</h4>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">JSON Schema 2020-12</Badge>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">Advanced schema identification and documentation</p>
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <Label>$id</Label>
-                        <Input
-                          value={formData.schemaId}
-                          onChange={(e) => setFormData(prev => ({ ...prev, schemaId: e.target.value }))}
-                          placeholder="https://example.com/schemas/myschema.json"
-                          disabled={isReadOnly}
-                        />
-                        <p className="text-xs text-gray-500">Unique identifier URI for this schema</p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label>$anchor</Label>
-                        <Input
-                          value={formData.schemaAnchor}
-                          onChange={(e) => setFormData(prev => ({ ...prev, schemaAnchor: e.target.value }))}
-                          placeholder="e.g., myAnchor"
-                          disabled={isReadOnly}
-                        />
-                        <p className="text-xs text-gray-500">Define a reusable anchor within the schema</p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label>$comment</Label>
-                        <Textarea
-                          value={formData.schemaComment}
-                          onChange={(e) => setFormData(prev => ({ ...prev, schemaComment: e.target.value }))}
-                          placeholder="Internal notes for schema authors..."
-                          disabled={isReadOnly}
-                          rows={2}
-                        />
-                        <p className="text-xs text-gray-500">Comments for schema authors (not shown to API consumers)</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* External Documentation */}
-                  <div className={`p-4 rounded-lg border ${changedSections.externalDocs ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <ExternalLink size={16} className="text-indigo-500" />
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">External Documentation</h4>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <Label>Documentation URL</Label>
-                        <Input
-                          type="url"
-                          value={formData.externalDocsUrl}
-                          onChange={(e) => setFormData(prev => ({ ...prev, externalDocsUrl: e.target.value }))}
-                          placeholder="https://docs.example.com/..."
-                          disabled={isReadOnly}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Description</Label>
-                        <Textarea
-                          value={formData.externalDocsDescription}
-                          onChange={(e) => setFormData(prev => ({ ...prev, externalDocsDescription: e.target.value }))}
-                          placeholder="Brief description of external docs"
-                          disabled={isReadOnly}
-                          rows={2}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Extensions */}
-                  <div className={`p-4 rounded-lg border ${changedSections.extensions ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Code size={16} className="text-indigo-500" />
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Custom Extensions</h4>
-                    </div>
-                    <ExtensionsEditor
-                      value={formData.extensions}
-                      onChange={(extensions) => setFormData(prev => ({ ...prev, extensions }))}
+              {/* SECTION: XML Representation */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('xml')) && (
+              <FormSection
+                id="xml"
+                icon={<Code size={16} />}
+                eyebrow="Documentation"
+                title="XML Representation"
+                description="Configure how this class is serialized to XML."
+                badge={<Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">OpenAPI 3.1</Badge>}
+                accent="orange"
+                changed={changedSections.xml}
+              >
+                <FormGrid cols={3} gap="md">
+                  <FormFieldGroup label="XML Name">
+                    <Input
+                      value={formData.xmlName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, xmlName: e.target.value }))}
+                      placeholder="e.g., CustomName"
                       disabled={isReadOnly}
                     />
-                  </div>
+                  </FormFieldGroup>
+                  <FormFieldGroup label="Namespace">
+                    <Input
+                      value={formData.xmlNamespace}
+                      onChange={(e) => setFormData(prev => ({ ...prev, xmlNamespace: e.target.value }))}
+                      placeholder="http://example.com/ns"
+                      disabled={isReadOnly}
+                    />
+                  </FormFieldGroup>
+                  <FormFieldGroup label="Prefix">
+                    <Input
+                      value={formData.xmlPrefix}
+                      onChange={(e) => setFormData(prev => ({ ...prev, xmlPrefix: e.target.value }))}
+                      placeholder="e.g., ns1"
+                      disabled={isReadOnly}
+                    />
+                  </FormFieldGroup>
+                </FormGrid>
+              </FormSection>
+              )}
+
+              {/* SECTION: Schema Metadata */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('schema-metadata')) && (
+              <FormSection
+                id="schema-metadata"
+                icon={<FileText size={16} />}
+                eyebrow="Documentation"
+                title="Schema Metadata"
+                description="Advanced schema identification and authoring metadata."
+                badge={<Badge variant="secondary" className="text-xs">JSON Schema 2020-12</Badge>}
+                changed={changedSections['schema-metadata']}
+              >
+                <FormFieldGroup label="$id" helper="Unique identifier URI for this schema">
+                  <Input
+                    value={formData.schemaId}
+                    onChange={(e) => setFormData(prev => ({ ...prev, schemaId: e.target.value }))}
+                    placeholder="https://example.com/schemas/myschema.json"
+                    disabled={isReadOnly}
+                  />
+                </FormFieldGroup>
+                <FormFieldGroup label="$anchor" helper="Define a reusable anchor within the schema">
+                  <Input
+                    value={formData.schemaAnchor}
+                    onChange={(e) => setFormData(prev => ({ ...prev, schemaAnchor: e.target.value }))}
+                    placeholder="e.g., myAnchor"
+                    disabled={isReadOnly}
+                  />
+                </FormFieldGroup>
+                <FormFieldGroup label="$comment" helper="Comments for schema authors (not shown to API consumers)">
+                  <Textarea
+                    value={formData.schemaComment}
+                    onChange={(e) => setFormData(prev => ({ ...prev, schemaComment: e.target.value }))}
+                    placeholder="Internal notes for schema authors..."
+                    disabled={isReadOnly}
+                    rows={2}
+                  />
+                </FormFieldGroup>
+              </FormSection>
+              )}
+
+              {/* SECTION: External Documentation */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('external-docs')) && (
+              <FormSection
+                id="external-docs"
+                icon={<ExternalLink size={16} />}
+                eyebrow="Documentation"
+                title="External Documentation"
+                description="Link out to human-readable docs, tutorials, or spec references."
+                changed={changedSections['external-docs']}
+              >
+                <FormFieldGroup label="Documentation URL">
+                  <Input
+                    type="url"
+                    value={formData.externalDocsUrl}
+                    onChange={(e) => setFormData(prev => ({ ...prev, externalDocsUrl: e.target.value }))}
+                    placeholder="https://docs.example.com/..."
+                    disabled={isReadOnly}
+                  />
+                </FormFieldGroup>
+                <FormFieldGroup label="Description">
+                  <Textarea
+                    value={formData.externalDocsDescription}
+                    onChange={(e) => setFormData(prev => ({ ...prev, externalDocsDescription: e.target.value }))}
+                    placeholder="Brief description of external docs"
+                    disabled={isReadOnly}
+                    rows={2}
+                  />
+                </FormFieldGroup>
+              </FormSection>
+              )}
+
+              {/* SECTION: Custom Extensions */}
+              {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('extensions')) && (
+              <FormSection
+                id="extensions"
+                icon={<Code size={16} />}
+                eyebrow="Documentation"
+                title="Custom Extensions"
+                description="Add x- prefixed vendor extensions for tooling and codegen."
+                changed={changedSections.extensions}
+              >
+                <ExtensionsEditor
+                  value={formData.extensions}
+                  onChange={(extensions) => setFormData(prev => ({ ...prev, extensions }))}
+                  disabled={isReadOnly}
+                />
+              </FormSection>
+              )}
+
+              {/* Guided-mode wizard controls, rendered inside the scroll pane */}
+              {viewMode === 'guided' && (
+                <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/95 px-8 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+                  <FormWizardControls
+                    currentIndex={currentStepIndex}
+                    stepCount={CLASS_WIZARD_STEPS.length}
+                    onBack={() => setCurrentStepIndex((i) => Math.max(0, i - 1))}
+                    onNext={() => setCurrentStepIndex((i) => Math.min(CLASS_WIZARD_STEPS.length - 1, i + 1))}
+                    onCancel={onClose}
+                    onFinish={handleSave}
+                    finishBusy={saving}
+                    finishDisabled={isReadOnly || !formData.name.trim()}
+                    finishLabel={editingClassData ? 'Save Changes' : 'Create Class'}
+                  />
                 </div>
-              </div>
+              )}
               </div>
             </div>
           </TabsContent>
@@ -2932,17 +3099,23 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           </TabsContent>
         </Tabs>
 
-        <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          {!isReadOnly && activeTab === 'edit' && (
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
-          )}
-          {activeTab !== 'edit' && (
-            <Button onClick={onClose}>Close</Button>
-          )}
-        </DialogFooter>
+        {/* Hide the dialog footer on the Edit tab in guided mode — wizard
+            controls live inside the scroll pane so the Back/Next buttons are
+            always adjacent to the current step. Other tabs keep the familiar
+            Cancel/Close footer. */}
+        {!(activeTab === 'edit' && viewMode === 'guided') && (
+          <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            {!isReadOnly && activeTab === 'edit' && (
+              <Button onClick={handleSave} disabled={saving || !formData.name.trim()}>
+                {saving ? 'Saving...' : (editingClassData ? 'Save Changes' : 'Create Class')}
+              </Button>
+            )}
+            {activeTab !== 'edit' && (
+              <Button onClick={onClose}>Close</Button>
+            )}
+          </DialogFooter>
+        )}
         </>
         )}
       </DialogContent>

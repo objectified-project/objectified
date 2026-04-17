@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,15 +10,13 @@ import {
 } from '../../ui/Dialog';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
-import { Label } from '../../ui/Label';
 import { Textarea } from '../../ui/Textarea';
 import { Alert } from '../../ui/Alert';
 import { Badge } from '../../ui/Badge';
-import { Checkbox } from '../../ui/Checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/Select';
 import { PropertyFormFields, PropertyFormData } from './PropertyFormFields';
 import { PrimitiveSelector } from './PrimitiveSelector';
 import ExtractToClassDialog from './ExtractToClassDialog';
-import { useDarkMode } from '@/app/hooks/useDarkMode';
 import {
   GitBranch,
   FileText,
@@ -28,7 +26,25 @@ import {
   Info,
   ExternalLink,
   Sparkles,
+  ListChecks,
+  BookOpenText,
 } from 'lucide-react';
+import {
+  FormSection,
+  FormSubsection,
+  FormFieldGroup,
+  FormGrid,
+  FormToggleCard,
+  FormViewModeToggle,
+  FormSectionNav,
+  FormWizardStepper,
+  FormWizardControls,
+  useFormScrollSpy,
+  scrollToSection,
+  useFormViewMode,
+  type FormSectionNavItem,
+  type FormWizardStep,
+} from './form';
 
 interface Props {
   open: boolean;
@@ -51,11 +67,604 @@ interface Props {
   availableClasses?: Array<{ id: string; name: string }>;
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Section renderers for the non-reference (scalar / object / array) editor.
+// Kept at module level so the same subtree renders in both Guided (wizard)
+// and Advanced (scroll-spy) modes without re-mounting.
+// ────────────────────────────────────────────────────────────────────────────
+
+interface BasicsSectionProps {
+  editPropName: string;
+  setEditPropName: (v: string) => void;
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  typeInfoLabel: string;
+  hasRef: boolean;
+  propertyType: string;
+  primitiveAvailable: boolean;
+  changed?: boolean;
+  eyebrow?: string;
+}
+
+const BasicsSection: React.FC<BasicsSectionProps> = ({
+  editPropName,
+  setEditPropName,
+  formData,
+  setFormData,
+  typeInfoLabel,
+  hasRef,
+  propertyType,
+  primitiveAvailable,
+  changed,
+  eyebrow = 'Basics',
+}) => (
+  <FormSection
+    id="basics"
+    icon={<FileText className="h-4 w-4" />}
+    eyebrow={eyebrow}
+    title="Basics"
+    description="Identify this class member. Only the name and constraints can be modified — the type is fixed."
+    changed={changed}
+  >
+    <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900/50 dark:bg-blue-950/30">
+      <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+      <p className="text-sm leading-5 text-blue-800 dark:text-blue-200">
+        Class-member properties can only have their name and validation constraints modified. The
+        underlying type is locked by the enclosing class.
+      </p>
+    </div>
+
+    <FormFieldGroup label="Property Type (Read-Only)">
+      <div className="flex items-center gap-2">
+        <Badge variant="secondary" className="px-3 py-1 font-mono text-sm">
+          {typeInfoLabel}
+        </Badge>
+        {hasRef && (
+          <span className="text-xs text-slate-500 dark:text-slate-400">(References another class)</span>
+        )}
+      </div>
+    </FormFieldGroup>
+
+    <FormFieldGroup
+      label="Property Name"
+      required
+      htmlFor="propertyName"
+      helper="camelCase recommended."
+    >
+      <Input
+        id="propertyName"
+        autoFocus
+        value={editPropName}
+        onChange={(e) => setEditPropName(e.target.value)}
+        placeholder="e.g., userName"
+      />
+    </FormFieldGroup>
+
+    <FormFieldGroup label="Description" htmlFor="description">
+      <Textarea
+        id="description"
+        value={formData.description || ''}
+        onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+        placeholder="Brief description of this property"
+        rows={3}
+      />
+    </FormFieldGroup>
+
+    {primitiveAvailable && (
+      <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/30">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-500 dark:bg-indigo-900/40 dark:text-indigo-300">
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Apply from Primitive
+              </h4>
+              <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                Quickly apply format, pattern, and constraints from a predefined primitive type.
+              </p>
+            </div>
+          </div>
+          <PrimitiveSelector
+            formData={formData}
+            onChange={(field, value) => setFormData((prev) => ({ ...prev, [field]: value }))}
+            propertyType={propertyType}
+            size="small"
+          />
+        </div>
+      </div>
+    )}
+  </FormSection>
+);
+
+interface FlagsSectionProps {
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  changed?: boolean;
+  eyebrow?: string;
+}
+
+const FlagsSection: React.FC<FlagsSectionProps> = ({ formData, setFormData, changed, eyebrow = 'Flags & Ownership' }) => (
+  <FormSection
+    id="flags"
+    icon={<Settings className="h-4 w-4" />}
+    eyebrow={eyebrow}
+    title="Flags & Ownership"
+    description="Declare runtime behavior and ownership metadata."
+    changed={changed}
+  >
+    <FormGrid cols={4} gap="md">
+      <FormToggleCard
+        id="required"
+        label="Required"
+        description="Must be provided"
+        accent="emerald"
+        checked={formData.required || false}
+        onCheckedChange={(v) => setFormData((prev) => ({ ...prev, required: v }))}
+      />
+      <FormToggleCard
+        id="nullable"
+        label="Nullable"
+        description="Can be null"
+        accent="amber"
+        checked={formData.nullable || false}
+        onCheckedChange={(v) => setFormData((prev) => ({ ...prev, nullable: v }))}
+      />
+      <FormToggleCard
+        id="readOnly"
+        label="Read Only"
+        description="Only in responses"
+        accent="blue"
+        checked={formData.readOnly || false}
+        onCheckedChange={(v) => setFormData((prev) => ({ ...prev, readOnly: v }))}
+      />
+      <FormToggleCard
+        id="writeOnly"
+        label="Write Only"
+        description="Only in requests"
+        accent="purple"
+        checked={formData.writeOnly || false}
+        onCheckedChange={(v) => setFormData((prev) => ({ ...prev, writeOnly: v }))}
+      />
+    </FormGrid>
+
+    <FormToggleCard
+      id="deprecated"
+      label="Deprecated"
+      icon={<AlertTriangle className="h-3.5 w-3.5" />}
+      accent="amber"
+      description="Signal consumers to migrate off this property."
+      checked={formData.deprecated || false}
+      onCheckedChange={(v) => setFormData((prev) => ({ ...prev, deprecated: v }))}
+      stack={!!formData.deprecated}
+      trailing={
+        formData.deprecated ? (
+          <Input
+            value={formData.deprecationMessage || ''}
+            onChange={(e) => setFormData((prev) => ({ ...prev, deprecationMessage: e.target.value }))}
+            placeholder="Deprecation message (e.g., Use newProperty instead)"
+            className="text-sm"
+          />
+        ) : undefined
+      }
+    />
+
+    <FormFieldGroup
+      label="Owner"
+      htmlFor="owner"
+      helper={
+        <>
+          Stored as <code className="font-mono text-[11px]">x-owner</code> on this property schema
+          (team or person responsible).
+        </>
+      }
+    >
+      <Input
+        id="owner"
+        value={formData.owner || ''}
+        onChange={(e) => setFormData((prev) => ({ ...prev, owner: e.target.value }))}
+        placeholder="e.g. platform-team or @handle"
+      />
+    </FormFieldGroup>
+  </FormSection>
+);
+
+interface DefaultsSectionProps {
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  changed?: boolean;
+  eyebrow?: string;
+}
+
+const DefaultsSection: React.FC<DefaultsSectionProps> = ({ formData, setFormData, changed, eyebrow = 'Defaults & Constants' }) => (
+  <FormSection
+    id="defaults"
+    icon={<Code className="h-4 w-4" />}
+    eyebrow={eyebrow}
+    title="Defaults & Constants"
+    description="Optional default and constant values for this property. Constant is mutually exclusive with enum."
+    changed={changed}
+  >
+    <FormGrid cols={2} gap="md">
+      <FormFieldGroup label="Default Value" htmlFor="defaultValue" helper="Used when no value is provided.">
+        <Input
+          id="defaultValue"
+          value={formData.default || ''}
+          onChange={(e) => setFormData((prev) => ({ ...prev, default: e.target.value }))}
+          placeholder='JSON value (e.g., "hello", 123, true)'
+          className="font-mono text-sm"
+        />
+      </FormFieldGroup>
+      <FormFieldGroup label="Constant Value" htmlFor="constValue" helper="Must always equal this value.">
+        <Input
+          id="constValue"
+          value={formData.const || ''}
+          onChange={(e) => setFormData((prev) => ({ ...prev, const: e.target.value }))}
+          placeholder="Fixed value (mutually exclusive with enum)"
+          className="font-mono text-sm"
+        />
+      </FormFieldGroup>
+    </FormGrid>
+  </FormSection>
+);
+
+interface ConstraintsSectionProps {
+  baseType: string;
+  isArray: boolean;
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  nestedProperties?: Array<{ id: string; name: string; data: any; description?: string; parent_id?: string | null }>;
+  availableClasses: string[];
+  eyebrow?: string;
+}
+
+const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
+  baseType,
+  isArray,
+  formData,
+  setFormData,
+  nestedProperties,
+  availableClasses,
+  eyebrow = 'Advanced Constraints',
+}) => (
+  <FormSection
+    id="constraints"
+    icon={<ListChecks className="h-4 w-4" />}
+    eyebrow={eyebrow}
+    title="Advanced Constraints"
+    description="Type-specific validation rules, values, and advanced schema options."
+    className="px-0 py-0"
+    headerClassName="mx-8 mt-7 mb-0"
+    bodyClassName="space-y-0"
+  >
+    <PropertyFormFields
+      baseType={baseType}
+      isArray={isArray}
+      data={formData}
+      onChange={(field, value) => {
+        setFormData((prev) => ({ ...prev, [field]: value }));
+      }}
+      showMetadata={false}
+      showTitle={false}
+      showPrimitiveSelector={false}
+      showHint={false}
+      size="small"
+      nestedProperties={nestedProperties}
+      availableClasses={availableClasses}
+    />
+  </FormSection>
+);
+
+interface DocsSectionProps {
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  changed?: boolean;
+  eyebrow?: string;
+}
+
+const DocsSection: React.FC<DocsSectionProps> = ({ formData, setFormData, changed, eyebrow = 'Documentation' }) => (
+  <FormSection
+    id="docs"
+    icon={<BookOpenText className="h-4 w-4" />}
+    eyebrow={eyebrow}
+    title="Documentation"
+    description="External documentation links surfaced in generated specs."
+    changed={changed}
+  >
+    <FormGrid cols={1} gap="md">
+      <FormFieldGroup label="URL" htmlFor="externalDocsUrl">
+        <Input
+          id="externalDocsUrl"
+          type="url"
+          value={formData.externalDocsUrl || ''}
+          onChange={(e) => setFormData((prev) => ({ ...prev, externalDocsUrl: e.target.value }))}
+          placeholder="https://docs.example.com/property"
+        />
+      </FormFieldGroup>
+      <FormFieldGroup
+        label="Description"
+        htmlFor="externalDocsDescription"
+        helper="Optional label describing what the link points to."
+      >
+        <Input
+          id="externalDocsDescription"
+          value={formData.externalDocsDescription || ''}
+          onChange={(e) => setFormData((prev) => ({ ...prev, externalDocsDescription: e.target.value }))}
+          placeholder="Link to property documentation"
+        />
+      </FormFieldGroup>
+    </FormGrid>
+
+    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+      <ExternalLink className="h-3.5 w-3.5" />
+      Shown inline with generated API documentation.
+    </div>
+  </FormSection>
+);
+
+// Reference-configuration body (renders as a single FormSection with subsections).
+interface ReferenceSectionProps {
+  refDescription: string;
+  setRefDescription: (v: string) => void;
+  refIsArray: boolean;
+  setRefIsArray: (v: boolean) => void;
+  refCompositionType: 'none' | 'allOf' | 'anyOf' | 'oneOf';
+  setRefCompositionType: (v: 'none' | 'allOf' | 'anyOf' | 'oneOf') => void;
+  refTargetClassId: string;
+  setRefTargetClassId: (v: string) => void;
+  refTargetClassIds: string[];
+  setRefTargetClassIds: (v: string[]) => void;
+  refMinItems: string;
+  setRefMinItems: (v: string) => void;
+  refMaxItems: string;
+  setRefMaxItems: (v: string) => void;
+  refUniqueItems: boolean;
+  setRefUniqueItems: (v: boolean) => void;
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  availableClasses: Array<{ id: string; name: string }>;
+}
+
+const COMPOSITION_OPTIONS: Array<{
+  value: 'none' | 'allOf' | 'anyOf' | 'oneOf';
+  title: string;
+  description: string;
+}> = [
+  { value: 'none', title: 'Single Reference', description: 'Reference a single class.' },
+  { value: 'allOf', title: 'allOf (Composition)', description: 'Must satisfy all referenced schemas.' },
+  { value: 'anyOf', title: 'anyOf (Union)', description: 'Can satisfy any of the referenced schemas.' },
+  { value: 'oneOf', title: 'oneOf (Exclusive)', description: 'Must satisfy exactly one referenced schema.' },
+];
+
+const ReferenceSection: React.FC<ReferenceSectionProps> = ({
+  refDescription,
+  setRefDescription,
+  refIsArray,
+  setRefIsArray,
+  refCompositionType,
+  setRefCompositionType,
+  refTargetClassId,
+  setRefTargetClassId,
+  refTargetClassIds,
+  setRefTargetClassIds,
+  refMinItems,
+  setRefMinItems,
+  refMaxItems,
+  setRefMaxItems,
+  refUniqueItems,
+  setRefUniqueItems,
+  formData,
+  setFormData,
+  availableClasses,
+}) => {
+  const changed =
+    Boolean(refDescription.trim()) ||
+    refIsArray ||
+    refCompositionType !== 'none' ||
+    Boolean(refTargetClassId) ||
+    refTargetClassIds.length > 0 ||
+    Boolean(formData.nullable);
+
+  return (
+    <FormSection
+      id="reference"
+      icon={<GitBranch className="h-4 w-4" />}
+      eyebrow="Reference"
+      title="Reference Configuration"
+      description="Link this property to one or more other classes, optionally composed via allOf, anyOf, or oneOf."
+      accent="purple"
+      changed={changed}
+    >
+      <FormFieldGroup label="Description" htmlFor="refDescription">
+        <Textarea
+          id="refDescription"
+          value={refDescription}
+          onChange={(e) => setRefDescription(e.target.value)}
+          placeholder="Description of this reference property"
+          rows={3}
+        />
+      </FormFieldGroup>
+
+      <FormToggleCard
+        id="refIsArray"
+        label="Array of references"
+        description="Check to model a list of referenced values."
+        accent="indigo"
+        checked={refIsArray}
+        onCheckedChange={setRefIsArray}
+      />
+
+      {refIsArray && (
+        <FormSubsection
+          tone="subtle"
+          icon={<Settings className="h-3.5 w-3.5" />}
+          title="Array constraints"
+          description="Apply size and uniqueness rules to the reference array."
+        >
+          <FormGrid cols={2} gap="md">
+            <FormFieldGroup label="Min Items" htmlFor="refMinItems">
+              <Input
+                id="refMinItems"
+                type="number"
+                value={refMinItems}
+                onChange={(e) => setRefMinItems(e.target.value)}
+                placeholder="0"
+              />
+            </FormFieldGroup>
+            <FormFieldGroup label="Max Items" htmlFor="refMaxItems">
+              <Input
+                id="refMaxItems"
+                type="number"
+                value={refMaxItems}
+                onChange={(e) => setRefMaxItems(e.target.value)}
+                placeholder="No limit"
+              />
+            </FormFieldGroup>
+          </FormGrid>
+          <FormToggleCard
+            id="refUniqueItems"
+            label="Unique items"
+            description="All elements must be distinct."
+            checked={refUniqueItems}
+            onCheckedChange={setRefUniqueItems}
+          />
+        </FormSubsection>
+      )}
+
+      <FormSubsection
+        tone="card"
+        icon={<GitBranch className="h-3.5 w-3.5" />}
+        title="Reference type"
+        description="Pick how the referenced classes combine."
+        accent="purple"
+      >
+        <div role="radiogroup" aria-label="Reference type" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {COMPOSITION_OPTIONS.map((opt) => {
+            const active = refCompositionType === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => {
+                  setRefCompositionType(opt.value);
+                  if (opt.value === 'none') {
+                    setRefTargetClassIds([]);
+                  } else {
+                    setRefTargetClassId('');
+                  }
+                }}
+                className={
+                  'flex flex-col items-start gap-1 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ' +
+                  (active
+                    ? 'border-indigo-300 bg-indigo-50 text-slate-900 dark:border-indigo-700 dark:bg-indigo-900/30 dark:text-slate-100'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300 dark:hover:border-slate-700')
+                }
+              >
+                <span className="font-medium">{opt.title}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{opt.description}</span>
+              </button>
+            );
+          })}
+        </div>
+      </FormSubsection>
+
+      {refCompositionType === 'none' ? (
+        <FormFieldGroup
+          label="Target Class"
+          htmlFor="targetClass"
+          helper="Select the class this property references."
+        >
+          <Select value={refTargetClassId} onValueChange={setRefTargetClassId}>
+            <SelectTrigger id="targetClass" className="w-full">
+              <SelectValue placeholder="Select a class..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableClasses.map((cls) => (
+                <SelectItem key={cls.id} value={cls.id}>
+                  {cls.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormFieldGroup>
+      ) : (
+        <FormFieldGroup label={`Classes for ${refCompositionType}`} htmlFor="targetClassMulti">
+          <Select
+            value=""
+            onValueChange={(classId) => {
+              if (classId && !refTargetClassIds.includes(classId)) {
+                setRefTargetClassIds([...refTargetClassIds, classId]);
+              }
+            }}
+          >
+            <SelectTrigger id="targetClassMulti" className="w-full">
+              <SelectValue placeholder="Add a class..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableClasses
+                .filter((cls) => !refTargetClassIds.includes(cls.id))
+                .map((cls) => (
+                  <SelectItem key={cls.id} value={cls.id}>
+                    {cls.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          {refTargetClassIds.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {refTargetClassIds.map((classId) => {
+                const cls = availableClasses.find((c) => c.id === classId);
+                return cls ? (
+                  <Badge key={classId} variant="secondary" className="flex items-center gap-1">
+                    {cls.name}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRefTargetClassIds(refTargetClassIds.filter((id) => id !== classId))
+                      }
+                      className="ml-1 rounded-sm px-0.5 text-slate-500 hover:text-red-500"
+                      aria-label={`Remove ${cls.name}`}
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ) : null;
+              })}
+            </div>
+          ) : (
+            <Alert variant="default" className="mt-2 border-blue-200 bg-blue-50 dark:border-blue-900/50 dark:bg-blue-950/30">
+              <Info className="h-4 w-4" />
+              <span className="ml-2 text-sm">Add at least one class for {refCompositionType}.</span>
+            </Alert>
+          )}
+        </FormFieldGroup>
+      )}
+
+      <FormToggleCard
+        id="refNullable"
+        label="Nullable"
+        description="The reference can be null."
+        accent="amber"
+        checked={formData.nullable || false}
+        onCheckedChange={(v) => setFormData((prev) => ({ ...prev, nullable: v }))}
+      />
+    </FormSection>
+  );
+};
+
 export default function ClassPropertyEditDialog({ open, onClose, editingClassProperty, onSaved, allClassProperties, existingClassNames = [], availableClasses = [] }: Props) {
-  const isDark = useDarkMode();
   const [editPropName, setEditPropName] = useState('');
   const [editPropertyError, setEditPropertyError] = useState('');
   const [extractDialogOpen, setExtractDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Form layout state
+  const [viewMode, setViewMode] = useFormViewMode('class-property-edit-view-mode');
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const advancedScrollRef = useRef<HTMLDivElement>(null);
 
   // Use shared form data structure
   const [formData, setFormData] = useState<PropertyFormData>({});
@@ -137,6 +746,11 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
     if (onSaved) await onSaved(true); // Pass true to apply layout
     onClose();
   };
+
+  // Reset wizard to the first step whenever the dialog reopens with a new property
+  useEffect(() => {
+    if (open) setCurrentStepIndex(0);
+  }, [open, editingClassProperty?.id]);
 
   // Initialize form when editingClassProperty changes
   useEffect(() => {
@@ -411,6 +1025,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       return;
     }
 
+    setIsSaving(true);
     try {
       const originalData = typeof editingClassProperty.data === 'string'
         ? JSON.parse(editingClassProperty.data)
@@ -960,8 +1575,176 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
     } catch (error) {
       console.error('Error updating class property:', error);
       setEditPropertyError('An error occurred while updating the property');
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  // ─── Derived state for the rewritten render ─────────────────────────────
+  const typeInfo = getPropertyTypeInfo();
+  const propData = editingClassProperty
+    ? typeof editingClassProperty.data === 'string'
+      ? JSON.parse(editingClassProperty.data)
+      : (editingClassProperty.data || {})
+    : {};
+  const schema = typeInfo.isArray ? (propData.items || {}) : propData;
+  const baseType = schema.$ref ? 'reference' : (schema.type || 'object');
+  const isReferenceType = Boolean(
+    schema.$ref ||
+      (schema.allOf && Array.isArray(schema.allOf) && schema.allOf.some((item: any) => item.$ref)) ||
+      (schema.anyOf && Array.isArray(schema.anyOf) && schema.anyOf.some((item: any) => item.$ref)) ||
+      (schema.oneOf && Array.isArray(schema.oneOf) && schema.oneOf.some((item: any) => item.$ref)),
+  );
+  const primitiveAvailable =
+    !isReferenceType &&
+    ['string', 'number', 'integer', 'array'].includes(baseType) &&
+    !formData.tupleMode;
+
+  const changedBasics = Boolean((formData.description || '').trim()) || editPropName.trim() !== (editingClassProperty?.name || '').trim();
+  const changedFlags =
+    Boolean(formData.required) ||
+    Boolean(formData.nullable) ||
+    Boolean(formData.readOnly) ||
+    Boolean(formData.writeOnly) ||
+    Boolean(formData.deprecated) ||
+    Boolean(formData.deprecationMessage?.trim()) ||
+    Boolean(formData.owner?.trim());
+  const changedDefaults = Boolean(formData.default?.trim()) || Boolean(formData.const?.trim());
+  const changedDocs =
+    Boolean(formData.externalDocsUrl?.trim()) || Boolean(formData.externalDocsDescription?.trim());
+
+  const navItems: FormSectionNavItem[] = [
+    { id: 'basics', label: 'Basics', icon: <FileText className="h-3.5 w-3.5" />, changed: changedBasics },
+    { id: 'flags', label: 'Flags & Ownership', icon: <Settings className="h-3.5 w-3.5" />, changed: changedFlags },
+    { id: 'defaults', label: 'Defaults & Constants', icon: <Code className="h-3.5 w-3.5" />, changed: changedDefaults },
+    { id: 'constraints', label: 'Advanced Constraints', icon: <ListChecks className="h-3.5 w-3.5" /> },
+    { id: 'docs', label: 'Documentation', icon: <BookOpenText className="h-3.5 w-3.5" />, changed: changedDocs },
+  ];
+
+  const wizardSteps: FormWizardStep[] = useMemo(
+    () => [
+      { id: 'basics', label: 'Basics', icon: <FileText className="h-4 w-4" /> },
+      { id: 'flags', label: 'Flags', icon: <Settings className="h-4 w-4" /> },
+      { id: 'defaults', label: 'Defaults', icon: <Code className="h-4 w-4" /> },
+      { id: 'constraints', label: 'Constraints', icon: <ListChecks className="h-4 w-4" /> },
+      { id: 'docs', label: 'Docs', icon: <BookOpenText className="h-4 w-4" /> },
+    ],
+    [],
+  );
+  const currentWizardSection = wizardSteps[currentStepIndex]?.id ?? 'basics';
+
+  const sectionOrder = useMemo(
+    () => ['basics', 'flags', 'defaults', 'constraints', 'docs'],
+    [],
+  );
+  const { activeId } = useFormScrollSpy({
+    sectionIds: sectionOrder,
+    containerRef: advancedScrollRef,
+    disabled: isReferenceType || viewMode !== 'advanced',
+  });
+
+  const handleNextStep = () => {
+    setCurrentStepIndex((i) => Math.min(i + 1, wizardSteps.length - 1));
+  };
+  const handlePrevStep = () => {
+    setCurrentStepIndex((i) => Math.max(i - 1, 0));
+  };
+
+  const guidedSection = (id: string) => {
+    switch (id) {
+      case 'basics':
+        return (
+          <BasicsSection
+            editPropName={editPropName}
+            setEditPropName={setEditPropName}
+            formData={formData}
+            setFormData={setFormData}
+            typeInfoLabel={typeInfo.type}
+            hasRef={!!typeInfo.hasRef}
+            propertyType={baseType}
+            primitiveAvailable={primitiveAvailable}
+            changed={changedBasics}
+            eyebrow="Step 1 · Basics"
+          />
+        );
+      case 'flags':
+        return (
+          <FlagsSection
+            formData={formData}
+            setFormData={setFormData}
+            changed={changedFlags}
+            eyebrow="Step 2 · Flags & Ownership"
+          />
+        );
+      case 'defaults':
+        return (
+          <DefaultsSection
+            formData={formData}
+            setFormData={setFormData}
+            changed={changedDefaults}
+            eyebrow="Step 3 · Defaults"
+          />
+        );
+      case 'constraints':
+        return (
+          <ConstraintsSection
+            baseType={baseType}
+            isArray={typeInfo.isArray}
+            formData={formData}
+            setFormData={setFormData}
+            nestedProperties={
+              baseType === 'object' && editingClassProperty
+                ? (allClassProperties || []).filter((p) => p.parent_id === editingClassProperty.id)
+                : undefined
+            }
+            availableClasses={existingClassNames}
+            eyebrow="Step 4 · Constraints"
+          />
+        );
+      case 'docs':
+        return (
+          <DocsSection
+            formData={formData}
+            setFormData={setFormData}
+            changed={changedDocs}
+            eyebrow="Step 5 · Documentation"
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  const allSections = (
+    <>
+      <BasicsSection
+        editPropName={editPropName}
+        setEditPropName={setEditPropName}
+        formData={formData}
+        setFormData={setFormData}
+        typeInfoLabel={typeInfo.type}
+        hasRef={!!typeInfo.hasRef}
+        propertyType={baseType}
+        primitiveAvailable={primitiveAvailable}
+        changed={changedBasics}
+      />
+      <FlagsSection formData={formData} setFormData={setFormData} changed={changedFlags} />
+      <DefaultsSection formData={formData} setFormData={setFormData} changed={changedDefaults} />
+      <ConstraintsSection
+        baseType={baseType}
+        isArray={typeInfo.isArray}
+        formData={formData}
+        setFormData={setFormData}
+        nestedProperties={
+          baseType === 'object' && editingClassProperty
+            ? (allClassProperties || []).filter((p) => p.parent_id === editingClassProperty.id)
+            : undefined
+        }
+        availableClasses={existingClassNames}
+      />
+      <DocsSection formData={formData} setFormData={setFormData} changed={changedDocs} />
+    </>
+  );
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()} modal={true}>
@@ -970,660 +1753,146 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         showCloseButton={true}
         aria-describedby={undefined}
       >
-        <DialogHeader className="pl-6 pr-10 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+        <DialogHeader className="shrink-0 border-b border-slate-200 bg-slate-50/60 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/60">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <div className="flex items-center gap-3 min-w-0">
-              <DialogTitle className="text-lg font-semibold">
-                Edit Property in Class
-              </DialogTitle>
+            <div className="flex min-w-0 items-center gap-3">
+              <span
+                className={
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ' +
+                  (isReferenceType
+                    ? 'bg-purple-100 text-purple-500 dark:bg-purple-900/40 dark:text-purple-300'
+                    : 'bg-indigo-100 text-indigo-500 dark:bg-indigo-900/40 dark:text-indigo-300')
+                }
+              >
+                {isReferenceType ? <GitBranch className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+              </span>
+              <div className="min-w-0">
+                <DialogTitle className="text-base font-semibold leading-5">
+                  Edit Property in Class
+                </DialogTitle>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  {isReferenceType
+                    ? 'Configure how this property references other classes.'
+                    : 'Update identity, flags, and validation rules for this member.'}
+                </p>
+              </div>
+              {editingClassProperty?.name && (
+                <code className="ml-1 hidden rounded bg-slate-200/70 px-2 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300 sm:inline-flex">
+                  {editingClassProperty.name}
+                </code>
+              )}
             </div>
-            <p className="text-xs text-amber-700 dark:text-amber-300 shrink-0 max-w-md sm:text-right">
-              Amber-highlighted sections indicate values that differ from defaults.
-            </p>
+            {!isReferenceType && (
+              <FormViewModeToggle value={viewMode} onChange={setViewMode} />
+            )}
           </div>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col">
           {editPropertyError && (
             <Alert variant="error" className="m-4 mb-0">
               {editPropertyError}
             </Alert>
           )}
 
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 divide-x divide-gray-200 dark:divide-gray-700 overflow-hidden min-h-0">
-            {/* LEFT COLUMN - Basic Configuration */}
-            <div className="flex flex-col overflow-y-auto min-h-0">
-              {/* SECTION 1: Property Information */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2 mb-4">
-                  <FileText size={18} className="text-indigo-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Property Information</h3>
-                </div>
-
-                {/* Info Alert */}
-                <div className="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                  <div className="flex items-start gap-2">
-                    <Info size={16} className="text-blue-500 mt-0.5 shrink-0" />
-                    <p className="text-sm text-blue-700 dark:text-blue-300">
-                      When editing a property that is a member of a class, only the name and constraints can be modified. The type is read-only.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Type Information - Read Only */}
-                {editingClassProperty && (
-                  <div className={`mb-4 p-4 rounded-lg border ${isDark ? 'bg-slate-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
-                    <Label className="text-sm font-semibold mb-2 block">Property Type (Read-Only)</Label>
-                    <div className="flex gap-2 items-center">
-                      <Badge variant="secondary" className="font-mono text-sm px-3 py-1">
-                        {getPropertyTypeInfo().type}
-                      </Badge>
-                      {getPropertyTypeInfo().hasRef && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          (References another class)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Property Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="propertyName">Property Name *</Label>
-                  <Input
-                    id="propertyName"
-                    autoFocus
-                    value={editPropName}
-                    onChange={(e) => setEditPropName(e.target.value)}
-                    placeholder="e.g., userName"
-                  />
-                  <p className="text-xs text-gray-500">camelCase recommended</p>
-                </div>
-
-                {/* Description */}
-                {editingClassProperty && (() => {
-                  const typeInfo = getPropertyTypeInfo();
-                  const propData = typeof editingClassProperty.data === 'string'
-                    ? JSON.parse(editingClassProperty.data)
-                    : (editingClassProperty.data || {});
-                  const schema = typeInfo.isArray ? (propData.items || {}) : propData;
-
-                  // Only show for non-reference types
-                  if (schema.$ref) return null;
-
-                  return (
-                    <div className="mt-4 space-y-2">
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea
-                        id="description"
-                        value={formData.description || ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="Brief description of this property"
-                        rows={2}
-                      />
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Apply from Primitive - Only show for applicable types */}
-              {editingClassProperty && (() => {
-                const typeInfo = getPropertyTypeInfo();
-                const propData = typeof editingClassProperty.data === 'string'
-                  ? JSON.parse(editingClassProperty.data)
-                  : (editingClassProperty.data || {});
-                const schema = typeInfo.isArray ? (propData.items || {}) : propData;
-                const baseType = schema.$ref ? 'reference' : (schema.type || 'object');
-
-                // Only show for applicable types (string, number, integer, array) and non-reference
-                if (schema.$ref) return null;
-                if (!['string', 'number', 'integer', 'array'].includes(baseType)) return null;
-                if (formData.tupleMode) return null;
-
-                return (
-                  <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                    <div className={`p-4 rounded-lg border ${isDark ? 'bg-indigo-900/10 border-indigo-700/30' : 'bg-indigo-50/50 border-indigo-200'}`}>
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                          <div className={`p-2 rounded-lg ${isDark ? 'bg-indigo-900/30' : 'bg-indigo-100'}`}>
-                            <Sparkles size={18} className="text-indigo-500" />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-0.5">
-                              Apply from Primitive
-                            </h4>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              Quickly apply format, pattern, and constraints from a predefined primitive type
-                            </p>
-                          </div>
-                        </div>
-                        <PrimitiveSelector
-                          formData={formData}
-                          onChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-                          propertyType={baseType}
-                          size="small"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* SECTION 2: Property Flags */}
-              {editingClassProperty && (() => {
-                const typeInfo = getPropertyTypeInfo();
-                const propData = typeof editingClassProperty.data === 'string'
-                  ? JSON.parse(editingClassProperty.data)
-                  : (editingClassProperty.data || {});
-                const schema = typeInfo.isArray ? (propData.items || {}) : propData;
-
-                // Only show for non-reference types
-                if (schema.$ref) return null;
-
-                return (
-                  <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
-                    <div className="flex items-center gap-2 mb-4">
-                      <Settings size={18} className="text-indigo-500" />
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Property Flags</h3>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Required */}
-                      <div className={`p-3 rounded-lg border ${formData.required ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            id="required"
-                            checked={formData.required || false}
-                            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, required: !!checked }))}
-                          />
-                          <label htmlFor="required" className="text-sm font-medium cursor-pointer">
-                            Required
-                          </label>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1 ml-6">Must be provided</p>
-                      </div>
-
-                      {/* Nullable */}
-                      <div className={`p-3 rounded-lg border ${formData.nullable ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            id="nullable"
-                            checked={formData.nullable || false}
-                            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, nullable: !!checked }))}
-                          />
-                          <label htmlFor="nullable" className="text-sm font-medium cursor-pointer">
-                            Nullable
-                          </label>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1 ml-6">Can be null</p>
-                      </div>
-
-                      {/* Read Only */}
-                      <div className={`p-3 rounded-lg border ${formData.readOnly ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            id="readOnly"
-                            checked={formData.readOnly || false}
-                            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, readOnly: !!checked }))}
-                          />
-                          <label htmlFor="readOnly" className="text-sm font-medium cursor-pointer">
-                            Read Only
-                          </label>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1 ml-6">Only in responses</p>
-                      </div>
-
-                      {/* Write Only */}
-                      <div className={`p-3 rounded-lg border ${formData.writeOnly ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            id="writeOnly"
-                            checked={formData.writeOnly || false}
-                            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, writeOnly: !!checked }))}
-                          />
-                          <label htmlFor="writeOnly" className="text-sm font-medium cursor-pointer">
-                            Write Only
-                          </label>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1 ml-6">Only in requests</p>
-                      </div>
-                    </div>
-
-                    {/* Deprecation */}
-                    <div className={`mt-4 p-3 rounded-lg border flex flex-col gap-3 ${formData.deprecated ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="deprecated"
-                          checked={formData.deprecated || false}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, deprecated: !!checked }))}
-                        />
-                        <label htmlFor="deprecated" className="text-sm font-medium cursor-pointer flex items-center gap-1">
-                          <AlertTriangle size={14} className={formData.deprecated ? 'text-amber-500' : 'text-gray-400'} />
-                          Deprecated
-                        </label>
-                      </div>
-                      {formData.deprecated && (
-                        <Input
-                          value={formData.deprecationMessage || ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, deprecationMessage: e.target.value }))}
-                          placeholder="Deprecation message (e.g., Use newProperty instead)"
-                          className="text-sm"
-                        />
-                      )}
-                    </div>
-
-                    {/* Owner */}
-                    <div className="mt-4 space-y-1">
-                      <Label htmlFor="owner" className="text-sm font-medium">Owner</Label>
-                      <Input
-                        id="owner"
-                        value={formData.owner || ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, owner: e.target.value }))}
-                        placeholder="e.g. platform-team or @handle"
-                        className="text-sm"
-                      />
-                      <p className="text-xs text-gray-500">Stored as <code>x-owner</code> on this property schema (team or person responsible).</p>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* SECTION 3: Default & Constant Values */}
-              {editingClassProperty && (() => {
-                const typeInfo = getPropertyTypeInfo();
-                const propData = typeof editingClassProperty.data === 'string'
-                  ? JSON.parse(editingClassProperty.data)
-                  : (editingClassProperty.data || {});
-                const schema = typeInfo.isArray ? (propData.items || {}) : propData;
-
-                // Only show for non-reference types
-                if (schema.$ref) return null;
-
-                return (
-                  <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Code size={18} className="text-indigo-500" />
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Default & Constant Values</h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Default Value */}
-                      <div className="space-y-2">
-                        <Label htmlFor="defaultValue">Default Value</Label>
-                        <Input
-                          id="defaultValue"
-                          value={formData.default || ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, default: e.target.value }))}
-                          placeholder="JSON value (e.g., &quot;hello&quot;, 123, true)"
-                          className="font-mono text-sm"
-                        />
-                        <p className="text-xs text-gray-500">Used when no value is provided</p>
-                      </div>
-
-                      {/* Constant Value */}
-                      <div className="space-y-2">
-                        <Label htmlFor="constValue">Constant Value</Label>
-                        <Input
-                          id="constValue"
-                          value={formData.const || ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, const: e.target.value }))}
-                          placeholder="Fixed value (mutually exclusive with enum)"
-                          className="font-mono text-sm"
-                        />
-                        <p className="text-xs text-gray-500">Must always equal this value</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
+          {isReferenceType ? (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <ReferenceSection
+                refDescription={refDescription}
+                setRefDescription={setRefDescription}
+                refIsArray={refIsArray}
+                setRefIsArray={setRefIsArray}
+                refCompositionType={refCompositionType}
+                setRefCompositionType={setRefCompositionType}
+                refTargetClassId={refTargetClassId}
+                setRefTargetClassId={setRefTargetClassId}
+                refTargetClassIds={refTargetClassIds}
+                setRefTargetClassIds={setRefTargetClassIds}
+                refMinItems={refMinItems}
+                setRefMinItems={setRefMinItems}
+                refMaxItems={refMaxItems}
+                setRefMaxItems={setRefMaxItems}
+                refUniqueItems={refUniqueItems}
+                setRefUniqueItems={setRefUniqueItems}
+                formData={formData}
+                setFormData={setFormData}
+                availableClasses={availableClasses}
+              />
             </div>
-
-            {/* RIGHT COLUMN - Advanced Configuration */}
-            <div className="flex flex-col overflow-y-auto min-h-0 w-full min-w-0">
-              {/* Advanced Header */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-                <div className="flex items-center gap-3 mb-2">
-                  <Settings size={20} className="text-purple-500" />
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Advanced Constraints</h3>
-                  <span className="px-2 py-0.5 rounded text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">Optional</span>
-                </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Configure type-specific validation rules and advanced constraints.</p>
-              </div>
-
-              {/* Property Constraints Section */}
-              {editingClassProperty && (() => {
-                const typeInfo = getPropertyTypeInfo();
-                const propData = typeof editingClassProperty.data === 'string'
-                  ? JSON.parse(editingClassProperty.data)
-                  : (editingClassProperty.data || {});
-                const schema = typeInfo.isArray ? (propData.items || {}) : propData;
-                const baseType = schema.$ref ? 'reference' : (schema.type || 'object');
-
-                // Check if this is a reference type (single $ref, allOf, anyOf, or oneOf with refs)
-                const isReferenceType = schema.$ref ||
-                  (schema.allOf && Array.isArray(schema.allOf) && schema.allOf.some((item: any) => item.$ref)) ||
-                  (schema.anyOf && Array.isArray(schema.anyOf) && schema.anyOf.some((item: any) => item.$ref)) ||
-                  (schema.oneOf && Array.isArray(schema.oneOf) && schema.oneOf.some((item: any) => item.$ref));
-
-                // Show reference editing UI for reference types
-                if (isReferenceType) {
-                  return (
-                    <div className="p-6 flex-1 overflow-y-auto space-y-6 w-full min-w-0">
-                      {/* Reference Type Header */}
-                      <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
-                        <GitBranch size={20} />
-                        <span className="font-medium">Reference Configuration</span>
-                      </div>
-
-                      {/* Description */}
-                      <div className="space-y-2">
-                        <Label htmlFor="refDescription">Description</Label>
-                        <Textarea
-                          id="refDescription"
-                          value={refDescription}
-                          onChange={(e) => setRefDescription(e.target.value)}
-                          placeholder="Description of this reference property"
-                          rows={2}
-                        />
-                      </div>
-
-                      {/* Array Toggle */}
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="refIsArray"
-                          checked={refIsArray}
-                          onCheckedChange={(checked) => setRefIsArray(checked === true)}
-                        />
-                        <Label htmlFor="refIsArray" className="cursor-pointer">
-                          Array of references
-                        </Label>
-                      </div>
-
-                      {/* Array Constraints */}
-                      {refIsArray && (
-                        <div className="pl-6 space-y-4 border-l-2 border-gray-200 dark:border-gray-700">
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Array constraints:</p>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="refMinItems">Min Items</Label>
-                              <Input
-                                id="refMinItems"
-                                type="number"
-                                value={refMinItems}
-                                onChange={(e) => setRefMinItems(e.target.value)}
-                                placeholder="0"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="refMaxItems">Max Items</Label>
-                              <Input
-                                id="refMaxItems"
-                                type="number"
-                                value={refMaxItems}
-                                onChange={(e) => setRefMaxItems(e.target.value)}
-                                placeholder="No limit"
-                              />
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="refUniqueItems"
-                              checked={refUniqueItems}
-                              onCheckedChange={(checked) => setRefUniqueItems(checked === true)}
-                            />
-                            <Label htmlFor="refUniqueItems" className="cursor-pointer text-sm">
-                              Unique items (all elements must be distinct)
-                            </Label>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Reference Type Selection */}
-                      <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <Label className="font-medium">Reference Type</Label>
-                        <div className="space-y-2">
-                          <label className="flex items-start gap-3 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="refType"
-                              value="none"
-                              checked={refCompositionType === 'none'}
-                              onChange={() => {
-                                setRefCompositionType('none');
-                                setRefTargetClassIds([]);
-                              }}
-                              className="mt-1"
-                            />
-                            <div>
-                              <span className="font-medium text-sm">Single Reference</span>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">Reference a single class</p>
-                            </div>
-                          </label>
-                          <label className="flex items-start gap-3 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="refType"
-                              value="allOf"
-                              checked={refCompositionType === 'allOf'}
-                              onChange={() => {
-                                setRefCompositionType('allOf');
-                                setRefTargetClassId('');
-                              }}
-                              className="mt-1"
-                            />
-                            <div>
-                              <span className="font-medium text-sm">allOf (Composition)</span>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">Must satisfy all referenced schemas</p>
-                            </div>
-                          </label>
-                          <label className="flex items-start gap-3 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="refType"
-                              value="anyOf"
-                              checked={refCompositionType === 'anyOf'}
-                              onChange={() => {
-                                setRefCompositionType('anyOf');
-                                setRefTargetClassId('');
-                              }}
-                              className="mt-1"
-                            />
-                            <div>
-                              <span className="font-medium text-sm">anyOf (Union)</span>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">Can satisfy any of the referenced schemas</p>
-                            </div>
-                          </label>
-                          <label className="flex items-start gap-3 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="refType"
-                              value="oneOf"
-                              checked={refCompositionType === 'oneOf'}
-                              onChange={() => {
-                                setRefCompositionType('oneOf');
-                                setRefTargetClassId('');
-                              }}
-                              className="mt-1"
-                            />
-                            <div>
-                              <span className="font-medium text-sm">oneOf (Exclusive)</span>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">Must satisfy exactly one referenced schema</p>
-                            </div>
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* Target Class Selection */}
-                      {refCompositionType === 'none' ? (
-                        <div className="space-y-2">
-                          <Label htmlFor="targetClass">Target Class</Label>
-                          <select
-                            id="targetClass"
-                            value={refTargetClassId}
-                            onChange={(e) => setRefTargetClassId(e.target.value)}
-                            className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                          >
-                            <option value="">Select a class...</option>
-                            {availableClasses.map((cls) => (
-                              <option key={cls.id} value={cls.id}>
-                                {cls.name}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="text-xs text-gray-500">Select the class this property references</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <Label>Select Classes for {refCompositionType}</Label>
-                          <select
-                            value=""
-                            onChange={(e) => {
-                              const classId = e.target.value;
-                              if (classId && !refTargetClassIds.includes(classId)) {
-                                setRefTargetClassIds([...refTargetClassIds, classId]);
-                              }
-                            }}
-                            className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                          >
-                            <option value="">Add a class...</option>
-                            {availableClasses
-                              .filter(cls => !refTargetClassIds.includes(cls.id))
-                              .map((cls) => (
-                                <option key={cls.id} value={cls.id}>
-                                  {cls.name}
-                                </option>
-                              ))}
-                          </select>
-                          {refTargetClassIds.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {refTargetClassIds.map((classId) => {
-                                const cls = availableClasses.find(c => c.id === classId);
-                                return cls ? (
-                                  <Badge
-                                    key={classId}
-                                    variant="secondary"
-                                    className="flex items-center gap-1"
-                                  >
-                                    {cls.name}
-                                    <button
-                                      type="button"
-                                      onClick={() => setRefTargetClassIds(refTargetClassIds.filter(id => id !== classId))}
-                                      className="ml-1 hover:text-red-500"
-                                    >
-                                      ×
-                                    </button>
-                                  </Badge>
-                                ) : null;
-                              })}
-                            </div>
-                          )}
-                          {refTargetClassIds.length === 0 && (
-                            <Alert variant="default" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                              <Info className="h-4 w-4" />
-                              <span className="ml-2 text-sm">Add at least one class for {refCompositionType}</span>
-                            </Alert>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Nullable Option */}
-                      <div className="flex items-center space-x-2 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <Checkbox
-                          id="refNullable"
-                          checked={formData.nullable || false}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, nullable: checked === true }))}
-                        />
-                        <Label htmlFor="refNullable" className="cursor-pointer">
-                          Nullable (can be null)
-                        </Label>
-                      </div>
-                    </div>
-                  );
+          ) : viewMode === 'guided' ? (
+            <>
+              <FormWizardStepper
+                steps={wizardSteps}
+                currentIndex={currentStepIndex}
+                onStepSelect={setCurrentStepIndex}
+              />
+              <div className="min-h-0 flex-1 overflow-y-auto">{guidedSection(currentWizardSection)}</div>
+              <FormWizardControls
+                currentIndex={currentStepIndex}
+                stepCount={wizardSteps.length}
+                onBack={handlePrevStep}
+                onNext={handleNextStep}
+                onCancel={onClose}
+                onFinish={handleSave}
+                finishLabel="Save"
+                finishBusy={isSaving}
+                leading={
+                  canExtractToClass() ? (
+                    <Button
+                      onClick={() => setExtractDialogOpen(true)}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <GitBranch size={14} />
+                      Extract to Class
+                    </Button>
+                  ) : undefined
                 }
-
-                return (
-                  <div className="p-6 flex-1 overflow-y-auto w-full min-w-0">
-                    <PropertyFormFields
-                      baseType={baseType}
-                      isArray={typeInfo.isArray}
-                      data={formData}
-                      onChange={(field, value) => {
-                        setFormData(prev => ({ ...prev, [field]: value }));
-                      }}
-                      showMetadata={false}
-                      showTitle={false}
-                      showHint={false}
-                      showPrimitiveSelector={false}
-                      size="small"
-                      nestedProperties={
-                        baseType === 'object'
-                          ? (allClassProperties || []).filter(p => p.parent_id === editingClassProperty.id)
-                          : undefined
-                      }
-                      availableClasses={existingClassNames}
-                    />
-
-                    {/* External Documentation - inside scrollable area */}
-                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-2 mb-4">
-                        <ExternalLink size={18} className="text-purple-500" />
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">External Documentation</h3>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="externalDocsUrl">URL</Label>
-                          <Input
-                            id="externalDocsUrl"
-                            value={formData.externalDocsUrl || ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, externalDocsUrl: e.target.value }))}
-                            placeholder="https://docs.example.com/property"
-                            type="url"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="externalDocsDescription">Description</Label>
-                          <Input
-                            id="externalDocsDescription"
-                            value={formData.externalDocsDescription || ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, externalDocsDescription: e.target.value }))}
-                            placeholder="Link to property documentation"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
+              />
+            </>
+          ) : (
+            <div className="flex min-h-0 flex-1">
+              <aside className="hidden w-60 shrink-0 border-r border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40 lg:block">
+                <FormSectionNav
+                  items={navItems}
+                  activeId={activeId}
+                  onSelect={(id) => scrollToSection(advancedScrollRef.current, id)}
+                />
+              </aside>
+              <div ref={advancedScrollRef} className="min-h-0 flex-1 overflow-y-auto">
+                {allSections}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
-          <div className="flex justify-between w-full items-center">
-            <div>
-              {canExtractToClass() && (
-                <Button
-                  onClick={() => setExtractDialogOpen(true)}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  <GitBranch size={16} />
-                  Extract to Class
+        {!(viewMode === 'guided' && !isReferenceType) && (
+          <DialogFooter className="shrink-0 border-t border-slate-200 px-6 py-4 dark:border-slate-800">
+            <div className="flex w-full items-center justify-between gap-3">
+              <div>
+                {canExtractToClass() && (
+                  <Button
+                    onClick={() => setExtractDialogOpen(true)}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <GitBranch size={16} />
+                    Extract to Class
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={onClose}>
+                  Cancel
                 </Button>
-              )}
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave}>
-                Save
-              </Button>
-            </div>
-          </div>
-        </DialogFooter>
+          </DialogFooter>
+        )}
       </DialogContent>
 
       {/* Extract to Class Dialog */}

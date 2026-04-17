@@ -408,66 +408,64 @@ const SortableEnumItem: React.FC<SortableEnumItemProps> = ({ id, value, onDelete
   );
 };
 
-// Section header component for consistent styling across form sections
+// Section header component for consistent styling across form sections.
+// Matches the ./form/FormSection visual contract: icon, optional eyebrow,
+// title, description, optional badge, and a discrete amber "changed" dot when
+// the section contains non-default values.
 interface SectionHeaderProps {
   icon: React.ReactNode;
   title: string;
   subtitle?: string;
   badge?: string;
+  eyebrow?: string;
+  changed?: boolean;
 }
 
-const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, title, subtitle, badge }) => {
-  const isDark = useDarkMode();
-
-  return (
-    <Box sx={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 1.5,
-      mb: 2.5,
-      pb: 1.5,
-      borderBottom: '1px solid',
-      borderColor: 'rgba(99, 102, 241, 0.1)',
-    }}>
-      <Box sx={{
-        p: 1,
-        borderRadius: 1.5,
-        bgcolor: 'rgba(99, 102, 241, 0.1)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        {icon}
-      </Box>
-      <Box sx={{ flex: 1 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b', letterSpacing: '-0.01em' }}>
-          {title}
-        </Typography>
-        {subtitle && (
-          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: isDark ? '#94a3b8' : '#64748b' }}>
-            {subtitle}
-          </Typography>
-        )}
-      </Box>
-      {badge && (
-        <Typography variant="caption" sx={{
-          px: 1.5,
-          py: 0.5,
-          bgcolor: isDark ? 'linear-gradient(135deg, #312e81 0%, #4338ca 100%)' : 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
-          background: isDark ? 'linear-gradient(135deg, #312e81 0%, #4338ca 100%)' : 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
-          color: isDark ? '#c7d2fe' : '#4338ca',
-          borderRadius: 2,
-          fontWeight: 600,
-          fontSize: '0.7rem',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-        }}>
-          {badge}
-        </Typography>
+const SectionHeader: React.FC<SectionHeaderProps> = ({
+  icon,
+  title,
+  subtitle,
+  badge,
+  eyebrow,
+  changed,
+}) => (
+  <header className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-1.5">
+    <div className="flex min-w-0 flex-1 flex-col gap-1">
+      {eyebrow && (
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-indigo-600 dark:text-indigo-400">
+          {eyebrow}
+        </span>
       )}
-    </Box>
-  );
-};
+      <div className="flex flex-wrap items-center gap-2">
+        {icon && (
+          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-indigo-500 dark:text-indigo-400">
+            {icon}
+          </span>
+        )}
+        <h3 className="text-base font-semibold leading-6 tracking-[-0.01em] text-slate-900 dark:text-slate-100">
+          {title}
+        </h3>
+        {changed && (
+          <span
+            className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"
+            aria-label="Contains non-default values"
+            title="Contains non-default values"
+          />
+        )}
+        {badge && (
+          <span className="ml-1 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">
+            {badge}
+          </span>
+        )}
+      </div>
+      {subtitle && (
+        <p className="mt-0.5 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400">
+          {subtitle}
+        </p>
+      )}
+    </div>
+  </header>
+);
 
 // Reusable component for editing pattern property schemas
 interface PatternPropertySchemaEditorProps {
@@ -918,30 +916,27 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         zIndex: 0,
       }}>
       {showHint && (
-        <Box sx={{
-          px: 3,
-          py: 1.5,
-          fontSize: '0.75rem',
-          color: isDark ? 'rgba(253, 230, 138, 0.9)' : '#b45309',
-          bgcolor: isDark ? 'rgba(180, 83, 9, 0.15)' : 'rgba(253, 230, 138, 0.4)',
-          borderBottom: isDark ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid rgba(217, 119, 6, 0.2)',
-        }}>
-          Amber-highlighted sections indicate values that differ from defaults.
-        </Box>
+        <div className="border-b border-amber-200/70 bg-amber-50 px-6 py-2 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+          An amber dot next to a section title means it contains values that differ from defaults.
+        </div>
       )}
       {/* ═══════════════════════════════════════════════════════════════════════════
           SECTION 1: Basic Information
           ═══════════════════════════════════════════════════════════════════════════ */}
-      <Box sx={{
-        p: 3,
-        bgcolor: changedSections.basicInfo ? (isDark ? 'rgba(180, 83, 9, 0.25)' : 'rgba(253, 230, 138, 0.6)') : (isDark ? '#1e293b' : 'white'),
-        borderBottom: '1px solid #e2e8f0',
-        ...(changedSections.basicInfo ? { border: '2px solid', borderColor: isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(217, 119, 6, 0.5)', borderRadius: 2 } : {}),
-      }}>
+      <Box
+        data-section-id="basicInfo"
+        sx={{
+          p: 3,
+          bgcolor: isDark ? '#1e293b' : 'white',
+          borderBottom: '1px solid',
+          borderColor: isDark ? '#1f2937' : '#e2e8f0',
+        }}
+      >
         <SectionHeader
           icon={<InfoOutlinedIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
           title="Basic Information"
           subtitle="Core property details"
+          changed={changedSections.basicInfo}
         />
 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 2fr' }, gap: 2.5 }}>
@@ -1143,18 +1138,20 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           SECTION 2: Property Behavior (Metadata flags) - Compact Layout
           ═══════════════════════════════════════════════════════════════════════════ */}
       {showMetadata && (
-        <Box sx={{
-          p: 2,
-          borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          bgcolor: changedSections.propertyFlags ? (isDark ? 'rgba(180, 83, 9, 0.25)' : 'rgba(253, 230, 138, 0.6)') : (isDark ? '#1e293b' : '#f8fafc'),
-          ...(changedSections.propertyFlags ? { border: '2px solid', borderColor: isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(217, 119, 6, 0.5)', borderRadius: 2 } : {}),
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-            <TuneIcon sx={{ color: '#6366f1', fontSize: 16 }} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b', fontSize: '0.875rem' }}>
-              Property Flags
-            </Typography>
-          </Box>
+        <Box
+          data-section-id="propertyFlags"
+          sx={{
+            p: 2,
+            borderBottom: isDark ? '1px solid #1f2937' : '1px solid #e2e8f0',
+            bgcolor: isDark ? '#1e293b' : '#f8fafc',
+          }}
+        >
+          <SectionHeader
+            icon={<TuneIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
+            title="Property Flags"
+            subtitle="Metadata flags that describe how this property behaves at runtime"
+            changed={changedSections.propertyFlags}
+          />
 
           {/* Compact horizontal checkbox layout */}
           <Box sx={{
@@ -1327,20 +1324,25 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════════════
           SECTION 3: Type-Specific Constraints
           ═══════════════════════════════════════════════════════════════════════════ */}
-      <Box sx={{
-        p: 3,
-        borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-        bgcolor: (changedSections.stringConstraints || changedSections.numberConstraints || changedSections.arrayConstraints || changedSections.objectConstraints)
-          ? (isDark ? 'rgba(180, 83, 9, 0.25)' : 'rgba(253, 230, 138, 0.6)')
-          : (isDark ? '#1e293b' : 'white'),
-        ...((changedSections.stringConstraints || changedSections.numberConstraints || changedSections.arrayConstraints || changedSections.objectConstraints)
-          ? { border: '2px solid', borderColor: isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(217, 119, 6, 0.5)', borderRadius: 2 } : {}),
-      }}>
+      <Box
+        data-section-id="constraints"
+        sx={{
+          p: 3,
+          borderBottom: isDark ? '1px solid #1f2937' : '1px solid #e2e8f0',
+          bgcolor: isDark ? '#1e293b' : 'white',
+        }}
+      >
         <SectionHeader
           icon={<SettingsIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
           title="Constraints"
           subtitle="Validation rules for this property"
           badge={`${baseType}${isArray ? '[]' : ''}`}
+          changed={Boolean(
+            changedSections.stringConstraints ||
+              changedSections.numberConstraints ||
+              changedSections.arrayConstraints ||
+              changedSections.objectConstraints,
+          )}
         />
 
         {/* Tuple mode message */}
@@ -3294,17 +3296,21 @@ value={data.format || ''}
           SECTION 4: Values (Const & Enum)
           ═══════════════════════════════════════════════════════════════════════════ */}
       {(baseType === 'string' || baseType === 'number' || baseType === 'integer' || baseType === 'boolean') && (
-        <Box sx={{
-          p: 3,
-          borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          bgcolor: changedSections.values ? (isDark ? 'rgba(180, 83, 9, 0.25)' : 'rgba(253, 230, 138, 0.6)') : undefined,
-          background: changedSections.values ? undefined : (isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'),
-          ...(changedSections.values ? { border: '2px solid', borderColor: isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(217, 119, 6, 0.5)', borderRadius: 2 } : {}),
-        }}>
+        <Box
+          data-section-id="values"
+          sx={{
+            p: 3,
+            borderBottom: isDark ? '1px solid #1f2937' : '1px solid #e2e8f0',
+            background: isDark
+              ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)'
+              : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          }}
+        >
           <SectionHeader
             icon={<CodeIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
             title="Allowed Values"
             subtitle="Restrict to specific values"
+            changed={changedSections.values}
           />
 
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
@@ -3491,17 +3497,20 @@ value={data.format || ''}
       {/* ═══════════════════════════════════════════════════════════════════════════
           SECTION 5: Advanced (NOT Composition, External Docs, Extensions)
           ═══════════════════════════════════════════════════════════════════════════ */}
-      <Box sx={{
-        p: 3,
-        width: '100%',
-        minWidth: 0,
-        bgcolor: changedSections.advanced ? (isDark ? 'rgba(180, 83, 9, 0.25)' : 'rgba(253, 230, 138, 0.6)') : (isDark ? '#1e293b' : 'white'),
-        ...(changedSections.advanced ? { border: '2px solid', borderColor: isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(217, 119, 6, 0.5)', borderRadius: 2 } : {}),
-      }}>
+      <Box
+        data-section-id="advanced"
+        sx={{
+          p: 3,
+          width: '100%',
+          minWidth: 0,
+          bgcolor: isDark ? '#1e293b' : 'white',
+        }}
+      >
         <SectionHeader
           icon={<SettingsIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
           title="Advanced"
           subtitle="Extended schema options"
+          changed={changedSections.advanced}
         />
 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3, width: '100%', minWidth: 0 }}>

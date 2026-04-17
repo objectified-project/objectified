@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -11,10 +11,8 @@ import {
 } from '../../ui/Dialog';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
-import { Label } from '../../ui/Label';
 import { Textarea } from '../../ui/Textarea';
 import { Alert } from '../../ui/Alert';
-import { Checkbox } from '../../ui/Checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/Tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/Select';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
@@ -27,7 +25,24 @@ import {
   AlertTriangle,
   ExternalLink,
   Sparkles,
+  ListChecks,
+  BookOpenText,
 } from 'lucide-react';
+import {
+  FormSection,
+  FormFieldGroup,
+  FormGrid,
+  FormToggleCard,
+  FormViewModeToggle,
+  FormSectionNav,
+  FormWizardStepper,
+  FormWizardControls,
+  useFormScrollSpy,
+  scrollToSection,
+  useFormViewMode,
+  type FormSectionNavItem,
+  type FormWizardStep,
+} from './form';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -94,6 +109,385 @@ interface PropertyDialogProps {
   availableClasses?: string[];
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Section renderers. Kept as module-level components so they can be reused by
+// both the Guided wizard and the Advanced scrolling pane without re-creating
+// React subtrees on every render of the parent dialog.
+// ────────────────────────────────────────────────────────────────────────────
+
+interface BasicsSectionProps {
+  mode: 'add' | 'edit';
+  propertyName: string;
+  setPropertyName: (next: string) => void;
+  propertyType: string;
+  setPropertyType: (next: string) => void;
+  propertyIsArray: boolean;
+  setPropertyIsArray: (next: boolean) => void;
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  primitiveAvailable: boolean;
+  setPrimitiveDialogOpen: (next: boolean) => void;
+  changed?: boolean;
+  eyebrow?: string;
+}
+
+const BasicsSection: React.FC<BasicsSectionProps> = ({
+  mode,
+  propertyName,
+  setPropertyName,
+  propertyType,
+  setPropertyType,
+  propertyIsArray,
+  setPropertyIsArray,
+  formData,
+  setFormData,
+  primitiveAvailable,
+  setPrimitiveDialogOpen,
+  changed,
+  eyebrow = 'Basics',
+}) => (
+  <FormSection
+    id="basics"
+    icon={<FileText className="h-4 w-4" />}
+    eyebrow={eyebrow}
+    title="Basics"
+    description="Identify and describe this property. Name and type are locked once the property exists."
+    changed={changed}
+  >
+    <FormFieldGroup
+      label="Property Name"
+      required
+      htmlFor="propertyName"
+      helper="Only letters, numbers, and underscores. camelCase recommended."
+    >
+      <Input
+        id="propertyName"
+        autoFocus
+        value={propertyName}
+        onChange={(e) => {
+          const filteredValue = e.target.value.replace(/[^A-Za-z0-9_]/g, '');
+          setPropertyName(filteredValue);
+        }}
+        placeholder="e.g., userName"
+        disabled={mode === 'edit'}
+      />
+    </FormFieldGroup>
+
+    <FormGrid cols={2} gap="md">
+      <FormToggleCard
+        id="isArray"
+        label="Array"
+        description="An array of the selected base type."
+        checked={propertyIsArray}
+        onCheckedChange={setPropertyIsArray}
+        disabled={mode === 'edit'}
+      />
+      <FormFieldGroup
+        label="Type"
+        required
+        htmlFor="propertyType"
+        helper={mode === 'edit' ? 'Type cannot be changed after creation.' : undefined}
+      >
+        <Select value={propertyType} onValueChange={setPropertyType} disabled={mode === 'edit'}>
+          <SelectTrigger id="propertyType" className="w-full">
+            <SelectValue placeholder="Select type..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="string">string</SelectItem>
+            <SelectItem value="number">number</SelectItem>
+            <SelectItem value="integer">integer</SelectItem>
+            <SelectItem value="boolean">boolean</SelectItem>
+            <SelectItem value="object">object</SelectItem>
+            <SelectItem value="null">null</SelectItem>
+          </SelectContent>
+        </Select>
+      </FormFieldGroup>
+    </FormGrid>
+
+    <FormFieldGroup
+      label="Title"
+      htmlFor="title"
+      helper="A human-readable title for documentation."
+    >
+      <Input
+        id="title"
+        value={formData.title || ''}
+        onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+        placeholder="Human-readable title"
+      />
+    </FormFieldGroup>
+
+    <FormFieldGroup label="Description" htmlFor="description">
+      <Textarea
+        id="description"
+        value={formData.description || ''}
+        onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+        placeholder="Brief description of this property"
+        rows={3}
+      />
+    </FormFieldGroup>
+
+    {primitiveAvailable && (
+      <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/30">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-500 dark:bg-indigo-900/40 dark:text-indigo-300">
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Apply from Primitive
+              </h4>
+              <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                Quickly apply format, pattern, and constraints from a predefined primitive type.
+              </p>
+            </div>
+          </div>
+          <PrimitiveSelector
+            formData={formData}
+            onChange={(field, value) => setFormData((prev) => ({ ...prev, [field]: value }))}
+            propertyType={propertyType}
+            size="small"
+            onOpenChange={setPrimitiveDialogOpen}
+          />
+        </div>
+      </div>
+    )}
+  </FormSection>
+);
+
+interface FlagsSectionProps {
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  changed?: boolean;
+  eyebrow?: string;
+}
+
+const FlagsSection: React.FC<FlagsSectionProps> = ({ formData, setFormData, changed, eyebrow = 'Flags & Ownership' }) => (
+  <FormSection
+    id="flags"
+    icon={<Settings className="h-4 w-4" />}
+    eyebrow={eyebrow}
+    title="Flags & Ownership"
+    description="Declare runtime behavior and ownership metadata."
+    changed={changed}
+  >
+    <FormGrid cols={4} gap="md">
+      <FormToggleCard
+        id="required"
+        label="Required"
+        description="Must be provided"
+        accent="emerald"
+        checked={formData.required || false}
+        onCheckedChange={(v) => setFormData((prev) => ({ ...prev, required: v }))}
+      />
+      <FormToggleCard
+        id="nullable"
+        label="Nullable"
+        description="Can be null"
+        accent="amber"
+        checked={formData.nullable || false}
+        onCheckedChange={(v) => setFormData((prev) => ({ ...prev, nullable: v }))}
+      />
+      <FormToggleCard
+        id="readOnly"
+        label="Read Only"
+        description="Only in responses"
+        accent="blue"
+        checked={formData.readOnly || false}
+        onCheckedChange={(v) => setFormData((prev) => ({ ...prev, readOnly: v }))}
+      />
+      <FormToggleCard
+        id="writeOnly"
+        label="Write Only"
+        description="Only in requests"
+        accent="purple"
+        checked={formData.writeOnly || false}
+        onCheckedChange={(v) => setFormData((prev) => ({ ...prev, writeOnly: v }))}
+      />
+    </FormGrid>
+
+    <FormToggleCard
+      id="deprecated"
+      label="Deprecated"
+      icon={<AlertTriangle className="h-3.5 w-3.5" />}
+      accent="amber"
+      description="Signal consumers to migrate off this property."
+      checked={formData.deprecated || false}
+      onCheckedChange={(v) => setFormData((prev) => ({ ...prev, deprecated: v }))}
+      stack={!!formData.deprecated}
+      trailing={
+        formData.deprecated ? (
+          <Input
+            value={formData.deprecationMessage || ''}
+            onChange={(e) => setFormData((prev) => ({ ...prev, deprecationMessage: e.target.value }))}
+            placeholder="Deprecation message (e.g., Use newProperty instead)"
+            className="text-sm"
+          />
+        ) : undefined
+      }
+    />
+
+    <FormFieldGroup
+      label="Owner"
+      htmlFor="owner"
+      helper={
+        <>
+          Stored as <code className="font-mono text-[11px]">x-owner</code> on this property schema
+          (team or person responsible).
+        </>
+      }
+    >
+      <Input
+        id="owner"
+        value={formData.owner || ''}
+        onChange={(e) => setFormData((prev) => ({ ...prev, owner: e.target.value }))}
+        placeholder="e.g. platform-team or @handle"
+      />
+    </FormFieldGroup>
+  </FormSection>
+);
+
+interface DefaultsSectionProps {
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  changed?: boolean;
+  eyebrow?: string;
+}
+
+const DefaultsSection: React.FC<DefaultsSectionProps> = ({ formData, setFormData, changed, eyebrow = 'Defaults & Constants' }) => (
+  <FormSection
+    id="defaults"
+    icon={<Code className="h-4 w-4" />}
+    eyebrow={eyebrow}
+    title="Defaults & Constants"
+    description="Optional default and constant values for this property. Constant is mutually exclusive with enum."
+    changed={changed}
+  >
+    <FormGrid cols={2} gap="md">
+      <FormFieldGroup
+        label="Default Value"
+        htmlFor="defaultValue"
+        helper="Used when no value is provided."
+      >
+        <Input
+          id="defaultValue"
+          value={formData.default || ''}
+          onChange={(e) => setFormData((prev) => ({ ...prev, default: e.target.value }))}
+          placeholder='JSON value (e.g., "hello", 123, true)'
+          className="font-mono text-sm"
+        />
+      </FormFieldGroup>
+      <FormFieldGroup
+        label="Constant Value"
+        htmlFor="constValue"
+        helper="Must always equal this value."
+      >
+        <Input
+          id="constValue"
+          value={formData.const || ''}
+          onChange={(e) => setFormData((prev) => ({ ...prev, const: e.target.value }))}
+          placeholder="Fixed value (mutually exclusive with enum)"
+          className="font-mono text-sm"
+        />
+      </FormFieldGroup>
+    </FormGrid>
+  </FormSection>
+);
+
+interface ConstraintsSectionProps {
+  propertyType: string;
+  propertyIsArray: boolean;
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  availableClasses: string[];
+  eyebrow?: string;
+}
+
+const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
+  propertyType,
+  propertyIsArray,
+  formData,
+  setFormData,
+  availableClasses,
+  eyebrow = 'Advanced Constraints',
+}) => (
+  <FormSection
+    id="constraints"
+    icon={<ListChecks className="h-4 w-4" />}
+    eyebrow={eyebrow}
+    title="Advanced Constraints"
+    description="Type-specific validation rules, values, and advanced schema options."
+    className="px-0 py-0"
+    headerClassName="mx-8 mt-7 mb-0"
+    bodyClassName="space-y-0"
+  >
+    <PropertyFormFields
+      baseType={propertyType}
+      isArray={propertyIsArray}
+      data={formData}
+      onChange={(field, value) => {
+        setFormData((prev) => ({ ...prev, [field]: value }));
+      }}
+      showMetadata={false}
+      showTitle={false}
+      showPrimitiveSelector={false}
+      showHint={false}
+      size="small"
+      availableClasses={availableClasses}
+    />
+  </FormSection>
+);
+
+interface DocsSectionProps {
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  changed?: boolean;
+  eyebrow?: string;
+}
+
+const DocsSection: React.FC<DocsSectionProps> = ({ formData, setFormData, changed, eyebrow = 'Documentation' }) => (
+  <FormSection
+    id="docs"
+    icon={<BookOpenText className="h-4 w-4" />}
+    eyebrow={eyebrow}
+    title="Documentation"
+    description="External documentation links surfaced in generated specs."
+    changed={changed}
+  >
+    <FormGrid cols={1} gap="md">
+      <FormFieldGroup label="URL" htmlFor="externalDocsUrl">
+        <Input
+          id="externalDocsUrl"
+          type="url"
+          value={formData.externalDocsUrl || ''}
+          onChange={(e) => setFormData((prev) => ({ ...prev, externalDocsUrl: e.target.value }))}
+          placeholder="https://docs.example.com/property"
+        />
+      </FormFieldGroup>
+      <FormFieldGroup
+        label="Description"
+        htmlFor="externalDocsDescription"
+        helper="Optional label describing what the link points to."
+      >
+        <Input
+          id="externalDocsDescription"
+          value={formData.externalDocsDescription || ''}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, externalDocsDescription: e.target.value }))
+          }
+          placeholder="Link to property documentation"
+        />
+      </FormFieldGroup>
+    </FormGrid>
+
+    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+      <ExternalLink className="h-3.5 w-3.5" />
+      Shown inline with generated API documentation.
+    </div>
+  </FormSection>
+);
+
 export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                                                                 open,
                                                                 onClose,
@@ -104,7 +498,9 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                                                               }) => {
   const isDark = useDarkMode();
 
-  const [viewMode, setViewMode] = useState<'form' | 'json'>('form');
+  const [tabMode, setTabMode] = useState<'form' | 'json'>('form');
+  const [viewMode, setViewMode] = useFormViewMode('property-dialog-view-mode');
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [propertyName, setPropertyName] = useState('');
   const [propertyType, setPropertyType] = useState('string');
   const [propertyIsArray, setPropertyIsArray] = useState(false);
@@ -114,6 +510,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
 
   // Use shared form data structure
   const [formData, setFormData] = useState<PropertyFormData>({});
+
+  const advancedScrollRef = useRef<HTMLDivElement>(null);
 
   // Load property data when dialog opens in edit mode
   useEffect(() => {
@@ -311,7 +709,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       setPropertyError('');
     } else if (open && mode === 'add') {
       // Reset all fields for add mode
-      setViewMode('form');
+      setTabMode('form');
+      setCurrentStepIndex(0);
       setPropertyName('');
       setPropertyType('string');
       setPropertyIsArray(false);
@@ -1109,6 +1508,74 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
     }
   };
 
+  const primitiveAvailable =
+    (propertyType === 'string' ||
+      propertyType === 'number' ||
+      propertyType === 'integer' ||
+      propertyType === 'array') &&
+    !formData.tupleMode;
+
+  const changedBasics =
+    Boolean(formData.description?.trim()) || Boolean(formData.title?.trim());
+  const changedFlags =
+    Boolean(formData.required) ||
+    Boolean(formData.nullable) ||
+    Boolean(formData.readOnly) ||
+    Boolean(formData.writeOnly) ||
+    Boolean(formData.deprecated) ||
+    Boolean(formData.deprecationMessage?.trim()) ||
+    Boolean(formData.owner?.trim());
+  const changedDefaults =
+    Boolean(formData.default?.trim()) || Boolean(formData.const?.trim());
+  const changedDocs =
+    Boolean(formData.externalDocsUrl?.trim()) ||
+    Boolean(formData.externalDocsDescription?.trim());
+
+  const sectionChanged: Record<string, boolean> = {
+    basics: changedBasics,
+    flags: changedFlags,
+    defaults: changedDefaults,
+    constraints: false,
+    docs: changedDocs,
+  };
+
+  const navItems: FormSectionNavItem[] = [
+    { id: 'basics', label: 'Basics', icon: <FileText className="h-3.5 w-3.5" />, changed: sectionChanged.basics },
+    { id: 'flags', label: 'Flags & Ownership', icon: <Settings className="h-3.5 w-3.5" />, changed: sectionChanged.flags },
+    { id: 'defaults', label: 'Defaults & Constants', icon: <Code className="h-3.5 w-3.5" />, changed: sectionChanged.defaults },
+    { id: 'constraints', label: 'Advanced Constraints', icon: <ListChecks className="h-3.5 w-3.5" /> },
+    { id: 'docs', label: 'Documentation', icon: <BookOpenText className="h-3.5 w-3.5" />, changed: sectionChanged.docs },
+  ];
+
+  const wizardSteps: FormWizardStep[] = useMemo(
+    () => [
+      { id: 'basics', label: 'Basics', icon: <FileText className="h-4 w-4" /> },
+      { id: 'flags', label: 'Flags', icon: <Settings className="h-4 w-4" /> },
+      { id: 'defaults', label: 'Defaults', icon: <Code className="h-4 w-4" /> },
+      { id: 'constraints', label: 'Constraints', icon: <ListChecks className="h-4 w-4" /> },
+      { id: 'docs', label: 'Docs', icon: <BookOpenText className="h-4 w-4" /> },
+    ],
+    [],
+  );
+  const currentWizardSection = wizardSteps[currentStepIndex]?.id ?? 'basics';
+
+  const sectionOrder = useMemo(
+    () => ['basics', 'flags', 'defaults', 'constraints', 'docs'],
+    [],
+  );
+  const { activeId } = useFormScrollSpy({
+    sectionIds: sectionOrder,
+    containerRef: advancedScrollRef,
+    disabled: tabMode !== 'form' || viewMode !== 'advanced',
+  });
+
+  const handleNextStep = () => {
+    setCurrentStepIndex((i) => Math.min(i + 1, wizardSteps.length - 1));
+  };
+  const handlePrevStep = () => {
+    setCurrentStepIndex((i) => Math.max(i - 1, 0));
+  };
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()} modal={true}>
       <DialogContent
@@ -1117,367 +1584,162 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         aria-describedby={undefined}
       >
         <DialogHeader className="pl-6 pr-10 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <div className="flex items-center gap-3 min-w-0">
-              <DialogTitle className="text-lg font-semibold">
-                {mode === 'add' ? 'Add Property' : 'Edit Property'}
-              </DialogTitle>
-            </div>
-            <p className="text-xs text-amber-700 dark:text-amber-300 shrink-0 max-w-md sm:text-right">
-              Amber-highlighted sections indicate values that differ from defaults.
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <DialogTitle className="text-lg font-semibold">
+              {mode === 'add' ? 'Add Property' : 'Edit Property'}
+            </DialogTitle>
+            {propertyName && mode === 'edit' && (
+              <code className="truncate rounded bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                {propertyName}
+              </code>
+            )}
           </div>
         </DialogHeader>
 
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'form' | 'json')} className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex items-center border-b border-gray-200 dark:border-gray-700 px-6 shrink-0">
+        <Tabs value={tabMode} onValueChange={(v) => setTabMode(v as 'form' | 'json')} className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 shrink-0 gap-4">
             <TabsList className="h-auto p-0 rounded-none bg-transparent justify-start gap-0 -ml-2">
               <TabsTrigger
-              value="form"
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
-            >
-              Form
-            </TabsTrigger>
-            <TabsTrigger
-              value="json"
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
-            >
-              JSON
-            </TabsTrigger>
+                value="form"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
+              >
+                Form
+              </TabsTrigger>
+              <TabsTrigger
+                value="json"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
+              >
+                JSON
+              </TabsTrigger>
             </TabsList>
+            {tabMode === 'form' && (
+              <FormViewModeToggle value={viewMode} onChange={setViewMode} />
+            )}
           </div>
 
           {/* Form Tab */}
           <TabsContent value="form" className="flex-1 flex flex-col overflow-hidden mt-0 p-0">
             {propertyError && <Alert variant="error" className="m-4 mb-0">{propertyError}</Alert>}
 
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 divide-x divide-gray-200 dark:divide-gray-700 overflow-hidden min-h-0">
-              {/* LEFT COLUMN - Basic Configuration */}
-              <div className="flex flex-col overflow-y-auto min-h-0">
-                {/* SECTION 1: Property Information */}
-                <div className={`p-6 border-b border-gray-200 dark:border-gray-700 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}>
-                  <div className="flex items-center gap-2 mb-4">
-                    <FileText size={18} className="text-indigo-500" />
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Property Information</h3>
-                  </div>
-
-                  {/* Property Name */}
-                  <div className="space-y-2 mb-4">
-                    <Label htmlFor="propertyName">Property Name *</Label>
-                    <Input
-                      id="propertyName"
-                      autoFocus
-                      value={propertyName}
-                      onChange={(e) => {
-                        const filteredValue = e.target.value.replace(/[^A-Za-z0-9_]/g, '');
-                        setPropertyName(filteredValue);
-                      }}
-                      placeholder="e.g., userName"
-                    />
-                    <p className="text-xs text-gray-500">Only letters, numbers, and underscores. camelCase recommended.</p>
-                  </div>
-
-                  {/* Type Selector */}
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className={`p-3 rounded-lg border ${propertyIsArray ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-300 dark:border-indigo-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="isArray"
-                          checked={propertyIsArray}
-                          onCheckedChange={(checked) => setPropertyIsArray(!!checked)}
-                          disabled={mode === 'edit'}
-                        />
-                        <label htmlFor="isArray" className="text-sm font-medium cursor-pointer">
-                          Array
-                        </label>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1 ml-6">An array of...</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="propertyType">Type *</Label>
-                      <Select
-                        value={propertyType}
-                        onValueChange={setPropertyType}
-                        disabled={mode === 'edit'}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select type..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="string">string</SelectItem>
-                          <SelectItem value="number">number</SelectItem>
-                          <SelectItem value="integer">integer</SelectItem>
-                          <SelectItem value="boolean">boolean</SelectItem>
-                          <SelectItem value="object">object</SelectItem>
-                          <SelectItem value="null">null</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {mode === 'edit' && (
-                        <p className="text-xs text-gray-500">Type cannot be changed after creation</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Brief description of this property"
-                      rows={2}
-                    />
-                  </div>
-
-                  {/* Title (optional) */}
-                  <div className="mt-4 space-y-2">
-                    <Label htmlFor="title">Title (Optional)</Label>
-                    <Input
-                      id="title"
-                      value={formData.title || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Human-readable title"
-                    />
-                    <p className="text-xs text-gray-500">A human-readable title for documentation</p>
-                  </div>
-                </div>
-
-                {/* Apply from Primitive - Only show for applicable types */}
-                {(propertyType === 'string' || propertyType === 'number' || propertyType === 'integer' || propertyType === 'array') && !formData.tupleMode && (
-                  <div className={`p-6 border-b border-gray-200 dark:border-gray-700 transition-all duration-200 ${primitiveDialogOpen ? 'ring-2 ring-inset ring-indigo-500 dark:ring-indigo-400 bg-indigo-50/60 dark:bg-indigo-900/20' : ''}`}>
-                    <div className={`p-4 rounded-lg border ${isDark ? 'bg-indigo-900/10 border-indigo-700/30' : 'bg-indigo-50/50 border-indigo-200'}`}>
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                          <div className={`p-2 rounded-lg ${isDark ? 'bg-indigo-900/30' : 'bg-indigo-100'}`}>
-                            <Sparkles size={18} className="text-indigo-500" />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-0.5">
-                              Apply from Primitive
-                            </h4>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              Quickly apply format, pattern, and constraints from a predefined primitive type
-                            </p>
-                          </div>
-                        </div>
-                        <PrimitiveSelector
-                          formData={formData}
-                          onChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-                          propertyType={propertyType}
-                          size="small"
-                          onOpenChange={setPrimitiveDialogOpen}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* SECTION 2: Property Flags */}
-                <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${isDark ? 'bg-slate-900' : 'bg-gray-50'} transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Settings size={18} className="text-indigo-500" />
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Property Flags</h3>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Required */}
-                    <div className={`p-3 rounded-lg border ${formData.required ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="required"
-                          checked={formData.required || false}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, required: !!checked }))}
-                        />
-                        <label htmlFor="required" className="text-sm font-medium cursor-pointer">
-                          Required
-                        </label>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1 ml-6">Must be provided</p>
-                    </div>
-
-                    {/* Nullable */}
-                    <div className={`p-3 rounded-lg border ${formData.nullable ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="nullable"
-                          checked={formData.nullable || false}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, nullable: !!checked }))}
-                        />
-                        <label htmlFor="nullable" className="text-sm font-medium cursor-pointer">
-                          Nullable
-                        </label>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1 ml-6">Can be null</p>
-                    </div>
-
-                    {/* Read Only */}
-                    <div className={`p-3 rounded-lg border ${formData.readOnly ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="readOnly"
-                          checked={formData.readOnly || false}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, readOnly: !!checked }))}
-                        />
-                        <label htmlFor="readOnly" className="text-sm font-medium cursor-pointer">
-                          Read Only
-                        </label>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1 ml-6">Only in responses</p>
-                    </div>
-
-                    {/* Write Only */}
-                    <div className={`p-3 rounded-lg border ${formData.writeOnly ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="writeOnly"
-                          checked={formData.writeOnly || false}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, writeOnly: !!checked }))}
-                        />
-                        <label htmlFor="writeOnly" className="text-sm font-medium cursor-pointer">
-                          Write Only
-                        </label>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1 ml-6">Only in requests</p>
-                    </div>
-                  </div>
-
-                  {/* Deprecation */}
-                  <div className={`mt-4 p-3 rounded-lg border flex flex-col gap-3 ${formData.deprecated ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="deprecated"
-                        checked={formData.deprecated || false}
-                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, deprecated: !!checked }))}
+            {viewMode === 'guided' ? (
+              <div className="flex flex-1 flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
+                <FormWizardStepper
+                  steps={wizardSteps}
+                  currentIndex={currentStepIndex}
+                  onStepSelect={setCurrentStepIndex}
+                />
+                <div
+                  className={`flex-1 overflow-y-auto min-h-0 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}
+                >
+                  <div className="mx-auto max-w-4xl">
+                    {currentWizardSection === 'basics' && (
+                      <BasicsSection
+                        mode={mode}
+                        propertyName={propertyName}
+                        setPropertyName={setPropertyName}
+                        propertyType={propertyType}
+                        setPropertyType={setPropertyType}
+                        propertyIsArray={propertyIsArray}
+                        setPropertyIsArray={setPropertyIsArray}
+                        formData={formData}
+                        setFormData={setFormData}
+                        primitiveAvailable={primitiveAvailable}
+                        setPrimitiveDialogOpen={setPrimitiveDialogOpen}
+                        changed={changedBasics}
+                        eyebrow="Step 1 of 5"
                       />
-                      <label htmlFor="deprecated" className="text-sm font-medium cursor-pointer flex items-center gap-1">
-                        <AlertTriangle size={14} className={formData.deprecated ? 'text-amber-500' : 'text-gray-400'} />
-                        Deprecated
-                      </label>
-                    </div>
-                    {formData.deprecated && (
-                      <Input
-                        value={formData.deprecationMessage || ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, deprecationMessage: e.target.value }))}
-                        placeholder="Deprecation message (e.g., Use newProperty instead)"
-                        className="text-sm"
+                    )}
+                    {currentWizardSection === 'flags' && (
+                      <FlagsSection
+                        formData={formData}
+                        setFormData={setFormData}
+                        changed={changedFlags}
+                        eyebrow="Step 2 of 5"
+                      />
+                    )}
+                    {currentWizardSection === 'defaults' && (
+                      <DefaultsSection
+                        formData={formData}
+                        setFormData={setFormData}
+                        changed={changedDefaults}
+                        eyebrow="Step 3 of 5"
+                      />
+                    )}
+                    {currentWizardSection === 'constraints' && (
+                      <ConstraintsSection
+                        propertyType={propertyType}
+                        propertyIsArray={propertyIsArray}
+                        formData={formData}
+                        setFormData={setFormData}
+                        availableClasses={availableClasses}
+                        eyebrow="Step 4 of 5"
+                      />
+                    )}
+                    {currentWizardSection === 'docs' && (
+                      <DocsSection
+                        formData={formData}
+                        setFormData={setFormData}
+                        changed={changedDocs}
+                        eyebrow="Step 5 of 5"
                       />
                     )}
                   </div>
-
-                  {/* Owner */}
-                  <div className="mt-4 space-y-1">
-                    <Label htmlFor="owner" className="text-sm font-medium">Owner</Label>
-                    <Input
-                      id="owner"
-                      value={formData.owner || ''}
-                      onChange={(e) => setFormData(prev => ({ ...prev, owner: e.target.value }))}
-                      placeholder="e.g. platform-team or @handle"
-                      className="text-sm"
-                    />
-                    <p className="text-xs text-gray-500">Stored as <code>x-owner</code> on this property schema (team or person responsible).</p>
-                  </div>
                 </div>
-
-                {/* SECTION 3: Default & Constant Values */}
-                <div className={`p-6 border-b border-gray-200 dark:border-gray-700 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Code size={18} className="text-indigo-500" />
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Default & Constant Values</h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Default Value */}
-                    <div className="space-y-2">
-                      <Label htmlFor="defaultValue">Default Value</Label>
-                      <Input
-                        id="defaultValue"
-                        value={formData.default || ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, default: e.target.value }))}
-                        placeholder='JSON value (e.g., "hello", 123, true)'
-                        className="font-mono text-sm"
-                      />
-                      <p className="text-xs text-gray-500">Used when no value is provided</p>
-                    </div>
-
-                    {/* Constant Value */}
-                    <div className="space-y-2">
-                      <Label htmlFor="constValue">Constant Value</Label>
-                      <Input
-                        id="constValue"
-                        value={formData.const || ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, const: e.target.value }))}
-                        placeholder="Fixed value (mutually exclusive with enum)"
-                        className="font-mono text-sm"
-                      />
-                      <p className="text-xs text-gray-500">Must always equal this value</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT COLUMN - Advanced Configuration */}
-              <div className={`flex flex-col overflow-y-auto min-h-0 w-full min-w-0 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}>
-                {/* Advanced Header */}
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Settings size={20} className="text-purple-500" />
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Advanced Constraints</h3>
-                    <span className="px-2 py-0.5 rounded text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">Optional</span>
-                  </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Configure type-specific validation rules and advanced constraints.</p>
-                </div>
-
-                {/* Property Constraints Section */}
-                <div className="p-6 flex-1 overflow-y-auto w-full min-w-0">
-                  <PropertyFormFields
-                    baseType={propertyType}
-                    isArray={propertyIsArray}
-                    data={formData}
-                    onChange={(field, value) => {
-                      setFormData(prev => ({ ...prev, [field]: value }));
-                    }}
-                    showMetadata={false}
-                    showTitle={false}
-                    showPrimitiveSelector={false}
-                    showHint={false}
-                    size="small"
-                    availableClasses={availableClasses}
+                <div className="border-t border-slate-200 bg-white px-6 py-3 dark:border-slate-800 dark:bg-slate-900">
+                  <FormWizardControls
+                    currentIndex={currentStepIndex}
+                    stepCount={wizardSteps.length}
+                    onBack={handlePrevStep}
+                    onNext={handleNextStep}
+                    onCancel={onClose}
+                    onFinish={handleSubmit}
+                    finishLabel={mode === 'add' ? 'Add Property' : 'Save'}
+                    finishBusy={isSubmitting}
+                    finishDisabled={!propertyName.trim() || isSubmitting}
                   />
-
-                  {/* External Documentation - inside scrollable area */}
-                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-2 mb-4">
-                      <ExternalLink size={18} className="text-purple-500" />
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">External Documentation</h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="externalDocsUrl">URL</Label>
-                        <Input
-                          id="externalDocsUrl"
-                          value={formData.externalDocsUrl || ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, externalDocsUrl: e.target.value }))}
-                          placeholder="https://docs.example.com/property"
-                          type="url"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="externalDocsDescription">Description</Label>
-                        <Input
-                          id="externalDocsDescription"
-                          value={formData.externalDocsDescription || ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, externalDocsDescription: e.target.value }))}
-                          placeholder="Link to property documentation"
-                        />
-                      </div>
-                    </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-1 overflow-hidden min-h-0 bg-slate-50 dark:bg-slate-950">
+                <FormSectionNav
+                  items={navItems}
+                  activeId={activeId}
+                  onSelect={(id) => scrollToSection(advancedScrollRef.current, id, 16)}
+                  title="Property"
+                />
+                <div
+                  ref={advancedScrollRef}
+                  className={`flex-1 overflow-y-auto min-h-0 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}
+                >
+                  <div className="mx-auto max-w-4xl divide-y divide-slate-200 dark:divide-slate-800">
+                    <BasicsSection
+                      mode={mode}
+                      propertyName={propertyName}
+                      setPropertyName={setPropertyName}
+                      propertyType={propertyType}
+                      setPropertyType={setPropertyType}
+                      propertyIsArray={propertyIsArray}
+                      setPropertyIsArray={setPropertyIsArray}
+                      formData={formData}
+                      setFormData={setFormData}
+                      primitiveAvailable={primitiveAvailable}
+                      setPrimitiveDialogOpen={setPrimitiveDialogOpen}
+                      changed={changedBasics}
+                    />
+                    <FlagsSection formData={formData} setFormData={setFormData} changed={changedFlags} />
+                    <DefaultsSection formData={formData} setFormData={setFormData} changed={changedDefaults} />
+                    <ConstraintsSection
+                      propertyType={propertyType}
+                      propertyIsArray={propertyIsArray}
+                      formData={formData}
+                      setFormData={setFormData}
+                      availableClasses={availableClasses}
+                    />
+                    <DocsSection formData={formData} setFormData={setFormData} changed={changedDocs} />
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </TabsContent>
 
           {/* JSON Tab */}
@@ -1518,17 +1780,19 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           </TabsContent>
         </Tabs>
 
-        {/* Footer */}
-        <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
-          <div className="flex justify-end w-full gap-2">
-            <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={isSubmitting}>
-              {mode === 'add' ? 'Add' : 'Save'}
-            </Button>
-          </div>
-        </DialogFooter>
+        {/* Footer - hidden in guided-form mode because the wizard provides its own controls */}
+        {!(tabMode === 'form' && viewMode === 'guided') && (
+          <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+            <div className="flex justify-end w-full gap-2">
+              <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmit} disabled={isSubmitting || !propertyName.trim()}>
+                {isSubmitting ? 'Saving…' : mode === 'add' ? 'Add Property' : 'Save'}
+              </Button>
+            </div>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
