@@ -2,19 +2,24 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Twitter, Linkedin, Youtube } from 'lucide-react';
+import { Youtube } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const reduce = useReducedMotion();
 
   return (
-    <footer className="border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {/* Brand */}
+    <footer className="relative border-t border-zinc-200/70 bg-white/60 backdrop-blur-sm dark:border-zinc-800/70 dark:bg-zinc-950/60">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent dark:via-blue-400/30"
+      />
+      <div className="container mx-auto px-4 py-14">
+        <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-3">
           <div>
             <div className="mb-4 flex items-center gap-3">
-              <div className="relative h-10 w-auto flex items-center">
+              <div className="relative flex h-10 w-auto items-center">
                 <Image
                   src="/Objectified-02.png"
                   alt="Objectified Logo"
@@ -31,157 +36,94 @@ export function Footer() {
                 />
               </div>
             </div>
-            <p className="mb-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+            <p className="mb-2 font-display text-lg italic text-zinc-700 dark:text-zinc-200">
               Your data: Designed, Defined, Discovered.
             </p>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              Visual API & Database Design Platform. Build better APIs faster with our intuitive tools.
+            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+              Visual API & Database Design Platform. Build better APIs faster with intuitive, visual tools.
             </p>
-            <div className="mt-4 flex gap-3">
-              {/* GitHub - Coming Soon
-              <a
-                href="https://github.com/objectified"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                aria-label="GitHub"
-              >
-                <Github className="h-5 w-5" />
-              </a>
-              */}
-              {/*<a*/}
-              {/*  href="https://twitter.com/objectifieddev"*/}
-              {/*  target="_blank"*/}
-              {/*  rel="noopener noreferrer"*/}
-              {/*  className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"*/}
-              {/*  aria-label="Twitter"*/}
-              {/*>*/}
-              {/*  <Twitter className="h-5 w-5" />*/}
-              {/*</a>*/}
-              <a
+            <div className="mt-5 flex gap-3">
+              <motion.a
                 href="https://www.youtube.com/@objectifieddev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                whileHover={reduce ? undefined : { y: -2, scale: 1.05 }}
+                whileTap={reduce ? undefined : { scale: 0.95 }}
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100/70 text-zinc-600 ring-1 ring-inset ring-zinc-200/70 transition-colors hover:bg-red-500/10 hover:text-red-600 dark:bg-zinc-900/70 dark:text-zinc-400 dark:ring-zinc-800/70 dark:hover:bg-red-500/20 dark:hover:text-red-400"
                 aria-label="YouTube"
               >
                 <Youtube className="h-5 w-5" />
-              </a>
-              {/*<a*/}
-              {/*  href="https://linkedin.com/company/objectified"*/}
-              {/*  target="_blank"*/}
-              {/*  rel="noopener noreferrer"*/}
-              {/*  className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"*/}
-              {/*  aria-label="LinkedIn"*/}
-              {/*>*/}
-              {/*  <Linkedin className="h-5 w-5" />*/}
-              {/*</a>*/}
+              </motion.a>
             </div>
           </div>
 
-          {/* Product */}
           <div>
-            <h3 className="mb-4 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-50">
               Product
             </h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <a
-                  href="https://app.objectified.dev"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-                >
-                  Launch App
-                </a>
-              </li>
-              <li>
-                <Link
-                  href="/features"
-                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-                >
-                  Features
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/for-teams"
-                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-                >
-                  For Teams
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/pricing"
-                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-                >
-                  Pricing
-                </Link>
-              </li>
-              <li>
-                <a
-                  href="https://browse.objectified.dev"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-                >
-                  Browse APIs
-                </a>
-              </li>
+            <ul className="space-y-2.5 text-sm">
+              <FooterLink href="https://app.objectified.dev" external>
+                Launch App
+              </FooterLink>
+              <FooterLink href="/features">Features</FooterLink>
+              <FooterLink href="/for-teams">For Teams</FooterLink>
+              <FooterLink href="/pricing">Pricing</FooterLink>
+              <FooterLink href="https://browse.objectified.dev" external>
+                Browse APIs
+              </FooterLink>
             </ul>
           </div>
 
-          {/* Resources */}
           <div>
-            <h3 className="mb-4 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-50">
               Resources
             </h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <a
-                  href="https://www.youtube.com/@objectifieddev"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-                >
-                  Tutorials
-                </a>
-              </li>
-              {/* GitHub - Coming Soon
-              <li>
-                <a
-                  href="https://github.com/objectified"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-                >
-                  GitHub
-                </a>
-              </li>
-              */}
-              {/* Community - Coming Soon
-              <li>
-                <a
-                  href="https://discord.gg/objectified"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-                >
-                  Community
-                </a>
-              </li>
-              */}
+            <ul className="space-y-2.5 text-sm">
+              <FooterLink href="https://www.youtube.com/@objectifieddev" external>
+                Tutorials
+              </FooterLink>
             </ul>
           </div>
         </div>
 
-        <div className="mt-12 border-t border-zinc-200 pt-8 dark:border-zinc-800">
-          <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
+        <div className="mt-12 border-t border-zinc-200/70 pt-8 dark:border-zinc-800/70">
+          <p className="text-center text-sm text-zinc-500 dark:text-zinc-500">
             © 2018 - {currentYear} NobuData, LLC. All rights reserved.
           </p>
         </div>
       </div>
     </footer>
+  );
+}
+
+function FooterLink({
+  href,
+  external,
+  children,
+}: {
+  href: string;
+  external?: boolean;
+  children: React.ReactNode;
+}) {
+  const className =
+    'group relative inline-flex text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50';
+  const inner = (
+    <span className="relative">
+      {children}
+      <span className="pointer-events-none absolute -bottom-0.5 left-0 h-px w-0 bg-gradient-to-r from-blue-500 to-indigo-500 transition-[width] duration-300 group-hover:w-full" />
+    </span>
+  );
+  return (
+    <li>
+      {external ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+          {inner}
+        </a>
+      ) : (
+        <Link href={href} className={className}>
+          {inner}
+        </Link>
+      )}
+    </li>
   );
 }

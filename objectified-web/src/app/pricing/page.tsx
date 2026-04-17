@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Tag } from "lucide-react";
 import { buttonVariants } from "../components/ui/Button";
+import { Aurora } from "../components/ui/Aurora";
+import { Reveal, StaggerGroup, StaggerItem } from "../components/motion/Reveal";
+import { FAQAccordion } from "./FAQAccordion";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -42,30 +45,31 @@ function PricingCard({
     : { href: cta.href };
 
   return (
-    <div className="relative flex min-h-full flex-col rounded-2xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-950">
+    <div
+      className={cn(
+        "group relative flex min-h-full flex-col rounded-2xl p-8 transition-all duration-300",
+        recommended
+          ? "conic-border bg-white shadow-[0_18px_60px_-20px_rgba(79,70,229,0.35)] dark:bg-zinc-950 dark:shadow-[0_18px_60px_-20px_rgba(99,102,241,0.45)] lg:scale-[1.02]"
+          : "glass gradient-border hover:-translate-y-1 hover:shadow-[0_18px_60px_-20px_rgba(37,99,235,0.25)] dark:hover:shadow-[0_18px_60px_-20px_rgba(96,165,250,0.35)]",
+      )}
+    >
+      {recommended && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white shadow-lg">
+          Recommended
+        </div>
+      )}
       <div className="mb-4 flex flex-wrap items-baseline gap-2">
-        <h3 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+        <h3 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {name}
         </h3>
-        {recommended && (
-          <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
-            Recommended
-          </span>
-        )}
       </div>
       <div className="mb-6">
-        <div className="text-xl font-normal text-zinc-700 dark:text-zinc-200">
-          {price}
-        </div>
+        <div className="text-2xl font-normal text-zinc-800 dark:text-zinc-100">{price}</div>
         {period && (
-          <div className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
-            {period}
-          </div>
+          <div className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">{period}</div>
         )}
         {annualNote && (
-          <div className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-500">
-            {annualNote}
-          </div>
+          <div className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-500">{annualNote}</div>
         )}
       </div>
       <p className="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -74,15 +78,10 @@ function PricingCard({
       <ul className="flex-1 space-y-2.5">
         {features.map((feature, index) => (
           <li key={index} className="flex items-start gap-3">
-            <span
-              className="mt-0.5 text-zinc-500 dark:text-zinc-400"
-              aria-hidden
-            >
+            <span className="mt-0.5 text-blue-500 dark:text-blue-400" aria-hidden>
               ✓
             </span>
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">
-              {feature}
-            </span>
+            <span className="text-sm text-zinc-600 dark:text-zinc-400">{feature}</span>
           </li>
         ))}
       </ul>
@@ -90,15 +89,15 @@ function PricingCard({
         {...ctaProps}
         className={cn(
           buttonVariants({
-            variant: recommended ? "secondary" : cta.variant,
+            variant: recommended ? "default" : cta.variant,
             size: "lg",
           }),
-          "mt-6 w-full inline-flex"
+          "mt-6 w-full inline-flex",
         )}
       >
         {cta.text}
-        {cta.variant === "default" && (
-          <ArrowRight className="ml-2 h-4 w-4" />
+        {(cta.variant === "default" || recommended) && (
+          <ArrowRight className="ml-1 h-4 w-4" />
         )}
       </CtaWrapper>
     </div>
@@ -108,208 +107,214 @@ function PricingCard({
 export default function PricingPage() {
   return (
     <div className="flex flex-col">
-      <section className="relative overflow-hidden border-b border-zinc-200 bg-gradient-to-b from-white to-zinc-50 px-6 py-20 dark:border-zinc-800 dark:from-zinc-950 dark:to-zinc-900 sm:py-32">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
+      <section className="relative overflow-hidden border-b border-zinc-200/70 px-6 py-24 dark:border-zinc-800/70 sm:py-36">
+        <Aurora />
         <div className="container relative mx-auto max-w-4xl text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
-            <Tag className="h-4 w-4" />
-            Simple, Transparent Pricing
-          </div>
-          <h1 className="mb-6 text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-6xl">
-            Affordable Plans for
-            <br />
-            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Every Team
-            </span>
-          </h1>
-          <p className="mb-8 text-xl text-zinc-600 dark:text-zinc-400">
-            Choose the plan that&apos;s right for you and your team
-          </p>
+          <Reveal>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-blue-50/80 px-4 py-2 text-sm font-medium text-blue-700 backdrop-blur dark:border-blue-900/60 dark:bg-blue-950/50 dark:text-blue-300">
+              <Tag className="h-4 w-4" />
+              Simple, Transparent Pricing
+            </div>
+          </Reveal>
+          <Reveal delay={0.06}>
+            <h1 className="mb-6 text-5xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-6xl">
+              Affordable plans for
+              <br />
+              <span className="display-accent">every team</span>
+            </h1>
+          </Reveal>
+          <Reveal delay={0.14}>
+            <p className="mb-8 text-lg leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-xl">
+              Choose the plan that&apos;s right for you and your team.
+            </p>
+          </Reveal>
         </div>
       </section>
 
-      <section className="px-6 py-20">
+      <section className="px-6 py-24">
         <div className="container mx-auto max-w-6xl">
-          <p className="mb-10 text-center text-xl font-bold text-zinc-900 dark:text-zinc-50">
-            Early adopters receive free Pro accounts for a year.
-          </p>
-          <h2 className="mb-10 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-            Individual Plans
-          </h2>
-          <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
-            <PricingCard
-              name="Free"
-              price="Free"
-              period="No credit card required"
-              featuresHeading="Includes:"
-              features={[
-                "1 tenant",
-                "3 projects",
-                "No AI assistance",
-                "Public-only publishing",
-              ]}
-              cta={{
-                text: "Get Started",
-                href: "https://app.objectified.dev",
-                variant: "outline",
-                external: true,
-              }}
-            />
+          <Reveal>
+            <p className="mb-10 text-center text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+              Early adopters receive free Pro accounts for a year.
+            </p>
+          </Reveal>
 
-            <PricingCard
-              name="Pro"
-              price="$20/mo."
-              period="per month"
-              annualNote="$200/year billed annually"
-              featuresHeading="Everything in Free, plus:"
-              features={[
-                "10 projects",
-                "AI assistance",
-                "Public & private publishing",
-                "Beta Access",
-                "MCP Access",
-              ]}
-              cta={{
-                text: "Get Pro",
-                href: "https://app.objectified.dev",
-                variant: "default",
-                external: true,
-              }}
-              recommended
-            />
+          <Reveal>
+            <h2 className="mb-10 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+              Individual Plans
+            </h2>
+          </Reveal>
 
-            <PricingCard
-              name="Startup"
-              price="$40/mo."
-              period="per month"
-              annualNote="$400/year billed annually"
-              featuresHeading="Everything in Pro, plus:"
-              features={[
-                "5 tenants",
-                "20 projects per tenant",
-              ]}
-              cta={{
-                text: "Get Startup",
-                href: "https://app.objectified.dev",
-                variant: "outline",
-                external: true,
-              }}
-            />
+          <StaggerGroup className="grid gap-8 pt-2 sm:grid-cols-2 xl:grid-cols-4">
+            <StaggerItem>
+              <PricingCard
+                name="Free"
+                price="Free"
+                period="No credit card required"
+                featuresHeading="Includes:"
+                features={["1 tenant", "3 projects", "No AI assistance", "Public-only publishing"]}
+                cta={{
+                  text: "Get Started",
+                  href: "https://app.objectified.dev",
+                  variant: "outline",
+                  external: true,
+                }}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <PricingCard
+                name="Pro"
+                price="$20/mo."
+                period="per month"
+                annualNote="$200/year billed annually"
+                featuresHeading="Everything in Free, plus:"
+                features={[
+                  "10 projects",
+                  "AI assistance",
+                  "Public & private publishing",
+                  "Beta Access",
+                  "MCP Access",
+                ]}
+                cta={{
+                  text: "Get Pro",
+                  href: "https://app.objectified.dev",
+                  variant: "default",
+                  external: true,
+                }}
+                recommended
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <PricingCard
+                name="Startup"
+                price="$40/mo."
+                period="per month"
+                annualNote="$400/year billed annually"
+                featuresHeading="Everything in Pro, plus:"
+                features={["5 tenants", "20 projects per tenant"]}
+                cta={{
+                  text: "Get Startup",
+                  href: "https://app.objectified.dev",
+                  variant: "outline",
+                  external: true,
+                }}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <PricingCard
+                name="Ultra"
+                price="$200/mo."
+                period="per month"
+                featuresHeading="Everything in Groups, plus:"
+                features={[
+                  "10 tenants",
+                  "Unlimited projects per tenant",
+                  "Voting rights for new features",
+                  "Priority New Feature Access",
+                ]}
+                cta={{
+                  text: "Get Ultra",
+                  href: "mailto:sales@objectified.dev",
+                  variant: "outline",
+                  external: true,
+                }}
+              />
+            </StaggerItem>
+          </StaggerGroup>
 
-            <PricingCard
-              name="Ultra"
-              price="$200/mo."
-              period="per month"
-              featuresHeading="Everything in Groups, plus:"
-              features={[
-                "10 tenants",
-                "Unlimited projects per tenant",
-                "Voting rights for new features",
-                "Priority New Feature Access",
-              ]}
-              cta={{
-                text: "Get Ultra",
-                href: "mailto:sales@objectified.dev",
-                variant: "outline",
-                external: true,
-              }}
-            />
-          </div>
+          <Reveal>
+            <h2 className="mb-10 mt-20 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+              Organization & Self-Hosted
+            </h2>
+          </Reveal>
 
-          <h2 className="mb-10 mt-16 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-            Organization & Self-Hosted
-          </h2>
-          <div className="grid gap-8 sm:grid-cols-2">
-            <PricingCard
-              name="Enterprise Unlimited"
-              price="Contact sales"
-              period=""
-              featuresHeading="Includes:"
-              features={[
-                "Unlimited tenants",
-                "Unlimited projects",
-                "AI assistance",
-                "Public & private publishing",
-                "Dedicated support & SLA",
-                "SSO & advanced security",
-                "Priority New Feature Access",
-              ]}
-              cta={{
-                text: "Contact Sales",
-                href: "mailto:sales@objectified.dev",
-                variant: "outline",
-                external: true,
-              }}
-            />
-
-            <PricingCard
-              name="Self-Hosted"
-              price="Yearly subscription"
-              period="No limits"
-              featuresHeading="Includes:"
-              features={[
-                "No tenant or project limits",
-                "Unlimited versioning",
-                "AI assistance",
-                "Public & private publishing",
-                "Private Docker repository",
-                "Access to updates",
-                "Full control of your data",
-                "Priority New Feature Access",
-              ]}
-              cta={{
-                text: "Contact Sales",
-                href: "mailto:sales@objectified.dev",
-                variant: "outline",
-                external: true,
-              }}
-            />
-          </div>
+          <StaggerGroup className="grid gap-8 sm:grid-cols-2">
+            <StaggerItem>
+              <PricingCard
+                name="Enterprise Unlimited"
+                price="Contact sales"
+                period=""
+                featuresHeading="Includes:"
+                features={[
+                  "Unlimited tenants",
+                  "Unlimited projects",
+                  "AI assistance",
+                  "Public & private publishing",
+                  "Dedicated support & SLA",
+                  "SSO & advanced security",
+                  "Priority New Feature Access",
+                ]}
+                cta={{
+                  text: "Contact Sales",
+                  href: "mailto:sales@objectified.dev",
+                  variant: "outline",
+                  external: true,
+                }}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <PricingCard
+                name="Self-Hosted"
+                price="Yearly subscription"
+                period="No limits"
+                featuresHeading="Includes:"
+                features={[
+                  "No tenant or project limits",
+                  "Unlimited versioning",
+                  "AI assistance",
+                  "Public & private publishing",
+                  "Private Docker repository",
+                  "Access to updates",
+                  "Full control of your data",
+                  "Priority New Feature Access",
+                ]}
+                cta={{
+                  text: "Contact Sales",
+                  href: "mailto:sales@objectified.dev",
+                  variant: "outline",
+                  external: true,
+                }}
+              />
+            </StaggerItem>
+          </StaggerGroup>
         </div>
       </section>
 
-      <section className="border-t border-zinc-200 bg-zinc-50 px-6 py-20 dark:border-zinc-800 dark:bg-zinc-900/50">
+      <section className="border-t border-zinc-200/70 bg-gradient-to-b from-zinc-50/80 via-white/0 to-zinc-50/80 px-6 py-24 dark:border-zinc-800/70 dark:from-zinc-900/40 dark:via-transparent dark:to-zinc-900/40">
         <div className="container mx-auto max-w-3xl">
-          <h2 className="mb-12 text-center text-3xl font-bold text-zinc-900 dark:text-zinc-50">
-            Frequently Asked Questions
-          </h2>
-          <div className="space-y-6">
-            <FAQ
-              question="Can I change plans later?"
-              answer="Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate any charges."
+          <Reveal>
+            <h2 className="mb-12 text-center text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-5xl">
+              Frequently asked <span className="display-accent">questions</span>
+            </h2>
+          </Reveal>
+          <Reveal delay={0.08}>
+            <FAQAccordion
+              items={[
+                {
+                  question: "Can I change plans later?",
+                  answer:
+                    "Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate any charges.",
+                },
+                {
+                  question: "Is there a free trial?",
+                  answer:
+                    "Yes! Pro and paid plans come with a free trial. No credit card required to start with the Free plan.",
+                },
+                {
+                  question: "What payment methods do you accept?",
+                  answer:
+                    "We accept all major credit cards. For Enterprise and Self-Hosted, we can arrange invoicing.",
+                },
+                {
+                  question: "What happens to my data if I cancel?",
+                  answer:
+                    "You can export all your data before canceling. We'll keep your data for 30 days after cancellation in case you want to reactivate.",
+                },
+              ]}
             />
-            <FAQ
-              question="Is there a free trial?"
-              answer="Yes! Pro and paid plans come with a free trial. No credit card required to start with the Free plan."
-            />
-            <FAQ
-              question="What payment methods do you accept?"
-              answer="We accept all major credit cards. For Enterprise and Self-Hosted, we can arrange invoicing."
-            />
-            <FAQ
-              question="What happens to my data if I cancel?"
-              answer="You can export all your data before canceling. We'll keep your data for 30 days after cancellation in case you want to reactivate."
-            />
-          </div>
+          </Reveal>
         </div>
       </section>
-    </div>
-  );
-}
-
-function FAQ({
-  question,
-  answer,
-}: {
-  question: string;
-  answer: string;
-}) {
-  return (
-    <div>
-      <h3 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-        {question}
-      </h3>
-      <p className="text-zinc-600 dark:text-zinc-400">{answer}</p>
     </div>
   );
 }
