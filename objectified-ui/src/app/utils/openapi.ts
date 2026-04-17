@@ -20,6 +20,11 @@ export { extractClassNameFromRef, findReferencedClasses };
  */
 function buildPropertySchema(prop: any, allProperties: any[]): any {
   const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : { ...prop.data };
+  // Strip internal persistence fields from exported schema output.
+  delete propData.id;
+  delete propData.property_id;
+  delete propData.class_id;
+  delete propData.parent_id;
 
   // Preserve the property's own required flag (boolean) - this indicates if THIS property is required
   // It will be extracted by the caller and moved to the parent's required array
