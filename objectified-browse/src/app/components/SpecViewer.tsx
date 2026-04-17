@@ -423,8 +423,15 @@ function SpecOverview({ spec, format }: { spec: unknown; format: SpecFormat }) {
     const servers = Array.isArray(spec.servers) ? spec.servers : [];
     const declaredTags = Array.isArray(spec.tags) ? spec.tags : [];
     const paths = isObject(spec.paths) ? spec.paths : {};
+    const components = isObject(spec.components) ? spec.components : null;
+    const componentSchemas = components && isObject(components.schemas) ? components.schemas : {};
+    const legacyDefinitions = isObject(spec.definitions) ? spec.definitions : {};
 
     const pathEntries = Object.entries(paths);
+    const schemaCount = new Set([
+      ...Object.keys(componentSchemas),
+      ...Object.keys(legacyDefinitions),
+    ]).size;
     let opCount = 0;
     const groups = new Map<string, { tag: string; description?: string; ops: { method: string; path: string; summary?: string; deprecated?: boolean }[] }>();
     const ensure = (tag: string) => {
@@ -484,10 +491,11 @@ function SpecOverview({ spec, format }: { spec: unknown; format: SpecFormat }) {
               {typeof spec.openapi === 'string' && <Pill tone="neutral">OpenAPI {spec.openapi}</Pill>}
             </div>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Metric label="Endpoints" value={opCount} />
             <Metric label="Paths" value={pathEntries.length} />
             <Metric label="Tags" value={Math.max(orderedGroups.length, declaredTags.length)} />
+            <Metric label="Schemas" value={schemaCount} />
           </div>
         </div>
 
