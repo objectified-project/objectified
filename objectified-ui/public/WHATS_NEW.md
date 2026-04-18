@@ -4,6 +4,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 ---
 
+## Git-like Functionality
 - Added default-branch foundations for git-like workflows: branch rows now support a single project default (`isDefault`) with promotion support and first-commit auto-bootstrap of `main`.
 
 ---
