@@ -15,7 +15,7 @@ import packageJson from '../../../../package.json';
 import { isDesignerStudioNavActive, isPathsStudioNavActive } from '../../../../lib/ade-studio-nav';
 
 // Import version from package.json
-const APP_VERSION = `03-2026-v${packageJson.version}`;
+const APP_VERSION = `05-2026-v${packageJson.version}`;
 
 type NavItem = {
   label: string;
