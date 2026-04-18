@@ -50,6 +50,10 @@ class BranchNotFoundError(Exception):
         super().__init__(f"branch not found: {branch_id}")
 
 
+class BranchDefaultConflictError(Exception):
+    """Concurrent default-branch promotion conflicted with unique default-per-project invariant."""
+
+
 def _compute_delta(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
     """
     Compute top-level delta: keys added, removed, or changed.
@@ -4104,7 +4108,7 @@ class Database:
     ) -> Optional[Dict[str, Any]]:
         q = """
             SELECT b.id, b.project_id, b.name, b.tip_version_id, b.branched_from_revision_id,
-                   b.protected, b.require_merge_path, b.created_by, b.created_at, b.updated_at
+                   b.protected, b.is_default, b.require_merge_path, b.created_by, b.created_at, b.updated_at
             FROM odb.version_branches b
             JOIN odb.projects p ON b.project_id = p.id
             WHERE b.project_id = %s AND p.tenant_id = %s AND b.name = %s
@@ -4119,34 +4123,80 @@ class Database:
         branch_id: str,
         *,
         protected: Optional[bool] = None,
+        is_default: Optional[bool] = None,
         require_merge_path: Optional[bool] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Tenant-admin policy fields on a branch (#504, #2583). At least one of protected or
-        require_merge_path must be set.
+        require_merge_path or is_default must be set.
         """
-        if protected is None and require_merge_path is None:
+        if protected is None and require_merge_path is None and is_default is None:
             return None
-        sets: List[str] = []
-        params: List[Any] = []
-        if protected is not None:
-            sets.append("b.protected = %s")
-            params.append(protected)
-        if require_merge_path is not None:
-            sets.append("b.require_merge_path = %s")
-            params.append(require_merge_path)
-        sets.append("b.updated_at = CURRENT_TIMESTAMP")
-        params.extend([branch_id, project_id, tenant_id])
-        q = f"""
-            UPDATE odb.version_branches b
-            SET {", ".join(sets)}
-            FROM odb.projects p
-            WHERE b.id = %s AND b.project_id = %s AND b.project_id = p.id AND p.tenant_id = %s
-            RETURNING b.id, b.project_id, b.name, b.tip_version_id, b.branched_from_revision_id,
-                      b.protected, b.require_merge_path, b.created_by, b.created_at, b.updated_at
-        """
-        rows = self.execute_query(q, tuple(params))
-        return dict(rows[0]) if rows else None
+        conn = self.connect()
+        prev_autocommit = self._begin_tx(conn)
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT b.id
+                    FROM odb.version_branches b
+                    JOIN odb.projects p ON b.project_id = p.id
+                    WHERE b.id = %s AND b.project_id = %s AND p.tenant_id = %s
+                    FOR UPDATE
+                    """,
+                    (branch_id, project_id, tenant_id),
+                )
+                locked = cursor.fetchone()
+                if not locked:
+                    conn.rollback()
+                    return None
+
+                if is_default is True:
+                    cursor.execute(
+                        """
+                        UPDATE odb.version_branches
+                        SET is_default = false, updated_at = CURRENT_TIMESTAMP
+                        WHERE project_id = %s AND id <> %s AND is_default = true
+                        """,
+                        (project_id, branch_id),
+                    )
+
+                sets: List[str] = []
+                params: List[Any] = []
+                if protected is not None:
+                    sets.append("protected = %s")
+                    params.append(protected)
+                if is_default is not None:
+                    sets.append("is_default = %s")
+                    params.append(is_default)
+                if require_merge_path is not None:
+                    sets.append("require_merge_path = %s")
+                    params.append(require_merge_path)
+                sets.append("updated_at = CURRENT_TIMESTAMP")
+                params.extend([branch_id, project_id, tenant_id])
+
+                cursor.execute(
+                    f"""
+                    UPDATE odb.version_branches b
+                    SET {", ".join(sets)}
+                    FROM odb.projects p
+                    WHERE b.id = %s AND b.project_id = %s AND b.project_id = p.id AND p.tenant_id = %s
+                    RETURNING b.id, b.project_id, b.name, b.tip_version_id, b.branched_from_revision_id,
+                              b.protected, b.is_default, b.require_merge_path, b.created_by, b.created_at, b.updated_at
+                    """,
+                    tuple(params),
+                )
+                row = cursor.fetchone()
+            conn.commit()
+            return dict(row) if row else None
+        except Exception as e:
+            conn.rollback()
+            msg = str(e).lower()
+            if "23505" in msg or "uq_version_branches_default_per_project" in msg:
+                raise BranchDefaultConflictError() from e
+            raise
+        finally:
+            conn.autocommit = prev_autocommit
 
     def _branch_from_revision_idempotent_result(
         self,
@@ -4223,7 +4273,7 @@ class Database:
                         (project_id, name, tip_version_id, created_by, branched_from_revision_id)
                     VALUES (%s, %s, %s, %s, %s)
                     RETURNING id, project_id, name, tip_version_id, branched_from_revision_id,
-                              protected, require_merge_path, created_by, created_at, updated_at
+                              protected, is_default, require_merge_path, created_by, created_at, updated_at
                     """,
                     (project_id, bn, src, creator_id, src),
                 )
@@ -4417,11 +4467,11 @@ class Database:
         """Named branches for a project (tenant-scoped)."""
         q = """
             SELECT b.id, b.project_id, b.name, b.tip_version_id, b.branched_from_revision_id,
-                   b.protected, b.require_merge_path, b.created_by
+                   b.protected, b.is_default, b.require_merge_path, b.created_by
             FROM odb.version_branches b
             JOIN odb.projects p ON b.project_id = p.id
             WHERE b.project_id = %s AND p.tenant_id = %s
-            ORDER BY b.name ASC
+            ORDER BY b.is_default DESC, b.name ASC
         """
         return self.execute_query(q, (project_id, tenant_id))
 
@@ -4466,6 +4516,7 @@ class Database:
         copied_count = 0
         new_id: Optional[str] = None
         prev_autocommit = self._begin_tx(conn)
+        no_prior_revision = False
         try:
             with conn.cursor() as cursor:
                 if branch_row is not None:
@@ -4510,6 +4561,7 @@ class Database:
                     )
                     head_row = cursor.fetchone()
                     current_tip: Optional[str] = str(head_row["id"]) if head_row else None
+                    no_prior_revision = current_tip is None
                     if current_tip is None and base:
                         raise ValueError("baseRevisionId must be empty for projects with no existing revisions")
                     if current_tip is not None and base != current_tip:
@@ -4551,6 +4603,21 @@ class Database:
                         WHERE id = %s
                         """,
                         (new_id, str(branch_row["id"])),
+                    )
+                elif no_prior_revision:
+                    # First commit in a brand-new project: bootstrap a default main branch.
+                    cursor.execute(
+                        """
+                        INSERT INTO odb.version_branches
+                            (project_id, name, tip_version_id, created_by, branched_from_revision_id, is_default)
+                        VALUES (%s, 'main', %s, %s, %s, true)
+                        ON CONFLICT (project_id, name)
+                        DO UPDATE SET
+                            tip_version_id = EXCLUDED.tip_version_id,
+                            is_default = true,
+                            updated_at = CURRENT_TIMESTAMP
+                        """,
+                        (project_id, new_id, creator_id, new_id),
                     )
 
             conn.commit()

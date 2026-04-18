@@ -19,7 +19,7 @@ from .compatibility_engine import (
     compat_report_fingerprint,
     openapi_for_revision,
 )
-from .database import db
+from .database import BranchDefaultConflictError, db
 from .models import (
     CompatibilityFindingOut,
     MergeSessionStatusPatchRequest,
@@ -80,6 +80,7 @@ def _version_branch_record_out(br: Dict[str, Any]) -> VersionBranchRecordOut:
             str(br["branched_from_revision_id"]) if br.get("branched_from_revision_id") else None
         ),
         protected=bool(br.get("protected")),
+        is_default=bool(br.get("is_default")),
         require_merge_path=bool(br.get("require_merge_path")),
         created_by=str(br["created_by"]) if br.get("created_by") else None,
         created_at=br.get("created_at"),
@@ -451,7 +452,7 @@ async def patch_version_branch_policy(
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> Dict[str, Any]:
     """
-    Tenant administrators: set ``protected`` and/or ``requireMergePath`` on a branch (#504, #2583).
+    Tenant administrators: set ``protected`` and/or ``requireMergePath`` and/or promote default branch.
     """
     tenant_id = auth_data["tenant_id"]
     uid = get_authenticated_user_id(auth_data)
@@ -464,19 +465,37 @@ async def patch_version_branch_policy(
     if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
 
-    row = db.update_version_branch_protection_policy(
-        project_id,
-        tenant_id,
-        branch_id,
-        protected=body.protected,
-        require_merge_path=body.require_merge_path,
-    )
+    if body.is_default is not None and body.is_default is not True:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_INPUT", "message": "isDefault only supports true on this endpoint"},
+        )
+
+    try:
+        row = db.update_version_branch_protection_policy(
+            project_id,
+            tenant_id,
+            branch_id,
+            protected=body.protected,
+            is_default=body.is_default,
+            require_merge_path=body.require_merge_path,
+        )
+    except BranchDefaultConflictError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "BRANCH_DEFAULT_CONFLICT",
+                "message": "Another branch was promoted as default concurrently; retry the request.",
+            },
+        ) from e
     if not row:
         raise HTTPException(status_code=404, detail="Branch not found")
 
     detail: Dict[str, Any] = {}
     if body.protected is not None:
         detail["protected"] = body.protected
+    if body.is_default is not None:
+        detail["isDefault"] = body.is_default
     if body.require_merge_path is not None:
         detail["requireMergePath"] = body.require_merge_path
     db.insert_version_protection_audit(
