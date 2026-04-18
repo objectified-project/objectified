@@ -461,6 +461,11 @@ class VersionBranchRecordOut(BaseModel):
         description="Revision this branch was created from (lineage; persists when tip advances).",
     )
     protected: bool = False
+    is_default: bool = Field(
+        default=False,
+        serialization_alias="isDefault",
+        description="True when this is the project's default branch.",
+    )
     require_merge_path: bool = Field(
         default=False,
         serialization_alias="requireMergePath",
@@ -477,6 +482,10 @@ class VersionBranchPolicyPatchRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     protected: Optional[bool] = None
+    is_default: Optional[bool] = Field(
+        default=None,
+        validation_alias=AliasChoices("isDefault", "is_default"),
+    )
     require_merge_path: Optional[bool] = Field(
         default=None,
         validation_alias=AliasChoices("requireMergePath", "require_merge_path"),
@@ -484,8 +493,8 @@ class VersionBranchPolicyPatchRequest(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "VersionBranchPolicyPatchRequest":
-        if self.protected is None and self.require_merge_path is None:
-            raise ValueError("Provide protected and/or requireMergePath")
+        if self.protected is None and self.require_merge_path is None and self.is_default is None:
+            raise ValueError("Provide protected, requireMergePath, and/or isDefault")
         return self
 
 

@@ -6,6 +6,11 @@ Covers PATCH /v1/versions/{tenant}/{project}/version-branches/{branch_id}:
 - 200 + audit insert when protected is set
 - 200 + audit insert when requireMergePath is set
 - 200 + audit insert when both fields are set
+- 200 + audit insert when isDefault is set to true
+- 400 when isDefault is false (promote-only contract)
+- 400 when branch belongs to a different project (BRANCH_NOT_IN_PROJECT)
+- 404 when branch is not found
+- 409 when concurrent default-branch promotion conflicts (BRANCH_DEFAULT_CONFLICT)
 """
 
 from unittest.mock import patch, call
@@ -36,6 +41,7 @@ _BRANCH_ROW = {
     "tip_version_id": "00000000-0000-0000-0000-0000000000v1",
     "branched_from_revision_id": None,
     "protected": True,
+    "is_default": False,
     "require_merge_path": False,
     "created_by": _USER,
     "created_at": None,
@@ -138,6 +144,39 @@ def test_patch_branch_policy_both_fields_200():
 
 
 # ---------------------------------------------------------------------------
+# 200 + audit insert: isDefault only
+# ---------------------------------------------------------------------------
+
+def test_patch_branch_policy_is_default_only_200():
+    with patch("src.app.version_merge_routes.db") as mdb:
+        mdb.is_user_tenant_admin.return_value = True
+        mdb.get_project_by_id.return_value = {"id": _PROJECT_ID}
+        updated_row = dict(_BRANCH_ROW, is_default=True)
+        mdb.update_version_branch_protection_policy.return_value = updated_row
+        r = client.patch(_PATCH_URL, json={"isDefault": True})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["branch"]["isDefault"] is True
+    mdb.insert_version_protection_audit.assert_called_once()
+    audit_detail = mdb.insert_version_protection_audit.call_args.args[7]
+    assert audit_detail["isDefault"] is True
+
+
+# ---------------------------------------------------------------------------
+# 400: isDefault false rejected (promote-only endpoint contract)
+# ---------------------------------------------------------------------------
+
+def test_patch_branch_policy_is_default_false_400():
+    with patch("src.app.version_merge_routes.db") as mdb:
+        mdb.is_user_tenant_admin.return_value = True
+        mdb.get_project_by_id.return_value = {"id": _PROJECT_ID}
+        r = client.patch(_PATCH_URL, json={"isDefault": False})
+    assert r.status_code == 400
+    detail = r.json()["detail"]
+    assert detail["code"] == "INVALID_INPUT"
+
+
+# ---------------------------------------------------------------------------
 # 404: branch not found
 # ---------------------------------------------------------------------------
 
@@ -146,5 +185,43 @@ def test_patch_branch_policy_branch_not_found_404():
         mdb.is_user_tenant_admin.return_value = True
         mdb.get_project_by_id.return_value = {"id": _PROJECT_ID}
         mdb.update_version_branch_protection_policy.return_value = None
+        mdb.get_version_branch_by_id.return_value = None
         r = client.patch(_PATCH_URL, json={"protected": False})
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# 400: branch belongs to a different project
+# ---------------------------------------------------------------------------
+
+_OTHER_PROJECT_ID = "00000000-0000-0000-0000-0000000000a2"
+
+
+def test_patch_branch_policy_branch_not_in_project_400():
+    with patch("src.app.version_merge_routes.db") as mdb:
+        mdb.is_user_tenant_admin.return_value = True
+        mdb.get_project_by_id.return_value = {"id": _PROJECT_ID}
+        mdb.update_version_branch_protection_policy.return_value = None
+        # Branch exists but under a different project
+        mdb.get_version_branch_by_id.return_value = dict(_BRANCH_ROW, project_id=_OTHER_PROJECT_ID)
+        r = client.patch(_PATCH_URL, json={"protected": False})
+    assert r.status_code == 400
+    detail = r.json()["detail"]
+    assert detail["code"] == "BRANCH_NOT_IN_PROJECT"
+
+
+# ---------------------------------------------------------------------------
+# 409: concurrent default-branch promotion conflict
+# ---------------------------------------------------------------------------
+
+def test_patch_branch_policy_default_conflict_409():
+    from src.app.database import BranchDefaultConflictError
+
+    with patch("src.app.version_merge_routes.db") as mdb:
+        mdb.is_user_tenant_admin.return_value = True
+        mdb.get_project_by_id.return_value = {"id": _PROJECT_ID}
+        mdb.update_version_branch_protection_policy.side_effect = BranchDefaultConflictError()
+        r = client.patch(_PATCH_URL, json={"isDefault": True})
+    assert r.status_code == 409
+    detail = r.json()["detail"]
+    assert detail["code"] == "BRANCH_DEFAULT_CONFLICT"

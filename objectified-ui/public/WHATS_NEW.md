@@ -4,6 +4,10 @@ We continue to improve the platform based on your feedback with improvements and
 
 ---
 
+- Added default-branch foundations for git-like workflows: branch rows now support a single project default (`isDefault`) with promotion support and first-commit auto-bootstrap of `main`.
+
+---
+
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
 ---
@@ -16,5 +20,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: April 8, 2026*
+*Last updated: April 18, 2026*
 
