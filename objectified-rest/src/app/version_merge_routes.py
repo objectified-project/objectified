@@ -489,6 +489,15 @@ async def patch_version_branch_policy(
             },
         ) from e
     if not row:
+        existing_branch = db.get_version_branch_by_id(branch_id, tenant_id)
+        if existing_branch and existing_branch.get("project_id") != project_id:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "BRANCH_NOT_IN_PROJECT",
+                    "message": "Branch does not belong to the specified project",
+                },
+            )
         raise HTTPException(status_code=404, detail="Branch not found")
 
     detail: Dict[str, Any] = {}

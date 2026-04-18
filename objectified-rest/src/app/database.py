@@ -4103,6 +4103,20 @@ class Database:
         rid = rows[0].get("id")
         return str(rid) if rid is not None else None
 
+    def get_version_branch_by_id(
+        self, branch_id: str, tenant_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Return the branch row for *branch_id* scoped to *tenant_id* (no project filter)."""
+        q = """
+            SELECT b.id, b.project_id, b.name, b.tip_version_id, b.branched_from_revision_id,
+                   b.protected, b.is_default, b.require_merge_path, b.created_by, b.created_at, b.updated_at
+            FROM odb.version_branches b
+            JOIN odb.projects p ON b.project_id = p.id
+            WHERE b.id = %s AND p.tenant_id = %s
+        """
+        rows = self.execute_query(q, (branch_id, tenant_id))
+        return rows[0] if rows else None
+
     def get_version_branch_by_name(
         self, project_id: str, tenant_id: str, name: str
     ) -> Optional[Dict[str, Any]]:
