@@ -12,6 +12,42 @@ const defaultViewport = (): { x: number; y: number; zoom: number } => ({
   zoom: 1,
 });
 
+function edgeSemanticOf(edgeLike: { data?: unknown } | undefined): string | undefined {
+  const data = edgeLike?.data;
+  if (!data || typeof data !== 'object') return undefined;
+  const semantic = (data as { semantic?: unknown }).semantic;
+  return typeof semantic === 'string' ? semantic : undefined;
+}
+
+function isPathToOperationHandles(
+  edgeLike:
+    | {
+        sourceHandle?: unknown;
+        targetHandle?: unknown;
+      }
+    | undefined
+): boolean {
+  const sourceHandle = edgeLike?.sourceHandle;
+  const targetHandle = edgeLike?.targetHandle;
+  return sourceHandle === 'path-output' && targetHandle === 'operation-input';
+}
+
+function isPathHasOperationSemantic(edgeLike: { data?: unknown } | undefined): boolean {
+  return edgeSemanticOf(edgeLike) === 'path-has-operation';
+}
+
+function isPathHasOperationEdge(
+  edgeLike:
+    | {
+        data?: unknown;
+        sourceHandle?: unknown;
+        targetHandle?: unknown;
+      }
+    | undefined
+): boolean {
+  return isPathHasOperationSemantic(edgeLike) || isPathToOperationHandles(edgeLike);
+}
+
 /** Strip React Flow state to JSON-safe layout fields (no function data). */
 export function serializePathsCanvas(
   nodes: Node[],
@@ -106,16 +142,18 @@ export function mergePathsCanvasLayout(
   const mergedEdges: Edge[] = computedEdges.map((e) => {
     const s = byId.get(e.id);
     if (!s) return e;
+    const isPathHasOperation = isPathHasOperationEdge(e)
+      || isPathHasOperationEdge(s as { data?: unknown; sourceHandle?: unknown; targetHandle?: unknown });
     return {
       ...e,
       ...(typeof s.type === 'string' ? { type: s.type as Edge['type'] } : {}),
       ...(typeof s.animated === 'boolean' ? { animated: s.animated } : {}),
       ...(s.style && typeof s.style === 'object' ? { style: s.style as Edge['style'] } : {}),
-      ...(s.label !== undefined ? { label: s.label as Edge['label'] } : {}),
-      ...(s.labelStyle && typeof s.labelStyle === 'object'
+      ...(!isPathHasOperation && s.label !== undefined ? { label: s.label as Edge['label'] } : {}),
+      ...(!isPathHasOperation && s.labelStyle && typeof s.labelStyle === 'object'
         ? { labelStyle: s.labelStyle as Edge['labelStyle'] }
         : {}),
-      ...(s.labelBgStyle && typeof s.labelBgStyle === 'object'
+      ...(!isPathHasOperation && s.labelBgStyle && typeof s.labelBgStyle === 'object'
         ? { labelBgStyle: s.labelBgStyle as Edge['labelBgStyle'] }
         : {}),
       ...(s.data && typeof s.data === 'object' ? { data: { ...e.data, ...s.data } as Edge['data'] } : {}),
@@ -130,6 +168,16 @@ export function mergePathsCanvasLayout(
     const target = (raw as { target?: string }).target;
     if (typeof source !== 'string' || typeof target !== 'string') continue;
     if (!nodeIds.has(source) || !nodeIds.has(target)) continue;
+    if (isPathHasOperationEdge(raw as { data?: unknown; sourceHandle?: unknown; targetHandle?: unknown })) {
+      const rawEdge = raw as Edge;
+      mergedEdges.push({
+        ...rawEdge,
+        label: '',
+        labelStyle: undefined,
+        labelBgStyle: undefined,
+      });
+      continue;
+    }
     mergedEdges.push(raw as Edge);
   }
 

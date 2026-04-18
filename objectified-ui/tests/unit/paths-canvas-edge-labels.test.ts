@@ -10,7 +10,7 @@ import {
 
 describe('paths-canvas-edge-labels', () => {
   it('uses roadmap role strings for primary attachments', () => {
-    expect(labelPathToOperation()).toBe('has');
+    expect(labelPathToOperation()).toBe('');
     expect(labelOperationToParameter()).toBe('hasParam');
     expect(labelOperationToRequestBody()).toBe('requestBody');
     expect(labelOperationToResponse('200')).toBe('response 200');
@@ -31,6 +31,6 @@ describe('paths-canvas-edge-labels', () => {
     expect(labelForManualConnection(resp, op)?.label).toBe('response 201');
     expect(labelForManualConnection(op, rb)?.label).toBe('requestBody');
     expect(labelForManualConnection(rb, op)?.label).toBe('requestBody');
-    expect(labelForManualConnection(path, op)?.label).toBe('has');
+    expect(labelForManualConnection(path, op)?.label).toBe('');
   });
 });

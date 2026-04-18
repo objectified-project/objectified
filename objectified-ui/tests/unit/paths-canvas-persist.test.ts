@@ -38,4 +38,61 @@ describe('paths-canvas-persist', () => {
     expect(ser.nodes[0]).not.toHaveProperty('data');
     expect(ser.viewport.zoom).toBe(0.25);
   });
+
+  it('drops legacy "has" labels for path-has-operation edges from saved layout', () => {
+    const computedNodes: Node[] = [
+      { id: 'path-1', type: 'pathTemplate', position: { x: 0, y: 0 }, data: {} },
+      { id: 'op-1', type: 'operation', position: { x: 10, y: 10 }, data: {} },
+      { id: 'op-2', type: 'operation', position: { x: 20, y: 20 }, data: {} },
+    ];
+    const computedEdges: Edge[] = [
+      {
+        id: 'edge-path-op-1',
+        source: 'path-1',
+        sourceHandle: 'path-output',
+        target: 'op-1',
+        targetHandle: 'operation-input',
+        data: { semantic: 'path-has-operation' },
+      },
+    ];
+    const saved = {
+      nodes: [],
+      edges: [
+        {
+          id: 'edge-path-op-1',
+          source: 'path-1',
+          sourceHandle: 'path-output',
+          target: 'op-1',
+          targetHandle: 'operation-input',
+          label: 'has',
+          labelStyle: { fill: '#000' },
+          labelBgStyle: { fill: '#fff' },
+          data: { semantic: 'path-has-operation' },
+        },
+        {
+          id: 'legacy-manual-path-op',
+          source: 'path-1',
+          sourceHandle: 'path-output',
+          target: 'op-2',
+          targetHandle: 'operation-input',
+          label: 'has',
+          labelStyle: { fill: '#000' },
+          labelBgStyle: { fill: '#fff' },
+        },
+      ],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    };
+
+    const out = mergePathsCanvasLayout(computedNodes, computedEdges, saved);
+    const computedEdgeOut = out.edges.find((e) => e.id === 'edge-path-op-1');
+    const savedOnlyEdgeOut = out.edges.find((e) => e.id === 'legacy-manual-path-op');
+
+    expect(computedEdgeOut?.label).toBeUndefined();
+    expect(computedEdgeOut?.labelStyle).toBeUndefined();
+    expect(computedEdgeOut?.labelBgStyle).toBeUndefined();
+
+    expect(savedOnlyEdgeOut?.label).toBe('');
+    expect(savedOnlyEdgeOut?.labelStyle).toBeUndefined();
+    expect(savedOnlyEdgeOut?.labelBgStyle).toBeUndefined();
+  });
 });

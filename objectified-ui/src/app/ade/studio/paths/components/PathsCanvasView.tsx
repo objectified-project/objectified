@@ -428,6 +428,30 @@ function PathsCanvasInner({
   const { screenToFlowPosition, getNodes, getNode, getViewport, setViewport, fitView } = useReactFlow();
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuidesState>({ horizontal: [], vertical: [] });
 
+  // Remove legacy path->operation "has" labels that may still exist in in-memory edge state.
+  useEffect(() => {
+    setEdges((eds) => {
+      let changed = false;
+      const next = eds.map((edge) => {
+        const semantic = (edge.data as { semantic?: unknown } | undefined)?.semantic;
+        const isPathToOperation = edge.sourceHandle === 'path-output' && edge.targetHandle === 'operation-input';
+        const isPathHasOperation = semantic === 'path-has-operation' || isPathToOperation;
+        if (!isPathHasOperation) return edge;
+        if (edge.label === undefined && edge.labelStyle === undefined && edge.labelBgStyle === undefined) {
+          return edge;
+        }
+        changed = true;
+        return {
+          ...edge,
+          label: undefined,
+          labelStyle: undefined,
+          labelBgStyle: undefined,
+        };
+      });
+      return changed ? next : eds;
+    });
+  }, [setEdges]);
+
   useEffect(() => {
     const fn = (nodeId: string) => {
       const n = getNode(nodeId);
@@ -2278,6 +2302,7 @@ function PathsCanvasInner({
             : edgeRouting === 'bezier' ? 'default'
             : edgeRouting === 'smart' ? 'smart'
             : 'smoothstep';
+          const pathToOperationLabel = labelPathToOperation();
           return {
             id: `edge-path-op-${selectedPathId}-${op.id}`,
             source: pathNodeId,
@@ -2286,9 +2311,13 @@ function PathsCanvasInner({
             targetHandle: 'operation-input',
             type: edgeType,
             animated: edgeAnimation !== 'none',
-            label: labelPathToOperation(),
-            labelStyle: pathsCanvasEdgeLabelStyle,
-            labelBgStyle: pathsCanvasEdgeLabelBgStyle,
+            ...(pathToOperationLabel
+              ? {
+                  label: pathToOperationLabel,
+                  labelStyle: pathsCanvasEdgeLabelStyle,
+                  labelBgStyle: pathsCanvasEdgeLabelBgStyle,
+                }
+              : {}),
             style: {
               stroke: edgeStyling.directColor,
               strokeWidth: 2,
@@ -3286,7 +3315,7 @@ function PathsCanvasInner({
         ...(stableEdgeId ? { id: stableEdgeId } : {}),
         type: edgeType,
         animated: edgeAnimation !== 'none',
-        ...(manualLabel
+        ...(manualLabel?.label
           ? {
               label: manualLabel.label,
               labelStyle: pathsCanvasEdgeLabelStyle,
@@ -3913,6 +3942,7 @@ function PathsCanvasInner({
                   : 'smoothstep';
 
           setNodes((nds) => [...nds, newNode]);
+          const pathToOperationLabel = labelPathToOperation();
           setEdges((eds) => [
             ...eds,
             {
@@ -3923,9 +3953,13 @@ function PathsCanvasInner({
               targetHandle: 'operation-input',
               type: dropEdgeType,
               animated: edgeAnimation !== 'none',
-              label: labelPathToOperation(),
-              labelStyle: pathsCanvasEdgeLabelStyle,
-              labelBgStyle: pathsCanvasEdgeLabelBgStyle,
+              ...(pathToOperationLabel
+                ? {
+                    label: pathToOperationLabel,
+                    labelStyle: pathsCanvasEdgeLabelStyle,
+                    labelBgStyle: pathsCanvasEdgeLabelBgStyle,
+                  }
+                : {}),
               style: {
                 stroke: edgeStyling.directColor,
                 strokeWidth: 2,

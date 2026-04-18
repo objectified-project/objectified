@@ -11,7 +11,7 @@ export type PathsCanvasEdgeSemantic =
   | 'response-has-class';
 
 export function labelPathToOperation(): string {
-  return 'has';
+  return '';
 }
 
 export function labelOperationToParameter(): string {
