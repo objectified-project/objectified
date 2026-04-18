@@ -1,6 +1,7 @@
 import {
   extractPathParameters,
   getPathParameterCoverageError,
+  getPathSaveValidationError,
   getPathTemplateValidationError,
 } from '../../lib/utils/path-params';
 
@@ -44,5 +45,17 @@ describe('getPathParameterCoverageError', () => {
         { name: 'y', in_location: 'path' },
       ])
     ).toBeNull();
+  });
+
+  it('allows create flow templates with path variables before parameters exist', () => {
+    expect(
+      getPathSaveValidationError('/users/{vaccinationId}', [], { enforceCoverage: false })
+    ).toBeNull();
+  });
+
+  it('enforces coverage when editing existing path templates', () => {
+    const msg = getPathSaveValidationError('/users/{vaccinationId}', [], { enforceCoverage: true });
+    expect(msg).toContain('{vaccinationId}');
+    expect(msg).toContain('no path parameter');
   });
 });

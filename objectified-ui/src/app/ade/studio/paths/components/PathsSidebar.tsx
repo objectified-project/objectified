@@ -27,7 +27,7 @@ import {
   type OperationData,
 } from '../../../../../../lib/api/paths-client';
 import { getSharedPathParameters } from '../../../../../../lib/db/helper-shared-path-parameters';
-import { getPathParameterCoverageError, getPathTemplateValidationError, isValidPath } from '../../../../../../lib/utils/path-params';
+import { getPathSaveValidationError, isValidPath } from '../../../../../../lib/utils/path-params';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { AVAILABLE_OPERATIONS, OPERATION_COLORS } from './paths-operation-colors';
 import type { ParameterLocation } from './paths-theme';
@@ -312,16 +312,6 @@ export default function PathsSidebar({
     if (!selectedVersionId || !pathNameInput.trim()) return;
 
     const trimmedPath = pathNameInput.trim();
-    const templateError = getPathTemplateValidationError(trimmedPath);
-    if (templateError) {
-      await alertDialog({
-        title: 'Invalid path template',
-        message: templateError,
-        variant: 'warning',
-      });
-      return;
-    }
-
     let paramsForCoverage: { name: string; in_location: string }[] = [];
     if (editingPath) {
       const paramsRaw = await getSharedPathParameters(editingPath.id);
@@ -333,11 +323,13 @@ export default function PathsSidebar({
         paramsForCoverage = paramsParsed.parameters;
       }
     }
-    const coverageError = getPathParameterCoverageError(trimmedPath, paramsForCoverage);
-    if (coverageError) {
+    const validationError = getPathSaveValidationError(trimmedPath, paramsForCoverage, {
+      enforceCoverage: Boolean(editingPath),
+    });
+    if (validationError) {
       await alertDialog({
-        title: 'Path parameters do not match template',
-        message: coverageError,
+        title: editingPath ? 'Path parameters do not match template' : 'Invalid path template',
+        message: validationError,
         variant: 'warning',
       });
       return;

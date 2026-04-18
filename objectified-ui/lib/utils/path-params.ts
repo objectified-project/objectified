@@ -177,3 +177,22 @@ export function getPathParameterCoverageError(
 
   return null;
 }
+
+/**
+ * Validation used by path create/edit flows.
+ * - Always validates template syntax.
+ * - Optionally enforces path-parameter coverage (used for editing existing paths
+ *   that already have shared parameters attached).
+ */
+export function getPathSaveValidationError(
+  pathname: string,
+  parameters: PathParamCoverageRow[],
+  options?: { enforceCoverage?: boolean }
+): string | null {
+  const templateError = getPathTemplateValidationError(pathname);
+  if (templateError) return templateError;
+  if (options?.enforceCoverage) {
+    return getPathParameterCoverageError(pathname, parameters);
+  }
+  return null;
+}

@@ -50,6 +50,7 @@ import { propertyDataToParameterSchema } from '../../../../../../lib/utils/path-
 import {
   getLinkedResponsesForOperation,
   getSharedPathResponses,
+  createSharedPathResponse,
   deleteSharedPathResponse,
   unlinkResponseFromOperation,
   linkResponseToOperation,
@@ -2180,29 +2181,99 @@ function PathsCanvasInner({
                     } else {
                       // Handle response creation with class
                       try {
+                        const classId = schemaData.id || schemaData.classId;
+                        if (!classId) {
+                          await alertDialog({
+                            title: 'Error',
+                            message: 'Missing class id for response schema drop.',
+                            variant: 'error',
+                          });
+                          return;
+                        }
+
                         // Find or create 200 response for this operation
                         const responsesResult = await getLinkedResponsesForOperation(operationId);
                         const responsesParsed = JSON.parse(responsesResult);
-                        
-                        if (responsesParsed.success && responsesParsed.responses && responsesParsed.responses.length > 0) {
-                          // Update existing response
-                          const response = responsesParsed.responses[0];
-                          const contentResult = await addResponseContentType(
-                            response.id,
-                            'application/json',
-                            action === 'reference' ? schemaData.id || schemaData.classId : undefined,
-                            action === 'copy' ? { type: 'object', properties: [] } : undefined
+
+                        if (!responsesParsed.success) {
+                          await alertDialog({
+                            title: 'Error',
+                            message: responsesParsed.error || 'Failed to load operation responses',
+                            variant: 'error',
+                          });
+                          return;
+                        }
+
+                        let targetResponseId: string | null = responsesParsed.responses?.[0]?.id ?? null;
+                        if (!targetResponseId) {
+                          const createResult = await createSharedPathResponse(
+                            selectedPathId!,
+                            '200',
+                            'Successful response',
+                            { type: 'object', properties: [] }
                           );
-                          const contentParsed = JSON.parse(contentResult);
-                          
-                          if (action === 'copy' && contentParsed.success && contentParsed.content) {
-                            const classId = schemaData.id || schemaData.classId;
-                            if (classId) {
-                              await copyClassPropertiesToContentType(contentParsed.content.id, classId);
-                            }
+                          const createParsed = JSON.parse(createResult);
+                          if (!createParsed.success || !createParsed.response?.id) {
+                            await alertDialog({
+                              title: 'Error',
+                              message: createParsed.error || 'Failed to create response',
+                              variant: 'error',
+                            });
+                            return;
+                          }
+                          const createdResponseId = String(createParsed.response.id);
+                          targetResponseId = createdResponseId;
+
+                          const linkResult = await linkResponseToOperation(operationId, createdResponseId);
+                          const linkParsed = JSON.parse(linkResult);
+                          if (!linkParsed.success) {
+                            await alertDialog({
+                              title: 'Error',
+                              message: linkParsed.error || 'Failed to link response to operation',
+                              variant: 'error',
+                            });
+                            return;
                           }
                         }
-                        
+
+                        if (!targetResponseId) {
+                          await alertDialog({
+                            title: 'Error',
+                            message: 'Failed to resolve response id for operation.',
+                            variant: 'error',
+                          });
+                          return;
+                        }
+
+                        const contentResult = await addResponseContentType(
+                          targetResponseId,
+                          'application/json',
+                          action === 'reference' ? classId : undefined,
+                          action === 'copy' ? { type: 'object', properties: [] } : undefined
+                        );
+                        const contentParsed = JSON.parse(contentResult);
+                        if (!contentParsed.success || !contentParsed.content?.id) {
+                          await alertDialog({
+                            title: 'Error',
+                            message: contentParsed.error || 'Failed to add response content type',
+                            variant: 'error',
+                          });
+                          return;
+                        }
+
+                        if (action === 'copy') {
+                          const copyResult = await copyClassPropertiesToContentType(contentParsed.content.id, classId);
+                          const copyParsed = JSON.parse(copyResult);
+                          if (!copyParsed.success) {
+                            await alertDialog({
+                              title: 'Error',
+                              message: copyParsed.error || 'Failed to copy class properties',
+                              variant: 'error',
+                            });
+                            return;
+                          }
+                        }
+
                         if (onRefresh) onRefresh();
                       } catch (error) {
                         console.error('Error adding class to response:', error);
