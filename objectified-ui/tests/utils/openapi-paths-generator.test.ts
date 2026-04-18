@@ -289,6 +289,25 @@ describe('OpenAPI Paths Generator', () => {
       });
       expect(result.content).toBeDefined();
     });
+
+    it('should build schema from direct array data payload', () => {
+      const response: ResponseInfo = {
+        id: 'resp-array-data',
+        status_code: '200',
+        description: 'List response',
+        data: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+      };
+
+      const result = buildResponseForOpenAPI(response);
+      const content = result.content as Record<string, { schema: Record<string, unknown> }>;
+      expect(content['application/json'].schema).toEqual({
+        type: 'array',
+        items: { type: 'string' },
+      });
+    });
   });
 
   describe('buildOperationForOpenAPI', () => {

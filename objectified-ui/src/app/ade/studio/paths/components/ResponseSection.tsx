@@ -368,7 +368,34 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
       if (mode === 'primitive') {
         data = { type: primitiveType };
       } else if (mode === 'array') {
-        data = { type: 'array', items: { type: arrayItemType } };
+        let arrayItems: Record<string, any> = { type: arrayItemType };
+
+        // Preserve existing object/class schema when converting object/class -> array.
+        if (schemaMode === 'class') {
+          const className = currentContentType?.class_name || response.class_name;
+          if (className) {
+            arrayItems = { $ref: `#/components/schemas/${className}` };
+          }
+        } else if (schemaMode === 'object') {
+          let objectSchema: any = currentContentType?.inline_schema ?? null;
+          if (!objectSchema && response.inline_schema) {
+            try {
+              objectSchema =
+                typeof response.inline_schema === 'string'
+                  ? JSON.parse(response.inline_schema)
+                  : response.inline_schema;
+            } catch {
+              objectSchema = null;
+            }
+          }
+          if (objectSchema && typeof objectSchema === 'object') {
+            arrayItems = objectSchema.type === 'object'
+              ? objectSchema
+              : { type: 'object', ...objectSchema };
+          }
+        }
+
+        data = { type: 'array', items: arrayItems };
       } else if (mode === 'object') {
         inlineSchema = { type: 'object', properties: [] };
       } else if (mode === 'class') {

@@ -35,6 +35,7 @@ import {
   getOperationDescription,
   upsertOperationDescription,
 } from '../../../../../../lib/db/helper-path-operation-descriptions';
+import { generateOperationId } from '../../../../../../lib/utils/path-utils';
 import {
   getLinkedParametersForOperation,
   linkParameterToOperation,
@@ -406,6 +407,7 @@ function PathsCanvasInner({
   pendingFocusNodeId,
   onPendingFocusComplete,
 }: PathsCanvasInnerProps) {
+  type ClassDropDialogOptions = { asArray: boolean };
   const {
     gridSize,
     gridStyle,
@@ -503,7 +505,9 @@ function PathsCanvasInner({
   // State for class drop choice dialog
   const [classDropDialogOpen, setClassDropDialogOpen] = useState(false);
   const [classDropDialogClassName, setClassDropDialogClassName] = useState('');
-  const [classDropDialogCallback, setClassDropDialogCallback] = useState<((action: 'copy' | 'reference') => void) | null>(null);
+  const [classDropDialogCallback, setClassDropDialogCallback] = useState<((action: 'copy' | 'reference', options: ClassDropDialogOptions) => void) | null>(null);
+  const [classDropDialogShowArrayOption, setClassDropDialogShowArrayOption] = useState(false);
+  const [classDropDialogAsArray, setClassDropDialogAsArray] = useState(false);
 
   // State for path variable drop target (property drag from sidebar for type binding)
   const [dragOverPathVariable, setDragOverPathVariable] = useState<string | null>(null);
@@ -1995,10 +1999,13 @@ function PathsCanvasInner({
   // Handler to show dialog asking user what action to take when dropping a class
   const handleShowClassDropDialog = useCallback((
     classData: any,
-    onConfirm: (action: 'copy' | 'reference') => void
+    onConfirm: (action: 'copy' | 'reference', options: ClassDropDialogOptions) => void,
+    options?: { showArrayOption?: boolean }
   ) => {
     const className = classData.className || 'class';
     setClassDropDialogClassName(className);
+    setClassDropDialogShowArrayOption(Boolean(options?.showArrayOption));
+    setClassDropDialogAsArray(false);
     setClassDropDialogCallback(() => onConfirm);
     setClassDropDialogOpen(true);
   }, []);
@@ -2006,11 +2013,13 @@ function PathsCanvasInner({
   // Handle the choice from the class drop dialog
   const handleClassDropDialogChoice = useCallback((action: ClassDropAction) => {
     if (action !== 'cancel' && classDropDialogCallback) {
-      classDropDialogCallback(action);
+      classDropDialogCallback(action, { asArray: classDropDialogAsArray });
     }
     setClassDropDialogOpen(false);
+    setClassDropDialogShowArrayOption(false);
+    setClassDropDialogAsArray(false);
     setClassDropDialogCallback(null);
-  }, [classDropDialogCallback]);
+  }, [classDropDialogAsArray, classDropDialogCallback]);
 
   // Load operations and parameters when path is selected
   useEffect(() => {
@@ -2132,7 +2141,7 @@ function PathsCanvasInner({
               if (schemaData.type === 'class') {
                 handleShowClassDropDialog(
                   { className: schemaData.name || schemaData.className || 'class', classId: schemaData.id || schemaData.classId },
-                  async (action: 'copy' | 'reference') => {
+                  async (action: 'copy' | 'reference', dialogOptions: ClassDropDialogOptions) => {
                     if (schemaType === 'request') {
                       // Handle request body creation with class
                       try {
@@ -2182,6 +2191,7 @@ function PathsCanvasInner({
                       // Handle response creation with class
                       try {
                         const classId = schemaData.id || schemaData.classId;
+                        const linkAsArray = dialogOptions.asArray;
                         if (!classId) {
                           await alertDialog({
                             title: 'Error',
@@ -2245,32 +2255,51 @@ function PathsCanvasInner({
                           return;
                         }
 
-                        const contentResult = await addResponseContentType(
-                          targetResponseId,
-                          'application/json',
-                          action === 'reference' ? classId : undefined,
-                          action === 'copy' ? { type: 'object', properties: [] } : undefined
-                        );
-                        const contentParsed = JSON.parse(contentResult);
-                        if (!contentParsed.success || !contentParsed.content?.id) {
-                          await alertDialog({
-                            title: 'Error',
-                            message: contentParsed.error || 'Failed to add response content type',
-                            variant: 'error',
+                        if (linkAsArray && action === 'reference') {
+                          const classNameForRef = schemaData.name || schemaData.className || 'Unknown';
+                          const setArrayRefResult = await updateSharedPathResponse(targetResponseId, {
+                            schemaMode: 'array',
+                            classId: null,
+                            inlineSchema: null,
+                            data: { type: 'array', items: { $ref: `#/components/schemas/${classNameForRef}` } },
                           });
-                          return;
-                        }
-
-                        if (action === 'copy') {
-                          const copyResult = await copyClassPropertiesToContentType(contentParsed.content.id, classId);
-                          const copyParsed = JSON.parse(copyResult);
-                          if (!copyParsed.success) {
+                          const setArrayRefParsed = JSON.parse(setArrayRefResult);
+                          if (!setArrayRefParsed.success) {
                             await alertDialog({
                               title: 'Error',
-                              message: copyParsed.error || 'Failed to copy class properties',
+                              message: setArrayRefParsed.error || 'Failed to set array response reference',
                               variant: 'error',
                             });
                             return;
+                          }
+                        } else {
+                          const contentResult = await addResponseContentType(
+                            targetResponseId,
+                            'application/json',
+                            action === 'reference' ? classId : undefined,
+                            action === 'copy' ? { type: 'object', properties: [] } : undefined
+                          );
+                          const contentParsed = JSON.parse(contentResult);
+                          if (!contentParsed.success || !contentParsed.content?.id) {
+                            await alertDialog({
+                              title: 'Error',
+                              message: contentParsed.error || 'Failed to add response content type',
+                              variant: 'error',
+                            });
+                            return;
+                          }
+
+                          if (action === 'copy') {
+                            const copyResult = await copyClassPropertiesToContentType(contentParsed.content.id, classId);
+                            const copyParsed = JSON.parse(copyResult);
+                            if (!copyParsed.success) {
+                              await alertDialog({
+                                title: 'Error',
+                                message: copyParsed.error || 'Failed to copy class properties',
+                                variant: 'error',
+                              });
+                              return;
+                            }
                           }
                         }
 
@@ -2284,7 +2313,8 @@ function PathsCanvasInner({
                         });
                       }
                     }
-                  }
+                  },
+                  schemaType === 'response' ? { showArrayOption: true } : undefined
                 );
               } else if (schemaData.type === 'property') {
                 // Handle property drop: create a request/response node that matches this property
@@ -3977,6 +4007,8 @@ function PathsCanvasInner({
           }
 
           const savedOperation = result.data;
+          const operationMethod = String(savedOperation.operation || dropData.operation || '').toUpperCase();
+          const generatedOperationId = generateOperationId(pathname || '/', operationMethod);
 
           let operationId: string | undefined;
           try {
@@ -3987,14 +4019,33 @@ function PathsCanvasInner({
             console.log('[onDrop] Could not fetch operation description:', descError);
           }
 
+          // Persist a default operationId immediately so the node and properties panel
+          // both show a stable value on first add (before manual Save).
+          if (!operationId) {
+            try {
+              await upsertOperationDescription(
+                savedOperation.id,
+                undefined,
+                undefined,
+                generatedOperationId,
+                undefined
+              );
+              operationId = generatedOperationId;
+            } catch (upsertError) {
+              console.error('[onDrop] Could not persist generated operationId:', upsertError);
+              // Keep UI usable even if the description upsert fails.
+              operationId = generatedOperationId;
+            }
+          }
+
           const newNode: Node = {
             id: savedOperation.id,
             type: 'operation',
             deletable: true,
             position,
             data: {
-              operation: savedOperation.operation,
-              color: dropData.color,
+              operation: operationMethod,
+              color: OPERATION_COLORS[operationMethod] || dropData.color || '#64748b',
               dbOperationId: savedOperation.id,
               versionPathId: selectedPathId,
               operationId: operationId,
@@ -4043,6 +4094,12 @@ function PathsCanvasInner({
               },
             },
           ]);
+
+          // Rehydrate from server so the new operation has full node handlers/data
+          // (schema drop, delete, security metadata) immediately after creation.
+          if (onRefresh) {
+            onRefresh();
+          }
         } catch (error) {
           console.error('Error creating operation:', error);
           await alertDialog({
@@ -4534,6 +4591,9 @@ function PathsCanvasInner({
         open={classDropDialogOpen}
         onOpenChange={setClassDropDialogOpen}
         className={classDropDialogClassName}
+        showArrayOption={classDropDialogShowArrayOption}
+        arrayOptionChecked={classDropDialogAsArray}
+        onArrayOptionCheckedChange={setClassDropDialogAsArray}
         onChoice={handleClassDropDialogChoice}
       />
     </div>

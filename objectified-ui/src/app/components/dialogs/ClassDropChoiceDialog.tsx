@@ -11,6 +11,9 @@ interface ClassDropChoiceDialogProps {
   onOpenChange: (open: boolean) => void;
   className?: string;
   onChoice: (action: ClassDropAction) => void;
+  showArrayOption?: boolean;
+  arrayOptionChecked?: boolean;
+  onArrayOptionCheckedChange?: (checked: boolean) => void;
 }
 
 export default function ClassDropChoiceDialog({
@@ -18,6 +21,9 @@ export default function ClassDropChoiceDialog({
   onOpenChange,
   className = 'class',
   onChoice,
+  showArrayOption = false,
+  arrayOptionChecked = false,
+  onArrayOptionCheckedChange,
 }: ClassDropChoiceDialogProps) {
   const handleChoice = (action: ClassDropAction) => {
     onChoice(action);
@@ -78,6 +84,18 @@ export default function ClassDropChoiceDialog({
                 </p>
               </div>
             </button>
+
+            {showArrayOption && (
+              <label className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-700 dark:text-gray-200">
+                <input
+                  type="checkbox"
+                  checked={arrayOptionChecked}
+                  onChange={(e) => onArrayOptionCheckedChange?.(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span>Link as array response (schema type: array)</span>
+              </label>
+            )}
           </div>
 
           {/* Footer */}

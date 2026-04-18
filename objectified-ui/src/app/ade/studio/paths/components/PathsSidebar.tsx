@@ -401,6 +401,10 @@ export default function PathsSidebar({
       const result = await deletePathRest(selectedVersionId, path.id);
       if (result.success) {
         setPaths(prevPaths => prevPaths.filter(p => p.id !== path.id));
+        if (selectedPathId === path.id) {
+          // Clear canvas/panels when deleting the currently selected path.
+          onPathSelect(null);
+        }
       } else {
         throw new Error(result.error || 'Failed to delete path');
       }

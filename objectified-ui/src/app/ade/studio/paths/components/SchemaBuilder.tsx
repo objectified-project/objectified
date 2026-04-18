@@ -8,6 +8,7 @@ import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../../lib/db/helper';
 import ReuseSearchCombobox from './ReuseSearchCombobox';
+import { buildArraySchemaFromCurrent } from './schema-builder-utils';
 
 interface SchemaBuilderProps {
   value?: any; // Current schema value (can be $ref, type: object, etc.)
@@ -149,7 +150,7 @@ export default function SchemaBuilder({
     if (type === 'primitive') {
       onChange({ type: 'string' });
     } else if (type === 'array') {
-      onChange({ type: 'array', items: { type: 'string' } });
+      onChange(buildArraySchemaFromCurrent(value));
     } else if (type === 'object') {
       onChange({ type: 'object', properties: {} });
     } else {

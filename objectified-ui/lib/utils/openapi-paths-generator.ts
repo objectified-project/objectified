@@ -263,6 +263,43 @@ function resolveInlineSchemaForExport(inline: InlineSchema): Record<string, unkn
 }
 
 /**
+ * Response `data` historically stores either:
+ * - full OpenAPI response bits (`content`, `headers`, `links`)
+ * - a direct schema object (`type`, `items`, `$ref`, etc.)
+ *
+ * Array/primitive response modes persist direct schema objects in `data`, so
+ * we detect and extract them here for export fallback handling.
+ */
+function extractSchemaFromResponseData(data: Record<string, unknown>): Record<string, unknown> | null {
+  if (data.schema && typeof data.schema === 'object' && !Array.isArray(data.schema)) {
+    return data.schema as Record<string, unknown>;
+  }
+
+  if (typeof data.$ref === 'string') {
+    return { $ref: data.$ref };
+  }
+
+  const hasSchemaShape =
+    typeof data.type === 'string' ||
+    typeof data.$ref === 'string' ||
+    'properties' in data ||
+    'items' in data ||
+    'allOf' in data ||
+    'anyOf' in data ||
+    'oneOf' in data ||
+    'additionalProperties' in data ||
+    'not' in data ||
+    'enum' in data;
+
+  if (!hasSchemaShape) {
+    return null;
+  }
+
+  const { headers: _headers, links: _links, content: _content, ...schema } = data;
+  return Object.keys(schema).length > 0 ? schema : null;
+}
+
+/**
  * Build OpenAPI response object from database response record
  */
 export function buildResponseForOpenAPI(response: ResponseInfo): Record<string, unknown> {
@@ -335,10 +372,8 @@ export function buildResponseForOpenAPI(response: ResponseInfo): Record<string, 
       if (data.content) {
         // Already has content structure
         result.content = data.content;
-      } else if (data.schema) {
-        schema = data.schema as Record<string, unknown>;
-      } else if (data.$ref) {
-        schema = { $ref: data.$ref as string };
+      } else {
+        schema = extractSchemaFromResponseData(data);
       }
     }
 
