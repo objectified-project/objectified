@@ -170,7 +170,10 @@ def test_patch_branch_policy_passes_actor_id_to_database():
         mdb.is_user_tenant_admin.return_value = True
         mdb.get_project_by_id.return_value = {"id": _PROJECT_ID}
         mdb.update_version_branch_protection_policy.return_value = dict(_BRANCH_ROW)
-        client.patch(_PATCH_URL, json={"protected": False})
+        r = client.patch(_PATCH_URL, json={"protected": False})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["branch"]["id"] == _BRANCH_ID
     assert mdb.update_version_branch_protection_policy.call_args.kwargs.get("actor_id") == _USER
 
 
