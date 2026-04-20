@@ -220,6 +220,8 @@ import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
 import SchemaTimelinePanel from '../components/SchemaTimelinePanel';
 import SchemaVersionScoringPanel from '../components/SchemaVersionScoringPanel';
 import { DesignerCanvasGitMenu } from '../components/DesignerCanvasGitMenu';
+import { BranchPickerChip } from '../components/BranchPickerChip';
+import { useStudioBranchSync } from '../lib/use-studio-branch-sync';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 import {
   loadPresentationBookmarks,
@@ -364,7 +366,18 @@ const StudioContent = () => {
     setSchemaQualityScore,
     setSchemaQualityDetail,
     setSyncLocalDirty,
+    setSelectedBranchId,
+    versionBranchesByProjectId,
+    setVersionBranchesForProject,
   } = useStudio();
+
+  useStudioBranchSync({
+    projectId: contextProjectId ?? '',
+    revisionId: contextVersionId ?? '',
+    versionBranchesByProjectId,
+    setVersionBranchesForProject,
+    setSelectedBranchId,
+  });
 
   // Toggle click-to-focus mode (defined after useStudio to access setContextClickToFocusEnabled)
   const toggleClickToFocus = useCallback(() => {
@@ -9390,6 +9403,12 @@ const StudioContent = () => {
             {/* Branch, layout, and export — one toolbar (top-right) */}
             {!canvasPresentationActive && (
             <Panel position="top-right" className="flex items-center gap-1.5 z-[1002] border-0 bg-transparent p-0 shadow-none">
+              <BranchPickerChip
+                versions={versions}
+                setVersions={setVersions}
+                variant="toolbar"
+                showCreateBranch={false}
+              />
               <DesignerCanvasGitMenu versions={versions} setVersions={setVersions} />
               <div className="relative" ref={layoutDropdownRef}>
                 <input

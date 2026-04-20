@@ -13,7 +13,7 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { toast } from 'sonner';
 import {
   Download,
@@ -37,12 +37,14 @@ import {
 } from '@/app/utils/studio-sync-indicators';
 import { Spinner } from '@/app/components/ui/Spinner';
 import type { Version } from '../editor/components/types';
+import type { VersionBranchRow } from '@/app/components/ade/version-dialogs/types';
 import { CommitRevisionDialog } from '@/app/components/ade/version-dialogs/CommitRevisionDialog';
 import { BranchFromRevisionDialog } from '@/app/components/ade/version-dialogs/BranchFromRevisionDialog';
 import { VersionTagDialog } from '@/app/components/ade/version-dialogs/VersionTagDialog';
 import { MergeBranchesDialog } from '@/app/components/ade/version-dialogs/MergeBranchesDialog';
 import { RollbackBranchDialog } from '@/app/components/ade/version-dialogs/RollbackBranchDialog';
 import { CanvasHistoryGraphDialog } from './CanvasHistoryGraphDialog';
+import { BranchPickerChip } from './BranchPickerChip';
 
 export type DesignerCanvasGitMenuProps = {
   versions: Version[];
@@ -85,7 +87,31 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
     triggerSidebarRefresh,
     syncLocalDirty,
     canvasPresentationMode,
+    setVersionBranchesForProject,
+    registerBranchFromRevisionOpener,
   } = useStudio();
+
+  useEffect(() => {
+    registerBranchFromRevisionOpener(() => {
+      setOpenDialog('branch');
+    });
+    return () => {
+      registerBranchFromRevisionOpener(null);
+    };
+  }, [registerBranchFromRevisionOpener]);
+
+  const refreshBranchList = useCallback(async () => {
+    if (!selectedProjectId) return;
+    try {
+      const r = await fetch(`/api/projects/${encodeURIComponent(selectedProjectId)}/version-branches`);
+      const d = (await r.json()) as { success?: boolean; branches?: unknown[] };
+      if (r.ok && d.success && Array.isArray(d.branches)) {
+        setVersionBranchesForProject(selectedProjectId, d.branches as VersionBranchRow[]);
+      }
+    } catch {
+      /* chip / sync will refetch */
+    }
+  }, [selectedProjectId, setVersionBranchesForProject]);
 
   const sessionUserId = (session?.user as { user_id?: string } | undefined)?.user_id;
   const isTenantAdmin = Boolean((session?.user as { is_tenant_admin?: boolean } | undefined)?.is_tenant_admin);
@@ -249,7 +275,7 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
 
   return (
     <>
-      <DropdownMenu.Root>
+      <DropdownMenu.Root modal={false}>
         <DropdownMenu.Trigger asChild>
           <button
             type="button"
@@ -267,7 +293,8 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
             align="end"
           >
             <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-700">
-              <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <BranchPickerChip versions={versions} setVersions={setVersions} variant="menu" showCreateBranch />
+              <div className="mt-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 Current revision
               </div>
               <div className="mt-0.5 text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -454,6 +481,7 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
             }}
             onCreated={async (result) => {
               const list = await refreshVersionList();
+              await refreshBranchList();
               if (result.id) {
                 setSelectedVersionId(result.id);
                 setIsReadOnly(result.published ?? false);
@@ -494,6 +522,7 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
             isTenantAdmin={isTenantAdmin}
             onMerged={async (result) => {
               const list = await refreshVersionList();
+              await refreshBranchList();
               if (result.version?.id && list?.some((v) => v.id === result.version?.id)) {
                 setSelectedVersionId(result.version.id);
                 const next = list.find((v) => v.id === result.version?.id);
