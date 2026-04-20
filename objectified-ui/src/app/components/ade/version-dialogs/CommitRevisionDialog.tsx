@@ -34,12 +34,31 @@ import type { VersionBranchRow, CreatedRevisionResult, DialogRevisionRef } from 
 
 type BumpStrategy = 'patch' | 'minor' | 'major';
 
+/**
+ * Multi-branch commit UI: show the branch dropdown when there is more than one branch and there is no
+ * **valid** studio lock (#2724 GLI-05). Invalid locks fall back to the picker.
+ */
+export function commitRevisionDialogShowsBranchPicker(
+  branchCount: number,
+  lockedBranchId: string | null | undefined,
+  branches: Array<{ id: string }>
+): boolean {
+  if (branchCount <= 1) return false;
+  const lock = String(lockedBranchId ?? '').trim();
+  if (!lock) return true;
+  return !branches.some((b) => b.id === lock);
+}
+
 export interface CommitRevisionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
   /** Current canvas revision (used as fallback base when no named branches exist). */
   currentRevision: DialogRevisionRef | null;
+  /**
+   * When set, commit targets this branch tip and the branch dropdown is hidden (canvas toolbar / #2724).
+   */
+  lockedBranchId?: string | null;
   onCreated?: (result: CreatedRevisionResult) => void;
   /**
    * Fired on 409 STALE_HEAD so the caller can hydrate the shared PushConflictBanner.
@@ -62,6 +81,7 @@ export function CommitRevisionDialog({
   onOpenChange,
   projectId,
   currentRevision,
+  lockedBranchId,
   onCreated,
   onStaleHead,
 }: CommitRevisionDialogProps) {
@@ -102,12 +122,18 @@ export function CommitRevisionDialog({
         const d = (await r.json()) as { success?: boolean; branches?: VersionBranchRow[]; error?: string };
         if (d.success && Array.isArray(d.branches)) {
           setBranches(d.branches);
-          if (d.branches.length === 1) setSelectedBranchId(d.branches[0].id);
-          else if (d.branches.length > 1) {
-            const matching = d.branches.find(
-              (b) => b.tip_version_id && b.tip_version_id === currentRevision?.id
-            );
-            setSelectedBranchId(matching?.id ?? '');
+          const lock = String(lockedBranchId ?? '').trim();
+          if (d.branches.length === 1) {
+            setSelectedBranchId(d.branches[0].id);
+          } else if (d.branches.length > 1) {
+            if (lock && d.branches.some((b) => b.id === lock)) {
+              setSelectedBranchId(lock);
+            } else {
+              const matching = d.branches.find(
+                (b) => b.tip_version_id && b.tip_version_id === currentRevision?.id
+              );
+              setSelectedBranchId(matching?.id ?? '');
+            }
           }
         } else {
           setBranchError(typeof d.error === 'string' ? d.error : 'Could not load branches');
@@ -122,7 +148,7 @@ export function CommitRevisionDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, projectId, currentRevision?.id]);
+  }, [open, projectId, currentRevision?.id, lockedBranchId]);
 
   const selectedBranch = useMemo(
     () => branches.find((b) => b.id === selectedBranchId) ?? null,
@@ -172,9 +198,18 @@ export function CommitRevisionDialog({
       setErrorMessage(`External reference must be at most ${COMMIT_EXTERNAL_REF_MAX_CHARS} characters`);
       return;
     }
-    if (branches.length > 1 && !selectedBranch) {
-      setErrorMessage('Select a branch to commit on.');
-      return;
+    if (branches.length > 1) {
+      const lock = String(lockedBranchId ?? '').trim();
+      if (lock) {
+        const locked = branches.find((b) => b.id === lock);
+        if (!locked) {
+          setErrorMessage('Locked branch is no longer available. Refresh and try again.');
+          return;
+        }
+      } else if (!selectedBranch) {
+        setErrorMessage('Select a branch to commit on.');
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -283,7 +318,7 @@ export function CommitRevisionDialog({
             </Alert>
           )}
 
-          {branches.length > 1 && (
+          {commitRevisionDialogShowsBranchPicker(branches.length, lockedBranchId, branches) && (
             <div className="space-y-1">
               <Label>Branch</Label>
               <Select
@@ -306,6 +341,19 @@ export function CommitRevisionDialog({
               </Select>
             </div>
           )}
+
+          {branches.length > 1 &&
+            !commitRevisionDialogShowsBranchPicker(branches.length, lockedBranchId, branches) &&
+            selectedBranch && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-200">
+                <span className="font-medium">Branch</span>
+                <span className="mx-1.5 text-gray-400 dark:text-gray-500">·</span>
+                <span>{selectedBranch.name}</span>
+                <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
+                  (tip v{selectedBranch.tip_version_string ?? '?'})
+                </span>
+              </div>
+            )}
 
           <div className="space-y-1">
             <Label htmlFor="canvas-commit-msg">Message *</Label>
