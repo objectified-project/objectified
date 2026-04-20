@@ -4,15 +4,9 @@ import * as React from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Lock } from 'lucide-react';
 import { cn } from '@lib/utils';
+import { useDraftLockShared } from '@/app/ade/studio/hooks/useDraftLockShared';
 
-const POLL_INTERVAL_MS = 10_000;
-const TICK_MS = 1_000;
-
-export type DraftLockStatusPayload = {
-  active: boolean;
-  ownerUserId?: string;
-  expiresAt?: string;
-};
+export type { DraftLockStatusPayload } from '@/app/ade/studio/lib/studio-draft-lock-shared';
 
 function formatRemaining(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return '0s';
@@ -46,53 +40,7 @@ export function DraftLockHeaderChip({
   sessionUserId,
   className,
 }: DraftLockHeaderChipProps) {
-  const [remote, setRemote] = React.useState<DraftLockStatusPayload | null>(null);
-  const [nowMs, setNowMs] = React.useState(() => Date.now());
-
-  const fetchStatus = React.useCallback(async () => {
-    try {
-      const qs = new URLSearchParams({ projectId });
-      const res = await fetch(`/api/versions/${encodeURIComponent(versionId)}/draft-lock?${qs.toString()}`);
-      const json = (await res.json()) as {
-        success?: boolean;
-        status?: { active?: boolean; ownerUserId?: string; expiresAt?: string };
-        error?: string;
-      };
-      if (!res.ok || !json.success || !json.status) {
-        setRemote(null);
-        return;
-      }
-      const st = json.status;
-      setRemote({
-        active: Boolean(st.active),
-        ownerUserId: typeof st.ownerUserId === 'string' ? st.ownerUserId : undefined,
-        expiresAt: typeof st.expiresAt === 'string' ? st.expiresAt : undefined,
-      });
-    } catch {
-      setRemote(null);
-    }
-  }, [projectId, versionId]);
-
-  React.useEffect(() => {
-    if (published || !projectId || !versionId) {
-      setRemote(null);
-      return;
-    }
-    void fetchStatus();
-    const id = window.setInterval(() => {
-      void fetchStatus();
-    }, POLL_INTERVAL_MS);
-    return () => window.clearInterval(id);
-  }, [published, projectId, versionId, fetchStatus]);
-
-  React.useEffect(() => {
-    if (!remote?.active || !remote.expiresAt) return;
-    setNowMs(Date.now());
-    const id = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, TICK_MS);
-    return () => window.clearInterval(id);
-  }, [remote?.active, remote?.expiresAt]);
+  const { payload: remote, nowMs } = useDraftLockShared(projectId, versionId, published);
 
   if (published || !remote?.active || !remote?.ownerUserId || !remote?.expiresAt) {
     return null;
