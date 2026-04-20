@@ -74,17 +74,15 @@ export function BranchPickerChip({
   const [highlight, setHighlight] = useState(0);
   const [pendingCheckout, setPendingCheckout] = useState<VersionBranchRow | null>(null);
 
-  const cached = selectedProjectId ? versionBranchesByProjectId[selectedProjectId] : undefined;
-
   const currentVersion = useMemo(
     () => versions.find((v) => String(v.id) === String(selectedVersionId)),
     [versions, selectedVersionId]
   );
 
-  const branchesForLabel = useMemo(() => {
-    if (cached?.length) return cached;
-    return list;
-  }, [cached, list]);
+  const branchesForLabel = useMemo(
+    () => (selectedProjectId ? (versionBranchesByProjectId[selectedProjectId] ?? []) : []),
+    [selectedProjectId, versionBranchesByProjectId]
+  );
 
   const resolvedBranch = useMemo(() => {
     if (!selectedVersionId || !branchesForLabel.length) return null;
@@ -180,10 +178,16 @@ export function BranchPickerChip({
       setSelectedVersionId(tipId);
       setSelectedBranchId(branch.id);
       setIsReadOnly(tip.published ?? false);
-      const r = await fetch(`/api/projects/${encodeURIComponent(selectedProjectId)}/version-branches`);
-      const d = (await r.json()) as { success?: boolean; branches?: VersionBranchRow[] };
-      if (d.success && Array.isArray(d.branches)) {
-        setVersionBranchesForProject(selectedProjectId, d.branches);
+      try {
+        const r = await fetch(`/api/projects/${encodeURIComponent(selectedProjectId)}/version-branches`);
+        if (r.ok) {
+          const d = (await r.json()) as { success?: boolean; branches?: VersionBranchRow[] };
+          if (d.success && Array.isArray(d.branches)) {
+            setVersionBranchesForProject(selectedProjectId, d.branches);
+          }
+        }
+      } catch {
+        // Best-effort branch refresh; checkout should still complete even if this fails.
       }
       triggerCanvasRefresh();
       triggerSidebarRefresh();
@@ -211,6 +215,7 @@ export function BranchPickerChip({
         return;
       }
       if (syncLocalDirty) {
+        setOpen(false);
         setPendingCheckout(branch);
         return;
       }
