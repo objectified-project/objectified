@@ -16,9 +16,10 @@ const config: Config = {
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
+    '^.+\\.[tj]sx?$': ['ts-jest', {
       tsconfig: {
         jsx: 'react',
+        allowJs: true,
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
       }
@@ -32,7 +33,7 @@ const config: Config = {
     '^.*auth/server-session$': '<rootDir>/tests/__mocks__/server-session.ts',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(react-markdown|remark-gfm|unified|bail|is-plain-obj|trough|vfile|unist-.*|unified|remark-.*|mdast-.*|micromark.*|decode-named-character-reference|character-entities|property-information|hast-util-whitespace|space-separated-tokens|comma-separated-tokens|pretty-bytes|@seriousme/openapi-schema-validator)/)',
+    'node_modules/(?!(react-markdown|remark-gfm|unified|bail|is-plain-obj|trough|vfile|unist-.*|unified|remark-.*|mdast-.*|micromark.*|decode-named-character-reference|character-entities|property-information|hast-util-whitespace|space-separated-tokens|comma-separated-tokens|pretty-bytes|@seriousme/openapi-schema-validator|uuid)/)',
   ],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   testTimeout: 30000,
