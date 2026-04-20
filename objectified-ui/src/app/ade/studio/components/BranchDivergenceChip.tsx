@@ -75,7 +75,7 @@ export function BranchDivergenceChip({ variant }: BranchDivergenceChipProps) {
     selectedProjectId &&
       selectedVersionId &&
       displayBranch &&
-      !displayBranch.is_default &&
+      displayBranch.is_default === false &&
       !canvasPresentationMode
   );
 
@@ -188,8 +188,8 @@ export function BranchDivergenceChip({ variant }: BranchDivergenceChipProps) {
               Ahead ({aheadN} commit{aheadN === 1 ? '' : 's'})
             </div>
             <ul className="list-disc space-y-1 pl-4 text-gray-100 dark:text-gray-900">
-              {aheadRows.map((row) => (
-                <li key={row.revisionId}>
+              {aheadRows.map((row, i) => (
+                <li key={row.revisionId ?? `ahead-${i}`}>
                   <span className="opacity-90">{row.shortMessage?.trim() || '(no message)'}</span>
                   {row.revisionId ? (
                     <span className="ml-1 font-mono text-[10px] opacity-80">({shortRev(row.revisionId)})</span>
@@ -205,8 +205,8 @@ export function BranchDivergenceChip({ variant }: BranchDivergenceChipProps) {
               Behind ({behindN} commit{behindN === 1 ? '' : 's'})
             </div>
             <ul className="list-disc space-y-1 pl-4 text-gray-100 dark:text-gray-900">
-              {behindRows.map((row) => (
-                <li key={row.revisionId}>
+              {behindRows.map((row, i) => (
+                <li key={row.revisionId ?? `behind-${i}`}>
                   <span className="opacity-90">{row.shortMessage?.trim() || '(no message)'}</span>
                   {row.revisionId ? (
                     <span className="ml-1 font-mono text-[10px] opacity-80">({shortRev(row.revisionId)})</span>
@@ -236,6 +236,7 @@ export function BranchDivergenceChip({ variant }: BranchDivergenceChipProps) {
               loading || error || !mergeBaseId || !branchTipId ? 'opacity-60' : ''
             }`}
             aria-label={`${label}. Open compare with default branch.`}
+            disabled={loading || Boolean(error) || !mergeBaseId || !branchTipId}
             aria-disabled={loading || Boolean(error) || !mergeBaseId || !branchTipId}
             onClick={() => openCompare()}
           >

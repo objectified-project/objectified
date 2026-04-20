@@ -98,8 +98,8 @@ export async function GET(
       }
       return NextResponse.json(
         {
-          success: false,
           ...(typeof body === 'object' && body !== null ? (body as object) : { detail: body }),
+          success: false,
         },
         { status: response.status }
       );
