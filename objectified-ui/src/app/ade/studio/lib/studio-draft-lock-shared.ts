@@ -88,9 +88,14 @@ async function fetchOnce(projectId: string, versionId: string) {
 function ensurePolling(projectId: string, versionId: string) {
   const key = `${projectId}:${versionId}`;
   if (activeKey === key && pollTimer !== null) return;
+  const keyChanged = activeKey !== key;
   stopTimers();
   activeKey = key;
   nowMs = Date.now();
+  if (keyChanged) {
+    payload = null;
+    emit();
+  }
   void fetchOnce(projectId, versionId);
   pollTimer = window.setInterval(() => {
     void fetchOnce(projectId, versionId);

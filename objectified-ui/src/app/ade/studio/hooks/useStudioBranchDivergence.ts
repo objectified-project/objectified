@@ -98,8 +98,8 @@ export function useStudioBranchDivergence() {
 
   const fetchKey = useMemo(() => {
     if (!showDivergence || !selectedProjectId || !branchIdForFetch) return '';
-    return `${selectedProjectId}:${branchIdForFetch}:${sidebarRefreshKey}`;
-  }, [showDivergence, selectedProjectId, branchIdForFetch, sidebarRefreshKey]);
+    return `${selectedProjectId}:${branchIdForFetch}`;
+  }, [showDivergence, selectedProjectId, branchIdForFetch]);
 
   const snapshot = useSyncExternalStore(
     subscribeDivergence,
@@ -146,7 +146,7 @@ export function useStudioBranchDivergence() {
           data: json,
           error: null,
           loading: false,
-          etag: etag ?? prevEntry.etag,
+          etag: etag ?? null,
         });
       } catch {
         divergenceSet(fetchKey, { error: 'Could not load branch divergence', data: null, loading: false });
@@ -157,7 +157,7 @@ export function useStudioBranchDivergence() {
     void run.finally(() => {
       divergenceInflight.delete(fetchKey);
     });
-  }, [fetchKey, selectedProjectId, branchIdForFetch]);
+  }, [fetchKey, selectedProjectId, branchIdForFetch, sidebarRefreshKey]);
 
   const defaultBranchName = useMemo(() => {
     const fromBranches = branchesForLabel.find((b) => b.is_default)?.name?.trim() ?? '';

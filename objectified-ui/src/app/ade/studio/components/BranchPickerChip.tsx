@@ -454,7 +454,9 @@ export function BranchPickerChip({
             }}
             onPointerLeave={() => {
               clearHoverOpenTimer();
-              scheduleClose();
+              if (openedFromHoverRef.current) {
+                scheduleClose();
+              }
             }}
             onPointerDown={() => {
               openedFromHoverRef.current = false;
@@ -492,7 +494,9 @@ export function BranchPickerChip({
               clearHoverOpenTimer();
             }}
             onPointerLeave={() => {
-              scheduleClose();
+              if (openedFromHoverRef.current) {
+                scheduleClose();
+              }
             }}
           >
             <div className="border-b border-gray-100 px-3 py-3 dark:border-gray-700">
