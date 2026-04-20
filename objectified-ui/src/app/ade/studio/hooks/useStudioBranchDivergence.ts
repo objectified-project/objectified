@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useStudio } from '../StudioContext';
 import { resolveActiveBranchForRevision } from '@/app/ade/studio/lib/studio-branch-resolve';
 import type { VersionBranchRow } from '@/app/components/ade/version-dialogs/types';
@@ -15,9 +15,48 @@ export type BranchDivergencePayload = {
   behindSample?: Array<{ revisionId?: string; shortMessage?: string | null }>;
 };
 
+type DivergenceEntry = {
+  data: BranchDivergencePayload | null;
+  error: string | null;
+  loading: boolean;
+  etag: string | null;
+};
+
+const EMPTY_DIVERGENCE: DivergenceEntry = {
+  data: null,
+  error: null,
+  loading: false,
+  etag: null,
+};
+
+const divergenceByKey = new Map<string, DivergenceEntry>();
+const divergenceListeners = new Set<() => void>();
+
+function divergenceNotify() {
+  divergenceListeners.forEach((l) => l());
+}
+
+function divergenceGet(key: string): DivergenceEntry {
+  if (!key) return EMPTY_DIVERGENCE;
+  return divergenceByKey.get(key) ?? EMPTY_DIVERGENCE;
+}
+
+function divergenceSet(key: string, patch: Partial<DivergenceEntry>) {
+  const prev = divergenceGet(key);
+  divergenceByKey.set(key, { ...prev, ...patch });
+  divergenceNotify();
+}
+
+function subscribeDivergence(cb: () => void) {
+  divergenceListeners.add(cb);
+  return () => divergenceListeners.delete(cb);
+}
+
+const divergenceInflight = new Map<string, Promise<void>>();
+
 /**
  * Fetches default-branch vs active-branch divergence for the current canvas revision (#2723 GLI-04).
- * Used by `BranchDivergenceChip` and `DesignerCanvasGitMenu` sync-from-default (#2725 GLI-06).
+ * Shared across subscribers (#2726) so toolbar + git menu do not duplicate GET …/divergence.
  */
 export function useStudioBranchDivergence() {
   const {
@@ -28,11 +67,6 @@ export function useStudioBranchDivergence() {
     canvasPresentationMode,
     versionBranchesByProjectId,
   } = useStudio();
-
-  const [data, setData] = useState<BranchDivergencePayload | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const etagRef = useRef<string | null>(null);
 
   const branchesForLabel = useMemo(
     () => (selectedProjectId ? (versionBranchesByProjectId[selectedProjectId] ?? []) : []),
@@ -62,29 +96,38 @@ export function useStudioBranchDivergence() {
 
   const branchIdForFetch = displayBranch?.id ?? '';
 
-  useEffect(() => {
-    etagRef.current = null;
-    setData(null);
-    setError(null);
-  }, [branchIdForFetch, selectedProjectId]);
+  const fetchKey = useMemo(() => {
+    if (!showDivergence || !selectedProjectId || !branchIdForFetch) return '';
+    return `${selectedProjectId}:${branchIdForFetch}`;
+  }, [showDivergence, selectedProjectId, branchIdForFetch]);
+
+  const snapshot = useSyncExternalStore(
+    subscribeDivergence,
+    () => divergenceGet(fetchKey),
+    () => divergenceGet(fetchKey)
+  );
 
   useEffect(() => {
-    if (!showDivergence || !selectedProjectId || !branchIdForFetch) return;
+    if (!fetchKey || !selectedProjectId || !branchIdForFetch) return;
 
-    const ac = new AbortController();
+    if (divergenceInflight.has(fetchKey)) {
+      return;
+    }
 
-    (async () => {
-      setLoading(true);
-      setError(null);
+    const run = (async () => {
+      const prevEntry = divergenceGet(fetchKey);
+      divergenceSet(fetchKey, { loading: true, error: null });
+
       try {
         const url = `/api/projects/${encodeURIComponent(selectedProjectId)}/version-branches/${encodeURIComponent(branchIdForFetch)}/divergence`;
         const headers: Record<string, string> = {};
-        if (etagRef.current) {
-          headers['If-None-Match'] = etagRef.current;
+        if (prevEntry.etag) {
+          headers['If-None-Match'] = prevEntry.etag;
         }
-        const r = await fetch(url, { signal: ac.signal, headers });
+        const r = await fetch(url, { headers });
         const etag = r.headers.get('etag');
         if (r.status === 304) {
+          divergenceSet(fetchKey, { loading: false });
           return;
         }
         if (!r.ok) {
@@ -95,43 +138,41 @@ export function useStudioBranchDivergence() {
               : typeof j?.detail === 'object' && j.detail !== null && 'message' in j.detail
                 ? String((j.detail as { message?: string }).message ?? 'Request failed')
                 : 'Could not load branch divergence';
-          setError(msg);
-          setData(null);
+          divergenceSet(fetchKey, { error: msg, data: null, loading: false });
           return;
         }
-        if (etag) {
-          etagRef.current = etag;
-        }
         const json = (await r.json()) as BranchDivergencePayload;
-        setData(json);
-      } catch (e) {
-        if ((e as Error)?.name === 'AbortError') return;
-        setError('Could not load branch divergence');
-        setData(null);
-      } finally {
-        if (!ac.signal.aborted) {
-          setLoading(false);
-        }
+        divergenceSet(fetchKey, {
+          data: json,
+          error: null,
+          loading: false,
+          etag: etag ?? null,
+        });
+      } catch {
+        divergenceSet(fetchKey, { error: 'Could not load branch divergence', data: null, loading: false });
       }
     })();
 
-    return () => ac.abort();
-  }, [showDivergence, selectedProjectId, branchIdForFetch, sidebarRefreshKey]);
+    divergenceInflight.set(fetchKey, run);
+    void run.finally(() => {
+      divergenceInflight.delete(fetchKey);
+    });
+  }, [fetchKey, selectedProjectId, branchIdForFetch, sidebarRefreshKey]);
 
   const defaultBranchName = useMemo(() => {
     const fromBranches = branchesForLabel.find((b) => b.is_default)?.name?.trim() ?? '';
     if (fromBranches) return fromBranches;
-    return data?.against?.name?.trim() ?? '';
-  }, [branchesForLabel, data?.against?.name]);
+    return snapshot.data?.against?.name?.trim() ?? '';
+  }, [branchesForLabel, snapshot.data?.against?.name]);
 
   const activeBranchName = displayBranch?.name?.trim() ?? '';
 
   return {
     selectedProjectId,
     showDivergence,
-    data,
-    loading,
-    error,
+    data: snapshot.data,
+    loading: snapshot.loading,
+    error: snapshot.error,
     displayBranch,
     branchesForLabel,
     defaultBranchName,
