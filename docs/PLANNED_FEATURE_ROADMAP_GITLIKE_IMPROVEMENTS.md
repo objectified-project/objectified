@@ -100,7 +100,7 @@ MVP (first major release) = GLI-01 → GLI-07. Enterprise (later releases)
 | 7 | GLI-07 | #2718 | [#2726](https://github.com/KenSuenobu/objectified-commercial/issues/2726) ✅ |
 | 8 | GLI-08 | #2719 | [#2727](https://github.com/KenSuenobu/objectified-commercial/issues/2727) ✅ |
 | 9 | GLI-09 | #2719 | [#2728](https://github.com/KenSuenobu/objectified-commercial/issues/2728) ✅ |
-| 10 | GLI-10 | #2719 | [#2729](https://github.com/KenSuenobu/objectified-commercial/issues/2729) |
+| 10 | GLI-10 | #2719 | [#2729](https://github.com/KenSuenobu/objectified-commercial/issues/2729) ✅ |
 
 ### Parallel execution map
 
@@ -879,6 +879,8 @@ opens the Versions dashboard.
 ---
 
 ## GLI-10: Keyboard palette for git actions (CLI muscle memory)
+
+**Status:** Shipped — `GitCommandPalette` in studio layout, handlers via `StudioContext`, shortcuts in `studio-keybindings.ts`.
 
 **Summary:** A `Cmd/Ctrl + G` palette that lists every git-like action
 (`commit`, `branch`, `checkout`, `pull`, `sync`, `merge`, `rollback`)

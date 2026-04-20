@@ -22,6 +22,7 @@ import { getClassesForVersion, getTagsForProject } from '../../../../lib/db/help
 import { deleteClassWithSession } from '../../../../lib/api/rest-client';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ADE_SUBHEADER_RESERVE_PX } from '../constants/subheader-layout';
+import { GitCommandPalette } from './components/GitCommandPalette';
 
 // Helper function to check permissions
 const checkPermissions = async (condition: boolean, message: string, alertDialog: any) => {
@@ -583,6 +584,8 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
           }
         }}
       />
+
+      <GitCommandPalette />
     </div>
   );
 }
