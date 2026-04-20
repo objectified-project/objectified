@@ -11,6 +11,10 @@ import {
 } from './lib/studio-canvas-prefs-storage';
 import type { OverallSchemaQualityDetail } from '@/app/utils/overall-schema-quality';
 import type { VersionBranchRow } from '@/app/components/ade/version-dialogs/types';
+import type {
+  StudioGitPaletteActionId,
+  StudioGitPaletteHandlers,
+} from '@/app/utils/studio-keybindings';
 
 // Group style options
 export interface GroupStyleOptions {
@@ -108,6 +112,12 @@ interface StudioContextType {
   /** Registered by `DesignerCanvasGitMenu` so toolbar `BranchPickerChip` can open "Create branch from here…". */
   registerBranchFromRevisionOpener: (fn: (() => void) | null) => void;
   openBranchFromRevisionDialog: () => void;
+  /** Mergeable handlers for `GitCommandPalette` — e.g. `CanvasCommitButton` registers commit, `DesignerCanvasGitMenu` registers the rest. */
+  registerGitPaletteHandler: <K extends StudioGitPaletteActionId>(
+    key: K,
+    fn: StudioGitPaletteHandlers[K] | null
+  ) => void;
+  invokeGitPaletteAction: (key: StudioGitPaletteActionId) => boolean;
   canvasRefreshKey: number;
   triggerCanvasRefresh: () => void;
   sidebarRefreshKey: number;
@@ -237,6 +247,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
   const openBranchFromRevisionDialog = useCallback(() => {
     branchFromRevisionOpenerRef.current?.();
+  }, []);
+
+  const gitPaletteHandlersRef = useRef<StudioGitPaletteHandlers>({});
+  const registerGitPaletteHandler = useCallback(
+    <K extends StudioGitPaletteActionId>(key: K, fn: StudioGitPaletteHandlers[K] | null) => {
+      if (fn == null) {
+        delete gitPaletteHandlersRef.current[key];
+      } else {
+        gitPaletteHandlersRef.current[key] = fn;
+      }
+    },
+    []
+  );
+  const invokeGitPaletteAction = useCallback((key: StudioGitPaletteActionId) => {
+    const fn = gitPaletteHandlersRef.current[key];
+    if (typeof fn === 'function') {
+      fn();
+      return true;
+    }
+    return false;
   }, []);
 
   const setVersionBranchesForProject = useCallback((projectId: string, branches: VersionBranchRow[]) => {
@@ -577,6 +607,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setVersionBranchesForProject,
       registerBranchFromRevisionOpener,
       openBranchFromRevisionDialog,
+      registerGitPaletteHandler,
+      invokeGitPaletteAction,
       canvasRefreshKey,
       triggerCanvasRefresh,
       sidebarRefreshKey,

@@ -105,6 +105,7 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
     canvasPresentationMode,
     setVersionBranchesForProject,
     registerBranchFromRevisionOpener,
+    registerGitPaletteHandler,
   } = useStudio();
 
   useEffect(() => {
@@ -270,6 +271,73 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
     },
     [versions, setSelectedVersionId, setIsReadOnly, triggerCanvasRefresh]
   );
+
+  const handleSyncFromDefaultBranch = useCallback(() => {
+    const hasBranchDivergenceData = Boolean(branchDivergenceData);
+    const branchBehindCount = branchDivergenceData?.behind ?? 0;
+    const canSyncFromMain =
+      !branchDivergenceLoading &&
+      !branchDivergenceError &&
+      Boolean(syncDefaultBranchName) &&
+      Boolean(syncActiveBranchName) &&
+      hasBranchDivergenceData &&
+      branchBehindCount > 0;
+    if (!canSyncFromMain) {
+      toast.message(
+        'Nothing to sync from the default branch right now (up to date, still loading, or status unavailable).'
+      );
+      return;
+    }
+    setMergeBranchPreset({
+      source: syncDefaultBranchName!,
+      target: syncActiveBranchName!,
+    });
+    setOpenDialog('merge');
+  }, [
+    branchDivergenceData,
+    branchDivergenceLoading,
+    branchDivergenceError,
+    syncDefaultBranchName,
+    syncActiveBranchName,
+  ]);
+
+  useEffect(() => {
+    if (!selectedProjectId || !selectedVersionId || canvasPresentationMode) {
+      registerGitPaletteHandler('branch', null);
+      registerGitPaletteHandler('checkout', null);
+      registerGitPaletteHandler('pull', null);
+      registerGitPaletteHandler('sync', null);
+      registerGitPaletteHandler('merge', null);
+      registerGitPaletteHandler('rollback', null);
+      return;
+    }
+    registerGitPaletteHandler('branch', () => setOpenDialog('branch'));
+    registerGitPaletteHandler('checkout', () => setOpenDialog('history'));
+    registerGitPaletteHandler('pull', () => {
+      void handlePullLatest();
+    });
+    registerGitPaletteHandler('sync', handleSyncFromDefaultBranch);
+    registerGitPaletteHandler('merge', () => {
+      setMergeBranchPreset(null);
+      setOpenDialog('merge');
+    });
+    registerGitPaletteHandler('rollback', () => setOpenDialog('rollback'));
+    return () => {
+      registerGitPaletteHandler('branch', null);
+      registerGitPaletteHandler('checkout', null);
+      registerGitPaletteHandler('pull', null);
+      registerGitPaletteHandler('sync', null);
+      registerGitPaletteHandler('merge', null);
+      registerGitPaletteHandler('rollback', null);
+    };
+  }, [
+    selectedProjectId,
+    selectedVersionId,
+    canvasPresentationMode,
+    registerGitPaletteHandler,
+    handlePullLatest,
+    handleSyncFromDefaultBranch,
+  ]);
 
   if (!selectedProjectId || !selectedVersionId || canvasPresentationMode) {
     return null;
@@ -460,14 +528,7 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
                       disabled={!canSyncFromMain}
                       onSelect={(e) => {
                         e.preventDefault();
-                        if (!canSyncFromMain) {
-                          return;
-                        }
-                        setMergeBranchPreset({
-                          source: syncDefaultBranchName,
-                          target: syncActiveBranchName,
-                        });
-                        setOpenDialog('merge');
+                        handleSyncFromDefaultBranch();
                       }}
                     >
                       {branchDivergenceLoading && !hasBranchDivergenceData ? (

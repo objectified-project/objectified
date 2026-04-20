@@ -8,6 +8,7 @@ import { GitCommit } from 'lucide-react';
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useState,
@@ -52,6 +53,7 @@ export const CanvasCommitButton = forwardRef<CanvasCommitButtonHandle, CanvasCom
       setVersionBranchesForProject,
       isReadOnly,
       versionBranchesByProjectId,
+      registerGitPaletteHandler,
     } = useStudio();
 
     const branchesForLabel = useMemo(
@@ -127,6 +129,23 @@ export const CanvasCommitButton = forwardRef<CanvasCommitButtonHandle, CanvasCom
     }, [selectedProjectId, selectedVersionId, isReadOnly]);
 
     useImperativeHandle(ref, () => ({ open: tryOpen }), [tryOpen]);
+
+    useEffect(() => {
+      if (!selectedProjectId || !selectedVersionId || canvasPresentationMode) {
+        registerGitPaletteHandler('commit', null);
+        return;
+      }
+      registerGitPaletteHandler('commit', tryOpen);
+      return () => {
+        registerGitPaletteHandler('commit', null);
+      };
+    }, [
+      selectedProjectId,
+      selectedVersionId,
+      canvasPresentationMode,
+      tryOpen,
+      registerGitPaletteHandler,
+    ]);
 
     if (!selectedProjectId || !selectedVersionId || canvasPresentationMode) {
       return null;
