@@ -5,12 +5,13 @@ Git-like version branch merge: three-way OpenAPI schema merge + merge-base (#738
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import logging
 import re
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from .auth import validate_authentication, get_authenticated_user_id
 from .compatibility_engine import (
@@ -26,6 +27,10 @@ from .models import (
     RevisionDeprecationWarningOut,
     VersionBranchFromRevisionRequest,
     VersionBranchFromRevisionResponse,
+    VersionBranchDivergenceBranchOut,
+    VersionBranchDivergenceMergeBaseOut,
+    VersionBranchDivergenceResponse,
+    VersionBranchDivergenceSampleOut,
     VersionBranchMergePreviewRequest,
     VersionBranchMergeRequest,
     VersionBranchPolicyPatchRequest,
@@ -62,12 +67,41 @@ logger = logging.getLogger(__name__)
 _MERGE_PREVIEW_MAX_JSON_BYTES = 512 * 1024
 
 _VERSION_BRANCH_NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9._\-/]{0,254}$")
+_DIVERGENCE_SAMPLE_MAX = 5
 
 
 def _is_valid_version_branch_name(name: str) -> bool:
     """Aligned with objectified-ui/lib/version-branch-utils.ts (Git-like branch labels)."""
     s = (name or "").strip()
     return bool(_VERSION_BRANCH_NAME_RE.match(s))
+
+
+def _strong_etag_for_branch_tips(branch_tip_revision_id: str, against_tip_revision_id: str) -> str:
+    raw = f"{str(branch_tip_revision_id).strip()}:{str(against_tip_revision_id).strip()}"
+    digest = hashlib.sha1(raw.encode("utf-8")).hexdigest()
+    return f'"{digest}"'
+
+
+def _if_none_match_matches_etag(etag_value: str, if_none_match: Optional[str]) -> bool:
+    """True when If-None-Match contains this resource ETag (or wildcard)."""
+    if not if_none_match or not str(if_none_match).strip():
+        return False
+    token_target = str(etag_value).strip().strip('"').lower()
+    header = str(if_none_match).strip()
+    if header == "*":
+        return True
+    for raw in header.split(","):
+        token = raw.strip()
+        if not token:
+            continue
+        if token == "*":
+            return True
+        if token.startswith("W/"):
+            token = token[2:].strip()
+        token_norm = token.strip('"').lower()
+        if token_norm == token_target:
+            return True
+    return False
 
 
 def _version_branch_record_out(br: Dict[str, Any]) -> VersionBranchRecordOut:
@@ -518,6 +552,133 @@ async def patch_version_branch_policy(
         detail,
     )
     return {"branch": _version_branch_record_out(row)}
+
+
+@router.get(
+    "/{tenant_slug}/{project_id}/version-branches/{branch_id}/divergence",
+    response_model=VersionBranchDivergenceResponse,
+)
+async def get_version_branch_divergence(
+    request: Request,
+    tenant_slug: str,
+    project_id: str,
+    branch_id: str,
+    against: Optional[str] = None,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+):
+    """
+    Branch-vs-branch divergence: merge base, ahead/behind counts, and sampled commits (#2721).
+    """
+    _ = tenant_slug  # preserved for route consistency with other version endpoints
+    tenant_id = auth_data["tenant_id"]
+    project = db.get_project_by_id(project_id, tenant_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    against_id = (against or "").strip() or None
+    if against_id and against_id == branch_id:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "SELF_DIVERGENCE",
+                "message": "branchId and against must be different branch ids",
+            },
+        )
+
+    branch = db.get_version_branch_by_id(branch_id, tenant_id)
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    if str(branch.get("project_id")) != str(project_id):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "BRANCHES_PROJECT_MISMATCH",
+                "message": "Branch does not belong to the specified project",
+            },
+        )
+
+    if against_id:
+        against_branch = db.get_version_branch_by_id(against_id, tenant_id)
+        if not against_branch:
+            raise HTTPException(status_code=404, detail="Against branch not found")
+    else:
+        branches = db.list_version_branches_for_project(project_id, tenant_id)
+        against_branch = next((b for b in branches if bool(b.get("is_default"))), None)
+        if not against_branch:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "code": "DEFAULT_BRANCH_NOT_FOUND",
+                    "message": "Default branch not found for this project",
+                },
+            )
+    if str(against_branch.get("project_id")) != str(project_id):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "BRANCHES_PROJECT_MISMATCH",
+                "message": "Compared branches must belong to the same project",
+            },
+        )
+    if str(branch["id"]) == str(against_branch["id"]):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "SELF_DIVERGENCE",
+                "message": "branchId and against must be different branch ids",
+            },
+        )
+
+    branch_tip = str(branch["tip_version_id"])
+    against_tip = str(against_branch["tip_version_id"])
+    etag = _strong_etag_for_branch_tips(branch_tip, against_tip)
+    if _if_none_match_matches_etag(etag, request.headers.get("if-none-match")):
+        return Response(status_code=304, headers={"ETag": etag})
+
+    divergence = db.compute_branch_divergence(
+        project_id=project_id,
+        tenant_id=tenant_id,
+        branch_tip_revision_id=branch_tip,
+        against_tip_revision_id=against_tip,
+        sample_limit=_DIVERGENCE_SAMPLE_MAX,
+    )
+
+    merge_base = None
+    merge_base_revision_id = divergence.get("merge_base_revision_id")
+    if merge_base_revision_id:
+        merge_base = VersionBranchDivergenceMergeBaseOut(
+            revision_id=str(merge_base_revision_id),
+            created_at=divergence.get("merge_base_created_at"),
+        )
+
+    body = VersionBranchDivergenceResponse(
+        branch=VersionBranchDivergenceBranchOut(
+            id=str(branch["id"]),
+            name=str(branch.get("name") or ""),
+            tip_revision_id=branch_tip,
+        ),
+        against=VersionBranchDivergenceBranchOut(
+            id=str(against_branch["id"]),
+            name=str(against_branch.get("name") or ""),
+            tip_revision_id=against_tip,
+        ),
+        merge_base=merge_base,
+        ahead=int(divergence.get("ahead_count") or 0),
+        behind=int(divergence.get("behind_count") or 0),
+        ahead_sample=[
+            VersionBranchDivergenceSampleOut.model_validate(item)
+            for item in (divergence.get("ahead_sample") or [])
+        ],
+        behind_sample=[
+            VersionBranchDivergenceSampleOut.model_validate(item)
+            for item in (divergence.get("behind_sample") or [])
+        ],
+    )
+    return Response(
+        content=body.model_dump_json(by_alias=True),
+        media_type="application/json",
+        headers={"ETag": etag},
+    )
 
 
 @router.post("/{tenant_slug}/{project_id}/version-branches/merge-preview")
