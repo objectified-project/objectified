@@ -4489,6 +4489,210 @@ class Database:
         """
         return self.execute_query(q, (project_id, tenant_id))
 
+    def compute_branch_divergence(
+        self,
+        *,
+        project_id: str,
+        tenant_id: str,
+        branch_tip_revision_id: str,
+        against_tip_revision_id: str,
+        sample_limit: int = 5,
+    ) -> Dict[str, Any]:
+        """
+        Compute git-like branch divergence from branch tips using recursive CTEs.
+
+        Returns merge base revision metadata, ahead/behind counts, and sampled revisions on each side.
+        """
+        limit = max(1, min(int(sample_limit), 25))
+        q = """
+            WITH RECURSIVE
+            branch_ancestors AS (
+                SELECT
+                    v.id::text AS revision_id,
+                    v.parent_version_id::text AS parent_revision_id,
+                    v.merge_parent_version_id::text AS merge_parent_revision_id
+                FROM odb.versions v
+                JOIN odb.projects p ON v.project_id = p.id
+                WHERE v.id = %s
+                  AND v.project_id = %s
+                  AND p.tenant_id = %s
+                  AND v.deleted_at IS NULL
+                UNION
+                SELECT
+                    v.id::text AS revision_id,
+                    v.parent_version_id::text AS parent_revision_id,
+                    v.merge_parent_version_id::text AS merge_parent_revision_id
+                FROM odb.versions v
+                JOIN branch_ancestors a
+                  ON v.id::text = a.parent_revision_id
+                  OR v.id::text = a.merge_parent_revision_id
+                WHERE v.project_id = %s
+                  AND v.deleted_at IS NULL
+            ),
+            against_ancestors AS (
+                SELECT
+                    v.id::text AS revision_id,
+                    v.parent_version_id::text AS parent_revision_id,
+                    v.merge_parent_version_id::text AS merge_parent_revision_id
+                FROM odb.versions v
+                JOIN odb.projects p ON v.project_id = p.id
+                WHERE v.id = %s
+                  AND v.project_id = %s
+                  AND p.tenant_id = %s
+                  AND v.deleted_at IS NULL
+                UNION
+                SELECT
+                    v.id::text AS revision_id,
+                    v.parent_version_id::text AS parent_revision_id,
+                    v.merge_parent_version_id::text AS merge_parent_revision_id
+                FROM odb.versions v
+                JOIN against_ancestors a
+                  ON v.id::text = a.parent_revision_id
+                  OR v.id::text = a.merge_parent_revision_id
+                WHERE v.project_id = %s
+                  AND v.deleted_at IS NULL
+            ),
+            merge_base AS (
+                SELECT v.id::text AS revision_id, v.created_at
+                FROM odb.versions v
+                JOIN branch_ancestors ba ON ba.revision_id = v.id::text
+                JOIN against_ancestors aa ON aa.revision_id = v.id::text
+                WHERE v.project_id = %s
+                  AND v.deleted_at IS NULL
+                ORDER BY v.created_at DESC, v.id DESC
+                LIMIT 1
+            ),
+            merge_base_ancestors AS (
+                SELECT
+                    v.id::text AS revision_id,
+                    v.parent_version_id::text AS parent_revision_id,
+                    v.merge_parent_version_id::text AS merge_parent_revision_id
+                FROM odb.versions v
+                JOIN merge_base mb ON v.id::text = mb.revision_id
+                UNION
+                SELECT
+                    v.id::text AS revision_id,
+                    v.parent_version_id::text AS parent_revision_id,
+                    v.merge_parent_version_id::text AS merge_parent_revision_id
+                FROM odb.versions v
+                JOIN merge_base_ancestors mba
+                  ON v.id::text = mba.parent_revision_id
+                  OR v.id::text = mba.merge_parent_revision_id
+                WHERE v.project_id = %s
+                  AND v.deleted_at IS NULL
+            ),
+            ahead_set AS (
+                SELECT ba.revision_id
+                FROM branch_ancestors ba
+                LEFT JOIN merge_base_ancestors mba ON mba.revision_id = ba.revision_id
+                WHERE mba.revision_id IS NULL
+            ),
+            behind_set AS (
+                SELECT aa.revision_id
+                FROM against_ancestors aa
+                LEFT JOIN merge_base_ancestors mba ON mba.revision_id = aa.revision_id
+                WHERE mba.revision_id IS NULL
+            ),
+            ahead_sample AS (
+                SELECT
+                    v.id::text AS revision_id,
+                    COALESCE(v.description, '') AS short_message,
+                    v.created_at
+                FROM odb.versions v
+                JOIN ahead_set a ON a.revision_id = v.id::text
+                WHERE v.project_id = %s
+                  AND v.deleted_at IS NULL
+                ORDER BY v.created_at DESC, v.id DESC
+                LIMIT %s
+            ),
+            behind_sample AS (
+                SELECT
+                    v.id::text AS revision_id,
+                    COALESCE(v.description, '') AS short_message,
+                    v.created_at
+                FROM odb.versions v
+                JOIN behind_set b ON b.revision_id = v.id::text
+                WHERE v.project_id = %s
+                  AND v.deleted_at IS NULL
+                ORDER BY v.created_at DESC, v.id DESC
+                LIMIT %s
+            )
+            SELECT
+                (SELECT mb.revision_id FROM merge_base mb) AS merge_base_revision_id,
+                (SELECT mb.created_at FROM merge_base mb) AS merge_base_created_at,
+                (SELECT COUNT(*)::int FROM ahead_set) AS ahead_count,
+                (SELECT COUNT(*)::int FROM behind_set) AS behind_count,
+                COALESCE(
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'revisionId', a.revision_id,
+                                'shortMessage', a.short_message
+                            )
+                            ORDER BY a.created_at DESC, a.revision_id DESC
+                        )
+                        FROM ahead_sample a
+                    ),
+                    '[]'::json
+                ) AS ahead_sample,
+                COALESCE(
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'revisionId', b.revision_id,
+                                'shortMessage', b.short_message
+                            )
+                            ORDER BY b.created_at DESC, b.revision_id DESC
+                        )
+                        FROM behind_sample b
+                    ),
+                    '[]'::json
+                ) AS behind_sample
+        """
+        rows = self.execute_query(
+            q,
+            (
+                branch_tip_revision_id,
+                project_id,
+                tenant_id,
+                project_id,
+                against_tip_revision_id,
+                project_id,
+                tenant_id,
+                project_id,
+                project_id,
+                project_id,
+                project_id,
+                limit,
+                project_id,
+                limit,
+            ),
+        )
+        if not rows:
+            return {
+                "merge_base_revision_id": None,
+                "merge_base_created_at": None,
+                "ahead_count": 0,
+                "behind_count": 0,
+                "ahead_sample": [],
+                "behind_sample": [],
+            }
+        row = rows[0]
+        ahead_sample = row.get("ahead_sample") or []
+        behind_sample = row.get("behind_sample") or []
+        if isinstance(ahead_sample, str):
+            ahead_sample = json.loads(ahead_sample)
+        if isinstance(behind_sample, str):
+            behind_sample = json.loads(behind_sample)
+        return {
+            "merge_base_revision_id": row.get("merge_base_revision_id"),
+            "merge_base_created_at": row.get("merge_base_created_at"),
+            "ahead_count": int(row.get("ahead_count") or 0),
+            "behind_count": int(row.get("behind_count") or 0),
+            "ahead_sample": ahead_sample if isinstance(ahead_sample, list) else [],
+            "behind_sample": behind_sample if isinstance(behind_sample, list) else [],
+        }
+
     def get_latest_revision_id_for_project(
         self, project_id: str, tenant_id: str
     ) -> Optional[str]:

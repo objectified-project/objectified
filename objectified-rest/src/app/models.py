@@ -476,6 +476,64 @@ class VersionBranchRecordOut(BaseModel):
     updated_at: Optional[Union[datetime, str]] = Field(default=None, serialization_alias="updatedAt")
 
 
+class VersionBranchDivergenceBranchOut(BaseModel):
+    """Branch descriptor used in divergence responses (#2721)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    name: str
+    tip_revision_id: str = Field(serialization_alias="tipRevisionId")
+
+
+class VersionBranchDivergenceMergeBaseOut(BaseModel):
+    """Merge-base revision metadata for branch divergence."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    revision_id: str = Field(serialization_alias="revisionId")
+    created_at: Optional[Union[datetime, str]] = Field(default=None, serialization_alias="createdAt")
+
+
+class VersionBranchDivergenceSampleOut(BaseModel):
+    """Sampled revision entry in ahead/behind lists."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    revision_id: str = Field(
+        validation_alias=AliasChoices("revisionId", "revision_id"),
+        serialization_alias="revisionId",
+    )
+    short_message: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("shortMessage", "short_message"),
+        serialization_alias="shortMessage",
+    )
+
+
+class VersionBranchDivergenceResponse(BaseModel):
+    """Branch-vs-branch divergence metrics and commit samples (#2721)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    branch: VersionBranchDivergenceBranchOut
+    against: VersionBranchDivergenceBranchOut
+    merge_base: Optional[VersionBranchDivergenceMergeBaseOut] = Field(
+        default=None,
+        serialization_alias="mergeBase",
+    )
+    ahead: int
+    behind: int
+    ahead_sample: List[VersionBranchDivergenceSampleOut] = Field(
+        default_factory=list,
+        serialization_alias="aheadSample",
+    )
+    behind_sample: List[VersionBranchDivergenceSampleOut] = Field(
+        default_factory=list,
+        serialization_alias="behindSample",
+    )
+
+
 class VersionBranchPolicyPatchRequest(BaseModel):
     """Tenant-admin: branch protection and merge-path policy (#504, #2583)."""
 
