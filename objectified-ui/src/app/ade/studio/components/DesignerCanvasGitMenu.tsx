@@ -434,57 +434,60 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
               <span className="flex-1">Show history graph…</span>
             </DropdownMenu.Item>
 
-            {showSyncFromMain ? (
-              <DropdownMenu.Item
-                className={itemClass}
-                title={
-                  branchDivergenceError
-                    ? branchDivergenceError
-                    : (branchDivergenceData?.behind ?? 0) === 0 && !branchDivergenceLoading
-                      ? `Up to date with ${syncDefaultBranchName || 'the default branch'}.`
-                      : undefined
-                }
-                disabled={
-                  branchDivergenceLoading ||
-                  Boolean(branchDivergenceError) ||
-                  !syncDefaultBranchName ||
-                  !syncActiveBranchName ||
-                  (Boolean(branchDivergenceData) && (branchDivergenceData?.behind ?? 0) === 0)
-                }
-                onSelect={(e) => {
-                  e.preventDefault();
-                  if (
-                    branchDivergenceLoading ||
-                    branchDivergenceError ||
-                    !syncDefaultBranchName ||
-                    !syncActiveBranchName ||
-                    (branchDivergenceData && (branchDivergenceData.behind ?? 0) === 0)
-                  ) {
-                    return;
-                  }
-                  setMergeBranchPreset({
-                    source: syncDefaultBranchName,
-                    target: syncActiveBranchName,
-                  });
-                  setOpenDialog('merge');
-                }}
-              >
-                {branchDivergenceLoading && !branchDivergenceData ? (
-                  <Spinner size="sm" className="shrink-0" aria-hidden />
-                ) : (
-                  <ArrowDownToLine className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-                )}
-                <span className="flex-1">
-                  {branchDivergenceError
-                    ? 'Sync from main — status unavailable'
-                    : branchDivergenceLoading && !branchDivergenceData
-                      ? 'Sync from main…'
-                      : (branchDivergenceData?.behind ?? 0) > 0
-                        ? `Sync from main (${branchDivergenceData?.behind ?? 0} behind)`
-                        : `Sync from main — up to date with ${syncDefaultBranchName || 'default'}`}
-                </span>
-              </DropdownMenu.Item>
-            ) : null}
+            {showSyncFromMain
+              ? (() => {
+                  const hasBranchDivergenceData = Boolean(branchDivergenceData);
+                  const branchBehindCount = branchDivergenceData?.behind ?? 0;
+                  const canSyncFromMain =
+                    !branchDivergenceLoading &&
+                    !branchDivergenceError &&
+                    Boolean(syncDefaultBranchName) &&
+                    Boolean(syncActiveBranchName) &&
+                    hasBranchDivergenceData &&
+                    branchBehindCount > 0;
+                  const defaultBranchLabel = syncDefaultBranchName || 'default branch';
+
+                  return (
+                    <DropdownMenu.Item
+                      className={itemClass}
+                      title={
+                        branchDivergenceError
+                          ? branchDivergenceError
+                          : hasBranchDivergenceData && branchBehindCount === 0 && !branchDivergenceLoading
+                            ? `Up to date with ${defaultBranchLabel}.`
+                            : undefined
+                      }
+                      disabled={!canSyncFromMain}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        if (!canSyncFromMain) {
+                          return;
+                        }
+                        setMergeBranchPreset({
+                          source: syncDefaultBranchName,
+                          target: syncActiveBranchName,
+                        });
+                        setOpenDialog('merge');
+                      }}
+                    >
+                      {branchDivergenceLoading && !hasBranchDivergenceData ? (
+                        <Spinner size="sm" className="shrink-0" aria-hidden />
+                      ) : (
+                        <ArrowDownToLine className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                      )}
+                      <span className="flex-1">
+                        {branchDivergenceError
+                          ? `Sync from ${defaultBranchLabel} — status unavailable`
+                          : !hasBranchDivergenceData
+                            ? `Sync from ${defaultBranchLabel}…`
+                            : branchBehindCount > 0
+                              ? `Sync from ${defaultBranchLabel} (${branchBehindCount} behind)`
+                              : `Sync from ${defaultBranchLabel} — up to date`}
+                      </span>
+                    </DropdownMenu.Item>
+                  );
+                })()
+              : null}
 
             <DropdownMenu.Item
               className={itemClass}
