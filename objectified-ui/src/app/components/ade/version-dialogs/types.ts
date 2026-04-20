@@ -14,6 +14,8 @@ export interface VersionBranchRow {
   created_at?: string;
   created_by?: string | null;
   protected?: boolean;
+  /** GLI-01 — exactly one default branch per project. */
+  is_default?: boolean;
 }
 
 /** Minimal revision shape needed by dialogs for labels and branch-from operations. */

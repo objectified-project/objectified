@@ -5484,7 +5484,7 @@ export async function listVersionBranches(projectId: string, tenantId: string) {
     const ok = await assertProjectInTenant(projectId, tenantId);
     if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
     const result = await connectionPool.query(
-      `SELECT b.id, b.project_id, b.name, b.tip_version_id, b.protected, b.require_merge_path, b.created_by, b.created_at, b.updated_at,
+      `SELECT b.id, b.project_id, b.name, b.tip_version_id, b.is_default, b.protected, b.require_merge_path, b.created_by, b.created_at, b.updated_at,
               v.version_id AS tip_version_string
        FROM odb.version_branches b
        JOIN odb.versions v ON v.id = b.tip_version_id AND v.project_id = b.project_id

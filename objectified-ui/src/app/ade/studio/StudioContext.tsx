@@ -10,6 +10,7 @@ import {
   type StudioCanvasSurface,
 } from './lib/studio-canvas-prefs-storage';
 import type { OverallSchemaQualityDetail } from '@/app/utils/overall-schema-quality';
+import type { VersionBranchRow } from '@/app/components/ade/version-dialogs/types';
 
 // Group style options
 export interface GroupStyleOptions {
@@ -98,6 +99,15 @@ interface StudioContextType {
   setSelectedProjectId: (id: string | null) => void;
   selectedVersionId: string | null;
   setSelectedVersionId: (id: string | null) => void;
+  /** Named version branch whose tip matches the current revision when applicable (#2722 GLI-03). */
+  selectedBranchId: string | null;
+  setSelectedBranchId: (id: string | null) => void;
+  /** Cached GET /version-branches per project for branch chip + resolution. */
+  versionBranchesByProjectId: Record<string, VersionBranchRow[]>;
+  setVersionBranchesForProject: (projectId: string, branches: VersionBranchRow[]) => void;
+  /** Registered by `DesignerCanvasGitMenu` so toolbar `BranchPickerChip` can open "Create branch from here…". */
+  registerBranchFromRevisionOpener: (fn: (() => void) | null) => void;
+  openBranchFromRevisionDialog: () => void;
   canvasRefreshKey: number;
   triggerCanvasRefresh: () => void;
   sidebarRefreshKey: number;
@@ -217,6 +227,22 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [versionBranchesByProjectId, setVersionBranchesByProjectId] = useState<
+    Record<string, VersionBranchRow[]>
+  >({});
+  const branchFromRevisionOpenerRef = useRef<(() => void) | null>(null);
+  const registerBranchFromRevisionOpener = useCallback((fn: (() => void) | null) => {
+    branchFromRevisionOpenerRef.current = fn;
+  }, []);
+  const openBranchFromRevisionDialog = useCallback(() => {
+    branchFromRevisionOpenerRef.current?.();
+  }, []);
+
+  const setVersionBranchesForProject = useCallback((projectId: string, branches: VersionBranchRow[]) => {
+    setVersionBranchesByProjectId((prev) => ({ ...prev, [projectId]: branches }));
+  }, []);
+
   const [canvasRefreshKey, setCanvasRefreshKey] = useState<number>(0);
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState<number>(0);
   const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
@@ -545,6 +571,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSelectedProjectId,
       selectedVersionId,
       setSelectedVersionId,
+      selectedBranchId,
+      setSelectedBranchId,
+      versionBranchesByProjectId,
+      setVersionBranchesForProject,
+      registerBranchFromRevisionOpener,
+      openBranchFromRevisionDialog,
       canvasRefreshKey,
       triggerCanvasRefresh,
       sidebarRefreshKey,

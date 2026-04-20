@@ -73,7 +73,7 @@ on the ones above it to be meaningful in isolation.
 |---|---|---|---|
 | ~~GLI-01~~ | ~~Designate a default (main) branch per project~~ ([#2720](https://github.com/KenSuenobu/objectified-commercial/issues/2720)) | **MVP** (completed) | — |
 | ~~GLI-02~~ | ~~Branch divergence API (`ahead` / `behind` / `mergeBase`)~~ ([#2721](https://github.com/KenSuenobu/objectified-commercial/issues/2721)) | **MVP** (completed) | GLI-01 |
-| GLI-03 | Canvas branch picker (`checkout`) with current-branch chip | **MVP** | GLI-01 |
+| ~~GLI-03~~ | ~~Canvas branch picker (`checkout`) with current-branch chip~~ ([#2722](https://github.com/KenSuenobu/objectified-commercial/issues/2722)) | **MVP** (completed) | GLI-01 |
 | GLI-04 | Ahead / behind-main chip in canvas header | **MVP** | GLI-02, GLI-03 |
 | GLI-05 | Prominent "Commit…" action on the canvas toolbar | **MVP** | GLI-03 |
 | GLI-06 | "Sync from main" one-click action | **MVP** | GLI-02, GLI-03 |
@@ -93,7 +93,7 @@ MVP (first major release) = GLI-01 → GLI-07. Enterprise (later releases)
 | E2 | Enterprise Branch Workflow Epic | — | [#2719](https://github.com/KenSuenobu/objectified-commercial/issues/2719) |
 | 1 | GLI-01 | #2718 | [#2720](https://github.com/KenSuenobu/objectified-commercial/issues/2720) ✅ |
 | 2 | GLI-02 | #2718 | [#2721](https://github.com/KenSuenobu/objectified-commercial/issues/2721) ✅ |
-| 3 | GLI-03 | #2718 | [#2722](https://github.com/KenSuenobu/objectified-commercial/issues/2722) |
+| 3 | GLI-03 | #2718 | [#2722](https://github.com/KenSuenobu/objectified-commercial/issues/2722) ✅ |
 | 4 | GLI-04 | #2718 | [#2723](https://github.com/KenSuenobu/objectified-commercial/issues/2723) |
 | 5 | GLI-05 | #2718 | [#2724](https://github.com/KenSuenobu/objectified-commercial/issues/2724) |
 | 6 | GLI-06 | #2718 | [#2725](https://github.com/KenSuenobu/objectified-commercial/issues/2725) |
