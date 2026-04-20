@@ -39,11 +39,10 @@ type BumpStrategy = 'patch' | 'minor' | 'major';
  * **valid** studio lock (#2724 GLI-05). Invalid locks fall back to the picker.
  */
 export function commitRevisionDialogShowsBranchPicker(
-  branchCount: number,
   lockedBranchId: string | null | undefined,
   branches: Array<{ id: string }>
 ): boolean {
-  if (branchCount <= 1) return false;
+  if (branches.length <= 1) return false;
   const lock = String(lockedBranchId ?? '').trim();
   if (!lock) return true;
   return !branches.some((b) => b.id === lock);
@@ -198,18 +197,20 @@ export function CommitRevisionDialog({
       setErrorMessage(`External reference must be at most ${COMMIT_EXTERNAL_REF_MAX_CHARS} characters`);
       return;
     }
-    if (branches.length > 1) {
-      const lock = String(lockedBranchId ?? '').trim();
-      if (lock) {
-        const locked = branches.find((b) => b.id === lock);
-        if (!locked) {
-          setErrorMessage('Locked branch is no longer available. Refresh and try again.');
-          return;
-        }
-      } else if (!selectedBranch) {
-        setErrorMessage('Select a branch to commit on.');
+    const lock = String(lockedBranchId ?? '').trim();
+    if (lock) {
+      if (branchesLoading) {
+        setErrorMessage('Branch information is still loading. Please wait and try again.');
         return;
       }
+      const locked = branches.find((b) => b.id === lock);
+      if (!locked) {
+        setErrorMessage('Locked branch is no longer available. Refresh and try again.');
+        return;
+      }
+    } else if (branches.length > 1 && !selectedBranch) {
+      setErrorMessage('Select a branch to commit on.');
+      return;
     }
 
     setSubmitting(true);
@@ -318,7 +319,7 @@ export function CommitRevisionDialog({
             </Alert>
           )}
 
-          {commitRevisionDialogShowsBranchPicker(branches.length, lockedBranchId, branches) && (
+          {commitRevisionDialogShowsBranchPicker(lockedBranchId, branches) && (
             <div className="space-y-1">
               <Label>Branch</Label>
               <Select
@@ -343,7 +344,7 @@ export function CommitRevisionDialog({
           )}
 
           {branches.length > 1 &&
-            !commitRevisionDialogShowsBranchPicker(branches.length, lockedBranchId, branches) &&
+            !commitRevisionDialogShowsBranchPicker(lockedBranchId, branches) &&
             selectedBranch && (
               <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-200">
                 <span className="font-medium">Branch</span>
