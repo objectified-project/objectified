@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { toast } from 'sonner';
 import {
+  ArrowDownToLine,
   Download,
   ExternalLink,
   FileSearch,
@@ -46,6 +47,7 @@ import { RollbackBranchDialog } from '@/app/components/ade/version-dialogs/Rollb
 import { CanvasHistoryGraphDialog } from './CanvasHistoryGraphDialog';
 import { BranchPickerChip } from './BranchPickerChip';
 import { BranchDivergenceChip } from './BranchDivergenceChip';
+import { useStudioBranchDivergence } from '../hooks/useStudioBranchDivergence';
 
 export type DesignerCanvasGitMenuProps = {
   versions: Version[];
@@ -77,6 +79,19 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
   const [pullLoading, setPullLoading] = useState(false);
   const [refreshLoading, setRefreshLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState<MenuDialog>(null);
+  const [mergeBranchPreset, setMergeBranchPreset] = useState<{
+    source: string;
+    target: string;
+  } | null>(null);
+
+  const {
+    showDivergence: showSyncFromMain,
+    data: branchDivergenceData,
+    loading: branchDivergenceLoading,
+    error: branchDivergenceError,
+    defaultBranchName: syncDefaultBranchName,
+    activeBranchName: syncActiveBranchName,
+  } = useStudioBranchDivergence();
 
   const {
     selectedProjectId,
@@ -385,6 +400,7 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
               className={itemClass}
               onSelect={(e) => {
                 e.preventDefault();
+                setMergeBranchPreset(null);
                 setOpenDialog('merge');
               }}
             >
@@ -417,6 +433,58 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
               <FileSearch className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
               <span className="flex-1">Show history graph…</span>
             </DropdownMenu.Item>
+
+            {showSyncFromMain ? (
+              <DropdownMenu.Item
+                className={itemClass}
+                title={
+                  branchDivergenceError
+                    ? branchDivergenceError
+                    : (branchDivergenceData?.behind ?? 0) === 0 && !branchDivergenceLoading
+                      ? `Up to date with ${syncDefaultBranchName || 'the default branch'}.`
+                      : undefined
+                }
+                disabled={
+                  branchDivergenceLoading ||
+                  Boolean(branchDivergenceError) ||
+                  !syncDefaultBranchName ||
+                  !syncActiveBranchName ||
+                  (Boolean(branchDivergenceData) && (branchDivergenceData?.behind ?? 0) === 0)
+                }
+                onSelect={(e) => {
+                  e.preventDefault();
+                  if (
+                    branchDivergenceLoading ||
+                    branchDivergenceError ||
+                    !syncDefaultBranchName ||
+                    !syncActiveBranchName ||
+                    (branchDivergenceData && (branchDivergenceData.behind ?? 0) === 0)
+                  ) {
+                    return;
+                  }
+                  setMergeBranchPreset({
+                    source: syncDefaultBranchName,
+                    target: syncActiveBranchName,
+                  });
+                  setOpenDialog('merge');
+                }}
+              >
+                {branchDivergenceLoading && !branchDivergenceData ? (
+                  <Spinner size="sm" className="shrink-0" aria-hidden />
+                ) : (
+                  <ArrowDownToLine className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                )}
+                <span className="flex-1">
+                  {branchDivergenceError
+                    ? 'Sync from main — status unavailable'
+                    : branchDivergenceLoading && !branchDivergenceData
+                      ? 'Sync from main…'
+                      : (branchDivergenceData?.behind ?? 0) > 0
+                        ? `Sync from main (${branchDivergenceData?.behind ?? 0} behind)`
+                        : `Sync from main — up to date with ${syncDefaultBranchName || 'default'}`}
+                </span>
+              </DropdownMenu.Item>
+            ) : null}
 
             <DropdownMenu.Item
               className={itemClass}
@@ -519,9 +587,14 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
 
           <MergeBranchesDialog
             open={openDialog === 'merge'}
-            onOpenChange={(o) => setOpenDialog(o ? 'merge' : null)}
+            onOpenChange={(o) => {
+              if (!o) setMergeBranchPreset(null);
+              setOpenDialog(o ? 'merge' : null);
+            }}
             projectId={selectedProjectId}
             isTenantAdmin={isTenantAdmin}
+            initialSourceBranch={mergeBranchPreset?.source}
+            initialTargetBranch={mergeBranchPreset?.target}
             onMerged={async (result) => {
               const list = await refreshVersionList();
               await refreshBranchList();
