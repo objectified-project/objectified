@@ -513,6 +513,7 @@ async def patch_version_branch_policy(
             protected=body.protected,
             is_default=body.is_default,
             require_merge_path=body.require_merge_path,
+            actor_id=uid,
         )
     except BranchDefaultConflictError as e:
         raise HTTPException(

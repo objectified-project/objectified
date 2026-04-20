@@ -78,7 +78,7 @@ on the ones above it to be meaningful in isolation.
 | ~~GLI-05~~ | ~~Prominent "Commit…" action on the canvas toolbar~~ ([#2724](https://github.com/KenSuenobu/objectified-commercial/issues/2724)) | **MVP** (completed) | GLI-03 |
 | ~~GLI-06~~ | ~~"Sync from main" one-click action~~ ([#2725](https://github.com/KenSuenobu/objectified-commercial/issues/2725)) | **MVP** (completed) | GLI-02, GLI-03 |
 | ~~GLI-07~~ | ~~Branch status popover (`git status` style summary)~~ ([#2726](https://github.com/KenSuenobu/objectified-commercial/issues/2726)) | **MVP** (completed) | GLI-02, GLI-03, GLI-05 |
-| GLI-08 | Auto-protect the default branch (require merge path) | **Enterprise** | GLI-01 |
+| ~~GLI-08~~ | ~~Auto-protect the default branch (require merge path)~~ ([#2727](https://github.com/KenSuenobu/objectified-commercial/issues/2727)) | **Enterprise** (completed) | GLI-01 |
 | GLI-09 | Recent-activity ticker for current branch | **Enterprise** | GLI-03 |
 | GLI-10 | Keyboard palette for git actions (CLI muscle memory) | **Enterprise** | GLI-03, GLI-05, GLI-06 |
 
@@ -98,7 +98,7 @@ MVP (first major release) = GLI-01 → GLI-07. Enterprise (later releases)
 | 5 | GLI-05 | #2718 | [#2724](https://github.com/KenSuenobu/objectified-commercial/issues/2724) ✅ |
 | 6 | GLI-06 | #2718 | [#2725](https://github.com/KenSuenobu/objectified-commercial/issues/2725) ✅ |
 | 7 | GLI-07 | #2718 | [#2726](https://github.com/KenSuenobu/objectified-commercial/issues/2726) ✅ |
-| 8 | GLI-08 | #2719 | [#2727](https://github.com/KenSuenobu/objectified-commercial/issues/2727) |
+| 8 | GLI-08 | #2719 | [#2727](https://github.com/KenSuenobu/objectified-commercial/issues/2727) ✅ |
 | 9 | GLI-09 | #2719 | [#2728](https://github.com/KenSuenobu/objectified-commercial/issues/2728) |
 | 10 | GLI-10 | #2719 | [#2729](https://github.com/KenSuenobu/objectified-commercial/issues/2729) |
 

@@ -4139,10 +4139,17 @@ class Database:
         protected: Optional[bool] = None,
         is_default: Optional[bool] = None,
         require_merge_path: Optional[bool] = None,
+        actor_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
-        Tenant-admin policy fields on a branch (#504, #2583). At least one of protected or
+        Tenant-admin policy fields on a branch (#504, #2583, #2727). At least one of protected or
         require_merge_path or is_default must be set.
+
+        When the default branch changes (promotion), ``require_merge_path`` is set to true in the
+        same transaction unless the request explicitly sets ``require_merge_path`` false. If the
+        target branch is already default, merge-path is only updated when ``require_merge_path`` is
+        present in the request. Optionally records ``version.default_branch_promoted`` in
+        ``workflow_audit`` when ``actor_id`` is set.
         """
         if protected is None and require_merge_path is None and is_default is None:
             return None
@@ -4165,6 +4172,35 @@ class Database:
                     conn.rollback()
                     return None
 
+                prior_default_id: Optional[str] = None
+                is_promotion = False
+                merge_path_auto_enabled = False
+                rmp_for_set: Optional[bool] = None
+
+                if is_default is True:
+                    cursor.execute(
+                        """
+                        SELECT id FROM odb.version_branches
+                        WHERE project_id = %s AND is_default = true
+                        FOR UPDATE
+                        """,
+                        (project_id,),
+                    )
+                    prow = cursor.fetchone()
+                    pid = prow.get("id") if prow else None
+                    prior_default_id = str(pid) if pid is not None else None
+                    is_promotion = prior_default_id is None or prior_default_id != str(branch_id)
+                    if is_promotion:
+                        if require_merge_path is None:
+                            rmp_for_set = True
+                            merge_path_auto_enabled = True
+                        else:
+                            rmp_for_set = require_merge_path
+                    elif require_merge_path is not None:
+                        rmp_for_set = require_merge_path
+                elif require_merge_path is not None:
+                    rmp_for_set = require_merge_path
+
                 if is_default is True:
                     cursor.execute(
                         """
@@ -4183,9 +4219,9 @@ class Database:
                 if is_default is not None:
                     sets.append("is_default = %s")
                     params.append(is_default)
-                if require_merge_path is not None:
+                if rmp_for_set is not None:
                     sets.append("require_merge_path = %s")
-                    params.append(require_merge_path)
+                    params.append(rmp_for_set)
                 sets.append("updated_at = CURRENT_TIMESTAMP")
                 params.extend([branch_id, project_id, tenant_id])
 
@@ -4201,6 +4237,30 @@ class Database:
                     tuple(params),
                 )
                 row = cursor.fetchone()
+
+                if row and is_default is True and is_promotion and actor_id:
+                    detail = {
+                        "priorDefaultBranchId": prior_default_id,
+                        "newDefaultBranchId": str(branch_id),
+                        "mergePathAutoEnabled": merge_path_auto_enabled,
+                    }
+                    cursor.execute(
+                        """
+                        INSERT INTO odb.workflow_audit
+                          (tenant_id, project_id, version_id, action, outcome, actor_id, detail)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
+                        """,
+                        (
+                            tenant_id,
+                            project_id,
+                            None,
+                            "version.default_branch_promoted",
+                            "success",
+                            actor_id,
+                            json.dumps(detail),
+                        ),
+                    )
+
             conn.commit()
             return dict(row) if row else None
         except Exception as e:
@@ -4823,16 +4883,18 @@ class Database:
                         (new_id, str(branch_row["id"])),
                     )
                 elif no_prior_revision:
-                    # First commit in a brand-new project: bootstrap a default main branch.
+                    # First commit in a brand-new project: bootstrap a default main branch (#2727).
                     cursor.execute(
                         """
                         INSERT INTO odb.version_branches
-                            (project_id, name, tip_version_id, created_by, branched_from_revision_id, is_default)
-                        VALUES (%s, 'main', %s, %s, %s, true)
+                            (project_id, name, tip_version_id, created_by, branched_from_revision_id,
+                             is_default, require_merge_path)
+                        VALUES (%s, 'main', %s, %s, %s, true, true)
                         ON CONFLICT (project_id, name)
                         DO UPDATE SET
                             tip_version_id = EXCLUDED.tip_version_id,
                             is_default = true,
+                            require_merge_path = true,
                             updated_at = CURRENT_TIMESTAMP
                         """,
                         (project_id, new_id, creator_id, new_id),
