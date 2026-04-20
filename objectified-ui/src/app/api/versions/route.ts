@@ -187,12 +187,16 @@ export async function GET(request: NextRequest) {
     const tenantSlug = tenant.slug;
 
     // Build REST API URL
+    // When filtering by branch lineage, skip text/lifecycle/date filters so the full version
+    // list is returned and ancestors are not inadvertently excluded (GLI-09 comment feedback).
     const restParams = new URLSearchParams();
-    if (lifecycle) restParams.set('lifecycle', lifecycle);
-    if (q) restParams.set('q', q);
-    if (creatorId) restParams.set('creatorId', creatorId);
-    if (createdAfter) restParams.set('createdAfter', createdAfter);
-    if (createdBefore) restParams.set('createdBefore', createdBefore);
+    if (!branchId) {
+      if (lifecycle) restParams.set('lifecycle', lifecycle);
+      if (q) restParams.set('q', q);
+      if (creatorId) restParams.set('creatorId', creatorId);
+      if (createdAfter) restParams.set('createdAfter', createdAfter);
+      if (createdBefore) restParams.set('createdBefore', createdBefore);
+    }
     const qs = restParams.toString();
     const url = `${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}${qs ? `?${qs}` : ''}`;
 

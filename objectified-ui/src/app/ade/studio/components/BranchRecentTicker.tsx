@@ -40,7 +40,7 @@ export function BranchRecentTicker() {
     return branches?.find((b) => b.id === selectedBranchId)?.tip_version_id ?? null;
   }, [selectedProjectId, selectedBranchId, versionBranchesByProjectId]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     if (!selectedProjectId?.trim() || !selectedBranchId?.trim()) {
       setRows([]);
       return;
@@ -52,17 +52,19 @@ export function BranchRecentTicker() {
         branchId: selectedBranchId,
         limit: '3',
       });
-      const r = await fetch(`/api/versions?${qs.toString()}`);
+      const r = await fetch(`/api/versions?${qs.toString()}`, { signal });
       const d = (await r.json()) as { success?: boolean; versions?: TickerRow[] };
+      if (signal?.aborted) return;
       if (!r.ok || !d.success || !Array.isArray(d.versions)) {
         setRows([]);
         return;
       }
       setRows(d.versions);
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       setRows([]);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [selectedProjectId, selectedBranchId]);
 
@@ -75,24 +77,49 @@ export function BranchRecentTicker() {
 
   useEffect(() => {
     if (!tabVisible || !selectedProjectId || !selectedBranchId) return;
-    void load();
-    const timer = window.setInterval(() => void load(), POLL_MS);
-    return () => window.clearInterval(timer);
+    let activeController: AbortController | null = null;
+    function doLoad() {
+      activeController?.abort();
+      activeController = new AbortController();
+      void load(activeController.signal);
+    }
+    doLoad();
+    const timer = window.setInterval(doLoad, POLL_MS);
+    return () => {
+      window.clearInterval(timer);
+      activeController?.abort();
+    };
   }, [tabVisible, selectedProjectId, selectedBranchId, load]);
 
   const effectiveTipId = rows[0]?.id ?? branchTipFromContext ?? null;
 
   const openCompare = useCallback(
     (row: TickerRow) => {
-      if (!selectedProjectId || !effectiveTipId) return;
+      if (!selectedProjectId) return;
+
+      const versionsQs = new URLSearchParams({
+        projectId: selectedProjectId,
+      });
+
+      if (!effectiveTipId) {
+        router.push(`/ade/dashboard/versions?${versionsQs.toString()}`);
+        return;
+      }
+
       let compareBase = row.id;
       const compareHead = effectiveTipId;
       if (row.id === effectiveTipId) {
         const parent = row.parent_version_id?.trim();
-        if (!parent) return;
+        if (!parent) {
+          router.push(`/ade/dashboard/versions?${versionsQs.toString()}`);
+          return;
+        }
         compareBase = parent;
       }
-      if (compareBase === compareHead) return;
+      if (compareBase === compareHead) {
+        router.push(`/ade/dashboard/versions?${versionsQs.toString()}`);
+        return;
+      }
       const qs = new URLSearchParams({
         projectId: selectedProjectId,
         compareOpen: '1',
