@@ -1436,6 +1436,52 @@ const Versions = () => {
     }
   };
 
+  const runCompareBetweenRef = useRef(runCompareBetween);
+  runCompareBetweenRef.current = runCompareBetween;
+
+  /** Deep link from canvas divergence chip: compareOpen=1&compareBase=&compareHead= (#2723). */
+  useEffect(() => {
+    if (typeof window === 'undefined' || projects.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('compareOpen') !== '1') return;
+    const compareBase = params.get('compareBase');
+    const compareHead = params.get('compareHead');
+    if (!compareBase?.trim() || !compareHead?.trim()) return;
+    if (compareBase.trim() === compareHead.trim()) return;
+    const pid = params.get('projectId');
+    if (pid && projects.some((p) => p.id === pid) && selectedProjectId !== pid) {
+      setSelectedProjectId(pid);
+      return;
+    }
+    if (!selectedProjectId) return;
+    if (versions.length === 0 || versions[0]?.project_id !== selectedProjectId) return;
+
+    const b = compareBase.trim();
+    const h = compareHead.trim();
+    const hasBase = versions.some((v) => v.id === b);
+    const hasHead = versions.some((v) => v.id === h);
+
+    params.delete('compareOpen');
+    params.delete('compareBase');
+    params.delete('compareHead');
+    if (pid) params.delete('projectId');
+    const qs = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+
+    if (!hasBase || !hasHead) {
+      toast.warning('Compare link referred to revisions that are not in the loaded list. Refresh the timeline.');
+      return;
+    }
+
+    setCompareVersion1Id(b);
+    setCompareVersion2Id(h);
+    setCompareBaseTagId('');
+    setCompareToTagId('');
+    setActiveCompareTab('diff');
+    setShowCompareDialog(true);
+    void runCompareBetweenRef.current?.(b, h);
+  }, [projects, selectedProjectId, versions]);
+
   /** Latest revision by `created_at` in the loaded list — used as “current” for compare (#2580). */
   const headRevisionId = useMemo(() => projectHeadRevisionId(versions), [versions]);
 

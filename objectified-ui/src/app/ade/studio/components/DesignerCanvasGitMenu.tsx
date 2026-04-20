@@ -45,6 +45,7 @@ import { MergeBranchesDialog } from '@/app/components/ade/version-dialogs/MergeB
 import { RollbackBranchDialog } from '@/app/components/ade/version-dialogs/RollbackBranchDialog';
 import { CanvasHistoryGraphDialog } from './CanvasHistoryGraphDialog';
 import { BranchPickerChip } from './BranchPickerChip';
+import { BranchDivergenceChip } from './BranchDivergenceChip';
 
 export type DesignerCanvasGitMenuProps = {
   versions: Version[];
@@ -294,6 +295,7 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
           >
             <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-700">
               <BranchPickerChip versions={versions} setVersions={setVersions} variant="menu" showCreateBranch />
+              <BranchDivergenceChip variant="menu" />
               <div className="mt-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 Current revision
               </div>

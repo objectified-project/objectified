@@ -221,6 +221,7 @@ import SchemaTimelinePanel from '../components/SchemaTimelinePanel';
 import SchemaVersionScoringPanel from '../components/SchemaVersionScoringPanel';
 import { DesignerCanvasGitMenu } from '../components/DesignerCanvasGitMenu';
 import { BranchPickerChip } from '../components/BranchPickerChip';
+import { BranchDivergenceChip } from '../components/BranchDivergenceChip';
 import { useStudioBranchSync } from '../lib/use-studio-branch-sync';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 import {
@@ -9409,6 +9410,7 @@ const StudioContent = () => {
                 variant="toolbar"
                 showCreateBranch={false}
               />
+              <BranchDivergenceChip variant="toolbar" />
               <DesignerCanvasGitMenu versions={versions} setVersions={setVersions} />
               <div className="relative" ref={layoutDropdownRef}>
                 <input
