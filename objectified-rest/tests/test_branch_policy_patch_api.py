@@ -151,15 +151,30 @@ def test_patch_branch_policy_is_default_only_200():
     with patch("src.app.version_merge_routes.db") as mdb:
         mdb.is_user_tenant_admin.return_value = True
         mdb.get_project_by_id.return_value = {"id": _PROJECT_ID}
-        updated_row = dict(_BRANCH_ROW, is_default=True)
+        updated_row = dict(_BRANCH_ROW, is_default=True, require_merge_path=True)
         mdb.update_version_branch_protection_policy.return_value = updated_row
         r = client.patch(_PATCH_URL, json={"isDefault": True})
     assert r.status_code == 200
     data = r.json()
     assert data["branch"]["isDefault"] is True
+    assert data["branch"]["requireMergePath"] is True
+    mdb.update_version_branch_protection_policy.assert_called_once()
+    assert mdb.update_version_branch_protection_policy.call_args.kwargs.get("actor_id") == _USER
     mdb.insert_version_protection_audit.assert_called_once()
     audit_detail = mdb.insert_version_protection_audit.call_args.args[7]
     assert audit_detail["isDefault"] is True
+
+
+def test_patch_branch_policy_passes_actor_id_to_database():
+    with patch("src.app.version_merge_routes.db") as mdb:
+        mdb.is_user_tenant_admin.return_value = True
+        mdb.get_project_by_id.return_value = {"id": _PROJECT_ID}
+        mdb.update_version_branch_protection_policy.return_value = dict(_BRANCH_ROW)
+        r = client.patch(_PATCH_URL, json={"protected": False})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["branch"]["id"] == _BRANCH_ID
+    assert mdb.update_version_branch_protection_policy.call_args.kwargs.get("actor_id") == _USER
 
 
 # ---------------------------------------------------------------------------
