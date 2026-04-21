@@ -29,6 +29,7 @@ import {
   COMMIT_EXTERNAL_REF_MAX_CHARS,
   validateVersionNotesClient,
 } from '@lib/version-notes';
+import { sortBranchesForPicker } from '@/app/ade/studio/lib/studio-branch-resolve';
 import { parseStaleHeadFromVersionsPostJson } from '@/app/utils/push-conflict';
 import type { VersionBranchRow, CreatedRevisionResult, DialogRevisionRef } from './types';
 
@@ -58,6 +59,11 @@ export interface CommitRevisionDialogProps {
    * When set, commit targets this branch tip and the branch dropdown is hidden (canvas toolbar / #2724).
    */
   lockedBranchId?: string | null;
+  /**
+   * Branch the user has checked out in the studio (when known). Used to default the branch picker and
+   * label the current branch — same as committing on that branch in git.
+   */
+  studioSelectedBranchId?: string | null;
   onCreated?: (result: CreatedRevisionResult) => void;
   /**
    * Fired on 409 STALE_HEAD so the caller can hydrate the shared PushConflictBanner.
@@ -81,6 +87,7 @@ export function CommitRevisionDialog({
   projectId,
   currentRevision,
   lockedBranchId,
+  studioSelectedBranchId,
   onCreated,
   onStaleHead,
 }: CommitRevisionDialogProps) {
@@ -128,10 +135,12 @@ export function CommitRevisionDialog({
             if (lock && d.branches.some((b) => b.id === lock)) {
               setSelectedBranchId(lock);
             } else {
-              const matching = d.branches.find(
+              const studio = String(studioSelectedBranchId ?? '').trim();
+              const studioOk = Boolean(studio && d.branches.some((b) => b.id === studio));
+              const matchingTip = d.branches.find(
                 (b) => b.tip_version_id && b.tip_version_id === currentRevision?.id
               );
-              setSelectedBranchId(matching?.id ?? '');
+              setSelectedBranchId((studioOk ? studio : matchingTip?.id) ?? '');
             }
           }
         } else {
@@ -147,7 +156,16 @@ export function CommitRevisionDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, projectId, currentRevision?.id, lockedBranchId]);
+  }, [open, projectId, currentRevision?.id, lockedBranchId, studioSelectedBranchId]);
+
+  const branchesForSelect = useMemo(() => {
+    const sorted = sortBranchesForPicker(branches);
+    const sid = String(studioSelectedBranchId ?? '').trim();
+    if (!sid) return sorted;
+    const cur = sorted.find((b) => b.id === sid);
+    if (!cur) return sorted;
+    return [cur, ...sorted.filter((b) => b.id !== sid)];
+  }, [branches, studioSelectedBranchId]);
 
   const selectedBranch = useMemo(
     () => branches.find((b) => b.id === selectedBranchId) ?? null,
@@ -307,8 +325,8 @@ export function CommitRevisionDialog({
         <DialogHeader>
           <DialogTitle>Commit revision</DialogTitle>
           <DialogDescription id="canvas-commit-desc">
-            Create a new schema revision. Message is required; add an external reference when linking to a ticket or
-            issue.
+            Record a new schema revision on top of a branch tip (like <code className="text-xs">git commit</code> on
+            that branch). Message is required; add an external reference when linking to a ticket or issue.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -321,7 +339,11 @@ export function CommitRevisionDialog({
 
           {commitRevisionDialogShowsBranchPicker(lockedBranchId, branches) && (
             <div className="space-y-1">
-              <Label>Branch</Label>
+              <Label>Commit to branch</Label>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                The new revision parents from this branch&apos;s current tip and becomes its new tip. Choose another
+                branch only if you intend to advance that branch instead.
+              </p>
               <Select
                 value={selectedBranchId || '__pick__'}
                 onValueChange={(v) => setSelectedBranchId(v === '__pick__' ? '' : v)}
@@ -332,9 +354,10 @@ export function CommitRevisionDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__pick__">Choose branch</SelectItem>
-                  {branches.map((b) => (
+                  {branchesForSelect.map((b) => (
                     <SelectItem key={b.id} value={b.id}>
                       {b.name} — tip v{b.tip_version_string ?? '?'}
+                      {String(studioSelectedBranchId ?? '') === b.id ? ' · current' : ''}
                       {b.protected ? ' (protected)' : ''}
                     </SelectItem>
                   ))}
@@ -343,16 +366,22 @@ export function CommitRevisionDialog({
             </div>
           )}
 
-          {branches.length > 1 &&
+          {branches.length >= 1 &&
             !commitRevisionDialogShowsBranchPicker(lockedBranchId, branches) &&
             selectedBranch && (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-200">
-                <span className="font-medium">Branch</span>
-                <span className="mx-1.5 text-gray-400 dark:text-gray-500">·</span>
-                <span>{selectedBranch.name}</span>
-                <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
-                  (tip v{selectedBranch.tip_version_string ?? '?'})
-                </span>
+              <div className="space-y-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-200">
+                <div>
+                  <span className="font-medium">Commit on current branch</span>
+                  <span className="mx-1.5 text-gray-400 dark:text-gray-500">·</span>
+                  <span>{selectedBranch.name}</span>
+                  <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
+                    (tip v{selectedBranch.tip_version_string ?? '?'})
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  This revision will stack on that branch&apos;s tip — the same as <code className="text-[11px]">git commit</code>{' '}
+                  while you&apos;re on this branch.
+                </p>
               </div>
             )}
 

@@ -240,7 +240,15 @@ describe('deleteVersionBranch', () => {
     getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
     getDbMock().query.mockResolvedValueOnce({
       rowCount: 1,
-      rows: [{ id: BRANCH_ID, created_by: USER_ID, protected: true }],
+      rows: [
+        {
+          id: BRANCH_ID,
+          created_by: USER_ID,
+          protected: true,
+          name: 'feature',
+          is_default: false,
+        },
+      ],
     });
     getDbMock().query.mockResolvedValueOnce({ rowCount: 1 });
     const result = JSON.parse(
@@ -254,7 +262,15 @@ describe('deleteVersionBranch', () => {
     getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // project OK
     getDbMock().query.mockResolvedValueOnce({
       rowCount: 1,
-      rows: [{ id: BRANCH_ID, created_by: 'other-user', protected: false }],
+      rows: [
+        {
+          id: BRANCH_ID,
+          created_by: 'other-user',
+          protected: false,
+          name: 'feature',
+          is_default: false,
+        },
+      ],
     });
     const result = JSON.parse(
       await deleteVersionBranch(BRANCH_ID, PROJECT_ID, TENANT_ID, USER_ID, false)
@@ -267,7 +283,15 @@ describe('deleteVersionBranch', () => {
     getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
     getDbMock().query.mockResolvedValueOnce({
       rowCount: 1,
-      rows: [{ id: BRANCH_ID, created_by: 'other-user', protected: false }],
+      rows: [
+        {
+          id: BRANCH_ID,
+          created_by: 'other-user',
+          protected: false,
+          name: 'feature',
+          is_default: false,
+        },
+      ],
     });
     getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [] }); // DELETE
     const result = JSON.parse(
@@ -280,13 +304,65 @@ describe('deleteVersionBranch', () => {
     getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
     getDbMock().query.mockResolvedValueOnce({
       rowCount: 1,
-      rows: [{ id: BRANCH_ID, created_by: USER_ID, protected: false }],
+      rows: [
+        {
+          id: BRANCH_ID,
+          created_by: USER_ID,
+          protected: false,
+          name: 'feature',
+          is_default: false,
+        },
+      ],
     });
     getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
     const result = JSON.parse(
       await deleteVersionBranch(BRANCH_ID, PROJECT_ID, TENANT_ID, USER_ID, false)
     );
     expect(result.success).toBe(true);
+  });
+
+  it('returns BRANCH_DELETE_FORBIDDEN for main even for tenant admin', async () => {
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
+    getDbMock().query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [
+        {
+          id: BRANCH_ID,
+          created_by: USER_ID,
+          protected: false,
+          name: 'main',
+          is_default: false,
+        },
+      ],
+    });
+    const result = JSON.parse(
+      await deleteVersionBranch(BRANCH_ID, PROJECT_ID, TENANT_ID, USER_ID, true)
+    );
+    expect(result.success).toBe(false);
+    expect(result.code).toBe('BRANCH_DELETE_FORBIDDEN');
+    expect(result.error).toMatch(/main/i);
+  });
+
+  it('returns BRANCH_DELETE_FORBIDDEN for default branch even for tenant admin', async () => {
+    getDbMock().query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
+    getDbMock().query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [
+        {
+          id: BRANCH_ID,
+          created_by: USER_ID,
+          protected: false,
+          name: 'trunk',
+          is_default: true,
+        },
+      ],
+    });
+    const result = JSON.parse(
+      await deleteVersionBranch(BRANCH_ID, PROJECT_ID, TENANT_ID, USER_ID, true)
+    );
+    expect(result.success).toBe(false);
+    expect(result.code).toBe('BRANCH_DELETE_FORBIDDEN');
+    expect(result.error).toMatch(/default/i);
   });
 });
 

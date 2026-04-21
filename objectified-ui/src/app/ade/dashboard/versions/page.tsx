@@ -242,6 +242,13 @@ interface VersionBranchRow {
   created_at?: string;
   created_by?: string | null;
   protected?: boolean;
+  /** Project default branch (cannot be deleted). */
+  is_default?: boolean;
+}
+
+function isVersionBranchNonDeletable(b: Pick<VersionBranchRow, 'name' | 'is_default'>): boolean {
+  if (b.is_default) return true;
+  return b.name.trim().toLowerCase() === 'main';
 }
 
 interface VersionTagRow {
@@ -2808,6 +2815,14 @@ const Versions = () => {
               >
                 <span className="font-mono font-medium text-gray-900 dark:text-white">{b.name}</span>
                 <span className="text-gray-500 dark:text-gray-400">→ v{b.tip_version_string ?? '?'}</span>
+                {b.is_default && (
+                  <span
+                    title="Default branch for this project — cannot be deleted"
+                    className="text-xs px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200"
+                  >
+                    default
+                  </span>
+                )}
                 {b.protected && (
                   <span
                     title="Protected branch: only tenant admins can delete"
@@ -2826,7 +2841,8 @@ const Versions = () => {
                     {b.protected ? 'Unprotect' : 'Protect'}
                   </button>
                 )}
-                {(effectiveIsAdmin || (!b.protected && b.created_by === currentUserId)) && (
+                {(effectiveIsAdmin || (!b.protected && b.created_by === currentUserId)) &&
+                  !isVersionBranchNonDeletable(b) && (
                   <button
                     type="button"
                     onClick={() => handleDeleteBranch(b.id)}
@@ -3334,8 +3350,11 @@ const Versions = () => {
 
       {/* Commit new revision (Radix dialog + validation #2564) */}
       <Dialog open={showCreateDialog} onOpenChange={(open) => !isLoading && setShowCreateDialog(open)}>
-        <DialogContent className="max-w-xl" aria-describedby="commit-dialog-desc">
-          <DialogHeader>
+        <DialogContent
+          className="flex max-h-[min(90vh,56rem)] max-w-xl flex-col gap-4 overflow-hidden"
+          aria-describedby="commit-dialog-desc"
+        >
+          <DialogHeader className="shrink-0">
             <DialogTitle>{createDialogMode === 'new-version' ? 'New Version' : 'Commit'}</DialogTitle>
             <DialogDescription id="commit-dialog-desc">
               {createDialogMode === 'new-version'
@@ -3343,7 +3362,7 @@ const Versions = () => {
                 : 'Create a new schema revision for this project. Message is required; add an external reference when linking to a ticket or issue.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain py-1 pr-1 [-webkit-overflow-scrolling:touch]">
             {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
             {branchListError && (
               <Alert variant="warning" role="status">
@@ -3512,7 +3531,7 @@ const Versions = () => {
               )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t border-gray-100 pt-4 dark:border-gray-700">
             <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={isLoading}>Cancel</Button>
             <Button onClick={handleCreateSubmit} disabled={isLoading || !createCommitFormValid}>
               {isLoading

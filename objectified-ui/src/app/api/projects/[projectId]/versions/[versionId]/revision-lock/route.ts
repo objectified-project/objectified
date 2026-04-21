@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { setVersionRevisionLock } from '@lib/db/helper';
+import { resolveTenantAdminForSession, setVersionRevisionLock } from '@lib/db/helper';
 
 /**
  * POST /api/projects/[projectId]/versions/[versionId]/revision-lock
@@ -18,10 +18,14 @@ export async function POST(
     }
     const tenantId = (session.user as { current_tenant_id?: string }).current_tenant_id;
     const userId = (session.user as { user_id?: string }).user_id;
-    const isTenantAdmin = Boolean((session.user as { is_tenant_admin?: boolean }).is_tenant_admin);
     if (!tenantId || !userId) {
       return NextResponse.json({ success: false, error: 'No tenant or user' }, { status: 400 });
     }
+    const isTenantAdmin = await resolveTenantAdminForSession(
+      userId,
+      tenantId,
+      (session.user as { is_tenant_admin?: boolean }).is_tenant_admin
+    );
     const { projectId, versionId } = await params;
     const body = await request.json();
     if (typeof body.revisionLocked !== 'boolean') {

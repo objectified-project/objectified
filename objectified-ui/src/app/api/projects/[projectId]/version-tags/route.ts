@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { createVersionTag, listVersionTags } from '@lib/db/helper';
+import { createVersionTag, listVersionTags, resolveTenantAdminForSession } from '@lib/db/helper';
 
 /**
  * GET /api/projects/[projectId]/version-tags
@@ -64,7 +64,11 @@ export async function POST(
         { status: 400 }
       );
     }
-    const isTenantAdmin = Boolean((session.user as { is_tenant_admin?: boolean }).is_tenant_admin);
+    const isTenantAdmin = await resolveTenantAdminForSession(
+      userId,
+      tenantId,
+      (session.user as { is_tenant_admin?: boolean }).is_tenant_admin
+    );
     const raw = await createVersionTag(
       projectId,
       tenantId,

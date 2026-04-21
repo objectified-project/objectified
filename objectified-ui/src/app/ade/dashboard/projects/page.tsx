@@ -467,9 +467,9 @@ const Projects = () => {
                   <th scope="col" className={dashboardThClass}>
                     Description
                   </th>
-                  <th scope="col" className={`${dashboardThClass} w-52`}>
+                  <th scope="col" className={`${dashboardThClass} w-[11rem]`}>
                     <span className="inline-flex items-center gap-1.5">
-                      <TrendingUp className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                      <TrendingUp className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
                       Quality trend
                     </span>
                   </th>
@@ -523,7 +523,7 @@ const Projects = () => {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap align-middle">
+                    <td className="w-[11rem] max-w-[11rem] px-6 py-4 align-middle whitespace-nowrap">
                       {(() => {
                         const qh = projectQualityHistoryMap[project.id] ?? [];
                         const latest = qh.length > 0 ? qh[qh.length - 1] : null;
@@ -539,13 +539,17 @@ const Projects = () => {
                           <button
                             type="button"
                             onClick={() => setQualityTrendProject(project)}
-                            className="flex items-center gap-2 text-left rounded-lg border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/40 px-2 py-1 -mx-2 -my-1 transition-colors w-full min-w-0"
+                            className="inline-flex max-w-full items-center gap-2 rounded-lg border border-transparent px-1 py-0.5 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-800 dark:hover:bg-indigo-950/40"
                             title="Open quality score history"
                           >
-                            <div className="h-8 w-24 shrink-0 overflow-hidden rounded-md bg-gray-100 dark:bg-gray-900/80 border border-gray-200/80 dark:border-gray-700">
-                              <ProjectQualityTrendSparkline history={qh} className="h-full w-full" />
+                            <div className="h-8 w-[4.5rem] shrink-0 overflow-hidden rounded-md border border-gray-200/80 bg-gray-100 dark:border-gray-700 dark:bg-gray-900/80">
+                              <ProjectQualityTrendSparkline history={qh} className="block h-full w-full" />
                             </div>
-                            <span className={`text-sm font-semibold tabular-nums shrink-0 ${tier?.textClass ?? ''}`}>{latest.overall}</span>
+                            <span
+                              className={`shrink-0 text-sm font-semibold tabular-nums leading-none ${tier?.textClass ?? ''}`}
+                            >
+                              {latest.overall}
+                            </span>
                           </button>
                         );
                       })()}

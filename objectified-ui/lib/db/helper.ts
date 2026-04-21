@@ -180,6 +180,30 @@ export async function getTenantsAdministratedByUser(userId: string) {
   return JSON.stringify(result.rows);
 }
 
+/** True when the user is in odb.tenant_administrators for this tenant (source of truth for admin role). */
+export async function isUserTenantAdministrator(userId: string, tenantId: string): Promise<boolean> {
+  if (!String(userId ?? '').trim() || !String(tenantId ?? '').trim()) return false;
+  const r = await connectionPool.query(
+    `SELECT 1 FROM odb.tenant_administrators WHERE user_id = $1 AND tenant_id = $2 LIMIT 1`,
+    [userId, tenantId]
+  );
+  return (r.rowCount ?? 0) > 0;
+}
+
+/**
+ * Prefer JWT is_tenant_admin; if false/missing, fall back to DB so API matches Versions dashboard effectiveIsAdmin
+ * (session token can be stale after admin promotion).
+ */
+export async function resolveTenantAdminForSession(
+  userId: string | undefined,
+  tenantId: string | undefined,
+  jwtIsTenantAdmin: boolean | undefined
+): Promise<boolean> {
+  if (jwtIsTenantAdmin) return true;
+  if (!userId || !tenantId) return false;
+  return isUserTenantAdministrator(userId, tenantId);
+}
+
 export async function getTenantUsers(tenantId: string) {
   const result = await connectionPool.query(
     `SELECT a.id, a.tenant_id, a.user_id, b.name, b.email FROM odb.tenant_users a, odb.users b 
@@ -5555,13 +5579,33 @@ export async function deleteVersionBranch(
     const ok = await assertProjectInTenant(projectId, tenantId);
     if (!ok) return JSON.stringify({ success: false, error: 'Project not found' });
     const row = await connectionPool.query(
-      `SELECT b.id, b.created_by, b.protected FROM odb.version_branches b
+      `SELECT b.id, b.created_by, b.protected, b.name, b.is_default FROM odb.version_branches b
        JOIN odb.projects p ON b.project_id = p.id
        WHERE b.id = $1 AND b.project_id = $2 AND p.tenant_id = $3`,
       [branchId, projectId, tenantId]
     );
     if (row.rowCount === 0) return JSON.stringify({ success: false, error: 'Branch not found' });
-    const br = row.rows[0] as { created_by: string | null; protected: boolean };
+    const br = row.rows[0] as {
+      created_by: string | null;
+      protected: boolean;
+      name: string;
+      is_default?: boolean | null;
+    };
+    const nameNorm = String(br.name ?? '').trim().toLowerCase();
+    if (br.is_default === true) {
+      return JSON.stringify({
+        success: false,
+        error: 'The default branch cannot be deleted',
+        code: 'BRANCH_DELETE_FORBIDDEN',
+      });
+    }
+    if (nameNorm === 'main') {
+      return JSON.stringify({
+        success: false,
+        error: 'The main branch cannot be deleted',
+        code: 'BRANCH_DELETE_FORBIDDEN',
+      });
+    }
     if (br.protected && !isTenantAdmin) {
       await insertVersionProtectionAudit({
         tenantId,

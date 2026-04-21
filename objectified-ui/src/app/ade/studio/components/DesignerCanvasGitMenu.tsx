@@ -5,7 +5,7 @@
  *
  * Canvas parity: every git-like action that used to require navigating to the Versions
  * dashboard now opens a Radix dialog in-place. Sections mirror the mental model of git:
- *   • This revision — Commit, Tag, Compare-with-parent, Branch from here
+ *   • This revision — Commit, Tag, Compare-with-parent (branch switch lives in submenu)
  *   • Branching     — Merge, Rollback
  *   • History/Sync  — History graph, Switch-to-latest (pull), Refresh, Open dashboard
  */
@@ -13,13 +13,23 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { toast } from 'sonner';
 import {
   ArrowDownToLine,
   Download,
   ExternalLink,
   FileSearch,
+  ChevronRight,
   GitBranch,
   GitCompareArrows,
   GitCommit,
@@ -36,6 +46,11 @@ import {
   countAuthoredRevisionsTowardHead,
   isRemoteHeadAheadOfSelection,
 } from '@/app/utils/studio-sync-indicators';
+import {
+  branchDivergenceChipToneClasses,
+  getBranchDivergenceChipPresentation,
+} from '@/app/ade/studio/lib/branch-divergence-chip-copy';
+import { resolveActiveBranchForRevision } from '@/app/ade/studio/lib/studio-branch-resolve';
 import { Spinner } from '@/app/components/ui/Spinner';
 import type { Version } from '../editor/components/types';
 import type { VersionBranchRow } from '@/app/components/ade/version-dialogs/types';
@@ -45,13 +60,17 @@ import { VersionTagDialog } from '@/app/components/ade/version-dialogs/VersionTa
 import { MergeBranchesDialog } from '@/app/components/ade/version-dialogs/MergeBranchesDialog';
 import { RollbackBranchDialog } from '@/app/components/ade/version-dialogs/RollbackBranchDialog';
 import { CanvasHistoryGraphDialog } from './CanvasHistoryGraphDialog';
-import { BranchPickerChip } from './BranchPickerChip';
-import { BranchDivergenceChip } from './BranchDivergenceChip';
+import { BranchSwitchSubmenu } from './BranchSwitchSubmenu';
 import { useStudioBranchDivergence } from '../hooks/useStudioBranchDivergence';
 
 export type DesignerCanvasGitMenuProps = {
   versions: Version[];
   setVersions: Dispatch<SetStateAction<Version[]>>;
+};
+
+export type DesignerCanvasGitMenuHandle = {
+  /** Opens the commit dialog (e.g. canvas ⌘/Ctrl+Enter). */
+  openCommit: () => void;
 };
 
 function versionSyncRow(v: Version) {
@@ -71,7 +90,8 @@ type MenuDialog =
   | 'rollback'
   | 'history';
 
-export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasGitMenuProps) {
+export const DesignerCanvasGitMenu = forwardRef<DesignerCanvasGitMenuHandle, DesignerCanvasGitMenuProps>(
+  function DesignerCanvasGitMenu({ versions, setVersions }, ref) {
   const { data: session } = useSession();
   const router = useRouter();
   const { conflict, clearPushConflict, setPushConflictFrom409 } = usePushConflictBanner();
@@ -91,11 +111,13 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
     error: branchDivergenceError,
     defaultBranchName: syncDefaultBranchName,
     activeBranchName: syncActiveBranchName,
+    displayBranch,
   } = useStudioBranchDivergence();
 
   const {
     selectedProjectId,
     selectedVersionId,
+    selectedBranchId,
     setSelectedVersionId,
     isReadOnly,
     setIsReadOnly,
@@ -104,9 +126,55 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
     syncLocalDirty,
     canvasPresentationMode,
     setVersionBranchesForProject,
+    versionBranchesByProjectId,
     registerBranchFromRevisionOpener,
     registerGitPaletteHandler,
   } = useStudio();
+
+  const branchesForLabel = useMemo(
+    () => (selectedProjectId ? (versionBranchesByProjectId[selectedProjectId] ?? []) : []),
+    [selectedProjectId, versionBranchesByProjectId]
+  );
+
+  const resolvedBranch = useMemo(() => {
+    if (!selectedVersionId || !branchesForLabel.length) return null;
+    return resolveActiveBranchForRevision(selectedVersionId, branchesForLabel);
+  }, [selectedVersionId, branchesForLabel]);
+
+  const lockBranchId = useMemo(() => {
+    if (selectedBranchId && branchesForLabel.some((b) => b.id === selectedBranchId)) {
+      return selectedBranchId;
+    }
+    return resolvedBranch?.id ?? null;
+  }, [selectedBranchId, branchesForLabel, resolvedBranch]);
+
+  const branchLabel = displayBranch?.name?.trim() || syncActiveBranchName || '—';
+
+  const divergenceCompact = useMemo(() => {
+    if (branchDivergenceError) {
+      return { label: 'Divergence unavailable', tone: 'muted' as const };
+    }
+    if (showSyncFromMain) {
+      if (!branchDivergenceData && branchDivergenceLoading) {
+        return { label: 'Checking vs default…', tone: 'muted' as const };
+      }
+      if (!branchDivergenceData) return null;
+      const against = branchDivergenceData.against?.name?.trim() || syncDefaultBranchName || 'default';
+      return getBranchDivergenceChipPresentation(
+        branchDivergenceData.ahead ?? 0,
+        branchDivergenceData.behind ?? 0,
+        against
+      );
+    }
+    const def = syncDefaultBranchName?.trim() || 'default';
+    return getBranchDivergenceChipPresentation(0, 0, def);
+  }, [
+    branchDivergenceError,
+    showSyncFromMain,
+    branchDivergenceData,
+    branchDivergenceLoading,
+    syncDefaultBranchName,
+  ]);
 
   useEffect(() => {
     registerBranchFromRevisionOpener(() => {
@@ -339,6 +407,28 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
     handleSyncFromDefaultBranch,
   ]);
 
+  const tryOpenCommit = useCallback(() => {
+    if (!selectedProjectId || !selectedVersionId) return;
+    if (isReadOnly) {
+      toast.warning('This revision is read-only. Pull the latest to commit new work.');
+      return;
+    }
+    setOpenDialog('commit');
+  }, [selectedProjectId, selectedVersionId, isReadOnly]);
+
+  useImperativeHandle(ref, () => ({ openCommit: tryOpenCommit }), [tryOpenCommit]);
+
+  useEffect(() => {
+    if (!selectedProjectId || !selectedVersionId || canvasPresentationMode) {
+      registerGitPaletteHandler('commit', null);
+      return;
+    }
+    registerGitPaletteHandler('commit', tryOpenCommit);
+    return () => {
+      registerGitPaletteHandler('commit', null);
+    };
+  }, [selectedProjectId, selectedVersionId, canvasPresentationMode, tryOpenCommit, registerGitPaletteHandler]);
+
   if (!selectedProjectId || !selectedVersionId || canvasPresentationMode) {
     return null;
   }
@@ -377,15 +467,23 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
             align="end"
           >
             <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-700">
-              <BranchPickerChip versions={versions} setVersions={setVersions} variant="menu" showCreateBranch />
-              <BranchDivergenceChip variant="menu" />
-              <div className="mt-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                Current revision
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Branch
               </div>
-              <div className="mt-0.5 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{branchLabel}</div>
+              {divergenceCompact ? (
+                <p className={`mt-0.5 text-xs ${branchDivergenceChipToneClasses(divergenceCompact.tone)}`}>
+                  {divergenceCompact.label}
+                </p>
+              ) : null}
+
+              <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Revision
+              </div>
+              <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
                 {currentVersion ? formatVersionSelectorLabel(currentVersion) : '—'}
               </div>
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-400">
+              <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-gray-600 dark:text-gray-400">
                 {currentVersion?.published ? (
                   <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
                     Published
@@ -397,14 +495,33 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
                 )}
                 {authoredRevisionCount > 0 && (
                   <span title="Revisions you authored between this selection and the latest revision (main lineage).">
-                    {authoredRevisionCount} your revision{authoredRevisionCount === 1 ? '' : 's'} toward head
+                    {authoredRevisionCount} yours → head
                   </span>
                 )}
                 {syncLocalDirty && <span className="text-amber-700 dark:text-amber-300">Unsaved layout</span>}
                 {showServerAhead && (
-                  <span className="text-indigo-700 dark:text-indigo-300">Server has newer revision</span>
+                  <span className="text-indigo-700 dark:text-indigo-300">Newer on server</span>
                 )}
               </div>
+
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger
+                  className={`${itemClass} mt-2 -mx-1 flex w-[calc(100%+0.5rem)] cursor-pointer items-center rounded-md border border-gray-100 dark:border-gray-700`}
+                >
+                  <GitBranch className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                  <span className="flex-1 text-left">Switch branch</span>
+                  <ChevronRight className="h-4 w-4 shrink-0 opacity-50" aria-hidden />
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.SubContent
+                    className="z-[10055] max-h-[min(60vh,20rem)] min-w-[220px] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                    sideOffset={6}
+                    alignOffset={-2}
+                  >
+                    <BranchSwitchSubmenu versions={versions} setVersions={setVersions} itemClass={itemClass} />
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Sub>
             </div>
 
             <div className={sectionLabelClass}>This revision</div>
@@ -434,18 +551,6 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
             >
               <Tag className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
               <span className="flex-1">Tag this revision…</span>
-            </DropdownMenu.Item>
-
-            <DropdownMenu.Item
-              className={itemClass}
-              disabled={!hasCurrent}
-              onSelect={(e) => {
-                e.preventDefault();
-                setOpenDialog('branch');
-              }}
-            >
-              <GitBranch className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-              <span className="flex-1">Create branch from here…</span>
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
@@ -604,6 +709,8 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
             onOpenChange={(o) => setOpenDialog(o ? 'commit' : null)}
             projectId={selectedProjectId}
             currentRevision={currentRevisionRef}
+            lockedBranchId={lockBranchId}
+            studioSelectedBranchId={selectedBranchId}
             onStaleHead={(info) => {
               if (!selectedProjectId) return;
               setPushConflictFrom409({
@@ -718,4 +825,6 @@ export function DesignerCanvasGitMenu({ versions, setVersions }: DesignerCanvasG
       )}
     </>
   );
-}
+});
+
+DesignerCanvasGitMenu.displayName = 'DesignerCanvasGitMenu';

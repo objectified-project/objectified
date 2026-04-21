@@ -109,10 +109,10 @@ interface StudioContextType {
   /** Cached GET /version-branches per project for branch chip + resolution. */
   versionBranchesByProjectId: Record<string, VersionBranchRow[]>;
   setVersionBranchesForProject: (projectId: string, branches: VersionBranchRow[]) => void;
-  /** Registered by `DesignerCanvasGitMenu` so toolbar `BranchPickerChip` can open "Create branch from here…". */
+  /** Registered by `DesignerCanvasGitMenu` so "New branch" in the branch submenu can open the dialog. */
   registerBranchFromRevisionOpener: (fn: (() => void) | null) => void;
   openBranchFromRevisionDialog: () => void;
-  /** Mergeable handlers for `GitCommandPalette` — e.g. `CanvasCommitButton` registers commit, `DesignerCanvasGitMenu` registers the rest. */
+  /** Mergeable handlers for `GitCommandPalette` — registered by `DesignerCanvasGitMenu`. */
   registerGitPaletteHandler: <K extends StudioGitPaletteActionId>(
     key: K,
     fn: StudioGitPaletteHandlers[K] | null

@@ -219,11 +219,11 @@ import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
 import SchemaTimelinePanel from '../components/SchemaTimelinePanel';
 import SchemaVersionScoringPanel from '../components/SchemaVersionScoringPanel';
-import { DesignerCanvasGitMenu } from '../components/DesignerCanvasGitMenu';
-import { BranchPickerChip } from '../components/BranchPickerChip';
-import { BranchDivergenceChip } from '../components/BranchDivergenceChip';
+import {
+  DesignerCanvasGitMenu,
+  type DesignerCanvasGitMenuHandle,
+} from '../components/DesignerCanvasGitMenu';
 import { BranchRecentTicker } from '../components/BranchRecentTicker';
-import { CanvasCommitButton, type CanvasCommitButtonHandle } from '../components/CanvasCommitButton';
 import { useStudioBranchSync } from '../lib/use-studio-branch-sync';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 import {
@@ -1673,7 +1673,7 @@ const StudioContent = () => {
         if (el?.closest('input, textarea, select, [contenteditable="true"]')) return;
         if (!el?.closest('.react-flow')) return;
         e.preventDefault();
-        canvasCommitButtonRef.current?.open();
+        designerCanvasGitMenuRef.current?.openCommit();
       }
 
       // Escape: exit focus mode, then isolate selection, then close search
@@ -2783,7 +2783,7 @@ const StudioContent = () => {
   const headerVersionSelectIdRef = useRef(selectedVersionId);
   headerVersionSelectIdRef.current = selectedVersionId;
   const headerVersionsRef = useRef(versions);
-  const canvasCommitButtonRef = useRef<CanvasCommitButtonHandle>(null);
+  const designerCanvasGitMenuRef = useRef<DesignerCanvasGitMenuHandle>(null);
   headerVersionsRef.current = versions;
 
   const handleHeaderProjectSelectChange = useCallback(
@@ -9417,15 +9417,11 @@ const StudioContent = () => {
             {!canvasPresentationActive && (
             <Panel position="top-right" className="flex flex-col items-end gap-1 z-[1002] border-0 bg-transparent p-0 shadow-none">
               <div className="flex items-center gap-1.5">
-              <BranchPickerChip
+              <DesignerCanvasGitMenu
+                ref={designerCanvasGitMenuRef}
                 versions={versions}
                 setVersions={setVersions}
-                variant="toolbar"
-                showCreateBranch={false}
               />
-              <BranchDivergenceChip variant="toolbar" />
-              <CanvasCommitButton ref={canvasCommitButtonRef} versions={versions} setVersions={setVersions} />
-              <DesignerCanvasGitMenu versions={versions} setVersions={setVersions} />
               <div className="relative" ref={layoutDropdownRef}>
                 <input
                   ref={layoutJsonImportInputRef}

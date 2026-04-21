@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { deleteVersionBranch, updateVersionBranchProtection } from '@lib/db/helper';
+import { deleteVersionBranch, resolveTenantAdminForSession, updateVersionBranchProtection } from '@lib/db/helper';
 
 /**
  * PATCH /api/projects/[projectId]/version-branches/[branchId] — body: { protected?: boolean, requireMergePath?: boolean } (tenant admin only; at least one field)
@@ -18,10 +18,14 @@ export async function PATCH(
     }
     const tenantId = (session.user as { current_tenant_id?: string }).current_tenant_id;
     const userId = (session.user as { user_id?: string }).user_id;
-    const isTenantAdmin = Boolean((session.user as { is_tenant_admin?: boolean }).is_tenant_admin);
     if (!tenantId || !userId) {
       return NextResponse.json({ success: false, error: 'No tenant or user' }, { status: 400 });
     }
+    const isTenantAdmin = await resolveTenantAdminForSession(
+      userId,
+      tenantId,
+      (session.user as { is_tenant_admin?: boolean }).is_tenant_admin
+    );
     const { projectId, branchId } = await params;
     const body = (await request.json()) as { protected?: boolean; requireMergePath?: boolean };
     const hasProtected = typeof body.protected === 'boolean';
@@ -69,10 +73,14 @@ export async function DELETE(
     }
     const tenantId = (session.user as { current_tenant_id?: string }).current_tenant_id;
     const userId = (session.user as { user_id?: string }).user_id;
-    const isTenantAdmin = Boolean((session.user as { is_tenant_admin?: boolean }).is_tenant_admin);
     if (!tenantId || !userId) {
       return NextResponse.json({ success: false, error: 'No tenant or user' }, { status: 400 });
     }
+    const isTenantAdmin = await resolveTenantAdminForSession(
+      userId,
+      tenantId,
+      (session.user as { is_tenant_admin?: boolean }).is_tenant_admin
+    );
     const { projectId, branchId } = await params;
     const raw = await deleteVersionBranch(branchId, projectId, tenantId, userId, isTenantAdmin);
     const data = JSON.parse(raw) as { success: boolean; error?: string; status?: number; code?: string };
@@ -81,7 +89,7 @@ export async function DELETE(
       const st =
         typeof data.status === 'number'
           ? data.status
-          : data.code === 'BRANCH_PROTECTED'
+          : data.code === 'BRANCH_PROTECTED' || data.code === 'BRANCH_DELETE_FORBIDDEN'
             ? 403
             : error.includes('not found')
               ? 404

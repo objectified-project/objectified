@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { deleteVersionTag, updateVersionTag } from '@lib/db/helper';
+import { deleteVersionTag, resolveTenantAdminForSession, updateVersionTag } from '@lib/db/helper';
 
 /**
  * PATCH /api/projects/[projectId]/version-tags/[tagId] — body: { versionId?, immutable?, protected? }
@@ -21,7 +21,11 @@ export async function PATCH(
     if (!tenantId || !userId) {
       return NextResponse.json({ success: false, error: 'No tenant or user' }, { status: 400 });
     }
-    const isTenantAdmin = Boolean((session.user as { is_tenant_admin?: boolean }).is_tenant_admin);
+    const isTenantAdmin = await resolveTenantAdminForSession(
+      userId,
+      tenantId,
+      (session.user as { is_tenant_admin?: boolean }).is_tenant_admin
+    );
     const { projectId, tagId } = await params;
     const body = await request.json();
     const versionId = typeof body.versionId === 'string' ? body.versionId : undefined;
@@ -70,7 +74,11 @@ export async function DELETE(
     if (!tenantId || !userId) {
       return NextResponse.json({ success: false, error: 'No tenant or user' }, { status: 400 });
     }
-    const isTenantAdmin = Boolean((session.user as { is_tenant_admin?: boolean }).is_tenant_admin);
+    const isTenantAdmin = await resolveTenantAdminForSession(
+      userId,
+      tenantId,
+      (session.user as { is_tenant_admin?: boolean }).is_tenant_admin
+    );
     const { projectId, tagId } = await params;
     const raw = await deleteVersionTag(tagId, projectId, tenantId, userId, isTenantAdmin);
     const data = JSON.parse(raw) as { success: boolean; error?: string; code?: string };
