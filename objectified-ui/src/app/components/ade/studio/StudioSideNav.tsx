@@ -422,39 +422,6 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                 )}
               </div>
 
-              {/* Add and Import Buttons */}
-              <div className="absolute bottom-5 right-5 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => callbacks.onClassImport?.()}
-                  disabled={!selectedVersionId || isReadOnly}
-                  aria-label="Import classes"
-                  title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot import to published version' : 'Import classes from file'}
-                  className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-emerald-500 to-emerald-600 text-white hover:shadow-emerald-500/40"
-                >
-                  <Upload className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => callbacks.onClassTemplates?.()}
-                  disabled={!selectedVersionId || isReadOnly}
-                  aria-label="Class templates"
-                  title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Browse class templates'}
-                  className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-amber-500 to-amber-600 text-white hover:shadow-amber-500/40"
-                >
-                  <Library className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => callbacks.onClassAdd?.()}
-                  disabled={!selectedVersionId || isReadOnly}
-                  aria-label="Add class"
-                  title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Add class'}
-                  className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-indigo-500 to-purple-600 text-white hover:shadow-indigo-500/40"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
             </div>
           </Tabs.Content>
           <Tabs.Content value="properties" className="flex flex-col flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
@@ -623,29 +590,6 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                 )}
               </div>
 
-              {/* Action Buttons */}
-              <div className="absolute bottom-5 right-5 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => callbacks.onPropertyTemplates?.()}
-                  disabled={!selectedProjectId || isReadOnly}
-                  aria-label="Browse property templates"
-                  title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Browse property templates'}
-                  className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-emerald-500 to-emerald-600 text-white hover:shadow-emerald-500/40"
-                >
-                  <Library className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => callbacks.onPropertyAdd?.()}
-                  disabled={!selectedProjectId || isReadOnly}
-                  aria-label="Add property"
-                  title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Add property'}
-                  className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-indigo-500 to-purple-600 text-white hover:shadow-indigo-500/40"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
             </div>
           </Tabs.Content>
 
@@ -819,8 +763,66 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
               </div>
             </div>
           </Tabs.Content>
-          <div className={['border-t px-3 py-2', sidebarTheme.borderSoft].join(' ')}>
+          <div className={['border-t px-3 py-2 flex items-center justify-between gap-2', sidebarTheme.borderSoft].join(' ')}>
             <SidebarDensityToggle />
+            {currentTab === 'classes' && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => callbacks.onClassImport?.()}
+                  disabled={!selectedVersionId || isReadOnly}
+                  aria-label="Import classes"
+                  title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot import to published version' : 'Import classes from file'}
+                  className="w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-emerald-500 to-emerald-600 text-white hover:shadow-emerald-500/40"
+                >
+                  <Upload className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => callbacks.onClassTemplates?.()}
+                  disabled={!selectedVersionId || isReadOnly}
+                  aria-label="Class templates"
+                  title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Browse class templates'}
+                  className="w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-amber-500 to-amber-600 text-white hover:shadow-amber-500/40"
+                >
+                  <Library className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => callbacks.onClassAdd?.()}
+                  disabled={!selectedVersionId || isReadOnly}
+                  aria-label="Add class"
+                  title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Add class'}
+                  className="w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-indigo-500 to-purple-600 text-white hover:shadow-indigo-500/40"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            {currentTab === 'properties' && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => callbacks.onPropertyTemplates?.()}
+                  disabled={!selectedProjectId || isReadOnly}
+                  aria-label="Browse property templates"
+                  title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Browse property templates'}
+                  className="w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-emerald-500 to-emerald-600 text-white hover:shadow-emerald-500/40"
+                >
+                  <Library className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => callbacks.onPropertyAdd?.()}
+                  disabled={!selectedProjectId || isReadOnly}
+                  aria-label="Add property"
+                  title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Add property'}
+                  className="w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-indigo-500 to-purple-600 text-white hover:shadow-indigo-500/40"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         </Tabs.Root>
       </div>
