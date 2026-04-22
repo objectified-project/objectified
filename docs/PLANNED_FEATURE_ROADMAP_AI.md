@@ -23,28 +23,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 ### Studio AI Chatbot
 
-**Chatbot Panel** ✅ COMPLETE
-- ✅ **Panel Location**:
-    - ✅ Slide-out panel from right side of Studio
-    - ✅ Floating chat bubble option
-    - ✅ Full-screen chat mode for complex conversations
-    - ✅ Keyboard shortcut to toggle (`Cmd+Shift+A`)
-    - ✅ Bottom right-hand corner of the canvas opens the AI Chatbot
-- ✅ **Chat Interface**:
-    - ✅ Modern chat UI with message bubbles
-    - ✅ User messages vs AI responses clearly distinguished
-    - ✅ Typing indicators while AI processes
-    - ✅ Markdown rendering in responses
-    - ✅ Code blocks with syntax highlighting
-    - ✅ Copy button for code snippets
-    - ✅ Regenerate response button
-    - ✅ Thumbs up/down for feedback
-    - ✅ OpenAPI Specifications are parsed using ```json``` markers, click button to view/accept import
-
-| Ticket | Feature Description                               |
-|--------|---------------------------------------------------|
-| #258   | Studio AI chatbot interface guidelines ✅ |
-
 **Conversation Features** 📋 PLANNED
 - 📋 **Conversation History**:
     - 📋 Persist conversations per project/version
@@ -334,3 +312,25 @@ This outlines the planned features for integrating AI capabilities into Objectif
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 || #623   | Intelligent Layout Suggestions                  |
+
+---
+
+## Complete
+
+**Chatbot Panel** ✅ COMPLETE
+- ✅ **Panel Location**:
+    - ✅ Slide-out panel from right side of Studio
+    - ✅ Floating chat bubble option
+    - ✅ Full-screen chat mode for complex conversations
+    - ✅ Keyboard shortcut to toggle (`Cmd+Shift+A`)
+    - ✅ Bottom right-hand corner of the canvas opens the AI Chatbot
+- ✅ **Chat Interface**:
+    - ✅ Modern chat UI with message bubbles
+    - ✅ User messages vs AI responses clearly distinguished
+    - ✅ Typing indicators while AI processes
+    - ✅ Markdown rendering in responses
+    - ✅ Code blocks with syntax highlighting
+    - ✅ Copy button for code snippets
+    - ✅ Regenerate response button
+    - ✅ Thumbs up/down for feedback
+    - ✅ OpenAPI Specifications are parsed using ```json``` markers, click button to view/accept import

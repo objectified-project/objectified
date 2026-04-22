@@ -67,7 +67,7 @@ export function ChatBubble({
           {message.pending && !message.content ? (
             <ChatTypingIndicator />
           ) : isUser ? (
-            <p className="m-0 whitespace-pre-wrap">{message.content}</p>
+            <p className="m-0 whitespace-pre-wrap text-white!">{message.content}</p>
           ) : (
             <AssistantMarkdown content={message.content} />
           )}
