@@ -12,6 +12,11 @@ We continue to improve the platform based on your feedback with improvements and
 - Gitlike functionality will be redesigned; currently not working as expected, and will be perfected in a later release.
 - Clicking on the warning chevron now eases in/out the warning for the project for sunset indicators.
 - Clicking the tools chevron in the designer canvas now animates instead of just (dis)appearing.
+- Layout form now looks associated with the button from which it appears.
+- Clicking outside the layout form now dismisses it from the canvas.
+- Added the ability to decide whether or not to save the layout image on a layout persist.
+- Corrects schema metrics display when the schema list is empty.
+- Corrects opacity of overlay buttons in canvas.
 
 ---
 
@@ -27,5 +32,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: April 20, 2026*
+*Last updated: April 22, 2026*
 

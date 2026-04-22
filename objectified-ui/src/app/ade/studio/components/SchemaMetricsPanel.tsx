@@ -42,6 +42,10 @@ export default function SchemaMetricsPanel({
   onMinimizeToggle,
 }: SchemaMetricsPanelProps) {
   if (!metrics) {
+    const hasVersionLoaded = Boolean(versionLabel && versionLabel.trim().length > 0);
+    const emptyMessage = hasVersionLoaded
+      ? 'No classes in this version.'
+      : 'Load a version to see metrics.';
     return (
       <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 w-72 p-4">
         <div className="flex items-center justify-between mb-2">
@@ -55,7 +59,7 @@ export default function SchemaMetricsPanel({
             </button>
           )}
         </div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Load a version to see metrics.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{emptyMessage}</p>
       </div>
     );
   }

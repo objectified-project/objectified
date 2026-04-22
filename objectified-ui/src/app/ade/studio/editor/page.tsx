@@ -255,6 +255,23 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
 const LAYOUT_COMMENT_MAX_LENGTH = 240;
 const LAYOUT_ANNOTATIONS_MAX_LENGTH = 4000;
 
+/**
+ * html-to-image filter that removes ReactFlow overlay UI from canvas
+ * snapshots so saved layout previews and quick-snapshot thumbnails capture
+ * just the diagram (background + edges + nodes), not the floating toolbars,
+ * the layout popover, controls, minimap, or attribution.
+ */
+const isCanvasSnapshotNode = (domNode: HTMLElement): boolean => {
+  if (!(domNode instanceof Element)) return true;
+  const cls = domNode.classList;
+  if (!cls) return true;
+  if (cls.contains('react-flow__panel')) return false;
+  if (cls.contains('react-flow__controls')) return false;
+  if (cls.contains('react-flow__minimap')) return false;
+  if (cls.contains('react-flow__attribution')) return false;
+  return true;
+};
+
 const StudioContent = () => {
   const BUILTIN_LAYOUT_NAMES = useMemo(
     () => ['Development Layout', 'Presentation Layout', 'Logical Layout', 'Dependency Layout'],
@@ -672,6 +689,11 @@ const StudioContent = () => {
 
   // Layout saved state
   const [layoutSaved, setLayoutSaved] = useState(false);
+  const [layoutSaving, setLayoutSaving] = useState(false);
+  /** When true, capture a PNG preview of the canvas alongside the saved
+   *  layout. Off by default — snapshotting is expensive and many users only
+   *  care about persisting node positions. */
+  const [layoutSaveSnapshot, setLayoutSaveSnapshot] = useState(false);
   const [hasExistingLayout, setHasExistingLayout] = useState(false);
   const [selectedLayoutName, setSelectedLayoutName] = useState('Development Layout');
   const [availableLayoutNames, setAvailableLayoutNames] = useState<string[]>(BUILTIN_LAYOUT_NAMES);
@@ -743,6 +765,10 @@ const StudioContent = () => {
   const [layoutDropdownOpen, setLayoutDropdownOpen] = useState(false);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
   const layoutJsonImportInputRef = useRef<HTMLInputElement>(null);
+  // Custom combobox for the Layout Name input — replaces the OS-native
+  // <datalist> dropdown with a styled popover that matches the rest of the form.
+  const [layoutNamePickerOpen, setLayoutNamePickerOpen] = useState(false);
+  const layoutNamePickerRef = useRef<HTMLDivElement>(null);
   const [layoutHistoryOpen, setLayoutHistoryOpen] = useState(false);
   const [layoutHistoryRevisions, setLayoutHistoryRevisions] = useState<
     Array<{ id: string; revision: number; created_at: string }>
@@ -4743,26 +4769,38 @@ const StudioContent = () => {
     }
 
     try {
-      setLoadingMessage('Saving canvas layout...');
+      setLayoutSaving(true);
+      setLoadingMessage(layoutSaveSnapshot ? 'Saving canvas layout and capturing preview...' : 'Saving canvas layout...');
       setIsLoadingCanvas(true);
+
+      // Yield two animation frames so React commits the spinner state and the
+      // browser actually paints it BEFORE we start the heavy synchronous work
+      // inside toPng (DOM cloning + rasterization). Without this the user sees
+      // a frozen browser instead of the spinner.
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
 
       let snapshotDataUrl: string | undefined;
       let snapshotBase64ForServer: string | undefined;
-      const captureEl = canvasCaptureAreaRef.current;
-      if (captureEl) {
-        try {
-          const dataUrl = await toPng(captureEl, {
-            pixelRatio: 0.45,
-            cacheBust: true,
-            backgroundColor: isDark ? '#111827' : '#f8fafc',
-          });
-          const comma = dataUrl.indexOf(',');
-          if (comma !== -1 && dataUrl.slice(0, comma).includes('image/png')) {
-            snapshotDataUrl = dataUrl;
-            snapshotBase64ForServer = dataUrl.slice(comma + 1);
+      if (layoutSaveSnapshot) {
+        const captureEl = canvasCaptureAreaRef.current;
+        if (captureEl) {
+          try {
+            const dataUrl = await toPng(captureEl, {
+              pixelRatio: 0.45,
+              cacheBust: true,
+              backgroundColor: isDark ? '#111827' : '#f8fafc',
+              filter: isCanvasSnapshotNode,
+            });
+            const comma = dataUrl.indexOf(',');
+            if (comma !== -1 && dataUrl.slice(0, comma).includes('image/png')) {
+              snapshotDataUrl = dataUrl;
+              snapshotBase64ForServer = dataUrl.slice(comma + 1);
+            }
+          } catch (snapErr) {
+            console.warn('Canvas snapshot capture failed:', snapErr);
           }
-        } catch (snapErr) {
-          console.warn('Canvas snapshot capture failed:', snapErr);
         }
       }
 
@@ -4839,6 +4877,7 @@ const StudioContent = () => {
     } finally {
       setIsLoadingCanvas(false);
       setLoadingMessage('');
+      setLayoutSaving(false);
     }
   }, [
     isReadOnly,
@@ -4856,6 +4895,7 @@ const StudioContent = () => {
     isDark,
     layoutCommentDraft,
     layoutAnnotationsDraft,
+    layoutSaveSnapshot,
   ]);
 
   const handleDeleteLayout = useCallback(async () => {
@@ -4966,6 +5006,7 @@ const StudioContent = () => {
               pixelRatio: 0.4,
               cacheBust: true,
               backgroundColor: isDark ? '#111827' : '#f8fafc',
+              filter: isCanvasSnapshotNode,
             });
             const comma = dataUrl.indexOf(',');
             if (comma !== -1 && dataUrl.slice(0, comma).includes('image/png')) {
@@ -6866,28 +6907,66 @@ const StudioContent = () => {
   }, [currentTenantId]);
 
 
-  // Handle clicking outside layout dropdown to close it
+  // Handle clicking outside layout dropdown to close it.
+  // Use capture phase + pointerdown so ReactFlow's pane/zoom handlers
+  // (which call stopPropagation in the bubbling phase) can't swallow the event.
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (layoutDropdownRef.current && !layoutDropdownRef.current.contains(event.target as HTMLElement)) {
+    if (!layoutDropdownOpen) return;
+
+    const handleClickOutside = (event: Event) => {
+      const target = event.target as globalThis.Node | null;
+      if (layoutDropdownRef.current && target && !layoutDropdownRef.current.contains(target)) {
         setLayoutDropdownOpen(false);
       }
     };
 
-    if (layoutDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setLayoutDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handleClickOutside, true);
+    document.addEventListener('keydown', handleKey);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('pointerdown', handleClickOutside, true);
+      document.removeEventListener('keydown', handleKey);
     };
   }, [layoutDropdownOpen]);
 
   useEffect(() => {
     if (!layoutDropdownOpen) {
       setLayoutHistoryOpen(false);
+      setLayoutNamePickerOpen(false);
     }
   }, [layoutDropdownOpen]);
+
+  // Close the layout-name combobox when clicking outside it or pressing Escape.
+  useEffect(() => {
+    if (!layoutNamePickerOpen) return;
+
+    const handlePointerDown = (event: Event) => {
+      const target = event.target as globalThis.Node | null;
+      if (layoutNamePickerRef.current && target && !layoutNamePickerRef.current.contains(target)) {
+        setLayoutNamePickerOpen(false);
+      }
+    };
+
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setLayoutNamePickerOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    document.addEventListener('keydown', handleKey);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [layoutNamePickerOpen]);
 
   // Load versions when project is selected
   useEffect(() => {
@@ -8830,7 +8909,7 @@ const StudioContent = () => {
               <>
                 <Panel
                   position="top-left"
-                  className={`bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 ${isReadOnly ? 'mt-14' : ''}`}
+                  className={`bg-white/45 dark:bg-gray-900/40 backdrop-blur-md rounded-xl shadow-md border border-gray-200/55 dark:border-gray-600/45 ${isReadOnly ? 'mt-14' : ''}`}
                 >
                   <Collapsible.Root open={canvasToolsDrawerOpen} onOpenChange={setCanvasToolsDrawerOpen}>
                     <div className="flex items-stretch gap-1.5 p-1.5">
@@ -8842,8 +8921,8 @@ const StudioContent = () => {
                           title="Canvas tools"
                           className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-2 border ${
                             canvasVisibilityRestricted
-                              ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
-                              : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-transparent hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-700'
+                              ? 'bg-indigo-100/70 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/70 dark:border-indigo-700/60'
+                              : 'bg-transparent text-gray-800 dark:text-gray-200 border-transparent hover:bg-indigo-50/60 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-300 hover:border-indigo-200/70 dark:hover:border-indigo-700/60'
                           }`}
                         >
                           <PanelLeft className="h-4 w-4 shrink-0" aria-hidden />
@@ -8863,7 +8942,7 @@ const StudioContent = () => {
                           <button
                             type="button"
                             onClick={handleExpandAll}
-                            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-transparent text-gray-800 dark:text-gray-200 hover:bg-indigo-50/60 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-300 flex items-center gap-1.5 border border-transparent hover:border-indigo-200/70 dark:hover:border-indigo-700/60"
                             title="Expand all properties"
                           >
                             <ChevronDown className="h-3.5 w-3.5" />
@@ -8872,7 +8951,7 @@ const StudioContent = () => {
                           <button
                             type="button"
                             onClick={handleCollapseAll}
-                            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-transparent text-gray-800 dark:text-gray-200 hover:bg-indigo-50/60 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-300 flex items-center gap-1.5 border border-transparent hover:border-indigo-200/70 dark:hover:border-indigo-700/60"
                             title="Collapse all properties"
                           >
                             <ChevronUp className="h-3.5 w-3.5" />
@@ -8884,7 +8963,7 @@ const StudioContent = () => {
                               setCanvasToolsDrawerOpen(false);
                               openCanvasSearch();
                             }}
-                            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-transparent text-gray-800 dark:text-gray-200 hover:bg-indigo-50/60 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-300 flex items-center gap-1.5 border border-transparent hover:border-indigo-200/70 dark:hover:border-indigo-700/60"
                             title="Search classes (Cmd+F)"
                           >
                             <Search className="h-3.5 w-3.5" />
@@ -8897,8 +8976,8 @@ const StudioContent = () => {
                                 type="button"
                                 className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-1.5 border ${
                                   canvasVisibilityRestricted
-                                    ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
-                                    : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-transparent hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'
+                                    ? 'bg-indigo-100/70 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/70 dark:border-indigo-700/60'
+                                    : 'bg-transparent text-gray-800 dark:text-gray-200 border-transparent hover:bg-indigo-50/60 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-300 hover:border-indigo-200/70 dark:hover:border-indigo-700/60'
                                 }`}
                                 title="View mode options"
                                 aria-label="View mode"
@@ -9094,7 +9173,7 @@ const StudioContent = () => {
                                 setCanvasToolsDrawerOpen(false);
                                 setTagManagerOpen(true);
                               }}
-                              className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-1.5 border border-transparent hover:border-amber-200 dark:hover:border-amber-700"
+                              className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-transparent text-gray-800 dark:text-gray-200 hover:bg-amber-50/60 dark:hover:bg-amber-900/30 hover:text-amber-600 dark:hover:text-amber-300 flex items-center gap-1.5 border border-transparent hover:border-amber-200/70 dark:hover:border-amber-700/60"
                               title="Manage project tags"
                             >
                               <Tag className="h-3.5 w-3.5" />
@@ -9455,7 +9534,13 @@ const StudioContent = () => {
 
                 {/* Dropdown Menu */}
                 {layoutDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-[min(94vw,46rem)] max-h-[min(calc(100vh-5rem),42rem)] flex min-h-0 flex-col bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[1002] overflow-hidden">
+                  <div className="absolute right-0 mt-2 z-[1002]">
+                    {/* Connector arrow pointing up to the Layout button */}
+                    <div
+                      aria-hidden
+                      className="absolute -top-1.5 right-3 h-3 w-3 rotate-45 border-t border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                    />
+                    <div className="relative w-[min(94vw,46rem)] max-h-[min(calc(100vh-5rem),42rem)] flex min-h-0 flex-col bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div className="shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Layout</h3>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-snug">
@@ -9475,21 +9560,91 @@ const StudioContent = () => {
                           >
                             Layout Name
                           </label>
-                          <input
-                            id="layout-name-input"
-                            type="text"
-                            list="canvas-suggested-layout-names"
-                            value={selectedLayoutName}
-                            onChange={(e) => setSelectedLayoutName(e.target.value)}
-                            placeholder="Built-in name or your own"
-                            autoComplete="off"
-                            className="w-full px-2.5 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                          <datalist id="canvas-suggested-layout-names">
-                            {availableLayoutNames.map((layoutName) => (
-                              <option key={layoutName} value={layoutName} />
-                            ))}
-                          </datalist>
+                          <div className="relative" ref={layoutNamePickerRef}>
+                            <input
+                              id="layout-name-input"
+                              type="text"
+                              role="combobox"
+                              aria-expanded={layoutNamePickerOpen}
+                              aria-controls="layout-name-picker-list"
+                              aria-autocomplete="list"
+                              value={selectedLayoutName}
+                              onChange={(e) => {
+                                setSelectedLayoutName(e.target.value);
+                                if (!layoutNamePickerOpen) setLayoutNamePickerOpen(true);
+                              }}
+                              onFocus={() => setLayoutNamePickerOpen(true)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'ArrowDown' && !layoutNamePickerOpen) {
+                                  e.preventDefault();
+                                  setLayoutNamePickerOpen(true);
+                                }
+                              }}
+                              placeholder="Built-in name or your own"
+                              autoComplete="off"
+                              className="w-full pl-2.5 pr-9 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <button
+                              type="button"
+                              tabIndex={-1}
+                              aria-label={layoutNamePickerOpen ? 'Hide saved layout names' : 'Show saved layout names'}
+                              onClick={() => setLayoutNamePickerOpen((open) => !open)}
+                              className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                            >
+                              <ChevronDown
+                                className={`h-4 w-4 transition-transform duration-200 ${layoutNamePickerOpen ? 'rotate-180' : ''}`}
+                              />
+                            </button>
+                            {layoutNamePickerOpen && (
+                              <div
+                                id="layout-name-picker-list"
+                                role="listbox"
+                                className="absolute left-0 right-0 top-full mt-1 z-20 max-h-56 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-1"
+                              >
+                                {(() => {
+                                  const query = selectedLayoutName.trim().toLowerCase();
+                                  const matches = query.length === 0
+                                    ? availableLayoutNames
+                                    : availableLayoutNames.filter((n) => n.toLowerCase().includes(query));
+                                  if (matches.length === 0) {
+                                    return (
+                                      <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+                                        No matching saved layouts. Press Save to create &ldquo;{selectedLayoutName.trim() || 'a new layout'}&rdquo;.
+                                      </div>
+                                    );
+                                  }
+                                  return matches.map((name) => {
+                                    const isSelected = name === selectedLayoutName;
+                                    const isBuiltIn = BUILTIN_LAYOUT_NAMES.includes(name);
+                                    return (
+                                      <button
+                                        key={name}
+                                        type="button"
+                                        role="option"
+                                        aria-selected={isSelected}
+                                        onClick={() => {
+                                          setSelectedLayoutName(name);
+                                          setLayoutNamePickerOpen(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-left text-sm rounded-md transition-colors ${
+                                          isSelected
+                                            ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200'
+                                            : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        }`}
+                                      >
+                                        <span className="truncate">{name}</span>
+                                        {isBuiltIn && (
+                                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                                            Built-in
+                                          </span>
+                                        )}
+                                      </button>
+                                    );
+                                  });
+                                })()}
+                              </div>
+                            )}
+                          </div>
                           {namedLayoutSnapshotDataUrls[selectedLayoutName.trim()] ? (
                             <div className="mt-2 flex items-start gap-2">
                               <img
@@ -9563,22 +9718,58 @@ const StudioContent = () => {
                             </div>
                           </div>
                         </div>
+                        <label
+                          htmlFor="layout-save-snapshot-toggle"
+                          className="flex items-start gap-3 px-2 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700/50"
+                        >
+                          <input
+                            id="layout-save-snapshot-toggle"
+                            type="checkbox"
+                            checked={layoutSaveSnapshot}
+                            onChange={(e) => setLayoutSaveSnapshot(e.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-xs font-medium text-gray-700 dark:text-gray-200">
+                              Capture canvas preview
+                            </span>
+                            <span className="block text-[11px] text-gray-500 dark:text-gray-400 leading-snug">
+                              Save a thumbnail image with the layout. Off keeps the save fast and the preview blank.
+                            </span>
+                          </span>
+                        </label>
                         <div className="grid grid-cols-3 gap-2">
                           <button
                             onClick={handleSaveLayout}
-                            disabled={!selectedLayoutCanEdit || layoutSaved}
+                            disabled={!selectedLayoutCanEdit || layoutSaved || layoutSaving}
+                            aria-busy={layoutSaving}
                             className={`
                               px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2
                               ${layoutSaved
                                 ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700'
+                                : layoutSaving
+                                ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 cursor-wait'
                                 : selectedLayoutCanEdit
                                 ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-700'
                                 : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed border border-gray-200 dark:border-gray-600'
                               }
                             `}
-                            title={layoutSaved ? 'Layout saved!' : selectedLayoutSaveBlockedReason}
+                            title={
+                              layoutSaving
+                                ? layoutSaveSnapshot
+                                  ? 'Saving layout and capturing preview…'
+                                  : 'Saving layout…'
+                                : layoutSaved
+                                ? 'Layout saved!'
+                                : selectedLayoutSaveBlockedReason
+                            }
                           >
-                            {layoutSaved ? (
+                            {layoutSaving ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
+                                <span>Saving…</span>
+                              </>
+                            ) : layoutSaved ? (
                               <>
                                 <Check className="w-4 h-4" />
                                 <span>Saved</span>
@@ -10174,6 +10365,7 @@ const StudioContent = () => {
                       </section>
                         </div>
                       </div>
+                    </div>
                     </div>
                   </div>
                 )}
