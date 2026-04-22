@@ -10,6 +10,8 @@ We continue to improve the platform based on your feedback with improvements and
 - Moved the add, import, and template buttons to the bottom of the classes and properties sidebar list so they don't obscure the lists.
 - Added bottom header to show status of the canvas editor screens.
 - Gitlike functionality will be redesigned; currently not working as expected, and will be perfected in a later release.
+- Clicking on the warning chevron now eases in/out the warning for the project for sunset indicators.
+- Clicking the tools chevron in the designer canvas now animates instead of just (dis)appearing.
 
 ---
 

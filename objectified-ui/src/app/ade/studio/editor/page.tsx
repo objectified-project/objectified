@@ -8857,9 +8857,9 @@ const StudioContent = () => {
 
                       <Collapsible.Content
                         id="ade-canvas-tools-mini-drawer"
-                        className="overflow-hidden"
+                        className="collapsible-horizontal overflow-hidden"
                       >
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 w-max flex-nowrap whitespace-nowrap">
                           <button
                             type="button"
                             onClick={handleExpandAll}

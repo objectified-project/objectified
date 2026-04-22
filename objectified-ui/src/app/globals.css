@@ -216,6 +216,41 @@ body[data-theme="darcula"] .dark\:bg-gray-800 {
   animation: fadeOut 0.15s ease-in;
 }
 
+/* Radix Collapsible horizontal slide (used by the canvas Tools mini-drawer) */
+@keyframes collapsible-slide-right-in {
+  from {
+    width: 0;
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    width: var(--radix-collapsible-content-width);
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes collapsible-slide-right-out {
+  from {
+    width: var(--radix-collapsible-content-width);
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    width: 0;
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+}
+
+.collapsible-horizontal[data-state="open"] {
+  animation: collapsible-slide-right-in 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.collapsible-horizontal[data-state="closed"] {
+  animation: collapsible-slide-right-out 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* System preference dark mode (only when no explicit .dark class and no saved preference) */
 @media (prefers-color-scheme: dark) {
   :root:not(.dark):not([data-theme="light"]) {
