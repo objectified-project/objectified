@@ -231,6 +231,14 @@ interface StudioContextType {
   /** Registered by Paths canvas: zoom to a node by React Flow id (DB operation id or path-node-*). */
   focusPathsCanvasNodeFn: ((nodeId: string) => void) | null;
   setFocusPathsCanvasNodeFn: (fn: ((nodeId: string) => void) | null) => void;
+  /**
+   * Class node IDs currently selected on the editor canvas (#259). Published
+   * by the editor's React Flow `onSelectionChange` so chrome surfaces — most
+   * notably the Studio AI chatbot — can ground their behaviour in what the
+   * user is looking at.
+   */
+  selectedCanvasNodeIds: string[];
+  setSelectedCanvasNodeIds: (ids: string[]) => void;
 }
 
 export const PATHS_VIEW_MODE_STORAGE_KEY = 'studio.paths.viewMode';
@@ -436,6 +444,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const [focusPathsCanvasNodeFn, setFocusPathsCanvasNodeFn] = useState<((nodeId: string) => void) | null>(null);
+
+  const [selectedCanvasNodeIds, setSelectedCanvasNodeIdsState] = useState<string[]>([]);
+  const setSelectedCanvasNodeIds = useCallback((ids: string[]) => {
+    setSelectedCanvasNodeIdsState((prev) => {
+      if (prev.length === ids.length && prev.every((id, i) => id === ids[i])) return prev;
+      return ids;
+    });
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -716,7 +732,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       pathsQualityRevision,
       bumpPathsQualityRevision,
       focusPathsCanvasNodeFn,
-      setFocusPathsCanvasNodeFn
+      setFocusPathsCanvasNodeFn,
+      selectedCanvasNodeIds,
+      setSelectedCanvasNodeIds,
     }}>
       {children}
     </StudioContext.Provider>

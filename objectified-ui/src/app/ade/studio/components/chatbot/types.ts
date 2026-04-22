@@ -1,10 +1,12 @@
 /**
- * Studio AI chatbot — shared types (#258).
+ * Studio AI chatbot — shared types (#258, #259).
  *
  * The chat surface is intentionally backend-agnostic so the same UI can host
  * the offline demo responder today and a streaming Ollama transport later
  * (#259, #265). Anything UI-facing lives here.
  */
+
+import type { ChatStudioContext } from './chat-context';
 
 export type ChatRole = 'user' | 'assistant';
 
@@ -29,6 +31,14 @@ export interface ChatSendContext {
   prompt: string;
   /** True when the caller asked the assistant to redo its previous answer. */
   isRegenerate: boolean;
+  /**
+   * Snapshot of the user's Studio workspace (#259): current project / version,
+   * loaded classes and properties, and any canvas selection. Responders should
+   * treat this as authoritative grounding for the user's request — it is
+   * captured at the moment the message is sent so later edits don't leak
+   * back into earlier turns.
+   */
+  studioContext?: ChatStudioContext;
 }
 
 /**

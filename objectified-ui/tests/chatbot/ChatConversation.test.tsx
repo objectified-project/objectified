@@ -15,17 +15,24 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import '@testing-library/jest-dom';
 
 import { ChatConversation } from '../../src/app/ade/studio/components/chatbot/ChatConversation';
+import type { ChatStudioContext } from '../../src/app/ade/studio/components/chatbot/chat-context';
 import type { ChatSendFn } from '../../src/app/ade/studio/components/chatbot/types';
+
+type ResponderCall = {
+  prompt: string;
+  isRegenerate: boolean;
+  studioContext?: ChatStudioContext;
+};
 
 function createDeferredResponder(): {
   responder: ChatSendFn;
   resolveWith: (text: string) => void;
-  calls: Array<{ prompt: string; isRegenerate: boolean }>;
+  calls: ResponderCall[];
 } {
-  const calls: Array<{ prompt: string; isRegenerate: boolean }> = [];
+  const calls: ResponderCall[] = [];
   let pendingResolve: ((text: string) => void) | null = null;
-  const responder: ChatSendFn = ({ prompt, isRegenerate }) => {
-    calls.push({ prompt, isRegenerate });
+  const responder: ChatSendFn = ({ prompt, isRegenerate, studioContext }) => {
+    calls.push({ prompt, isRegenerate, studioContext });
     return new Promise<string>((resolve) => {
       pendingResolve = resolve;
     });
@@ -153,6 +160,76 @@ describe('ChatConversation', () => {
       expect(screen.getByText(/the assistant could not respond/i)).toBeInTheDocument();
     });
     expect(screen.getByTestId('studio-ai-chat-input')).not.toBeDisabled();
+  });
+
+  it('does not render the context chip when no studio context is supplied', () => {
+    render(<ChatConversation />);
+    expect(screen.queryByTestId('studio-ai-chat-context-chip')).not.toBeInTheDocument();
+  });
+
+  it('renders the context chip when a non-empty studio context is supplied', () => {
+    const studioContext: ChatStudioContext = {
+      project: { id: 'p', name: 'Acme' },
+      version: { id: 'v', label: 'v1.0' },
+      classes: [{ id: 'c', name: 'User' }],
+      properties: [],
+      selectedClassIds: [],
+    };
+    render(<ChatConversation studioContext={studioContext} />);
+    expect(screen.getByTestId('studio-ai-chat-context-chip')).toBeInTheDocument();
+  });
+
+  it('forwards the studio context snapshot to the responder on each send', async () => {
+    const studioContext: ChatStudioContext = {
+      project: { id: 'p', name: 'Acme' },
+      version: { id: 'v', label: 'v1.0' },
+      classes: [{ id: 'c', name: 'User' }],
+      properties: [],
+      selectedClassIds: ['c'],
+    };
+    const { responder, calls, resolveWith } = createDeferredResponder();
+    render(<ChatConversation onSendMessage={responder} studioContext={studioContext} />);
+
+    fireEvent.change(screen.getByTestId('studio-ai-chat-input'), { target: { value: 'hi' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-send'));
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0].studioContext).toEqual(studioContext);
+
+    await act(async () => {
+      resolveWith('ok');
+    });
+  });
+
+  it('captures the latest studio context snapshot at send time, not at mount time', async () => {
+    const initial: ChatStudioContext = {
+      project: { id: 'p', name: 'Acme' },
+      version: null,
+      classes: [],
+      properties: [],
+      selectedClassIds: [],
+    };
+    const updated: ChatStudioContext = {
+      ...initial,
+      version: { id: 'v', label: 'v2.0' },
+      selectedClassIds: ['c'],
+    };
+    const { responder, calls, resolveWith } = createDeferredResponder();
+    const { rerender } = render(
+      <ChatConversation onSendMessage={responder} studioContext={initial} />
+    );
+
+    rerender(<ChatConversation onSendMessage={responder} studioContext={updated} />);
+
+    fireEvent.change(screen.getByTestId('studio-ai-chat-input'), { target: { value: 'hi' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-send'));
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0].studioContext).toEqual(updated);
+
+    await act(async () => {
+      resolveWith('ok');
+    });
   });
 
   it('forwards the import callback when the assistant returns an OpenAPI spec', async () => {

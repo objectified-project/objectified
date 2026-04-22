@@ -391,6 +391,7 @@ const StudioContent = () => {
     versionBranchesByProjectId,
     setVersionBranchesForProject,
     setCanvasViewport,
+    setSelectedCanvasNodeIds,
   } = useStudio();
 
   /* When git-like is disabled, pass empty ids so the hook short-circuits and
@@ -842,17 +843,25 @@ const StudioContent = () => {
       setSuppressGroupSidebarDestructive(true);
       setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
       setSelectedNodeIds([]);
+      setSelectedCanvasNodeIds([]);
     });
   }, [
     setSuppressGroupFloatingToolbars,
     setSuppressGroupSidebarDestructive,
     setNodes,
+    setSelectedCanvasNodeIds,
   ]);
 
   useEffect(() => {
     setClearCanvasSelectionFn(() => prepareCanvasForCodeView);
     return () => setClearCanvasSelectionFn(null);
   }, [prepareCanvasForCodeView, setClearCanvasSelectionFn]);
+
+  // Clear the published canvas selection on unmount (#259) so the chatbot
+  // context never shows stale node IDs after navigating away from the editor.
+  useEffect(() => {
+    return () => setSelectedCanvasNodeIds([]);
+  }, [setSelectedCanvasNodeIds]);
 
   useEffect(() => {
     if (viewMode === 'canvas') {
@@ -7576,6 +7585,9 @@ const StudioContent = () => {
       .filter(n => n.type !== 'groupNode')
       .map(n => n.id);
     setSelectedNodeIds(classNodeIds);
+    // Publish to studio context (#259) so the AI chatbot can ground replies
+    // in whatever the user has selected on the canvas.
+    setSelectedCanvasNodeIds(classNodeIds);
 
     // Update spacing indicators when selection changes
     if (showSpacingIndicators && classNodeIds.length >= 2) {
@@ -7583,7 +7595,7 @@ const StudioContent = () => {
     } else {
       setSpacingIndicators({ horizontal: [], vertical: [] });
     }
-  }, [showSpacingIndicators]);
+  }, [showSpacingIndicators, setSelectedCanvasNodeIds]);
 
   // Calculate spacing indicators between selected nodes
   const calculateSpacingIndicators = useCallback((nodeIds: string[]) => {

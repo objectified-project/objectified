@@ -30,12 +30,12 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - 📋 Search conversation history
     - 📋 Export conversations as markdown
     - 📋 Clear conversation option
-- 📋 **Context Awareness**:
-    - 📋 AI knows current project, version, classes
-    - 📋 AI can reference existing schemas in responses
-    - 📋 AI understands selected items on canvas
-    - 📋 AI can see property definitions
-    - 📋 Automatic context injection into prompts
+- ✅ **Context Awareness** (#259):
+    - ✅ AI knows current project, version, classes
+    - ✅ AI can reference existing schemas in responses
+    - ✅ AI understands selected items on canvas
+    - ✅ AI can see property definitions
+    - ✅ Automatic context injection into prompts
 - 📋 **Multi-Turn Conversations**:
     - 📋 Follow-up questions with context
     - 📋 Clarification requests
@@ -46,7 +46,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                                |
 |--------|----------------------------------------------------|
-| #259   | AI Chat Context Awareness                          |
 | #260   | AI Multi-Turn Conversation with History            |
 | #261   | AI Conversation history actions                    |
 | #262   | Install guardrails.ai server                       |

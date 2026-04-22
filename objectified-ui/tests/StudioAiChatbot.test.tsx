@@ -19,6 +19,13 @@ import {
   StudioAiChatbot,
   isStudioAiChatbotPath,
 } from '../src/app/ade/studio/components/StudioAiChatbot';
+import type { ChatStudioContext } from '../src/app/ade/studio/components/chatbot/chat-context';
+
+(global as { ResizeObserver: typeof ResizeObserver }).ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
 
 const mockUsePathname = jest.fn<string | null, []>();
 jest.mock('next/navigation', () => ({
@@ -171,5 +178,46 @@ describe('StudioAiChatbot', () => {
     expect(screen.getByTestId('studio-ai-chat-send')).toBeInTheDocument();
     // Empty-state suggestions surface the prompt patterns the panel ships with.
     expect(screen.getAllByTestId('studio-ai-chat-suggestion').length).toBeGreaterThan(0);
+  });
+
+  it('does not render the context chip when no studio context is provided', () => {
+    mockUsePathname.mockReturnValue('/ade/studio/editor');
+    render(<StudioAiChatbot initialMode="slide" />);
+    expect(screen.queryByTestId('studio-ai-chat-context-chip')).not.toBeInTheDocument();
+  });
+
+  it('does not render the context chip when the supplied context is empty (#259)', () => {
+    mockUsePathname.mockReturnValue('/ade/studio/editor');
+    const emptyContext: ChatStudioContext = {
+      project: null,
+      version: null,
+      classes: [],
+      properties: [],
+      selectedClassIds: [],
+    };
+    render(<StudioAiChatbot initialMode="slide" studioContext={emptyContext} />);
+    expect(screen.queryByTestId('studio-ai-chat-context-chip')).not.toBeInTheDocument();
+  });
+
+  it('renders the context chip with project + class summary when context is supplied (#259)', () => {
+    mockUsePathname.mockReturnValue('/ade/studio/editor');
+    const populatedContext: ChatStudioContext = {
+      project: { id: 'proj-1', name: 'Acme Catalog' },
+      version: { id: 'ver-1', label: 'v1.0.0' },
+      classes: [
+        { id: 'cls-1', name: 'Product', description: 'Sellable item', schema: null },
+        { id: 'cls-2', name: 'Customer', description: null, schema: null },
+      ],
+      properties: [
+        { id: 'prop-1', name: 'sku', type: 'string', format: null, required: true },
+      ],
+      selectedClassIds: ['cls-1'],
+    };
+    render(<StudioAiChatbot initialMode="slide" studioContext={populatedContext} />);
+
+    const chip = screen.getByTestId('studio-ai-chat-context-chip');
+    expect(chip).toBeInTheDocument();
+    expect(chip).toHaveTextContent('Acme Catalog');
+    expect(chip).toHaveTextContent('v1.0.0');
   });
 });
