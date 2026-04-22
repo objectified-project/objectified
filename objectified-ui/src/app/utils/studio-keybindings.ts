@@ -15,6 +15,23 @@ export function matchesStudioGitPaletteShortcut(ev: KeyboardEvent): boolean {
   return true;
 }
 
+/** Toggle key for the Studio AI chatbot panel (#257). */
+export const STUDIO_AI_CHATBOT_KEY = 'a' as const;
+
+/**
+ * Modifier combo for the Studio AI chatbot panel: ⌘+Shift+A on macOS, Ctrl+Shift+A on
+ * Windows/Linux. Either modifier is accepted so Linux users get the same affordance.
+ */
+export function matchesStudioAiChatbotShortcut(ev: KeyboardEvent): boolean {
+  if (ev.defaultPrevented) return false;
+  if (ev.repeat) return false;
+  if (ev.key?.toLowerCase() !== STUDIO_AI_CHATBOT_KEY) return false;
+  if (!(ev.metaKey || ev.ctrlKey)) return false;
+  if (!ev.shiftKey) return false;
+  if (ev.altKey) return false;
+  return true;
+}
+
 export type StudioGitPaletteActionId =
   | 'commit'
   | 'branch'
@@ -50,6 +67,7 @@ export const STUDIO_GIT_PALETTE_LABELS: Record<StudioGitPaletteActionId, { title
 export const STUDIO_KEYBINDING_CHEATSHEET_LINES: { keys: string; description: string }[] = [
   { keys: '⌘G / Ctrl+G', description: 'Open git command palette' },
   { keys: '⌘Enter / Ctrl+Enter', description: 'Commit new revision (Designer toolbar, when available)' },
+  { keys: '⌘⇧A / Ctrl+Shift+A', description: 'Toggle the AI chatbot panel on the canvas' },
   { keys: 'Esc', description: 'Close git palette' },
   { keys: '?', description: 'Toggle this cheatsheet inside the palette' },
 ];

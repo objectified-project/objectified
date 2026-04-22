@@ -23,6 +23,7 @@ import { deleteClassWithSession } from '../../../../lib/api/rest-client';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ADE_SUBHEADER_RESERVE_PX } from '../constants/subheader-layout';
 import { GitCommandPalette } from './components/GitCommandPalette';
+import { StudioAiChatbot } from './components/StudioAiChatbot';
 import StudioFooterBar from './components/StudioFooterBar';
 import { FEATURE_GITLIKE } from '@lib/feature-flags';
 
@@ -591,6 +592,12 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       />
 
       {FEATURE_GITLIKE && <GitCommandPalette />}
+
+      {/* AI chatbot launcher + slide-out / fullscreen panel (#257). Mounted at the
+          studio layout level so the floating bubble and ⌘⇧A shortcut are available
+          across the canvas and paths surfaces. Hidden in presentation mode to keep
+          the canvas chrome-free. */}
+      {!canvasPresentationMode && <StudioAiChatbot />}
 
       {/* Programmatic state of the canvas — pinned to the bottom of the studio layout.
           Hidden in presentation mode for chrome consistency with StudioHeader. */}

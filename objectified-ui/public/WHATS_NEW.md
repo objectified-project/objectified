@@ -20,6 +20,11 @@ We continue to improve the platform based on your feedback with improvements and
 
 ---
 
+## Studio AI
+- Added the Studio AI chatbot launcher and panel: a floating bubble in the bottom right of the canvas opens a slide-out panel with full-screen mode, toggled with `Cmd+Shift+A` / `Ctrl+Shift+A`.
+
+---
+
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
 ---
