@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Search, Plus, Pencil, Trash2, FileX, Upload, Library, ChevronDown, ChevronUp, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, FileX, Upload, Library, ChevronDown, ChevronUp, ChevronRight, Eye, EyeOff, Boxes, ListTree, Layers } from 'lucide-react';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 import SidebarDensityToggle from '@/app/components/sidebar/SidebarDensityToggle';
@@ -271,8 +271,15 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
     callbacks.onPropertySelect?.(propertyItem);
   };
 
+  /**
+   * VSCode/Cursor-style activity rail (~48px) + content layout. The rail
+   * lives flush-left inside the drawer; content fills the remaining width.
+   */
+  const ACTIVITY_RAIL_WIDTH = 40;
+  const DRAWER_WIDTH = 320;
+
   const drawerStyle = {
-    width: 280,
+    width: DRAWER_WIDTH,
     flexShrink: 0,
     boxSizing: 'border-box' as const,
     top: 102,
@@ -285,40 +292,90 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
     boxShadow: isDark ? '4px 0 24px rgba(0, 0, 0, 0.3)' : '4px 0 24px rgba(0, 0, 0, 0.06)',
   };
 
+  /**
+   * Single icon button on the activity rail. Rendered as a Radix
+   * Tabs.Trigger so it keeps role="tab" semantics (consumed by tests and
+   * assistive tech). The aria-label preserves the previous human-readable
+   * label even though the visible content is now an icon.
+   */
+  const railTriggerClass = [
+    'relative flex items-center justify-center w-9 h-9 rounded-md transition-colors',
+    'text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-500/5',
+    'data-[state=active]:text-indigo-500 data-[state=active]:bg-indigo-500/10',
+    /* Left accent bar (VSCode pattern) shown only when active. */
+    'before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[2px] before:rounded-r',
+    'before:bg-transparent data-[state=active]:before:bg-indigo-500',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40',
+  ].join(' ');
+
   return (
     <aside className="flex-shrink-0" style={drawerStyle}>
-      <div className="flex flex-col h-full">
-        {/* Version/Project Status Indicator */}
-        {((currentTab === 'classes' && !selectedVersionId) || (currentTab === 'properties' && !selectedProjectId)) && (
-          <div className="p-4 text-center text-xs font-semibold border-b border-amber-300/30 flex items-center justify-center gap-2 bg-gradient-to-br from-amber-100 to-amber-200 text-amber-800 dark:from-amber-900/30 dark:to-amber-800/30 dark:text-amber-200">
-            <span className="text-base">⚠️</span>
-            {currentTab === 'classes'
-              ? 'Select a version from the canvas to manage classes'
-              : 'Select a project from the canvas to manage properties'}
-          </div>
-        )}
+      <Tabs.Root
+        value={currentTab}
+        onValueChange={handleTabChange}
+        orientation="vertical"
+        className="flex h-full"
+      >
+        {/* Activity rail (icons left) */}
+        <Tabs.List
+          aria-label="Studio sidebar sections"
+          className={[
+            'flex flex-col items-center gap-0.5 py-1.5 shrink-0 border-r',
+            sidebarTheme.borderSoft,
+          ].join(' ')}
+          style={{ width: ACTIVITY_RAIL_WIDTH }}
+        >
+          <Tabs.Trigger
+            value="classes"
+            aria-label="Classes"
+            title="Classes"
+            className={railTriggerClass}
+          >
+            <Boxes className="w-4 h-4" aria-hidden />
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            value="properties"
+            aria-label="Properties"
+            title="Properties"
+            className={railTriggerClass}
+          >
+            <ListTree className="w-4 h-4" aria-hidden />
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            value="groups"
+            aria-label="Groups"
+            title="Groups"
+            className={railTriggerClass}
+          >
+            <Layers className="w-4 h-4" aria-hidden />
+          </Tabs.Trigger>
+        </Tabs.List>
 
-        <Tabs.Root value={currentTab} onValueChange={handleTabChange} className="flex flex-col flex-1 min-h-0">
-          <Tabs.List className={['flex border-b shrink-0', tokens.headerHeight, sidebarTheme.borderSoft].join(' ')}>
-            <Tabs.Trigger
-              value="classes"
-              className={['flex-1 font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent', tokens.rowText].join(' ')}
-            >
-              Classes
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="properties"
-              className={['flex-1 font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent', tokens.rowText].join(' ')}
-            >
-              Properties
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="groups"
-              className={['flex-1 font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent', tokens.rowText].join(' ')}
-            >
-              Groups
-            </Tabs.Trigger>
-          </Tabs.List>
+        {/* Content panel (right of rail) */}
+        <div className="flex flex-col flex-1 min-w-0">
+          {/* Section header shows the active label so users still see
+              "Classes / Properties / Groups" in plain text. */}
+          <div
+            className={[
+              'flex items-center px-3 shrink-0 border-b',
+              tokens.headerHeight,
+              sidebarTheme.borderSoft,
+            ].join(' ')}
+          >
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+              {currentTab === 'classes' ? 'Classes' : currentTab === 'properties' ? 'Properties' : 'Groups'}
+            </span>
+          </div>
+
+          {/* Version/Project Status Indicator */}
+          {((currentTab === 'classes' && !selectedVersionId) || (currentTab === 'properties' && !selectedProjectId)) && (
+            <div className="p-4 text-center text-xs font-semibold border-b border-amber-300/30 flex items-center justify-center gap-2 bg-gradient-to-br from-amber-100 to-amber-200 text-amber-800 dark:from-amber-900/30 dark:to-amber-800/30 dark:text-amber-200">
+              <span className="text-base">⚠️</span>
+              {currentTab === 'classes'
+                ? 'Select a version from the canvas to manage classes'
+                : 'Select a project from the canvas to manage properties'}
+            </div>
+          )}
 
           <Tabs.Content value="classes" className="flex flex-col flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
             <div className="relative flex flex-col h-full">
@@ -825,8 +882,8 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
               </div>
             )}
           </div>
-        </Tabs.Root>
-      </div>
+        </div>
+      </Tabs.Root>
     </aside>
   );
 };

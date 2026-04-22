@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import { toast } from 'sonner';
-import { Check, ChevronDown, ChevronRight, Gauge, Settings, X } from 'lucide-react';
+import { Check, ChevronRight, Gauge, Settings, X } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -592,11 +592,12 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
             >
               !
             </span>
-            {deprecatedRevisionOpen ? (
-              <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
-            ) : (
-              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-            )}
+            <ChevronRight
+              className={`h-4 w-4 shrink-0 transition-transform duration-300 ease-in-out ${
+                deprecatedRevisionOpen ? 'rotate-90' : ''
+              }`}
+              aria-hidden
+            />
           </button>
         ) : null}
 
@@ -1107,14 +1108,27 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           </>
         )}
       </div>
-      {FEATURE_GITLIKE && selectedVersionDeprecated && deprecatedRevisionOpen && selectedVersion ? (
-        <div id="studio-deprecated-revision-panel" className="mt-2 w-full min-w-0 px-1">
-          <RevisionDeprecationBanner
-            roleLabel="Studio"
-            versionLabel={selectedVersion.version_id}
-            metadata={selectedVersion.metadata}
-            className="rounded-lg border border-amber-300/80 dark:border-amber-700/80"
-          />
+      {selectedVersionDeprecated && selectedVersion ? (
+        <div
+          id="studio-deprecated-revision-panel"
+          /* `grid-template-rows` 0fr→1fr is the modern way to animate
+             height: auto. The inner overflow-hidden child clips during
+             the transition. */
+          className={`grid w-full min-w-0 px-1 transition-[grid-template-rows,opacity,margin-top] duration-300 ease-in-out ${
+            deprecatedRevisionOpen
+              ? 'grid-rows-[1fr] opacity-100 mt-2'
+              : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'
+          }`}
+          aria-hidden={!deprecatedRevisionOpen}
+        >
+          <div className="overflow-hidden">
+            <RevisionDeprecationBanner
+              roleLabel="Studio"
+              versionLabel={selectedVersion.version_id}
+              metadata={selectedVersion.metadata}
+              className="rounded-lg border border-amber-300/80 dark:border-amber-700/80"
+            />
+          </div>
         </div>
       ) : null}
       {FEATURE_GITLIKE && serverAheadForProject && (

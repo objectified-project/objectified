@@ -7,7 +7,6 @@ import * as Select from '@radix-ui/react-select';
 import { useMigration } from '../MigrationContext';
 import RevisionDeprecationBanner from '@/app/components/ade/RevisionDeprecationBanner';
 import { isRevisionDeprecated } from '@/app/utils/revision-deprecation';
-import { FEATURE_GITLIKE } from '@lib/feature-flags';
 import { formatVersionSelectorLabel } from '@/app/utils/version-display';
 
 interface Project {
@@ -251,14 +250,14 @@ export default function MigrationHeader() {
           </Select.Root>
         </div>
       </div>
-      {FEATURE_GITLIKE && fromVer && isRevisionDeprecated(fromVer.metadata) ? (
+      {fromVer && isRevisionDeprecated(fromVer.metadata) ? (
         <RevisionDeprecationBanner
           roleLabel="From"
           versionLabel={fromVer.version_id}
           metadata={fromVer.metadata}
         />
       ) : null}
-      {FEATURE_GITLIKE && toVer && isRevisionDeprecated(toVer.metadata) ? (
+      {toVer && isRevisionDeprecated(toVer.metadata) ? (
         <RevisionDeprecationBanner
           roleLabel="To"
           versionLabel={toVer.version_id}

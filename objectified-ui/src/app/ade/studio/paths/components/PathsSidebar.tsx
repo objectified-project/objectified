@@ -1,15 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, AlertTriangle, FileUp, ChevronRight, ChevronDown, Route, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, AlertTriangle, FileUp, ChevronRight, ChevronDown, Route, Search, Boxes, ListTree, ShieldCheck, Server, Zap } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../../../components/ui/Select';
+import * as Tabs from '@radix-ui/react-tabs';
 import { useStudio } from '../../StudioContext';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import {
@@ -515,37 +509,62 @@ export default function PathsSidebar({
     }
   };
 
-  const TAB_OPTIONS = [
-    { value: 'paths' as const, label: 'Paths' },
-    { value: 'operations' as const, label: 'Operations' },
-    { value: 'classes' as const, label: 'Classes' },
-    { value: 'properties' as const, label: 'Properties' },
-    { value: 'security' as const, label: 'Security' },
-    { value: 'servers' as const, label: 'Servers' },
+  /**
+   * Sections rendered as a vertical activity rail (VSCode/Cursor style).
+   * Order = top-to-bottom in the rail. Each Lucide icon was picked to read
+   * at 16px without a label since the tooltip carries the long-form name.
+   */
+  const TAB_OPTIONS: { value: typeof activeTab; label: string; Icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }> }[] = [
+    { value: 'paths', label: 'Paths', Icon: Route },
+    { value: 'operations', label: 'Operations', Icon: Zap },
+    { value: 'classes', label: 'Classes', Icon: Boxes },
+    { value: 'properties', label: 'Properties', Icon: ListTree },
+    { value: 'security', label: 'Security', Icon: ShieldCheck },
+    { value: 'servers', label: 'Servers', Icon: Server },
   ];
 
   const activeTabLabel = TAB_OPTIONS.find((opt) => opt.value === activeTab)?.label ?? 'Section';
 
+  /** VSCode-style trigger: indigo accent bar on the left when active. */
+  const railTriggerClass = [
+    'relative flex items-center justify-center w-9 h-9 rounded-md transition-colors',
+    'text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-500/5',
+    'data-[state=active]:text-indigo-500 data-[state=active]:bg-indigo-500/10',
+    'before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[2px] before:rounded-r',
+    'before:bg-transparent data-[state=active]:before:bg-indigo-500',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40',
+  ].join(' ');
+
   return (
-    <SidebarShell
+    <Tabs.Root
+      value={activeTab}
+      onValueChange={handleTabChange}
+      orientation="vertical"
+      className="contents"
+    >
+      <SidebarShell
       icon={<Route />}
       title="API Designer"
       subtitle={activeTabLabel}
       width={280}
       bodyScroll={activeTab !== 'properties'}
-      toolbar={
-        <Select value={activeTab} onValueChange={handleTabChange}>
-          <SelectTrigger className="h-8 text-[12.5px] w-full">
-            <SelectValue placeholder="Section" />
-          </SelectTrigger>
-          <SelectContent>
-            {TAB_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      rail={
+        <Tabs.List
+          aria-label="API Designer sections"
+          className="flex flex-col items-center gap-0.5 py-1.5"
+        >
+          {TAB_OPTIONS.map(({ value, label, Icon }) => (
+            <Tabs.Trigger
+              key={value}
+              value={value}
+              aria-label={label}
+              title={label}
+              className={railTriggerClass}
+            >
+              <Icon className="w-4 h-4" aria-hidden />
+            </Tabs.Trigger>
+          ))}
+        </Tabs.List>
       }
       footer={
         <div className="flex items-center justify-between gap-2">
@@ -1314,7 +1333,8 @@ export default function PathsSidebar({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </SidebarShell>
+      </SidebarShell>
+    </Tabs.Root>
   );
 }
 

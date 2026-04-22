@@ -12,7 +12,8 @@ interface SidebarShellProps {
   subtitle?: React.ReactNode;
   /** Optional right-aligned slot inside the header (e.g. status pill). */
   headerActions?: React.ReactNode;
-  /** Width of the sidebar in pixels. Defaults to 280. */
+  /** Width of the sidebar content column in pixels. Defaults to 280. The
+   *  rail (when provided) is added to this for the total sidebar width. */
   width?: number;
   /** Optional toolbar rendered directly below the header (filters, tabs). */
   toolbar?: React.ReactNode;
@@ -24,6 +25,15 @@ interface SidebarShellProps {
   className?: string;
   /** Override scrolling behavior for the body. Defaults to true. */
   bodyScroll?: boolean;
+  /**
+   * Optional VSCode/Cursor-style activity rail rendered flush-left of the
+   * shell. Typically a vertical list of icon buttons (e.g. Radix Tabs.List
+   * with orientation="vertical"). When present, the total sidebar width
+   * becomes `railWidth + width`.
+   */
+  rail?: React.ReactNode;
+  /** Width of the activity rail in pixels. Defaults to 40. */
+  railWidth?: number;
 }
 
 /**
@@ -44,20 +54,33 @@ export default function SidebarShell({
   children,
   className,
   bodyScroll = true,
+  rail,
+  railWidth = 40,
 }: SidebarShellProps) {
   const tokens = useSidebarTokens();
+
+  const totalWidth = rail != null ? width + railWidth : width;
 
   return (
     <aside
       className={[
-        'shrink-0 flex flex-col h-full relative overflow-hidden',
+        'shrink-0 flex h-full relative overflow-hidden',
         'border-r',
         sidebarTheme.surface,
         sidebarTheme.border,
         className ?? '',
       ].join(' ')}
-      style={{ width, minWidth: width }}
+      style={{ width: totalWidth, minWidth: totalWidth }}
     >
+      {rail != null && (
+        <div
+          className={['shrink-0 flex flex-col items-stretch border-r', sidebarTheme.borderSoft].join(' ')}
+          style={{ width: railWidth }}
+        >
+          {rail}
+        </div>
+      )}
+      <div className="flex flex-col h-full flex-1 min-w-0">
       {/* Header */}
       <div
         className={[
@@ -130,6 +153,7 @@ export default function SidebarShell({
           {footer}
         </div>
       )}
+      </div>
     </aside>
   );
 }
