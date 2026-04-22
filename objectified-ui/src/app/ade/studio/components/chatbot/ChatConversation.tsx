@@ -5,12 +5,15 @@ import { Sparkles } from 'lucide-react';
 
 import { ChatBubble } from './ChatBubble';
 import { ChatComposer } from './ChatComposer';
+import { ChatContextChip } from './ChatContextChip';
+import type { ChatStudioContext } from './chat-context';
+import { isChatStudioContextEmpty } from './chat-context';
 import { createDemoChatResponder } from './demo-responder';
 import type { DetectedOpenApiSpec } from './openapi-detection';
 import type { ChatFeedback, ChatMessage, ChatSendFn } from './types';
 
 /**
- * Studio AI chat conversation surface (#258).
+ * Studio AI chat conversation surface (#258, #259).
  *
  * Owns the message transcript, scroll behaviour, and request lifecycle for
  * the chatbot panel. Stateless from the caller's perspective: pass an
@@ -20,6 +23,9 @@ import type { ChatFeedback, ChatMessage, ChatSendFn } from './types';
  *   - User and assistant bubbles are visually distinct
  *   - Typing indicator is shown while the assistant is composing
  *   - Markdown / code / OpenAPI affordances are delegated to `ChatBubble`
+ *   - When a `studioContext` snapshot is provided (#259), each send captures
+ *     the snapshot at that moment and forwards it to the responder, and a
+ *     small "Sharing context" chip lets the user inspect what is being sent
  */
 export interface ChatConversationProps {
   /** Adapter invoked to produce assistant replies. Defaults to the demo responder. */
@@ -30,6 +36,13 @@ export interface ChatConversationProps {
   initialMessages?: ChatMessage[];
   /** Optional empty-state body copy. */
   emptyStateMessage?: string;
+  /**
+   * Optional Studio workspace snapshot (#259). When supplied, the snapshot is
+   * captured on every send and threaded through the responder so it can
+   * ground its replies in the user's project, version, classes, properties,
+   * and current canvas selection.
+   */
+  studioContext?: ChatStudioContext;
 }
 
 const PROMPT_SUGGESTIONS: readonly string[] = [
@@ -43,12 +56,22 @@ export function ChatConversation({
   onImportSpec,
   initialMessages,
   emptyStateMessage,
+  studioContext,
 }: ChatConversationProps) {
   const responder = React.useMemo(() => onSendMessage ?? createDemoChatResponder(), [onSendMessage]);
   const [messages, setMessages] = React.useState<ChatMessage[]>(() => initialMessages ?? []);
   const [isBusy, setIsBusy] = React.useState(false);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const requestIdRef = React.useRef(0);
+  // Hold the current snapshot in a ref so each send captures the latest state
+  // without re-creating the send callback on every studio change (which would
+  // thrash effects in the composer / message list).
+  const studioContextRef = React.useRef<ChatStudioContext | undefined>(studioContext);
+  React.useEffect(() => {
+    studioContextRef.current = studioContext;
+  }, [studioContext]);
+
+  const hasStudioContext = !!studioContext && !isChatStudioContextEmpty(studioContext);
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -78,7 +101,12 @@ export function ChatConversation({
 
       let reply: string;
       try {
-        reply = await responder({ messages: transcript, prompt, isRegenerate });
+        reply = await responder({
+          messages: transcript,
+          prompt,
+          isRegenerate,
+          studioContext: studioContextRef.current,
+        });
       } catch (error) {
         console.error('Chat assistant failed to respond', error);
         reply = 'Sorry — the assistant could not respond. Please try again.';
@@ -164,6 +192,12 @@ export function ChatConversation({
           </div>
         )}
       </div>
+
+      {hasStudioContext && (
+        <div className="border-t border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+          <ChatContextChip studioContext={studioContext!} />
+        </div>
+      )}
 
       <ChatComposer onSend={handleSend} isBusy={isBusy} />
     </div>

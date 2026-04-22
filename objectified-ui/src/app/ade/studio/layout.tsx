@@ -24,6 +24,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ADE_SUBHEADER_RESERVE_PX } from '../constants/subheader-layout';
 import { GitCommandPalette } from './components/GitCommandPalette';
 import { StudioAiChatbot } from './components/StudioAiChatbot';
+import type { ChatStudioContext, ChatStudioProperty } from './components/chatbot/chat-context';
 import StudioFooterBar from './components/StudioFooterBar';
 import { FEATURE_GITLIKE } from '@lib/feature-flags';
 
@@ -45,6 +46,9 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const {
     selectedProjectId,
     selectedVersionId,
+    selectedProjectName,
+    selectedVersionLabel,
+    selectedCanvasNodeIds,
     triggerCanvasRefresh,
     triggerSidebarRefresh,
     sidebarRefreshKey,
@@ -414,6 +418,53 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     });
   }, [groups, sidebarRefreshKey]);
 
+  // Snapshot of the studio workspace assembled for the AI chatbot (#259).
+  // Recomputed only when its inputs change so the chatbot doesn't re-render
+  // on unrelated layout state churn.
+  const chatbotStudioContext = React.useMemo<ChatStudioContext>(() => {
+    const chatProperties: ChatStudioProperty[] = properties.map((prop) => {
+      const propAny = prop as unknown as Record<string, unknown>;
+      const dataObj = (propAny['data'] && typeof propAny['data'] === 'object'
+        ? (propAny['data'] as Record<string, unknown>)
+        : propAny) as Record<string, unknown>;
+      const type = typeof dataObj['type'] === 'string' ? (dataObj['type'] as string) : null;
+      const format = typeof dataObj['format'] === 'string' ? (dataObj['format'] as string) : null;
+      const required = typeof dataObj['required'] === 'boolean' ? (dataObj['required'] as boolean) : null;
+      return {
+        id: prop.id,
+        name: prop.name,
+        description: prop.description ?? null,
+        type,
+        format,
+        required,
+      };
+    });
+    return {
+      project: selectedProjectId
+        ? { id: selectedProjectId, name: selectedProjectName ?? null }
+        : null,
+      version: selectedVersionId
+        ? { id: selectedVersionId, label: selectedVersionLabel ?? null }
+        : null,
+      classes: classes.map((cls) => ({
+        id: cls.id,
+        name: cls.name,
+        description: cls.description ?? null,
+        schema: cls.schema,
+      })),
+      properties: chatProperties,
+      selectedClassIds: selectedCanvasNodeIds,
+    };
+  }, [
+    selectedProjectId,
+    selectedProjectName,
+    selectedVersionId,
+    selectedVersionLabel,
+    classes,
+    properties,
+    selectedCanvasNodeIds,
+  ]);
+
   // Convert classes to nodes format expected by ClassEditDialog
   const classNodes = React.useMemo(() => {
     return classes.map(cls => ({
@@ -597,7 +648,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
           studio layout level so the floating bubble and ⌘⇧A shortcut are available
           across the canvas and paths surfaces. Hidden in presentation mode to keep
           the canvas chrome-free. */}
-      {!canvasPresentationMode && <StudioAiChatbot />}
+      {!canvasPresentationMode && <StudioAiChatbot studioContext={chatbotStudioContext} />}
 
       {/* Programmatic state of the canvas — pinned to the bottom of the studio layout.
           Hidden in presentation mode for chrome consistency with StudioHeader. */}

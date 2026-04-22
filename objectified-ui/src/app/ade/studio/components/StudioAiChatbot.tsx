@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Studio AI Chatbot — placement chrome + chat surface (#257, #258).
+ * Studio AI Chatbot — placement chrome + chat surface (#257, #258, #259).
  *
  * Provides the launcher and panel surfaces for the studio chatbot:
  *   - Floating launcher bubble in the bottom right corner of the canvas
@@ -15,9 +15,14 @@
  * regenerate / thumbs up / thumbs down message actions, and one-click import
  * for ```json``` blocks that look like OpenAPI specs.
  *
- * Backend wiring (Ollama transport, context awareness, history) lands in
- * follow-up tickets (#259, #260, #265). Until those land the panel uses an
- * offline demo responder so reviewers can exercise the full UI today.
+ * Context awareness (#259): callers can pass a `studioContext` snapshot
+ * (project, version, classes, properties, canvas selection) which is
+ * forwarded to the responder on every send, and surfaced in-panel via a
+ * "Sharing context" chip so users always see what the assistant can see.
+ *
+ * Live model wiring (Ollama transport, history) lands in follow-up tickets
+ * (#260, #265). Until those land the panel uses an offline demo responder
+ * so reviewers can exercise the full UI today.
  */
 
 import * as React from 'react';
@@ -26,6 +31,7 @@ import { toast } from 'sonner';
 import { Bot, Maximize2, Minimize2, Sparkles, X } from 'lucide-react';
 import { matchesStudioAiChatbotShortcut } from '@/app/utils/studio-keybindings';
 import { ChatConversation } from './chatbot/ChatConversation';
+import type { ChatStudioContext } from './chatbot/chat-context';
 import type { DetectedOpenApiSpec } from './chatbot/openapi-detection';
 
 /**
@@ -60,13 +66,23 @@ export interface StudioAiChatbotProps {
   forceVisible?: boolean;
   /** Optional initial mode (defaults to `closed`). */
   initialMode?: StudioAiChatbotMode;
+  /**
+   * Snapshot of the user's Studio workspace (#259). Forwarded to the chat
+   * conversation so the responder can ground its replies in the active
+   * project, version, classes, properties, and canvas selection.
+   */
+  studioContext?: ChatStudioContext;
 }
 
 /**
  * Mounts the chatbot launcher and panel. Safe to render once at the studio
  * layout level; it gates itself based on the current pathname.
  */
-export function StudioAiChatbot({ forceVisible, initialMode = 'closed' }: StudioAiChatbotProps = {}) {
+export function StudioAiChatbot({
+  forceVisible,
+  initialMode = 'closed',
+  studioContext,
+}: StudioAiChatbotProps = {}) {
   const pathname = usePathname();
   const [mode, setMode] = React.useState<StudioAiChatbotMode>(initialMode);
 
@@ -110,6 +126,7 @@ export function StudioAiChatbot({ forceVisible, initialMode = 'closed' }: Studio
           mode={mode}
           onModeChange={setMode}
           onClose={close}
+          studioContext={studioContext}
         />
       )}
     </>
@@ -138,9 +155,10 @@ interface ChatbotPanelProps {
   mode: Exclude<StudioAiChatbotMode, 'closed'>;
   onModeChange: (mode: StudioAiChatbotMode) => void;
   onClose: () => void;
+  studioContext?: ChatStudioContext;
 }
 
-function ChatbotPanel({ mode, onModeChange, onClose }: ChatbotPanelProps) {
+function ChatbotPanel({ mode, onModeChange, onClose, studioContext }: ChatbotPanelProps) {
   const isFullscreen = mode === 'fullscreen';
 
   const containerClasses = isFullscreen
@@ -150,8 +168,8 @@ function ChatbotPanel({ mode, onModeChange, onClose }: ChatbotPanelProps) {
   const toggleFullscreen = () =>
     onModeChange(isFullscreen ? 'slide' : 'fullscreen');
 
-  // Until project-aware import lands (#259), surface the detected spec via a
-  // toast so reviewers see the affordance fire end-to-end.
+  // Until project-aware import lands in a follow-up, surface the detected
+  // spec via a toast so reviewers see the affordance fire end-to-end.
   const handleImportSpec = React.useCallback((spec: DetectedOpenApiSpec) => {
     const title = (spec.spec.info as { title?: string } | undefined)?.title ?? 'OpenAPI spec';
     toast.success(`Ready to import: ${title}`, {
@@ -205,7 +223,7 @@ function ChatbotPanel({ mode, onModeChange, onClose }: ChatbotPanelProps) {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        <ChatConversation onImportSpec={handleImportSpec} />
+        <ChatConversation onImportSpec={handleImportSpec} studioContext={studioContext} />
       </div>
 
       <footer className="border-t border-gray-200 bg-gray-50 px-4 py-2 text-[11px] text-gray-500 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
