@@ -30,6 +30,7 @@ const config: Config = {
     '^@lib/(.*)$': '<rootDir>/lib/$1',
     '^react-markdown$': '<rootDir>/tests/__mocks__/react-markdown.tsx',
     '^remark-gfm$': '<rootDir>/tests/__mocks__/remark-gfm.ts',
+    '^rehype-raw$': '<rootDir>/tests/__mocks__/rehype-raw.ts',
     '^.*auth/server-session$': '<rootDir>/tests/__mocks__/server-session.ts',
   },
   transformIgnorePatterns: [

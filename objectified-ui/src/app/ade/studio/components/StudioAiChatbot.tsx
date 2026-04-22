@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Studio AI Chatbot — placement chrome (#257).
+ * Studio AI Chatbot — placement chrome + chat surface (#257, #258).
  *
  * Provides the launcher and panel surfaces for the studio chatbot:
  *   - Floating launcher bubble in the bottom right corner of the canvas
@@ -9,16 +9,24 @@
  *   - Full-screen chat mode for complex conversations
  *   - Keyboard shortcut to toggle (⌘+Shift+A on macOS, Ctrl+Shift+A elsewhere)
  *
- * The actual chat content (model selection, prompts, streaming, context awareness)
- * lands in subsequent tickets (#258, #259, ...). For now the panel renders a
- * focused placeholder so the placement, controls, and shortcuts can be exercised
- * end-to-end.
+ * The chat surface itself follows the chatbot interface guidelines (#258):
+ * message bubbles distinguished by role, typing indicator while the assistant
+ * is working, markdown + syntax-highlighted code blocks with copy buttons,
+ * regenerate / thumbs up / thumbs down message actions, and one-click import
+ * for ```json``` blocks that look like OpenAPI specs.
+ *
+ * Backend wiring (Ollama transport, context awareness, history) lands in
+ * follow-up tickets (#259, #260, #265). Until those land the panel uses an
+ * offline demo responder so reviewers can exercise the full UI today.
  */
 
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
+import { toast } from 'sonner';
 import { Bot, Maximize2, Minimize2, Sparkles, X } from 'lucide-react';
 import { matchesStudioAiChatbotShortcut } from '@/app/utils/studio-keybindings';
+import { ChatConversation } from './chatbot/ChatConversation';
+import type { DetectedOpenApiSpec } from './chatbot/openapi-detection';
 
 /**
  * Open/closed state for the chatbot panel. `slide` is the default expanded mode
@@ -142,6 +150,15 @@ function ChatbotPanel({ mode, onModeChange, onClose }: ChatbotPanelProps) {
   const toggleFullscreen = () =>
     onModeChange(isFullscreen ? 'slide' : 'fullscreen');
 
+  // Until project-aware import lands (#259), surface the detected spec via a
+  // toast so reviewers see the affordance fire end-to-end.
+  const handleImportSpec = React.useCallback((spec: DetectedOpenApiSpec) => {
+    const title = (spec.spec.info as { title?: string } | undefined)?.title ?? 'OpenAPI spec';
+    toast.success(`Ready to import: ${title}`, {
+      description: `${spec.version ? `OpenAPI ${spec.version}` : 'OpenAPI document'} captured from the chat.`,
+    });
+  }, []);
+
   return (
     <div
       role="dialog"
@@ -187,8 +204,8 @@ function ChatbotPanel({ mode, onModeChange, onClose }: ChatbotPanelProps) {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6">
-        <ChatbotComingSoon />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <ChatConversation onImportSpec={handleImportSpec} />
       </div>
 
       <footer className="border-t border-gray-200 bg-gray-50 px-4 py-2 text-[11px] text-gray-500 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
@@ -202,41 +219,6 @@ function ChatbotPanel({ mode, onModeChange, onClose }: ChatbotPanelProps) {
         </kbd>
         .
       </footer>
-    </div>
-  );
-}
-
-const COMING_SOON_FEATURES: readonly string[] = [
-  'Natural-language schema design and refinement',
-  'Context-aware responses about your current project and version',
-  'One-click "create class" and "add properties" actions',
-  'Conversation history per project, with export and search',
-];
-
-function ChatbotComingSoon() {
-  return (
-    <div className="flex h-full flex-col items-center justify-center text-center">
-      <span className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-100 to-indigo-100 text-purple-600 dark:from-purple-900/40 dark:to-indigo-900/40 dark:text-purple-300">
-        <Sparkles className="h-8 w-8" />
-      </span>
-      <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
-        Studio AI is on the way
-      </h2>
-      <p className="mb-6 max-w-sm text-sm text-gray-600 dark:text-gray-400">
-        This panel is the new home for the Studio chatbot. The conversation surface
-        ships in the next release; for now it gives you a stable place to expect it.
-      </p>
-      <ul className="w-full max-w-sm space-y-2 text-left text-sm text-gray-600 dark:text-gray-400">
-        {COMING_SOON_FEATURES.map((feature) => (
-          <li key={feature} className="flex items-start gap-2">
-            <span
-              aria-hidden
-              className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500 dark:bg-indigo-400"
-            />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
