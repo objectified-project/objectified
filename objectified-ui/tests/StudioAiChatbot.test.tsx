@@ -1,5 +1,6 @@
 /**
- * Unit tests for the Studio AI chatbot placement chrome (#257).
+ * Unit tests for the Studio AI chatbot placement chrome (#257) and the
+ * mounted chat surface (#258).
  *
  * Covers:
  *   - Visibility gating against the current pathname (canvas surfaces only).
@@ -7,6 +8,7 @@
  *   - Slide-out → fullscreen toggle and back.
  *   - Closing via the close button and via the Escape key.
  *   - ⌘+Shift+A / Ctrl+Shift+A keyboard toggle.
+ *   - The opened panel renders the chat conversation surface and composer.
  */
 
 import React from 'react';
@@ -23,8 +25,13 @@ jest.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
 }));
 
+jest.mock('sonner', () => ({
+  toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
+}));
+
 beforeEach(() => {
   mockUsePathname.mockReset();
+  Element.prototype.scrollIntoView = jest.fn();
 });
 
 describe('isStudioAiChatbotPath', () => {
@@ -153,5 +160,16 @@ describe('StudioAiChatbot', () => {
     mockUsePathname.mockReturnValue('/ade/dashboard');
     render(<StudioAiChatbot forceVisible />);
     expect(screen.getByTestId('studio-ai-chatbot-launcher')).toBeInTheDocument();
+  });
+
+  it('mounts the chat conversation and composer when the panel is open', () => {
+    mockUsePathname.mockReturnValue('/ade/studio/editor');
+    render(<StudioAiChatbot initialMode="slide" />);
+
+    expect(screen.getByTestId('studio-ai-chat-conversation')).toBeInTheDocument();
+    expect(screen.getByTestId('studio-ai-chat-input')).toBeInTheDocument();
+    expect(screen.getByTestId('studio-ai-chat-send')).toBeInTheDocument();
+    // Empty-state suggestions surface the prompt patterns the panel ships with.
+    expect(screen.getAllByTestId('studio-ai-chat-suggestion').length).toBeGreaterThan(0);
   });
 });
