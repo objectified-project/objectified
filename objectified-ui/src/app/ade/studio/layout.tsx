@@ -24,6 +24,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ADE_SUBHEADER_RESERVE_PX } from '../constants/subheader-layout';
 import { GitCommandPalette } from './components/GitCommandPalette';
 import StudioFooterBar from './components/StudioFooterBar';
+import { FEATURE_GITLIKE } from '@lib/feature-flags';
 
 // Helper function to check permissions
 const checkPermissions = async (condition: boolean, message: string, alertDialog: any) => {
@@ -589,7 +590,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         }}
       />
 
-      <GitCommandPalette />
+      {FEATURE_GITLIKE && <GitCommandPalette />}
 
       {/* Programmatic state of the canvas — pinned to the bottom of the studio layout.
           Hidden in presentation mode for chrome consistency with StudioHeader. */}

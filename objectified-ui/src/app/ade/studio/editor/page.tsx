@@ -225,6 +225,7 @@ import {
 } from '../components/DesignerCanvasGitMenu';
 import { BranchRecentTicker } from '../components/BranchRecentTicker';
 import { useStudioBranchSync } from '../lib/use-studio-branch-sync';
+import { FEATURE_GITLIKE } from '@lib/feature-flags';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 import {
   loadPresentationBookmarks,
@@ -375,9 +376,11 @@ const StudioContent = () => {
     setCanvasViewport,
   } = useStudio();
 
+  /* When git-like is disabled, pass empty ids so the hook short-circuits and
+     never issues GET /version-branches. The hook itself bails on empty input. */
   useStudioBranchSync({
-    projectId: contextProjectId ?? '',
-    revisionId: contextVersionId ?? '',
+    projectId: FEATURE_GITLIKE ? (contextProjectId ?? '') : '',
+    revisionId: FEATURE_GITLIKE ? (contextVersionId ?? '') : '',
     versionBranchesByProjectId,
     setVersionBranchesForProject,
     setSelectedBranchId,
@@ -1668,8 +1671,9 @@ const StudioContent = () => {
         openCanvasSearch();
       }
 
-      // GLI-05 (#2724): commit from canvas when React Flow surface is focused
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      // GLI-05 (#2724): commit from canvas when React Flow surface is focused.
+      // Disabled along with the rest of the git-like UI.
+      if (FEATURE_GITLIKE && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         const el = e.target as HTMLElement | null;
         if (el?.closest('input, textarea, select, [contenteditable="true"]')) return;
         if (!el?.closest('.react-flow')) return;
@@ -9421,11 +9425,13 @@ const StudioContent = () => {
             {!canvasPresentationActive && (
             <Panel position="top-right" className="flex flex-col items-end gap-1 z-[1002] border-0 bg-transparent p-0 shadow-none">
               <div className="flex items-center gap-1.5">
-              <DesignerCanvasGitMenu
-                ref={designerCanvasGitMenuRef}
-                versions={versions}
-                setVersions={setVersions}
-              />
+              {FEATURE_GITLIKE && (
+                <DesignerCanvasGitMenu
+                  ref={designerCanvasGitMenuRef}
+                  versions={versions}
+                  setVersions={setVersions}
+                />
+              )}
               <div className="relative" ref={layoutDropdownRef}>
                 <input
                   ref={layoutJsonImportInputRef}
@@ -10181,7 +10187,7 @@ const StudioContent = () => {
                 <Download className="w-5 h-5" />
               </button>
               </div>
-              <BranchRecentTicker />
+              {FEATURE_GITLIKE && <BranchRecentTicker />}
             </Panel>
             )}
 

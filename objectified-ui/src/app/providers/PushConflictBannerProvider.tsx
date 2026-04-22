@@ -8,6 +8,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
+import { FEATURE_GITLIKE } from '@lib/feature-flags';
 
 const STORAGE_KEY = 'objectified:push-409';
 
@@ -37,6 +38,17 @@ const PushConflictBannerContext = createContext<PushConflictBannerContextValue |
 
 function readConflictFromSession(): PushConflictState | null {
   if (typeof window === 'undefined') return null;
+  /* When git-like is disabled, ignore any persisted 409 state from a previous
+     session so the banner never re-surfaces. We also clear it from storage
+     defensively. */
+  if (!FEATURE_GITLIKE) {
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
@@ -58,6 +70,10 @@ export function PushConflictBannerProvider({ children }: { children: ReactNode }
   const [conflict, setConflict] = useState<PushConflictState | null>(readConflictFromSession);
 
   const setPushConflictFrom409 = useCallback((state: PushConflictState) => {
+    /* No-op when git-like is disabled — push/pull is gone, so 409s shouldn't
+       surface as banners. The provider must stay mounted because consumers
+       (StudioHeader, dashboard versions page) still call usePushConflictBanner(). */
+    if (!FEATURE_GITLIKE) return;
     setConflict(state);
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));

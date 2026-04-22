@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Markdown } from '@/app/components/ui/Markdown';
-import { whatsNewMarkdownComponents } from '@/app/components/ui/markdownWhatsNewComponents';
+import { githubMarkdownComponents } from '@/app/components/ui/markdownGithubComponents';
 
 interface WhatsNewDialogProps {
   isOpen: boolean;
@@ -62,7 +62,7 @@ const WhatsNewDialog: React.FC<WhatsNewDialogProps> = ({ isOpen, onClose }) => {
             <Markdown
               variant="article"
               allowHtml
-              components={whatsNewMarkdownComponents}
+              components={githubMarkdownComponents}
             >
               {markdownContent}
             </Markdown>

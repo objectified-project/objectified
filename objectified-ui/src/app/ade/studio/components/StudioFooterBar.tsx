@@ -12,6 +12,7 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import { useStudio } from '../StudioContext';
+import { FEATURE_GITLIKE } from '@lib/feature-flags';
 
 /**
  * VSCode-style status bar pinned to the bottom of the studio layout.
@@ -108,12 +109,14 @@ export default function StudioFooterBar() {
         title="Selected version (revision label)"
         tone={selectedVersionLabel ? 'default' : 'muted'}
       />
-      <Segment
-        icon={<GitBranch size={11} />}
-        label={branchLabel || '— no branch'}
-        title="Active branch tracking the selected revision"
-        tone={branchLabel ? 'default' : 'muted'}
-      />
+      {FEATURE_GITLIKE && (
+        <Segment
+          icon={<GitBranch size={11} />}
+          label={branchLabel || '— no branch'}
+          title="Active branch tracking the selected revision"
+          tone={branchLabel ? 'default' : 'muted'}
+        />
+      )}
 
       {isReadOnly ? (
         <Segment

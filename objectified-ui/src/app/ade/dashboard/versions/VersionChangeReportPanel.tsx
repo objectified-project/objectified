@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Markdown, MARKDOWN_EMPTY_EM_DASH } from '@/app/components/ui/Markdown';
+import { githubMarkdownComponents } from '@/app/components/ui/markdownGithubComponents';
 import Mustache from 'mustache';
 import { FileText, Loader2, RefreshCw, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -58,9 +59,21 @@ type TemplateSummary = {
   ownerTenantId?: string | null;
 };
 
+/**
+ * Renders change report snapshot text (header / body / footnote) using the
+ * shared GitHub-flavored component map. `allowHtml` is on because the template
+ * pipeline emits a mix of HTML and Markdown — without it, raw `<div>`/`<span>`
+ * markup leaks through as visible text and the document looks unstyled.
+ */
 function SafeMarkdown({ content, className }: { content: string; className?: string }) {
   return (
-    <Markdown variant="default" className={className} fallback={MARKDOWN_EMPTY_EM_DASH}>
+    <Markdown
+      variant="article"
+      allowHtml
+      components={githubMarkdownComponents}
+      className={className}
+      fallback={MARKDOWN_EMPTY_EM_DASH}
+    >
       {content}
     </Markdown>
   );

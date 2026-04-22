@@ -94,6 +94,7 @@ import {
   dashboardTbodyClass,
   dashboardTrHoverClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
+import { FEATURE_GITLIKE } from '@lib/feature-flags';
 
 /** Radix Select cannot use empty string as a value; maps to no successor in metadata. */
 const SUCCESSOR_SELECT_NONE = '__none__';
@@ -298,7 +299,12 @@ const Versions = () => {
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
   /** Timeline vs publication change report (CR-05, #2703); gated by `NEXT_PUBLIC_CHANGE_REPORT_UI`. */
   const [versionsMainTab, setVersionsMainTab] = useState<'timeline' | 'change-report'>('timeline');
-  const changeReportUiEnabled = process.env.NEXT_PUBLIC_CHANGE_REPORT_UI !== '0';
+  /* Change reports are part of the git-like publication flow, so the UI gate
+     is the union of the env opt-out and the master git-like feature flag.
+     When git-like is off, all change-report panels, tabs, and publish-preview
+     fetches collapse into no-ops. */
+  const changeReportUiEnabled =
+    FEATURE_GITLIKE && process.env.NEXT_PUBLIC_CHANGE_REPORT_UI !== '0';
   const [versionId, setVersionId] = useState('');
   const [autoGenerate, setAutoGenerate] = useState(true);
   const [bumpStrategy, setBumpStrategy] = useState<'patch' | 'minor'>('patch');
@@ -2636,40 +2642,46 @@ const Versions = () => {
                 <Copy className="h-4 w-4 mr-2" />
                 Compare
               </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setMergeSourceBranch('');
-                  setMergeTargetBranch('');
-                  setMergePreviewData(null);
-                  setMergeCompat(null);
-                  setShowMergeDialog(true);
-                }}
-                disabled={!selectedProjectId || versionBranches.length < 2}
-                title={versionBranches.length < 2 ? 'Create at least two named branches to merge' : undefined}
-              >
-                <GitMerge className="h-4 w-4 mr-2" />
-                Merge branches
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={handleNewVersionClick}
-                disabled={!selectedProjectId}
-                title="Start a new version (fresh release line, defaults to a minor bump)"
-              >
-                <GitFork className="h-4 w-4 mr-2" />
-                New Version
-              </Button>
-              <Button onClick={handleCreateClick} disabled={!selectedProjectId || versions.length === 0} title={versions.length === 0 ? 'No versions yet — use New Version to create the first one' : 'Create a new schema revision (commit)'}>
-                <Plus className="h-4 w-4 mr-2" />
-                Commit
-              </Button>
+              {FEATURE_GITLIKE && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setMergeSourceBranch('');
+                    setMergeTargetBranch('');
+                    setMergePreviewData(null);
+                    setMergeCompat(null);
+                    setShowMergeDialog(true);
+                  }}
+                  disabled={!selectedProjectId || versionBranches.length < 2}
+                  title={versionBranches.length < 2 ? 'Create at least two named branches to merge' : undefined}
+                >
+                  <GitMerge className="h-4 w-4 mr-2" />
+                  Merge branches
+                </Button>
+              )}
+              {FEATURE_GITLIKE && (
+                <Button
+                  variant="secondary"
+                  onClick={handleNewVersionClick}
+                  disabled={!selectedProjectId}
+                  title="Start a new version (fresh release line, defaults to a minor bump)"
+                >
+                  <GitFork className="h-4 w-4 mr-2" />
+                  New Version
+                </Button>
+              )}
+              {FEATURE_GITLIKE && (
+                <Button onClick={handleCreateClick} disabled={!selectedProjectId || versions.length === 0} title={versions.length === 0 ? 'No versions yet — use New Version to create the first one' : 'Create a new schema revision (commit)'}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Commit
+                </Button>
+              )}
             </div>
           </div>
         </div>
       </header>
 
-      {conflict && conflict.projectId === selectedProjectId && selectedProjectId && (
+      {FEATURE_GITLIKE && conflict && conflict.projectId === selectedProjectId && selectedProjectId && (
         <div className="border-b border-amber-200/80 bg-amber-50/50 px-6 py-3 dark:border-amber-800/50 dark:bg-amber-950/25">
           <div>
             <ServerAheadPushBanner
@@ -2739,7 +2751,7 @@ const Versions = () => {
         />
       ) : null}
 
-      {(!showChangeReportTab || versionsMainTab === 'timeline') && selectedProjectId && versionTags.length > 0 && (
+      {FEATURE_GITLIKE && (!showChangeReportTab || versionsMainTab === 'timeline') && selectedProjectId && versionTags.length > 0 && (
         <div className={dashboardPanelPaddedClass}>
           <div className="flex items-center gap-2 mb-3">
             <Tag className="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -2801,7 +2813,7 @@ const Versions = () => {
         </div>
       )}
 
-      {(!showChangeReportTab || versionsMainTab === 'timeline') && selectedProjectId && versionBranches.length > 0 && (
+      {FEATURE_GITLIKE && (!showChangeReportTab || versionsMainTab === 'timeline') && selectedProjectId && versionBranches.length > 0 && (
         <div id="ade-named-branches-panel" className={dashboardPanelPaddedClass}>
           <div className="flex items-center gap-2 mb-3">
             <GitBranch className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
@@ -2959,40 +2971,42 @@ const Versions = () => {
               </Button>
             ) : null}
           </div>
-          <div className="mb-6" ref={historyGraphSectionRef}>
-            <VersionHistoryGraphPanel
-              key={versionBranches.map((b) => b.id).sort().join('|') || 'graph-branches'}
-              versions={displayVersions.map((v) => ({
-                id: v.id,
-                version_id: v.version_id,
-                parent_version_id: v.parent_version_id ?? null,
-                merge_parent_version_id: v.merge_parent_version_id ?? null,
-                created_at: v.created_at,
-                shortMessage: v.shortMessage,
-                commitMessage: v.message ?? null,
-                authorName: v.author ?? v.creator_name ?? null,
-                creatorId: v.creator_id ?? null,
-              }))}
-              branches={versionBranches.map((b) => ({
-                id: b.id,
-                name: b.name,
-                tip_version_id: b.tip_version_id,
-              }))}
-              tags={versionTags.map((t) => ({
-                id: t.id,
-                name: t.name,
-                version_id: t.version_id,
-                immutable: t.immutable,
-                protected: t.protected,
-              }))}
-              headRevisionId={headRevisionId}
-              windowSize={historyGraphWindowSize}
-              onWindowSizeIncrease={setHistoryGraphWindowSize}
-              onCompareToPrimaryParent={handleHistoryGraphCompareToParent}
-              onViewSpec={handleHistoryGraphViewSpec}
-              onBranchFromRevision={openBranchFromRevisionDialog}
-            />
-          </div>
+          {FEATURE_GITLIKE && (
+            <div className="mb-6" ref={historyGraphSectionRef}>
+              <VersionHistoryGraphPanel
+                key={versionBranches.map((b) => b.id).sort().join('|') || 'graph-branches'}
+                versions={displayVersions.map((v) => ({
+                  id: v.id,
+                  version_id: v.version_id,
+                  parent_version_id: v.parent_version_id ?? null,
+                  merge_parent_version_id: v.merge_parent_version_id ?? null,
+                  created_at: v.created_at,
+                  shortMessage: v.shortMessage,
+                  commitMessage: v.message ?? null,
+                  authorName: v.author ?? v.creator_name ?? null,
+                  creatorId: v.creator_id ?? null,
+                }))}
+                branches={versionBranches.map((b) => ({
+                  id: b.id,
+                  name: b.name,
+                  tip_version_id: b.tip_version_id,
+                }))}
+                tags={versionTags.map((t) => ({
+                  id: t.id,
+                  name: t.name,
+                  version_id: t.version_id,
+                  immutable: t.immutable,
+                  protected: t.protected,
+                }))}
+                headRevisionId={headRevisionId}
+                windowSize={historyGraphWindowSize}
+                onWindowSizeIncrease={setHistoryGraphWindowSize}
+                onCompareToPrimaryParent={handleHistoryGraphCompareToParent}
+                onViewSpec={handleHistoryGraphViewSpec}
+                onBranchFromRevision={openBranchFromRevisionDialog}
+              />
+            </div>
+          )}
         <div className={dashboardTableWrapClass}>
           <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-3 bg-gray-50 dark:bg-gray-900">
             <span className="text-sm text-gray-600 dark:text-gray-400">Lifecycle filter</span>
@@ -3151,49 +3165,55 @@ const Versions = () => {
                                 <Eye className="w-4 h-4 text-purple-500" />
                                 View Spec
                               </button>
-                              <button
-                                type="button"
-                                disabled={!headRevisionId || version.id === headRevisionId}
-                                title={
-                                  !headRevisionId
-                                    ? 'No head revision'
-                                    : version.id === headRevisionId
-                                      ? 'This revision is already the current head'
-                                      : 'OpenAPI diff: this revision → latest (current) head'
-                                }
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenVersionDropdown(null);
-                                  void handleCompareWithCurrent(version.id);
-                                }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                <GitCompareArrows className="w-4 h-4 text-indigo-500 shrink-0" aria-hidden />
-                                Compare with current
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenVersionDropdown(null);
-                                  handleRowAction('relationshipGraph', version);
-                                }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                              >
-                                <Network className="w-4 h-4 text-teal-500" />
-                                Relationship graph
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenVersionDropdown(null);
-                                  handleRowAction('branchFrom', version);
-                                }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                              >
-                                <GitBranch className="w-4 h-4 text-indigo-500" />
-                                Branch from here
-                              </button>
-                              {versionBranches.length > 0 && (
+                              {FEATURE_GITLIKE && (
+                                <button
+                                  type="button"
+                                  disabled={!headRevisionId || version.id === headRevisionId}
+                                  title={
+                                    !headRevisionId
+                                      ? 'No head revision'
+                                      : version.id === headRevisionId
+                                        ? 'This revision is already the current head'
+                                        : 'OpenAPI diff: this revision → latest (current) head'
+                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenVersionDropdown(null);
+                                    void handleCompareWithCurrent(version.id);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <GitCompareArrows className="w-4 h-4 text-indigo-500 shrink-0" aria-hidden />
+                                  Compare with current
+                                </button>
+                              )}
+                              {FEATURE_GITLIKE && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenVersionDropdown(null);
+                                    handleRowAction('relationshipGraph', version);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                  <Network className="w-4 h-4 text-teal-500" />
+                                  Relationship graph
+                                </button>
+                              )}
+                              {FEATURE_GITLIKE && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenVersionDropdown(null);
+                                    handleRowAction('branchFrom', version);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                  <GitBranch className="w-4 h-4 text-indigo-500" />
+                                  Branch from here
+                                </button>
+                              )}
+                              {FEATURE_GITLIKE && versionBranches.length > 0 && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -3206,28 +3226,32 @@ const Versions = () => {
                                   Rollback branch to this revision…
                                 </button>
                               )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenVersionDropdown(null);
-                                  handleRowAction('forkToProject', version);
-                                }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                              >
-                                <GitFork className="w-4 h-4 text-violet-500" />
-                                Fork to another project…
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenVersionDropdown(null);
-                                  handleRowAction('tagFrom', version);
-                                }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                              >
-                                <Tag className="w-4 h-4 text-amber-600" />
-                                Tag this revision
-                              </button>
+                              {FEATURE_GITLIKE && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenVersionDropdown(null);
+                                    handleRowAction('forkToProject', version);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                  <GitFork className="w-4 h-4 text-violet-500" />
+                                  Fork to another project…
+                                </button>
+                              )}
+                              {FEATURE_GITLIKE && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenVersionDropdown(null);
+                                    handleRowAction('tagFrom', version);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                  <Tag className="w-4 h-4 text-amber-600" />
+                                  Tag this revision
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -3289,7 +3313,7 @@ const Versions = () => {
                                   Unpublish
                                 </button>
                               )}
-                              {!hasClassSchemaMap[version.id] && (version.creator_id === currentUserId || effectiveIsAdmin) && (
+                              {FEATURE_GITLIKE && !hasClassSchemaMap[version.id] && (version.creator_id === currentUserId || effectiveIsAdmin) && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -3304,7 +3328,7 @@ const Versions = () => {
                                   {freezingSchemaVersionId === version.id ? 'Freezing...' : 'Freeze schema'}
                                 </button>
                               )}
-                              {effectiveIsAdmin && (
+                              {FEATURE_GITLIKE && effectiveIsAdmin && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -3317,20 +3341,24 @@ const Versions = () => {
                                   {version.revisionLocked ? 'Unlock revision (allow delete)' : 'Lock revision (delete policy)'}
                                 </button>
                               )}
-                              <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenVersionDropdown(null);
-                                  handleRowAction('delete', version);
-                                }}
-                                disabled={!!version.revisionLocked && !effectiveIsAdmin}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                title={version.revisionLocked && !effectiveIsAdmin ? 'Revision is locked; only a tenant admin can delete' : undefined}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                Delete
-                              </button>
+                              {FEATURE_GITLIKE && (
+                                <>
+                                  <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenVersionDropdown(null);
+                                      handleRowAction('delete', version);
+                                    }}
+                                    disabled={!!version.revisionLocked && !effectiveIsAdmin}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title={version.revisionLocked && !effectiveIsAdmin ? 'Revision is locked; only a tenant admin can delete' : undefined}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </>
@@ -3348,8 +3376,8 @@ const Versions = () => {
         </div>
       </main>
 
-      {/* Commit new revision (Radix dialog + validation #2564) */}
-      <Dialog open={showCreateDialog} onOpenChange={(open) => !isLoading && setShowCreateDialog(open)}>
+      {/* Commit new revision (Radix dialog + validation #2564) — gated off with the rest of git-like. */}
+      <Dialog open={FEATURE_GITLIKE && showCreateDialog} onOpenChange={(open) => !isLoading && setShowCreateDialog(open)}>
         <DialogContent
           className="flex max-h-[min(90vh,56rem)] max-w-xl flex-col gap-4 overflow-hidden"
           aria-describedby="commit-dialog-desc"
@@ -4823,7 +4851,7 @@ const Versions = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showForkDialog} onOpenChange={(open) => !forkSaving && setShowForkDialog(open)}>
+      <Dialog open={FEATURE_GITLIKE && showForkDialog} onOpenChange={(open) => !forkSaving && setShowForkDialog(open)}>
         <DialogContent className="max-w-lg" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Fork to another project</DialogTitle>
@@ -4923,7 +4951,7 @@ const Versions = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showBranchDialog} onOpenChange={(open) => !branchSaving && setShowBranchDialog(open)}>
+      <Dialog open={FEATURE_GITLIKE && showBranchDialog} onOpenChange={(open) => !branchSaving && setShowBranchDialog(open)}>
         <DialogContent className="max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Create named branch</DialogTitle>
@@ -4954,7 +4982,7 @@ const Versions = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showTagDialog} onOpenChange={(open) => !tagSaving && setShowTagDialog(open)}>
+      <Dialog open={FEATURE_GITLIKE && showTagDialog} onOpenChange={(open) => !tagSaving && setShowTagDialog(open)}>
         <DialogContent className="max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Create version tag</DialogTitle>
@@ -5027,7 +5055,7 @@ const Versions = () => {
       </Dialog>
 
       <Dialog
-        open={showMergeDialog}
+        open={FEATURE_GITLIKE && showMergeDialog}
         onOpenChange={(open) => {
           if (!open) {
             setMergeCompat(null);
@@ -5199,7 +5227,7 @@ const Versions = () => {
       </Dialog>
 
       <Dialog
-        open={showRollbackDialog}
+        open={FEATURE_GITLIKE && showRollbackDialog}
         onOpenChange={(open) => {
           if (!rollbackPreviewLoading && !rollbackApplyLoading) {
             setShowRollbackDialog(open);
@@ -5389,9 +5417,9 @@ const Versions = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Relationship graph (#322) */}
+      {/* Relationship graph (#322) — gated with the rest of git-like UI. */}
       <RelationshipGraphDialog
-        open={showRelationshipGraphDialog}
+        open={FEATURE_GITLIKE && showRelationshipGraphDialog}
         onOpenChange={setShowRelationshipGraphDialog}
         version={relationshipGraphVersion}
         projectName={projects.find(p => p.id === relationshipGraphVersion?.project_id)?.name ?? ''}

@@ -35,6 +35,7 @@ import {
 } from '@/app/utils/studio-sync-indicators';
 import { StudioSyncStatusChips } from './StudioSyncStatusChips';
 import { DraftLockHeaderChip } from './DraftLockHeaderChip';
+import { FEATURE_GITLIKE } from '@lib/feature-flags';
 
 interface Project {
   id: string;
@@ -599,7 +600,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           </button>
         ) : null}
 
-        {selectedProjectId && selectedVersionId ? (
+        {FEATURE_GITLIKE && selectedProjectId && selectedVersionId ? (
           <StudioSyncStatusChips
             localDirty={syncLocalDirty}
             authoredRevisionCount={authoredRevisionCount}
@@ -607,7 +608,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           />
         ) : null}
 
-        {selectedProjectId && selectedVersionId ? (
+        {FEATURE_GITLIKE && selectedProjectId && selectedVersionId ? (
           <DraftLockHeaderChip
             projectId={selectedProjectId}
             versionId={selectedVersionId}
@@ -1106,7 +1107,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           </>
         )}
       </div>
-      {selectedVersionDeprecated && deprecatedRevisionOpen && selectedVersion ? (
+      {FEATURE_GITLIKE && selectedVersionDeprecated && deprecatedRevisionOpen && selectedVersion ? (
         <div id="studio-deprecated-revision-panel" className="mt-2 w-full min-w-0 px-1">
           <RevisionDeprecationBanner
             roleLabel="Studio"
@@ -1116,7 +1117,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           />
         </div>
       ) : null}
-      {serverAheadForProject && (
+      {FEATURE_GITLIKE && serverAheadForProject && (
         <div className="mt-2 w-full min-w-0 px-1">
           <ServerAheadPushBanner
             detail={serverAheadForProject.message}

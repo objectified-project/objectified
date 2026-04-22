@@ -5,10 +5,15 @@ import type { Components } from 'react-markdown';
 import { ExternalLink } from 'lucide-react';
 
 /**
- * Rich component map for static What’s New markdown (`/WHATS_NEW.md`).
- * Paired with `<Markdown allowHtml variant="article" components={whatsNewMarkdownComponents} />`.
+ * Rich, GitHub-flavored component map for long-form markdown surfaces:
+ *   - What’s New (`/WHATS_NEW.md`)
+ *   - Version change reports (header / body / footnote)
+ *   - Any other readable document rendered through `<Markdown />`
+ *
+ * Pair with `<Markdown allowHtml variant="article" components={githubMarkdownComponents} />`
+ * for content that may contain inline HTML (e.g. template-rendered snapshots).
  */
-export const whatsNewMarkdownComponents: Components = {
+export const githubMarkdownComponents: Components = {
   h1: ({ children }) => (
     <h1 className="text-2xl font-bold mt-0 mb-5 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-600 pb-3">
       {children}
