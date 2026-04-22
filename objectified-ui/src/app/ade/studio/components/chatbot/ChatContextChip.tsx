@@ -178,9 +178,9 @@ function DetailListSection({ label, items, cap, testId }: DetailListSectionProps
         {label}
       </p>
       <ul className="mt-1 flex flex-wrap gap-1">
-        {visible.map((item) => (
+        {visible.map((item, index) => (
           <li
-            key={item}
+            key={`${item}-${index}`}
             className="rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-700 dark:bg-gray-800 dark:text-gray-200"
           >
             {item}
