@@ -142,7 +142,7 @@ describe('createDemoChatResponder', () => {
         { id: 'u1', role: 'user', content: 'Generate an OpenAPI spec for me' },
         { id: 'a1', role: 'assistant', content: initialReply },
         { id: 'u2', role: 'user', content: prompt },
-      ].slice(0, 2); // pass only the prior turns; prompt is supplied separately.
+      ]; // mirror production: messages includes the latest user turn as well.
     }
 
     it('refines the previously-generated spec when the user asks to add a property', async () => {

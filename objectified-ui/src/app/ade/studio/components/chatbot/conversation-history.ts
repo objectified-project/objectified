@@ -89,20 +89,28 @@ const CLARIFICATION_LEADERS = [
 ];
 
 /**
- * Build a {@link ChatHistorySummary} from prior transcript + the new prompt.
+ * Build a {@link ChatHistorySummary} from the full transcript plus the new
+ * prompt text.
  *
- * `priorMessages` is the transcript BEFORE the user's just-sent message —
- * matching the shape the {@link ChatSendContext.messages} field carries when
- * the chat shell invokes the responder.
+ * `messages` is the transcript INCLUDING the user's just-sent message, which
+ * is typically the final entry in the array when the chat shell invokes the
+ * responder.
  */
 export function summarizeConversationHistory(
-  priorMessages: ChatMessage[],
+  messages: ChatMessage[],
   prompt: string,
 ): ChatHistorySummary {
   const trimmedPrompt = prompt.trim();
   const lower = trimmedPrompt.toLowerCase();
+  const lastMessage = messages[messages.length - 1];
+  const priorMessages =
+    lastMessage &&
+    lastMessage.role === 'user' &&
+    lastMessage.content.trim() === trimmedPrompt
+      ? messages.slice(0, -1)
+      : messages;
 
-  const userTurns = priorMessages.filter((m) => m.role === 'user').length + 1;
+  const userTurns = messages.filter((m) => m.role === 'user').length;
   const assistantTurns = priorMessages.filter(
     (m) => m.role === 'assistant' && !m.pending && m.content.trim().length > 0,
   ).length;
@@ -255,7 +263,7 @@ function isJsonSchemaType(value: string): boolean {
 }
 
 function extractRefinementOps(prompt: string): ChatRefinementOp[] {
-  const ops: ChatRefinementOp[] = [];
+  const indexed: Array<{ index: number; op: ChatRefinementOp }> = [];
   const seen = new Set<string>();
   for (const { regex, build } of REFINE_PATTERNS) {
     regex.lastIndex = 0;
@@ -266,10 +274,11 @@ function extractRefinementOps(prompt: string): ChatRefinementOp[] {
       const key = opKey(op);
       if (seen.has(key)) continue;
       seen.add(key);
-      ops.push(op);
+      indexed.push({ index: match.index, op });
     }
   }
-  return ops;
+  indexed.sort((a, b) => a.index - b.index);
+  return indexed.map(({ op }) => op);
 }
 
 function opKey(op: ChatRefinementOp): string {

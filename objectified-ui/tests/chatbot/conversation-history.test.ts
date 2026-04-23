@@ -50,7 +50,7 @@ const SAMPLE_SPEC_REPLY = [
 
 describe('summarizeConversationHistory', () => {
   it('classifies the first turn when there is no prior assistant reply', () => {
-    const summary = summarizeConversationHistory([], 'Sketch a User class');
+    const summary = summarizeConversationHistory([user('Sketch a User class')], 'Sketch a User class');
     expect(summary.intent).toBe('first-turn');
     expect(summary.userTurnCount).toBe(1);
     expect(summary.assistantTurnCount).toBe(0);
@@ -59,7 +59,7 @@ describe('summarizeConversationHistory', () => {
   });
 
   it('treats unrelated follow-ups as standalone when no other pattern matches', () => {
-    const messages: ChatMessage[] = [user('hi'), assistant('hello there')];
+    const messages: ChatMessage[] = [user('hi'), assistant('hello there'), user('sketch a wholly new schema')];
     const summary = summarizeConversationHistory(messages, 'sketch a wholly new schema');
     expect(summary.intent).toBe('standalone');
     expect(summary.userTurnCount).toBe(2);
@@ -70,6 +70,7 @@ describe('summarizeConversationHistory', () => {
     const messages: ChatMessage[] = [
       user('first'),
       { id: 'pending', role: 'assistant', content: '', pending: true },
+      user('follow up'),
     ];
     const summary = summarizeConversationHistory(messages, 'follow up');
     expect(summary.assistantTurnCount).toBe(0);
@@ -77,19 +78,19 @@ describe('summarizeConversationHistory', () => {
   });
 
   it('detects clarification questions about the previous reply', () => {
-    const messages: ChatMessage[] = [user('q'), assistant('a long answer')];
+    const messages: ChatMessage[] = [user('q'), assistant('a long answer'), user('What does that mean?')];
     const summary = summarizeConversationHistory(messages, 'What does that mean?');
     expect(summary.intent).toBe('clarification');
   });
 
   it('detects iteration intent for "actually" / "instead" prompts', () => {
-    const messages: ChatMessage[] = [user('q'), assistant('first try')];
+    const messages: ChatMessage[] = [user('q'), assistant('first try'), user('actually, try again with fewer fields')];
     const summary = summarizeConversationHistory(messages, 'actually, try again with fewer fields');
     expect(summary.intent).toBe('iteration');
   });
 
   it('detects "more like X" comparison prompts and captures the subject', () => {
-    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY), user('Make it more like Stripe Charges')];
     const summary = summarizeConversationHistory(
       messages,
       'Make it more like Stripe Charges',
@@ -99,36 +100,37 @@ describe('summarizeConversationHistory', () => {
   });
 
   it('detects refine-spec intent when a prior spec exists and refinement words appear', () => {
-    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY), user('refine that please')];
     const summary = summarizeConversationHistory(messages, 'refine that please');
     expect(summary.intent).toBe('refine-spec');
     expect(summary.lastAssistantSpec).not.toBeNull();
   });
 
   it('returns standalone (not refine-spec) when refinement words appear but no spec is present', () => {
-    const messages: ChatMessage[] = [user('q'), assistant('plain text reply')];
+    const messages: ChatMessage[] = [user('q'), assistant('plain text reply'), user('refine that please')];
     const summary = summarizeConversationHistory(messages, 'refine that please');
     expect(summary.intent).toBe('standalone');
     expect(summary.lastAssistantSpec).toBeNull();
   });
 
   it('extracts add / remove / require / rename ops from the prompt', () => {
-    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const prompt = 'add a phone field of type string, remove priceCents, make name required, rename id to productId';
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY), user(prompt)];
     const summary = summarizeConversationHistory(
       messages,
-      'add a phone field of type string, remove priceCents, make name required, rename id to productId',
+      prompt,
     );
     expect(summary.intent).toBe('refine-spec');
     expect(summary.refinementOps).toEqual<ChatRefinementOp[]>([
-      { kind: 'rename-property', from: 'id', to: 'productId' },
+      { kind: 'add-property', name: 'phone', type: 'string' },
       { kind: 'remove-property', name: 'priceCents' },
       { kind: 'require-property', name: 'name' },
-      { kind: 'add-property', name: 'phone', type: 'string' },
+      { kind: 'rename-property', from: 'id', to: 'productId' },
     ]);
   });
 
   it('parses concise add-property phrasing like "add timestamps integer"', () => {
-    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY), user('add createdAt integer')];
     const summary = summarizeConversationHistory(messages, 'add createdAt integer');
     expect(summary.refinementOps).toContainEqual({
       kind: 'add-property',
@@ -144,6 +146,7 @@ describe('summarizeConversationHistory', () => {
       messages.push(user(`u-${i}`, `u-${i}`));
       messages.push(assistant(`a-${i}-${long}`, `a-${i}`));
     }
+    messages.push(user('next')); // mirror production: include the current user turn.
     const summary = summarizeConversationHistory(messages, 'next');
     expect(summary.recentExcerpts.length).toBeLessThanOrEqual(CHAT_HISTORY_TURN_CAP);
     for (const e of summary.recentExcerpts) {
@@ -152,7 +155,7 @@ describe('summarizeConversationHistory', () => {
   });
 
   it('replaces fenced code blocks in excerpts with a placeholder', () => {
-    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY), user('next')];
     const summary = summarizeConversationHistory(messages, 'next');
     const last = summary.recentExcerpts[summary.recentExcerpts.length - 1];
     expect(last.content).toContain('[code block omitted]');
@@ -162,12 +165,12 @@ describe('summarizeConversationHistory', () => {
 
 describe('buildConversationHistoryPreamble', () => {
   it('returns an empty string for the first turn', () => {
-    const summary = summarizeConversationHistory([], 'hello');
+    const summary = summarizeConversationHistory([user('hello')], 'hello');
     expect(buildConversationHistoryPreamble(summary)).toBe('');
   });
 
   it('mentions turn counters and intent when refining a spec', () => {
-    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY), user('add a phone field')];
     const summary = summarizeConversationHistory(messages, 'add a phone field');
     const preamble = buildConversationHistoryPreamble(summary);
     expect(preamble).toMatch(/Turn 2 of an ongoing thread/);
@@ -176,14 +179,14 @@ describe('buildConversationHistoryPreamble', () => {
   });
 
   it('mentions the comparison subject when present', () => {
-    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY), user('Make it more like FHIR Patient')];
     const summary = summarizeConversationHistory(messages, 'Make it more like FHIR Patient');
     const preamble = buildConversationHistoryPreamble(summary);
     expect(preamble).toMatch(/look more like: FHIR Patient/);
   });
 
   it('describes clarification intent without inventing schema edits', () => {
-    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY), user('What does priceCents mean?')];
     const summary = summarizeConversationHistory(messages, 'What does priceCents mean?');
     const preamble = buildConversationHistoryPreamble(summary);
     expect(preamble).toMatch(/clarifying question/);
