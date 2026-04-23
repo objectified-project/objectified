@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MDM · Stewardship Inbox</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-sky-500 flex items-center justify-center"><i data-lucide="gem" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">MDM</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Stewardship</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Inbox</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto p-4 h-full">
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> MDM</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Overview</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Master Data</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="domains.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="library" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Domains</span></a></li>
+            <li><a href="golden-record.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="gem" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Golden Records</span></a></li>
+            <li><a href="xref-map.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="link" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Cross-Reference</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Match &amp; Merge</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="match-rules.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-merge" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Rules</span></a></li>
+            <li><a href="merge-candidates.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="combine" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Candidates</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">142</span></a></li>
+            <li><a href="survivorship.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="crown" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Survivorship</span></a></li>
+            <li><a href="unmerge.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="split" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Unmerge</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Stewardship</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="stewardship-inbox.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10"><i data-lucide="inbox" class="w-5 h-5 text-indigo-500"></i><span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Inbox</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">23</span></a></li>
+            <li><a href="steward-workspace.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="columns-3" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Workspace</span></a></li>
+            <li><a href="approvals.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="badge-check" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Approvals</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Quality</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="quality-dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="gauge" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">DQ Dashboard</span></a></li>
+            <li><a href="profiling.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="bar-chart-3" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Profiling</span></a></li>
+            <li><a href="dq-rules.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="check-square" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Rules</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Reference</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="hierarchies.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="folder-tree" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Hierarchies</span></a></li>
+            <li><a href="reference-data.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="book-open" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Reference Data</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div>
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Distribution</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="sources.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="plug" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Sources</span><span class="text-[10px] text-gray-400 mono">7</span></a></li>
+            <li><a href="lineage.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-fork" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Lineage</span></a></li>
+            <li><a href="subscriptions.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="rss" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Subscriptions</span></a></li>
+            <li><a href="publish-jobs.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="send" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Publish Jobs</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">Ent</span></a></li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div class="px-6 py-4 flex items-end justify-between">
+          <div>
+            <h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="inbox" class="w-6 h-6 text-indigo-500"></i> Stewardship Inbox</h2>
+            <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">Unified queue of work that needs human eyes — across match, DQ, override and unmerge requests · <span class="mono">issue 3.1</span></p>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="relative">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+              <input type="text" placeholder="Filter · key, source, value…" class="pl-9 pr-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 w-56 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+            </div>
+            <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="users" class="w-4 h-4"></i> Assignees</button>
+            <button class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"><i data-lucide="zap" class="w-4 h-4"></i> Open next</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-6">
+
+        <!-- KPI strip -->
+        <section class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500">Open</p>
+            <p class="text-2xl font-bold mt-1 mono">23</p>
+            <p class="text-[11px] text-gray-500 mt-1">across 5 domains</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-rose-200 dark:border-rose-700/40 p-4">
+            <p class="text-xs text-rose-500">Breaching SLA</p>
+            <p class="text-2xl font-bold mt-1 mono text-rose-500">6</p>
+            <p class="text-[11px] text-rose-500 mt-1">oldest 12 h over</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500">Mine</p>
+            <p class="text-2xl font-bold mt-1 mono">7</p>
+            <p class="text-[11px] text-gray-500 mt-1">@kshim</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500">Closed today</p>
+            <p class="text-2xl font-bold mt-1 mono text-emerald-500">38</p>
+            <p class="text-[11px] text-emerald-600 mt-1 inline-flex items-center gap-1"><i data-lucide="trending-up" class="w-3 h-3"></i> +12 vs avg</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500">Avg handle time</p>
+            <p class="text-2xl font-bold mt-1 mono">4 m 12 s</p>
+            <p class="text-[11px] text-gray-500 mt-1">p50 · 30 d</p>
+          </div>
+        </section>
+
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+
+          <!-- Filter rail -->
+          <aside class="xl:col-span-3 space-y-4">
+
+            <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 text-xs font-semibold uppercase tracking-wider text-gray-500">Type</div>
+              <ul class="text-sm">
+                <li class="px-4 py-2 flex items-center justify-between bg-indigo-500/10"><span class="inline-flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-indigo-500"></i> All</span><span class="mono text-xs text-indigo-600">23</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><i data-lucide="combine" class="w-4 h-4 text-amber-500"></i> Merge candidate</span><span class="mono text-xs text-gray-500">9</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><i data-lucide="check-square" class="w-4 h-4 text-rose-500"></i> DQ rule breach</span><span class="mono text-xs text-gray-500">6</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><i data-lucide="user-cog" class="w-4 h-4 text-purple-500"></i> Field override</span><span class="mono text-xs text-gray-500">4</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><i data-lucide="split" class="w-4 h-4 text-rose-500"></i> Unmerge request</span><span class="mono text-xs text-gray-500">2</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><i data-lucide="folder-tree" class="w-4 h-4 text-blue-500"></i> Hierarchy change</span><span class="mono text-xs text-gray-500">2</span></li>
+              </ul>
+            </section>
+
+            <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 text-xs font-semibold uppercase tracking-wider text-gray-500">Domain</div>
+              <ul class="text-sm">
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-sky-500"></span> Customer</span><span class="mono text-xs text-gray-500">12</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-fuchsia-500"></span> Product</span><span class="mono text-xs text-gray-500">5</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-500"></span> Location</span><span class="mono text-xs text-gray-500">3</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-orange-500"></span> Supplier</span><span class="mono text-xs text-gray-500">2</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-purple-500"></span> Employee</span><span class="mono text-xs text-gray-500">1</span></li>
+              </ul>
+            </section>
+
+            <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 text-xs font-semibold uppercase tracking-wider text-gray-500">Saved views</div>
+              <ul class="text-sm">
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><i data-lucide="star" class="w-3.5 h-3.5 text-amber-500"></i> SLA breaches</span><span class="mono text-xs text-rose-500">6</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><i data-lucide="user" class="w-3.5 h-3.5 text-indigo-500"></i> My queue</span><span class="mono text-xs text-gray-500">7</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><i data-lucide="shield-alert" class="w-3.5 h-3.5 text-rose-500"></i> Safe-field blocked</span><span class="mono text-xs text-gray-500">2</span></li>
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"><span class="inline-flex items-center gap-2"><i data-lucide="cpu" class="w-3.5 h-3.5 text-emerald-500"></i> ML ambiguous</span><span class="mono text-xs text-gray-500">4</span></li>
+              </ul>
+            </section>
+
+          </aside>
+
+          <!-- Task list -->
+          <section class="xl:col-span-9 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <header class="px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center gap-3 flex-wrap">
+              <div class="flex items-center gap-2">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-300" />
+                <span class="text-xs text-gray-500">23 tasks · sorted by priority</span>
+              </div>
+              <div class="ml-auto flex items-center gap-2">
+                <div class="flex items-center gap-1 rounded-md border border-gray-200 dark:border-gray-700 p-0.5 text-xs">
+                  <button class="px-2 py-1 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">Open · 23</button>
+                  <button class="px-2 py-1 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">Snoozed · 4</button>
+                  <button class="px-2 py-1 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">Closed · 412</button>
+                </div>
+                <button class="px-2 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1"><i data-lucide="arrow-up-down" class="w-3.5 h-3.5"></i> SLA ↓</button>
+              </div>
+            </header>
+
+            <ul class="divide-y divide-gray-100 dark:divide-gray-700/60">
+
+              <!-- Task: SLA breach merge -->
+              <li class="px-5 py-3 hover:bg-gray-50/40 dark:hover:bg-gray-900/30 cursor-pointer flex items-center gap-3">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-300" />
+                <span class="w-1 h-10 rounded bg-rose-500"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Merge candidate</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">Customer</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 inline-flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3 h-3"></i> SLA -2 h</span>
+                    <span class="text-sm font-medium">Acme Holdings · 3-way ambiguous match</span>
+                  </div>
+                  <p class="text-[11px] text-gray-500 mt-1 mono">cand_M00142 · score 0.81 · SFDC + NetSuite + HubSpot · queued 6 h ago</p>
+                </div>
+                <div class="flex items-center -space-x-2">
+                  <div class="w-6 h-6 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-gray-800 flex items-center justify-center text-[10px] text-white font-semibold">KS</div>
+                </div>
+                <a href="steward-workspace.html" class="px-2 py-1 text-xs rounded text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 inline-flex items-center gap-1">Open <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+              </li>
+
+              <!-- Task: DQ breach -->
+              <li class="px-5 py-3 hover:bg-gray-50/40 dark:hover:bg-gray-900/30 cursor-pointer flex items-center gap-3">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-300" />
+                <span class="w-1 h-10 rounded bg-rose-500"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">DQ breach</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Location</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 inline-flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3 h-3"></i> SLA -12 h</span>
+                    <span class="text-sm font-medium">postal_code missing · 412 records</span>
+                  </div>
+                  <p class="text-[11px] text-gray-500 mt-1 mono">rule_DQ-LOC-04 · completeness drop 3.2 % · NetSuite source · since 2 d</p>
+                </div>
+                <div class="flex items-center -space-x-2">
+                  <div class="w-6 h-6 rounded-full bg-pink-500 ring-2 ring-white dark:ring-gray-800 flex items-center justify-center text-[10px] text-white font-semibold">EM</div>
+                </div>
+                <a href="dq-rules.html" class="px-2 py-1 text-xs rounded text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 inline-flex items-center gap-1">Open <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+              </li>
+
+              <!-- Task: safe field merge banking -->
+              <li class="px-5 py-3 hover:bg-gray-50/40 dark:hover:bg-gray-900/30 cursor-pointer flex items-center gap-3">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-300" />
+                <span class="w-1 h-10 rounded bg-rose-500"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Merge candidate</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">Supplier</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> Safe-field</span>
+                    <span class="text-sm font-medium">Pacific Logistics · banking conflict</span>
+                  </div>
+                  <p class="text-[11px] text-gray-500 mt-1 mono">cand_M00138 · score 0.88 · NetSuite ****1284 vs Coupa ****8702 · Finance approval needed</p>
+                </div>
+                <div class="flex items-center -space-x-2">
+                  <div class="w-6 h-6 rounded-full bg-rose-500 ring-2 ring-white dark:ring-gray-800 flex items-center justify-center text-[10px] text-white font-semibold">CV</div>
+                </div>
+                <a href="approvals.html" class="px-2 py-1 text-xs rounded text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 inline-flex items-center gap-1">Open <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+              </li>
+
+              <!-- Task: field override -->
+              <li class="px-5 py-3 hover:bg-gray-50/40 dark:hover:bg-gray-900/30 cursor-pointer flex items-center gap-3">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-300" />
+                <span class="w-1 h-10 rounded bg-amber-500"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">Field override</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">Customer</span>
+                    <span class="text-sm font-medium">Override approval · primary_email</span>
+                  </div>
+                  <p class="text-[11px] text-gray-500 mt-1 mono">G3a812 · @kshim wants accounts@acme.com over winning HubSpot value · 14 m ago</p>
+                </div>
+                <div class="flex items-center -space-x-2">
+                  <div class="w-6 h-6 rounded-full bg-rose-500 ring-2 ring-white dark:ring-gray-800 flex items-center justify-center text-[10px] text-white font-semibold">NB</div>
+                </div>
+                <a href="approvals.html" class="px-2 py-1 text-xs rounded text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 inline-flex items-center gap-1">Open <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+              </li>
+
+              <!-- Task: unmerge request -->
+              <li class="px-5 py-3 hover:bg-gray-50/40 dark:hover:bg-gray-900/30 cursor-pointer flex items-center gap-3">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-300" />
+                <span class="w-1 h-10 rounded bg-amber-500"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">Unmerge</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/40 dark:text-fuchsia-300">Product</span>
+                    <span class="text-sm font-medium">Anvil 12 oz Black vs Anvil 12 oz Blk · same SKU different colors</span>
+                  </div>
+                  <p class="text-[11px] text-gray-500 mt-1 mono">G7d012 · Shopify variant collision · raised by @rpatel · 1 h ago</p>
+                </div>
+                <div class="flex items-center -space-x-2">
+                  <div class="w-6 h-6 rounded-full bg-purple-500 ring-2 ring-white dark:ring-gray-800 flex items-center justify-center text-[10px] text-white font-semibold">RP</div>
+                </div>
+                <a href="unmerge.html" class="px-2 py-1 text-xs rounded text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 inline-flex items-center gap-1">Open <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+              </li>
+
+              <!-- Task: hierarchy change -->
+              <li class="px-5 py-3 hover:bg-gray-50/40 dark:hover:bg-gray-900/30 cursor-pointer flex items-center gap-3">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-300" />
+                <span class="w-1 h-10 rounded bg-amber-500"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Hierarchy</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">Customer</span>
+                    <span class="text-sm font-medium">Re-parent · Acme EMEA → Acme Holdings</span>
+                  </div>
+                  <p class="text-[11px] text-gray-500 mt-1 mono">corp roll-up · effective 2026-05-01 · SFDC restructure</p>
+                </div>
+                <div class="flex items-center -space-x-2">
+                  <div class="w-6 h-6 rounded-full bg-amber-500 ring-2 ring-white dark:ring-gray-800 flex items-center justify-center text-[10px] text-white font-semibold">AL</div>
+                </div>
+                <a href="hierarchies.html" class="px-2 py-1 text-xs rounded text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 inline-flex items-center gap-1">Open <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+              </li>
+
+              <!-- Lower priority items -->
+              <li class="px-5 py-3 hover:bg-gray-50/40 dark:hover:bg-gray-900/30 cursor-pointer flex items-center gap-3">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-300" />
+                <span class="w-1 h-10 rounded bg-emerald-500"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Merge candidate</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/40 dark:text-fuchsia-300">Product</span>
+                    <span class="text-sm font-medium">Acme Anvil 12 oz · clean GTIN match</span>
+                  </div>
+                  <p class="text-[11px] text-gray-500 mt-1 mono">cand_M00141 · score 0.91 · safe to bulk-approve</p>
+                </div>
+                <a href="merge-candidates.html" class="px-2 py-1 text-xs rounded text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 inline-flex items-center gap-1">Open <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+              </li>
+
+              <li class="px-5 py-3 hover:bg-gray-50/40 dark:hover:bg-gray-900/30 cursor-pointer flex items-center gap-3">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-300" />
+                <span class="w-1 h-10 rounded bg-emerald-500"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">DQ breach</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">Employee</span>
+                    <span class="text-sm font-medium">cost_center mismatch with Workday roll-up</span>
+                  </div>
+                  <p class="text-[11px] text-gray-500 mt-1 mono">rule_DQ-EMP-12 · 3 records · since 4 h</p>
+                </div>
+                <a href="dq-rules.html" class="px-2 py-1 text-xs rounded text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 inline-flex items-center gap-1">Open <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+              </li>
+
+              <li class="px-5 py-3 hover:bg-gray-50/40 dark:hover:bg-gray-900/30 cursor-pointer flex items-center gap-3">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-300" />
+                <span class="w-1 h-10 rounded bg-emerald-500"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Merge candidate</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">Customer</span>
+                    <span class="text-sm font-medium">Northwind Traders vs Northwind Trading Co.</span>
+                  </div>
+                  <p class="text-[11px] text-gray-500 mt-1 mono">cand_M00139 · score 0.73 · likely separate · suggest parent/child link</p>
+                </div>
+                <a href="merge-candidates.html" class="px-2 py-1 text-xs rounded text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 inline-flex items-center gap-1">Open <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+              </li>
+
+            </ul>
+
+            <footer class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40 text-xs text-gray-500 flex items-center justify-between">
+              <span>Showing 9 of 23 open · keyboard <span class="mono px-1.5 py-0.5 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">J</span> next · <span class="mono px-1.5 py-0.5 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">K</span> prev · <span class="mono px-1.5 py-0.5 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">Enter</span> open</span>
+              <button class="text-indigo-500 hover:underline">Load more →</button>
+            </footer>
+          </section>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'mdm-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>

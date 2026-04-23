@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MDM · Subscriptions</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-sky-500 flex items-center justify-center"><i data-lucide="gem" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">MDM</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Distribution</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Subscriptions</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto p-4 h-full">
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> MDM</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Overview</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Master Data</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="domains.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="library" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Domains</span></a></li>
+            <li><a href="golden-record.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="gem" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Golden Records</span></a></li>
+            <li><a href="xref-map.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="link" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Cross-Reference</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Match &amp; Merge</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="match-rules.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-merge" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Rules</span></a></li>
+            <li><a href="merge-candidates.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="combine" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Candidates</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">142</span></a></li>
+            <li><a href="survivorship.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="crown" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Survivorship</span></a></li>
+            <li><a href="unmerge.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="split" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Unmerge</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Stewardship</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="stewardship-inbox.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="inbox" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Inbox</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">23</span></a></li>
+            <li><a href="steward-workspace.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="columns-3" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Workspace</span></a></li>
+            <li><a href="approvals.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="badge-check" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Approvals</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Quality</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="quality-dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="gauge" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">DQ Dashboard</span></a></li>
+            <li><a href="profiling.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="bar-chart-3" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Profiling</span></a></li>
+            <li><a href="dq-rules.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="check-square" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Rules</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Reference</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="hierarchies.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="folder-tree" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Hierarchies</span></a></li>
+            <li><a href="reference-data.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="book-open" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Reference Data</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div>
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Distribution</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="sources.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="plug" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Sources</span><span class="text-[10px] text-gray-400 mono">7</span></a></li>
+            <li><a href="lineage.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-fork" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Lineage</span></a></li>
+            <li><a href="subscriptions.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10"><i data-lucide="rss" class="w-5 h-5 text-indigo-500"></i><span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Subscriptions</span><span class="text-[10px] text-indigo-500 mono">12</span></a></li>
+            <li><a href="publish-jobs.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="send" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Publish Jobs</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">Ent</span></a></li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div class="px-6 py-4 flex items-end justify-between">
+          <div>
+            <h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="rss" class="w-6 h-6 text-indigo-500"></i> Subscriptions</h2>
+            <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">Downstream consumers of golden records · Kafka, webhooks, REST pull, warehouse syncs · <span class="mono">issue 6.3</span></p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="play" class="w-4 h-4"></i> Test fan-out</button>
+            <button class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i> New subscription</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-6 space-y-6">
+
+        <!-- KPI strip -->
+        <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500">Active subscriptions</p>
+            <p class="text-2xl font-bold mt-1 mono">12</p>
+            <p class="text-[11px] text-gray-500 mt-1">5 Kafka · 3 webhook · 2 Snowflake · 2 REST</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500">Events delivered · 24 h</p>
+            <p class="text-2xl font-bold mt-1 mono">1.2 M</p>
+            <p class="text-[11px] text-emerald-500 mt-1 inline-flex items-center gap-1"><i data-lucide="trending-up" class="w-3 h-3"></i> 99.92 % success</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500">P99 latency</p>
+            <p class="text-2xl font-bold mt-1 mono">312 ms</p>
+            <p class="text-[11px] text-gray-500 mt-1">SLO 800 ms</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-rose-200 dark:border-rose-700/40 p-4">
+            <p class="text-xs text-rose-500">DLQ items</p>
+            <p class="text-2xl font-bold mt-1 mono text-rose-500">14</p>
+            <p class="text-[11px] text-rose-500 mt-1">Stripe webhook · 401</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500">Avg fan-out</p>
+            <p class="text-2xl font-bold mt-1 mono">5.3 ×</p>
+            <p class="text-[11px] text-gray-500 mt-1">per golden update</p>
+          </div>
+        </section>
+
+        <section class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+
+          <!-- Subscriptions list -->
+          <div class="xl:col-span-8 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <header class="px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+              <div>
+                <h3 class="text-base font-semibold">Active subscriptions</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">filter by transport, domain, owner</p>
+              </div>
+              <div class="flex items-center gap-2 text-[11px]">
+                <button class="px-2 py-1 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-medium">All · 12</button>
+                <button class="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">Kafka · 5</button>
+                <button class="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">Webhook · 3</button>
+                <button class="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">Warehouse · 2</button>
+                <button class="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">REST · 2</button>
+              </div>
+            </header>
+            <table class="w-full text-xs">
+              <thead class="text-[10px] uppercase tracking-wider text-gray-500 bg-gray-50 dark:bg-gray-900">
+                <tr>
+                  <th class="px-4 py-2 text-left">Name</th>
+                  <th class="px-4 py-2 text-left">Transport</th>
+                  <th class="px-4 py-2 text-left">Domain · filter</th>
+                  <th class="px-4 py-2 text-right">Throughput</th>
+                  <th class="px-4 py-2 text-right">P99</th>
+                  <th class="px-4 py-2 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-700/60">
+                <tr class="hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10 cursor-pointer">
+                  <td class="px-4 py-3">
+                    <p class="font-medium">mdm.customer.v1</p>
+                    <p class="text-[11px] text-gray-500 mono">sub_K01 · @data-platform</p>
+                  </td>
+                  <td class="px-4 py-3"><span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 text-[10px] font-semibold inline-flex items-center gap-1"><i data-lucide="zap" class="w-3 h-3"></i> Kafka</span></td>
+                  <td class="px-4 py-3"><span class="mono">customer</span> · <span class="text-gray-500">all</span></td>
+                  <td class="px-4 py-3 text-right mono">412 / s</td>
+                  <td class="px-4 py-3 text-right mono">42 ms</td>
+                  <td class="px-4 py-3 text-center"><span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                </tr>
+                <tr class="hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10 cursor-pointer bg-indigo-50/40 dark:bg-indigo-900/10 border-l-2 border-indigo-500">
+                  <td class="px-4 py-3">
+                    <p class="font-medium">snowflake.dim_customer</p>
+                    <p class="text-[11px] text-gray-500 mono">sub_S01 · @analytics</p>
+                  </td>
+                  <td class="px-4 py-3"><span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 text-[10px] font-semibold inline-flex items-center gap-1"><i data-lucide="database" class="w-3 h-3"></i> Snowflake</span></td>
+                  <td class="px-4 py-3"><span class="mono">customer</span> · <span class="text-gray-500">tier in (gold,plat)</span></td>
+                  <td class="px-4 py-3 text-right mono">incremental · 5 m</td>
+                  <td class="px-4 py-3 text-right mono">2.1 s</td>
+                  <td class="px-4 py-3 text-center"><span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                </tr>
+                <tr class="hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10 cursor-pointer">
+                  <td class="px-4 py-3">
+                    <p class="font-medium">stripe.customer.sync</p>
+                    <p class="text-[11px] text-gray-500 mono">sub_W01 · @billing</p>
+                  </td>
+                  <td class="px-4 py-3"><span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 text-[10px] font-semibold inline-flex items-center gap-1"><i data-lucide="webhook" class="w-3 h-3"></i> Webhook</span></td>
+                  <td class="px-4 py-3"><span class="mono">customer</span> · <span class="text-gray-500">field in (email,name)</span></td>
+                  <td class="px-4 py-3 text-right mono">87 / hr</td>
+                  <td class="px-4 py-3 text-right mono text-rose-500">4.8 s</td>
+                  <td class="px-4 py-3 text-center"><span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">14 DLQ</span></td>
+                </tr>
+                <tr class="hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10 cursor-pointer">
+                  <td class="px-4 py-3">
+                    <p class="font-medium">mdm.product.v1</p>
+                    <p class="text-[11px] text-gray-500 mono">sub_K02 · @catalog</p>
+                  </td>
+                  <td class="px-4 py-3"><span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 text-[10px] font-semibold inline-flex items-center gap-1"><i data-lucide="zap" class="w-3 h-3"></i> Kafka</span></td>
+                  <td class="px-4 py-3"><span class="mono">product</span> · <span class="text-gray-500">all</span></td>
+                  <td class="px-4 py-3 text-right mono">1 248 / hr</td>
+                  <td class="px-4 py-3 text-right mono">38 ms</td>
+                  <td class="px-4 py-3 text-center"><span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                </tr>
+                <tr class="hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10 cursor-pointer">
+                  <td class="px-4 py-3">
+                    <p class="font-medium">mdm.supplier.v2</p>
+                    <p class="text-[11px] text-gray-500 mono">sub_K03 · @procurement</p>
+                  </td>
+                  <td class="px-4 py-3"><span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 text-[10px] font-semibold inline-flex items-center gap-1"><i data-lucide="zap" class="w-3 h-3"></i> Kafka</span></td>
+                  <td class="px-4 py-3"><span class="mono">supplier</span> · <span class="text-gray-500">approved=true</span></td>
+                  <td class="px-4 py-3 text-right mono">42 / hr</td>
+                  <td class="px-4 py-3 text-right mono">28 ms</td>
+                  <td class="px-4 py-3 text-center"><span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                </tr>
+                <tr class="hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10 cursor-pointer">
+                  <td class="px-4 py-3">
+                    <p class="font-medium">snowflake.dim_supplier</p>
+                    <p class="text-[11px] text-gray-500 mono">sub_S02 · @finance</p>
+                  </td>
+                  <td class="px-4 py-3"><span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 text-[10px] font-semibold inline-flex items-center gap-1"><i data-lucide="database" class="w-3 h-3"></i> Snowflake</span></td>
+                  <td class="px-4 py-3"><span class="mono">supplier</span> · <span class="text-gray-500">all</span></td>
+                  <td class="px-4 py-3 text-right mono">incremental · 15 m</td>
+                  <td class="px-4 py-3 text-right mono">3.8 s</td>
+                  <td class="px-4 py-3 text-center"><span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                </tr>
+                <tr class="hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10 cursor-pointer">
+                  <td class="px-4 py-3">
+                    <p class="font-medium">netsuite.customer.push</p>
+                    <p class="text-[11px] text-gray-500 mono">sub_W02 · @ops</p>
+                  </td>
+                  <td class="px-4 py-3"><span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 text-[10px] font-semibold inline-flex items-center gap-1"><i data-lucide="webhook" class="w-3 h-3"></i> Webhook</span></td>
+                  <td class="px-4 py-3"><span class="mono">customer</span> · <span class="text-gray-500">!path startsWith(billing)</span></td>
+                  <td class="px-4 py-3 text-right mono">12 / hr</td>
+                  <td class="px-4 py-3 text-right mono">628 ms</td>
+                  <td class="px-4 py-3 text-center"><span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                </tr>
+                <tr class="hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10 cursor-pointer">
+                  <td class="px-4 py-3">
+                    <p class="font-medium">consent.gdpr.export</p>
+                    <p class="text-[11px] text-gray-500 mono">sub_R01 · @privacy</p>
+                  </td>
+                  <td class="px-4 py-3"><span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 text-[10px] font-semibold inline-flex items-center gap-1"><i data-lucide="cloud-download" class="w-3 h-3"></i> REST pull</span></td>
+                  <td class="px-4 py-3"><span class="mono">customer</span> · <span class="text-gray-500">consent.export=true</span></td>
+                  <td class="px-4 py-3 text-right mono">on demand</td>
+                  <td class="px-4 py-3 text-right mono">—</td>
+                  <td class="px-4 py-3 text-center"><span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">Idle</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Detail rail -->
+          <aside class="xl:col-span-4 space-y-6">
+
+            <section class="bg-white dark:bg-gray-800 rounded-lg border border-indigo-200 dark:border-indigo-700/60 p-5">
+              <p class="text-[10px] uppercase tracking-wider text-indigo-500 mono">selected</p>
+              <h3 class="text-base font-bold mt-1 flex items-center gap-2">snowflake.dim_customer</h3>
+              <p class="text-xs text-gray-500 mono">sub_S01 · created 2025-04-12</p>
+
+              <div class="grid grid-cols-2 gap-3 mt-4 text-xs">
+                <div class="p-2 rounded border border-gray-200 dark:border-gray-700"><p class="text-[10px] text-gray-500">Mode</p><p class="font-semibold mt-0.5">Incremental MERGE</p></div>
+                <div class="p-2 rounded border border-gray-200 dark:border-gray-700"><p class="text-[10px] text-gray-500">Cadence</p><p class="font-semibold mt-0.5">every 5 min</p></div>
+                <div class="p-2 rounded border border-gray-200 dark:border-gray-700"><p class="text-[10px] text-gray-500">Format</p><p class="font-semibold mt-0.5">JSON · flat</p></div>
+                <div class="p-2 rounded border border-gray-200 dark:border-gray-700"><p class="text-[10px] text-gray-500">Stage</p><p class="font-semibold mt-0.5">@s3 / mdm-stage</p></div>
+              </div>
+
+              <div class="mt-4">
+                <p class="text-[11px] font-semibold mb-1">Filter (JEXL)</p>
+                <pre class="mono text-[11px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-2 overflow-x-auto">tier in ['gold','platinum']
+  &amp;&amp; consent.share_with_warehouse</pre>
+              </div>
+
+              <div class="mt-4">
+                <p class="text-[11px] font-semibold mb-1">Field projection · 18 of 32</p>
+                <div class="flex flex-wrap gap-1">
+                  <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">id</span>
+                  <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">legal_name</span>
+                  <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">primary_email</span>
+                  <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">tier</span>
+                  <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">tax_id</span>
+                  <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">country</span>
+                  <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">created_at</span>
+                  <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">+ 11 more</span>
+                </div>
+              </div>
+
+              <div class="mt-4 grid grid-cols-2 gap-2 text-[11px]">
+                <div class="p-2 rounded border border-gray-200 dark:border-gray-700"><p class="text-[10px] text-gray-500">SLO target</p><p class="font-semibold mono">≤ 5 m</p></div>
+                <div class="p-2 rounded border border-gray-200 dark:border-gray-700"><p class="text-[10px] text-gray-500">Last lag</p><p class="font-semibold mono text-emerald-500">3 m 12 s</p></div>
+                <div class="p-2 rounded border border-gray-200 dark:border-gray-700"><p class="text-[10px] text-gray-500">Backfill</p><p class="font-semibold">enabled · auto</p></div>
+                <div class="p-2 rounded border border-gray-200 dark:border-gray-700"><p class="text-[10px] text-gray-500">Schema lock</p><p class="font-semibold">capture v 12</p></div>
+              </div>
+
+              <div class="mt-4 flex items-center gap-2">
+                <button class="flex-1 px-3 py-1.5 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white">Open run history</button>
+                <button class="px-3 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Pause</button>
+              </div>
+            </section>
+
+            <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+              <h3 class="text-base font-semibold flex items-center gap-2"><i data-lucide="bell-ring" class="w-4 h-4 text-amber-500"></i> Recent dead-letter</h3>
+              <ul class="mt-3 text-xs space-y-2">
+                <li class="p-2 rounded border border-rose-200 dark:border-rose-700/40 bg-rose-50/30 dark:bg-rose-900/10"><div class="flex items-center justify-between"><span class="font-medium">Stripe webhook · 401</span><span class="mono text-rose-500">14</span></div><p class="text-[11px] text-gray-500 mt-0.5 mono">restricted_key.invalid · rotate token</p></li>
+                <li class="p-2 rounded border border-amber-200 dark:border-amber-700/40 bg-amber-50/30 dark:bg-amber-900/10"><div class="flex items-center justify-between"><span class="font-medium">Snowflake · stage perms</span><span class="mono text-amber-500">2</span></div><p class="text-[11px] text-gray-500 mt-0.5 mono">role MDM_LOADER missing INSERT</p></li>
+                <li class="p-2 rounded border border-gray-200 dark:border-gray-700"><div class="flex items-center justify-between"><span class="font-medium">Kafka · serialization</span><span class="mono">0</span></div><p class="text-[11px] text-gray-500 mt-0.5 mono">resolved 4 h ago</p></li>
+              </ul>
+            </section>
+
+          </aside>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'mdm-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>

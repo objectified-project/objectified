@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MDM · Unmerge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-sky-500 flex items-center justify-center"><i data-lucide="gem" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">MDM</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Customer</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Unmerge</span>
+      <span class="text-xs text-gray-400">·</span>
+      <span class="text-sm font-medium mono text-indigo-600 dark:text-indigo-400">G3a812</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto p-4 h-full">
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> MDM</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Overview</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Master Data</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="domains.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="library" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Domains</span></a></li>
+            <li><a href="golden-record.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="gem" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Golden Records</span></a></li>
+            <li><a href="xref-map.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="link" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Cross-Reference</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Match &amp; Merge</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="match-rules.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-merge" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Rules</span></a></li>
+            <li><a href="merge-candidates.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="combine" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Candidates</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">142</span></a></li>
+            <li><a href="survivorship.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="crown" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Survivorship</span></a></li>
+            <li><a href="unmerge.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10"><i data-lucide="split" class="w-5 h-5 text-indigo-500"></i><span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Unmerge</span><span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Stewardship</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="stewardship-inbox.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="inbox" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Inbox</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">23</span></a></li>
+            <li><a href="steward-workspace.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="columns-3" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Workspace</span></a></li>
+            <li><a href="approvals.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="badge-check" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Approvals</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Quality</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="quality-dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="gauge" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">DQ Dashboard</span></a></li>
+            <li><a href="profiling.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="bar-chart-3" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Profiling</span></a></li>
+            <li><a href="dq-rules.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="check-square" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Rules</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Reference</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="hierarchies.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="folder-tree" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Hierarchies</span></a></li>
+            <li><a href="reference-data.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="book-open" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Reference Data</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div>
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Distribution</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="sources.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="plug" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Sources</span><span class="text-[10px] text-gray-400 mono">7</span></a></li>
+            <li><a href="lineage.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-fork" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Lineage</span></a></li>
+            <li><a href="subscriptions.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="rss" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Subscriptions</span></a></li>
+            <li><a href="publish-jobs.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="send" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Publish Jobs</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">Ent</span></a></li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div class="px-6 py-4 flex items-end justify-between">
+          <div>
+            <h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="split" class="w-6 h-6 text-rose-500"></i> Unmerge · <span class="mono text-base text-indigo-600 dark:text-indigo-400">G3a812 — Acme Holdings, Inc.</span></h2>
+            <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">Reverse a previous merge by extracting selected source records into a new golden · <span class="mono">issue 2.4</span></p>
+          </div>
+          <div class="flex items-center gap-2">
+            <a href="golden-record.html" class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-2"><i data-lucide="arrow-left" class="w-4 h-4"></i> Back to record</a>
+            <button class="px-3 py-1.5 text-sm rounded-md bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center gap-2 disabled:opacity-50" disabled><i data-lucide="split" class="w-4 h-4"></i> Apply unmerge</button>
+          </div>
+        </div>
+        <div class="px-6 pb-3 flex items-center gap-3 text-xs text-gray-500">
+          <span class="inline-flex items-center gap-1.5"><i data-lucide="info" class="w-3 h-3 text-indigo-500"></i> Unmerge writes a new event to the append-only log — original golden version <span class="mono">42</span> remains queryable via Time Travel.</span>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-6 grid grid-cols-1 xl:grid-cols-12 gap-6">
+
+        <!-- Step rail -->
+        <section class="xl:col-span-3">
+          <ol class="space-y-4 text-sm">
+            <li class="flex items-start gap-3"><div class="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-3.5 h-3.5 text-white"></i></div><div><p class="font-medium">Pick golden record</p><p class="text-[11px] mono text-gray-500">G3a812 · v 42</p></div></li>
+            <li class="flex items-start gap-3"><div class="w-6 h-6 rounded-full border-2 border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 flex items-center justify-center flex-shrink-0 text-[11px] font-semibold text-indigo-600">2</div><div><p class="font-medium text-indigo-600 dark:text-indigo-400">Select records to extract</p><p class="text-[11px] text-gray-500">Pick which contributing source records leave the golden.</p></div></li>
+            <li class="flex items-start gap-3"><div class="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center flex-shrink-0 text-[11px] font-semibold text-gray-500">3</div><div><p class="font-medium text-gray-500">Preview split</p><p class="text-[11px] text-gray-500">See the two resulting goldens before committing.</p></div></li>
+            <li class="flex items-start gap-3"><div class="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center flex-shrink-0 text-[11px] font-semibold text-gray-500">4</div><div><p class="font-medium text-gray-500">Reason &amp; approve</p><p class="text-[11px] text-gray-500">Capture justification — written to Detective audit.</p></div></li>
+          </ol>
+
+          <div class="mt-6 p-4 rounded-lg border border-amber-200 dark:border-amber-700/40 bg-amber-50/40 dark:bg-amber-900/10 text-xs space-y-2">
+            <p class="font-semibold inline-flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-500"></i> Downstream impact</p>
+            <p class="text-gray-700 dark:text-gray-300">Republishing the golden will fan out a <span class="mono">delete + create</span> pair to 3 subscribers — Snowflake, Kafka, Stripe webhook.</p>
+            <p class="text-[11px] text-gray-500 mono">Existing FK references on golden_id will be re-pointed via the xref index transactionally.</p>
+          </div>
+        </section>
+
+        <!-- Selection panel -->
+        <section class="xl:col-span-9 space-y-6">
+
+          <!-- Merge history -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <header class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+              <h3 class="text-base font-semibold flex items-center gap-2"><i data-lucide="git-merge" class="w-4 h-4 text-indigo-500"></i> Merge history</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">3 sources contributed across 2 merge events</p>
+            </header>
+            <ol class="relative ml-6 mr-6 my-4 border-l border-gray-200 dark:border-gray-700 space-y-4">
+              <li class="ml-4 relative">
+                <span class="absolute -left-[22px] top-1.5 w-3 h-3 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-gray-800"></span>
+                <p class="text-xs"><span class="font-medium">create</span> — initial golden from <span class="mono">SFDC 0014x...zR3aQ</span> + <span class="mono">NetSuite NS-CUST-48201</span></p>
+                <p class="text-[11px] text-gray-400">v 1 · auto · 2023-08-14 09:42 · score 1.00 (tax_id match)</p>
+              </li>
+              <li class="ml-4 relative">
+                <span class="absolute -left-[22px] top-1.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-gray-800"></span>
+                <p class="text-xs"><span class="font-medium">absorb</span> — <span class="mono">Workday WD-ORG-339</span> joined</p>
+                <p class="text-[11px] text-gray-400">v 18 · auto · 2024-02-08 11:00 · score 0.97</p>
+              </li>
+              <li class="ml-4 relative">
+                <span class="absolute -left-[22px] top-1.5 w-3 h-3 rounded-full bg-amber-500 ring-2 ring-white dark:ring-gray-800"></span>
+                <p class="text-xs"><span class="font-medium">absorb</span> — <span class="mono">HubSpot 7281044</span> joined</p>
+                <p class="text-[11px] text-gray-400">v 31 · steward (@nbarrett) · 2024-09-22 16:08 · score 0.84</p>
+              </li>
+            </ol>
+          </div>
+
+          <!-- Source selection -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <header class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+              <div>
+                <h3 class="text-base font-semibold flex items-center gap-2"><i data-lucide="check-square" class="w-4 h-4 text-indigo-500"></i> Select records to extract</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Picked records will form a new golden — at least one must remain in the original</p>
+              </div>
+              <div class="flex items-center gap-2 text-[11px]">
+                <span class="text-gray-500">selected</span>
+                <span class="mono font-semibold text-indigo-600">1</span>
+                <span class="text-gray-400">/</span>
+                <span class="mono text-gray-500">4</span>
+              </div>
+            </header>
+            <ul class="divide-y divide-gray-100 dark:divide-gray-700/60">
+
+              <li class="px-5 py-4 flex items-start gap-4">
+                <input type="checkbox" disabled class="mt-1 w-4 h-4 rounded border-gray-300" />
+                <div class="w-7 h-7 rounded bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0"><i data-lucide="cloud" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i></div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <div><p class="text-sm font-medium">Salesforce <span class="text-[10px] mono text-gray-400 ml-1">0014x00001zR3aQ</span></p><p class="text-[11px] text-gray-500 mono">Acme Holdings, Inc. · accounts@acme.com · 2400 Mission St</p></div>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Anchor · cannot extract</span>
+                  </div>
+                </div>
+              </li>
+
+              <li class="px-5 py-4 flex items-start gap-4">
+                <input type="checkbox" class="mt-1 w-4 h-4 rounded border-gray-300" />
+                <div class="w-7 h-7 rounded bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0"><i data-lucide="building-2" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i></div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <div><p class="text-sm font-medium">NetSuite <span class="text-[10px] mono text-gray-400 ml-1">NS-CUST-48201</span></p><p class="text-[11px] text-gray-500 mono">Acme Holdings · ar@acme.com · tax_id 12-3456789</p></div>
+                    <span class="text-[10px] text-gray-400 mono">contributes 5 fields</span>
+                  </div>
+                </div>
+              </li>
+
+              <li class="px-5 py-4 flex items-start gap-4">
+                <input type="checkbox" class="mt-1 w-4 h-4 rounded border-gray-300" />
+                <div class="w-7 h-7 rounded bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0"><i data-lucide="briefcase" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i></div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <div><p class="text-sm font-medium">Workday <span class="text-[10px] mono text-gray-400 ml-1">WD-ORG-339</span></p><p class="text-[11px] text-gray-500 mono">Acme Holdings, Inc. · 2400 Mission St Suite 401 · 287 employees</p></div>
+                    <span class="text-[10px] text-gray-400 mono">contributes 4 fields</span>
+                  </div>
+                </div>
+              </li>
+
+              <li class="px-5 py-4 flex items-start gap-4 bg-rose-50/40 dark:bg-rose-900/10">
+                <input type="checkbox" checked class="mt-1 w-4 h-4 rounded border-gray-300 accent-rose-500" />
+                <div class="w-7 h-7 rounded bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0"><i data-lucide="contact" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i></div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <div><p class="text-sm font-medium text-rose-700 dark:text-rose-300">HubSpot <span class="text-[10px] mono text-gray-400 ml-1">7281044</span></p><p class="text-[11px] text-gray-500 mono">Westcoast Trading LLC · acme@westcoast.io · different street suffix</p></div>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">→ extract</span>
+                  </div>
+                </div>
+              </li>
+
+            </ul>
+          </div>
+
+          <!-- Preview split -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <header class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+              <h3 class="text-base font-semibold flex items-center gap-2"><i data-lucide="git-pull-request-arrow" class="w-4 h-4 text-indigo-500"></i> Resulting split · preview</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Survivorship rules re-evaluated for both new records</p>
+            </header>
+            <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100 dark:divide-gray-700/60">
+
+              <div class="p-5">
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center"><i data-lucide="gem" class="w-4 h-4 text-white"></i></div>
+                  <div>
+                    <p class="text-xs uppercase tracking-wider text-gray-500">Original · stays</p>
+                    <p class="text-sm font-medium mono text-indigo-600 dark:text-indigo-400">G3a812 · Acme Holdings, Inc.</p>
+                  </div>
+                </div>
+                <ul class="text-xs space-y-1 mt-3 mono">
+                  <li><span class="text-gray-500">legal_name</span> <span class="text-gray-400">·</span> Acme Holdings, Inc. <span class="text-emerald-500">(SFDC)</span></li>
+                  <li><span class="text-gray-500">tax_id</span> <span class="text-gray-400">·</span> 12-3456789 <span class="text-emerald-500">(NetSuite)</span></li>
+                  <li><span class="text-gray-500">primary_email</span> <span class="text-gray-400">·</span> accounts@acme.com <span class="text-emerald-500">(SFDC)</span></li>
+                  <li><span class="text-gray-500">billing_addr</span> <span class="text-gray-400">·</span> 2400 Mission St Suite 401 <span class="text-emerald-500">(Workday)</span></li>
+                  <li><span class="text-gray-500">employee_count</span> <span class="text-gray-400">·</span> 287 <span class="text-emerald-500">(Workday)</span></li>
+                </ul>
+                <p class="text-[10px] mono text-gray-400 mt-3">3 sources · DQ 96 · v 43 (post-split)</p>
+              </div>
+
+              <div class="p-5 bg-rose-50/30 dark:bg-rose-900/10">
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center"><i data-lucide="gem" class="w-4 h-4 text-white"></i></div>
+                  <div>
+                    <p class="text-xs uppercase tracking-wider text-rose-600 dark:text-rose-400">New · extracted</p>
+                    <p class="text-sm font-medium mono text-indigo-600 dark:text-indigo-400">G4f917 · Westcoast Trading LLC</p>
+                  </div>
+                </div>
+                <ul class="text-xs space-y-1 mt-3 mono">
+                  <li><span class="text-gray-500">legal_name</span> <span class="text-gray-400">·</span> Westcoast Trading LLC <span class="text-amber-500">(HubSpot)</span></li>
+                  <li><span class="text-gray-500">tax_id</span> <span class="text-gray-400">·</span> <span class="text-rose-500">— missing</span></li>
+                  <li><span class="text-gray-500">primary_email</span> <span class="text-gray-400">·</span> acme@westcoast.io <span class="text-amber-500">(HubSpot)</span></li>
+                  <li><span class="text-gray-500">billing_addr</span> <span class="text-gray-400">·</span> 2400 Mission St #401 <span class="text-amber-500">(HubSpot)</span></li>
+                  <li><span class="text-gray-500">employee_count</span> <span class="text-gray-400">·</span> <span class="text-rose-500">— missing</span></li>
+                </ul>
+                <p class="text-[10px] mono text-gray-400 mt-3">1 source · DQ 62 · v 1 (newly created) · will route to steward inbox</p>
+              </div>
+
+            </div>
+            <footer class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40 text-xs text-gray-500 inline-flex items-center gap-3">
+              <span class="inline-flex items-center gap-1"><i data-lucide="git-fork" class="w-3 h-3 text-indigo-500"></i> xref will re-point HubSpot ID 7281044 → G4f917</span>
+              <span class="text-gray-300">·</span>
+              <span class="inline-flex items-center gap-1"><i data-lucide="rss" class="w-3 h-3 text-indigo-500"></i> 3 subscribers will receive both events atomically</span>
+            </footer>
+          </div>
+
+          <!-- Reason field -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <header class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+              <h3 class="text-base font-semibold flex items-center gap-2"><i data-lucide="file-pen" class="w-4 h-4 text-indigo-500"></i> Justification</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Required · captured into <span class="mono">detective.unmerge_event</span> with actor + correlation_id</p>
+            </header>
+            <div class="p-5 space-y-3">
+              <div class="flex items-center gap-2 text-xs">
+                <select class="px-3 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm">
+                  <option>Reason · false-positive merge</option>
+                  <option>Reason · entity split (corp restructure)</option>
+                  <option>Reason · GDPR request</option>
+                  <option>Reason · other</option>
+                </select>
+                <span class="text-gray-400">·</span>
+                <span>Detective category will be <span class="mono text-indigo-600">data_correction</span></span>
+              </div>
+              <textarea rows="3" placeholder="Add a free-text note for future reviewers…" class="w-full px-3 py-2 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">HubSpot 7281044 was wrongly merged in v 31 — the lead was actually a separate LLC sub-leasing the same address. Confirmed with @cvallejo in Finance.</textarea>
+              <div class="flex items-center justify-end gap-2">
+                <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+                <button class="px-3 py-1.5 text-sm rounded-md bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center gap-2"><i data-lucide="split" class="w-4 h-4"></i> Apply unmerge</button>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'mdm-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>

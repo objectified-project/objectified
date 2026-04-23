@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MDM · Steward Workspace</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+    .pick-btn { transition: all .15s ease; }
+    .pick-btn:hover { transform: scale(1.05); }
+    .src-a { border-left-color: #10b981; }
+    .src-b { border-right-color: #f59e0b; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-sky-500 flex items-center justify-center"><i data-lucide="gem" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">MDM</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Stewardship</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm font-medium mono text-indigo-600 dark:text-indigo-400">cand_M00142</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto p-4 h-full">
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> MDM</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Overview</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Master Data</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="domains.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="library" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Domains</span></a></li>
+            <li><a href="golden-record.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="gem" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Golden Records</span></a></li>
+            <li><a href="xref-map.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="link" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Cross-Reference</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Match &amp; Merge</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="match-rules.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-merge" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Rules</span></a></li>
+            <li><a href="merge-candidates.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="combine" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Candidates</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">142</span></a></li>
+            <li><a href="survivorship.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="crown" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Survivorship</span></a></li>
+            <li><a href="unmerge.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="split" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Unmerge</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Stewardship</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="stewardship-inbox.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="inbox" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Inbox</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">23</span></a></li>
+            <li><a href="steward-workspace.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10"><i data-lucide="columns-3" class="w-5 h-5 text-indigo-500"></i><span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Workspace</span><span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span></a></li>
+            <li><a href="approvals.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="badge-check" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Approvals</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Quality</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="quality-dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="gauge" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">DQ Dashboard</span></a></li>
+            <li><a href="profiling.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="bar-chart-3" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Profiling</span></a></li>
+            <li><a href="dq-rules.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="check-square" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Rules</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Reference</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="hierarchies.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="folder-tree" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Hierarchies</span></a></li>
+            <li><a href="reference-data.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="book-open" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Reference Data</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div>
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Distribution</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="sources.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="plug" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Sources</span><span class="text-[10px] text-gray-400 mono">7</span></a></li>
+            <li><a href="lineage.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-fork" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Lineage</span></a></li>
+            <li><a href="subscriptions.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="rss" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Subscriptions</span></a></li>
+            <li><a href="publish-jobs.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="send" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Publish Jobs</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">Ent</span></a></li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div class="px-6 py-3 flex items-center justify-between gap-4">
+          <div class="flex items-center gap-4 min-w-0">
+            <button class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1 text-xs"><i data-lucide="chevron-up" class="w-3.5 h-3.5"></i> Prev</button>
+            <button class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1 text-xs">Next <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i></button>
+            <div class="text-xs text-gray-500"><span class="mono text-gray-700 dark:text-gray-300">7 / 23</span> in queue</div>
+            <span class="text-gray-300">·</span>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Merge candidate</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">Customer</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">3-way</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 inline-flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3 h-3"></i> SLA -2 h</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <div class="text-right">
+              <div class="flex items-center gap-2 text-xs">
+                <span class="text-gray-500">Match score</span>
+                <span class="mono font-semibold text-amber-500">0.81</span>
+              </div>
+              <p class="text-[10px] text-gray-400 mono">A↔B 0.81 · A↔C 0.97 · B↔C 0.78</p>
+            </div>
+            <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1"><i data-lucide="bookmark" class="w-4 h-4"></i> Save draft</button>
+            <button class="px-3 py-1.5 text-sm rounded-md border border-rose-200 dark:border-rose-700 text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/20 inline-flex items-center gap-1"><i data-lucide="x" class="w-4 h-4"></i> Reject all</button>
+            <button class="px-3 py-1.5 text-sm rounded-md border border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 inline-flex items-center gap-1"><i data-lucide="user-plus" class="w-4 h-4"></i> Escalate</button>
+            <button class="px-3 py-1.5 text-sm rounded-md bg-emerald-600 hover:bg-emerald-700 text-white inline-flex items-center gap-1"><i data-lucide="check" class="w-4 h-4"></i> Approve merge <span class="mono text-[10px] opacity-80 ml-1">⌘ ⏎</span></button>
+          </div>
+        </div>
+        <div class="px-6 pb-2 flex items-center gap-3 text-[11px] text-gray-500">
+          <span class="inline-flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> opened 0 m 42 s ago by @kshim</span>
+          <span class="text-gray-300">·</span>
+          <span class="inline-flex items-center gap-1"><i data-lucide="keyboard" class="w-3 h-3"></i> hotkeys · <span class="mono px-1 rounded bg-gray-100 dark:bg-gray-700">←</span> pick A · <span class="mono px-1 rounded bg-gray-100 dark:bg-gray-700">→</span> pick C · <span class="mono px-1 rounded bg-gray-100 dark:bg-gray-700">↓</span> pick B · <span class="mono px-1 rounded bg-gray-100 dark:bg-gray-700">N</span> next field</span>
+          <span class="text-gray-300">·</span>
+          <span class="inline-flex items-center gap-1"><i data-lucide="eye" class="w-3 h-3"></i> diff mode · auto-pick rule defaults</span>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-6">
+
+        <!-- Three-way side-by-side -->
+        <section class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+
+          <!-- Source A -->
+          <div class="xl:col-span-3 bg-white dark:bg-gray-800 rounded-lg border-2 border-emerald-200 dark:border-emerald-700/50 overflow-hidden h-fit">
+            <header class="px-4 py-3 border-b border-emerald-200 dark:border-emerald-700/50 bg-emerald-50/40 dark:bg-emerald-900/10 flex items-center justify-between">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-7 h-7 rounded bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0"><i data-lucide="cloud" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i></div>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold truncate">Salesforce</p>
+                  <p class="text-[10px] mono text-gray-500 truncate">0014x00001zR3aQ · trust 0.95</p>
+                </div>
+              </div>
+              <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-emerald-200/40 dark:bg-emerald-700/30 text-emerald-700 dark:text-emerald-300">A</span>
+            </header>
+            <ul class="text-xs">
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">legal_name</p><p class="font-medium mt-0.5">Acme Holdings, Inc.</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">primary_email</p><p class="font-medium mt-0.5 mono">accounts@acme.com</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">phone</p><p class="font-medium mt-0.5 mono">+1-415-555-0142</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">tax_id · country</p><p class="font-medium mt-0.5 mono text-gray-400">— · US</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">website</p><p class="font-medium mt-0.5 mono">https://www.acme.com</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">billing_addr</p><p class="font-medium mt-0.5">2400 Mission St, SF 94110</p></li>
+              <li class="px-4 py-2"><p class="text-[10px] uppercase tracking-wider text-gray-400">employee_count</p><p class="font-medium mt-0.5 mono text-gray-400">— null</p></li>
+            </ul>
+            <footer class="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/40 text-[10px] text-gray-500 mono">last sync 14 m · DQ 96</footer>
+          </div>
+
+          <!-- Source B (HubSpot - the outlier) -->
+          <div class="xl:col-span-3 bg-white dark:bg-gray-800 rounded-lg border-2 border-amber-200 dark:border-amber-700/50 overflow-hidden h-fit">
+            <header class="px-4 py-3 border-b border-amber-200 dark:border-amber-700/50 bg-amber-50/40 dark:bg-amber-900/10 flex items-center justify-between">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-7 h-7 rounded bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0"><i data-lucide="contact" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i></div>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold truncate">HubSpot</p>
+                  <p class="text-[10px] mono text-gray-500 truncate">7281044 · trust 0.71</p>
+                </div>
+              </div>
+              <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-amber-200/40 dark:bg-amber-700/30 text-amber-700 dark:text-amber-300">B</span>
+            </header>
+            <ul class="text-xs">
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60 bg-rose-50/40 dark:bg-rose-900/10"><p class="text-[10px] uppercase tracking-wider text-rose-500">legal_name · differs</p><p class="font-medium mt-0.5">Westcoast Trading LLC</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60 bg-rose-50/40 dark:bg-rose-900/10"><p class="text-[10px] uppercase tracking-wider text-rose-500">primary_email · differs</p><p class="font-medium mt-0.5 mono">acme@westcoast.io</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">phone</p><p class="font-medium mt-0.5 mono text-gray-400">— null</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">tax_id · country</p><p class="font-medium mt-0.5 mono text-gray-400">— · US</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60 bg-rose-50/40 dark:bg-rose-900/10"><p class="text-[10px] uppercase tracking-wider text-rose-500">website · differs</p><p class="font-medium mt-0.5 mono">www.acme.io</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">billing_addr</p><p class="font-medium mt-0.5">2400 Mission St #401, SF 94110</p></li>
+              <li class="px-4 py-2"><p class="text-[10px] uppercase tracking-wider text-gray-400">employee_count</p><p class="font-medium mt-0.5 mono text-gray-400">— null</p></li>
+            </ul>
+            <footer class="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/40 text-[10px] text-gray-500 mono">last sync 38 h · DQ 62 · likely false-positive</footer>
+          </div>
+
+          <!-- Resulting Golden (center, indigo) -->
+          <div class="xl:col-span-3 bg-white dark:bg-gray-800 rounded-lg border-2 border-indigo-300 dark:border-indigo-600 overflow-hidden h-fit shadow-md">
+            <header class="px-4 py-3 border-b border-indigo-200 dark:border-indigo-700/50 bg-gradient-to-r from-indigo-50 to-sky-50 dark:from-indigo-900/20 dark:to-sky-900/20 flex items-center justify-between">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-7 h-7 rounded bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center flex-shrink-0"><i data-lucide="gem" class="w-4 h-4 text-white"></i></div>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold truncate">Resulting golden</p>
+                  <p class="text-[10px] mono text-indigo-600 dark:text-indigo-400 truncate">G3a812 · v 43 (preview)</p>
+                </div>
+              </div>
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">7 / 7 picked</span>
+            </header>
+            <ul class="text-xs">
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-400">legal_name</p><span class="text-[10px] mono px-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">A</span></div><p class="font-medium mt-0.5">Acme Holdings, Inc.</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-400">primary_email</p><span class="text-[10px] mono px-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">A</span></div><p class="font-medium mt-0.5 mono">accounts@acme.com</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-400">phone</p><span class="text-[10px] mono px-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">A</span></div><p class="font-medium mt-0.5 mono">+1-415-555-0142</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-400">tax_id</p><span class="text-[10px] mono px-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">C</span></div><p class="font-medium mt-0.5 mono">12-3456789 · US</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60 bg-purple-50/40 dark:bg-purple-900/10"><div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-purple-500">website · custom</p><span class="text-[10px] mono px-1 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">expr</span></div><p class="font-medium mt-0.5 mono">https://www.acme.com</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-400">billing_addr</p><span class="text-[10px] mono px-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">C</span></div><p class="font-medium mt-0.5">2400 Mission St Suite 401, SF 94110</p></li>
+              <li class="px-4 py-2"><div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-400">employee_count</p><span class="text-[10px] mono px-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">C</span></div><p class="font-medium mt-0.5 mono">287</p></li>
+            </ul>
+            <footer class="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/40 text-[10px] text-gray-500 mono">DQ 96 · projected</footer>
+          </div>
+
+          <!-- Source C (NetSuite) -->
+          <div class="xl:col-span-3 bg-white dark:bg-gray-800 rounded-lg border-2 border-emerald-200 dark:border-emerald-700/50 overflow-hidden h-fit">
+            <header class="px-4 py-3 border-b border-emerald-200 dark:border-emerald-700/50 bg-emerald-50/40 dark:bg-emerald-900/10 flex items-center justify-between">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-7 h-7 rounded bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0"><i data-lucide="building-2" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i></div>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold truncate">NetSuite</p>
+                  <p class="text-[10px] mono text-gray-500 truncate">NS-CUST-48201 · trust 0.92</p>
+                </div>
+              </div>
+              <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-emerald-200/40 dark:bg-emerald-700/30 text-emerald-700 dark:text-emerald-300">C</span>
+            </header>
+            <ul class="text-xs">
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">legal_name</p><p class="font-medium mt-0.5">Acme Holdings</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">primary_email</p><p class="font-medium mt-0.5 mono">ar@acme.com</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">phone</p><p class="font-medium mt-0.5 mono text-gray-400">— null</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60 bg-emerald-50/40 dark:bg-emerald-900/10"><p class="text-[10px] uppercase tracking-wider text-emerald-600">tax_id · only here</p><p class="font-medium mt-0.5 mono">12-3456789 · US</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">website</p><p class="font-medium mt-0.5 mono">acme.com</p></li>
+              <li class="px-4 py-2 border-b border-gray-100 dark:border-gray-700/60"><p class="text-[10px] uppercase tracking-wider text-gray-400">billing_addr</p><p class="font-medium mt-0.5">2400 Mission, San Francisco, 94110</p></li>
+              <li class="px-4 py-2 bg-emerald-50/40 dark:bg-emerald-900/10"><p class="text-[10px] uppercase tracking-wider text-emerald-600">employee_count · only here</p><p class="font-medium mt-0.5 mono">287</p></li>
+            </ul>
+            <footer class="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/40 text-[10px] text-gray-500 mono">last sync 5 m · DQ 94</footer>
+          </div>
+
+        </section>
+
+        <!-- Field-by-field cherry-pick row -->
+        <section class="mt-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <header class="px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-semibold flex items-center gap-2"><i data-lucide="mouse-pointer-click" class="w-4 h-4 text-indigo-500"></i> Field cherry-pick</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Pick which source wins per field — defaults preselected by survivorship rules</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="px-2 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1"><i data-lucide="undo-2" class="w-3.5 h-3.5"></i> Reset to rule defaults</button>
+              <button class="px-2 py-1 text-xs rounded-md border border-rose-200 dark:border-rose-700 text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/20 inline-flex items-center gap-1"><i data-lucide="x" class="w-3.5 h-3.5"></i> Reject all of B</button>
+            </div>
+          </header>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead class="bg-gray-50/60 dark:bg-gray-900/40 text-[10px] uppercase tracking-wider text-gray-500">
+                <tr>
+                  <th class="text-left px-4 py-2 font-semibold w-44">Field</th>
+                  <th class="text-center px-2 py-2 font-semibold">Pick A · Salesforce</th>
+                  <th class="text-center px-2 py-2 font-semibold">Pick B · HubSpot</th>
+                  <th class="text-center px-2 py-2 font-semibold">Pick C · NetSuite</th>
+                  <th class="text-center px-2 py-2 font-semibold">Custom</th>
+                  <th class="text-left px-4 py-2 font-semibold w-44">Default rule</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-700/60">
+
+                <tr>
+                  <td class="px-4 py-2 mono">legal_name</td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="legal_name" checked class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer">Acme Holdings, Inc.</span></label></td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="legal_name" class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer line-through">Westcoast Trading LLC</span></label></td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="legal_name" class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer">Acme Holdings</span></label></td>
+                  <td class="px-2 py-2 text-center"><button class="pick-btn px-2 py-1 rounded text-[11px] font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 hover:text-purple-500"><i data-lucide="pencil" class="w-3 h-3"></i></button></td>
+                  <td class="px-4 py-2 text-gray-500 inline-flex items-center gap-1"><i data-lucide="crown" class="w-3 h-3 text-purple-500"></i> source_rank</td>
+                </tr>
+
+                <tr>
+                  <td class="px-4 py-2 mono">primary_email</td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="email" checked class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer">accounts@acme.com</span></label></td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="email" class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer line-through">acme@westcoast.io</span></label></td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="email" class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer">ar@acme.com</span></label></td>
+                  <td class="px-2 py-2 text-center"><button class="pick-btn px-2 py-1 rounded text-[11px] font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 hover:text-purple-500"><i data-lucide="pencil" class="w-3 h-3"></i></button></td>
+                  <td class="px-4 py-2 text-gray-500 inline-flex items-center gap-1"><i data-lucide="crown" class="w-3 h-3 text-purple-500"></i> source_rank · SFDC override</td>
+                </tr>
+
+                <tr>
+                  <td class="px-4 py-2 mono">phone</td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="phone" checked class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer">+1-415-555-0142</span></label></td>
+                  <td class="px-2 py-2 text-center text-[11px] text-gray-300 italic">— null</td>
+                  <td class="px-2 py-2 text-center text-[11px] text-gray-300 italic">— null</td>
+                  <td class="px-2 py-2 text-center"><button class="pick-btn px-2 py-1 rounded text-[11px] font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 hover:text-purple-500"><i data-lucide="pencil" class="w-3 h-3"></i></button></td>
+                  <td class="px-4 py-2 text-gray-500 inline-flex items-center gap-1"><i data-lucide="zap" class="w-3 h-3 text-amber-500"></i> longest_non_null</td>
+                </tr>
+
+                <tr>
+                  <td class="px-4 py-2 mono">tax_id · country</td>
+                  <td class="px-2 py-2 text-center text-[11px] text-gray-300 italic">— · US</td>
+                  <td class="px-2 py-2 text-center text-[11px] text-gray-300 italic">— · US</td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="tax" checked class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer mono">12-3456789 · US</span></label></td>
+                  <td class="px-2 py-2 text-center"><button class="pick-btn px-2 py-1 rounded text-[11px] font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 hover:text-purple-500"><i data-lucide="pencil" class="w-3 h-3"></i></button></td>
+                  <td class="px-4 py-2 text-gray-500 inline-flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-500"></i> deterministic_key</td>
+                </tr>
+
+                <tr class="bg-purple-50/40 dark:bg-purple-900/10">
+                  <td class="px-4 py-2 mono">website</td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="website" class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer">https://www.acme.com</span></label></td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="website" class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer line-through">www.acme.io</span></label></td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="website" class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer">acme.com</span></label></td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="website" checked class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-purple-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer mono">expr → https://www.acme.com</span></label></td>
+                  <td class="px-4 py-2 text-purple-600 dark:text-purple-300 inline-flex items-center gap-1"><i data-lucide="code-2" class="w-3 h-3"></i> custom_expression</td>
+                </tr>
+
+                <tr>
+                  <td class="px-4 py-2 mono">billing_addr</td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="addr" class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer">2400 Mission St</span></label></td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="addr" class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer">2400 Mission St #401</span></label></td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="addr" checked class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer">2400 Mission, SF, 94110</span></label></td>
+                  <td class="px-2 py-2 text-center"><button class="pick-btn px-2 py-1 rounded text-[11px] font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 hover:text-purple-500"><i data-lucide="pencil" class="w-3 h-3"></i></button></td>
+                  <td class="px-4 py-2 text-gray-500 inline-flex items-center gap-1"><i data-lucide="crown" class="w-3 h-3 text-purple-500"></i> source_rank</td>
+                </tr>
+
+                <tr>
+                  <td class="px-4 py-2 mono">employee_count</td>
+                  <td class="px-2 py-2 text-center text-[11px] text-gray-300 italic">— null</td>
+                  <td class="px-2 py-2 text-center text-[11px] text-gray-300 italic">— null</td>
+                  <td class="px-2 py-2 text-center"><label class="inline-flex items-center justify-center"><input type="radio" name="emp" checked class="sr-only peer" /><span class="pick-btn px-2 py-1 rounded text-[11px] font-medium peer-checked:bg-emerald-500 peer-checked:text-white bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-pointer mono">287</span></label></td>
+                  <td class="px-2 py-2 text-center"><button class="pick-btn px-2 py-1 rounded text-[11px] font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 hover:text-purple-500"><i data-lucide="pencil" class="w-3 h-3"></i></button></td>
+                  <td class="px-4 py-2 text-gray-500 inline-flex items-center gap-1"><i data-lucide="code-2" class="w-3 h-3 text-fuchsia-500"></i> custom_expression</td>
+                </tr>
+
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Bottom · context strip -->
+        <section class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center gap-2 mb-2"><i data-lucide="cpu" class="w-4 h-4 text-indigo-500"></i> <h4 class="text-sm font-semibold">Match-rule trace</h4></div>
+            <ul class="text-[11px] space-y-1 mono">
+              <li class="flex items-center justify-between"><span class="text-gray-500">A↔C · tax_id exact</span><span class="text-emerald-500">1.00</span></li>
+              <li class="flex items-center justify-between"><span class="text-gray-500">A↔B · email JW + name JW</span><span class="text-amber-500">0.62</span></li>
+              <li class="flex items-center justify-between"><span class="text-gray-500">A↔B · embedding cosine</span><span class="text-amber-500">0.81</span></li>
+              <li class="flex items-center justify-between"><span class="text-gray-500">B↔C · embedding cosine</span><span class="text-amber-500">0.78</span></li>
+              <li class="flex items-center justify-between"><span class="text-gray-500">geo distance A↔B↔C</span><span class="text-emerald-500">0 m</span></li>
+            </ul>
+            <p class="text-[11px] text-gray-500 mt-3">A and C unanimously match on tax_id; B matches on address but not tax — likely sub-tenant at the same building.</p>
+          </div>
+
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center gap-2 mb-2"><i data-lucide="message-square-text" class="w-4 h-4 text-indigo-500"></i> <h4 class="text-sm font-semibold">Steward notes</h4></div>
+            <textarea rows="4" placeholder="Capture reasoning · linked into Detective audit trail" class="w-full px-3 py-2 text-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">Confirmed with Westcoast Trading via phone — separate LLC sub-leasing the same suite. Recommend rejecting B from this match cluster and routing to its own golden record. A + C are confirmed merge.</textarea>
+            <div class="flex items-center justify-between text-[11px] text-gray-500 mt-2">
+              <span class="inline-flex items-center gap-1"><i data-lucide="paperclip" class="w-3 h-3"></i> 1 attachment</span>
+              <span>auto-saved 8 s ago</span>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center gap-2 mb-2"><i data-lucide="git-fork" class="w-4 h-4 text-indigo-500"></i> <h4 class="text-sm font-semibold">Downstream impact</h4></div>
+            <ul class="text-[11px] space-y-2">
+              <li class="flex items-center justify-between"><span class="inline-flex items-center gap-1.5"><i data-lucide="snowflake" class="w-3 h-3 text-sky-500"></i> Snowflake · analytics.dim_customer</span><span class="mono text-emerald-500">+ 1 update</span></li>
+              <li class="flex items-center justify-between"><span class="inline-flex items-center gap-1.5"><i data-lucide="rss" class="w-3 h-3 text-orange-500"></i> Kafka · mdm.customer.v1</span><span class="mono text-emerald-500">+ 1 event</span></li>
+              <li class="flex items-center justify-between"><span class="inline-flex items-center gap-1.5"><i data-lucide="webhook" class="w-3 h-3 text-purple-500"></i> Stripe webhook · /v1/customers</span><span class="mono text-emerald-500">+ 1 PUT</span></li>
+              <li class="flex items-center justify-between"><span class="inline-flex items-center gap-1.5"><i data-lucide="shield" class="w-3 h-3 text-rose-500"></i> Detective · merge_event</span><span class="mono text-emerald-500">+ 1 audit</span></li>
+            </ul>
+            <p class="text-[11px] text-gray-500 mt-3 inline-flex items-center gap-1"><i data-lucide="info" class="w-3 h-3"></i> Approve will write a single transaction across xref, snapshot, event-log, and Detective.</p>
+          </div>
+
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'mdm-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>

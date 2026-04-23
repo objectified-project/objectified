@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MDM · Merge Candidates</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-sky-500 flex items-center justify-center"><i data-lucide="gem" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">MDM</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Merge candidates</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto p-4 h-full">
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> MDM</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Overview</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Master Data</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="domains.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="library" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Domains</span></a></li>
+            <li><a href="golden-record.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="gem" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Golden Records</span></a></li>
+            <li><a href="xref-map.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="link" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Cross-Reference</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Match &amp; Merge</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="match-rules.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-merge" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Rules</span></a></li>
+            <li><a href="merge-candidates.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10"><i data-lucide="combine" class="w-5 h-5 text-indigo-500"></i><span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Candidates</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">142</span></a></li>
+            <li><a href="survivorship.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="crown" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Survivorship</span></a></li>
+            <li><a href="unmerge.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="split" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Unmerge</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Stewardship</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="stewardship-inbox.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="inbox" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Inbox</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">23</span></a></li>
+            <li><a href="steward-workspace.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="columns-3" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Workspace</span></a></li>
+            <li><a href="approvals.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="badge-check" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Approvals</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Quality</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="quality-dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="gauge" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">DQ Dashboard</span></a></li>
+            <li><a href="profiling.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="bar-chart-3" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Profiling</span></a></li>
+            <li><a href="dq-rules.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="check-square" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Rules</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Reference</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="hierarchies.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="folder-tree" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Hierarchies</span></a></li>
+            <li><a href="reference-data.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="book-open" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Reference Data</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div>
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Distribution</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="sources.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="plug" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Sources</span><span class="text-[10px] text-gray-400 mono">7</span></a></li>
+            <li><a href="lineage.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-fork" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Lineage</span></a></li>
+            <li><a href="subscriptions.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="rss" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Subscriptions</span></a></li>
+            <li><a href="publish-jobs.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="send" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Publish Jobs</span><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">Ent</span></a></li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div class="px-6 py-4 flex items-end justify-between">
+          <div>
+            <h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="combine" class="w-6 h-6 text-indigo-500"></i> Merge Candidates</h2>
+            <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">142 pairs awaiting decision · score in steward-review band <span class="mono">0.70 — 0.92</span></p>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1 rounded-md border border-gray-200 dark:border-gray-700 p-0.5 text-xs">
+              <button class="px-2 py-1 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">All · 142</button>
+              <button class="px-2 py-1 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">Customer · 87</button>
+              <button class="px-2 py-1 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">Product · 32</button>
+              <button class="px-2 py-1 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">Other · 23</button>
+            </div>
+            <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="check-check" class="w-4 h-4"></i> Bulk approve safe ≥ 0.90</button>
+            <button class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"><i data-lucide="zap" class="w-4 h-4"></i> Open queue</button>
+          </div>
+        </div>
+        <div class="px-6 pb-3 flex items-center gap-4 text-xs text-gray-500">
+          <span>Sorted by · <span class="font-medium text-gray-700 dark:text-gray-300">SLA breach</span> ↓</span>
+          <span class="text-gray-300">·</span>
+          <span>Assignee · <span class="font-medium text-gray-700 dark:text-gray-300">all stewards</span></span>
+          <span class="text-gray-300">·</span>
+          <span class="inline-flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> 6 breaching SLA</span>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-6 space-y-4">
+
+        <!-- Candidate row 1 · ambiguous 3-way -->
+        <article class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <header class="px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-[10px] mono text-gray-400">cand_M00142</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">Customer</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">3-way</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 inline-flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3 h-3"></i> SLA -2 h</span>
+              <span class="text-xs text-gray-500">queued 6 h ago</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <span class="text-gray-500">Score</span>
+              <span class="mono font-semibold text-amber-500">0.81</span>
+              <div class="w-24 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden"><div class="h-1.5 bg-amber-500" style="width: 81%"></div></div>
+            </div>
+          </header>
+          <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100 dark:divide-gray-700/60">
+            <div class="p-4">
+              <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center"><i data-lucide="cloud" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i></div><span class="text-xs font-semibold">SFDC · A</span></div><span class="mono text-[10px] text-gray-400">0014x...zR3aQ</span></div>
+              <p class="text-sm font-medium mt-2">Acme Holdings, Inc.</p>
+              <p class="text-[11px] text-gray-500 mono">accounts@acme.com</p>
+              <p class="text-[11px] text-gray-500 mono">tax: 12-3456789 · US</p>
+              <p class="text-[11px] text-gray-500 mono">2400 Mission St, SF</p>
+            </div>
+            <div class="p-4 bg-amber-50/30 dark:bg-amber-900/10">
+              <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center"><i data-lucide="contact" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"></i></div><span class="text-xs font-semibold">HubSpot · B</span></div><span class="mono text-[10px] text-gray-400">9921883</span></div>
+              <p class="text-sm font-medium mt-2">Westcoast Trading LLC</p>
+              <p class="text-[11px] text-gray-500 mono">acme@westcoast.io</p>
+              <p class="text-[11px] text-gray-500 mono">tax: — · US</p>
+              <p class="text-[11px] text-gray-500 mono">2400 Mission St #401, SF</p>
+            </div>
+            <div class="p-4">
+              <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center"><i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i></div><span class="text-xs font-semibold">NetSuite · A</span></div><span class="mono text-[10px] text-gray-400">NS-CUST-48201</span></div>
+              <p class="text-sm font-medium mt-2">Acme Holdings</p>
+              <p class="text-[11px] text-gray-500 mono">ar@acme.com</p>
+              <p class="text-[11px] text-gray-500 mono">tax: 12-3456789 · US</p>
+              <p class="text-[11px] text-gray-500 mono">2400 Mission, San Francisco</p>
+            </div>
+          </div>
+          <footer class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40 flex items-center justify-between">
+            <div class="flex items-center gap-3 text-[11px] text-gray-500">
+              <span>Triggered by · <span class="mono text-gray-700 dark:text-gray-300">embedding cosine 0.81</span></span>
+              <span class="text-gray-300">·</span>
+              <span>Address geo-distance · <span class="mono text-gray-700 dark:text-gray-300">0 m</span></span>
+              <span class="text-gray-300">·</span>
+              <span>SFDC ↔ NetSuite agree on tax_id; HubSpot is the outlier</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="px-3 py-1.5 text-xs rounded-md border border-rose-200 dark:border-rose-700 text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/20 inline-flex items-center gap-1"><i data-lucide="x" class="w-3.5 h-3.5"></i> Reject HubSpot</button>
+              <button class="px-3 py-1.5 text-xs rounded-md border border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 inline-flex items-center gap-1"><i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Escalate</button>
+              <a href="steward-workspace.html" class="px-3 py-1.5 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1"><i data-lucide="columns-3" class="w-3.5 h-3.5"></i> Open workspace</a>
+            </div>
+          </footer>
+        </article>
+
+        <!-- Candidate row 2 · clean pair, high score -->
+        <article class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <header class="px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-[10px] mono text-gray-400">cand_M00141</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/40 dark:text-fuchsia-300">Product</span>
+              <span class="text-xs text-gray-500">queued 38 m ago</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <span class="text-gray-500">Score</span>
+              <span class="mono font-semibold text-emerald-500">0.91</span>
+              <div class="w-24 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden"><div class="h-1.5 bg-emerald-500" style="width: 91%"></div></div>
+            </div>
+          </header>
+          <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100 dark:divide-gray-700/60">
+            <div class="p-4">
+              <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center"><i data-lucide="shopping-bag" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"></i></div><span class="text-xs font-semibold">Shopify · B</span></div><span class="mono text-[10px] text-gray-400">gid://...4192</span></div>
+              <p class="text-sm font-medium mt-2">Acme Anvil 12 oz · Black</p>
+              <p class="text-[11px] text-gray-500 mono">SKU: ACM-ANV-12-BLK</p>
+              <p class="text-[11px] text-gray-500 mono">GTIN: 0083920448211</p>
+            </div>
+            <div class="p-4">
+              <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center"><i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i></div><span class="text-xs font-semibold">NetSuite · A</span></div><span class="mono text-[10px] text-gray-400">NS-PRD-3801</span></div>
+              <p class="text-sm font-medium mt-2">Anvil 12oz Blk</p>
+              <p class="text-[11px] text-gray-500 mono">SKU: ACM-ANV-12-BK</p>
+              <p class="text-[11px] text-gray-500 mono">GTIN: 0083920448211</p>
+            </div>
+          </div>
+          <footer class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40 flex items-center justify-between">
+            <div class="flex items-center gap-3 text-[11px] text-gray-500">
+              <span>GTIN exact · <span class="mono text-emerald-600">+0.40</span></span>
+              <span class="text-gray-300">·</span>
+              <span>SKU JW · <span class="mono text-emerald-600">0.96</span></span>
+              <span class="text-gray-300">·</span>
+              <span>name embedding · <span class="mono text-emerald-600">0.94</span></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="px-3 py-1.5 text-xs rounded-md border border-rose-200 dark:border-rose-700 text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/20 inline-flex items-center gap-1"><i data-lucide="x" class="w-3.5 h-3.5"></i> Reject</button>
+              <button class="px-3 py-1.5 text-xs rounded-md bg-emerald-600 hover:bg-emerald-700 text-white inline-flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Approve merge</button>
+            </div>
+          </footer>
+        </article>
+
+        <!-- Candidate row 3 · low confidence pair, distinct addresses -->
+        <article class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <header class="px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-[10px] mono text-gray-400">cand_M00139</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">Customer</span>
+              <span class="text-xs text-gray-500">queued 2 h ago · assigned <span class="font-medium text-gray-700 dark:text-gray-300">@nbarrett</span></span>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <span class="text-gray-500">Score</span>
+              <span class="mono font-semibold text-amber-500">0.73</span>
+              <div class="w-24 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden"><div class="h-1.5 bg-amber-500" style="width: 73%"></div></div>
+            </div>
+          </header>
+          <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100 dark:divide-gray-700/60">
+            <div class="p-4">
+              <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center"><i data-lucide="cloud" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i></div><span class="text-xs font-semibold">SFDC · A</span></div><span class="mono text-[10px] text-gray-400">0014x...8KqZ</span></div>
+              <p class="text-sm font-medium mt-2">Northwind Traders</p>
+              <p class="text-[11px] text-gray-500 mono">contact@northwind.com</p>
+              <p class="text-[11px] text-gray-500 mono">901 Pike St, Seattle WA</p>
+            </div>
+            <div class="p-4">
+              <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center"><i data-lucide="contact" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"></i></div><span class="text-xs font-semibold">HubSpot · B</span></div><span class="mono text-[10px] text-gray-400">8821042</span></div>
+              <p class="text-sm font-medium mt-2">Northwind Trading Co.</p>
+              <p class="text-[11px] text-gray-500 mono">info@northwind.io</p>
+              <p class="text-[11px] text-gray-500 mono">122 W Mercer, Seattle WA</p>
+            </div>
+          </div>
+          <footer class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40 flex items-center justify-between">
+            <div class="flex items-center gap-3 text-[11px] text-gray-500">
+              <span>name JW · <span class="mono text-amber-600">0.84</span></span>
+              <span class="text-gray-300">·</span>
+              <span>email JW · <span class="mono text-amber-600">0.71</span></span>
+              <span class="text-gray-300">·</span>
+              <span class="inline-flex items-center gap-1 text-amber-600"><i data-lucide="alert-triangle" class="w-3 h-3"></i> different street &amp; postal</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="px-3 py-1.5 text-xs rounded-md border border-rose-200 dark:border-rose-700 text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/20 inline-flex items-center gap-1"><i data-lucide="x" class="w-3.5 h-3.5"></i> Not a duplicate</button>
+              <button class="px-3 py-1.5 text-xs rounded-md border border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 inline-flex items-center gap-1"><i data-lucide="folder-tree" class="w-3.5 h-3.5"></i> Link as parent/child</button>
+              <button class="px-3 py-1.5 text-xs rounded-md bg-emerald-600 hover:bg-emerald-700 text-white inline-flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Approve merge</button>
+            </div>
+          </footer>
+        </article>
+
+        <!-- Candidate row 4 · supplier, banking conflict -->
+        <article class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <header class="px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-[10px] mono text-gray-400">cand_M00138</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">Supplier</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 inline-flex items-center gap-1"><i data-lucide="shield-alert" class="w-3 h-3"></i> Banking conflict</span>
+              <span class="text-xs text-gray-500">queued 4 h ago</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <span class="text-gray-500">Score</span>
+              <span class="mono font-semibold text-amber-500">0.88</span>
+              <div class="w-24 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden"><div class="h-1.5 bg-amber-500" style="width: 88%"></div></div>
+            </div>
+          </header>
+          <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100 dark:divide-gray-700/60">
+            <div class="p-4">
+              <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center"><i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i></div><span class="text-xs font-semibold">NetSuite · A</span></div><span class="mono text-[10px] text-gray-400">NS-VND-1029</span></div>
+              <p class="text-sm font-medium mt-2">Pacific Logistics, Inc.</p>
+              <p class="text-[11px] text-gray-500 mono">tax: 91-1234567 · US</p>
+              <p class="text-[11px] text-gray-500 mono">DUNS: 04-739-9921</p>
+              <p class="text-[11px] text-rose-500 mono">bank_acct: ****1284</p>
+            </div>
+            <div class="p-4 bg-rose-50/30 dark:bg-rose-900/10">
+              <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center"><i data-lucide="receipt" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"></i></div><span class="text-xs font-semibold">Coupa · B</span></div><span class="mono text-[10px] text-gray-400">cpa_77821</span></div>
+              <p class="text-sm font-medium mt-2">Pacific Logistics</p>
+              <p class="text-[11px] text-gray-500 mono">tax: 91-1234567 · US</p>
+              <p class="text-[11px] text-gray-500 mono">DUNS: 04-739-9921</p>
+              <p class="text-[11px] text-rose-500 mono">bank_acct: ****8702</p>
+            </div>
+          </div>
+          <footer class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40 flex items-center justify-between">
+            <div class="flex items-center gap-3 text-[11px] text-rose-600 dark:text-rose-400 inline-flex items-center gap-1">
+              <i data-lucide="lock" class="w-3 h-3"></i> Auto-merge blocked by safe-field policy on <span class="mono">bank_acct</span> · requires Finance steward
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="px-3 py-1.5 text-xs rounded-md border border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 inline-flex items-center gap-1"><i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Escalate to Finance</button>
+              <a href="approvals.html" class="px-3 py-1.5 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1"><i data-lucide="badge-check" class="w-3.5 h-3.5"></i> Open approval</a>
+            </div>
+          </footer>
+        </article>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-between text-xs text-gray-500 px-1">
+          <span>Showing 4 of 142 candidates</span>
+          <div class="flex items-center gap-2">
+            <button class="px-2 py-1 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">‹ Prev</button>
+            <span class="mono">page 1 / 36</span>
+            <button class="px-2 py-1 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">Next ›</button>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'mdm-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>
