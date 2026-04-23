@@ -12,7 +12,6 @@ import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
   { href: '/features', label: 'Features' },
-  { href: '/suite', label: 'Suite' },
   { href: '/for-teams', label: 'For Teams' },
   { href: '/pricing', label: 'Pricing' },
 ];

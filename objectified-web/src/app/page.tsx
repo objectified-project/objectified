@@ -8,15 +8,6 @@ import {
   Import,
   LayoutGrid,
   Sparkles,
-  ShieldHalf,
-  GraduationCap,
-  Network,
-  BarChart3,
-  Users,
-  Search,
-  Wand2,
-  ScrollText,
-  Crown,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -74,80 +65,6 @@ const HOME_FEATURES: HomeFeature[] = [
     description:
       "Describe your API in plain English and let AI generate a complete OpenAPI specification. Quality scoring grades your spec from A to F.",
     tone: "sky",
-  },
-];
-
-type SuitePreview = {
-  href: string;
-  title: string;
-  description: string;
-  tone: Tone;
-  icon: React.ReactNode;
-};
-
-const SUITE_PREVIEWS: SuitePreview[] = [
-  {
-    href: "/suite/data-shield",
-    title: "Shield",
-    description: "API security & runtime protection — scanning, firewall, anomaly, and compliance.",
-    tone: "red",
-    icon: <ShieldHalf className="h-4 w-4" />,
-  },
-  {
-    href: "/suite/academy",
-    title: "Academy",
-    description: "An LMS purpose-built for API and data teams — turn your platform into a curriculum.",
-    tone: "indigo",
-    icon: <GraduationCap className="h-4 w-4" />,
-  },
-  {
-    href: "/suite/connect",
-    title: "Connect",
-    description: "A built-in iPaaS — connectors, schema mapping, real-time sync, and event routing.",
-    tone: "cyan",
-    icon: <Network className="h-4 w-4" />,
-  },
-  {
-    href: "/suite/analytics",
-    title: "Analytics",
-    description: "Executive-grade analytics across every API, schema, and team in your tenant.",
-    tone: "blue",
-    icon: <BarChart3 className="h-4 w-4" />,
-  },
-  {
-    href: "/suite/collaboration",
-    title: "Collaboration",
-    description: "Real-time editing, threaded reviews, and approval workflows on every artifact.",
-    tone: "emerald",
-    icon: <Users className="h-4 w-4" />,
-  },
-  {
-    href: "/suite/detective",
-    title: "Detective",
-    description: "Forensic-grade investigation across instances, pipelines, and migrations.",
-    tone: "purple",
-    icon: <Search className="h-4 w-4" />,
-  },
-  {
-    href: "/suite/data-transform",
-    title: "Data Transform",
-    description: "Schema migrations done right — compatibility, rules, plans, and Spark at scale.",
-    tone: "amber",
-    icon: <Wand2 className="h-4 w-4" />,
-  },
-  {
-    href: "/suite/contracts",
-    title: "Contracts",
-    description: "Programmable data contracts — terms, consent, billing, and audit in one place.",
-    tone: "rose",
-    icon: <ScrollText className="h-4 w-4" />,
-  },
-  {
-    href: "/suite/mdm",
-    title: "MDM",
-    description: "Turn raw class instances into trusted, governed golden records.",
-    tone: "amber",
-    icon: <Crown className="h-4 w-4" />,
   },
 ];
 
@@ -328,63 +245,6 @@ export default function Home() {
               ))}
             </StaggerGroup>
           </div>
-        </div>
-      </section>
-
-      {/* The Objectified Suite — Coming Soon */}
-      <section className="border-b border-zinc-200/70 bg-gradient-to-b from-zinc-50/80 via-white/0 to-zinc-50/80 px-6 py-24 dark:border-zinc-800/70 dark:from-zinc-900/40 dark:via-transparent dark:to-zinc-900/40">
-        <div className="container mx-auto max-w-6xl">
-          <Reveal>
-            <div className="mb-12 text-center">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-purple-200/60 bg-purple-50/80 px-4 py-2 text-sm font-medium text-purple-700 backdrop-blur dark:border-purple-900/60 dark:bg-purple-950/50 dark:text-purple-300">
-                <Sparkles className="h-4 w-4" />
-                Coming Soon · Early Access Open
-              </div>
-              <h2 className="mb-4 text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-5xl">
-                The Objectified <span className="display-accent">Suite</span>
-              </h2>
-              <p className="mx-auto max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
-                Seventeen new enterprise applications coming to the platform — each with its
-                own AI integration, designed to be subscribed independently and composed
-                together.
-              </p>
-            </div>
-          </Reveal>
-
-          <StaggerGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {SUITE_PREVIEWS.map((s) => (
-              <StaggerItem key={s.title}>
-                <Link href={s.href} className="group block h-full">
-                  <GlassCard className="h-full p-5">
-                    <div className="flex items-start gap-3">
-                      <ToneChip tone={s.tone} className="h-9 w-9 rounded-lg">
-                        {s.icon}
-                      </ToneChip>
-                      <div className="min-w-0">
-                        <h3 className="truncate text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                          {s.title}
-                        </h3>
-                        <p className="mt-1 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">
-                          {s.description}
-                        </p>
-                      </div>
-                    </div>
-                  </GlassCard>
-                </Link>
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
-
-          <Reveal delay={0.1}>
-            <div className="mt-12 text-center">
-              <Link href="/suite">
-                <Button size="lg" className="group">
-                  Explore the Suite
-                  <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </Link>
-            </div>
-          </Reveal>
         </div>
       </section>
 
