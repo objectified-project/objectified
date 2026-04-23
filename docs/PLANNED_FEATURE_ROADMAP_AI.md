@@ -36,17 +36,16 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ AI understands selected items on canvas
     - ✅ AI can see property definitions
     - ✅ Automatic context injection into prompts
-- 📋 **Multi-Turn Conversations**:
-    - 📋 Follow-up questions with context
-    - 📋 Clarification requests
-    - 📋 Iterative refinement of schemas
-    - 📋 "Make it more like X" type instructions
+- ✅ **Multi-Turn Conversations** (#260):
+    - ✅ Follow-up questions with context
+    - ✅ Clarification requests
+    - ✅ Iterative refinement of schemas
+    - ✅ "Make it more like X" type instructions
 - Add guardrails to prevent sensitive data exposure
 - Add guardrails to prevent malicious code generation
 
 | Ticket | Feature Description                                |
 |--------|----------------------------------------------------|
-| #260   | AI Multi-Turn Conversation with History            |
 | #261   | AI Conversation history actions                    |
 | #262   | Install guardrails.ai server                       |
 | #263   | Add guardrails to prevent sensitive data exposure  |

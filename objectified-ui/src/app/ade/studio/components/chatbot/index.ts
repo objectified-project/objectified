@@ -37,4 +37,17 @@ export {
   hasOpenApiSpec,
 } from './openapi-detection';
 export type { DetectedOpenApiSpec } from './openapi-detection';
+export {
+  applyRefinementsToSpec,
+  buildConversationHistoryPreamble,
+  CHAT_HISTORY_EXCERPT_CHAR_CAP,
+  CHAT_HISTORY_TURN_CAP,
+  summarizeConversationHistory,
+} from './conversation-history';
+export type {
+  ChatFollowUpIntent,
+  ChatHistoryExcerpt,
+  ChatHistorySummary,
+  ChatRefinementOp,
+} from './conversation-history';
 export type { ChatFeedback, ChatMessage, ChatRole, ChatSendContext, ChatSendFn } from './types';

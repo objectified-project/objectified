@@ -1,0 +1,273 @@
+/**
+ * Tests for the multi-turn conversation history helpers (#260).
+ *
+ * Pins the intent classifier, refinement-op extraction, prompt-injection
+ * preamble, and the spec mutation pipeline so regressions show up loudly
+ * before they reach the chat surface.
+ */
+
+import {
+  applyRefinementsToSpec,
+  buildConversationHistoryPreamble,
+  CHAT_HISTORY_EXCERPT_CHAR_CAP,
+  CHAT_HISTORY_TURN_CAP,
+  summarizeConversationHistory,
+  type ChatRefinementOp,
+} from '../../src/app/ade/studio/components/chatbot/conversation-history';
+import type { ChatMessage } from '../../src/app/ade/studio/components/chatbot/types';
+
+function user(content: string, id = `u-${content.slice(0, 8)}`): ChatMessage {
+  return { id, role: 'user', content };
+}
+
+function assistant(content: string, id = `a-${content.slice(0, 8)}`): ChatMessage {
+  return { id, role: 'assistant', content };
+}
+
+const SAMPLE_SPEC_REPLY = [
+  'Here is the spec:',
+  '',
+  '```json',
+  JSON.stringify({
+    openapi: '3.1.0',
+    info: { title: 'Catalog', version: '0.1.0' },
+    components: {
+      schemas: {
+        Product: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            priceCents: { type: 'integer' },
+          },
+          required: ['id'],
+        },
+      },
+    },
+  }),
+  '```',
+].join('\n');
+
+describe('summarizeConversationHistory', () => {
+  it('classifies the first turn when there is no prior assistant reply', () => {
+    const summary = summarizeConversationHistory([], 'Sketch a User class');
+    expect(summary.intent).toBe('first-turn');
+    expect(summary.userTurnCount).toBe(1);
+    expect(summary.assistantTurnCount).toBe(0);
+    expect(summary.lastAssistantSpec).toBeNull();
+    expect(summary.refinementOps).toEqual([]);
+  });
+
+  it('treats unrelated follow-ups as standalone when no other pattern matches', () => {
+    const messages: ChatMessage[] = [user('hi'), assistant('hello there')];
+    const summary = summarizeConversationHistory(messages, 'sketch a wholly new schema');
+    expect(summary.intent).toBe('standalone');
+    expect(summary.userTurnCount).toBe(2);
+    expect(summary.assistantTurnCount).toBe(1);
+  });
+
+  it('skips pending and empty assistant messages when counting prior replies', () => {
+    const messages: ChatMessage[] = [
+      user('first'),
+      { id: 'pending', role: 'assistant', content: '', pending: true },
+    ];
+    const summary = summarizeConversationHistory(messages, 'follow up');
+    expect(summary.assistantTurnCount).toBe(0);
+    expect(summary.intent).toBe('first-turn');
+  });
+
+  it('detects clarification questions about the previous reply', () => {
+    const messages: ChatMessage[] = [user('q'), assistant('a long answer')];
+    const summary = summarizeConversationHistory(messages, 'What does that mean?');
+    expect(summary.intent).toBe('clarification');
+  });
+
+  it('detects iteration intent for "actually" / "instead" prompts', () => {
+    const messages: ChatMessage[] = [user('q'), assistant('first try')];
+    const summary = summarizeConversationHistory(messages, 'actually, try again with fewer fields');
+    expect(summary.intent).toBe('iteration');
+  });
+
+  it('detects "more like X" comparison prompts and captures the subject', () => {
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const summary = summarizeConversationHistory(
+      messages,
+      'Make it more like Stripe Charges',
+    );
+    expect(summary.intent).toBe('comparison');
+    expect(summary.comparisonSubject).toBe('Stripe Charges');
+  });
+
+  it('detects refine-spec intent when a prior spec exists and refinement words appear', () => {
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const summary = summarizeConversationHistory(messages, 'refine that please');
+    expect(summary.intent).toBe('refine-spec');
+    expect(summary.lastAssistantSpec).not.toBeNull();
+  });
+
+  it('returns standalone (not refine-spec) when refinement words appear but no spec is present', () => {
+    const messages: ChatMessage[] = [user('q'), assistant('plain text reply')];
+    const summary = summarizeConversationHistory(messages, 'refine that please');
+    expect(summary.intent).toBe('standalone');
+    expect(summary.lastAssistantSpec).toBeNull();
+  });
+
+  it('extracts add / remove / require / rename ops from the prompt', () => {
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const summary = summarizeConversationHistory(
+      messages,
+      'add a phone field of type string, remove priceCents, make name required, rename id to productId',
+    );
+    expect(summary.intent).toBe('refine-spec');
+    expect(summary.refinementOps).toEqual<ChatRefinementOp[]>([
+      { kind: 'rename-property', from: 'id', to: 'productId' },
+      { kind: 'remove-property', name: 'priceCents' },
+      { kind: 'require-property', name: 'name' },
+      { kind: 'add-property', name: 'phone', type: 'string' },
+    ]);
+  });
+
+  it('parses concise add-property phrasing like "add timestamps integer"', () => {
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const summary = summarizeConversationHistory(messages, 'add createdAt integer');
+    expect(summary.refinementOps).toContainEqual({
+      kind: 'add-property',
+      name: 'createdAt',
+      type: 'integer',
+    });
+  });
+
+  it('builds excerpts capped to the most recent turns and trims long text', () => {
+    const long = 'word '.repeat(120);
+    const messages: ChatMessage[] = [];
+    for (let i = 0; i < CHAT_HISTORY_TURN_CAP + 4; i += 1) {
+      messages.push(user(`u-${i}`, `u-${i}`));
+      messages.push(assistant(`a-${i}-${long}`, `a-${i}`));
+    }
+    const summary = summarizeConversationHistory(messages, 'next');
+    expect(summary.recentExcerpts.length).toBeLessThanOrEqual(CHAT_HISTORY_TURN_CAP);
+    for (const e of summary.recentExcerpts) {
+      expect(e.content.length).toBeLessThanOrEqual(CHAT_HISTORY_EXCERPT_CHAR_CAP);
+    }
+  });
+
+  it('replaces fenced code blocks in excerpts with a placeholder', () => {
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const summary = summarizeConversationHistory(messages, 'next');
+    const last = summary.recentExcerpts[summary.recentExcerpts.length - 1];
+    expect(last.content).toContain('[code block omitted]');
+    expect(last.content).not.toContain('```');
+  });
+});
+
+describe('buildConversationHistoryPreamble', () => {
+  it('returns an empty string for the first turn', () => {
+    const summary = summarizeConversationHistory([], 'hello');
+    expect(buildConversationHistoryPreamble(summary)).toBe('');
+  });
+
+  it('mentions turn counters and intent when refining a spec', () => {
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const summary = summarizeConversationHistory(messages, 'add a phone field');
+    const preamble = buildConversationHistoryPreamble(summary);
+    expect(preamble).toMatch(/Turn 2 of an ongoing thread/);
+    expect(preamble).toMatch(/refinement of the last generated schema/i);
+    expect(preamble).toMatch(/Add property `phone`/);
+  });
+
+  it('mentions the comparison subject when present', () => {
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const summary = summarizeConversationHistory(messages, 'Make it more like FHIR Patient');
+    const preamble = buildConversationHistoryPreamble(summary);
+    expect(preamble).toMatch(/look more like: FHIR Patient/);
+  });
+
+  it('describes clarification intent without inventing schema edits', () => {
+    const messages: ChatMessage[] = [user('q'), assistant(SAMPLE_SPEC_REPLY)];
+    const summary = summarizeConversationHistory(messages, 'What does priceCents mean?');
+    const preamble = buildConversationHistoryPreamble(summary);
+    expect(preamble).toMatch(/clarifying question/);
+    expect(preamble).not.toMatch(/Detected schema edits/);
+  });
+});
+
+describe('applyRefinementsToSpec', () => {
+  const baseSpec = (): Record<string, unknown> => ({
+    openapi: '3.1.0',
+    info: { title: 'Catalog', version: '0.1.0' },
+    components: {
+      schemas: {
+        Product: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            priceCents: { type: 'integer' },
+          },
+          required: ['id'],
+        },
+      },
+    },
+  });
+
+  it('returns a clone — never mutates the input spec', () => {
+    const input = baseSpec();
+    const before = JSON.stringify(input);
+    applyRefinementsToSpec(input, [{ kind: 'remove-property', name: 'name' }]);
+    expect(JSON.stringify(input)).toBe(before);
+  });
+
+  it('adds a property with the requested type', () => {
+    const out = applyRefinementsToSpec(baseSpec(), [
+      { kind: 'add-property', name: 'phone', type: 'string' },
+    ]) as { components: { schemas: { Product: { properties: Record<string, { type: string }> } } } };
+    expect(out.components.schemas.Product.properties.phone.type).toBe('string');
+  });
+
+  it('updates the type of an existing property when add is requested with a type', () => {
+    const out = applyRefinementsToSpec(baseSpec(), [
+      { kind: 'add-property', name: 'priceCents', type: 'number' },
+    ]) as { components: { schemas: { Product: { properties: Record<string, { type: string }> } } } };
+    expect(out.components.schemas.Product.properties.priceCents.type).toBe('number');
+  });
+
+  it('removes a property and prunes required entries', () => {
+    const out = applyRefinementsToSpec(baseSpec(), [
+      { kind: 'remove-property', name: 'id' },
+    ]) as { components: { schemas: { Product: { properties: Record<string, unknown>; required?: string[] } } } };
+    expect(out.components.schemas.Product.properties.id).toBeUndefined();
+    expect(out.components.schemas.Product.required).toBeUndefined();
+  });
+
+  it('marks an existing property as required without duplicating it', () => {
+    const out = applyRefinementsToSpec(baseSpec(), [
+      { kind: 'require-property', name: 'name' },
+      { kind: 'require-property', name: 'name' },
+    ]) as { components: { schemas: { Product: { required: string[] } } } };
+    expect(out.components.schemas.Product.required).toEqual(['id', 'name']);
+  });
+
+  it('creates a placeholder property when require is asked for an unknown name', () => {
+    const out = applyRefinementsToSpec(baseSpec(), [
+      { kind: 'require-property', name: 'tenantId' },
+    ]) as { components: { schemas: { Product: { properties: Record<string, { type: string }>; required: string[] } } } };
+    expect(out.components.schemas.Product.properties.tenantId.type).toBe('string');
+    expect(out.components.schemas.Product.required).toContain('tenantId');
+  });
+
+  it('renames a property and updates the required list', () => {
+    const out = applyRefinementsToSpec(baseSpec(), [
+      { kind: 'rename-property', from: 'id', to: 'productId' },
+    ]) as { components: { schemas: { Product: { properties: Record<string, unknown>; required: string[] } } } };
+    expect(out.components.schemas.Product.properties.productId).toBeDefined();
+    expect(out.components.schemas.Product.properties.id).toBeUndefined();
+    expect(out.components.schemas.Product.required).toContain('productId');
+  });
+
+  it('returns the clone untouched when the spec has no schemas', () => {
+    const spec = { openapi: '3.1.0', info: { title: 'x', version: '0.1.0' } };
+    const out = applyRefinementsToSpec(spec, [{ kind: 'remove-property', name: 'x' }]);
+    expect(out).toEqual(spec);
+    expect(out).not.toBe(spec);
+  });
+});

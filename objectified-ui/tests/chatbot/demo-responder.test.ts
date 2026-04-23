@@ -1,10 +1,15 @@
 /**
- * Tests for the offline demo responder used by the Studio chatbot (#258, #259).
+ * Tests for the offline demo responder used by the Studio chatbot
+ * (#258, #259, #260).
  *
- * Covers both the "no context" baseline behaviour designers see in isolated
- * previews and the context-aware grounding wired up in #259 — project /
- * version mention, canvas selection acknowledgement, and reuse of existing
- * class / property names inside the sample OpenAPI spec.
+ * Covers:
+ *   - The "no context" baseline behaviour designers see in isolated previews
+ *   - The context-aware grounding wired up in #259 — project / version
+ *     mention, canvas selection acknowledgement, and reuse of existing
+ *     class / property names inside the sample OpenAPI spec
+ *   - The multi-turn behaviour wired up in #260 — refining the previous
+ *     spec, handling clarification questions, "make it more like X"
+ *     comparisons, and re-rolls
  */
 
 import { createDemoChatResponder } from '../../src/app/ade/studio/components/chatbot/demo-responder';
@@ -13,6 +18,7 @@ import {
   EMPTY_CHAT_STUDIO_CONTEXT,
   type ChatStudioContext,
 } from '../../src/app/ade/studio/components/chatbot/chat-context';
+import type { ChatMessage } from '../../src/app/ade/studio/components/chatbot/types';
 
 const richContext: ChatStudioContext = {
   project: { id: 'proj-1', name: 'Acme Catalog' },
@@ -120,5 +126,118 @@ describe('createDemoChatResponder', () => {
     };
     expect(spec.info.title).toBe('Sample Catalog API');
     expect(Object.keys(spec.components.schemas)).toContain('Product');
+  });
+
+  describe('multi-turn behaviour (#260)', () => {
+    async function getInitialSpecReply(): Promise<string> {
+      return responder({
+        messages: [],
+        prompt: 'Generate an OpenAPI spec for me',
+        isRegenerate: false,
+      });
+    }
+
+    function turnsAfter(initialReply: string, prompt: string): ChatMessage[] {
+      return [
+        { id: 'u1', role: 'user', content: 'Generate an OpenAPI spec for me' },
+        { id: 'a1', role: 'assistant', content: initialReply },
+        { id: 'u2', role: 'user', content: prompt },
+      ].slice(0, 2); // pass only the prior turns; prompt is supplied separately.
+    }
+
+    it('refines the previously-generated spec when the user asks to add a property', async () => {
+      const initial = await getInitialSpecReply();
+      const initialSpecs = detectOpenApiSpecs(initial);
+      const initialSchemaName = Object.keys(
+        (initialSpecs[0].spec as { components: { schemas: Record<string, unknown> } })
+          .components.schemas,
+      )[0];
+
+      const refinement = await responder({
+        messages: turnsAfter(initial, 'add a phone field of type string'),
+        prompt: 'add a phone field of type string',
+        isRegenerate: false,
+      });
+      expect(refinement).toMatch(/Updated the previous schema/);
+      expect(refinement).toMatch(/added `phone`/);
+      const refinedSpecs = detectOpenApiSpecs(refinement);
+      expect(refinedSpecs).toHaveLength(1);
+      const refinedSchema = (refinedSpecs[0].spec as {
+        components: { schemas: Record<string, { properties: Record<string, { type: string }> }> };
+      }).components.schemas[initialSchemaName];
+      expect(refinedSchema.properties.phone).toEqual({
+        type: 'string',
+        description: 'Added in follow-up: phone.',
+      });
+      // The original properties are preserved by the deep clone.
+      expect(refinedSchema.properties.id).toBeDefined();
+      expect(refinedSchema.properties.name).toBeDefined();
+    });
+
+    it('removes a property and prunes the required list when asked', async () => {
+      const initial = await getInitialSpecReply();
+      const refinement = await responder({
+        messages: turnsAfter(initial, 'remove priceCents'),
+        prompt: 'remove priceCents',
+        isRegenerate: false,
+      });
+      expect(refinement).toMatch(/removed `priceCents`/);
+      const spec = detectOpenApiSpecs(refinement)[0].spec as {
+        components: { schemas: Record<string, { properties: Record<string, unknown> }> };
+      };
+      const schema = Object.values(spec.components.schemas)[0];
+      expect(schema.properties.priceCents).toBeUndefined();
+    });
+
+    it('marks a property required when the follow-up uses "make X required"', async () => {
+      const initial = await getInitialSpecReply();
+      const refinement = await responder({
+        messages: turnsAfter(initial, 'make name required'),
+        prompt: 'make name required',
+        isRegenerate: false,
+      });
+      const spec = detectOpenApiSpecs(refinement)[0].spec as {
+        components: { schemas: Record<string, { required: string[] }> };
+      };
+      const schema = Object.values(spec.components.schemas)[0];
+      expect(schema.required).toContain('name');
+    });
+
+    it('answers clarification questions without re-shipping a spec', async () => {
+      const initial = await getInitialSpecReply();
+      const reply = await responder({
+        messages: turnsAfter(initial, 'What does priceCents represent?'),
+        prompt: 'What does priceCents represent?',
+        isRegenerate: false,
+      });
+      expect(reply).toMatch(/Happy to clarify/);
+      expect(reply).toMatch(/turn 2/);
+      expect(detectOpenApiSpecs(reply)).toHaveLength(0);
+    });
+
+    it('reframes the spec when the user asks for "more like X"', async () => {
+      const initial = await getInitialSpecReply();
+      const reply = await responder({
+        messages: turnsAfter(initial, 'Make it more like Stripe Charges'),
+        prompt: 'Make it more like Stripe Charges',
+        isRegenerate: false,
+      });
+      expect(reply).toMatch(/lean more like \*\*Stripe Charges\*\*/);
+      const spec = detectOpenApiSpecs(reply)[0].spec as {
+        info: { title: string; description: string };
+      };
+      expect(spec.info.title).toMatch(/Stripe Charges/);
+      expect(spec.info.description).toMatch(/Stripe Charges/);
+    });
+
+    it('flags multi-turn standalone prompts with a continuation note', async () => {
+      const initial = await getInitialSpecReply();
+      const reply = await responder({
+        messages: turnsAfter(initial, 'tell me a joke'),
+        prompt: 'tell me a joke',
+        isRegenerate: false,
+      });
+      expect(reply).toMatch(/Continuing the thread — turn 2/);
+    });
   });
 });

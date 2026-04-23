@@ -24,6 +24,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Added the Studio AI chatbot launcher and panel: a floating bubble in the bottom right of the canvas opens a slide-out panel with full-screen mode, toggled with `Cmd+Shift+A` / `Ctrl+Shift+A`.
 - Filled out the Studio AI chat surface to the design guidelines: distinct user/assistant bubbles, typing indicator, markdown rendering, syntax-highlighted code blocks with a copy button, regenerate / thumbs up / thumbs down message actions, and a one-click import button when an assistant reply contains an OpenAPI spec in a ```json``` block.
 - The Studio AI chatbot is now context-aware: each message you send carries a snapshot of your current project, version, classes, reusable properties, and canvas selection, and a "Sharing context" chip in the panel lets you inspect exactly what the assistant can see.
+- The Studio AI chatbot now handles multi-turn conversations: follow-up prompts like "add a phone field", "remove priceCents", "make name required", "rename id to productId", "make it more like Stripe Charges", or simple clarification questions are recognized as edits to the previous reply, and the refined OpenAPI spec is re-shipped so you can keep iterating without restarting the thread.
 
 ---
 
