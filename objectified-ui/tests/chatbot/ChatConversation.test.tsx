@@ -1,5 +1,5 @@
 /**
- * Tests for the chat conversation orchestrator (#258).
+ * Tests for the chat conversation orchestrator (#258, #259, #260).
  *
  * Covers the end-to-end flow exercised by the StudioAiChatbot panel:
  *   - Empty-state suggestions seed the conversation
@@ -8,6 +8,9 @@
  *   - Regenerate re-uses the last user prompt and replaces the prior reply
  *   - Thumbs up/down feedback toggles
  *   - Composer is disabled while the assistant is working
+ *   - The studio context snapshot rides on every send (#259)
+ *   - Multi-turn follow-ups carry the full transcript and refine prior
+ *     specs through the chat surface (#260)
  */
 
 import React from 'react';
@@ -16,7 +19,7 @@ import '@testing-library/jest-dom';
 
 import { ChatConversation } from '../../src/app/ade/studio/components/chatbot/ChatConversation';
 import type { ChatStudioContext } from '../../src/app/ade/studio/components/chatbot/chat-context';
-import type { ChatSendFn } from '../../src/app/ade/studio/components/chatbot/types';
+import type { ChatMessage, ChatSendFn } from '../../src/app/ade/studio/components/chatbot/types';
 
 type ResponderCall = {
   prompt: string;
@@ -230,6 +233,65 @@ describe('ChatConversation', () => {
     await act(async () => {
       resolveWith('ok');
     });
+  });
+
+  it('passes the full prior transcript to the responder on follow-up turns (#260)', async () => {
+    const calls: ResponderCall[] = [];
+    const transcripts: ChatMessage[][] = [];
+    const responder: ChatSendFn = ({ messages, prompt, isRegenerate, studioContext }) => {
+      calls.push({ prompt, isRegenerate, studioContext });
+      transcripts.push(messages);
+      return Promise.resolve(`echo: ${prompt}`);
+    };
+    render(<ChatConversation onSendMessage={responder} />);
+
+    fireEvent.change(screen.getByTestId('studio-ai-chat-input'), { target: { value: 'first ask' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-send'));
+    await waitFor(() => expect(calls).toHaveLength(1));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('studio-ai-chat-input')).not.toBeDisabled();
+    });
+
+    fireEvent.change(screen.getByTestId('studio-ai-chat-input'), { target: { value: 'follow up' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-send'));
+    await waitFor(() => expect(calls).toHaveLength(2));
+
+    // First call only sees the just-sent user turn.
+    expect(transcripts[0]).toHaveLength(1);
+    expect(transcripts[0][0]).toMatchObject({ role: 'user', content: 'first ask' });
+
+    // Second call sees the full prior transcript: user + assistant + new user.
+    expect(transcripts[1]).toHaveLength(3);
+    expect(transcripts[1].map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
+    expect(transcripts[1][1].content).toBe('echo: first ask');
+    expect(transcripts[1][2].content).toBe('follow up');
+  });
+
+  it('lets the user iteratively refine a previously imported spec (#260)', async () => {
+    // Drives the actual demo responder through the chat shell so the
+    // multi-turn refinement path is exercised end-to-end.
+    const { createDemoChatResponder } = await import('../../src/app/ade/studio/components/chatbot/demo-responder');
+    const responder = createDemoChatResponder();
+    const onImportSpec = jest.fn();
+    render(<ChatConversation onSendMessage={responder} onImportSpec={onImportSpec} />);
+
+    fireEvent.change(screen.getByTestId('studio-ai-chat-input'), { target: { value: 'sketch a schema' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-send'));
+    await waitFor(() => expect(screen.getByTestId('studio-ai-chat-import-spec-0')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('studio-ai-chat-input')).not.toBeDisabled());
+
+    fireEvent.change(screen.getByTestId('studio-ai-chat-input'), { target: { value: 'add a phone field' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-send'));
+    // The refinement reply re-ships an importable spec — wait on the second
+    // import button so we know both turns made it through the responder.
+    await waitFor(() => expect(screen.getAllByTestId(/studio-ai-chat-import-spec-/)).toHaveLength(1));
+    const bubbles = screen.getAllByTestId('studio-ai-chat-bubble');
+    const assistantBubbles = bubbles.filter((b) => b.getAttribute('data-role') === 'assistant');
+    expect(assistantBubbles).toHaveLength(2);
+    // The second assistant reply is the refinement: it must include the
+    // refined spec containing a `phone` property as JSON text.
+    expect(assistantBubbles[1].textContent ?? '').toMatch(/"phone"/);
   });
 
   it('forwards the import callback when the assistant returns an OpenAPI spec', async () => {
