@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added poll-time branch HEAD SHA change detection with GitHub conditional `If-None-Match` checks so unchanged branches write `skipped_unchanged` scan history entries and skip downstream scan dispatch while still advancing poll cadence.
 - Added a repository poll scheduler tick that atomically reserves due tracked branches, skips paused repositories, enforces enterprise/free poll interval floors, dispatches `repo.poll.<priority>` jobs, and records `repository.polled` workflow audits.
 - Added the REPO-3.8 in-scan virtual filesystem resolver for repository imports, with dependency-ordered cross-file `$ref` resolution (relative paths + JSON pointers), per-scan memoization, and deterministic cycle detection errors.
 - Added standalone repository JSON Schema importer support for Draft 7, 2019-09, and 2020-12 schemas, preserving source `$id`/draft metadata while delegating sibling `$ref` resolution through the REPO-3.8 resolver contract.
