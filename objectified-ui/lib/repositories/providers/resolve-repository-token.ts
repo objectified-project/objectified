@@ -159,11 +159,15 @@ export function createResolveRepositoryTokenResolver(partialDeps?: Partial<Resol
          LEFT JOIN odb.external_auth_providers eap ON eap.id = rcr.linked_account_id
          WHERE rcr.repository_id = $1
            AND r.tenant_id = $2
+           AND eap.user_id = $3
+         ORDER BY rcr.linked_account_id
          LIMIT 1`,
-        [repositoryId, userContext.tenantId]
+        [repositoryId, userContext.tenantId, userContext.userId]
       );
 
       const row = toLinkedAccountTokenRow(linkedAccountResult.rows[0] ?? null);
+      linkedAccountId = row?.linked_account_id ?? null;
+
       if (!row || !row.linked_account_id || !row.provider) {
         throw new RepositoryTokenResolutionError(
           'LINKED_ACCOUNT_REMOVED',
@@ -171,7 +175,6 @@ export function createResolveRepositoryTokenResolver(partialDeps?: Partial<Resol
         );
       }
 
-      linkedAccountId = row.linked_account_id;
       provider = row.provider;
       projectId = row.project_id;
 
@@ -236,8 +239,7 @@ export function createResolveRepositoryTokenResolver(partialDeps?: Partial<Resol
           `UPDATE odb.external_auth_providers
            SET access_token = $1,
                refresh_token = $2,
-               token_expires_at = $3,
-               updated_at = CURRENT_TIMESTAMP
+               token_expires_at = $3
            WHERE id = $4`,
           [accessToken, refreshToken, nextExpiresAt, row.linked_account_id]
         );
