@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import YAML from 'yaml';
 import { resolveRepositoryCrossFileRefs } from '../../lib/repositories/importers/cross-file-ref-resolver';
 

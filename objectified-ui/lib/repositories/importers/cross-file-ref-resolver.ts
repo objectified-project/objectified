@@ -69,12 +69,14 @@ function buildVirtualFs(
 function computeResolutionOrder(virtualFs: Map<string, unknown>): string[] {
   const reverseDependencies = new Map<string, Set<string>>();
   const pendingDependencyCount = new Map<string, number>();
+  const forwardDependencies = new Map<string, Set<string>>();
 
   for (const [filePath, document] of virtualFs.entries()) {
     const refs = collectExternalRefTargets(document, filePath);
     const existingTargets = [...refs].filter((target) => virtualFs.has(target));
     const dependencySet = new Set(existingTargets);
     pendingDependencyCount.set(filePath, dependencySet.size);
+    forwardDependencies.set(filePath, dependencySet);
 
     for (const target of dependencySet) {
       const reverse = reverseDependencies.get(target) ?? new Set<string>();
@@ -108,14 +110,60 @@ function computeResolutionOrder(virtualFs: Map<string, unknown>): string[] {
   }
 
   if (ordered.length !== virtualFs.size) {
-    const cycleMembers = [...pendingDependencyCount.entries()]
-      .filter(([, depCount]) => depCount > 0)
-      .map(([filePath]) => filePath)
-      .sort((a, b) => a.localeCompare(b));
-    throw new Error(`Cross-file $ref cycle detected: ${cycleMembers.join(' -> ')} -> ${cycleMembers[0]}`);
+    const cycleSet = new Set(
+      [...pendingDependencyCount.entries()]
+        .filter(([, depCount]) => depCount > 0)
+        .map(([filePath]) => filePath)
+    );
+    const cyclePath = extractCyclePath(cycleSet, forwardDependencies);
+    throw new Error(`Cross-file $ref cycle detected: ${cyclePath}`);
   }
 
   return ordered;
+}
+
+function extractCyclePath(cycleSet: Set<string>, forwardDeps: Map<string, Set<string>>): string {
+  const start = [...cycleSet].sort((a, b) => a.localeCompare(b))[0];
+  const visited = new Set<string>();
+  const onPath = new Set<string>();
+  const pathStack: string[] = [];
+
+  function dfs(node: string): string[] | null {
+    if (onPath.has(node)) {
+      const idx = pathStack.indexOf(node);
+      return [...pathStack.slice(idx), node];
+    }
+    if (visited.has(node)) {
+      return null;
+    }
+    visited.add(node);
+    onPath.add(node);
+    pathStack.push(node);
+
+    const deps = [...(forwardDeps.get(node) ?? new Set<string>())]
+      .filter((dep) => cycleSet.has(dep))
+      .sort((a, b) => a.localeCompare(b));
+
+    for (const dep of deps) {
+      const result = dfs(dep);
+      if (result !== null) {
+        return result;
+      }
+    }
+
+    pathStack.pop();
+    onPath.delete(node);
+    return null;
+  }
+
+  const cyclePath = dfs(start);
+  if (cyclePath !== null) {
+    return cyclePath.join(' -> ');
+  }
+
+  // Fallback: should not occur for a valid cycle set
+  const members = [...cycleSet].sort((a, b) => a.localeCompare(b));
+  return `${members.join(' -> ')} -> ${members[0]}`;
 }
 
 function resolveDocumentRefs(input: {
@@ -145,16 +193,19 @@ function resolveDocumentRefs(input: {
 
       if (typeof value.$ref === 'string') {
         const parsedRef = parseRef(value.$ref);
-        const targetPath = parsedRef.filePath
+        const isExternalRef = parsedRef.filePath.length > 0;
+        const targetPath = isExternalRef
           ? normalizeVirtualPath(parsedRef.filePath, path.posix.dirname(input.filePath))
           : input.filePath;
-        const memoKey = parsedRef.filePath ? `${targetPath}#${parsedRef.fragment}` : null;
+        const memoKey = isExternalRef ? `${targetPath}#${parsedRef.fragment}` : null;
 
         let replacement: unknown;
         if (memoKey && externalMemo.has(memoKey)) {
           replacement = deepClone(externalMemo.get(memoKey));
         } else {
-          const targetDocument = input.resolvedDocs.get(targetPath);
+          const targetDocument = isExternalRef
+            ? input.resolvedDocs.get(targetPath)
+            : rootHolder.value;
           if (targetDocument === undefined) {
             throw new Error(`Unable to resolve $ref '${value.$ref}' from '${input.filePath}': missing '${targetPath}'.`);
           }
