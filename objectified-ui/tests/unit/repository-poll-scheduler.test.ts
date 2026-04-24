@@ -29,6 +29,7 @@ describe('repository poll scheduler', () => {
         expect(sql).toContain('GREATEST(');
         expect(sql).toContain('MIN(rcr.linked_account_id)');
         expect(sql).toContain('rb.last_known_sha');
+        expect(sql).toContain('rb.last_known_etag');
         expect(params).toEqual(['2026-04-24T20:00:00.000Z', 500, 60, 300]);
         return {
           rowCount: 2,
@@ -44,6 +45,7 @@ describe('repository poll scheduler', () => {
               branch: 'main',
               linked_account_id: 'linked-1',
               last_known_sha: 'old-sha-1',
+              last_known_etag: null,
               is_enterprise: false,
               effective_poll_interval_sec: 300,
             },
@@ -58,6 +60,7 @@ describe('repository poll scheduler', () => {
               branch: 'develop',
               linked_account_id: 'linked-2',
               last_known_sha: 'old-sha-2',
+              last_known_etag: '"etag-old-2"',
               is_enterprise: true,
               effective_poll_interval_sec: 60,
             },
@@ -65,9 +68,16 @@ describe('repository poll scheduler', () => {
         };
       },
       (sql, params) => {
-        expect(sql).toContain('SELECT access_token');
-        expect(params).toEqual(['linked-1']);
-        return { rowCount: 1, rows: [{ access_token: 'token-1' }] };
+        expect(sql).toContain('SELECT id, access_token, token_expires_at');
+        expect(sql).toContain('WHERE id = ANY($1::uuid[])');
+        expect(params[0]).toEqual(['linked-1', 'linked-2']);
+        return {
+          rowCount: 2,
+          rows: [
+            { id: 'linked-1', access_token: 'token-1', token_expires_at: null },
+            { id: 'linked-2', access_token: 'token-2', token_expires_at: null },
+          ],
+        };
       },
       (sql, params) => {
         expect(sql).toContain('INSERT INTO odb.repository_scan');
@@ -86,11 +96,6 @@ describe('repository poll scheduler', () => {
           poll_interval_sec: 300,
         });
         return { rowCount: 1, rows: [] };
-      },
-      (sql, params) => {
-        expect(sql).toContain('SELECT access_token');
-        expect(params).toEqual(['linked-2']);
-        return { rowCount: 1, rows: [{ access_token: 'token-2' }] };
       },
       (sql, params) => {
         expect(sql).toContain('INSERT INTO odb.repository_scan');
@@ -123,6 +128,12 @@ describe('repository poll scheduler', () => {
         expect(params[1]).toEqual(['new-sha-1', 'old-sha-2']);
         return { rowCount: 2, rows: [] };
       },
+      (sql, params) => {
+        expect(sql).toContain('SET last_known_etag = upd.etag');
+        expect(params[0]).toEqual(['branch-1']);
+        expect(params[1]).toEqual(['"etag-new-1"']);
+        return { rowCount: 1, rows: [] };
+      },
     ]);
     const enqueue = jest.fn(async () => undefined);
     const fetchImpl = jest
@@ -131,11 +142,13 @@ describe('repository poll scheduler', () => {
         ok: true,
         status: 200,
         json: async () => ({ sha: 'new-sha-1' }),
+        headers: { get: (h: string) => (h === 'ETag' ? '"etag-new-1"' : null) } as unknown as Headers,
       } as Response)
       .mockResolvedValueOnce({
         ok: false,
         status: 304,
         json: async () => ({}),
+        headers: { get: () => null } as unknown as Headers,
       } as Response);
     const scheduler = createRepositoryPollScheduler({
       query,
@@ -153,16 +166,20 @@ describe('repository poll scheduler', () => {
     expect(result.jobs[0]?.headCommitSha).toBe('new-sha-1');
     expect(enqueue).toHaveBeenCalledTimes(1);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+    // branch-1: no prior ETag so no If-None-Match header
     expect(fetchImpl.mock.calls[0]?.[1]).toMatchObject({
       headers: expect.objectContaining({
         Authorization: 'Bearer token-1',
-        'If-None-Match': '"old-sha-1"',
       }),
     });
+    expect((fetchImpl.mock.calls[0]?.[1] as RequestInit | undefined)?.headers).not.toMatchObject(
+      expect.objectContaining({ 'If-None-Match': expect.anything() })
+    );
+    // branch-2: uses stored ETag for conditional request
     expect(fetchImpl.mock.calls[1]?.[1]).toMatchObject({
       headers: expect.objectContaining({
         Authorization: 'Bearer token-2',
-        'If-None-Match': '"old-sha-2"',
+        'If-None-Match': '"etag-old-2"',
       }),
     });
   });
@@ -183,12 +200,13 @@ describe('repository poll scheduler', () => {
             branch: 'main',
             linked_account_id: 'linked-1',
             last_known_sha: 'old-sha-1',
+            last_known_etag: null,
             is_enterprise: false,
             effective_poll_interval_sec: 300,
           },
         ],
       }),
-      () => ({ rowCount: 1, rows: [{ access_token: 'token-1' }] }),
+      () => ({ rowCount: 1, rows: [{ id: 'linked-1', access_token: 'token-1', token_expires_at: null }] }),
       () => ({ rowCount: 1, rows: [] }),
       () => ({ rowCount: 1, rows: [] }),
       () => ({ rowCount: 1, rows: [] }),
@@ -200,6 +218,7 @@ describe('repository poll scheduler', () => {
       ok: true,
       status: 200,
       json: async () => ({ sha: 'new-sha-1' }),
+      headers: { get: () => null } as unknown as Headers,
     } as Response);
     const scheduler = createRepositoryPollScheduler({
       query,
@@ -217,3 +236,4 @@ describe('repository poll scheduler', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
+

@@ -37,6 +37,7 @@ type QueryRow = {
   is_enterprise: boolean;
   effective_poll_interval_sec: number;
   last_known_sha: string | null;
+  last_known_etag: string | null;
 };
 
 type QueryResult = {
@@ -58,56 +59,66 @@ export interface PollSchedulerOptions {
 const NON_ENTERPRISE_MIN_POLL_SEC = 300;
 const ENTERPRISE_MIN_POLL_SEC = 60;
 const DEFAULT_BATCH_SIZE = 500;
+const CONCURRENT_HEAD_CHECKS = 8;
 const GITHUB_API_BASE = 'https://api.github.com';
 
 type DetectedHead = {
   sha: string;
   unchanged: boolean;
+  etag: string | null;
 };
 
-async function resolveLinkedAccountToken(
+async function batchResolveLinkedAccountTokens(
   deps: PollSchedulerDeps,
-  linkedAccountId: string | null
-): Promise<string | null> {
-  if (!linkedAccountId) {
-    return null;
+  linkedAccountIds: string[]
+): Promise<Map<string, string>> {
+  const unique = [...new Set(linkedAccountIds.filter(Boolean))];
+  if (unique.length === 0) {
+    return new Map();
   }
 
   try {
     const result = await deps.query(
-      `SELECT access_token
+      `SELECT id, access_token, token_expires_at
        FROM odb.external_auth_providers
-       WHERE id = $1
-       LIMIT 1`,
-      [linkedAccountId]
+       WHERE id = ANY($1::uuid[])`,
+      [unique]
     );
-    const row = result.rows[0] as { access_token?: unknown } | undefined;
-    if (!row || typeof row.access_token !== 'string' || row.access_token.trim().length === 0) {
-      return null;
+    const now = deps.now();
+    const map = new Map<string, string>();
+    for (const rawRow of result.rows) {
+      const row = rawRow as { id?: unknown; access_token?: unknown; token_expires_at?: unknown };
+      if (typeof row.id !== 'string' || typeof row.access_token !== 'string' || !row.access_token.trim()) {
+        continue;
+      }
+      if (row.token_expires_at != null) {
+        const expiresAt = new Date(row.token_expires_at as string);
+        if (!isNaN(expiresAt.getTime()) && expiresAt <= now) {
+          console.warn('Skipping expired linked account token during poll for account:', row.id);
+          continue;
+        }
+      }
+      map.set(row.id, row.access_token);
     }
-    return row.access_token;
+    return map;
   } catch (err) {
-    console.error('Failed to resolve linked account token for poll branch', linkedAccountId, ':', err);
-    return null;
+    console.error('Failed to batch resolve linked account tokens for poll:', err);
+    return new Map();
   }
 }
 
 async function detectGithubBranchHead(
   deps: PollSchedulerDeps,
-  row: QueryRow
+  row: QueryRow,
+  token: string
 ): Promise<DetectedHead | null> {
-  const token = await resolveLinkedAccountToken(deps, row.linked_account_id);
-  if (!token) {
-    return null;
-  }
-
   const headers: HeadersInit = {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
   };
-  if (row.last_known_sha) {
-    headers['If-None-Match'] = `"${row.last_known_sha}"`;
+  if (row.last_known_etag) {
+    headers['If-None-Match'] = row.last_known_etag;
   }
 
   const owner = encodeURIComponent(row.owner);
@@ -121,6 +132,7 @@ async function detectGithubBranchHead(
       return {
         sha: row.last_known_sha,
         unchanged: true,
+        etag: null,
       };
     }
     if (!response.ok) {
@@ -138,9 +150,11 @@ async function detectGithubBranchHead(
     if (!sha) {
       return null;
     }
+    const etag = response.headers.get('ETag') ?? null;
     return {
       sha,
       unchanged: row.last_known_sha === sha,
+      etag,
     };
   } catch (err) {
     console.error('Failed to call provider for branch SHA detection', row.branch_id, ':', err);
@@ -294,6 +308,7 @@ export function createRepositoryPollScheduler(
           rb.branch,
           MIN(rcr.linked_account_id) AS linked_account_id,
           rb.last_known_sha,
+          rb.last_known_etag,
           COALESCE(MAX(CASE WHEN ue.plan_code ILIKE 'enterprise%' THEN 1 ELSE 0 END), 0) = 1 AS is_enterprise,
           GREATEST(
             rb.poll_interval_sec,
@@ -320,6 +335,7 @@ export function createRepositoryPollScheduler(
           r.name,
           rb.branch,
           rb.last_known_sha,
+          rb.last_known_etag,
           rb.poll_interval_sec
         ORDER BY rb.next_poll_at ASC, rb.id ASC
         LIMIT $2
@@ -332,14 +348,31 @@ export function createRepositoryPollScheduler(
     const processedIntervalsSec: number[] = [];
     const headShaBranchIds: string[] = [];
     const headShas: string[] = [];
+    const headEtagBranchIds: string[] = [];
+    const headEtags: string[] = [];
 
-    for (const row of rowsResult.rows) {
-      const detectedHead =
-        row.provider === 'github' ? await detectGithubBranchHead(deps, row) : null;
-      if (detectedHead) {
-        headShaBranchIds.push(row.branch_id);
-        headShas.push(detectedHead.sha);
-      }
+    // Batch-prefetch all linked account tokens in one query, checking expiry.
+    const githubLinkedAccountIds = rowsResult.rows
+      .filter((row) => row.provider === 'github')
+      .map((row) => row.linked_account_id)
+      .filter((id): id is string => !!id);
+    const tokenMap = await batchResolveLinkedAccountTokens(deps, githubLinkedAccountIds);
+
+    // Detect HEAD commits with bounded concurrency so scheduler latency scales.
+    const detectedHeads: (DetectedHead | null)[] = new Array(rowsResult.rows.length).fill(null);
+    const headTasks = rowsResult.rows.map((row, index) => async () => {
+      if (row.provider !== 'github') return;
+      const token = tokenMap.get(row.linked_account_id ?? '');
+      if (!token) return;
+      detectedHeads[index] = await detectGithubBranchHead(deps, row, token);
+    });
+    for (let i = 0; i < headTasks.length; i += CONCURRENT_HEAD_CHECKS) {
+      await Promise.all(headTasks.slice(i, i + CONCURRENT_HEAD_CHECKS).map((fn) => fn()));
+    }
+
+    for (let rowIndex = 0; rowIndex < rowsResult.rows.length; rowIndex++) {
+      const row = rowsResult.rows[rowIndex];
+      const detectedHead = detectedHeads[rowIndex] ?? null;
 
       if (detectedHead?.unchanged) {
         processedBranchIds.push(row.branch_id);
@@ -361,6 +394,9 @@ export function createRepositoryPollScheduler(
           stream: 'repo.poll.skipped_unchanged',
           effectivePollIntervalSec: row.effective_poll_interval_sec,
         });
+        // Persist SHA (ETag is null for 304 responses — no update needed).
+        headShaBranchIds.push(row.branch_id);
+        headShas.push(detectedHead.sha);
         continue;
       }
 
@@ -412,6 +448,16 @@ export function createRepositoryPollScheduler(
         stream: job.stream,
         effectivePollIntervalSec: job.effectivePollIntervalSec,
       });
+
+      // Persist SHA and ETag only after the job was successfully enqueued and recorded.
+      if (detectedHead) {
+        headShaBranchIds.push(row.branch_id);
+        headShas.push(detectedHead.sha);
+        if (detectedHead.etag) {
+          headEtagBranchIds.push(row.branch_id);
+          headEtags.push(detectedHead.etag);
+        }
+      }
     }
 
     if (processedBranchIds.length > 0) {
@@ -442,6 +488,20 @@ export function createRepositoryPollScheduler(
         ) upd
         WHERE rb.id = upd.branch_id`,
         [headShaBranchIds, headShas]
+      );
+    }
+
+    if (headEtagBranchIds.length > 0) {
+      await deps.query(
+        `UPDATE odb.repository_branch rb
+        SET last_known_etag = upd.etag
+        FROM (
+          SELECT
+            unnest($1::uuid[]) AS branch_id,
+            unnest($2::text[]) AS etag
+        ) upd
+        WHERE rb.id = upd.branch_id`,
+        [headEtagBranchIds, headEtags]
       );
     }
 
