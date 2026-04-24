@@ -16,6 +16,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from .auth import validate_authentication
+from .repositories.manifest import parse_repo_manifest
 
 router = APIRouter(prefix="/v1/repositories", tags=["repositories"])
 
@@ -203,11 +204,26 @@ async def register_repository(
         timeline=[timeline_entry],
     )
 
+    manifest_outcome = parse_repo_manifest(request.manifest)
+    initial_file_rows: List[Dict[str, Any]] = []
+    if manifest_outcome.manifest_error_row is not None:
+        row = manifest_outcome.manifest_error_row
+        initial_file_rows.append(
+            {
+                "path": row.path,
+                "format": row.format,
+                "tracked": row.tracked,
+                "pollIntervalSec": row.poll_interval_sec,
+                "status": row.status,
+                "metadata": row.metadata,
+            }
+        )
+
     with _STORE_LOCK:
         tenant_repos = _REPO_STORE.setdefault(tenant_id, {})
         _REPO_BRANCH_STORE[repository.id] = list(normalized_branches)
         _REPO_SCAN_STORE[repository.id] = [timeline_entry]
-        _REPO_FILE_STORE[repository.id] = []
+        _REPO_FILE_STORE[repository.id] = initial_file_rows
         _REPO_CREDENTIAL_REF_STORE[repository.id] = [{"linkedAccountId": request.linkedAccountId}]
         tenant_repos[repository.id] = repository
 
