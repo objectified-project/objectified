@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added the REPO-3.8 in-scan virtual filesystem resolver for repository imports, with dependency-ordered cross-file `$ref` resolution (relative paths + JSON pointers), per-scan memoization, and deterministic cycle detection errors.
 - Added standalone repository JSON Schema importer support for Draft 7, 2019-09, and 2020-12 schemas, preserving source `$id`/draft metadata while delegating sibling `$ref` resolution through the REPO-3.8 resolver contract.
 - Added repository importer support for `swagger_2_0`, routing Swagger 2.0 specs through the same conversion/parser pipeline as OpenAPI 3.x with semantic parity coverage for schemas, paths, parameters, and security mappings.
 - Added a repository OpenAPI importer hook for OpenAPI 3.0/3.1 that reuses the existing dialog converter with normalized `{source, format, content, refs}` input and parity-checked fixture coverage, while delegating cross-file `$ref` resolution through the REPO-3.8 resolver contract.
@@ -60,5 +61,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: April 23, 2026*
+*Last updated: April 24, 2026*
 

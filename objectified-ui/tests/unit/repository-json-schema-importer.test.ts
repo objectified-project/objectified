@@ -205,15 +205,36 @@ describe('repository JSON Schema importer hook', () => {
     expect(result.parseResult?.classes.some((cls) => cls.name === 'User')).toBe(true);
   });
 
-  it('returns success: false when refs are present but no resolver is configured', async () => {
+  it('uses the built-in REPO-3.8 resolver when refs are present and no override is provided', async () => {
     const result = await importJsonSchemaFromRepository({
       source: 'repository://schemas/order.json',
       format: 'json_schema',
-      content: '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}',
-      refs: [{ path: './user.schema.json', content: '{"type":"object"}' }],
+      content: JSON.stringify({
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        title: 'Order',
+        type: 'object',
+        properties: {
+          user: { $ref: './user.schema.json#/User' },
+        },
+      }),
+      refs: [
+        {
+          path: 'schemas/user.schema.json',
+          content: JSON.stringify({
+            User: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+              },
+            },
+          }),
+        },
+      ],
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/REPO-3\.8/);
+    expect(result.success).toBe(true);
+    expect(result.parseResult?.classes.some((cls) => cls.name === 'Order')).toBe(true);
+    expect(result.resolvedContent).toContain('"type": "string"');
+    expect(result.resolvedContent).not.toContain('./user.schema.json#/User');
   });
 });

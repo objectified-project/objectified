@@ -1,5 +1,6 @@
 import { parseOpenAPISpec, OpenAPIParseResult } from '../../../src/app/utils/openapi-import';
 import type { DetectedRepositorySpecFormat } from '../scanner/detect';
+import { resolveRepositoryCrossFileRefs } from './cross-file-ref-resolver';
 
 export type RepositoryOpenApiFormat = Extract<
   DetectedRepositorySpecFormat,
@@ -31,8 +32,8 @@ export type ResolveRepositoryOpenApiRefs = (
 
 export interface RepositoryOpenApiImportDeps {
   /**
-   * REPO-3.8 delegate: caller-provided cross-file $ref resolution.
-   * When omitted, the primary content is parsed as-is.
+   * Optional override for REPO-3.8 cross-file $ref resolution.
+   * When omitted, the built-in repository virtual filesystem resolver is used.
    */
   resolveRefs?: ResolveRepositoryOpenApiRefs;
 }
@@ -63,20 +64,18 @@ export async function importOpenApiFromRepository(
 
   let resolvedContent = input.content;
   const refs = input.refs ?? [];
-
-  if (refs.length > 0 && !deps.resolveRefs) {
-    return {
-      success: false,
-      source: input.source,
-      format: input.format,
-      warnings: [],
-      error: 'Cross-file $ref entries are present but no resolver is configured (REPO-3.8).',
-    };
-  }
+  const resolver: ResolveRepositoryOpenApiRefs =
+    deps.resolveRefs ??
+    ((resolveInput) =>
+      resolveRepositoryCrossFileRefs({
+        source: resolveInput.source,
+        content: resolveInput.content,
+        refs: resolveInput.refs,
+      }));
 
   try {
-    if (refs.length > 0 && deps.resolveRefs) {
-      resolvedContent = await deps.resolveRefs({
+    if (refs.length > 0) {
+      resolvedContent = await resolver({
         source: input.source,
         format: input.format,
         content: input.content,
