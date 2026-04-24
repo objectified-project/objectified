@@ -36,6 +36,7 @@ export interface TreeEntry {
   type: 'file' | 'dir' | 'symlink' | 'submodule';
   sha: string;
   sizeBytes: number;
+  mode?: string;
 }
 
 export interface WebhookTarget {
@@ -48,4 +49,5 @@ export type RepositoryProviderErrorCode =
   | 'UNAUTHORIZED'
   | 'NOT_FOUND'
   | 'NETWORK'
+  | 'SCAN_LIMIT_EXCEEDED'
   | 'UNKNOWN';

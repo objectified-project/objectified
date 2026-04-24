@@ -157,6 +157,7 @@ class GithubRepositoryProvider(RepositoryProvider):
                 type=entry_type,
                 sha=str(entry.get("sha", "")),
                 size_bytes=int(entry.get("size", 0)),
+                mode=str(entry.get("mode", "")),
             )
 
     async def read_file(self, token: str, repo: RepoRef, branch: str, path: str) -> ReadFileResult:

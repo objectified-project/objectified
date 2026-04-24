@@ -63,8 +63,8 @@ async def test_github_provider_contract_methods() -> None:
                 200,
                 {
                     "tree": [
-                        {"path": "docs/readme.md", "type": "blob", "sha": "s1", "size": 10},
-                        {"path": "src/index.ts", "type": "blob", "sha": "s2", "size": 11},
+                        {"path": "docs/readme.md", "type": "blob", "sha": "s1", "size": 10, "mode": "100644"},
+                        {"path": "src/index.ts", "type": "blob", "sha": "s2", "size": 11, "mode": "100644"},
                     ]
                 },
             )
@@ -89,6 +89,7 @@ async def test_github_provider_contract_methods() -> None:
     assert [branch.name for branch in branches] == ["main"]
     assert sha == "abc123"
     assert [entry.path for entry in tree] == ["docs/readme.md"]
+    assert tree[0].mode == "100644"
     assert read_file.content_base64 == "YQ=="
 
 
