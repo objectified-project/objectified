@@ -506,7 +506,9 @@ def _dispatch_import_jobs_for_scan(
 ) -> None:
     repository_jobs = _REPO_IMPORT_JOB_STORE.setdefault(repository_id, [])
     for file_row in scan_files:
-        if file_row.status == "unchanged":
+        if file_row.status not in {"new", "modified", "removed"}:
+            continue
+        if not file_row.tracked:
             continue
 
         operation: ImportJobOperation = "import"
@@ -515,7 +517,7 @@ def _dispatch_import_jobs_for_scan(
         if file_row.status == "removed":
             operation = "removal"
             promote = "manual"
-            settings_json.setdefault("requiresExplicitApproval", True)
+            settings_json["requiresExplicitApproval"] = True
 
         source_uri = _build_repository_source_uri(repository_id, file_row.path, branch, commit_sha)
         forced_failure = settings_json.get("forceImportFailure")
