@@ -73,6 +73,8 @@ BEGIN
        SELECT 1
        FROM pg_constraint
        WHERE conname = 'fk_repository_last_scan_id'
+         AND connamespace = 'odb'::regnamespace
+         AND conrelid = 'odb.repository'::regclass
      )
   THEN
     ALTER TABLE odb.repository
