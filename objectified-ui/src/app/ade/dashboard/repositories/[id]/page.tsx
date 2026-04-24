@@ -151,7 +151,7 @@ export default function RepositoryDetailPage() {
     const owner = ownerInput.trim();
     const name = nameInput.trim();
     if (!owner || !name) {
-      setErrorMessage('Owner and repository name are required.');
+      setErrorMessage(copy.ownerNameRequired);
       return;
     }
     setIsSavingDetails(true);
@@ -176,7 +176,7 @@ export default function RepositoryDetailPage() {
       setOwnerInput(updatedRepository.owner);
       setNameInput(updatedRepository.name);
       setManifestInput(updatedRepository.manifest || '');
-      setSuccessMessage('Repository settings updated.');
+      setSuccessMessage(copy.settingsUpdatedMessage);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update repository';
       setErrorMessage(message);
@@ -198,7 +198,7 @@ export default function RepositoryDetailPage() {
       }
       const updatedRepository = data.repository as RepositoryDetail;
       setRepository(updatedRepository);
-      setSuccessMessage(action === 'archive' ? 'Repository disabled.' : 'Repository enabled.');
+      setSuccessMessage(action === 'archive' ? copy.repositoryDisabledMessage : copy.repositoryEnabledMessage);
     } catch (error) {
       const message =
         error instanceof Error
@@ -325,12 +325,12 @@ export default function RepositoryDetailPage() {
                   <Input
                     value={ownerInput}
                     onChange={(event) => setOwnerInput(event.target.value)}
-                    placeholder="Repository owner"
+                    placeholder={copy.ownerPlaceholder}
                   />
                   <Input
                     value={nameInput}
                     onChange={(event) => setNameInput(event.target.value)}
-                    placeholder="Repository name"
+                    placeholder={copy.namePlaceholder}
                   />
                   <textarea
                     value={manifestInput}
@@ -340,7 +340,7 @@ export default function RepositoryDetailPage() {
                   />
                   <div className="flex flex-wrap items-center gap-2">
                     <Button onClick={() => void saveRepositoryDetails()} disabled={isSavingDetails || isLoading}>
-                      {isSavingDetails ? copy.savingButton : 'Save repository settings'}
+                      {isSavingDetails ? copy.savingButton : copy.saveSettingsButton}
                     </Button>
                     {repository.status === 'archived' ? (
                       <Button
@@ -348,7 +348,7 @@ export default function RepositoryDetailPage() {
                         onClick={() => void updateLifecycle('unarchive')}
                         disabled={isMutatingLifecycle}
                       >
-                        Enable
+                        {copy.enableButton}
                       </Button>
                     ) : (
                       <Button
@@ -356,11 +356,11 @@ export default function RepositoryDetailPage() {
                         onClick={() => void updateLifecycle('archive')}
                         disabled={isMutatingLifecycle}
                       >
-                        Disable
+                        {copy.disableButton}
                       </Button>
                     )}
                     <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)} disabled={isDeleting}>
-                      Delete
+                      {copy.deleteButton}
                     </Button>
                   </div>
                 </div>
@@ -474,26 +474,28 @@ export default function RepositoryDetailPage() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete repository</DialogTitle>
+            <DialogTitle>{copy.deleteDialogTitle}</DialogTitle>
             <DialogDescription>
-              Type <span className="font-semibold">{repository?.fullName}</span> to confirm permanent deletion.
+              {copy.deleteDialogDescriptionPrefix}{' '}
+              <span className="font-semibold">{repository?.fullName}</span>{' '}
+              {copy.deleteDialogDescriptionSuffix}
             </DialogDescription>
           </DialogHeader>
           <Input
             value={deleteConfirmation}
             onChange={(event) => setDeleteConfirmation(event.target.value)}
-            placeholder={repository?.fullName || 'owner/name'}
+            placeholder={repository?.fullName || copy.ownerNameFallbackPlaceholder}
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
-              Cancel
+              {copy.cancelButton}
             </Button>
             <Button
               variant="destructive"
               onClick={() => void deleteRepository()}
               disabled={isDeleting || !repository || deleteConfirmation.trim() !== repository.fullName}
             >
-              {isDeleting ? copy.savingButton : 'Delete repository'}
+              {isDeleting ? copy.savingButton : copy.deleteRepositoryButton}
             </Button>
           </DialogFooter>
         </DialogContent>

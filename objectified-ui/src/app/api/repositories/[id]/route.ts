@@ -102,7 +102,25 @@ export async function DELETE(
     if ('error' in auth) return auth.error;
 
     const params = await context.params;
-    const body = await request.json();
+    const rawBody = await request.text();
+    if (!rawBody.trim()) {
+      return NextResponse.json(
+        { success: false, error: 'Request body is required' },
+        { status: 400 }
+      );
+    }
+
+    let body: unknown;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    if (typeof body !== 'object' || body === null || typeof (body as Record<string, unknown>).confirmFullName !== 'string') {
+      return NextResponse.json({ success: false, error: 'confirmFullName is required' }, { status: 400 });
+    }
+
     const response = await fetch(
       `${REST_API_BASE_URL}/repositories/${encodeURIComponent(auth.tenantSlug)}/${encodeURIComponent(params.id)}`,
       {
