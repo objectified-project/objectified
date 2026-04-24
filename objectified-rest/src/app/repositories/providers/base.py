@@ -18,6 +18,7 @@ class RepositoryProviderErrorCode(str, Enum):
     UNAUTHORIZED = "UNAUTHORIZED"
     NOT_FOUND = "NOT_FOUND"
     NETWORK = "NETWORK"
+    SCAN_LIMIT_EXCEEDED = "SCAN_LIMIT_EXCEEDED"
     UNKNOWN = "UNKNOWN"
 
 
@@ -72,6 +73,7 @@ class TreeEntry:
     type: str
     sha: str
     size_bytes: int
+    mode: str = ""
 
 
 @dataclass(frozen=True)

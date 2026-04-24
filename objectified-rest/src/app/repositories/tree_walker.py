@@ -1,0 +1,122 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from fnmatch import fnmatchcase
+from inspect import isawaitable
+from typing import Any, AsyncIterator, Callable, Sequence
+
+from .providers import RepoRef, RepositoryProvider, RepositoryProviderError, RepositoryProviderErrorCode, TreeEntry
+
+WorkflowAuditEmitter = Callable[[str, dict[str, Any]], Any]
+
+
+@dataclass(frozen=True)
+class RepositoryWalkStats:
+    files: int
+    bytes: int
+
+
+@dataclass(frozen=True)
+class ScanLimit:
+    max_files: int | None = None
+    max_bytes: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.max_files is not None and self.max_files < 1:
+            raise ValueError("max_files must be >= 1 when provided")
+        if self.max_bytes is not None and self.max_bytes < 1:
+            raise ValueError("max_bytes must be >= 1 when provided")
+
+
+async def walk_repository_tree(
+    provider: RepositoryProvider,
+    *,
+    token: str,
+    repo: RepoRef,
+    commit_sha: str,
+    subpath_glob: str | None,
+    limits: ScanLimit | None = None,
+    audit_emitter: WorkflowAuditEmitter | None = None,
+) -> AsyncIterator[TreeEntry]:
+    """Yield repository file entries for a specific commit SHA with scan limits."""
+    stats = RepositoryWalkStats(files=0, bytes=0)
+    effective_limits = limits or ScanLimit()
+
+    async for entry in provider.walk_tree(token=token, repo=repo, branch=commit_sha):
+        if entry.type != "file":
+            continue
+        if not _glob_match(entry.path, subpath_glob):
+            continue
+
+        next_files = stats.files + 1
+        next_bytes = stats.bytes + max(0, entry.size_bytes)
+        _ensure_scan_limits(
+            limits=effective_limits,
+            files=next_files,
+            bytes_scanned=next_bytes,
+            path=entry.path,
+        )
+        stats = RepositoryWalkStats(files=next_files, bytes=next_bytes)
+        yield entry
+
+    if audit_emitter is not None:
+        maybe_awaitable = audit_emitter(
+            "repository.scan.walked",
+            {
+                "owner": repo.owner,
+                "name": repo.name,
+                "commitSha": commit_sha,
+                "subpathGlob": subpath_glob,
+                "files": stats.files,
+                "bytes": stats.bytes,
+            },
+        )
+        if isawaitable(maybe_awaitable):
+            await maybe_awaitable
+
+
+def _ensure_scan_limits(*, limits: ScanLimit, files: int, bytes_scanned: int, path: str) -> None:
+    if limits.max_files is not None and files > limits.max_files:
+        raise RepositoryProviderError(
+            RepositoryProviderErrorCode.SCAN_LIMIT_EXCEEDED,
+            f"scan file limit exceeded at '{path}': {files} > {limits.max_files}",
+        )
+    if limits.max_bytes is not None and bytes_scanned > limits.max_bytes:
+        raise RepositoryProviderError(
+            RepositoryProviderErrorCode.SCAN_LIMIT_EXCEEDED,
+            f"scan byte limit exceeded at '{path}': {bytes_scanned} > {limits.max_bytes}",
+        )
+
+
+def _glob_match(path: str, pattern: str | None) -> bool:
+    if not pattern:
+        return True
+
+    normalized_pattern = pattern.strip()
+    if not normalized_pattern or normalized_pattern in {"**", "**/*"}:
+        return True
+
+    path_parts = tuple(part for part in path.strip("/").split("/") if part)
+    pattern_parts = tuple(part for part in normalized_pattern.strip("/").split("/") if part)
+    if not path_parts:
+        return False
+    if not pattern_parts:
+        return True
+    return _match_parts(path_parts, pattern_parts)
+
+
+def _match_parts(path_parts: Sequence[str], pattern_parts: Sequence[str]) -> bool:
+    if not pattern_parts:
+        return len(path_parts) == 0
+
+    pattern_head = pattern_parts[0]
+    if pattern_head == "**":
+        return _match_parts(path_parts, pattern_parts[1:]) or (
+            len(path_parts) > 0 and _match_parts(path_parts[1:], pattern_parts)
+        )
+
+    if not path_parts:
+        return False
+    if not fnmatchcase(path_parts[0], pattern_head):
+        return False
+    return _match_parts(path_parts[1:], pattern_parts[1:])
