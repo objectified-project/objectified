@@ -251,6 +251,16 @@ def _empty_scan_diff_summary() -> Dict[str, int]:
     return {"added": 0, "modified": 0, "removed": 0, "unchanged": 0}
 
 
+def _first_duplicate(items: List[str]) -> Optional[str]:
+    """Return the first duplicate value in *items*, or ``None`` if all are unique."""
+    seen: set[str] = set()
+    for item in items:
+        if item in seen:
+            return item
+        seen.add(item)
+    return None
+
+
 def _classify_scan_files_against_previous(
     *,
     repository_id: str,
@@ -260,16 +270,26 @@ def _classify_scan_files_against_previous(
     previous_files: Sequence[RepositoryFileRecord],
 ) -> Tuple[List[RepositoryFileRecord], Dict[str, int]]:
     summary = _empty_scan_diff_summary()
-    previous_by_path = {
-        row.path: row
-        for row in previous_files
+
+    previous_filtered = [
+        row for row in previous_files
         if row.repositoryId == repository_id and row.status != "removed"
-    }
-    current_by_path = {
-        row.path: row
-        for row in current_files
+    ]
+    previous_paths = [row.path for row in previous_filtered]
+    previous_dup = _first_duplicate(previous_paths)
+    if previous_dup is not None:
+        raise ValueError(f"Duplicate path in previous scan files: {previous_dup!r}")
+    previous_by_path = {row.path: row for row in previous_filtered}
+
+    current_filtered = [
+        row for row in current_files
         if row.repositoryId == repository_id
-    }
+    ]
+    current_paths = [row.path for row in current_filtered]
+    current_dup = _first_duplicate(current_paths)
+    if current_dup is not None:
+        raise ValueError(f"Duplicate path in current scan files: {current_dup!r}")
+    current_by_path = {row.path: row for row in current_filtered}
     rows: List[RepositoryFileRecord] = []
 
     for path in sorted(current_by_path):
@@ -334,7 +354,7 @@ def _make_pending_scan(
         filesUnknown=0,
         filesFailed=0,
         eventLog=[{"type": "repository.scan.queued", "at": now, "force": force}],
-        diffSummary={},
+        diffSummary=_empty_scan_diff_summary(),
         createdAt=now,
     )
 
@@ -870,6 +890,22 @@ def _complete_repository_scan_for_tests(
             path_raw = item.get("path")
             if not isinstance(path_raw, str) or not path_raw.strip():
                 raise ValueError("Each file must include a non-empty path")
+            tracked_raw = item.get("tracked", False)
+            if isinstance(tracked_raw, bool):
+                tracked_value = tracked_raw
+            elif isinstance(tracked_raw, str):
+                if tracked_raw.lower() == "true":
+                    tracked_value = True
+                elif tracked_raw.lower() == "false":
+                    tracked_value = False
+                else:
+                    raise ValueError(
+                        f"Invalid value for 'tracked': {tracked_raw!r}; expected a boolean or 'true'/'false'"
+                    )
+            else:
+                raise ValueError(
+                    f"Invalid type for 'tracked': {type(tracked_raw).__name__}; expected a boolean"
+                )
             current_files.append(
                 RepositoryFileRecord(
                     id=str(uuid4()),
@@ -881,7 +917,7 @@ def _complete_repository_scan_for_tests(
                     format=item.get("format"),
                     confidence=item.get("confidence"),
                     discriminator=item.get("discriminator"),
-                    tracked=bool(item.get("tracked", False)),
+                    tracked=tracked_value,
                     projectSlug=item.get("projectSlug"),
                     versionStrategy=item.get("versionStrategy"),
                     status="new",
