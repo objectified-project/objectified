@@ -35,6 +35,10 @@ class RepositoryRegisterRequest(BaseModel):
     manifest: str | None = None
 
 
+class RepositoryBranchesUpdateRequest(BaseModel):
+    branches: List[RepositoryBranchInput] = Field(min_length=1)
+
+
 class RepositoryScanTimelineEntry(BaseModel):
     id: str
     type: Literal["scan"]
@@ -86,11 +90,23 @@ def _validate_uuid(raw: str, field_name: str) -> None:
 
 
 def _normalize_branch(record: RepositoryBranchInput) -> RepositoryBranchRecord:
+    stripped_subpath = record.subpathGlob.strip() if record.subpathGlob else ""
+    normalized_subpath = stripped_subpath if stripped_subpath else "**/*"
     return RepositoryBranchRecord(
         branch=record.branch.strip(),
-        subpathGlob=record.subpathGlob.strip() if record.subpathGlob else None,
+        subpathGlob=normalized_subpath,
         pollIntervalSec=record.pollIntervalSec,
     )
+
+
+def _normalize_branches(branches: List[RepositoryBranchInput]) -> List[RepositoryBranchRecord]:
+    normalized_branches = [_normalize_branch(branch) for branch in branches]
+    if any(not branch.branch for branch in normalized_branches):
+        raise HTTPException(status_code=400, detail="branches[].branch is required")
+    dedupe_key_count = len({branch.branch for branch in normalized_branches})
+    if dedupe_key_count != len(normalized_branches):
+        raise HTTPException(status_code=400, detail="branches[].branch must be unique")
+    return normalized_branches
 
 
 def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
@@ -121,9 +137,7 @@ async def register_repository(
     if not owner or not name:
         raise HTTPException(status_code=400, detail="owner and name are required")
 
-    normalized_branches = [_normalize_branch(branch) for branch in request.branches]
-    if any(not b.branch for b in normalized_branches):
-        raise HTTPException(status_code=400, detail="branches[].branch is required")
+    normalized_branches = _normalize_branches(request.branches)
 
     now = _utc_now_iso()
     repository_id = str(uuid4())
@@ -185,3 +199,22 @@ async def get_repository(
     if repository is None:
         raise HTTPException(status_code=404, detail=f"Repository not found: {repository_id}")
     return repository
+
+
+@router.patch("/{tenant_slug}/{repository_id}/branches", response_model=RepositoryRecord)
+async def update_repository_branches(
+    tenant_slug: str,
+    repository_id: str,
+    request: RepositoryBranchesUpdateRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositoryRecord:
+    tenant_id = auth_data["tenant_id"]
+    normalized_branches = _normalize_branches(request.branches)
+
+    with _STORE_LOCK:
+        repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
+        if repository is None:
+            raise HTTPException(status_code=404, detail=f"Repository not found: {repository_id}")
+        repository.branches = normalized_branches
+        repository.updatedAt = _utc_now_iso()
+        return repository
