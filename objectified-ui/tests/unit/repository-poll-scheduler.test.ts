@@ -281,7 +281,7 @@ describe('repository poll scheduler', () => {
       (sql, params) => {
         expect(sql).toContain('INSERT INTO odb.repository_branch');
         expect(sql).toContain('ON CONFLICT (repository_id, branch) DO UPDATE');
-        expect(params).toEqual(['repo-9', 'release/2026.04', 'services/**', 180, '2026-04-24T20:02:00.000Z']);
+        expect(params).toEqual(['repo-9', ['release/2026.04'], 'services/**', 180, '2026-04-24T20:02:00.000Z']);
         return { rowCount: 1, rows: [] };
       },
       (sql, params) => {

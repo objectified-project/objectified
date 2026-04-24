@@ -71,7 +71,7 @@ type DetectedHead = {
 };
 
 function isBranchGlobPattern(branch: string): boolean {
-  return branch.includes('*') || branch.includes('?') || branch.includes('[') || branch.includes(']');
+  return branch.includes('*') || branch.includes('?');
 }
 
 function escapeRegExpLiteral(value: string): string {
@@ -188,44 +188,54 @@ async function expandWildcardBranchRows(
 
     const matcher = branchGlobToRegExp(row.branch);
     const matchingBranches = providerBranches.filter((branch) => matcher.test(branch));
-    for (const matchedBranch of matchingBranches) {
-      try {
-        await deps.query(
-          `INSERT INTO odb.repository_branch (
-            repository_id,
-            branch,
-            subpath_glob,
-            is_tracked,
-            poll_interval_sec,
-            next_poll_at
-          ) VALUES (
-            $1::uuid,
-            $2,
-            $3,
-            TRUE,
-            $4,
-            $5::timestamptz
-          )
-          ON CONFLICT (repository_id, branch) DO UPDATE
-          SET
-            is_tracked = TRUE,
-            subpath_glob = EXCLUDED.subpath_glob,
-            poll_interval_sec = EXCLUDED.poll_interval_sec,
-            next_poll_at = LEAST(
-              COALESCE(odb.repository_branch.next_poll_at, EXCLUDED.next_poll_at),
-              EXCLUDED.next_poll_at
-            )`,
-          [
-            row.repository_id,
-            matchedBranch,
-            row.subpath_glob,
-            row.configured_poll_interval_sec,
-            now.toISOString(),
-          ]
-        );
-      } catch (err) {
-        console.error('Failed to upsert expanded wildcard branch', matchedBranch, 'for row', row.branch_id, ':', err);
-      }
+    if (matchingBranches.length === 0) {
+      continue;
+    }
+
+    try {
+      await deps.query(
+        `INSERT INTO odb.repository_branch (
+          repository_id,
+          branch,
+          subpath_glob,
+          is_tracked,
+          poll_interval_sec,
+          next_poll_at
+        )
+        SELECT
+          $1::uuid,
+          matched_branch.branch,
+          $3,
+          TRUE,
+          $4,
+          $5::timestamptz
+        FROM unnest($2::text[]) AS matched_branch(branch)
+        ON CONFLICT (repository_id, branch) DO UPDATE
+        SET
+          is_tracked = TRUE,
+          subpath_glob = EXCLUDED.subpath_glob,
+          poll_interval_sec = EXCLUDED.poll_interval_sec,
+          next_poll_at = LEAST(
+            COALESCE(odb.repository_branch.next_poll_at, EXCLUDED.next_poll_at),
+            EXCLUDED.next_poll_at
+          )`,
+        [
+          row.repository_id,
+          matchingBranches,
+          row.subpath_glob,
+          row.configured_poll_interval_sec,
+          now.toISOString(),
+        ]
+      );
+    } catch (err) {
+      console.error(
+        'Failed to upsert expanded wildcard branches',
+        matchingBranches,
+        'for row',
+        row.branch_id,
+        ':',
+        err
+      );
     }
   }
 
