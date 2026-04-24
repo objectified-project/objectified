@@ -38,7 +38,9 @@ export interface RepositoriesI18nBundle {
   timelineLabel: string;
   branchSubpathPlaceholder: string;
   manifestPlaceholder: string;
-  noGithubLinkedAccounts: string;
+  noLinkedAccountsQuestion: string;
+  yesButton: string;
+  noButton: string;
 }
 
 export const repositoriesI18n: Record<RepositoriesLocale, RepositoriesI18nBundle> = {
@@ -80,7 +82,10 @@ export const repositoriesI18n: Record<RepositoriesLocale, RepositoriesI18nBundle
     timelineLabel: 'Timeline',
     branchSubpathPlaceholder: 'Optional subpath glob (e.g. specs/**)',
     manifestPlaceholder: '.objectified/repo.yaml contents',
-    noGithubLinkedAccounts: 'No GitHub linked accounts found.',
+    noLinkedAccountsQuestion:
+      'No linked accounts have been added yet. Would you like me to direct you to the linked accounts page?',
+    yesButton: 'Yes',
+    noButton: 'No',
   },
 };
 

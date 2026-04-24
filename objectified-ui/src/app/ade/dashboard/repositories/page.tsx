@@ -252,6 +252,8 @@ const RepositoriesPage = () => {
     }
   };
 
+  const showNoLinkedAccountsPrompt = wizardStep === 0 && linkedAccounts.length === 0;
+
   return (
     <>
       <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
@@ -362,7 +364,9 @@ const RepositoriesPage = () => {
           <div className="space-y-4 py-2">
             {wizardStep === 0 && (
               <div className="space-y-3">
-                <p className="text-sm font-medium">{copy.stepAccountTitle}</p>
+                {!showNoLinkedAccountsPrompt ? (
+                  <p className="text-sm font-medium">{copy.stepAccountTitle}</p>
+                ) : null}
                 {linkedAccounts.map((account) => (
                   <button
                     key={account.id}
@@ -381,7 +385,31 @@ const RepositoriesPage = () => {
                   </button>
                 ))}
                 {linkedAccounts.length === 0 ? (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{copy.noGithubLinkedAccounts}</p>
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-3">
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      {copy.noLinkedAccountsQuestion}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          setWizardOpen(false);
+                          router.push('/ade/dashboard/linked-accounts');
+                        }}
+                      >
+                        {copy.yesButton}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setWizardOpen(false)}
+                      >
+                        {copy.noButton}
+                      </Button>
+                    </div>
+                  </div>
                 ) : null}
               </div>
             )}
@@ -460,25 +488,27 @@ const RepositoriesPage = () => {
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setWizardOpen(false)} disabled={isWizardBusy}>
-              {copy.wizardCancel}
-            </Button>
-            {wizardStep > 0 ? (
-              <Button variant="outline" onClick={() => setWizardStep((step) => step - 1)} disabled={isWizardBusy}>
-                {copy.wizardBack}
+          {!showNoLinkedAccountsPrompt ? (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setWizardOpen(false)} disabled={isWizardBusy}>
+                {copy.wizardCancel}
               </Button>
-            ) : null}
-            {wizardStep < 3 ? (
-              <Button onClick={goNext} disabled={isWizardBusy}>
-                {copy.wizardNext}
-              </Button>
-            ) : (
-              <Button onClick={() => void submitRegistration()} disabled={isWizardBusy}>
-                {copy.wizardSubmit}
-              </Button>
-            )}
-          </DialogFooter>
+              {wizardStep > 0 ? (
+                <Button variant="outline" onClick={() => setWizardStep((step) => step - 1)} disabled={isWizardBusy}>
+                  {copy.wizardBack}
+                </Button>
+              ) : null}
+              {wizardStep < 3 ? (
+                <Button onClick={goNext} disabled={isWizardBusy}>
+                  {copy.wizardNext}
+                </Button>
+              ) : (
+                <Button onClick={() => void submitRegistration()} disabled={isWizardBusy}>
+                  {copy.wizardSubmit}
+                </Button>
+              )}
+            </DialogFooter>
+          ) : null}
         </DialogContent>
       </Dialog>
     </>
