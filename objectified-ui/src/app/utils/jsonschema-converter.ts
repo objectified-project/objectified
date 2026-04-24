@@ -21,6 +21,11 @@ export interface JsonSchemaConversionResult {
   warnings: string[];
 }
 
+interface JsonSchemaSourceMetadata {
+  draft: string | null;
+  $id?: string;
+}
+
 /**
  * Supported JSON Schema draft versions
  */
@@ -90,9 +95,15 @@ export function convertJsonSchemaToOpenAPI(
       };
     }
 
+    const sourceMetadata: JsonSchemaSourceMetadata = {
+      draft: schemaVersion,
+      $id: typeof jsonSchemaDoc.$id === 'string' ? jsonSchemaDoc.$id : undefined,
+    };
+
     // Convert each schema
     for (const [name, schema] of Object.entries(schemas)) {
-      openApiDoc.components.schemas[name] = convertSchema(schema, warnings, name);
+      const convertedSchema = convertSchema(schema, warnings, name);
+      openApiDoc.components.schemas[name] = attachSourceMetadata(convertedSchema, schema, sourceMetadata);
     }
 
     return {
@@ -185,7 +196,6 @@ function extractSchemas(
     delete rootSchema.$schema;
     delete rootSchema.$defs;
     delete rootSchema.definitions;
-    delete rootSchema.$id;
     schemas[rootName] = rootSchema;
   }
 
@@ -467,6 +477,34 @@ function convertSchema(schema: any, warnings: string[], context?: string): any {
   }
 
   return converted;
+}
+
+function attachSourceMetadata(
+  convertedSchema: unknown,
+  originalSchema: unknown,
+  sourceMetadata: JsonSchemaSourceMetadata
+): unknown {
+  if (!convertedSchema || typeof convertedSchema !== 'object') {
+    return convertedSchema;
+  }
+
+  const originalSchemaRecord = originalSchema && typeof originalSchema === 'object'
+    ? originalSchema as Record<string, unknown>
+    : {};
+  const schemaId = typeof originalSchemaRecord.$id === 'string' ? originalSchemaRecord.$id : sourceMetadata.$id;
+  const metadata: Record<string, string | null> = {
+    format: 'json_schema',
+    draft: sourceMetadata.draft,
+  };
+
+  if (schemaId) {
+    metadata.$id = schemaId;
+  }
+
+  return {
+    ...(convertedSchema as Record<string, unknown>),
+    'x-objectified-source': metadata,
+  };
 }
 
 /**
