@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getTenantById } from '@lib/db/helper';
 import { createRestAuthHeaders, REST_API_BASE_URL } from '@lib/rest-auth';
+
+export const dynamic = 'force-dynamic';
 
 type SessionUser = {
   user_id?: string;
@@ -19,12 +22,23 @@ export async function GET(
     if (!session?.user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
+    const user = session.user as SessionUser;
+    if (!user.current_tenant_id) {
+      return NextResponse.json({ success: false, error: 'No tenant selected' }, { status: 400 });
+    }
+    const tenant = await getTenantById(user.current_tenant_id);
+    if (!tenant?.slug) {
+      return NextResponse.json({ success: false, error: 'Tenant slug not found' }, { status: 400 });
+    }
 
     const params = await context.params;
-    const response = await fetch(`${REST_API_BASE_URL}/repositories/${encodeURIComponent(params.id)}`, {
-      method: 'GET',
-      headers: createRestAuthHeaders(session.user as SessionUser),
-    });
+    const response = await fetch(
+      `${REST_API_BASE_URL}/repositories/${encodeURIComponent(tenant.slug)}/${encodeURIComponent(params.id)}`,
+      {
+        method: 'GET',
+        headers: createRestAuthHeaders(user),
+      }
+    );
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const detail = typeof data.detail === 'string' ? data.detail : 'Failed to load repository';

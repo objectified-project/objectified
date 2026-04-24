@@ -107,8 +107,9 @@ def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
     }
 
 
-@router.post("", status_code=201, response_model=RegisterRepositoryResponse)
+@router.post("/{tenant_slug}", status_code=201, response_model=RegisterRepositoryResponse)
 async def register_repository(
+    tenant_slug: str,
     request: RepositoryRegisterRequest,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> RegisterRepositoryResponse:
@@ -160,8 +161,9 @@ async def register_repository(
     )
 
 
-@router.get("")
+@router.get("/{tenant_slug}")
 async def list_repositories(
+    tenant_slug: str,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> Dict[str, List[Dict[str, Any]]]:
     tenant_id = auth_data["tenant_id"]
@@ -171,8 +173,9 @@ async def list_repositories(
     return {"repositories": [_to_summary(repo) for repo in tenant_repos]}
 
 
-@router.get("/{repository_id}", response_model=RepositoryRecord)
+@router.get("/{tenant_slug}/{repository_id}", response_model=RepositoryRecord)
 async def get_repository(
+    tenant_slug: str,
     repository_id: str,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> RepositoryRecord:

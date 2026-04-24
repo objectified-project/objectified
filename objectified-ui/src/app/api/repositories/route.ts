@@ -34,7 +34,7 @@ export async function GET() {
     const auth = await resolveAuthContext();
     if ('error' in auth) return auth.error;
 
-    const response = await fetch(`${REST_API_BASE_URL}/repositories`, {
+    const response = await fetch(`${REST_API_BASE_URL}/repositories/${auth.tenantSlug}`, {
       method: 'GET',
       headers: createRestAuthHeaders(auth.sessionUser),
     });
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     if ('error' in auth) return auth.error;
 
     const body = await request.json();
-    const response = await fetch(`${REST_API_BASE_URL}/repositories`, {
+    const response = await fetch(`${REST_API_BASE_URL}/repositories/${auth.tenantSlug}`, {
       method: 'POST',
       headers: createRestAuthHeaders(auth.sessionUser),
       body: JSON.stringify(body),

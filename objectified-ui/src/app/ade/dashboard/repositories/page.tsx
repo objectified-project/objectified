@@ -240,9 +240,19 @@ const RepositoriesPage = () => {
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to register repository');
       }
+      const normalizedRepository = {
+        ...data.repository,
+        branches: Array.isArray(data.repository?.branches)
+          ? data.repository.branches
+              .map((branch: string | { name?: string; branch?: string }) =>
+                typeof branch === 'string' ? branch : branch?.name ?? branch?.branch,
+              )
+              .filter((branchName): branchName is string => typeof branchName === 'string')
+          : [],
+      };
       setWizardOpen(false);
       setSuccessMessage(copy.successMessage);
-      setRepositories((prev) => [data.repository, ...prev]);
+      setRepositories((prev) => [normalizedRepository, ...prev]);
       router.push(`/ade/dashboard/repositories/${data.repository.id}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to register repository';
