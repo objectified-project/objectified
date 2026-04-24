@@ -60,6 +60,12 @@ interface RegisteredRepository {
   branches: string[];
 }
 
+function formatRepositoryStatus(status: string): string {
+  if (status === 'archived') return 'Disabled';
+  if (status === 'scan_in_progress') return 'Scan in progress';
+  return status.replace(/_/g, ' ');
+}
+
 const RepositoriesPage = () => {
   const router = useRouter();
   const copy = getRepositoriesI18nBundle('en');
@@ -385,7 +391,7 @@ const RepositoriesPage = () => {
                           {(repo.branches || []).join(', ')}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-                          {repo.status}
+                          {formatRepositoryStatus(repo.status)}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <Button

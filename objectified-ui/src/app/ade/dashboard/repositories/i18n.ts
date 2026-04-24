@@ -51,6 +51,22 @@ export interface RepositoriesI18nBundle {
   noLinkedAccountsQuestion: string;
   yesButton: string;
   noButton: string;
+  ownerPlaceholder: string;
+  namePlaceholder: string;
+  ownerNameRequired: string;
+  settingsUpdatedMessage: string;
+  repositoryDisabledMessage: string;
+  repositoryEnabledMessage: string;
+  saveSettingsButton: string;
+  enableButton: string;
+  disableButton: string;
+  deleteButton: string;
+  deleteDialogTitle: string;
+  deleteDialogDescriptionPrefix: string;
+  deleteDialogDescriptionSuffix: string;
+  cancelButton: string;
+  deleteRepositoryButton: string;
+  ownerNameFallbackPlaceholder: string;
 }
 
 export const repositoriesI18n: Record<RepositoriesLocale, RepositoriesI18nBundle> = {
@@ -106,6 +122,22 @@ export const repositoriesI18n: Record<RepositoriesLocale, RepositoriesI18nBundle
       'No linked accounts have been added yet. Would you like me to direct you to the linked accounts page?',
     yesButton: 'Yes',
     noButton: 'No',
+    ownerPlaceholder: 'Repository owner',
+    namePlaceholder: 'Repository name',
+    ownerNameRequired: 'Owner and repository name are required.',
+    settingsUpdatedMessage: 'Repository settings updated.',
+    repositoryDisabledMessage: 'Repository disabled.',
+    repositoryEnabledMessage: 'Repository enabled.',
+    saveSettingsButton: 'Save repository settings',
+    enableButton: 'Enable',
+    disableButton: 'Disable',
+    deleteButton: 'Delete',
+    deleteDialogTitle: 'Delete repository',
+    deleteDialogDescriptionPrefix: 'Type',
+    deleteDialogDescriptionSuffix: 'to confirm permanent deletion.',
+    cancelButton: 'Cancel',
+    deleteRepositoryButton: 'Delete repository',
+    ownerNameFallbackPlaceholder: 'owner/name',
   },
 };
 

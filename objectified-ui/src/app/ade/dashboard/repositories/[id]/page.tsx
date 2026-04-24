@@ -6,6 +6,14 @@ import { ArrowLeft, GitBranchPlus, Loader2 } from 'lucide-react';
 import { Button } from '@/app/components/ui/Button';
 import { Alert } from '@/app/components/ui/Alert';
 import { Input } from '@/app/components/ui/Input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/app/components/ui/Dialog';
 import { dashboardContentStackClass, dashboardMainClass, dashboardPanelClass } from '@/app/components/ade/dashboard/dashboardScreenClasses';
 import { getRepositoriesI18nBundle } from '../i18n';
 
@@ -25,6 +33,8 @@ interface RepositoryDetail {
   name: string;
   fullName: string;
   status: string;
+  manifest?: string | null;
+  archivedAt?: string | null;
   branches: Array<{ branch: string; subpathGlob?: string; pollIntervalSec?: number }>;
   timeline: RepositoryTimelineItem[];
 }
@@ -33,6 +43,12 @@ interface BranchRow {
   branch: string;
   subpathGlob: string;
   pollIntervalSec?: number;
+}
+
+function formatRepositoryStatus(status: string): string {
+  if (status === 'archived') return 'Disabled';
+  if (status === 'scan_in_progress') return 'Scan in progress';
+  return status.replace(/_/g, ' ');
 }
 
 export default function RepositoryDetailPage() {
@@ -46,7 +62,15 @@ export default function RepositoryDetailPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingBranches, setIsSavingBranches] = useState(false);
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [isMutatingLifecycle, setIsMutatingLifecycle] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [ownerInput, setOwnerInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [manifestInput, setManifestInput] = useState('');
 
   const updateSubpath = (branchName: string, next: string) => {
     setBranchRows((prev) =>
@@ -85,7 +109,7 @@ export default function RepositoryDetailPage() {
       setErrorMessage(copy.branchesRequired);
       return;
     }
-    setIsSaving(true);
+    setIsSavingBranches(true);
     setErrorMessage('');
     setSuccessMessage('');
     try {
@@ -118,7 +142,94 @@ export default function RepositoryDetailPage() {
       const message = error instanceof Error ? error.message : 'Failed to update branches';
       setErrorMessage(message);
     } finally {
-      setIsSaving(false);
+      setIsSavingBranches(false);
+    }
+  };
+
+  const saveRepositoryDetails = async () => {
+    if (!repository) return;
+    const owner = ownerInput.trim();
+    const name = nameInput.trim();
+    if (!owner || !name) {
+      setErrorMessage(copy.ownerNameRequired);
+      return;
+    }
+    setIsSavingDetails(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const response = await fetch(`/api/repositories/${repository.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner,
+          name,
+          manifest: manifestInput,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update repository');
+      }
+      const updatedRepository = data.repository as RepositoryDetail;
+      setRepository(updatedRepository);
+      setOwnerInput(updatedRepository.owner);
+      setNameInput(updatedRepository.name);
+      setManifestInput(updatedRepository.manifest || '');
+      setSuccessMessage(copy.settingsUpdatedMessage);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update repository';
+      setErrorMessage(message);
+    } finally {
+      setIsSavingDetails(false);
+    }
+  };
+
+  const updateLifecycle = async (action: 'archive' | 'unarchive') => {
+    if (!repository) return;
+    setIsMutatingLifecycle(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const response = await fetch(`/api/repositories/${repository.id}/${action}`, { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `Failed to ${action === 'archive' ? 'disable' : 'enable'} repository`);
+      }
+      const updatedRepository = data.repository as RepositoryDetail;
+      setRepository(updatedRepository);
+      setSuccessMessage(action === 'archive' ? copy.repositoryDisabledMessage : copy.repositoryEnabledMessage);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : `Failed to ${action === 'archive' ? 'disable' : 'enable'} repository`;
+      setErrorMessage(message);
+    } finally {
+      setIsMutatingLifecycle(false);
+    }
+  };
+
+  const deleteRepository = async () => {
+    if (!repository) return;
+    setIsDeleting(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const response = await fetch(`/api/repositories/${repository.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmFullName: deleteConfirmation }),
+      });
+      if (response.status !== 204) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to delete repository');
+      }
+      router.push('/ade/dashboard/repositories');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete repository';
+      setErrorMessage(message);
+      setIsDeleting(false);
     }
   };
 
@@ -134,6 +245,9 @@ export default function RepositoryDetailPage() {
         }
         const loadedRepository = data.repository as RepositoryDetail;
         setRepository(loadedRepository);
+        setOwnerInput(loadedRepository.owner);
+        setNameInput(loadedRepository.name);
+        setManifestInput(loadedRepository.manifest || '');
         setBranchRows(
           (loadedRepository.branches || []).map((branch) => ({
             branch: branch.branch,
@@ -204,7 +318,50 @@ export default function RepositoryDetailPage() {
                   </div>
                   <div>
                     <div className="text-gray-500 dark:text-gray-400">{copy.statusLabel}</div>
-                    <div className="font-medium">{repository.status}</div>
+                    <div className="font-medium">{formatRepositoryStatus(repository.status)}</div>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-3">
+                  <Input
+                    value={ownerInput}
+                    onChange={(event) => setOwnerInput(event.target.value)}
+                    placeholder={copy.ownerPlaceholder}
+                  />
+                  <Input
+                    value={nameInput}
+                    onChange={(event) => setNameInput(event.target.value)}
+                    placeholder={copy.namePlaceholder}
+                  />
+                  <textarea
+                    value={manifestInput}
+                    onChange={(event) => setManifestInput(event.target.value)}
+                    className="w-full min-h-28 rounded-lg border border-gray-200 dark:border-gray-700 p-3 text-sm bg-white dark:bg-gray-900"
+                    placeholder={copy.manifestPlaceholder}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button onClick={() => void saveRepositoryDetails()} disabled={isSavingDetails || isLoading}>
+                      {isSavingDetails ? copy.savingButton : copy.saveSettingsButton}
+                    </Button>
+                    {repository.status === 'archived' ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => void updateLifecycle('unarchive')}
+                        disabled={isMutatingLifecycle}
+                      >
+                        {copy.enableButton}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        onClick={() => void updateLifecycle('archive')}
+                        disabled={isMutatingLifecycle}
+                      >
+                        {copy.disableButton}
+                      </Button>
+                    )}
+                    <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)} disabled={isDeleting}>
+                      {copy.deleteButton}
+                    </Button>
                   </div>
                 </div>
                 <div className="mt-4">
@@ -291,8 +448,8 @@ export default function RepositoryDetailPage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button onClick={() => void saveBranches()} disabled={isSaving || branchRows.length === 0}>
-                    {isSaving ? copy.savingButton : copy.saveBranchesButton}
+                  <Button onClick={() => void saveBranches()} disabled={isSavingBranches || branchRows.length === 0}>
+                    {isSavingBranches ? copy.savingButton : copy.saveBranchesButton}
                   </Button>
                 </div>
               </section>
@@ -314,6 +471,35 @@ export default function RepositoryDetailPage() {
           ) : null}
         </div>
       </main>
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{copy.deleteDialogTitle}</DialogTitle>
+            <DialogDescription>
+              {copy.deleteDialogDescriptionPrefix}{' '}
+              <span className="font-semibold">{repository?.fullName}</span>{' '}
+              {copy.deleteDialogDescriptionSuffix}
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={deleteConfirmation}
+            onChange={(event) => setDeleteConfirmation(event.target.value)}
+            placeholder={repository?.fullName || copy.ownerNameFallbackPlaceholder}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+              {copy.cancelButton}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void deleteRepository()}
+              disabled={isDeleting || !repository || deleteConfirmation.trim() !== repository.fullName}
+            >
+              {isDeleting ? copy.savingButton : copy.deleteRepositoryButton}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
