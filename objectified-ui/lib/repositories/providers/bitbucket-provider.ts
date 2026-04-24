@@ -72,16 +72,10 @@ export class BitbucketRepositoryProvider implements RepositoryProvider {
       return summary;
     }
 
-    return {
-      id: '',
-      name,
-      fullName: `${owner}/${name}`,
-      description: null,
-      isPrivate: true,
-      defaultBranch: 'main',
-      htmlUrl: '',
-      updatedAt: null,
-    };
+    throw new RepositoryProviderError(
+      'UNKNOWN',
+      `Bitbucket returned an unparseable repository payload for ${owner}/${name}`,
+    );
   }
 
   async *listBranches(token: string, repo: RepoRef): AsyncIterable<BranchInfo> {
@@ -178,13 +172,13 @@ export class BitbucketRepositoryProvider implements RepositoryProvider {
       token,
       query: { format: 'meta' },
     });
-    const content = await this.requestText({ pathOrUrl, token });
+    const contentBuffer = await this.requestBuffer({ pathOrUrl, token });
     const metadataRecord = toRecord(metadata);
     const commit = toRecord(metadataRecord?.commit);
     return {
-      contentBase64: Buffer.from(content, 'utf8').toString('base64'),
+      contentBase64: contentBuffer.toString('base64'),
       sha: String(commit?.hash ?? ''),
-      sizeBytes: Number(metadataRecord?.size ?? Buffer.byteLength(content)),
+      sizeBytes: Number(metadataRecord?.size ?? contentBuffer.length),
     };
   }
 
@@ -202,6 +196,9 @@ export class BitbucketRepositoryProvider implements RepositoryProvider {
     });
     const record = toRecord(payload);
     const uuid = normalizeHookUuid(String(record?.uuid ?? ''));
+    if (!uuid) {
+      throw new RepositoryProviderError('UNKNOWN', 'Bitbucket webhook registration did not return a valid uuid');
+    }
     return {
       id: uuid,
       secret: uuid,
@@ -220,7 +217,7 @@ export class BitbucketRepositoryProvider implements RepositoryProvider {
     });
   }
 
-  verifyWebhookSignature(secret: string, headers: Headers): boolean {
+  verifyWebhookSignature(secret: string, headers: Headers, _body: string): boolean {
     const expected = normalizeHookUuid(secret);
     const provided = normalizeHookUuid(headers.get('x-hook-uuid') ?? '');
     if (!expected || !provided) {
@@ -243,6 +240,11 @@ export class BitbucketRepositoryProvider implements RepositoryProvider {
   private async requestText(options: RequestOptions): Promise<string> {
     const response = await this.request(options);
     return await response.text();
+  }
+
+  private async requestBuffer(options: RequestOptions): Promise<Buffer> {
+    const response = await this.request(options);
+    return Buffer.from(await response.arrayBuffer());
   }
 
   private async request({ pathOrUrl, token, query, method = 'GET', body }: RequestOptions): Promise<Response> {
@@ -303,13 +305,13 @@ function toRepoSummary(value: unknown): RepoSummary | null {
     return null;
   }
   const fullName = String(record.full_name ?? '');
-  const slug = toRecord(record.slug);
+  const slug = String(record.slug ?? '');
   const mainbranch = toRecord(record.mainbranch);
   const links = toRecord(record.links);
   const htmlLink = toRecord(links?.html);
   return {
     id: String(record.uuid ?? record.id ?? ''),
-    name: String(record.name ?? slug?.name ?? ''),
+    name: String(record.name ?? slug),
     fullName,
     description: typeof record.description === 'string' ? record.description : null,
     isPrivate: Boolean(record.is_private),

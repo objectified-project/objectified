@@ -41,6 +41,10 @@ function textResponse(
     } as Headers,
     json: async () => JSON.parse(body),
     text: async () => body,
+    arrayBuffer: async () => {
+      const buf = Buffer.from(body, 'utf8');
+      return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    },
   } as Response;
 }
 
