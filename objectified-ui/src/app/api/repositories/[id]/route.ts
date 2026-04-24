@@ -67,20 +67,59 @@ export async function PATCH(
 
     const params = await context.params;
     const body = await request.json();
+    const isBranchUpdate = Array.isArray(body?.branches);
+    const targetPath = isBranchUpdate
+      ? `${REST_API_BASE_URL}/repositories/${encodeURIComponent(auth.tenantSlug)}/${encodeURIComponent(params.id)}/branches`
+      : `${REST_API_BASE_URL}/repositories/${encodeURIComponent(auth.tenantSlug)}/${encodeURIComponent(params.id)}`;
+    const response = await fetch(targetPath, {
+      method: 'PATCH',
+      headers: createRestAuthHeaders(auth.sessionUser),
+      body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail =
+        typeof data.detail === 'string'
+          ? data.detail
+          : isBranchUpdate
+            ? 'Failed to update repository branches'
+            : 'Failed to update repository';
+      return NextResponse.json({ success: false, error: detail }, { status: response.status });
+    }
+    return NextResponse.json({ success: true, repository: data });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await resolveAuthContext();
+    if ('error' in auth) return auth.error;
+
+    const params = await context.params;
+    const body = await request.json();
     const response = await fetch(
-      `${REST_API_BASE_URL}/repositories/${encodeURIComponent(auth.tenantSlug)}/${encodeURIComponent(params.id)}/branches`,
+      `${REST_API_BASE_URL}/repositories/${encodeURIComponent(auth.tenantSlug)}/${encodeURIComponent(params.id)}`,
       {
-        method: 'PATCH',
+        method: 'DELETE',
         headers: createRestAuthHeaders(auth.sessionUser),
         body: JSON.stringify(body),
       }
     );
+    if (response.status === 204) {
+      return new NextResponse(null, { status: 204 });
+    }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const detail = typeof data.detail === 'string' ? data.detail : 'Failed to update repository branches';
+      const detail = typeof data.detail === 'string' ? data.detail : 'Failed to delete repository';
       return NextResponse.json({ success: false, error: detail }, { status: response.status });
     }
-    return NextResponse.json({ success: true, repository: data });
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
