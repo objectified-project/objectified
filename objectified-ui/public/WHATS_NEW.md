@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added previous-scan diffing for repository scans so completed scans classify files as `new`/`unchanged`/`modified`/`removed`, retain removed rows with prior blob SHA, and store `{added, modified, removed, unchanged}` summary counts.
 - Added repository scan history models (`repository_scan`/`repository_file`) with cursor-paginated scan/file REST endpoints, `force` re-scan support, and `skipped_unchanged` tracking.
 - Added `.objectified/repo.yaml` manifest support with published schema validation, non-fatal `manifest_error` recording, per-spec format/polling overrides, and untracked discovery rows for files not listed in the manifest.
 - Added provider-agnostic spec format detection with filename heuristics plus 64 KB content sniffing, confidence/discriminator output, and stream-mode sniffing for files over 5 MB.
