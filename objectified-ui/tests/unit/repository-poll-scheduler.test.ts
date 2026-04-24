@@ -138,6 +138,12 @@ describe('repository poll scheduler', () => {
         expect(params[1]).toEqual(['"etag-new-1"']);
         return { rowCount: 1, rows: [] };
       },
+      (sql, params) => {
+        expect(sql).toContain('consecutive_failures = 0');
+        expect(sql).toContain('last_error_code = NULL');
+        expect(params[0]).toEqual(['branch-1', 'branch-2']);
+        return { rowCount: 2, rows: [] };
+      },
     ]);
     const enqueue = jest.fn(async () => undefined);
     const fetchImpl = jest
@@ -217,6 +223,11 @@ describe('repository poll scheduler', () => {
       () => ({ rowCount: 1, rows: [] }),
       () => ({ rowCount: 1, rows: [] }),
       () => ({ rowCount: 1, rows: [] }),
+      (sql, params) => {
+        expect(sql).toContain('consecutive_failures = 0');
+        expect(params[0]).toEqual(['branch-1']);
+        return { rowCount: 1, rows: [] };
+      },
       () => ({ rowCount: 0, rows: [] }),
     ]);
     const enqueue = jest.fn(async () => undefined);
@@ -315,6 +326,104 @@ describe('repository poll scheduler', () => {
     expect(enqueue).not.toHaveBeenCalled();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(fetchImpl.mock.calls[0]?.[0]).toContain('/repos/acme/platform/branches?per_page=100&page=1');
+  });
+
+  it('applies failure backoff and auto-pauses repositories after threshold failures', async () => {
+    const query = makeQueryStub([
+      (sql, params) => {
+        expect(sql).toContain('rb.consecutive_failures');
+        expect(params).toEqual(['2026-04-24T20:03:00.000Z', 500, 60, 300]);
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              branch_id: 'branch-fail',
+              repository_id: 'repo-fail',
+              tenant_id: 'tenant-fail',
+              project_id: null,
+              provider: 'github',
+              owner: 'acme',
+              name: 'broken-repo',
+              branch: 'main',
+              subpath_glob: '**/*',
+              configured_poll_interval_sec: 300,
+              linked_account_id: 'linked-fail',
+              last_known_sha: 'old-sha',
+              last_known_etag: '"etag-old"',
+              consecutive_failures: 7,
+              last_error_code: 'PROVIDER_UNAVAILABLE',
+              last_error_detail: 'Previous failure',
+              is_enterprise: false,
+              effective_poll_interval_sec: 300,
+            },
+          ],
+        };
+      },
+      (sql, params) => {
+        expect(sql).toContain('SELECT id, access_token, token_expires_at');
+        expect(params[0]).toEqual(['linked-fail']);
+        return {
+          rowCount: 1,
+          rows: [{ id: 'linked-fail', access_token: 'token-fail', token_expires_at: null }],
+        };
+      },
+      (sql, params) => {
+        expect(sql).toContain('UPDATE odb.repository_branch rb');
+        expect(params[0]).toEqual(['branch-fail']);
+        // 8 failures => multiplier 32 => 300 * 32 = 9600
+        expect(params[1]).toEqual([9600]);
+        expect(params[2]).toBe('2026-04-24T20:03:00.000Z');
+        return { rowCount: 1, rows: [] };
+      },
+      (sql, params) => {
+        expect(sql).toContain('consecutive_failures = upd.consecutive_failures');
+        expect(params[0]).toEqual(['branch-fail']);
+        expect(params[1]).toEqual([8]);
+        expect(params[2]).toEqual(['PROVIDER_UNAVAILABLE']);
+        return { rowCount: 1, rows: [] };
+      },
+      (sql, params) => {
+        expect(sql).toContain('UPDATE odb.repository');
+        expect(sql).toContain("status = 'paused'");
+        expect(params[0]).toEqual(['repo-fail']);
+        expect(params[1]).toBe('2026-04-24T20:03:00.000Z');
+        return { rowCount: 1, rows: [] };
+      },
+      (sql, params) => {
+        expect(sql).toContain('INSERT INTO odb.workflow_audit');
+        expect(params[2]).toBe('repository.auto_paused');
+        const detail = JSON.parse(String(params[4]));
+        expect(detail).toMatchObject({
+          repository_id: 'repo-fail',
+          branch: 'main',
+          error_code: 'PROVIDER_UNAVAILABLE',
+          consecutive_failures: 8,
+        });
+        return { rowCount: 1, rows: [] };
+      },
+    ]);
+
+    const enqueue = jest.fn(async () => undefined);
+    const fetchImpl = jest.fn<typeof fetch>().mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      json: async () => ({}),
+      headers: { get: () => null } as unknown as Headers,
+    } as Response);
+
+    const scheduler = createRepositoryPollScheduler({
+      query,
+      enqueue,
+      fetchImpl,
+      now: () => new Date('2026-04-24T20:03:00.000Z'),
+    });
+
+    const result = await scheduler();
+
+    expect(result.dispatched).toBe(0);
+    expect(result.jobs).toEqual([]);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
 

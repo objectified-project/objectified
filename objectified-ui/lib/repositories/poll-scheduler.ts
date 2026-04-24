@@ -40,6 +40,9 @@ type QueryRow = {
   effective_poll_interval_sec: number;
   last_known_sha: string | null;
   last_known_etag: string | null;
+  consecutive_failures: number;
+  last_error_code: string | null;
+  last_error_detail: string | null;
 };
 
 type QueryResult = {
@@ -63,12 +66,69 @@ const ENTERPRISE_MIN_POLL_SEC = 60;
 const DEFAULT_BATCH_SIZE = 500;
 const CONCURRENT_HEAD_CHECKS = 8;
 const GITHUB_API_BASE = 'https://api.github.com';
+const MAX_BACKOFF_MULTIPLIER = 32;
+const MAX_BACKOFF_INTERVAL_SEC = 7 * 24 * 60 * 60;
+const AUTO_PAUSE_FAILURE_THRESHOLD = 8;
 
 type DetectedHead = {
   sha: string;
   unchanged: boolean;
   etag: string | null;
 };
+
+type HeadDetectionError = {
+  errorCode: string;
+  errorDetail: string;
+};
+
+type HeadDetectionResult =
+  | {
+      ok: true;
+      head: DetectedHead;
+    }
+  | {
+      ok: false;
+      error: HeadDetectionError;
+    };
+
+function computeBackoffIntervalSec(baseIntervalSec: number, consecutiveFailures: number): number {
+  if (consecutiveFailures <= 0) {
+    return baseIntervalSec;
+  }
+  const multiplier = Math.min(2 ** consecutiveFailures, MAX_BACKOFF_MULTIPLIER);
+  return Math.min(baseIntervalSec * multiplier, MAX_BACKOFF_INTERVAL_SEC);
+}
+
+function classifyGithubHeadError(status: number): HeadDetectionError {
+  if (status === 401) {
+    return {
+      errorCode: 'PROVIDER_UNAUTHORIZED',
+      errorDetail: 'GitHub credentials are unauthorized for this repository.',
+    };
+  }
+  if (status === 403 || status === 429) {
+    return {
+      errorCode: 'PROVIDER_RATE_LIMITED',
+      errorDetail: 'GitHub provider rate limit reached while detecting branch head.',
+    };
+  }
+  if (status === 404) {
+    return {
+      errorCode: 'PROVIDER_REPOSITORY_NOT_FOUND',
+      errorDetail: 'Repository or branch was not found while detecting branch head.',
+    };
+  }
+  if (status >= 500) {
+    return {
+      errorCode: 'PROVIDER_UNAVAILABLE',
+      errorDetail: `GitHub provider error status ${status} while detecting branch head.`,
+    };
+  }
+  return {
+    errorCode: 'PROVIDER_REQUEST_FAILED',
+    errorDetail: `GitHub request failed with status ${status} while detecting branch head.`,
+  };
+}
 
 function isBranchGlobPattern(branch: string): boolean {
   return branch.includes('*') || branch.includes('?');
@@ -285,7 +345,7 @@ async function detectGithubBranchHead(
   deps: PollSchedulerDeps,
   row: QueryRow,
   token: string
-): Promise<DetectedHead | null> {
+): Promise<HeadDetectionResult> {
   const headers: HeadersInit = {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
@@ -304,9 +364,12 @@ async function detectGithubBranchHead(
     const response = await deps.fetchImpl(url, { headers });
     if (response.status === 304 && row.last_known_sha) {
       return {
-        sha: row.last_known_sha,
-        unchanged: true,
-        etag: null,
+        ok: true,
+        head: {
+          sha: row.last_known_sha,
+          unchanged: true,
+          etag: null,
+        },
       };
     }
     if (!response.ok) {
@@ -316,23 +379,41 @@ async function detectGithubBranchHead(
         'status',
         response.status
       );
-      return null;
+      return {
+        ok: false,
+        error: classifyGithubHeadError(response.status),
+      };
     }
 
     const payload = (await response.json()) as { sha?: unknown };
     const sha = typeof payload.sha === 'string' ? payload.sha : '';
     if (!sha) {
-      return null;
+      return {
+        ok: false,
+        error: {
+          errorCode: 'PROVIDER_INVALID_RESPONSE',
+          errorDetail: 'GitHub provider response did not include a commit SHA.',
+        },
+      };
     }
     const etag = response.headers.get('ETag') ?? null;
     return {
-      sha,
-      unchanged: row.last_known_sha === sha,
-      etag,
+      ok: true,
+      head: {
+        sha,
+        unchanged: row.last_known_sha === sha,
+        etag,
+      },
     };
   } catch (err) {
     console.error('Failed to call provider for branch SHA detection', row.branch_id, ':', err);
-    return null;
+    return {
+      ok: false,
+      error: {
+        errorCode: 'PROVIDER_NETWORK_ERROR',
+        errorDetail: err instanceof Error ? err.message : 'Unknown network/provider error during branch head detection.',
+      },
+    };
   }
 }
 
@@ -452,6 +533,37 @@ async function insertDispatchAudit(
   }
 }
 
+async function insertAutoPausedAudit(
+  deps: PollSchedulerDeps,
+  args: {
+    tenantId: string;
+    projectId: string | null;
+    repositoryId: string;
+    branch: string;
+    errorCode: string;
+    errorDetail: string;
+    consecutiveFailures: number;
+  }
+): Promise<void> {
+  const detail = {
+    repository_id: args.repositoryId,
+    branch: args.branch,
+    error_code: args.errorCode,
+    error_detail: args.errorDetail,
+    consecutive_failures: args.consecutiveFailures,
+  };
+  try {
+    await deps.query(
+      `INSERT INTO odb.workflow_audit (
+        tenant_id, project_id, version_id, action, outcome, actor_id, detail
+      ) VALUES ($1, $2, NULL, $3, $4, NULL, $5::jsonb)`,
+      [args.tenantId, args.projectId, 'repository.auto_paused', 'success', JSON.stringify(detail)]
+    );
+  } catch (err) {
+    console.error('Failed to insert workflow_audit for repository.auto_paused:', err);
+  }
+}
+
 export function createRepositoryPollScheduler(
   partialDeps: Partial<PollSchedulerDeps>,
   options?: PollSchedulerOptions
@@ -485,6 +597,9 @@ export function createRepositoryPollScheduler(
           MIN(rcr.linked_account_id) AS linked_account_id,
           rb.last_known_sha,
           rb.last_known_etag,
+          COALESCE(rb.consecutive_failures, 0) AS consecutive_failures,
+          rb.last_error_code,
+          rb.last_error_detail,
           COALESCE(MAX(CASE WHEN ue.plan_code ILIKE 'enterprise%' THEN 1 ELSE 0 END), 0) = 1 AS is_enterprise,
           GREATEST(
             rb.poll_interval_sec,
@@ -512,6 +627,9 @@ export function createRepositoryPollScheduler(
           rb.branch,
           rb.last_known_sha,
           rb.last_known_etag,
+          rb.consecutive_failures,
+          rb.last_error_code,
+          rb.last_error_detail,
           rb.poll_interval_sec
         ORDER BY rb.next_poll_at ASC, rb.id ASC
         LIMIT $2
@@ -524,6 +642,23 @@ export function createRepositoryPollScheduler(
     const headShas: string[] = [];
     const headEtagBranchIds: string[] = [];
     const headEtags: string[] = [];
+    const failedBranchIds: string[] = [];
+    const failedBranchCounts: number[] = [];
+    const failedBranchErrorCodes: string[] = [];
+    const failedBranchErrorDetails: string[] = [];
+    const successfulBranchIds: string[] = [];
+    const repositoriesToAutoPause = new Map<
+      string,
+      {
+        tenantId: string;
+        projectId: string | null;
+        repositoryId: string;
+        branch: string;
+        errorCode: string;
+        errorDetail: string;
+        consecutiveFailures: number;
+      }
+    >();
 
     // Batch-prefetch all linked account tokens in one query, checking expiry.
     const githubLinkedAccountIds = rowsResult.rows
@@ -541,7 +676,7 @@ export function createRepositoryPollScheduler(
     const processedIntervalsSec: number[] = [...templateIntervalsSec];
 
     // Detect HEAD commits with bounded concurrency so scheduler latency scales.
-    const detectedHeads: (DetectedHead | null)[] = new Array(dispatchRows.length).fill(null);
+    const detectedHeads: (HeadDetectionResult | null)[] = new Array(dispatchRows.length).fill(null);
     const headTasks = dispatchRows.map((row, index) => async () => {
       if (row.provider !== 'github') return;
       const token = tokenMap.get(row.linked_account_id ?? '');
@@ -554,11 +689,37 @@ export function createRepositoryPollScheduler(
 
     for (let rowIndex = 0; rowIndex < dispatchRows.length; rowIndex++) {
       const row = dispatchRows[rowIndex];
-      const detectedHead = detectedHeads[rowIndex] ?? null;
+      const detectedHeadResult = detectedHeads[rowIndex] ?? null;
+      const detectedHead = detectedHeadResult?.ok ? detectedHeadResult.head : null;
+
+      if (detectedHeadResult && !detectedHeadResult.ok) {
+        const nextConsecutiveFailures = row.consecutive_failures + 1;
+        const backoffIntervalSec = computeBackoffIntervalSec(row.effective_poll_interval_sec, nextConsecutiveFailures);
+        processedBranchIds.push(row.branch_id);
+        processedIntervalsSec.push(backoffIntervalSec);
+        failedBranchIds.push(row.branch_id);
+        failedBranchCounts.push(nextConsecutiveFailures);
+        failedBranchErrorCodes.push(detectedHeadResult.error.errorCode);
+        failedBranchErrorDetails.push(detectedHeadResult.error.errorDetail);
+
+        if (nextConsecutiveFailures >= AUTO_PAUSE_FAILURE_THRESHOLD) {
+          repositoriesToAutoPause.set(row.repository_id, {
+            tenantId: row.tenant_id,
+            projectId: row.project_id,
+            repositoryId: row.repository_id,
+            branch: row.branch,
+            errorCode: detectedHeadResult.error.errorCode,
+            errorDetail: detectedHeadResult.error.errorDetail,
+            consecutiveFailures: nextConsecutiveFailures,
+          });
+        }
+        continue;
+      }
 
       if (detectedHead?.unchanged) {
         processedBranchIds.push(row.branch_id);
         processedIntervalsSec.push(row.effective_poll_interval_sec);
+        successfulBranchIds.push(row.branch_id);
         await insertScheduledScan(deps, {
           repositoryId: row.repository_id,
           branch: row.branch,
@@ -610,6 +771,7 @@ export function createRepositoryPollScheduler(
 
       processedBranchIds.push(job.branchId);
       processedIntervalsSec.push(job.effectivePollIntervalSec);
+      successfulBranchIds.push(job.branchId);
       jobs.push(job);
 
       await insertScheduledScan(deps, {
@@ -685,6 +847,53 @@ export function createRepositoryPollScheduler(
         WHERE rb.id = upd.branch_id`,
         [headEtagBranchIds, headEtags]
       );
+    }
+
+    if (failedBranchIds.length > 0) {
+      await deps.query(
+        `UPDATE odb.repository_branch rb
+        SET
+          consecutive_failures = upd.consecutive_failures,
+          last_error_code = upd.error_code,
+          last_error_detail = upd.error_detail
+        FROM (
+          SELECT
+            unnest($1::uuid[]) AS branch_id,
+            unnest($2::integer[]) AS consecutive_failures,
+            unnest($3::text[]) AS error_code,
+            unnest($4::text[]) AS error_detail
+        ) upd
+        WHERE rb.id = upd.branch_id`,
+        [failedBranchIds, failedBranchCounts, failedBranchErrorCodes, failedBranchErrorDetails]
+      );
+    }
+
+    if (successfulBranchIds.length > 0) {
+      await deps.query(
+        `UPDATE odb.repository_branch rb
+        SET
+          consecutive_failures = 0,
+          last_error_code = NULL,
+          last_error_detail = NULL
+        WHERE rb.id = ANY($1::uuid[])`,
+        [successfulBranchIds]
+      );
+    }
+
+    if (repositoriesToAutoPause.size > 0) {
+      const repositoryIds = Array.from(repositoriesToAutoPause.keys());
+      await deps.query(
+        `UPDATE odb.repository
+        SET
+          status = 'paused',
+          updated_at = $2::timestamptz
+        WHERE id = ANY($1::uuid[])
+          AND status <> 'paused'`,
+        [repositoryIds, now.toISOString()]
+      );
+      for (const autoPaused of repositoriesToAutoPause.values()) {
+        await insertAutoPausedAudit(deps, autoPaused);
+      }
     }
 
     return {

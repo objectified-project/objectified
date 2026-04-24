@@ -2,6 +2,7 @@
 
 ## Completed
 
+- REPO-4.5 (#2783): Added scheduler failure backoff and auto-pause behavior by persisting per-branch consecutive failure/error metadata, exponentially backing off poll cadence without mutating configured poll intervals, resetting failure state on successful checks, and auto-pausing repositories with `repository.auto_paused` workflow audits after eight consecutive failures.
 - REPO-4.4 (#2782): Added multi-branch scheduler tracking for wildcard patterns by treating branch globs as discovery templates, expanding provider-matched concrete branches at poll time into `repository_branch` rows, and preserving branch scan history by re-tracking existing rows instead of deleting history.
 - REPO-4.2 (#2780): Added commit-SHA change detection in scheduled polling by resolving provider branch HEADs, using conditional `If-None-Match` requests for GitHub checks, recording `skipped_unchanged` scans when HEAD is unchanged, and only dispatching downstream scan jobs when SHA changes.
 - REPO-4.1 (#2779): Added a scheduler tick dispatcher that atomically reserves due tracked branches, skips paused repositories, clamps poll cadence to enterprise/non-enterprise minimums, dispatches poll jobs to `repo.poll.<priority>`, and records `repository.polled` workflow audit rows per dispatch.
