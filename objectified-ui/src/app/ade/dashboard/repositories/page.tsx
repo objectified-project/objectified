@@ -41,11 +41,13 @@ interface RepoSummary {
   name: string;
   full_name: string;
   description?: string | null;
+  default_branch?: string;
 }
 
 interface BranchItem {
   branch: string;
-  subpathGlob?: string;
+  subpathGlob: string;
+  pollIntervalSec?: number;
 }
 
 interface RegisteredRepository {
@@ -77,6 +79,7 @@ const RepositoriesPage = () => {
   const [selectedRepo, setSelectedRepo] = useState<RepoSummary | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [selectedBranches, setSelectedBranches] = useState<BranchItem[]>([]);
+  const [customBranchPattern, setCustomBranchPattern] = useState('');
   const [manifest, setManifest] = useState('');
   const [isWizardBusy, setIsWizardBusy] = useState(false);
 
@@ -108,6 +111,7 @@ const RepositoriesPage = () => {
     setGithubRepos([]);
     setBranches([]);
     setSelectedBranches([]);
+    setCustomBranchPattern('');
     setManifest('');
     setRepoSearch('');
     setErrorMessage('');
@@ -128,6 +132,7 @@ const RepositoriesPage = () => {
     setSelectedRepo(null);
     setBranches([]);
     setSelectedBranches([]);
+    setCustomBranchPattern('');
     setIsWizardBusy(true);
     try {
       const response = await fetch(`/api/sso/github/repos?accountId=${encodeURIComponent(account.id)}`);
@@ -156,8 +161,15 @@ const RepositoriesPage = () => {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to load branches');
       }
-      setBranches(data.branches || []);
-      setSelectedBranches([]);
+      const availableBranches = Array.isArray(data.branches) ? data.branches : [];
+      const defaultBranchName =
+        (typeof data.defaultBranch === 'string' && data.defaultBranch) || repo.default_branch || null;
+      const defaultBranch =
+        defaultBranchName && availableBranches.includes(defaultBranchName)
+          ? [{ branch: defaultBranchName, subpathGlob: '**/*' }]
+          : [];
+      setBranches(availableBranches);
+      setSelectedBranches(defaultBranch);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load branches';
       setErrorMessage(message);
@@ -187,7 +199,7 @@ const RepositoriesPage = () => {
       if (exists) {
         return prev.filter((entry) => entry.branch !== branchName);
       }
-      return [...prev, { branch: branchName }];
+      return [...prev, { branch: branchName, subpathGlob: '**/*' }];
     });
   };
 
@@ -195,10 +207,33 @@ const RepositoriesPage = () => {
     setSelectedBranches((prev) =>
       prev.map((entry) =>
         entry.branch === branchName
-          ? { ...entry, subpathGlob: value.trim() || undefined }
+          ? { ...entry, subpathGlob: value }
           : entry
       )
     );
+  };
+
+  const updatePollInterval = (branchName: string, value: string) => {
+    const next = Number.parseInt(value, 10);
+    setSelectedBranches((prev) =>
+      prev.map((entry) =>
+        entry.branch === branchName
+          ? { ...entry, pollIntervalSec: Number.isFinite(next) ? next : undefined }
+          : entry
+      )
+    );
+  };
+
+  const addCustomBranch = () => {
+    const branchPattern = customBranchPattern.trim();
+    if (!branchPattern) return;
+    setSelectedBranches((prev) => {
+      if (prev.some((entry) => entry.branch === branchPattern)) {
+        return prev;
+      }
+      return [...prev, { branch: branchPattern, subpathGlob: '**/*' }];
+    });
+    setCustomBranchPattern('');
   };
 
   const goNext = () => {
@@ -232,7 +267,11 @@ const RepositoriesPage = () => {
           provider: 'github',
           owner,
           name,
-          branches: selectedBranches,
+          branches: selectedBranches.map((branch) => ({
+            branch: branch.branch.trim(),
+            subpathGlob: branch.subpathGlob.trim() || undefined,
+            pollIntervalSec: branch.pollIntervalSec,
+          })),
           manifest: manifest.trim() ? manifest : undefined,
         }),
       });
@@ -263,6 +302,9 @@ const RepositoriesPage = () => {
   };
 
   const showNoLinkedAccountsPrompt = wizardStep === 0 && linkedAccounts.length === 0;
+  const selectedCustomBranches = selectedBranches.filter(
+    (entry) => !branches.includes(entry.branch)
+  );
 
   return (
     <>
@@ -451,12 +493,18 @@ const RepositoriesPage = () => {
                     </button>
                   ))}
                 </div>
+                {selectedRepo?.default_branch ? (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {copy.defaultBranchLabel}: <span className="font-medium">{selectedRepo.default_branch}</span>
+                  </p>
+                ) : null}
               </div>
             )}
 
             {wizardStep === 2 && (
               <div className="space-y-3">
                 <p className="text-sm font-medium">{copy.stepBranchesTitle}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{copy.availableBranchesLabel}</p>
                 <div className="max-h-52 overflow-auto space-y-2">
                   {branches.map((branchName) => {
                     const selected = selectedBranches.find((entry) => entry.branch === branchName);
@@ -471,17 +519,71 @@ const RepositoriesPage = () => {
                           {branchName}
                         </label>
                         {selected ? (
-                          <Input
-                            className="mt-2"
-                            placeholder={copy.branchSubpathPlaceholder}
-                            value={selected.subpathGlob || ''}
-                            onChange={(event) => updateSubpath(branchName, event.target.value)}
-                          />
+                          <div className="space-y-2 mt-2">
+                            <Input
+                              placeholder={copy.branchSubpathPlaceholder}
+                              value={selected.subpathGlob}
+                              onChange={(event) => updateSubpath(branchName, event.target.value)}
+                            />
+                            <Input
+                              type="number"
+                              min={15}
+                              max={86400}
+                              placeholder={copy.pollIntervalPlaceholder}
+                              value={selected.pollIntervalSec ?? ''}
+                              onChange={(event) => updatePollInterval(branchName, event.target.value)}
+                            />
+                          </div>
                         ) : null}
                       </div>
                     );
                   })}
                 </div>
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
+                  <p className="text-sm font-medium">{copy.addBranchPatternLabel}</p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={customBranchPattern}
+                      onChange={(event) => setCustomBranchPattern(event.target.value)}
+                      placeholder={copy.branchPatternPlaceholder}
+                    />
+                    <Button type="button" variant="outline" onClick={addCustomBranch}>
+                      {copy.addPatternButton}
+                    </Button>
+                  </div>
+                </div>
+                {selectedCustomBranches.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedCustomBranches.map((branch) => (
+                      <div key={branch.branch} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium">{branch.branch}</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleBranch(branch.branch)}
+                          >
+                            {copy.removeButton}
+                          </Button>
+                        </div>
+                        <Input
+                          placeholder={copy.branchSubpathPlaceholder}
+                          value={branch.subpathGlob}
+                          onChange={(event) => updateSubpath(branch.branch, event.target.value)}
+                        />
+                        <Input
+                          type="number"
+                          min={15}
+                          max={86400}
+                          placeholder={copy.pollIntervalPlaceholder}
+                          value={branch.pollIntervalSec ?? ''}
+                          onChange={(event) => updatePollInterval(branch.branch, event.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             )}
 

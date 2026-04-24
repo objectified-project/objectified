@@ -23,6 +23,15 @@ export interface RepositoriesI18nBundle {
   stepRepoTitle: string;
   stepBranchesTitle: string;
   stepManifestTitle: string;
+  defaultBranchLabel: string;
+  addBranchPatternLabel: string;
+  addPatternButton: string;
+  branchPatternPlaceholder: string;
+  pollIntervalPlaceholder: string;
+  removeButton: string;
+  availableBranchesLabel: string;
+  saveBranchesButton: string;
+  savingButton: string;
   accountRequired: string;
   repoRequired: string;
   branchesRequired: string;
@@ -67,6 +76,15 @@ export const repositoriesI18n: Record<RepositoriesLocale, RepositoriesI18nBundle
     stepRepoTitle: 'Step 2: Search and pick repository',
     stepBranchesTitle: 'Step 3: Select branches and subpath',
     stepManifestTitle: 'Step 4: Optional manifest upload',
+    defaultBranchLabel: 'Default branch',
+    addBranchPatternLabel: 'Track branch pattern',
+    addPatternButton: 'Add pattern',
+    branchPatternPlaceholder: 'release/*',
+    pollIntervalPlaceholder: 'Poll interval seconds (optional)',
+    removeButton: 'Remove',
+    availableBranchesLabel: 'Available branches',
+    saveBranchesButton: 'Save branches',
+    savingButton: 'Saving...',
     accountRequired: 'Select a linked account before continuing.',
     repoRequired: 'Select a repository before continuing.',
     branchesRequired: 'Select at least one branch.',

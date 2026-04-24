@@ -13,6 +13,11 @@ test.describe('Repositories registration', () => {
         return;
       }
 
+      const payload = route.request().postDataJSON() as {
+        branches?: Array<{ branch: string; subpathGlob?: string; pollIntervalSec?: number }>;
+      };
+      expect(payload.branches).toEqual([{ branch: 'main', subpathGlob: '**/*' }]);
+
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
@@ -88,6 +93,7 @@ test.describe('Repositories registration', () => {
               name: 'api-platform',
               full_name: 'acme/api-platform',
               description: 'Core API repo',
+              default_branch: 'main',
             },
           ],
         }),
@@ -100,6 +106,7 @@ test.describe('Repositories registration', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           branches: ['main', 'release/2026.04'],
+          defaultBranch: 'main',
         }),
       });
     });
@@ -124,7 +131,6 @@ test.describe('Repositories registration', () => {
     await wizard.getByRole('button', { name: 'acme/api-platform Core API repo' }).click();
     await wizard.getByRole('button', { name: 'Next', exact: true }).click();
 
-    await wizard.getByRole('checkbox').first().check();
     await wizard.getByRole('button', { name: 'Next', exact: true }).click();
 
     await wizard.locator('textarea').fill('scan:\n  enabled: true\n');

@@ -8,6 +8,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Added a provider abstraction layer for repository connectors with a GitHub adapter, shared provider error taxonomy, and cross-provider contract tests.
 - Added a server-only `resolveRepositoryToken` helper that resolves linked-account repository credentials, refreshes supported expired tokens, emits typed resolver errors, and writes token-safe workflow audit rows.
 - Added a new ADE Repositories page with a four-step GitHub registration wizard and initial scan timeline flow.
+- Added per-repository branch management so tracked branches can be added/removed with per-branch subpath glob and polling settings, defaulting to the provider default branch and supporting wildcard branch patterns.
 
 ## UI
 - Branch workflow is its own button in the canvas now, and compacted to fit most functionality that's in Versions now.

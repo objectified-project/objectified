@@ -45,21 +45,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No access token found for this account' }, { status: 401 });
     }
 
-    const url = `https://api.github.com/repos/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}/branches?per_page=100`;
+    const commonHeaders = {
+      Authorization: `Bearer ${account.access_token}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    const branchesUrl = `https://api.github.com/repos/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}/branches?per_page=100`;
+    const repositoryUrl = `https://api.github.com/repos/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}`;
 
-    const githubResponse = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${account.access_token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-    });
+    const [githubBranchesResponse, githubRepositoryResponse] = await Promise.all([
+      fetch(branchesUrl, { headers: commonHeaders }),
+      fetch(repositoryUrl, { headers: commonHeaders }),
+    ]);
 
-    if (!githubResponse.ok) {
-      const errorText = await githubResponse.text();
-      console.error('GitHub API error:', githubResponse.status, errorText);
+    if (!githubBranchesResponse.ok) {
+      const errorText = await githubBranchesResponse.text();
+      console.error('GitHub API error:', githubBranchesResponse.status, errorText);
 
-      if (githubResponse.status === 401) {
+      if (githubBranchesResponse.status === 401) {
         return NextResponse.json(
           { error: 'GitHub access token is invalid or expired. Please re-link your account.' },
           { status: 401 }
@@ -67,19 +70,27 @@ export async function GET(request: NextRequest) {
       }
 
       return NextResponse.json(
-        { error: `GitHub API error: ${githubResponse.statusText}` },
-        { status: githubResponse.status }
+        { error: `GitHub API error: ${githubBranchesResponse.statusText}` },
+        { status: githubBranchesResponse.status }
       );
     }
 
-    const branches: unknown = await githubResponse.json();
+    const branches: unknown = await githubBranchesResponse.json();
     const names = Array.isArray(branches)
       ? branches
           .map((b) => (typeof b === 'object' && b !== null && 'name' in b ? String((b as { name: string }).name) : ''))
           .filter(Boolean)
       : [];
+    const repositoryPayload: unknown = githubRepositoryResponse.ok ? await githubRepositoryResponse.json() : null;
+    const defaultBranch =
+      typeof repositoryPayload === 'object' &&
+      repositoryPayload !== null &&
+      'default_branch' in repositoryPayload &&
+      typeof (repositoryPayload as { default_branch?: unknown }).default_branch === 'string'
+        ? String((repositoryPayload as { default_branch: string }).default_branch)
+        : null;
 
-    return NextResponse.json({ branches: names });
+    return NextResponse.json({ branches: names, defaultBranch });
   } catch (error: unknown) {
     console.error('Error fetching GitHub branches:', error);
     const message = error instanceof Error ? error.message : 'Failed to fetch branches';
