@@ -83,16 +83,41 @@ components:
     expect(result.parseResult?.classes.some((cls) => cls.name === 'User')).toBe(true);
   });
 
-  it('returns success: false when refs are present but no resolver is configured', async () => {
+  it('uses the built-in REPO-3.8 resolver when refs are present and no override is provided', async () => {
     const result = await importOpenApiFromRepository({
       source: 'repository://services/openapi.yaml',
       format: 'openapi_3_1',
-      content: 'openapi: 3.1.0',
-      refs: [{ path: './schemas/user.yaml', content: 'type: object' }],
+      content: `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+components:
+  schemas:
+    Account:
+      type: object
+      properties:
+        owner:
+          $ref: './schemas/user.yaml#/User'
+`,
+      refs: [
+        {
+          path: 'services/schemas/user.yaml',
+          content: `
+User:
+  type: object
+  properties:
+    id:
+      type: string
+`,
+        },
+      ],
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/REPO-3\.8/);
+    expect(result.success).toBe(true);
+    expect(result.parseResult?.classes.some((cls) => cls.name === 'Account')).toBe(true);
+    expect(result.resolvedContent).toContain('type: string');
+    expect(result.resolvedContent).not.toContain('./schemas/user.yaml#/User');
   });
 
   it('maps Swagger 2.0 repository fixtures to the same internal entities as the 3.x parse pipeline', async () => {
