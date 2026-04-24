@@ -127,3 +127,24 @@ def test_update_repository_branches_replaces_config_and_updates_timestamp():
         {"branch": "main", "subpathGlob": "**/*", "pollIntervalSec": 300},
     ]
     assert body["updatedAt"] >= original_updated_at
+
+
+def test_register_repository_normalizes_whitespace_only_subpath_glob():
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000005",
+                "provider": "github",
+                "owner": "acme",
+                "name": "whitespace-subpath-test",
+                "branches": [{"branch": "main", "subpathGlob": "   "}],
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["repository"]["branches"] == [{"branch": "main", "subpathGlob": "**/*", "pollIntervalSec": None}]

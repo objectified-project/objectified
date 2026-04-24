@@ -90,7 +90,8 @@ def _validate_uuid(raw: str, field_name: str) -> None:
 
 
 def _normalize_branch(record: RepositoryBranchInput) -> RepositoryBranchRecord:
-    normalized_subpath = record.subpathGlob.strip() if record.subpathGlob else "**/*"
+    stripped_subpath = record.subpathGlob.strip() if record.subpathGlob else ""
+    normalized_subpath = stripped_subpath if stripped_subpath else "**/*"
     return RepositoryBranchRecord(
         branch=record.branch.strip(),
         subpathGlob=normalized_subpath,

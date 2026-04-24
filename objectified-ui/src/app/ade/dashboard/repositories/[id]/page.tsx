@@ -113,7 +113,7 @@ export default function RepositoryDetailPage() {
           pollIntervalSec: branch.pollIntervalSec,
         }))
       );
-      setSuccessMessage('Repository branches updated.');
+      setSuccessMessage(copy.branchesUpdatedMessage);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update branches';
       setErrorMessage(message);

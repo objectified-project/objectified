@@ -36,6 +36,7 @@ export interface RepositoriesI18nBundle {
   repoRequired: string;
   branchesRequired: string;
   successMessage: string;
+  branchesUpdatedMessage: string;
   scanTimelineMessage: string;
   loadingRepositories: string;
   loadingRepository: string;
@@ -89,6 +90,7 @@ export const repositoriesI18n: Record<RepositoriesLocale, RepositoriesI18nBundle
     repoRequired: 'Select a repository before continuing.',
     branchesRequired: 'Select at least one branch.',
     successMessage: 'Repository registered. Initial scan started.',
+    branchesUpdatedMessage: 'Repository branches updated.',
     scanTimelineMessage: 'Scan in progress...',
     loadingRepositories: 'Loading repositories...',
     loadingRepository: 'Loading repository...',
