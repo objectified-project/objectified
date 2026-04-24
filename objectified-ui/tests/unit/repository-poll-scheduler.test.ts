@@ -27,7 +27,8 @@ describe('repository poll scheduler', () => {
         expect(sql).toContain("r.status <> 'paused'");
         expect(sql).toContain("ue.plan_code ILIKE 'enterprise%'");
         expect(sql).toContain('GREATEST(');
-        expect(sql).toContain('next_poll_at = $1 + make_interval');
+        expect(sql).toContain('MIN(rcr.linked_account_id)');
+        expect(sql).not.toContain('bumped');
         expect(params).toEqual(['2026-04-24T20:00:00.000Z', 500, 60, 300]);
         return {
           rowCount: 2,
@@ -65,6 +66,7 @@ describe('repository poll scheduler', () => {
         expect(sql).toContain('INSERT INTO odb.workflow_audit');
         expect(params[2]).toBe('repository.polled');
         expect(params[3]).toBe('success');
+        expect(params[4]).toBeNull();
         const detail = JSON.parse(String(params[5]));
         expect(detail).toMatchObject({
           repository_id: 'repo-1',
@@ -79,6 +81,7 @@ describe('repository poll scheduler', () => {
         expect(sql).toContain('INSERT INTO odb.workflow_audit');
         expect(params[2]).toBe('repository.polled');
         expect(params[3]).toBe('success');
+        expect(params[4]).toBeNull();
         const detail = JSON.parse(String(params[5]));
         expect(detail).toMatchObject({
           repository_id: 'repo-2',
@@ -88,6 +91,14 @@ describe('repository poll scheduler', () => {
           poll_interval_sec: 60,
         });
         return { rowCount: 1, rows: [] };
+      },
+      (sql, params) => {
+        expect(sql).toContain('UPDATE odb.repository_branch rb');
+        expect(sql).toContain('next_poll_at = upd.now + make_interval');
+        expect(params[0]).toEqual(['branch-1', 'branch-2']);
+        expect(params[1]).toEqual([300, 60]);
+        expect(params[2]).toBe('2026-04-24T20:00:00.000Z');
+        return { rowCount: 2, rows: [] };
       },
     ]);
     const enqueue = jest.fn(async () => undefined);
@@ -127,6 +138,7 @@ describe('repository poll scheduler', () => {
           },
         ],
       }),
+      () => ({ rowCount: 1, rows: [] }),
       () => ({ rowCount: 1, rows: [] }),
       () => ({ rowCount: 0, rows: [] }),
     ]);

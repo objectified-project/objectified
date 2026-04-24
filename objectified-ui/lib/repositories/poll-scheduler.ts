@@ -1,7 +1,5 @@
 'use server';
 
-const connectionPool = require('../db/db');
-
 export type PollPriority = 'high' | 'normal';
 
 export interface PollJob {
@@ -65,7 +63,7 @@ async function insertDispatchAudit(
     projectId: string | null;
     repositoryId: string;
     branch: string;
-    actorId: string;
+    actorId: string | null;
     priority: PollPriority;
     stream: string;
     effectivePollIntervalSec: number;
@@ -79,12 +77,16 @@ async function insertDispatchAudit(
     poll_interval_sec: args.effectivePollIntervalSec,
   };
 
-  await deps.query(
-    `INSERT INTO odb.workflow_audit (
-      tenant_id, project_id, version_id, action, outcome, actor_id, detail
-    ) VALUES ($1, $2, NULL, $3, $4, $5, $6::jsonb)`,
-    [args.tenantId, args.projectId, 'repository.polled', 'success', args.actorId, JSON.stringify(detail)]
-  );
+  try {
+    await deps.query(
+      `INSERT INTO odb.workflow_audit (
+        tenant_id, project_id, version_id, action, outcome, actor_id, detail
+      ) VALUES ($1, $2, NULL, $3, $4, $5, $6::jsonb)`,
+      [args.tenantId, args.projectId, 'repository.polled', 'success', args.actorId, JSON.stringify(detail)]
+    );
+  } catch {
+    return;
+  }
 }
 
 export function createRepositoryPollScheduler(
@@ -105,8 +107,7 @@ export function createRepositoryPollScheduler(
   return async function dispatchPollTick(): Promise<PollDispatchResult> {
     const now = deps.now();
     const rowsResult = await deps.query(
-      `WITH due AS (
-        SELECT
+      `SELECT
           rb.id AS branch_id,
           rb.repository_id,
           r.tenant_id,
@@ -115,7 +116,7 @@ export function createRepositoryPollScheduler(
           r.owner,
           r.name,
           rb.branch,
-          rcr.linked_account_id,
+          MIN(rcr.linked_account_id) AS linked_account_id,
           COALESCE(MAX(CASE WHEN ue.plan_code ILIKE 'enterprise%' THEN 1 ELSE 0 END), 0) = 1 AS is_enterprise,
           GREATEST(
             rb.poll_interval_sec,
@@ -141,26 +142,17 @@ export function createRepositoryPollScheduler(
           r.owner,
           r.name,
           rb.branch,
-          rb.poll_interval_sec,
-          rcr.linked_account_id
+          rb.poll_interval_sec
         ORDER BY rb.next_poll_at ASC, rb.id ASC
         LIMIT $2
-        FOR UPDATE OF rb SKIP LOCKED
-      ),
-      bumped AS (
-        UPDATE odb.repository_branch rb
-        SET
-          last_polled_at = $1,
-          next_poll_at = $1 + make_interval(secs => due.effective_poll_interval_sec)
-        FROM due
-        WHERE rb.id = due.branch_id
-        RETURNING due.*
-      )
-      SELECT * FROM bumped`,
+        FOR UPDATE OF rb SKIP LOCKED`,
       [now.toISOString(), batchSize, ENTERPRISE_MIN_POLL_SEC, NON_ENTERPRISE_MIN_POLL_SEC]
     );
 
     const jobs: PollJob[] = [];
+    const enqueuedBranchIds: string[] = [];
+    const enqueuedIntervalsSec: number[] = [];
+
     for (const row of rowsResult.rows) {
       const priority: PollPriority = row.is_enterprise ? 'high' : 'normal';
       const stream = `repo.poll.${priority}`;
@@ -180,18 +172,43 @@ export function createRepositoryPollScheduler(
         dispatchedAt: now,
       };
 
-      await deps.enqueue(job);
+      try {
+        await deps.enqueue(job);
+      } catch {
+        continue;
+      }
+
+      enqueuedBranchIds.push(job.branchId);
+      enqueuedIntervalsSec.push(job.effectivePollIntervalSec);
+      jobs.push(job);
+
       await insertDispatchAudit(deps, {
         tenantId: job.tenantId,
         projectId: job.projectId,
         repositoryId: job.repositoryId,
         branch: job.branch,
-        actorId: job.linkedAccountId ?? 'system:repository-poller',
+        actorId: null,
         priority: job.priority,
         stream: job.stream,
         effectivePollIntervalSec: job.effectivePollIntervalSec,
       });
-      jobs.push(job);
+    }
+
+    if (enqueuedBranchIds.length > 0) {
+      await deps.query(
+        `UPDATE odb.repository_branch rb
+        SET
+          last_polled_at = upd.now,
+          next_poll_at = upd.now + make_interval(secs => upd.interval_sec)
+        FROM (
+          SELECT
+            unnest($1::uuid[]) AS branch_id,
+            unnest($2::numeric[]) AS interval_sec,
+            $3::timestamptz AS now
+        ) upd
+        WHERE rb.id = upd.branch_id`,
+        [enqueuedBranchIds, enqueuedIntervalsSec, now.toISOString()]
+      );
     }
 
     return {
@@ -201,7 +218,13 @@ export function createRepositoryPollScheduler(
   };
 }
 
-export const dispatchRepositoryPollTick = createRepositoryPollScheduler({
-  query: (sql: string, params: unknown[]) => connectionPool.query(sql, params),
-  enqueue: async () => undefined,
-});
+export async function dispatchRepositoryPollTick(): Promise<PollDispatchResult> {
+  console.error(
+    'dispatchRepositoryPollTick called without a configured enqueue implementation; skipping poll dispatch to avoid mutating state without enqueuing jobs'
+  );
+
+  return {
+    dispatched: 0,
+    jobs: [],
+  };
+}
