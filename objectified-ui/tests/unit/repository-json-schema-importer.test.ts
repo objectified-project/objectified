@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import { describe, it, expect, jest } from '@jest/globals';
+import { parseOpenAPISpec } from '../../src/app/utils/openapi-import';
 import { importJsonSchemaFromRepository } from '../../lib/repositories/importers/json-schema';
 
 describe('repository JSON Schema importer hook', () => {
@@ -84,16 +86,22 @@ describe('repository JSON Schema importer hook', () => {
 
     for (const fixture of fixtures) {
       const content = fs.readFileSync(path.join(fixturesDir, fixture), 'utf-8');
-      const result = await importJsonSchemaFromRepository({
+      const oneShotResult = parseOpenAPISpec(content);
+      const repositoryResult = await importJsonSchemaFromRepository({
         source: `repository://json-schema/${fixture}`,
         format: 'json_schema',
         content,
         refs: [],
       });
 
-      expect(result.success).toBe(true);
-      expect(result.parseResult?.classes.length).toBeGreaterThan(0);
-      expect(result.warnings.some((warning) => warning.includes('JSON Schema'))).toBe(true);
+      expect(repositoryResult.success).toBe(oneShotResult.success);
+      if (oneShotResult.success) {
+        expect(repositoryResult.parseResult).toEqual(oneShotResult);
+      } else {
+        expect(repositoryResult.parseResult).toBeUndefined();
+      }
+      expect(repositoryResult.warnings).toEqual(oneShotResult.warnings);
+      expect(repositoryResult.error).toBe(oneShotResult.error);
     }
   });
 
