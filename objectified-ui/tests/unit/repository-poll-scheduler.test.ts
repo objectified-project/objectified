@@ -43,6 +43,8 @@ describe('repository poll scheduler', () => {
               owner: 'acme',
               name: 'catalog',
               branch: 'main',
+              subpath_glob: '**/*',
+              configured_poll_interval_sec: 300,
               linked_account_id: 'linked-1',
               last_known_sha: 'old-sha-1',
               last_known_etag: null,
@@ -58,6 +60,8 @@ describe('repository poll scheduler', () => {
               owner: 'acme',
               name: 'payments',
               branch: 'develop',
+              subpath_glob: '**/*',
+              configured_poll_interval_sec: 60,
               linked_account_id: 'linked-2',
               last_known_sha: 'old-sha-2',
               last_known_etag: '"etag-old-2"',
@@ -198,6 +202,8 @@ describe('repository poll scheduler', () => {
             owner: 'acme',
             name: 'catalog',
             branch: 'main',
+            subpath_glob: '**/*',
+            configured_poll_interval_sec: 300,
             linked_account_id: 'linked-1',
             last_known_sha: 'old-sha-1',
             last_known_etag: null,
@@ -234,6 +240,81 @@ describe('repository poll scheduler', () => {
     expect(second.dispatched).toBe(0);
     expect(enqueue).toHaveBeenCalledTimes(1);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('expands wildcard branch templates into tracked concrete branches', async () => {
+    const query = makeQueryStub([
+      (sql, params) => {
+        expect(sql).toContain('FROM odb.repository_branch rb');
+        expect(params).toEqual(['2026-04-24T20:02:00.000Z', 500, 60, 300]);
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              branch_id: 'template-1',
+              repository_id: 'repo-9',
+              tenant_id: 'tenant-9',
+              project_id: null,
+              provider: 'github',
+              owner: 'acme',
+              name: 'platform',
+              branch: 'release/*',
+              subpath_glob: 'services/**',
+              configured_poll_interval_sec: 180,
+              linked_account_id: 'linked-9',
+              last_known_sha: null,
+              last_known_etag: null,
+              is_enterprise: false,
+              effective_poll_interval_sec: 300,
+            },
+          ],
+        };
+      },
+      (sql, params) => {
+        expect(sql).toContain('SELECT id, access_token, token_expires_at');
+        expect(params[0]).toEqual(['linked-9']);
+        return {
+          rowCount: 1,
+          rows: [{ id: 'linked-9', access_token: 'token-9', token_expires_at: null }],
+        };
+      },
+      (sql, params) => {
+        expect(sql).toContain('INSERT INTO odb.repository_branch');
+        expect(sql).toContain('ON CONFLICT (repository_id, branch) DO UPDATE');
+        expect(params).toEqual(['repo-9', 'release/2026.04', 'services/**', 180, '2026-04-24T20:02:00.000Z']);
+        return { rowCount: 1, rows: [] };
+      },
+      (sql, params) => {
+        expect(sql).toContain('UPDATE odb.repository_branch rb');
+        expect(params[0]).toEqual(['template-1']);
+        expect(params[1]).toEqual([300]);
+        expect(params[2]).toBe('2026-04-24T20:02:00.000Z');
+        return { rowCount: 1, rows: [] };
+      },
+    ]);
+
+    const enqueue = jest.fn(async () => undefined);
+    const fetchImpl = jest.fn<typeof fetch>().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [{ name: 'main' }, { name: 'release/2026.04' }],
+      headers: { get: () => null } as unknown as Headers,
+    } as Response);
+
+    const scheduler = createRepositoryPollScheduler({
+      query,
+      enqueue,
+      fetchImpl,
+      now: () => new Date('2026-04-24T20:02:00.000Z'),
+    });
+
+    const result = await scheduler();
+
+    expect(result.dispatched).toBe(0);
+    expect(result.jobs).toEqual([]);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls[0]?.[0]).toContain('/repos/acme/platform/branches?per_page=100&page=1');
   });
 });
 
