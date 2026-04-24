@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, AsyncIterator
+from urllib.parse import quote
 
 import httpx
 
@@ -23,15 +24,35 @@ class GithubRepositoryProvider(RepositoryProvider):
     id = RepositoryProviderId.GITHUB
 
     def __init__(self, client: httpx.AsyncClient | None = None) -> None:
-        self._client = client
+        self._external_client = client
+        self._owned_client: httpx.AsyncClient | None = None
+
+    def _get_or_create_client(self) -> httpx.AsyncClient:
+        if self._external_client is not None:
+            return self._external_client
+        if self._owned_client is None:
+            self._owned_client = httpx.AsyncClient(base_url="https://api.github.com", timeout=20)
+        return self._owned_client
+
+    async def aclose(self) -> None:
+        if self._owned_client is not None:
+            await self._owned_client.aclose()
+            self._owned_client = None
+
+    async def __aenter__(self) -> "GithubRepositoryProvider":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        await self.aclose()
 
     async def list_repositories(self, token: str, opts: ListReposOpts | None = None) -> AsyncIterator[RepoSummary]:
         current = opts or ListReposOpts()
         page = current.page
+        per_page = min(current.per_page, 100)
 
         while True:
             repositories = await self._request_json(
-                f"/user/repos?sort={current.sort}&per_page={current.per_page}&page={page}&visibility={current.visibility}",
+                f"/user/repos?sort={current.sort}&per_page={per_page}&page={page}&visibility={current.visibility}",
                 token,
             )
             if not isinstance(repositories, list) or len(repositories) == 0:
@@ -51,7 +72,7 @@ class GithubRepositoryProvider(RepositoryProvider):
                     updated_at=repo.get("updated_at"),
                 )
 
-            if len(repositories) < current.per_page:
+            if len(repositories) < per_page:
                 return
             page += 1
 
@@ -100,7 +121,7 @@ class GithubRepositoryProvider(RepositoryProvider):
             page += 1
 
     async def get_commit_sha(self, token: str, repo: RepoRef, branch: str) -> str:
-        commit = await self._request_json(f"/repos/{repo.owner}/{repo.name}/commits/{branch}", token)
+        commit = await self._request_json(f"/repos/{repo.owner}/{repo.name}/commits/{quote(branch, safe='')}", token)
         if not isinstance(commit, dict):
             raise RepositoryProviderError(RepositoryProviderErrorCode.UNKNOWN, "Malformed GitHub response")
         return str(commit.get("sha", ""))
@@ -108,7 +129,7 @@ class GithubRepositoryProvider(RepositoryProvider):
     async def walk_tree(
         self, token: str, repo: RepoRef, branch: str, subpath: str | None = None
     ) -> AsyncIterator[TreeEntry]:
-        tree_response = await self._request_json(f"/repos/{repo.owner}/{repo.name}/git/trees/{branch}?recursive=1", token)
+        tree_response = await self._request_json(f"/repos/{repo.owner}/{repo.name}/git/trees/{quote(branch, safe='')}?recursive=1", token)
         if not isinstance(tree_response, dict):
             raise RepositoryProviderError(RepositoryProviderErrorCode.UNKNOWN, "Malformed GitHub response")
 
@@ -139,9 +160,9 @@ class GithubRepositoryProvider(RepositoryProvider):
             )
 
     async def read_file(self, token: str, repo: RepoRef, branch: str, path: str) -> ReadFileResult:
-        encoded_path = "/".join(httpx.QueryParams({"p": part})["p"] for part in path.split("/"))
+        encoded_path = "/".join(quote(part, safe="") for part in path.strip("/").split("/") if part)
         file_response = await self._request_json(
-            f"/repos/{repo.owner}/{repo.name}/contents/{encoded_path}?ref={branch}",
+            f"/repos/{repo.owner}/{repo.name}/contents/{encoded_path}?ref={quote(branch, safe='')}",
             token,
         )
         if not isinstance(file_response, dict):
@@ -161,11 +182,8 @@ class GithubRepositoryProvider(RepositoryProvider):
             "X-GitHub-Api-Version": "2022-11-28",
         }
 
-        if self._client is not None:
-            return await _request_with_client(self._client, path_with_query, headers)
-
-        async with httpx.AsyncClient(base_url="https://api.github.com", timeout=20) as client:
-            return await _request_with_client(client, path_with_query, headers)
+        client = self._get_or_create_client()
+        return await _request_with_client(client, path_with_query, headers)
 
 
 async def _request_with_client(client: httpx.AsyncClient, path_with_query: str, headers: dict[str, str]) -> Any:
@@ -183,7 +201,7 @@ async def _request_with_client(client: httpx.AsyncClient, path_with_query: str, 
     if response.status_code == 404:
         raise RepositoryProviderError(RepositoryProviderErrorCode.NOT_FOUND, "GitHub resource not found", 404)
     if response.status_code == 429 or _is_rate_limited(response.status_code, body, response.headers):
-        raise RepositoryProviderError(RepositoryProviderErrorCode.RATE_LIMITED, "GitHub API rate limit exceeded", 429)
+        raise RepositoryProviderError(RepositoryProviderErrorCode.RATE_LIMITED, "GitHub API rate limit exceeded", response.status_code)
     raise RepositoryProviderError(
         RepositoryProviderErrorCode.UNKNOWN,
         f"Unexpected GitHub API error: {response.status_code}",

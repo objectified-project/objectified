@@ -18,7 +18,7 @@ export class GithubRepositoryProvider implements RepositoryProvider {
   }
 
   async *listRepositories(token: string, opts?: ListReposOpts): AsyncIterable<RepoSummary> {
-    const perPage = opts?.perPage ?? 100;
+    const perPage = Math.min(opts?.perPage ?? 100, 100);
     let page = opts?.page ?? 1;
     const sort = opts?.sort ?? 'updated';
 
@@ -169,17 +169,24 @@ export class GithubRepositoryProvider implements RepositoryProvider {
     }
   }
 
+  private encodeContentPath(path: string): string {
+    return path
+      .replace(/^\/+|\/+$/g, '')
+      .split('/')
+      .filter((segment) => segment.length > 0)
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+  }
+
   async readFile(
     token: string,
     repo: RepoRef,
     branch: string,
     path: string
   ): Promise<{ contentBase64: string; sha: string; sizeBytes: number }> {
+    const encodedPath = this.encodeContentPath(path);
     const content = await this.requestJson<Record<string, unknown>>({
-      path: `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/contents/${path
-        .split('/')
-        .map((segment) => encodeURIComponent(segment))
-        .join('/')}`,
+      path: `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/contents${encodedPath ? `/${encodedPath}` : ''}`,
       token,
       query: { ref: branch },
     });
