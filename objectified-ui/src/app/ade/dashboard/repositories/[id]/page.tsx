@@ -45,6 +45,12 @@ interface BranchRow {
   pollIntervalSec?: number;
 }
 
+function formatRepositoryStatus(status: string): string {
+  if (status === 'archived') return 'Disabled';
+  if (status === 'scan_in_progress') return 'Scan in progress';
+  return status.replace(/_/g, ' ');
+}
+
 export default function RepositoryDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -188,13 +194,16 @@ export default function RepositoryDetailPage() {
       const response = await fetch(`/api/repositories/${repository.id}/${action}`, { method: 'POST' });
       const data = await response.json();
       if (!response.ok || !data.success) {
-        throw new Error(data.error || `Failed to ${action} repository`);
+        throw new Error(data.error || `Failed to ${action === 'archive' ? 'disable' : 'enable'} repository`);
       }
       const updatedRepository = data.repository as RepositoryDetail;
       setRepository(updatedRepository);
-      setSuccessMessage(action === 'archive' ? 'Repository archived.' : 'Repository unarchived.');
+      setSuccessMessage(action === 'archive' ? 'Repository disabled.' : 'Repository enabled.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : `Failed to ${action} repository`;
+      const message =
+        error instanceof Error
+          ? error.message
+          : `Failed to ${action === 'archive' ? 'disable' : 'enable'} repository`;
       setErrorMessage(message);
     } finally {
       setIsMutatingLifecycle(false);
@@ -309,7 +318,7 @@ export default function RepositoryDetailPage() {
                   </div>
                   <div>
                     <div className="text-gray-500 dark:text-gray-400">{copy.statusLabel}</div>
-                    <div className="font-medium">{repository.status}</div>
+                    <div className="font-medium">{formatRepositoryStatus(repository.status)}</div>
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-1 gap-3">
@@ -339,7 +348,7 @@ export default function RepositoryDetailPage() {
                         onClick={() => void updateLifecycle('unarchive')}
                         disabled={isMutatingLifecycle}
                       >
-                        Unarchive
+                        Enable
                       </Button>
                     ) : (
                       <Button
@@ -347,7 +356,7 @@ export default function RepositoryDetailPage() {
                         onClick={() => void updateLifecycle('archive')}
                         disabled={isMutatingLifecycle}
                       >
-                        Archive
+                        Disable
                       </Button>
                     )}
                     <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)} disabled={isDeleting}>
