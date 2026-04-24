@@ -261,9 +261,9 @@ function jsonSchemaDiscriminator(content: string, lower: string): string {
 }
 
 function looksLikeAvro(content: string): boolean {
-  const hasName = /"name"\s*:\s*"[^"]+"/i.test(content);
-  const hasType = /"type"\s*:\s*"[^"]+"/i.test(content);
-  const hasFields = /"fields"\s*:\s*\[/i.test(content);
+  const hasName = /"name"\s*:\s*"[^"]+"/.test(content);
+  const hasType = /"type"\s*:\s*"[^"]+"/.test(content);
+  const hasFields = /"fields"\s*:\s*\[/.test(content);
   return hasName && hasType && hasFields;
 }
 
