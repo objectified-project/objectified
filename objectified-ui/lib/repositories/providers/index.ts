@@ -1,5 +1,6 @@
 export { GithubRepositoryProvider } from './github-provider';
 export { GitlabRepositoryProvider } from './gitlab-provider';
+export { BitbucketRepositoryProvider } from './bitbucket-provider';
 export { RepositoryProviderError, type RepositoryProvider } from './repository-provider';
 export {
   createResolveRepositoryTokenResolver,
