@@ -3,7 +3,7 @@
 import { useSession, signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Link as LinkIcon, Key } from 'lucide-react';
-import { SiGithub, SiGitlab, SiGoogle, SiAmazon } from 'react-icons/si';
+import { SiAmazon, SiBitbucket, SiGithub, SiGitlab, SiGoogle } from 'react-icons/si';
 import {
   Dialog,
   DialogContent,
@@ -58,6 +58,7 @@ interface ProviderConfig {
 const providerConfigs: Record<string, ProviderConfig> = {
   github: { name: 'github', displayName: 'GitHub', icon: SiGithub, color: '#24292e', available: true },
   gitlab: { name: 'gitlab', displayName: 'GitLab', icon: SiGitlab, color: '#fc6d26', available: true },
+  bitbucket: { name: 'bitbucket', displayName: 'Bitbucket', icon: SiBitbucket, color: '#0052cc', available: true },
   google: { name: 'google', displayName: 'Google / GCP', icon: SiGoogle, color: '#4285f4', available: false },
   aws: { name: 'aws', displayName: 'AWS', icon: SiAmazon, color: '#ff9900', available: false },
 };

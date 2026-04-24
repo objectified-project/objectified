@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import { BitbucketRepositoryProvider } from '../bitbucket-provider';
 import { GithubRepositoryProvider } from '../github-provider';
 import { GitlabRepositoryProvider } from '../gitlab-provider';
 import { RepositoryProviderError } from '../repository-provider';
@@ -20,6 +21,30 @@ function jsonResponse(
     } as Headers,
     json: async () => body,
     text: async () => JSON.stringify(body),
+  } as Response;
+}
+
+function textResponse(
+  body: string,
+  init?: { status?: number; headers?: Record<string, string> }
+): Response {
+  const status = init?.status ?? 200;
+  const headersMap = new Map<string, string>(
+    Object.entries(init?.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value])
+  );
+
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: {
+      get: (name: string) => headersMap.get(name.toLowerCase()) ?? null,
+    } as Headers,
+    json: async () => JSON.parse(body),
+    text: async () => body,
+    arrayBuffer: async () => {
+      const buf = Buffer.from(body, 'utf8');
+      return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    },
   } as Response;
 }
 
@@ -348,6 +373,162 @@ describe('GitLab RepositoryProvider contract', () => {
     await expect(
       new GitlabRepositoryProvider(() => unknownApi).getRepository('t', 'a', 'b')
     ).rejects.toMatchObject<Partial<RepositoryProviderError>>({
+      code: 'UNKNOWN',
+    });
+  });
+});
+
+describe('Bitbucket RepositoryProvider contract', () => {
+  it('implements every contract method for Bitbucket, including webhooks', async () => {
+    const fetchMock = jest
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          values: [
+            {
+              uuid: '{repo-1}',
+              name: 'repo-a',
+              full_name: 'acme/repo-a',
+              description: 'A',
+              is_private: false,
+              mainbranch: { name: 'main' },
+              links: { html: { href: 'https://bitbucket.org/acme/repo-a' } },
+              updated_on: '2026-01-01T00:00:00+00:00',
+            },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          uuid: '{repo-1}',
+          name: 'repo-a',
+          full_name: 'acme/repo-a',
+          description: 'A',
+          is_private: false,
+          mainbranch: { name: 'main' },
+          links: { html: { href: 'https://bitbucket.org/acme/repo-a' } },
+          updated_on: '2026-01-01T00:00:00+00:00',
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          values: [
+            { name: 'main', target: { hash: 'abc123' } },
+            { name: 'dev', target: { hash: 'def456' } },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse({ name: 'main', target: { hash: 'abc123' } }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          values: [
+            { path: 'docs/readme.md', type: 'commit_file', commit: { hash: 's1' }, size: 4 },
+            { path: 'docs', type: 'commit_directory', commit: { hash: 's2' }, size: 0 },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          size: 7,
+          commit: { hash: 'f1' },
+        })
+      )
+      .mockResolvedValueOnce(textResponse('content'))
+      .mockResolvedValueOnce(jsonResponse({ uuid: '{hook-123}' }))
+      .mockResolvedValueOnce(jsonResponse({}, { status: 204 }));
+
+    const provider = new BitbucketRepositoryProvider(fetchMock);
+
+    const repos = await collect(provider.listRepositories('token-1', { perPage: 10 }));
+    const repo = await provider.getRepository('token-1', 'acme', 'repo-a');
+    const branches = await collect(provider.listBranches('token-1', { owner: 'acme', name: 'repo-a' }));
+    const sha = await provider.getCommitSha('token-1', { owner: 'acme', name: 'repo-a' }, 'main');
+    const tree = await collect(provider.walkTree('token-1', { owner: 'acme', name: 'repo-a' }, 'main', 'docs'));
+    const file = await provider.readFile('token-1', { owner: 'acme', name: 'repo-a' }, 'main', 'docs/readme.md');
+    const webhook = await provider.registerWebhook('token-1', { owner: 'acme', name: 'repo-a' }, {
+      url: 'https://example.com/hooks/bitbucket',
+      events: ['repo:push'],
+    });
+    await provider.removeWebhook('token-1', { owner: 'acme', name: 'repo-a' }, webhook.id);
+
+    const validHeaders = new Headers({ 'x-hook-uuid': '{hook-123}' });
+    const invalidHeaders = new Headers({ 'x-hook-uuid': '{hook-999}' });
+
+    expect(repos.map((item) => item.fullName)).toEqual(['acme/repo-a']);
+    expect(repo.fullName).toBe('acme/repo-a');
+    expect(branches.map((b) => b.name)).toEqual(['main', 'dev']);
+    expect(sha).toBe('abc123');
+    expect(tree.map((entry) => entry.path)).toEqual(['docs/readme.md', 'docs']);
+    expect(file).toEqual({ contentBase64: 'Y29udGVudA==', sha: 'f1', sizeBytes: 7 });
+    expect(webhook).toEqual({ id: 'hook-123', secret: 'hook-123' });
+    expect(provider.verifyWebhookSignature?.(webhook.secret, validHeaders, '')).toBe(true);
+    expect(provider.verifyWebhookSignature?.(webhook.secret, invalidHeaders, '')).toBe(false);
+  });
+
+  it('never caches token and forwards it per call', async () => {
+    const fetchMock = jest
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ values: [] }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          uuid: '{repo-1}',
+          name: 'repo-a',
+          full_name: 'acme/repo-a',
+          is_private: false,
+          mainbranch: { name: 'main' },
+          links: { html: { href: 'https://bitbucket.org/acme/repo-a' } },
+          updated_on: null,
+        })
+      );
+    const provider = new BitbucketRepositoryProvider(fetchMock);
+
+    await collect(provider.listRepositories('token-A'));
+    await provider.getRepository('token-B', 'acme', 'repo-a');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      headers: expect.objectContaining({ Authorization: 'Bearer token-A' }),
+    });
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+      headers: expect.objectContaining({ Authorization: 'Bearer token-B' }),
+    });
+  });
+
+  it('normalizes provider errors to the shared taxonomy', async () => {
+    const unauthorized = new BitbucketRepositoryProvider(
+      jest.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({ message: 'bad token' }, { status: 401 }))
+    );
+    const notFound = new BitbucketRepositoryProvider(
+      jest.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({ message: 'missing' }, { status: 404 }))
+    );
+    const rateLimited = new BitbucketRepositoryProvider(
+      jest.fn<typeof fetch>().mockResolvedValueOnce(
+        jsonResponse(
+          { message: 'rate limit exceeded' },
+          { status: 403, headers: { 'x-ratelimit-remaining': '0' } }
+        )
+      )
+    );
+    const network = new BitbucketRepositoryProvider(
+      jest.fn<typeof fetch>().mockRejectedValueOnce(new TypeError('network down'))
+    );
+    const unknown = new BitbucketRepositoryProvider(
+      jest.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({ message: 'boom' }, { status: 500 }))
+    );
+
+    await expect(unauthorized.getRepository('t', 'a', 'b')).rejects.toMatchObject<Partial<RepositoryProviderError>>({
+      code: 'UNAUTHORIZED',
+    });
+    await expect(notFound.getRepository('t', 'a', 'b')).rejects.toMatchObject<Partial<RepositoryProviderError>>({
+      code: 'NOT_FOUND',
+    });
+    await expect(rateLimited.getRepository('t', 'a', 'b')).rejects.toMatchObject<Partial<RepositoryProviderError>>({
+      code: 'RATE_LIMITED',
+    });
+    await expect(network.getRepository('t', 'a', 'b')).rejects.toMatchObject<Partial<RepositoryProviderError>>({
+      code: 'NETWORK',
+    });
+    await expect(unknown.getRepository('t', 'a', 'b')).rejects.toMatchObject<Partial<RepositoryProviderError>>({
       code: 'UNKNOWN',
     });
   });

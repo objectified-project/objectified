@@ -2,6 +2,7 @@
 
 ## Completed
 
+- REPO-1.8 (#2760): Implemented a Bitbucket Cloud repository provider adapter for REST API 2.0 with shared contract coverage, UUID-based webhook verification, and linked-account availability for Bitbucket linking.
 - REPO-1.7 (#2759): Implemented the GitLab repository provider adapter with full contract coverage, keyset pagination for repository listing, and GitLab webhook registration/signature verification.
 - REPO-1.4 (#2756): Added repository registration UI flow and REST registration endpoint for GitHub repositories.
 - REPO-1.5 (#2757): Added per-repository branch management with per-branch subpath and polling settings, including default branch preselection and wildcard branch patterns.
