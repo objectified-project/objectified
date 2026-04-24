@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added REPO-5.1 discovered-file import binding so repository scan completion now dispatches dry-run git import jobs for `new`/`modified` files, creates manual approval `removal` jobs for `removed` files, skips `unchanged` files, and records sync audit outcomes (`repository.sync_committed` / `repository.sync_pending_review`) with parse failures surfaced as `repository_file.parse_error`.
 - Added REPO-4.5 failure backoff + auto-pause behavior so repeated provider head-check failures exponentially back off scheduler cadence, reset on success, and auto-pause repositories with `repository.auto_paused` audit events after eight consecutive failures.
 - Added REPO-4.4 multi-branch tracking so wildcard branch templates (for example `release/*`) expand at scheduler time into tracked concrete repository branches without deleting historical scan records for previously seen branches.
 - Added poll-time branch HEAD SHA change detection with GitHub conditional `If-None-Match` checks so unchanged branches write `skipped_unchanged` scan history entries and skip downstream scan dispatch while still advancing poll cadence.

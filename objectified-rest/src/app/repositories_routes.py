@@ -70,6 +70,9 @@ RepositoryFileStatus = Literal[
     "parse_error",
     "manifest_error",
 ]
+ImportJobPromotion = Literal["auto", "manual"]
+ImportJobOperation = Literal["import", "removal"]
+ImportJobStatus = Literal["pending_review", "committed", "failed"]
 
 
 class RepositoryScanTimelineEntry(BaseModel):
@@ -142,9 +145,29 @@ class RepositoryFileRecord(BaseModel):
     tracked: bool
     projectSlug: str | None = None
     versionStrategy: str | None = None
+    settingsJson: Dict[str, Any] | None = None
+    promote: ImportJobPromotion | None = None
     status: RepositoryFileStatus
     qualityScore: int | None = None
     lastImportJobId: str | None = None
+    createdAt: str
+
+
+class RepositoryImportJobRecord(BaseModel):
+    id: str
+    repositoryId: str
+    repositoryFileId: str
+    scanId: str
+    branch: str
+    sourceType: Literal["git"]
+    sourceUri: str
+    operation: ImportJobOperation
+    format: str | None = None
+    settingsJson: Dict[str, Any] = Field(default_factory=dict)
+    dryRun: bool = True
+    state: ImportJobStatus
+    diffSnapshot: Dict[str, Any] = Field(default_factory=dict)
+    errorDetail: str | None = None
     createdAt: str
 
 
@@ -172,6 +195,7 @@ _REPO_FILE_STORE: Dict[str, List[Dict[str, Any]]] = {}
 _REPO_SCAN_HISTORY_STORE: Dict[str, List[RepositoryScanRecord]] = {}
 _REPO_SCAN_FILE_HISTORY_STORE: Dict[str, List[RepositoryFileRecord]] = {}
 _REPO_CREDENTIAL_REF_STORE: Dict[str, List[Dict[str, Any]]] = {}
+_REPO_IMPORT_JOB_STORE: Dict[str, List[RepositoryImportJobRecord]] = {}
 _REPO_AUDIT_STORE: List[Dict[str, Any]] = []
 _STORE_LOCK = Lock()
 
@@ -238,6 +262,13 @@ def _find_repository_for_tenant(tenant_id: str, repository_id: str) -> Repositor
     if repository is None:
         raise HTTPException(status_code=404, detail=f"Repository not found: {repository_id}")
     return repository
+
+
+def _find_tenant_id_for_repository(repository_id: str) -> str:
+    for tenant_id, repositories in _REPO_STORE.items():
+        if repository_id in repositories:
+            return tenant_id
+    raise ValueError(f"Repository not found: {repository_id}")
 
 
 def _to_sort_key(created_at: str, row_id: str) -> Tuple[datetime, str]:
@@ -427,7 +458,17 @@ def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
     }
 
 
-def _write_audit_row(tenant_id: str, repository_id: str, event_type: Literal["repository.archived", "repository.unarchived", "repository.removed"]) -> None:
+def _write_audit_row(
+    tenant_id: str,
+    repository_id: str,
+    event_type: Literal[
+        "repository.archived",
+        "repository.unarchived",
+        "repository.removed",
+        "repository.sync_committed",
+        "repository.sync_pending_review",
+    ],
+) -> None:
     _REPO_AUDIT_STORE.append(
         {
             "id": str(uuid4()),
@@ -437,6 +478,87 @@ def _write_audit_row(tenant_id: str, repository_id: str, event_type: Literal["re
             "createdAt": _utc_now_iso(),
         }
     )
+
+
+def _build_repository_source_uri(repository_id: str, path: str, branch: str, commit_sha: str) -> str:
+    normalized_path = path.lstrip("/")
+    return f"repo://{repository_id}/{normalized_path}@{branch}/{commit_sha}"
+
+
+def _build_diff_snapshot(file_row: RepositoryFileRecord) -> Dict[str, Any]:
+    return {
+        "path": file_row.path,
+        "status": file_row.status,
+        "blobSha": file_row.blobSha,
+        "format": file_row.format,
+        "tracked": file_row.tracked,
+    }
+
+
+def _dispatch_import_jobs_for_scan(
+    *,
+    tenant_id: str,
+    repository_id: str,
+    scan_id: str,
+    branch: str,
+    commit_sha: str,
+    scan_files: List[RepositoryFileRecord],
+) -> None:
+    repository_jobs = _REPO_IMPORT_JOB_STORE.setdefault(repository_id, [])
+    for file_row in scan_files:
+        if file_row.status == "unchanged":
+            continue
+
+        operation: ImportJobOperation = "import"
+        promote: ImportJobPromotion = file_row.promote if file_row.promote in {"auto", "manual"} else "manual"
+        settings_json: Dict[str, Any] = dict(file_row.settingsJson or {})
+        if file_row.status == "removed":
+            operation = "removal"
+            promote = "manual"
+            settings_json.setdefault("requiresExplicitApproval", True)
+
+        source_uri = _build_repository_source_uri(repository_id, file_row.path, branch, commit_sha)
+        forced_failure = settings_json.get("forceImportFailure")
+        failure_message: str | None = None
+        if isinstance(forced_failure, str) and forced_failure.strip():
+            failure_message = forced_failure.strip()
+        elif forced_failure is True:
+            failure_message = "forced import failure for test coverage"
+
+        state: ImportJobStatus = "pending_review"
+        if failure_message:
+            state = "failed"
+        elif promote == "auto":
+            state = "committed"
+
+        import_job = RepositoryImportJobRecord(
+            id=str(uuid4()),
+            repositoryId=repository_id,
+            repositoryFileId=file_row.id,
+            scanId=scan_id,
+            branch=branch,
+            sourceType="git",
+            sourceUri=source_uri,
+            operation=operation,
+            format=file_row.format,
+            settingsJson=settings_json,
+            dryRun=True,
+            state=state,
+            diffSnapshot=_build_diff_snapshot(file_row),
+            errorDetail=failure_message,
+            createdAt=file_row.createdAt,
+        )
+        repository_jobs.insert(0, import_job)
+        file_row.lastImportJobId = import_job.id
+
+        if failure_message:
+            file_row.status = "parse_error"
+            file_row.discriminator = failure_message
+            _write_audit_row(tenant_id, repository_id, "repository.sync_pending_review")
+        elif promote == "auto":
+            _write_audit_row(tenant_id, repository_id, "repository.sync_committed")
+        else:
+            _write_audit_row(tenant_id, repository_id, "repository.sync_pending_review")
 
 
 def _list_poll_targets_for_tenant(tenant_id: str) -> List[Dict[str, str]]:
@@ -867,6 +989,7 @@ def _reset_repository_state_for_tests() -> None:
         _REPO_SCAN_HISTORY_STORE.clear()
         _REPO_SCAN_FILE_HISTORY_STORE.clear()
         _REPO_CREDENTIAL_REF_STORE.clear()
+        _REPO_IMPORT_JOB_STORE.clear()
         _REPO_AUDIT_STORE.clear()
 
 
@@ -906,6 +1029,12 @@ def _complete_repository_scan_for_tests(
                 raise ValueError(
                     f"Invalid type for 'tracked': {type(tracked_raw).__name__}; expected a boolean"
                 )
+            settings_json_raw = item.get("settingsJson")
+            if settings_json_raw is not None and not isinstance(settings_json_raw, dict):
+                raise ValueError("settingsJson must be an object when provided")
+            promote_raw = item.get("promote")
+            if promote_raw is not None and promote_raw not in {"auto", "manual"}:
+                raise ValueError("promote must be either 'auto' or 'manual' when provided")
             current_files.append(
                 RepositoryFileRecord(
                     id=str(uuid4()),
@@ -920,6 +1049,8 @@ def _complete_repository_scan_for_tests(
                     tracked=tracked_value,
                     projectSlug=item.get("projectSlug"),
                     versionStrategy=item.get("versionStrategy"),
+                    settingsJson=settings_json_raw,
+                    promote=promote_raw,
                     status="new",
                     qualityScore=item.get("qualityScore"),
                     lastImportJobId=item.get("lastImportJobId"),
@@ -945,6 +1076,15 @@ def _complete_repository_scan_for_tests(
             created_at=now,
             current_files=current_files,
             previous_files=previous_files,
+        )
+        tenant_id = _find_tenant_id_for_repository(repository_id)
+        _dispatch_import_jobs_for_scan(
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            scan_id=scan_id,
+            branch=target_scan.branch,
+            commit_sha=commit_sha,
+            scan_files=classified_files,
         )
         _REPO_SCAN_FILE_HISTORY_STORE[scan_id] = classified_files
 
@@ -1017,6 +1157,11 @@ def _get_repository_relations_exist_for_tests(repository_id: str) -> Dict[str, b
             "repository_file": repository_id in _REPO_FILE_STORE,
             "repository_credential_ref": repository_id in _REPO_CREDENTIAL_REF_STORE,
         }
+
+
+def _get_repository_import_jobs_for_tests(repository_id: str) -> List[RepositoryImportJobRecord]:
+    with _STORE_LOCK:
+        return list(_REPO_IMPORT_JOB_STORE.get(repository_id, []))
 
 
 def _list_poll_targets_for_tests(tenant_id: str) -> List[Dict[str, str]]:

@@ -2,6 +2,7 @@
 
 ## Completed
 
+- REPO-5.1 (#2786): Added discovered-file to import-job binding in the repository scan completion path so `new`/`modified` files dispatch dry-run git import jobs, `removed` files dispatch manual-approval removal jobs, `unchanged` files skip job creation, parse failures write back `repository_file.status='parse_error'`, and each job records `repository.sync_committed` or `repository.sync_pending_review` audit events.
 - REPO-4.5 (#2783): Added scheduler failure backoff and auto-pause behavior by persisting per-branch consecutive failure/error metadata, exponentially backing off poll cadence without mutating configured poll intervals, resetting failure state on successful checks, and auto-pausing repositories with `repository.auto_paused` workflow audits after eight consecutive failures.
 - REPO-4.4 (#2782): Added multi-branch scheduler tracking for wildcard patterns by treating branch globs as discovery templates, expanding provider-matched concrete branches at poll time into `repository_branch` rows, and preserving branch scan history by re-tracking existing rows instead of deleting history.
 - REPO-4.2 (#2780): Added commit-SHA change detection in scheduled polling by resolving provider branch HEADs, using conditional `If-None-Match` requests for GitHub checks, recording `skipped_unchanged` scans when HEAD is unchanged, and only dispatching downstream scan jobs when SHA changes.

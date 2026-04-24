@@ -6,6 +6,7 @@ from app.main import app
 from app.repositories_routes import (
     _complete_repository_scan_for_tests,
     _get_repository_audit_rows_for_tests,
+    _get_repository_import_jobs_for_tests,
     _get_repository_relations_exist_for_tests,
     _list_poll_targets_for_tests,
     _reset_repository_state_for_tests,
@@ -452,3 +453,97 @@ def test_complete_scan_classifies_files_and_writes_diff_summary():
     assert by_path["docs/readme.md"]["status"] == "new"
     assert by_path["events/asyncapi.yaml"]["status"] == "removed"
     assert by_path["events/asyncapi.yaml"]["blobSha"] == "222"
+
+
+def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000025",
+                "provider": "github",
+                "owner": "acme",
+                "name": "scan-import-binding",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        first_scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            first_scan_id,
+            commit_sha="commit-first",
+            files=[
+                {"path": "apis/stable.yaml", "blobSha": "111", "tracked": True, "promote": "auto"},
+                {"path": "apis/error.yaml", "blobSha": "222", "tracked": True, "promote": "auto"},
+                {"path": "apis/removed.yaml", "blobSha": "333", "tracked": True, "promote": "manual"},
+            ],
+        )
+        baseline_job_count = len(_get_repository_import_jobs_for_tests(repository_id))
+        baseline_audit_count = len(_get_repository_audit_rows_for_tests(repository_id))
+
+        next_scan_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans",
+            json={"branch": "main", "force": True},
+        )
+        second_scan_id = next_scan_response.json()["id"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            second_scan_id,
+            commit_sha="commit-second",
+            files=[
+                {"path": "apis/stable.yaml", "blobSha": "111", "tracked": True},
+                {
+                    "path": "apis/error.yaml",
+                    "blobSha": "999",
+                    "tracked": True,
+                    "promote": "auto",
+                    "settingsJson": {"forceImportFailure": "parser exploded"},
+                },
+            ],
+        )
+        second_scan_files = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{second_scan_id}/files",
+        )
+        import_jobs = _get_repository_import_jobs_for_tests(repository_id)
+        audit_rows = _get_repository_audit_rows_for_tests(repository_id)
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert next_scan_response.status_code == 200
+    assert second_scan_files.status_code == 200
+
+    # unchanged files do not dispatch new import jobs
+    assert len(import_jobs) == baseline_job_count + 2
+    second_scan_jobs = [job for job in import_jobs if job.scanId == second_scan_id]
+    assert len(second_scan_jobs) == 2
+    by_path = {job.diffSnapshot["path"]: job for job in second_scan_jobs}
+    assert "apis/stable.yaml" not in by_path
+
+    removed_job = by_path["apis/removed.yaml"]
+    assert removed_job.operation == "removal"
+    assert removed_job.state == "pending_review"
+    assert removed_job.settingsJson["requiresExplicitApproval"] is True
+    assert removed_job.sourceType == "git"
+    assert removed_job.sourceUri == f"repo://{repository_id}/apis/removed.yaml@main/commit-second"
+
+    failed_job = by_path["apis/error.yaml"]
+    assert failed_job.operation == "import"
+    assert failed_job.state == "failed"
+    assert failed_job.errorDetail == "parser exploded"
+    assert failed_job.diffSnapshot["status"] == "modified"
+
+    files_by_path = {row["path"]: row for row in second_scan_files.json()["items"]}
+    assert files_by_path["apis/stable.yaml"]["status"] == "unchanged"
+    assert files_by_path["apis/stable.yaml"]["lastImportJobId"] is None
+    assert files_by_path["apis/removed.yaml"]["status"] == "removed"
+    assert files_by_path["apis/error.yaml"]["status"] == "parse_error"
+    assert files_by_path["apis/error.yaml"]["discriminator"] == "parser exploded"
+
+    new_audit_rows = audit_rows[baseline_audit_count:]
+    assert [row["eventType"] for row in new_audit_rows] == [
+        "repository.sync_pending_review",
+        "repository.sync_pending_review",
+    ]
