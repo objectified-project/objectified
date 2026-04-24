@@ -81,7 +81,7 @@ yarn test
 Also run any package-specific tests the issue touches, per READMEs.
 
 3. Fix **any failures you introduced tor that block the ticket** before proceeding.
-4. Do not proceed to Phase 6 if build or tests fail.
+4. Repeat Phase 5 if either step fails.  If steps 1 and 2 are successful, continue to Phase 6.
 
 ## Phase 6 - Note the Work
 
@@ -107,7 +107,7 @@ git push origin ticket-<number>
 
 ### Open the PR
 
-Use `gh` to create hte PR from `ticket-<number>` into the default branch:
+Use `gh` to create the PR from `ticket-<number>` into the default branch:
 
 ```bash
 gh pr create \
@@ -132,7 +132,13 @@ Request a review from **Copilot** via `gh`.  Note the assignment in a PR comment
 
 Comment "Work completed as directed" on the GitHub issue.
 
-## Phase 8 - Remain on the Branch
+## Phase 8 - Explains How to Test
+
+- Note how to test the implementation of what was just done.
+- Include steps, with each important piece boldfaced (ie. "**click button X**" or "**browse to Y**")
+- Note any example data to put into forms to test the functionality.
+
+## Phase 9 - Remain on the Branch
 
 Do not switch back to `main` after the PR is opened. Stay on `ticket-<number>`.
 
