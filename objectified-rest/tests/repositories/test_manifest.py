@@ -15,6 +15,8 @@ defaults:
 specs:
   - path: services/orders/openapi.yaml
     format: openapi_3_1
+    project: checkout
+    versionStrategy: branch
     pollIntervalSec: 300
 ignore:
   - "**/node_modules/**"
@@ -25,6 +27,8 @@ ignore:
     assert outcome.manifest is not None
     assert outcome.manifest.defaults.poll_interval_sec == 86400
     assert outcome.manifest.specs[0].format == "openapi_3_1"
+    assert outcome.manifest.specs[0].project_slug == "checkout"
+    assert outcome.manifest.specs[0].version_strategy == "branch"
 
 
 def test_parse_repo_manifest_returns_manifest_error_row_but_allows_scan_to_continue() -> None:
@@ -62,6 +66,8 @@ defaults:
 specs:
   - path: apis/openapi.yaml
     format: asyncapi_3
+    project: Orders API
+    versionStrategy: file-version
     pollIntervalSec: 30
   - path: apis/events.yaml
 """
@@ -83,8 +89,31 @@ specs:
     assert by_path["apis/openapi.yaml"].format == "asyncapi_3"
     # Per-spec pollIntervalSec wins over branch-level interval.
     assert by_path["apis/openapi.yaml"].poll_interval_sec == 30
+    # Manifest mapping values win over auto rules.
+    assert by_path["apis/openapi.yaml"].project_slug == "orders-api"
+    assert by_path["apis/openapi.yaml"].version_strategy == "file-version"
+
     # Missing per-spec pollIntervalSec falls back to branch-level interval.
     assert by_path["apis/events.yaml"].poll_interval_sec == 120
-    # Files omitted from manifest still appear as untracked discoveries.
-    assert by_path["apis/unlisted.yaml"].tracked is False
+    # Auto mapping derives project slug from path + commit-sha strategy.
+    assert by_path["apis/events.yaml"].project_slug == "apis"
+    assert by_path["apis/events.yaml"].version_strategy == "commit-sha"
+    # Files omitted from manifest can still be auto-mapped.
+    assert by_path["apis/unlisted.yaml"].tracked is True
     assert by_path["apis/unlisted.yaml"].format == "json_schema"
+
+
+def test_unmapped_root_file_gets_mapping_affordance() -> None:
+    rows = build_repository_file_rows(
+        discoveries=[RepositoryDiscoveryCandidate(path="openapi.yaml", detected_format="openapi_3_0")],
+        manifest=None,
+        branch_poll_interval_sec=120,
+    )
+    assert len(rows) == 1
+    assert rows[0].tracked is False
+    assert rows[0].project_slug is None
+    assert rows[0].version_strategy == "commit-sha"
+    assert rows[0].settings_json == {
+        "mappingRequired": True,
+        "mappingReason": "project_slug_not_resolved",
+    }

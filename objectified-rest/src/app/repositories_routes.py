@@ -19,7 +19,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from .auth import validate_authentication
-from .repositories.manifest import parse_repo_manifest
+from .repositories.manifest import parse_repo_manifest, resolve_repository_file_mapping
 
 router = APIRouter(prefix="/v1/repositories", tags=["repositories"])
 
@@ -1009,49 +1009,79 @@ def _complete_repository_scan_for_tests(
             raise ValueError(f"Scan not found: {scan_id}")
 
         target_scan = history[scan_idx]
+        repository = _REPO_STORE.get(_find_tenant_id_for_repository(repository_id), {}).get(repository_id)
+        manifest_specs_by_path: Dict[str, Any] = {}
+        if repository is not None:
+            manifest_outcome = parse_repo_manifest(repository.manifest)
+            if manifest_outcome.manifest is not None:
+                manifest_specs_by_path = {spec.path: spec for spec in manifest_outcome.manifest.specs}
         now = _utc_now_iso()
         current_files: List[RepositoryFileRecord] = []
         for item in files:
             path_raw = item.get("path")
             if not isinstance(path_raw, str) or not path_raw.strip():
                 raise ValueError("Each file must include a non-empty path")
-            tracked_raw = item.get("tracked", False)
-            if isinstance(tracked_raw, bool):
-                tracked_value = tracked_raw
-            elif isinstance(tracked_raw, str):
-                if tracked_raw.lower() == "true":
-                    tracked_value = True
-                elif tracked_raw.lower() == "false":
-                    tracked_value = False
+            normalized_path = path_raw.strip()
+            manifest_spec = manifest_specs_by_path.get(normalized_path)
+            mapping = resolve_repository_file_mapping(normalized_path, manifest_spec)
+
+            tracked_raw = item.get("tracked")
+            tracked_value = mapping.tracked
+            if tracked_raw is not None:
+                if isinstance(tracked_raw, bool):
+                    tracked_value = tracked_raw
+                elif isinstance(tracked_raw, str):
+                    if tracked_raw.lower() == "true":
+                        tracked_value = True
+                    elif tracked_raw.lower() == "false":
+                        tracked_value = False
+                    else:
+                        raise ValueError(
+                            f"Invalid value for 'tracked': {tracked_raw!r}; expected a boolean or 'true'/'false'"
+                        )
                 else:
                     raise ValueError(
-                        f"Invalid value for 'tracked': {tracked_raw!r}; expected a boolean or 'true'/'false'"
+                        f"Invalid type for 'tracked': {type(tracked_raw).__name__}; expected a boolean"
                     )
-            else:
-                raise ValueError(
-                    f"Invalid type for 'tracked': {type(tracked_raw).__name__}; expected a boolean"
-                )
+
+            if manifest_spec is not None:
+                tracked_value = mapping.tracked
+
             settings_json_raw = item.get("settingsJson")
             if settings_json_raw is not None and not isinstance(settings_json_raw, dict):
                 raise ValueError("settingsJson must be an object when provided")
+            settings_json_value = dict(settings_json_raw or {})
+            if mapping.settings_json is not None:
+                for key, value in mapping.settings_json.items():
+                    settings_json_value.setdefault(key, value)
+            if not settings_json_value:
+                settings_json_value = None
             promote_raw = item.get("promote")
             if promote_raw is not None and promote_raw not in {"auto", "manual"}:
                 raise ValueError("promote must be either 'auto' or 'manual' when provided")
+
+            project_slug_value = item.get("projectSlug")
+            if project_slug_value is None or manifest_spec is not None:
+                project_slug_value = mapping.project_slug
+            version_strategy_value = item.get("versionStrategy")
+            if version_strategy_value is None or manifest_spec is not None:
+                version_strategy_value = mapping.version_strategy
+
             current_files.append(
                 RepositoryFileRecord(
                     id=str(uuid4()),
                     repositoryId=repository_id,
                     scanId=scan_id,
-                    path=path_raw.strip(),
+                    path=normalized_path,
                     blobSha=item.get("blobSha"),
                     sizeBytes=item.get("sizeBytes"),
                     format=item.get("format"),
                     confidence=item.get("confidence"),
                     discriminator=item.get("discriminator"),
                     tracked=tracked_value,
-                    projectSlug=item.get("projectSlug"),
-                    versionStrategy=item.get("versionStrategy"),
-                    settingsJson=settings_json_raw,
+                    projectSlug=project_slug_value,
+                    versionStrategy=version_strategy_value,
+                    settingsJson=settings_json_value,
                     promote=promote_raw,
                     status="new",
                     qualityScore=item.get("qualityScore"),
