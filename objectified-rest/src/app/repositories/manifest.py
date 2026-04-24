@@ -36,7 +36,7 @@ class RepoManifestDefaults:
 class RepoManifestSpec:
     path: str
     format: DetectedRepositorySpecFormat | None
-    project_slug: str | None
+    project: str | None
     version_strategy: str | None
     poll_interval_sec: int | None
 
@@ -123,7 +123,7 @@ def parse_repo_manifest(raw_manifest: str | None) -> RepoManifestParseOutcome:
 
 
 def resolve_repository_file_mapping(path: str, spec: RepoManifestSpec | None) -> RepositoryMappingDecision:
-    manifest_project_slug = _normalize_project_slug(spec.project_slug) if spec is not None else None
+    manifest_project_slug = _normalize_project_slug(spec.project) if spec is not None else None
     auto_project_slug = _derive_project_slug_from_path(path)
     project_slug = manifest_project_slug or auto_project_slug
     version_strategy = (
@@ -205,7 +205,7 @@ def _to_repo_manifest(parsed: dict[str, Any]) -> RepoManifest:
             RepoManifestSpec(
                 path=str(spec["path"]),
                 format=spec.get("format"),
-                project_slug=spec.get("project"),
+                project=spec.get("project"),
                 version_strategy=spec.get("versionStrategy"),
                 poll_interval_sec=spec.get("pollIntervalSec"),
             )

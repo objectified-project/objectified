@@ -27,7 +27,7 @@ ignore:
     assert outcome.manifest is not None
     assert outcome.manifest.defaults.poll_interval_sec == 86400
     assert outcome.manifest.specs[0].format == "openapi_3_1"
-    assert outcome.manifest.specs[0].project_slug == "checkout"
+    assert outcome.manifest.specs[0].project == "checkout"
     assert outcome.manifest.specs[0].version_strategy == "branch"
 
 

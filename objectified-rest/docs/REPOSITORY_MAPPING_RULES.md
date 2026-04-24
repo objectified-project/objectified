@@ -8,8 +8,14 @@ Repository scan classification resolves `repository_file.project_slug` and
 When `.objectified/repo.yaml` includes a matching `specs[].path`, mapping is
 resolved from that spec first:
 
-- `specs[].project` -> `repository_file.project_slug`
+- `specs[].project` -> `repository_file.project_slug` (slugified before
+  persisting)
 - `specs[].versionStrategy` -> `repository_file.version_strategy`
+
+Slugification lowercases the value and replaces non-alphanumeric characters
+with `-`.
+
+- Example: `specs[].project: "Orders API"` -> `project_slug: "orders-api"`
 
 Manifest values are authoritative for matched paths.
 

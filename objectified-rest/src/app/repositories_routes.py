@@ -1041,7 +1041,7 @@ def _complete_repository_scan_for_tests(
                         )
                 else:
                     raise ValueError(
-                        f"Invalid type for 'tracked': {type(tracked_raw).__name__}; expected a boolean"
+                        f"Invalid type for 'tracked': {type(tracked_raw).__name__}; expected a boolean or the string 'true'/'false'"
                     )
 
             if manifest_spec is not None:
@@ -1053,7 +1053,7 @@ def _complete_repository_scan_for_tests(
             settings_json_value = dict(settings_json_raw or {})
             if mapping.settings_json is not None:
                 for key, value in mapping.settings_json.items():
-                    settings_json_value.setdefault(key, value)
+                    settings_json_value[key] = value
             if not settings_json_value:
                 settings_json_value = None
             promote_raw = item.get("promote")
@@ -1061,11 +1061,14 @@ def _complete_repository_scan_for_tests(
                 raise ValueError("promote must be either 'auto' or 'manual' when provided")
 
             project_slug_value = item.get("projectSlug")
-            if project_slug_value is None or manifest_spec is not None:
-                project_slug_value = mapping.project_slug
             version_strategy_value = item.get("versionStrategy")
-            if version_strategy_value is None or manifest_spec is not None:
-                version_strategy_value = mapping.version_strategy
+            if tracked_value:
+                if project_slug_value is None or manifest_spec is not None:
+                    project_slug_value = mapping.project_slug
+                if version_strategy_value is None or manifest_spec is not None:
+                    version_strategy_value = mapping.version_strategy
+            else:
+                project_slug_value = None
 
             current_files.append(
                 RepositoryFileRecord(
