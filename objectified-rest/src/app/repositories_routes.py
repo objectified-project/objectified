@@ -619,9 +619,10 @@ def _ensure_commit_sha_version(
     branch: str,
     path: str,
 ) -> RepositoryResolvedVersionRecord:
+    normalized_sha = commit_sha.strip().lower()
     tenant_versions = _REPO_VERSION_STORE.setdefault(tenant_id, {})
     project_versions = tenant_versions.setdefault(project_slug, {})
-    existing = project_versions.get(commit_sha)
+    existing = project_versions.get(normalized_sha)
     if existing is not None:
         return existing
 
@@ -642,7 +643,7 @@ def _ensure_commit_sha_version(
         },
         createdAt=now_dt.isoformat(),
     )
-    project_versions[commit_sha] = record
+    project_versions[normalized_sha] = record
     return record
 
 

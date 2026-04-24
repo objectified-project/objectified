@@ -632,6 +632,7 @@ def test_complete_scan_applies_manifest_first_mapping_and_auto_fallback_rules():
 
 
 def test_commit_sha_jobs_bind_to_idempotent_auto_created_versions() -> None:
+    expected_date_prefix = datetime.now(timezone.utc).strftime('%Y%m%d')
     app.dependency_overrides[validate_authentication] = _override_auth_tenant_admin_with_repo_project_autocreate
     try:
         create_response = client.post(
@@ -701,7 +702,7 @@ def test_commit_sha_jobs_bind_to_idempotent_auto_created_versions() -> None:
     assert first_job.targetProjectSlug == "checkout-core"
     assert first_job.targetVersionId == created_version.versionId
     assert second_job.targetVersionId == created_version.versionId
-    assert created_version.versionId == f"{datetime.now(timezone.utc).strftime('%Y%m%d')}-abc123def456"
+    assert created_version.versionId == f"{expected_date_prefix}-abc123def456"
     assert created_version.metadata["repositorySource"] == {
         "repositoryId": repository_id,
         "branch": "main",
