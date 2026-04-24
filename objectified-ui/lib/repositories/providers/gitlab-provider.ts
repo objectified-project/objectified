@@ -55,6 +55,8 @@ export class GitlabRepositoryProvider implements RepositoryProvider {
     const perPage = Math.min(opts?.perPage ?? GITLAB_MAX_PER_PAGE, GITLAB_MAX_PER_PAGE);
     const page = opts?.page ?? 1;
 
+    const visibilityFilter = mapGitlabVisibility(opts?.visibility);
+
     if (page > 1) {
       const repositories = await this.request<unknown[]>(() =>
         api.Projects.all({
@@ -63,6 +65,7 @@ export class GitlabRepositoryProvider implements RepositoryProvider {
           sort: 'desc',
           perPage,
           page,
+          ...(visibilityFilter !== undefined && { visibility: visibilityFilter }),
         })
       );
       for (const repo of repositories) {
@@ -84,6 +87,7 @@ export class GitlabRepositoryProvider implements RepositoryProvider {
           sort: 'asc',
           perPage,
           idAfter,
+          ...(visibilityFilter !== undefined && { visibility: visibilityFilter }),
         })
       );
 
@@ -223,7 +227,7 @@ export class GitlabRepositoryProvider implements RepositoryProvider {
       api.RepositoryFiles.show(projectPath(repo.owner, repo.name), normalizeFilePath(path), branch)
     );
     const record = toRecord(file);
-    const content = typeof record?.content === 'string' ? record.content : '';
+    const content = typeof record?.content === 'string' ? record.content.replace(/\n/g, '') : '';
     return {
       contentBase64: content,
       sha: String(record?.blob_id ?? ''),
@@ -246,7 +250,7 @@ export class GitlabRepositoryProvider implements RepositoryProvider {
     const api = this.apiFactory(token);
     const hookId = Number(id);
     if (!Number.isFinite(hookId)) {
-      throw new RepositoryProviderError('NOT_FOUND', 'GitLab webhook id is invalid');
+      throw new RepositoryProviderError('UNKNOWN', 'GitLab webhook id is invalid');
     }
     await this.request(() => api.ProjectHooks.remove(projectPath(repo.owner, repo.name), hookId));
   }
@@ -289,11 +293,12 @@ function toRepoSummary(value: unknown): RepoSummary | null {
     return null;
   }
   const namespacePath = String(record.path_with_namespace ?? '');
-  const [, ...segments] = namespacePath.split('/');
-  const name = String(record.path ?? segments.join('/') ?? '');
+  const segments = namespacePath.split('/').filter((segment) => segment.length > 0);
+  const fallbackName = segments[segments.length - 1] ?? '';
+  const name = String(record.path ?? fallbackName);
   return {
     id: String(record.id ?? ''),
-    name: String(record.path ?? name),
+    name,
     fullName: namespacePath,
     description: typeof record.description === 'string' ? record.description : null,
     isPrivate: String(record.visibility ?? 'private') !== 'public',
@@ -364,6 +369,16 @@ function normalizeFilePath(path: string): string {
   return path.replace(/^\/+|\/+$/g, '');
 }
 
+function mapGitlabVisibility(visibility?: ListReposOpts['visibility']): string | undefined {
+  if (visibility === 'public') {
+    return 'public';
+  }
+  if (visibility === 'private') {
+    return 'private';
+  }
+  return undefined;
+}
+
 function mapGitlabSort(sort?: ListReposOpts['sort']): string {
   if (sort === 'created') {
     return 'created_at';
@@ -399,7 +414,7 @@ function normalizeGitlabError(error: unknown): RepositoryProviderError {
   if (status === 404) {
     return new RepositoryProviderError('NOT_FOUND', 'GitLab resource not found', status, { cause: error });
   }
-  if (status === 429 || status === 403) {
+  if (status === 429) {
     return new RepositoryProviderError('RATE_LIMITED', 'GitLab API rate limit exceeded', status, { cause: error });
   }
   if (status !== undefined) {
