@@ -52,7 +52,7 @@ const OPENAPI_FILENAME_RE = /(openapi|swagger|oas)[^/]*(\.ya?ml|\.json)?$/i;
 const ASYNCAPI_FILENAME_RE = /asyncapi[^/]*(\.ya?ml|\.json)?$/i;
 const ARAZZO_FILENAME_RE = /arazzo[^/]*(\.ya?ml|\.json)?$/i;
 const JSON_OR_YAML_RE = /\.(json|ya?ml)$/i;
-const GRAPHQL_BLOCK_RE = /^\s*(schema\s*\{[\s\S]*\}|type\s+query\b[\s\S]*\})\s*$/i;
+const GRAPHQL_BLOCK_RE = /\b(?:schema\s*\{[\s\S]*?\}|type\s+query\b[\s\S]*?\})/i;
 
 export async function detectRepositorySpecFormat(
   input: DetectRepositorySpecInput
@@ -261,16 +261,10 @@ function jsonSchemaDiscriminator(content: string, lower: string): string {
 }
 
 function looksLikeAvro(content: string): boolean {
-  try {
-    const parsed = JSON.parse(content);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return false;
-    }
-    const obj = parsed as Record<string, unknown>;
-    return typeof obj.name === "string" && typeof obj.type === "string" && Array.isArray(obj.fields);
-  } catch {
-    return false;
-  }
+  const hasName = /"name"\s*:\s*"[^"]+"/i.test(content);
+  const hasType = /"type"\s*:\s*"[^"]+"/i.test(content);
+  const hasFields = /"fields"\s*:\s*\[/i.test(content);
+  return hasName && hasType && hasFields;
 }
 
 function matchVersionedField(content: string, key: string, valuePattern: RegExp): string | null {
@@ -314,10 +308,15 @@ async function readFromReadableStream(
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  let fullyConsumed = false;
   try {
     while (total < maxBytes) {
       const next = await reader.read();
-      if (next.done || !next.value) {
+      if (next.done) {
+        fullyConsumed = true;
+        break;
+      }
+      if (!next.value) {
         break;
       }
       const value = next.value;
@@ -326,7 +325,15 @@ async function readFromReadableStream(
       total += take;
     }
   } finally {
-    reader.releaseLock();
+    if (fullyConsumed) {
+      reader.releaseLock();
+    } else {
+      try {
+        await reader.cancel();
+      } catch {
+        // Preserve existing behavior if cleanup fails.
+      }
+    }
   }
   return decodeUtf8(joinChunks(chunks, total));
 }
