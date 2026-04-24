@@ -2,6 +2,7 @@
 
 ## Completed
 
+- REPO-4.1 (#2779): Added a scheduler tick dispatcher that atomically reserves due tracked branches, skips paused repositories, clamps poll cadence to enterprise/non-enterprise minimums, dispatches poll jobs to `repo.poll.<priority>`, and records `repository.polled` workflow audit rows per dispatch.
 - REPO-3.8 (#2777): Added an in-scan virtual filesystem `$ref` resolver for repository imports that resolves relative file-path and JSON-pointer chains in dependency order, memoizes repeated nodes per scan, and emits deterministic cycle errors for cross-file loops.
 - REPO-3.5 (#2774): Added a standalone repository JSON Schema importer for Draft 7, 2019-09, and 2020-12 documents, preserving source `$id`/draft metadata on class schemas, keeping composition keywords intact, and delegating sibling `$ref` resolution through the REPO-3.8 resolver contract.
 - REPO-3.2 (#2771): Added `swagger_2_0` support to the repository OpenAPI importer pipeline so Swagger 2.0 repository specs run through the same conversion/parser path as OpenAPI 3.x, with semantic parity tests covering definitions, paths, parameters, and security scheme mapping.

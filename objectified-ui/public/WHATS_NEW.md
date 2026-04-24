@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added a repository poll scheduler tick that atomically reserves due tracked branches, skips paused repositories, enforces enterprise/free poll interval floors, dispatches `repo.poll.<priority>` jobs, and records `repository.polled` workflow audits.
 - Added the REPO-3.8 in-scan virtual filesystem resolver for repository imports, with dependency-ordered cross-file `$ref` resolution (relative paths + JSON pointers), per-scan memoization, and deterministic cycle detection errors.
 - Added standalone repository JSON Schema importer support for Draft 7, 2019-09, and 2020-12 schemas, preserving source `$id`/draft metadata while delegating sibling `$ref` resolution through the REPO-3.8 resolver contract.
 - Added repository importer support for `swagger_2_0`, routing Swagger 2.0 specs through the same conversion/parser pipeline as OpenAPI 3.x with semantic parity coverage for schemas, paths, parameters, and security mappings.
