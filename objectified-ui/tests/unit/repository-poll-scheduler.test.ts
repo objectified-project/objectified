@@ -48,6 +48,9 @@ describe('repository poll scheduler', () => {
               linked_account_id: 'linked-1',
               last_known_sha: 'old-sha-1',
               last_known_etag: null,
+              consecutive_failures: 0,
+              last_error_code: null,
+              last_error_detail: null,
               is_enterprise: false,
               effective_poll_interval_sec: 300,
             },
@@ -65,6 +68,9 @@ describe('repository poll scheduler', () => {
               linked_account_id: 'linked-2',
               last_known_sha: 'old-sha-2',
               last_known_etag: '"etag-old-2"',
+              consecutive_failures: 0,
+              last_error_code: null,
+              last_error_detail: null,
               is_enterprise: true,
               effective_poll_interval_sec: 60,
             },
@@ -213,6 +219,9 @@ describe('repository poll scheduler', () => {
             linked_account_id: 'linked-1',
             last_known_sha: 'old-sha-1',
             last_known_etag: null,
+            consecutive_failures: 0,
+            last_error_code: null,
+            last_error_detail: null,
             is_enterprise: false,
             effective_poll_interval_sec: 300,
           },
@@ -275,6 +284,9 @@ describe('repository poll scheduler', () => {
               linked_account_id: 'linked-9',
               last_known_sha: null,
               last_known_etag: null,
+              consecutive_failures: 0,
+              last_error_code: null,
+              last_error_detail: null,
               is_enterprise: false,
               effective_poll_interval_sec: 300,
             },
@@ -385,9 +397,10 @@ describe('repository poll scheduler', () => {
       (sql, params) => {
         expect(sql).toContain('UPDATE odb.repository');
         expect(sql).toContain("status = 'paused'");
+        expect(sql).toContain('RETURNING id');
         expect(params[0]).toEqual(['repo-fail']);
         expect(params[1]).toBe('2026-04-24T20:03:00.000Z');
-        return { rowCount: 1, rows: [] };
+        return { rowCount: 1, rows: [{ id: 'repo-fail' }] };
       },
       (sql, params) => {
         expect(sql).toContain('INSERT INTO odb.workflow_audit');

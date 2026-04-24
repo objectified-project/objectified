@@ -106,7 +106,13 @@ function classifyGithubHeadError(status: number): HeadDetectionError {
       errorDetail: 'GitHub credentials are unauthorized for this repository.',
     };
   }
-  if (status === 403 || status === 429) {
+  if (status === 403) {
+    return {
+      errorCode: 'PROVIDER_FORBIDDEN',
+      errorDetail: 'GitHub credentials are forbidden for this repository.',
+    };
+  }
+  if (status === 429) {
     return {
       errorCode: 'PROVIDER_RATE_LIMITED',
       errorDetail: 'GitHub provider rate limit reached while detecting branch head.',
@@ -702,7 +708,7 @@ export function createRepositoryPollScheduler(
         failedBranchErrorCodes.push(detectedHeadResult.error.errorCode);
         failedBranchErrorDetails.push(detectedHeadResult.error.errorDetail);
 
-        if (nextConsecutiveFailures >= AUTO_PAUSE_FAILURE_THRESHOLD) {
+        if (nextConsecutiveFailures >= AUTO_PAUSE_FAILURE_THRESHOLD && !repositoriesToAutoPause.has(row.repository_id)) {
           repositoriesToAutoPause.set(row.repository_id, {
             tenantId: row.tenant_id,
             projectId: row.project_id,
@@ -771,7 +777,9 @@ export function createRepositoryPollScheduler(
 
       processedBranchIds.push(job.branchId);
       processedIntervalsSec.push(job.effectivePollIntervalSec);
-      successfulBranchIds.push(job.branchId);
+      if (detectedHead) {
+        successfulBranchIds.push(job.branchId);
+      }
       jobs.push(job);
 
       await insertScheduledScan(deps, {
@@ -882,17 +890,28 @@ export function createRepositoryPollScheduler(
 
     if (repositoriesToAutoPause.size > 0) {
       const repositoryIds = Array.from(repositoriesToAutoPause.keys());
-      await deps.query(
+      const pausedRepositoriesResult = await deps.query(
         `UPDATE odb.repository
         SET
           status = 'paused',
           updated_at = $2::timestamptz
         WHERE id = ANY($1::uuid[])
-          AND status <> 'paused'`,
+          AND status <> 'paused'
+        RETURNING id`,
         [repositoryIds, now.toISOString()]
       );
-      for (const autoPaused of repositoriesToAutoPause.values()) {
-        await insertAutoPausedAudit(deps, autoPaused);
+      const pausedRepositoryIds = new Set(
+        pausedRepositoriesResult.rows
+          .map((rawRow) => {
+            const row = rawRow as { id?: unknown };
+            return typeof row.id === 'string' ? row.id : '';
+          })
+          .filter(Boolean)
+      );
+      for (const [repositoryId, autoPaused] of repositoriesToAutoPause.entries()) {
+        if (pausedRepositoryIds.has(repositoryId)) {
+          await insertAutoPausedAudit(deps, autoPaused);
+        }
       }
     }
 
