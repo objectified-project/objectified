@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import importlib.resources as pkg_resources
 import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Literal, Sequence
 
 import yaml
@@ -23,7 +23,6 @@ DetectedRepositorySpecFormat = Literal[
 ]
 
 _MANIFEST_RELATIVE_PATH = ".objectified/repo.yaml"
-_SCHEMA_RELATIVE_PATH = Path("schemas/repo-manifest.v1.json")
 
 
 @dataclass(frozen=True)
@@ -84,7 +83,14 @@ def parse_repo_manifest(raw_manifest: str | None) -> RepoManifestParseOutcome:
     if parsed is None:
         parsed = {}
 
-    schema = _load_manifest_schema()
+    try:
+        schema = _load_manifest_schema()
+    except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
+        return RepoManifestParseOutcome(
+            manifest=None,
+            manifest_error_row=_manifest_error_row(f"unable to load manifest schema: {exc}"),
+        )
+
     validator = Draft202012Validator(schema)
     try:
         validator.validate(parsed)
@@ -133,9 +139,8 @@ def build_repository_file_rows(
 
 
 def _load_manifest_schema() -> dict[str, Any]:
-    repo_root = Path(__file__).resolve().parents[3]
-    schema_path = repo_root / _SCHEMA_RELATIVE_PATH
-    with schema_path.open("r", encoding="utf-8") as schema_file:
+    ref = pkg_resources.files("app.repositories.schemas") / "repo-manifest.v1.json"
+    with ref.open("r", encoding="utf-8") as schema_file:
         return json.load(schema_file)
 
 
