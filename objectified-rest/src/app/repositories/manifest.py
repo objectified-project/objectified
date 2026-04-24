@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.resources as pkg_resources
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Literal, Sequence
 
@@ -35,6 +36,8 @@ class RepoManifestDefaults:
 class RepoManifestSpec:
     path: str
     format: DetectedRepositorySpecFormat | None
+    project: str | None
+    version_strategy: str | None
     poll_interval_sec: int | None
 
 
@@ -51,9 +54,12 @@ class RepositoryFileRow:
     path: str
     format: DetectedRepositorySpecFormat | None
     tracked: bool
+    project_slug: str | None
+    version_strategy: str | None
     poll_interval_sec: int | None
     status: str
     metadata: dict[str, Any] | None = None
+    settings_json: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -66,6 +72,18 @@ class RepositoryDiscoveryCandidate:
 class RepoManifestParseOutcome:
     manifest: RepoManifest | None
     manifest_error_row: RepositoryFileRow | None
+
+
+@dataclass(frozen=True)
+class RepositoryMappingDecision:
+    tracked: bool
+    project_slug: str | None
+    version_strategy: str
+    settings_json: dict[str, Any] | None = None
+
+
+_DEFAULT_VERSION_STRATEGY = "commit-sha"
+_SLUG_SANITIZER = re.compile(r"[^a-z0-9]+")
 
 
 def parse_repo_manifest(raw_manifest: str | None) -> RepoManifestParseOutcome:
@@ -104,6 +122,30 @@ def parse_repo_manifest(raw_manifest: str | None) -> RepoManifestParseOutcome:
     return RepoManifestParseOutcome(manifest=manifest, manifest_error_row=None)
 
 
+def resolve_repository_file_mapping(path: str, spec: RepoManifestSpec | None) -> RepositoryMappingDecision:
+    manifest_project_slug = _normalize_project_slug(spec.project) if spec is not None else None
+    auto_project_slug = _derive_project_slug_from_path(path)
+    project_slug = manifest_project_slug or auto_project_slug
+    version_strategy = (
+        spec.version_strategy.strip()
+        if spec is not None and isinstance(spec.version_strategy, str) and spec.version_strategy.strip()
+        else _DEFAULT_VERSION_STRATEGY
+    )
+    tracked = project_slug is not None
+    settings_json = None
+    if not tracked:
+        settings_json = {
+            "mappingRequired": True,
+            "mappingReason": "project_slug_not_resolved",
+        }
+    return RepositoryMappingDecision(
+        tracked=tracked,
+        project_slug=project_slug,
+        version_strategy=version_strategy,
+        settings_json=settings_json,
+    )
+
+
 def build_repository_file_rows(
     *,
     discoveries: Sequence[RepositoryDiscoveryCandidate],
@@ -124,15 +166,19 @@ def build_repository_file_rows(
     for discovery in discoveries:
         spec = spec_by_path.get(discovery.path)
         manifest_spec_poll = spec.poll_interval_sec if spec is not None else None
+        mapping = resolve_repository_file_mapping(discovery.path, spec)
         rows.append(
             RepositoryFileRow(
                 path=discovery.path,
                 format=spec.format if spec is not None and spec.format is not None else discovery.detected_format,
-                tracked=spec is not None,
+                tracked=mapping.tracked,
+                project_slug=mapping.project_slug,
+                version_strategy=mapping.version_strategy,
                 poll_interval_sec=manifest_spec_poll
                 if manifest_spec_poll is not None
                 else effective_branch_poll_interval,
                 status="discovered",
+                settings_json=mapping.settings_json,
             )
         )
     return rows
@@ -159,6 +205,8 @@ def _to_repo_manifest(parsed: dict[str, Any]) -> RepoManifest:
             RepoManifestSpec(
                 path=str(spec["path"]),
                 format=spec.get("format"),
+                project=spec.get("project"),
+                version_strategy=spec.get("versionStrategy"),
                 poll_interval_sec=spec.get("pollIntervalSec"),
             )
             for spec in specs
@@ -172,6 +220,8 @@ def _manifest_error_row(message: str) -> RepositoryFileRow:
         path=_MANIFEST_RELATIVE_PATH,
         format=None,
         tracked=True,
+        project_slug=None,
+        version_strategy=None,
         poll_interval_sec=None,
         status="manifest_error",
         metadata={"error": message},
@@ -183,3 +233,20 @@ def _format_schema_error(error: ValidationError) -> str:
         pointer = ".".join(str(part) for part in error.path)
         return f"schema validation failed at '{pointer}': {error.message}"
     return f"schema validation failed: {error.message}"
+
+
+def _derive_project_slug_from_path(path: str) -> str | None:
+    parts = [segment.strip() for segment in path.strip().split("/") if segment.strip()]
+    if len(parts) < 2:
+        return None
+    return _normalize_project_slug(parts[0])
+
+
+def _normalize_project_slug(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    lowered = raw.strip().lower()
+    if not lowered:
+        return None
+    normalized = _SLUG_SANITIZER.sub("-", lowered).strip("-")
+    return normalized or None

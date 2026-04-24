@@ -547,3 +547,74 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
         "repository.sync_pending_review",
         "repository.sync_pending_review",
     ]
+
+
+def test_complete_scan_applies_manifest_first_mapping_and_auto_fallback_rules():
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000026",
+                "provider": "github",
+                "owner": "acme",
+                "name": "mapping-rules",
+                "branches": [{"branch": "main"}],
+                "manifest": (
+                    "version: 1\n"
+                    "specs:\n"
+                    "  - path: services/orders/openapi.yaml\n"
+                    "    project: checkout-core\n"
+                    "    versionStrategy: branch\n"
+                ),
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="commit-mapping-rules",
+            files=[
+                {
+                    "path": "services/orders/openapi.yaml",
+                    "blobSha": "111",
+                    "tracked": False,
+                    "projectSlug": "should-not-win",
+                    "versionStrategy": "commit-sha",
+                },
+                {
+                    "path": "billing/openapi.yaml",
+                    "blobSha": "222",
+                },
+                {
+                    "path": "root-openapi.yaml",
+                    "blobSha": "333",
+                },
+            ],
+        )
+        files_response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{scan_id}/files",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert files_response.status_code == 200
+    by_path = {row["path"]: row for row in files_response.json()["items"]}
+
+    assert by_path["services/orders/openapi.yaml"]["tracked"] is True
+    assert by_path["services/orders/openapi.yaml"]["projectSlug"] == "checkout-core"
+    assert by_path["services/orders/openapi.yaml"]["versionStrategy"] == "branch"
+
+    assert by_path["billing/openapi.yaml"]["tracked"] is True
+    assert by_path["billing/openapi.yaml"]["projectSlug"] == "billing"
+    assert by_path["billing/openapi.yaml"]["versionStrategy"] == "commit-sha"
+
+    assert by_path["root-openapi.yaml"]["tracked"] is False
+    assert by_path["root-openapi.yaml"]["projectSlug"] is None
+    assert by_path["root-openapi.yaml"]["versionStrategy"] == "commit-sha"
+    assert by_path["root-openapi.yaml"]["settingsJson"] == {
+        "mappingRequired": True,
+        "mappingReason": "project_slug_not_resolved",
+    }
