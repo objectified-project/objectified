@@ -12,7 +12,7 @@ import binascii
 import json
 from datetime import datetime, timezone
 from threading import Lock
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
@@ -247,6 +247,92 @@ def _to_sort_key(created_at: str, row_id: str) -> Tuple[datetime, str]:
     return parsed, row_id
 
 
+def _empty_scan_diff_summary() -> Dict[str, int]:
+    return {"added": 0, "modified": 0, "removed": 0, "unchanged": 0}
+
+
+def _first_duplicate(items: List[str]) -> Optional[str]:
+    """Return the first duplicate value in *items*, or ``None`` if all are unique."""
+    seen: set[str] = set()
+    for item in items:
+        if item in seen:
+            return item
+        seen.add(item)
+    return None
+
+
+def _classify_scan_files_against_previous(
+    *,
+    repository_id: str,
+    scan_id: str,
+    created_at: str,
+    current_files: Sequence[RepositoryFileRecord],
+    previous_files: Sequence[RepositoryFileRecord],
+) -> Tuple[List[RepositoryFileRecord], Dict[str, int]]:
+    summary = _empty_scan_diff_summary()
+
+    previous_filtered = [
+        row for row in previous_files
+        if row.repositoryId == repository_id and row.status != "removed"
+    ]
+    previous_paths = [row.path for row in previous_filtered]
+    previous_dup = _first_duplicate(previous_paths)
+    if previous_dup is not None:
+        raise ValueError(f"Duplicate path in previous scan files: {previous_dup!r}")
+    previous_by_path = {row.path: row for row in previous_filtered}
+
+    current_filtered = [
+        row for row in current_files
+        if row.repositoryId == repository_id
+    ]
+    current_paths = [row.path for row in current_filtered]
+    current_dup = _first_duplicate(current_paths)
+    if current_dup is not None:
+        raise ValueError(f"Duplicate path in current scan files: {current_dup!r}")
+    current_by_path = {row.path: row for row in current_filtered}
+    rows: List[RepositoryFileRecord] = []
+
+    for path in sorted(current_by_path):
+        current = current_by_path[path]
+        previous = previous_by_path.get(path)
+        if previous is None:
+            next_status: RepositoryFileStatus = "new"
+            summary["added"] += 1
+        elif current.blobSha == previous.blobSha:
+            next_status = "unchanged"
+            summary["unchanged"] += 1
+        else:
+            next_status = "modified"
+            summary["modified"] += 1
+
+        rows.append(
+            current.model_copy(
+                update={
+                    "scanId": scan_id,
+                    "status": next_status,
+                    "createdAt": created_at,
+                }
+            )
+        )
+
+    removed_paths = sorted(set(previous_by_path) - set(current_by_path))
+    for path in removed_paths:
+        previous = previous_by_path[path]
+        summary["removed"] += 1
+        rows.append(
+            previous.model_copy(
+                update={
+                    "id": str(uuid4()),
+                    "scanId": scan_id,
+                    "status": "removed",
+                    "createdAt": created_at,
+                }
+            )
+        )
+
+    return rows, summary
+
+
 def _make_pending_scan(
     *,
     repository_id: str,
@@ -268,7 +354,7 @@ def _make_pending_scan(
         filesUnknown=0,
         filesFailed=0,
         eventLog=[{"type": "repository.scan.queued", "at": now, "force": force}],
-        diffSummary={},
+        diffSummary=_empty_scan_diff_summary(),
         createdAt=now,
     )
 
@@ -302,7 +388,7 @@ def _make_skipped_unchanged_scan(
                 "reason": "force=false and no detected changes",
             }
         ],
-        diffSummary={"changed": 0},
+        diffSummary=_empty_scan_diff_summary(),
         createdAt=now,
     )
 
@@ -784,6 +870,102 @@ def _reset_repository_state_for_tests() -> None:
         _REPO_AUDIT_STORE.clear()
 
 
+def _complete_repository_scan_for_tests(
+    repository_id: str,
+    scan_id: str,
+    *,
+    commit_sha: str,
+    files: Sequence[Dict[str, Any]],
+) -> RepositoryScanRecord:
+    with _STORE_LOCK:
+        history = _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
+        scan_idx = next((idx for idx, scan in enumerate(history) if scan.id == scan_id), None)
+        if scan_idx is None:
+            raise ValueError(f"Scan not found: {scan_id}")
+
+        target_scan = history[scan_idx]
+        now = _utc_now_iso()
+        current_files: List[RepositoryFileRecord] = []
+        for item in files:
+            path_raw = item.get("path")
+            if not isinstance(path_raw, str) or not path_raw.strip():
+                raise ValueError("Each file must include a non-empty path")
+            tracked_raw = item.get("tracked", False)
+            if isinstance(tracked_raw, bool):
+                tracked_value = tracked_raw
+            elif isinstance(tracked_raw, str):
+                if tracked_raw.lower() == "true":
+                    tracked_value = True
+                elif tracked_raw.lower() == "false":
+                    tracked_value = False
+                else:
+                    raise ValueError(
+                        f"Invalid value for 'tracked': {tracked_raw!r}; expected a boolean or 'true'/'false'"
+                    )
+            else:
+                raise ValueError(
+                    f"Invalid type for 'tracked': {type(tracked_raw).__name__}; expected a boolean"
+                )
+            current_files.append(
+                RepositoryFileRecord(
+                    id=str(uuid4()),
+                    repositoryId=repository_id,
+                    scanId=scan_id,
+                    path=path_raw.strip(),
+                    blobSha=item.get("blobSha"),
+                    sizeBytes=item.get("sizeBytes"),
+                    format=item.get("format"),
+                    confidence=item.get("confidence"),
+                    discriminator=item.get("discriminator"),
+                    tracked=tracked_value,
+                    projectSlug=item.get("projectSlug"),
+                    versionStrategy=item.get("versionStrategy"),
+                    status="new",
+                    qualityScore=item.get("qualityScore"),
+                    lastImportJobId=item.get("lastImportJobId"),
+                    createdAt=now,
+                )
+            )
+
+        previous_completed_scan = next(
+            (
+                scan
+                for idx, scan in enumerate(history)
+                if idx != scan_idx and scan.branch == target_scan.branch and scan.status == "complete"
+            ),
+            None,
+        )
+        previous_files: Sequence[RepositoryFileRecord] = []
+        if previous_completed_scan is not None:
+            previous_files = _REPO_SCAN_FILE_HISTORY_STORE.get(previous_completed_scan.id, [])
+
+        classified_files, diff_summary = _classify_scan_files_against_previous(
+            repository_id=repository_id,
+            scan_id=scan_id,
+            created_at=now,
+            current_files=current_files,
+            previous_files=previous_files,
+        )
+        _REPO_SCAN_FILE_HISTORY_STORE[scan_id] = classified_files
+
+        completed_scan = target_scan.model_copy(
+            update={
+                "commitSha": commit_sha,
+                "status": "complete",
+                "finishedAt": now,
+                "durationMs": 0,
+                "filesSeen": len(current_files),
+                "filesClassified": len(classified_files),
+                "filesUnknown": 0,
+                "filesFailed": 0,
+                "eventLog": [*target_scan.eventLog, {"type": "repository.scan.complete", "at": now}],
+                "diffSummary": diff_summary,
+            }
+        )
+        history[scan_idx] = completed_scan
+        return completed_scan
+
+
 def _seed_repository_relations_for_tests(repository_id: str) -> None:
     with _STORE_LOCK:
         now = _utc_now_iso()
@@ -802,7 +984,7 @@ def _seed_repository_relations_for_tests(repository_id: str) -> None:
             filesUnknown=0,
             filesFailed=0,
             eventLog=[{"type": "repository.scan.seeded", "at": now}],
-            diffSummary={"changed": 1},
+            diffSummary={"added": 1, "modified": 0, "removed": 0, "unchanged": 0},
             createdAt=now,
         )
         _REPO_SCAN_STORE[repository_id] = [RepositoryScanTimelineEntry(id=str(uuid4()), type="scan", status="completed", message="done", createdAt=now)]

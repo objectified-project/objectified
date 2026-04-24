@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from app.auth import validate_authentication
 from app.main import app
 from app.repositories_routes import (
+    _complete_repository_scan_for_tests,
     _get_repository_audit_rows_for_tests,
     _get_repository_relations_exist_for_tests,
     _list_poll_targets_for_tests,
@@ -389,3 +390,65 @@ def test_list_scans_and_files_support_cursor_pagination_and_filters():
     file_rows = files_response.json()["items"]
     assert len(file_rows) == 1
     assert file_rows[0]["status"] == "manifest_error"
+
+
+def test_complete_scan_classifies_files_and_writes_diff_summary():
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000024",
+                "provider": "github",
+                "owner": "acme",
+                "name": "scan-diff",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        first_scan_id = create_response.json()["initialScanJobId"]
+        first_completed = _complete_repository_scan_for_tests(
+            repository_id,
+            first_scan_id,
+            commit_sha="commit-one",
+            files=[
+                {"path": "apis/openapi.yaml", "blobSha": "111", "tracked": True},
+                {"path": "events/asyncapi.yaml", "blobSha": "222", "tracked": True},
+            ],
+        )
+
+        next_scan_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans",
+            json={"branch": "main", "force": True},
+        )
+        second_scan_id = next_scan_response.json()["id"]
+        second_completed = _complete_repository_scan_for_tests(
+            repository_id,
+            second_scan_id,
+            commit_sha="commit-two",
+            files=[
+                {"path": "apis/openapi.yaml", "blobSha": "333", "tracked": True},
+                {"path": "docs/readme.md", "blobSha": "444", "tracked": False},
+            ],
+        )
+        files_response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{second_scan_id}/files",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert next_scan_response.status_code == 200
+
+    assert first_completed.status == "complete"
+    assert first_completed.diffSummary == {"added": 2, "modified": 0, "removed": 0, "unchanged": 0}
+
+    assert second_completed.status == "complete"
+    assert second_completed.diffSummary == {"added": 1, "modified": 1, "removed": 1, "unchanged": 0}
+
+    assert files_response.status_code == 200
+    by_path = {row["path"]: row for row in files_response.json()["items"]}
+    assert by_path["apis/openapi.yaml"]["status"] == "modified"
+    assert by_path["docs/readme.md"]["status"] == "new"
+    assert by_path["events/asyncapi.yaml"]["status"] == "removed"
+    assert by_path["events/asyncapi.yaml"]["blobSha"] == "222"

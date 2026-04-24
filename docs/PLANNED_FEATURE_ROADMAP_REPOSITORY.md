@@ -2,6 +2,7 @@
 
 ## Completed
 
+- REPO-2.7 (#2768): Added scan diff classification against the previous completed scan keyed by `(repository_id, path)`, including persisted `new/unchanged/modified/removed` per-file statuses with carried-forward `removed` rows and `{added, modified, removed, unchanged}` diff summary counts.
 - REPO-2.6 (#2767): Added `repository_scan` and `repository_file` history support with cursor-paginated scan/file REST endpoints, `force` rescan behavior, and `skipped_unchanged` audit/event tracking.
 - REPO-2.4 (#2765): Added `.objectified/repo.yaml` manifest support with published JSON Schema validation, non-fatal `manifest_error` repository file recording, per-spec format/polling overrides, and untracked discovery output for files not explicitly listed.
 - REPO-2.3 (#2764): Added provider-agnostic spec format detection with filename heuristics plus 64 KB content sniffing, confidence/discriminator output, and stream-mode sniffing for files larger than 5 MB.
