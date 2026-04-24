@@ -161,8 +161,9 @@ class GithubRepositoryProvider(RepositoryProvider):
 
     async def read_file(self, token: str, repo: RepoRef, branch: str, path: str) -> ReadFileResult:
         encoded_path = "/".join(quote(part, safe="") for part in path.strip("/").split("/") if part)
+        contents_path = f"/repos/{repo.owner}/{repo.name}/contents" + (f"/{encoded_path}" if encoded_path else "")
         file_response = await self._request_json(
-            f"/repos/{repo.owner}/{repo.name}/contents/{encoded_path}?ref={quote(branch, safe='')}",
+            f"{contents_path}?ref={quote(branch, safe='')}",
             token,
         )
         if not isinstance(file_response, dict):

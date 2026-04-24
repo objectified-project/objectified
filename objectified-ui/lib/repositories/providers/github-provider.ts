@@ -9,6 +9,8 @@ interface RequestJsonOptions {
   query?: Record<string, string | number | undefined>;
 }
 
+const GITHUB_MAX_PER_PAGE = 100;
+
 export class GithubRepositoryProvider implements RepositoryProvider {
   readonly id = 'github' as const;
   private readonly fetchFn: FetchFn;
@@ -18,7 +20,7 @@ export class GithubRepositoryProvider implements RepositoryProvider {
   }
 
   async *listRepositories(token: string, opts?: ListReposOpts): AsyncIterable<RepoSummary> {
-    const perPage = Math.min(opts?.perPage ?? 100, 100);
+    const perPage = Math.min(opts?.perPage ?? GITHUB_MAX_PER_PAGE, GITHUB_MAX_PER_PAGE);
     let page = opts?.page ?? 1;
     const sort = opts?.sort ?? 'updated';
 
@@ -186,7 +188,7 @@ export class GithubRepositoryProvider implements RepositoryProvider {
   ): Promise<{ contentBase64: string; sha: string; sizeBytes: number }> {
     const encodedPath = this.encodeContentPath(path);
     const content = await this.requestJson<Record<string, unknown>>({
-      path: `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/contents${encodedPath ? `/${encodedPath}` : ''}`,
+      path: `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/contents/${encodedPath}`,
       token,
       query: { ref: branch },
     });
