@@ -1,7 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { parseOpenAPISpec } from '../../src/app/utils/openapi-import';
-import { importOpenApiFromRepository } from '../../lib/repositories/importers/openapi';
+import { importOpenApiFromRepository, RepositoryOpenApiFormat } from '../../lib/repositories/importers/openapi';
+
+function deriveOpenApiFormat(content: string): RepositoryOpenApiFormat {
+  const match = content.match(/^\s*openapi\s*:\s*["']?(\d+\.\d+)/m);
+  if (match?.[1]?.startsWith('3.0')) return 'openapi_3_0';
+  return 'openapi_3_1';
+}
 
 describe('repository OpenAPI importer hook', () => {
   it('matches one-shot OpenAPI dialog parsing across the OpenAPI fixture set', async () => {
@@ -18,7 +24,7 @@ describe('repository OpenAPI importer hook', () => {
       const oneShotResult = parseOpenAPISpec(content);
       const repositoryResult = await importOpenApiFromRepository({
         source: `repository://${fixture}`,
-        format: fixture.includes('30-openapi-3.0') ? 'openapi_3_0' : 'openapi_3_1',
+        format: deriveOpenApiFormat(content),
         content,
         refs: [],
       });
@@ -71,5 +77,17 @@ components:
     expect(result.success).toBe(true);
     expect(result.parseResult?.success).toBe(true);
     expect(result.parseResult?.classes.some((cls) => cls.name === 'User')).toBe(true);
+  });
+
+  it('returns success: false when refs are present but no resolver is configured', async () => {
+    const result = await importOpenApiFromRepository({
+      source: 'repository://services/openapi.yaml',
+      format: 'openapi_3_1',
+      content: 'openapi: 3.1.0',
+      refs: [{ path: './schemas/user.yaml', content: 'type: object' }],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/REPO-3\.8/);
   });
 });

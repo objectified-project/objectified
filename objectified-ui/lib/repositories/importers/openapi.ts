@@ -1,6 +1,7 @@
 import { parseOpenAPISpec, OpenAPIParseResult } from '../../../src/app/utils/openapi-import';
+import type { DetectedRepositorySpecFormat } from '../scanner/detect';
 
-export type RepositoryOpenApiFormat = 'openapi_3_0' | 'openapi_3_1';
+export type RepositoryOpenApiFormat = Extract<DetectedRepositorySpecFormat, 'openapi_3_0' | 'openapi_3_1'>;
 
 export interface RepositoryOpenApiRef {
   path: string;
@@ -60,6 +61,16 @@ export async function importOpenApiFromRepository(
   let resolvedContent = input.content;
   const refs = input.refs ?? [];
 
+  if (refs.length > 0 && !deps.resolveRefs) {
+    return {
+      success: false,
+      source: input.source,
+      format: input.format,
+      warnings: [],
+      error: 'Cross-file $ref entries are present but no resolver is configured (REPO-3.8).',
+    };
+  }
+
   try {
     if (refs.length > 0 && deps.resolveRefs) {
       resolvedContent = await deps.resolveRefs({
@@ -85,6 +96,7 @@ export async function importOpenApiFromRepository(
       success: false,
       source: input.source,
       format: input.format,
+      resolvedContent,
       warnings: parseResult.warnings ?? [],
       error: parseResult.error || 'Failed to parse OpenAPI specification.',
     };
