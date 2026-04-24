@@ -33,6 +33,8 @@ type QueryRow = {
   owner: string;
   name: string;
   branch: string;
+  subpath_glob: string;
+  configured_poll_interval_sec: number;
   linked_account_id: string | null;
   is_enterprise: boolean;
   effective_poll_interval_sec: number;
@@ -67,6 +69,178 @@ type DetectedHead = {
   unchanged: boolean;
   etag: string | null;
 };
+
+function isBranchGlobPattern(branch: string): boolean {
+  return branch.includes('*') || branch.includes('?');
+}
+
+function escapeRegExpLiteral(value: string): string {
+  return value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+}
+
+function branchGlobToRegExp(branchGlob: string): RegExp {
+  let regex = '^';
+  for (let i = 0; i < branchGlob.length; i += 1) {
+    const char = branchGlob[i];
+    if (char === '*') {
+      const isDoubleStar = branchGlob[i + 1] === '*';
+      if (isDoubleStar) {
+        regex += '.*';
+        i += 1;
+      } else {
+        regex += '[^/]*';
+      }
+      continue;
+    }
+    if (char === '?') {
+      regex += '[^/]';
+      continue;
+    }
+    regex += escapeRegExpLiteral(char);
+  }
+  regex += '$';
+  return new RegExp(regex);
+}
+
+async function listGithubRepositoryBranches(
+  deps: PollSchedulerDeps,
+  row: QueryRow,
+  token: string
+): Promise<string[] | null> {
+  const owner = encodeURIComponent(row.owner);
+  const name = encodeURIComponent(row.name);
+  const headers: HeadersInit = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  const branchNames: string[] = [];
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const url = `${GITHUB_API_BASE}/repos/${owner}/${name}/branches?per_page=${perPage}&page=${page}`;
+    let response: Response;
+    try {
+      response = await deps.fetchImpl(url, { headers });
+    } catch (err) {
+      console.error('Failed to list provider branches for wildcard expansion', row.branch_id, ':', err);
+      return null;
+    }
+    if (!response.ok) {
+      console.error(
+        'Failed to list provider branches for wildcard expansion',
+        row.branch_id,
+        'status',
+        response.status
+      );
+      return null;
+    }
+    const payload = (await response.json()) as Array<{ name?: unknown }>;
+    if (!Array.isArray(payload)) {
+      return null;
+    }
+    for (const entry of payload) {
+      if (typeof entry.name === 'string' && entry.name) {
+        branchNames.push(entry.name);
+      }
+    }
+    if (payload.length < perPage) {
+      break;
+    }
+    page += 1;
+  }
+
+  return branchNames;
+}
+
+async function expandWildcardBranchRows(
+  deps: PollSchedulerDeps,
+  rows: QueryRow[],
+  tokenMap: Map<string, string>,
+  now: Date
+): Promise<{ dispatchRows: QueryRow[]; templateBranchIds: string[]; templateIntervalsSec: number[] }> {
+  const dispatchRows: QueryRow[] = [];
+  const templateBranchIds: string[] = [];
+  const templateIntervalsSec: number[] = [];
+
+  for (const row of rows) {
+    if (!isBranchGlobPattern(row.branch)) {
+      dispatchRows.push(row);
+      continue;
+    }
+
+    templateBranchIds.push(row.branch_id);
+    templateIntervalsSec.push(row.effective_poll_interval_sec);
+
+    if (row.provider !== 'github') {
+      continue;
+    }
+    const token = tokenMap.get(row.linked_account_id ?? '');
+    if (!token) {
+      continue;
+    }
+
+    const providerBranches = await listGithubRepositoryBranches(deps, row, token);
+    if (!providerBranches || providerBranches.length === 0) {
+      continue;
+    }
+
+    const matcher = branchGlobToRegExp(row.branch);
+    const matchingBranches = providerBranches.filter((branch) => matcher.test(branch));
+    if (matchingBranches.length === 0) {
+      continue;
+    }
+
+    try {
+      await deps.query(
+        `INSERT INTO odb.repository_branch (
+          repository_id,
+          branch,
+          subpath_glob,
+          is_tracked,
+          poll_interval_sec,
+          next_poll_at
+        )
+        SELECT
+          $1::uuid,
+          matched_branch.branch,
+          $3,
+          TRUE,
+          $4,
+          $5::timestamptz
+        FROM unnest($2::text[]) AS matched_branch(branch)
+        ON CONFLICT (repository_id, branch) DO UPDATE
+        SET
+          is_tracked = TRUE,
+          subpath_glob = EXCLUDED.subpath_glob,
+          poll_interval_sec = EXCLUDED.poll_interval_sec,
+          next_poll_at = LEAST(
+            COALESCE(odb.repository_branch.next_poll_at, EXCLUDED.next_poll_at),
+            EXCLUDED.next_poll_at
+          )`,
+        [
+          row.repository_id,
+          matchingBranches,
+          row.subpath_glob,
+          row.configured_poll_interval_sec,
+          now.toISOString(),
+        ]
+      );
+    } catch (err) {
+      console.error(
+        'Failed to upsert expanded wildcard branches',
+        matchingBranches,
+        'for row',
+        row.branch_id,
+        ':',
+        err
+      );
+    }
+  }
+
+  return { dispatchRows, templateBranchIds, templateIntervalsSec };
+}
 
 async function batchResolveLinkedAccountTokens(
   deps: PollSchedulerDeps,
@@ -306,6 +480,8 @@ export function createRepositoryPollScheduler(
           r.owner,
           r.name,
           rb.branch,
+          rb.subpath_glob,
+          rb.poll_interval_sec AS configured_poll_interval_sec,
           MIN(rcr.linked_account_id) AS linked_account_id,
           rb.last_known_sha,
           rb.last_known_etag,
@@ -344,8 +520,6 @@ export function createRepositoryPollScheduler(
     );
 
     const jobs: PollJob[] = [];
-    const processedBranchIds: string[] = [];
-    const processedIntervalsSec: number[] = [];
     const headShaBranchIds: string[] = [];
     const headShas: string[] = [];
     const headEtagBranchIds: string[] = [];
@@ -357,10 +531,18 @@ export function createRepositoryPollScheduler(
       .map((row) => row.linked_account_id)
       .filter((id): id is string => !!id);
     const tokenMap = await batchResolveLinkedAccountTokens(deps, githubLinkedAccountIds);
+    const { dispatchRows, templateBranchIds, templateIntervalsSec } = await expandWildcardBranchRows(
+      deps,
+      rowsResult.rows,
+      tokenMap,
+      now
+    );
+    const processedBranchIds: string[] = [...templateBranchIds];
+    const processedIntervalsSec: number[] = [...templateIntervalsSec];
 
     // Detect HEAD commits with bounded concurrency so scheduler latency scales.
-    const detectedHeads: (DetectedHead | null)[] = new Array(rowsResult.rows.length).fill(null);
-    const headTasks = rowsResult.rows.map((row, index) => async () => {
+    const detectedHeads: (DetectedHead | null)[] = new Array(dispatchRows.length).fill(null);
+    const headTasks = dispatchRows.map((row, index) => async () => {
       if (row.provider !== 'github') return;
       const token = tokenMap.get(row.linked_account_id ?? '');
       if (!token) return;
@@ -370,8 +552,8 @@ export function createRepositoryPollScheduler(
       await Promise.all(headTasks.slice(i, i + CONCURRENT_HEAD_CHECKS).map((fn) => fn()));
     }
 
-    for (let rowIndex = 0; rowIndex < rowsResult.rows.length; rowIndex++) {
-      const row = rowsResult.rows[rowIndex];
+    for (let rowIndex = 0; rowIndex < dispatchRows.length; rowIndex++) {
+      const row = dispatchRows[rowIndex];
       const detectedHead = detectedHeads[rowIndex] ?? null;
 
       if (detectedHead?.unchanged) {

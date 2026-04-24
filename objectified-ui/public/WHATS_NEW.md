@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added REPO-4.4 multi-branch tracking so wildcard branch templates (for example `release/*`) expand at scheduler time into tracked concrete repository branches without deleting historical scan records for previously seen branches.
 - Added poll-time branch HEAD SHA change detection with GitHub conditional `If-None-Match` checks so unchanged branches write `skipped_unchanged` scan history entries and skip downstream scan dispatch while still advancing poll cadence.
 - Added a repository poll scheduler tick that atomically reserves due tracked branches, skips paused repositories, enforces enterprise/free poll interval floors, dispatches `repo.poll.<priority>` jobs, and records `repository.polled` workflow audits.
 - Added the REPO-3.8 in-scan virtual filesystem resolver for repository imports, with dependency-ordered cross-file `$ref` resolution (relative paths + JSON pointers), per-scan memoization, and deterministic cycle detection errors.
