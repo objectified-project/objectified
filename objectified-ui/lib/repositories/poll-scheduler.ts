@@ -84,7 +84,8 @@ async function insertDispatchAudit(
       ) VALUES ($1, $2, NULL, $3, $4, $5, $6::jsonb)`,
       [args.tenantId, args.projectId, 'repository.polled', 'success', args.actorId, JSON.stringify(detail)]
     );
-  } catch {
+  } catch (err) {
+    console.error('Failed to insert workflow_audit for repository.polled:', err);
     return;
   }
 }
@@ -174,7 +175,8 @@ export function createRepositoryPollScheduler(
 
       try {
         await deps.enqueue(job);
-      } catch {
+      } catch (err) {
+        console.error('Failed to enqueue poll job for branch', job.branchId, ':', err);
         continue;
       }
 
