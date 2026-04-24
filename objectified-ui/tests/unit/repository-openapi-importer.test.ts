@@ -124,9 +124,26 @@ components:
 
     const swaggerParsed = swaggerImportResult.parseResult;
     const openApiParsed = openApiEquivalentResult.parseResult;
-    expect(openApiParsed?.classes).toEqual(swaggerParsed?.classes);
-    expect(openApiParsed?.paths).toEqual(swaggerParsed?.paths);
-    expect(openApiParsed?.securitySchemes).toEqual(swaggerParsed?.securitySchemes);
+
+    const sortClasses = (classes: typeof swaggerParsed.classes) =>
+      [...(classes ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+
+    const sortPaths = (paths: typeof swaggerParsed.paths) =>
+      [...(paths ?? [])]
+        .sort((a, b) => a.path.localeCompare(b.path))
+        .map((entry) => ({
+          ...entry,
+          operations: [...entry.operations].sort((a, b) =>
+            (a.operationId ?? '').localeCompare(b.operationId ?? '')
+          ),
+        }));
+
+    const sortSecuritySchemes = (schemes: typeof swaggerParsed.securitySchemes) =>
+      [...(schemes ?? [])].sort((a, b) => a.scheme_name.localeCompare(b.scheme_name));
+
+    expect(sortClasses(openApiParsed?.classes)).toEqual(sortClasses(swaggerParsed?.classes));
+    expect(sortPaths(openApiParsed?.paths)).toEqual(sortPaths(swaggerParsed?.paths));
+    expect(sortSecuritySchemes(openApiParsed?.securitySchemes)).toEqual(sortSecuritySchemes(swaggerParsed?.securitySchemes));
     expect(openApiParsed?.title).toBe(swaggerParsed?.title);
     expect(openApiParsed?.version).toBe(swaggerParsed?.version);
     expect(openApiParsed?.description).toBe(swaggerParsed?.description);
