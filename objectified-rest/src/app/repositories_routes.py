@@ -745,8 +745,7 @@ def _derive_import_conflicts(
                     "detail": detail.strip() if isinstance(detail, str) and detail.strip() else None,
                 }
             )
-        if conflicts:
-            return conflicts
+        return conflicts
 
     if operation != "import" or file_row.status != "modified":
         return []
@@ -1425,15 +1424,20 @@ async def resolve_repository_sync_conflict(
         if import_job is None:
             raise HTTPException(status_code=404, detail=f"Import job not found: {import_job_id}")
         normalized_schema_name = request.schemaName.strip()
-        if not any(conflict.get("schemaName") == normalized_schema_name for conflict in import_job.conflictRecords):
+        conflict_record = next(
+            (conflict for conflict in import_job.conflictRecords if conflict.get("schemaName") == normalized_schema_name),
+            None,
+        )
+        if conflict_record is None:
             raise HTTPException(status_code=404, detail=f"Conflict not found for schema: {normalized_schema_name}")
+        canonical_conflict_kinds = list(dict.fromkeys(conflict_record.get("kinds") or []))
         import_job.eventLog.append(
             {
                 "type": "repository.sync.conflict_resolved",
                 "at": _utc_now_iso(),
                 "schemaName": normalized_schema_name,
                 "choice": request.choice,
-                "conflictKinds": request.conflictKinds,
+                "conflictKinds": canonical_conflict_kinds,
                 "note": request.note.strip() if request.note and request.note.strip() else None,
             }
         )
