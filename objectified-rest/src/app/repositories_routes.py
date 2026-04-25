@@ -11,6 +11,9 @@ import base64
 import binascii
 import json
 import re
+from urllib import error as urllib_error
+from urllib import parse as urllib_parse
+from urllib import request as urllib_request
 from datetime import datetime, timezone
 from threading import Lock
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
@@ -473,81 +476,333 @@ def _make_pending_scan(
     )
 
 
-def process_pending_repository_scans(max_scans: int = 25) -> int:
-    """Process pending repository scans in-memory.
+def _github_api_get_json(url: str, access_token: str) -> Any:
+    request = urllib_request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        method="GET",
+    )
+    try:
+        with urllib_request.urlopen(request, timeout=20) as response:
+            payload = response.read()
+    except urllib_error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"GitHub API error {exc.code}: {detail[:500]}") from exc
+    except urllib_error.URLError as exc:
+        raise RuntimeError(f"GitHub API unavailable: {exc.reason}") from exc
+    try:
+        return json.loads(payload.decode("utf-8"))
+    except Exception as exc:
+        raise RuntimeError("GitHub API returned invalid JSON payload") from exc
 
-    This is a lightweight queue-drain worker used by the REST service runtime.
-    It finalizes queued scans so UI/consumers do not remain stuck in ``pending``.
-    """
+
+def _load_linked_account_access_token(linked_account_id: str | None) -> str:
+    if not linked_account_id:
+        raise RuntimeError("Repository is missing linked account reference")
+    rows = db.execute_query(
+        "SELECT access_token FROM odb.external_auth_providers WHERE id = %s::uuid LIMIT 1",
+        (linked_account_id,),
+    )
+    if not rows:
+        raise RuntimeError("Linked account not found")
+    token = rows[0].get("access_token")
+    if not isinstance(token, str) or not token.strip():
+        raise RuntimeError("Linked account has no usable access token")
+    return token.strip()
+
+
+def _guess_scan_format(path: str) -> str | None:
+    lower = path.lower()
+    if lower.endswith((".yaml", ".yml", ".json")):
+        if "asyncapi" in lower:
+            return "asyncapi_2"
+        if "openapi" in lower or "swagger" in lower:
+            return "openapi_3_1"
+        return "json_schema"
+    if lower.endswith(".graphql") or lower.endswith(".gql"):
+        return "graphql_sdl"
+    if lower.endswith(".proto"):
+        return "protobuf"
+    if lower.endswith(".avsc"):
+        return "avro"
+    return None
+
+
+def _fetch_github_scan_inputs(repository: RepositoryRecord, branch: str) -> Tuple[str, List[Dict[str, Any]]]:
+    access_token = _load_linked_account_access_token(repository.linkedAccountId)
+    owner = urllib_parse.quote(repository.owner, safe="")
+    name = urllib_parse.quote(repository.name, safe="")
+    branch_ref = urllib_parse.quote(branch, safe="")
+    commit_payload = _github_api_get_json(
+        f"https://api.github.com/repos/{owner}/{name}/commits/{branch_ref}",
+        access_token,
+    )
+    if not isinstance(commit_payload, dict) or not isinstance(commit_payload.get("sha"), str):
+        raise RuntimeError("Could not resolve branch head commit SHA")
+    commit_sha = str(commit_payload["sha"])
+    tree_payload = _github_api_get_json(
+        f"https://api.github.com/repos/{owner}/{name}/git/trees/{commit_sha}?recursive=1",
+        access_token,
+    )
+    raw_tree = tree_payload.get("tree") if isinstance(tree_payload, dict) else None
+    if not isinstance(raw_tree, list):
+        raise RuntimeError("Could not list repository tree")
+    file_rows: List[Dict[str, Any]] = []
+    for entry in raw_tree:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("type") != "blob":
+            continue
+        path = entry.get("path")
+        if not isinstance(path, str) or not path.strip():
+            continue
+        file_rows.append(
+            {
+                "path": path,
+                "blobSha": entry.get("sha") if isinstance(entry.get("sha"), str) else None,
+                "sizeBytes": entry.get("size") if isinstance(entry.get("size"), int) else None,
+            }
+        )
+    return commit_sha, file_rows
+
+
+def _build_scan_file_rows(
+    *,
+    repository: RepositoryRecord,
+    scan_id: str,
+    discovered_files: Sequence[Dict[str, Any]],
+    created_at: str,
+) -> List[RepositoryFileRecord]:
+    manifest_outcome = parse_repo_manifest(repository.manifest)
+    manifest_specs_by_path: Dict[str, Any] = {}
+    if manifest_outcome.manifest is not None:
+        manifest_specs_by_path = {spec.path: spec for spec in manifest_outcome.manifest.specs}
+
+    rows: List[RepositoryFileRecord] = []
+    for item in discovered_files:
+        path = item["path"]
+        manifest_spec = manifest_specs_by_path.get(path)
+        mapping = resolve_repository_file_mapping(path, manifest_spec)
+        settings_json = dict(mapping.settings_json or {})
+        if mapping.on_breaking_change is not None:
+            settings_json["onBreakingChange"] = mapping.on_breaking_change
+        rows.append(
+            RepositoryFileRecord(
+                id=str(uuid4()),
+                repositoryId=repository.id,
+                scanId=scan_id,
+                path=path,
+                blobSha=item.get("blobSha"),
+                sizeBytes=item.get("sizeBytes"),
+                format=_guess_scan_format(path),
+                confidence=0.9 if _guess_scan_format(path) else 0.2,
+                discriminator=None,
+                tracked=mapping.tracked,
+                projectSlug=mapping.project_slug if mapping.tracked else None,
+                versionStrategy=mapping.version_strategy,
+                settingsJson=settings_json or None,
+                promote=mapping.promote,
+                status="new",
+                qualityScore=None,
+                createdAt=created_at,
+            )
+        )
+    return rows
+
+
+def _process_single_pending_repository_scan(
+    tenant_id: str,
+    repository_id: str,
+    scan_id: str,
+) -> Tuple[bool, List[Dict[str, Any]]]:
+    with _STORE_LOCK:
+        repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
+        history = _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
+        if repository is None or not history:
+            return False, []
+        scan = next((row for row in history if row.id == scan_id and row.status == "pending"), None)
+        if scan is None:
+            return False, []
+        branch = scan.branch
+
+    try:
+        commit_sha, discovered_files = _fetch_github_scan_inputs(repository, branch)
+    except Exception as exc:
+        now = _utc_now_iso()
+        with _STORE_LOCK:
+            repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
+            history = _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
+            if repository is None or not history:
+                return False, []
+            scan_index = next((idx for idx, row in enumerate(history) if row.id == scan_id and row.status == "pending"), None)
+            if scan_index is None:
+                return False, []
+            failed_scan = history[scan_index].model_copy(
+                update={
+                    "status": "failed",
+                    "finishedAt": now,
+                    "durationMs": 0,
+                    "eventLog": [*history[scan_index].eventLog, {"type": "repository.scan.failed", "at": now}],
+                    "errorDetail": str(exc),
+                }
+            )
+            history[scan_index] = failed_scan
+            timeline = _REPO_SCAN_STORE.setdefault(repository_id, repository.timeline)
+            timeline.insert(
+                0,
+                RepositoryScanTimelineEntry(
+                    id=str(uuid4()),
+                    type="scan",
+                    status="failed",
+                    message="Scan failed.",
+                    createdAt=now,
+                ),
+            )
+            repository.timeline = list(timeline)
+            if repository.status not in {"archived", "paused"}:
+                repository.status = "error"
+            repository.updatedAt = now
+            audit = _append_audit_row(
+                tenant_id,
+                repository_id,
+                "repository.scanned",
+                actor_id=_SYSTEM_ACTOR_ID,
+                outcome="failure",
+                detail={
+                    "scanId": failed_scan.id,
+                    "branch": failed_scan.branch,
+                    "trigger": failed_scan.trigger,
+                    "status": failed_scan.status,
+                    "error": str(exc),
+                },
+            )
+        return True, [audit]
+
+    now = _utc_now_iso()
+    with _STORE_LOCK:
+        repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
+        history = _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
+        if repository is None or not history:
+            return False, []
+        scan_index = next((idx for idx, row in enumerate(history) if row.id == scan_id and row.status == "pending"), None)
+        if scan_index is None:
+            return False, []
+
+        current_files = _build_scan_file_rows(
+            repository=repository,
+            scan_id=scan_id,
+            discovered_files=discovered_files,
+            created_at=now,
+        )
+        previous_completed_scan = next(
+            (
+                row
+                for idx, row in enumerate(history)
+                if idx != scan_index and row.branch == branch and row.status == "complete"
+            ),
+            None,
+        )
+        previous_files: Sequence[RepositoryFileRecord] = []
+        if previous_completed_scan is not None:
+            previous_files = _REPO_SCAN_FILE_HISTORY_STORE.get(previous_completed_scan.id, [])
+
+        classified_files, diff_summary = _classify_scan_files_against_previous(
+            repository_id=repository_id,
+            scan_id=scan_id,
+            created_at=now,
+            current_files=current_files,
+            previous_files=previous_files,
+        )
+        _REPO_SCAN_FILE_HISTORY_STORE[scan_id] = classified_files
+
+        pending_audit_rows = _dispatch_import_jobs_for_scan(
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            scan_id=scan_id,
+            branch=branch,
+            commit_sha=commit_sha,
+            scan_files=classified_files,
+            actor_id=_SYSTEM_ACTOR_ID,
+        )
+
+        completed_scan = history[scan_index].model_copy(
+            update={
+                "commitSha": commit_sha,
+                "status": "complete",
+                "finishedAt": now,
+                "durationMs": 0,
+                "filesSeen": len(discovered_files),
+                "filesClassified": len(classified_files),
+                "filesUnknown": sum(1 for row in classified_files if not row.format),
+                "filesFailed": 0,
+                "eventLog": [*history[scan_index].eventLog, {"type": "repository.scan.complete", "at": now}],
+                "diffSummary": diff_summary,
+            }
+        )
+        history[scan_index] = completed_scan
+        timeline = _REPO_SCAN_STORE.setdefault(repository_id, repository.timeline)
+        timeline.insert(
+            0,
+            RepositoryScanTimelineEntry(
+                id=str(uuid4()),
+                type="scan",
+                status="completed",
+                message="Scan completed.",
+                createdAt=now,
+            ),
+        )
+        repository.timeline = list(timeline)
+        if repository.status not in {"archived", "paused"}:
+            repository.status = "healthy"
+        repository.updatedAt = now
+        pending_audit_rows.append(
+            _append_audit_row(
+                tenant_id,
+                repository_id,
+                "repository.scanned",
+                actor_id=_SYSTEM_ACTOR_ID,
+                detail={
+                    "scanId": completed_scan.id,
+                    "branch": completed_scan.branch,
+                    "trigger": completed_scan.trigger,
+                    "status": completed_scan.status,
+                    "diffSummary": completed_scan.diffSummary,
+                },
+            )
+        )
+    return True, pending_audit_rows
+
+
+def process_pending_repository_scans(max_scans: int = 25) -> int:
+    """Process queued repository scans and persist scan results."""
     if max_scans <= 0:
         return 0
-
-    pending_audit_rows: List[Dict[str, Any]] = []
-    processed = 0
     with _STORE_LOCK:
+        pending_targets: List[Tuple[str, str, str]] = []
         for tenant_id, repositories in _REPO_STORE.items():
             for repository in repositories.values():
                 history = _REPO_SCAN_HISTORY_STORE.get(repository.id, [])
-                if not history:
-                    continue
-
-                timeline = _REPO_SCAN_STORE.setdefault(repository.id, repository.timeline)
-                for index, scan in enumerate(history):
-                    if scan.status != "pending":
-                        continue
-
-                    now = _utc_now_iso()
-                    completed_scan = scan.model_copy(
-                        update={
-                            "status": "complete",
-                            "finishedAt": now,
-                            "durationMs": 0,
-                            "filesSeen": 0,
-                            "filesClassified": 0,
-                            "filesUnknown": 0,
-                            "filesFailed": 0,
-                            "eventLog": [*scan.eventLog, {"type": "repository.scan.complete", "at": now}],
-                            "diffSummary": _empty_scan_diff_summary(),
-                        }
-                    )
-                    history[index] = completed_scan
-                    _REPO_SCAN_FILE_HISTORY_STORE.setdefault(completed_scan.id, [])
-                    timeline.insert(
-                        0,
-                        RepositoryScanTimelineEntry(
-                            id=str(uuid4()),
-                            type="scan",
-                            status="completed",
-                            message="Scan completed.",
-                            createdAt=now,
-                        ),
-                    )
-                    repository.timeline = list(timeline)
-                    if repository.status not in {"archived", "paused"}:
-                        repository.status = "healthy"
-                    repository.updatedAt = now
-                    pending_audit_rows.append(
-                        _append_audit_row(
-                            tenant_id,
-                            repository.id,
-                            "repository.scanned",
-                            actor_id=_SYSTEM_ACTOR_ID,
-                            detail={
-                                "scanId": completed_scan.id,
-                                "branch": completed_scan.branch,
-                                "trigger": completed_scan.trigger,
-                                "status": completed_scan.status,
-                                "diffSummary": completed_scan.diffSummary,
-                            },
-                        )
-                    )
-                    processed += 1
-                    if processed >= max_scans:
-                        break
-                if processed >= max_scans:
+                for scan in history:
+                    if scan.status == "pending":
+                        pending_targets.append((tenant_id, repository.id, scan.id))
+                        if len(pending_targets) >= max_scans:
+                            break
+                if len(pending_targets) >= max_scans:
                     break
-            if processed >= max_scans:
+            if len(pending_targets) >= max_scans:
                 break
+
+    processed = 0
+    pending_audit_rows: List[Dict[str, Any]] = []
+    for tenant_id, repository_id, scan_id in pending_targets:
+        handled, rows = _process_single_pending_repository_scan(tenant_id, repository_id, scan_id)
+        if handled:
+            processed += 1
+            pending_audit_rows.extend(rows)
 
     for audit_row in pending_audit_rows:
         _persist_audit_row(audit_row)
