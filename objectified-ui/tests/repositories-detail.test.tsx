@@ -102,7 +102,7 @@ function setupFetchMock() {
         }),
       } as Response;
     }
-    if (url === '/api/repositories/repo-1/scans/scan-1/files?limit=2000' && method === 'GET') {
+    if (url === '/api/repositories/repo-1/scans/scan-1/files?limit=200' && method === 'GET') {
       return {
         ok: true,
         json: async () => ({

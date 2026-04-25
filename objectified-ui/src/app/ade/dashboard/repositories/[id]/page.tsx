@@ -371,7 +371,7 @@ export default function RepositoryDetailPage() {
     if (!repositoryId || !selectedScanId) return;
     setIsLoadingFiles(true);
     try {
-      const response = await fetch(`/api/repositories/${repositoryId}/scans/${selectedScanId}/files?limit=2000`);
+      const response = await fetch(`/api/repositories/${repositoryId}/scans/${selectedScanId}/files?limit=200`);
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to load scan files');
