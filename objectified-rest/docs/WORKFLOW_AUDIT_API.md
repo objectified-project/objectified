@@ -86,6 +86,26 @@ For **`action`** = **`version.rollback`**, **`detail`** is a JSON object that ma
 
 **`actorId`** and **`createdAt`** on the audit row identify **who** and **when**; they are not duplicated inside **`detail`**.
 
+## Repository action codes (`#2799`)
+
+Repository connector events use the same ledger and filter surface through `action`:
+
+- `repository.registered`
+- `repository.scanned`
+- `repository.sync_committed`
+- `repository.sync_pending_review`
+- `repository.sync_failed`
+- `repository.removed`
+- `repository.archived`
+- `repository.unarchived`
+- `repository.paused`
+- `repository.auto_paused`
+- `repository.token_resolved`
+- `repository.polled`
+
+Each repository row includes tenant scope (`tenant_id`), repository context in `detail.repositoryId`,
+an `actor_id` (user or system identity), and a structured `detail` JSON payload with no secrets.
+
 ## Errors
 
 | Code | When |

@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added REPO-7.1 workflow-audit repository events in the shared ledger so repository register/scan/sync/pause/poll/token/archive/remove actions now emit filterable `workflow_audit` rows with actor identity and structured detail payloads.
 - Added REPO-6.3 scan timeline upgrades with trigger/status/branch filter chips, per-scan trigger/SHA/duration/file-count summaries, and expandable failed-scan error console details from `event_log` + `error_detail`.
 - Added REPO-6.2 repository detail tabs with deep-link navigation (`branches/files/scans/sync/manifest/settings`), virtualized file lists with side-drawer file details/promote action, scan timeline links, and Monaco manifest editing with REPO-2.4 schema validation.
 - Added REPO-6.1 repository index upgrades with skeleton loading, provider/status/search filters, sortable name/last-scan/status columns, and quick row actions for **Scan now**, **Pause/Resume**, and **Open detail** under Account -> Repositories.
