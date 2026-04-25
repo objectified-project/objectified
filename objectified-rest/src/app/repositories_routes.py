@@ -670,8 +670,15 @@ def _build_diff_snapshot(file_row: RepositoryFileRecord) -> Dict[str, Any]:
     }
 
 
+def _schema_name_from_path(path: str) -> str:
+    sanitized = re.sub(r"[^a-zA-Z0-9]+", "_", path.strip("/"))
+    sanitized = sanitized.strip("_")
+    # Truncate to keep schema names at a reasonable display length.
+    return sanitized[:64] if sanitized else "repo_sync"
+
+
 def _build_repository_sync_change_report_model(file_row: RepositoryFileRecord) -> Dict[str, Any]:
-    schema_name = f"repo_{uuid4().hex[:8]}"
+    schema_name = _schema_name_from_path(file_row.path)
     baseline_openapi: Dict[str, Any] = {
         "openapi": "3.1.0",
         "info": {"title": "Repository Sync Baseline", "version": "0.0.0"},
@@ -693,14 +700,11 @@ def _build_repository_sync_change_report_model(file_row: RepositoryFileRecord) -
         "type": "object",
         "properties": {"status": {"type": "string", "const": "candidate"}},
     }
-    path_key = f"/repository-sync/{file_row.path.lstrip('/')}"
 
     if file_row.status == "new":
         candidate_openapi["components"]["schemas"][schema_name] = candidate_payload
-        candidate_openapi["paths"][path_key] = {"get": {"responses": {"200": {"description": "candidate"}}}}
     elif file_row.status == "removed":
         baseline_openapi["components"]["schemas"][schema_name] = baseline_payload
-        baseline_openapi["paths"][path_key] = {"get": {"responses": {"200": {"description": "baseline"}}}}
     elif file_row.status == "modified":
         baseline_openapi["components"]["schemas"][schema_name] = baseline_payload
         candidate_openapi["components"]["schemas"][schema_name] = candidate_payload
@@ -720,6 +724,7 @@ def _preview_target_version_id_for_dry_run(commit_sha: str, created_at_iso: str)
 
 def _resolve_target_project_slug_for_dry_run(
     *,
+    tenant_id: str,
     repository_id: str,
     file_row: RepositoryFileRecord,
     manifest_project_slug_by_path: Dict[str, str],
@@ -727,7 +732,6 @@ def _resolve_target_project_slug_for_dry_run(
     normalized_project_slug = _normalize_slug(file_row.projectSlug)
     if normalized_project_slug is None:
         return None
-    tenant_id = _find_tenant_id_for_repository(repository_id)
     tenant_projects = _REPO_PROJECT_STORE.get(tenant_id, {})
     if normalized_project_slug in tenant_projects:
         return normalized_project_slug
@@ -783,6 +787,7 @@ def _dispatch_import_jobs_for_scan(
         target_version_id: str | None = None
         if file_row.versionStrategy == "commit-sha":
             resolved_project_slug = _resolve_target_project_slug_for_dry_run(
+                tenant_id=tenant_id,
                 repository_id=repository_id,
                 file_row=file_row,
                 manifest_project_slug_by_path=manifest_project_slug_by_path,
