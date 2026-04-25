@@ -140,7 +140,7 @@ describe('Repositories index page', () => {
   });
 
   it('renders skeleton rows while loading', async () => {
-    let resolveFetch!: (value: unknown) => void;
+    let resolveFetch: (value: unknown) => void;
     const fetchPromise = new Promise((resolve) => { resolveFetch = resolve; });
     global.fetch = jest.fn(() => fetchPromise) as unknown as typeof fetch;
 
@@ -149,10 +149,11 @@ describe('Repositories index page', () => {
     const skeletons = document.querySelectorAll('.animate-pulse');
     expect(skeletons.length).toBeGreaterThan(0);
 
-    resolveFetch({
+    resolveFetch!({
       ok: true,
       json: async () => ({ success: true, repositories: [] }),
     });
+    await waitFor(() => {});
   });
 
   it('sorts repositories by name ascending then descending when name header is clicked', async () => {
