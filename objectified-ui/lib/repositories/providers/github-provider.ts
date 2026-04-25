@@ -129,6 +129,13 @@ export class GithubRepositoryProvider implements RepositoryProvider {
     return String(commit.sha ?? '');
   }
 
+  async probeIdentity(token: string): Promise<void> {
+    await this.requestJson<Record<string, unknown>>({
+      path: '/user',
+      token,
+    });
+  }
+
   async *walkTree(token: string, repo: RepoRef, branch: string, subpath?: string): AsyncIterable<TreeEntry> {
     const normalizedSubpath = normalizeSubpath(subpath);
     const response = await this.requestJson<Record<string, unknown>>({
@@ -262,6 +269,9 @@ function mapTreeType(value: unknown): TreeEntry['type'] | null {
 function normalizeError(status: number, body: string, headers: Headers): RepositoryProviderError {
   if (status === 401) {
     return new RepositoryProviderError('UNAUTHORIZED', 'Unauthorized GitHub token', status);
+  }
+  if (status === 403 && !isRateLimited(status, body, headers)) {
+    return new RepositoryProviderError('FORBIDDEN', 'GitHub token is missing required scope', status);
   }
   if (status === 404) {
     return new RepositoryProviderError('NOT_FOUND', 'GitHub resource not found', status);

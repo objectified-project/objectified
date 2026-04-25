@@ -19,6 +19,9 @@ type GitlabApiFactory = (token: string) => GitlabApi;
 type SecretGenerator = () => string;
 
 interface GitlabApi {
+  Users: {
+    current(): Promise<unknown>;
+  };
   Projects: {
     all(options: Record<string, unknown>): Promise<unknown[]>;
     show(projectId: string): Promise<unknown>;
@@ -235,6 +238,11 @@ export class GitlabRepositoryProvider implements RepositoryProvider {
     };
   }
 
+  async probeIdentity(token: string): Promise<void> {
+    const api = this.apiFactory(token);
+    await this.request(() => api.Users.current());
+  }
+
   async registerWebhook(token: string, repo: RepoRef, target: WebhookTarget): Promise<{ id: string; secret: string }> {
     const api = this.apiFactory(token);
     const secret = this.secretGenerator();
@@ -410,6 +418,9 @@ function normalizeGitlabError(error: unknown): RepositoryProviderError {
   const status = extractStatus(error);
   if (status === 401) {
     return new RepositoryProviderError('UNAUTHORIZED', 'Unauthorized GitLab token', status, { cause: error });
+  }
+  if (status === 403) {
+    return new RepositoryProviderError('FORBIDDEN', 'GitLab token is missing required scope', status, { cause: error });
   }
   if (status === 404) {
     return new RepositoryProviderError('NOT_FOUND', 'GitLab resource not found', status, { cause: error });

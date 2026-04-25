@@ -121,6 +121,13 @@ export class BitbucketRepositoryProvider implements RepositoryProvider {
     return String(target?.hash ?? '');
   }
 
+  async probeIdentity(token: string): Promise<void> {
+    await this.requestJson({
+      pathOrUrl: '/user',
+      token,
+    });
+  }
+
   async *walkTree(token: string, repo: RepoRef, branch: string, subpath?: string): AsyncIterable<TreeEntry> {
     const normalizedSubpath = normalizePath(subpath ?? '');
     const queue: string[] = [normalizedSubpath];
@@ -385,6 +392,9 @@ function normalizeBitbucketEvents(events: string[]): string[] {
 function normalizeBitbucketError(status: number, body: string, headers: Headers): RepositoryProviderError {
   if (status === 401) {
     return new RepositoryProviderError('UNAUTHORIZED', 'Unauthorized Bitbucket token', status);
+  }
+  if (status === 403 && !isBitbucketRateLimited(status, body, headers)) {
+    return new RepositoryProviderError('FORBIDDEN', 'Bitbucket token is missing required scope', status);
   }
   if (status === 404) {
     return new RepositoryProviderError('NOT_FOUND', 'Bitbucket resource not found', status);

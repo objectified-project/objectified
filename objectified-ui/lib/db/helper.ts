@@ -2613,9 +2613,19 @@ export async function getLinkedAccountsForUser(userId: string) {
     const result = await connectionPool.query(
       `SELECT id, provider, provider_user_id, provider_email, provider_username,
               (CASE WHEN access_token IS NOT NULL THEN RIGHT(access_token, 6) ELSE NULL END) AS access_token_suffix,
-              created_at, last_login_at
-       FROM odb.external_auth_providers
-       WHERE user_id = $1
+              created_at, last_login_at,
+              COALESCE(repo_usage.repository_count, 0) AS repository_count,
+              credential_health.status AS health_status,
+              credential_health.checked_at AS health_checked_at
+       FROM odb.external_auth_providers eap
+       LEFT JOIN (
+         SELECT linked_account_id, COUNT(DISTINCT repository_id) AS repository_count
+         FROM odb.repository_credential_ref
+         GROUP BY linked_account_id
+       ) repo_usage ON repo_usage.linked_account_id = eap.id
+       LEFT JOIN odb.repository_credential_health credential_health
+         ON credential_health.linked_account_id = eap.id
+       WHERE eap.user_id = $1
        ORDER BY created_at DESC`,
       [userId]
     );

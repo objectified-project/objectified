@@ -58,6 +58,9 @@ async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
 
 function makeGitlabApiMock() {
   return {
+    Users: {
+      current: jest.fn(),
+    },
     Projects: {
       all: jest.fn(),
       show: jest.fn(),
@@ -131,6 +134,11 @@ describe('RepositoryProvider contract', () => {
           sha: 'f1',
           size: 7,
         })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          login: 'acme-user',
+        })
       );
 
     const provider = new GithubRepositoryProvider(fetchMock);
@@ -141,6 +149,7 @@ describe('RepositoryProvider contract', () => {
     const sha = await provider.getCommitSha('token-1', { owner: 'acme', name: 'repo-a' }, 'main');
     const tree = await collect(provider.walkTree('token-1', { owner: 'acme', name: 'repo-a' }, 'main', 'docs'));
     const file = await provider.readFile('token-1', { owner: 'acme', name: 'repo-a' }, 'main', 'docs/readme.md');
+    await provider.probeIdentity('token-1');
 
     expect(repos).toHaveLength(1);
     expect(repo.fullName).toBe('acme/repo-a');
@@ -274,6 +283,7 @@ describe('GitLab RepositoryProvider contract', () => {
       blob_id: 'f1',
       size: 7,
     });
+    api.Users.current.mockResolvedValueOnce({ id: 101, username: 'acme-user' });
     api.ProjectHooks.add.mockResolvedValueOnce({ id: 42 });
     api.ProjectHooks.remove.mockResolvedValueOnce(undefined);
 
@@ -285,6 +295,7 @@ describe('GitLab RepositoryProvider contract', () => {
     const sha = await provider.getCommitSha('token-1', { owner: 'acme', name: 'repo-a' }, 'main');
     const tree = await collect(provider.walkTree('token-1', { owner: 'acme', name: 'repo-a' }, 'main', 'docs'));
     const file = await provider.readFile('token-1', { owner: 'acme', name: 'repo-a' }, 'main', 'docs/readme.md');
+    await provider.probeIdentity('token-1');
     const webhook = await provider.registerWebhook('token-1', { owner: 'acme', name: 'repo-a' }, {
       url: 'https://example.com/hooks/gitlab',
       events: ['push'],
@@ -435,7 +446,8 @@ describe('Bitbucket RepositoryProvider contract', () => {
       )
       .mockResolvedValueOnce(textResponse('content'))
       .mockResolvedValueOnce(jsonResponse({ uuid: '{hook-123}' }))
-      .mockResolvedValueOnce(jsonResponse({}, { status: 204 }));
+      .mockResolvedValueOnce(jsonResponse({}, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ username: 'acme-user' }));
 
     const provider = new BitbucketRepositoryProvider(fetchMock);
 
@@ -450,6 +462,7 @@ describe('Bitbucket RepositoryProvider contract', () => {
       events: ['repo:push'],
     });
     await provider.removeWebhook('token-1', { owner: 'acme', name: 'repo-a' }, webhook.id);
+    await provider.probeIdentity('token-1');
 
     const validHeaders = new Headers({ 'x-hook-uuid': '{hook-123}' });
     const invalidHeaders = new Headers({ 'x-hook-uuid': '{hook-999}' });

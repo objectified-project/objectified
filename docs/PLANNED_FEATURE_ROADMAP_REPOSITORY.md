@@ -2,6 +2,7 @@
 
 ## Completed
 
+- REPO-7.4 (#2802): Added linked-account token health monitoring by introducing per-credential probe persistence, classifying daily probe outcomes (`healthy` / `scope_missing` / `revoked` / `network_error`), auto-pausing repositories bound to revoked credentials, and surfacing usage + verification + reconnect states in Linked Accounts UI.
 - REPO-7.1 (#2799): Added repository workflow-audit coverage in the shared `workflow_audit` ledger, documenting and emitting repository action codes (`registered/scanned/sync/pause/poll/token/archive/remove`) with structured per-event detail payloads and actor identities.
 - REPO-6.3 (#2796): Added scan timeline upgrades in the repository detail view with trigger/status/branch filter chips, per-row trigger/SHA/duration/file-count summaries, and expandable failed-scan error consoles that render `repository_scan.event_log` plus `error_detail`.
 - REPO-6.2 (#2795): Added the repository detail experience at `/ade/dashboard/repositories/{id}` with deep-link tabs (`branches/files/scans/sync/manifest/settings`), virtualized file rendering + drawer details, scan timeline links for REPO-6.3 and `repository_scan` drill-in, and Monaco-based manifest editing with REPO-2.4 schema validation.

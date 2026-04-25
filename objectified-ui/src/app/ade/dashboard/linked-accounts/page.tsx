@@ -45,6 +45,9 @@ interface LinkedAccount {
   access_token_suffix?: string | null;
   created_at: string;
   last_login_at: string | null;
+  repository_count: number;
+  health_status: 'healthy' | 'scope_missing' | 'revoked' | 'network_error' | null;
+  health_checked_at: string | null;
 }
 
 interface ProviderConfig {
@@ -96,7 +99,21 @@ const LinkedAccounts = () => {
     setIsLoading(true);
     try {
       const result = await getLinkedAccountsForUser(userId);
-      setLinkedAccounts(JSON.parse(result));
+      const parsed = JSON.parse(result) as Array<Record<string, unknown>>;
+      setLinkedAccounts(
+        parsed.map((account) => ({
+          ...(account as unknown as LinkedAccount),
+          repository_count: Number(account.repository_count ?? 0),
+          health_status:
+            account.health_status === 'healthy' ||
+            account.health_status === 'scope_missing' ||
+            account.health_status === 'revoked' ||
+            account.health_status === 'network_error'
+              ? account.health_status
+              : null,
+          health_checked_at: typeof account.health_checked_at === 'string' ? account.health_checked_at : null,
+        }))
+      );
     } catch (error: any) {
       setErrorMessage('Failed to load linked accounts');
     } finally {
@@ -233,6 +250,36 @@ const LinkedAccounts = () => {
     return `${datePart} ${timePart}`;
   };
 
+  const formatVerificationAge = (checkedAt: string | null) => {
+    if (!checkedAt) {
+      return 'not yet verified';
+    }
+    const deltaMs = Date.now() - new Date(checkedAt).getTime();
+    if (!Number.isFinite(deltaMs) || deltaMs < 0) {
+      return 'just now';
+    }
+    const hours = Math.floor(deltaMs / (60 * 60 * 1000));
+    if (hours < 1) {
+      return 'just now';
+    }
+    return `${hours}h ago`;
+  };
+
+  const getHealthPresentation = (status: LinkedAccount['health_status']) => {
+    switch (status) {
+      case 'healthy':
+        return { label: '\u2713 healthy', toneClass: 'text-emerald-600 dark:text-emerald-400', needsReconnect: false };
+      case 'scope_missing':
+        return { label: '\u26a0 scope missing', toneClass: 'text-amber-600 dark:text-amber-400', needsReconnect: true };
+      case 'revoked':
+        return { label: '\u2716 revoked', toneClass: 'text-red-600 dark:text-red-400', needsReconnect: true };
+      case 'network_error':
+        return { label: '\u26a0 network error', toneClass: 'text-amber-600 dark:text-amber-400', needsReconnect: true };
+      default:
+        return { label: '\u2026 pending verification', toneClass: 'text-gray-500 dark:text-gray-400', needsReconnect: false };
+    }
+  };
+
   if (!session) {
     return (
       <div className="p-6">
@@ -292,6 +339,7 @@ const LinkedAccounts = () => {
                     const Icon = getProviderIcon(account.provider);
                     const displayName = getProviderDisplayName(account.provider);
                     const config = providerConfigs[account.provider];
+                    const health = getHealthPresentation(account.health_status);
 
                     return (
                       <tr key={account.id} className={dashboardTrHoverClass}>
@@ -306,6 +354,9 @@ const LinkedAccounts = () => {
                             <div>
                               <div className="text-sm font-semibold text-gray-900 dark:text-white">{displayName}</div>
                               <div className="text-sm text-gray-500 dark:text-gray-400">{account.provider_username || account.provider_email}</div>
+                              <div className={`text-xs mt-1 ${health.toneClass}`}>
+                                {`Used by ${account.repository_count} ${account.repository_count === 1 ? 'repository' : 'repositories'} \u00b7 last verified ${formatVerificationAge(account.health_checked_at)} \u00b7 ${health.label}`}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -316,10 +367,22 @@ const LinkedAccounts = () => {
                           {account.last_login_at ? formatDate(account.last_login_at) : '—'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <Button variant="outline" size="sm" onClick={() => handleUnlinkAccount(account)} disabled={isLoading} className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300">
-                            <Trash2 className="h-4 w-4" />
-                            Unlink
-                          </Button>
+                          <div className="flex justify-end items-center gap-2">
+                            {health.needsReconnect && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleLinkAccount(account.provider)}
+                                disabled={isLoading}
+                              >
+                                Reconnect
+                              </Button>
+                            )}
+                            <Button variant="outline" size="sm" onClick={() => handleUnlinkAccount(account)} disabled={isLoading} className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300">
+                              <Trash2 className="h-4 w-4" />
+                              Unlink
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
