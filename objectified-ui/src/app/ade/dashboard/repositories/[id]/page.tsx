@@ -184,15 +184,14 @@ export default function RepositoryDetailPage() {
       return;
     }
     let cancelled = false;
-    void (async () => {
+    Promise.all([
+      import('ajv/dist/2020'),
+      import('yaml'),
+    ]).then(([{ default: Ajv2020 }, { parse: parseYaml }]) => {
+      if (cancelled) return;
+      const ajv = new Ajv2020({ allErrors: true, strict: false });
+      const validate = ajv.compile(repositoryManifestSchema);
       try {
-        const [{ default: Ajv2020 }, { parse: parseYaml }] = await Promise.all([
-          import('ajv/dist/2020'),
-          import('yaml'),
-        ]);
-        if (cancelled) return;
-        const ajv = new Ajv2020({ allErrors: true, strict: false });
-        const validate = ajv.compile(repositoryManifestSchema);
         const parsed = parseYaml(source);
         const valid = validate(parsed);
         if (cancelled) return;
@@ -206,7 +205,10 @@ export default function RepositoryDetailPage() {
         if (cancelled) return;
         setManifestValidation({ valid: false, errors: [e instanceof Error ? e.message : 'Invalid YAML'] });
       }
-    })();
+    }).catch((e) => {
+      if (cancelled) return;
+      setManifestValidation({ valid: false, errors: [e instanceof Error ? e.message : 'Invalid YAML'] });
+    });
     return () => { cancelled = true; };
   }, [manifestDraft]);
 
@@ -341,16 +343,6 @@ export default function RepositoryDetailPage() {
       void loadScanFiles();
     }
   }, [activeTab, loadScanFiles, selectedScanId]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && selectedFile) {
-        setSelectedFile(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedFile]);
 
   useEffect(() => {
     if (selectedFile && fileDrawerRef.current) {
@@ -915,6 +907,7 @@ export default function RepositoryDetailPage() {
             aria-modal="true"
             aria-label="File detail drawer"
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => { if (event.key === 'Escape') setSelectedFile(null); }}
           >
             <div className="flex items-center justify-between">
               <h3 className="font-semibold flex items-center gap-2"><FileCode2 className="h-4 w-4" />{selectedFile.path}</h3>
