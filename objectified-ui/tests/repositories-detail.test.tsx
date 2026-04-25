@@ -183,10 +183,34 @@ describe('Repository detail page tabs', () => {
     expect(screen.getByText(/Trigger manual/)).toBeInTheDocument();
     expect(screen.getByText(/Files seen 11 .* classified 7 .* unknown 2 .* failed 2/)).toBeInTheDocument();
 
+    // status filter
     fireEvent.click(screen.getByRole('button', { name: 'Status: failed' }));
     expect(screen.queryByText('main · complete')).not.toBeInTheDocument();
     expect(screen.getByText('release/2026.04 · failed')).toBeInTheDocument();
 
+    // reset status filter before next assertion
+    fireEvent.click(screen.getByRole('button', { name: 'Status: All' }));
+    await waitFor(() => expect(screen.getByText('main · complete')).toBeInTheDocument());
+
+    // trigger filter
+    fireEvent.click(screen.getByRole('button', { name: 'Trigger: scheduled' }));
+    expect(screen.queryByText('main · complete')).not.toBeInTheDocument();
+    expect(screen.getByText('release/2026.04 · failed')).toBeInTheDocument();
+
+    // reset trigger filter before next assertion
+    fireEvent.click(screen.getByRole('button', { name: 'Trigger: All' }));
+    await waitFor(() => expect(screen.getByText('main · complete')).toBeInTheDocument());
+
+    // branch filter
+    fireEvent.click(screen.getByRole('button', { name: 'Branch: main' }));
+    expect(screen.getByText('main · complete')).toBeInTheDocument();
+    expect(screen.queryByText('release/2026.04 · failed')).not.toBeInTheDocument();
+
+    // reset branch filter
+    fireEvent.click(screen.getByRole('button', { name: 'Branch: All' }));
+    await waitFor(() => expect(screen.getByText('release/2026.04 · failed')).toBeInTheDocument());
+
+    // failed scan error console
     fireEvent.click(screen.getByRole('button', { name: 'Show errors' }));
     await waitFor(() => expect(screen.getByText(/Repository import failed for openapi\.yaml/)).toBeInTheDocument());
   });

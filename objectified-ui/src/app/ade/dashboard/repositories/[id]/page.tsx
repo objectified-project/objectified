@@ -456,29 +456,31 @@ export default function RepositoryDetailPage() {
     [filteredFiles, visibleRange.end, visibleRange.start]
   );
 
+  const normalizeScanFilterValue = useCallback((value?: string | null) => value || 'unknown', []);
+
   const scanTriggerOptions = useMemo(
-    () => Array.from(new Set(scans.map((scan) => scan.trigger || 'unknown'))),
-    [scans]
+    () => Array.from(new Set(scans.map((scan) => normalizeScanFilterValue(scan.trigger)))),
+    [normalizeScanFilterValue, scans]
   );
 
   const scanStatusOptions = useMemo(
-    () => Array.from(new Set(scans.map((scan) => scan.status || 'unknown'))),
-    [scans]
+    () => Array.from(new Set(scans.map((scan) => normalizeScanFilterValue(scan.status)))),
+    [normalizeScanFilterValue, scans]
   );
 
   const scanBranchOptions = useMemo(
-    () => Array.from(new Set(scans.map((scan) => scan.branch || 'unknown'))),
-    [scans]
+    () => Array.from(new Set(scans.map((scan) => normalizeScanFilterValue(scan.branch)))),
+    [normalizeScanFilterValue, scans]
   );
 
   const filteredScans = useMemo(() => {
     return scans.filter((scan) => {
-      if (scanTriggerFilter !== 'all' && scan.trigger !== scanTriggerFilter) return false;
-      if (scanStatusFilter !== 'all' && scan.status !== scanStatusFilter) return false;
-      if (scanBranchFilter !== 'all' && scan.branch !== scanBranchFilter) return false;
+      if (scanTriggerFilter !== 'all' && normalizeScanFilterValue(scan.trigger) !== scanTriggerFilter) return false;
+      if (scanStatusFilter !== 'all' && normalizeScanFilterValue(scan.status) !== scanStatusFilter) return false;
+      if (scanBranchFilter !== 'all' && normalizeScanFilterValue(scan.branch) !== scanBranchFilter) return false;
       return true;
     });
-  }, [scanBranchFilter, scanStatusFilter, scanTriggerFilter, scans]);
+  }, [normalizeScanFilterValue, scanBranchFilter, scanStatusFilter, scanTriggerFilter, scans]);
 
   const saveBranches = async () => {
     if (!repository || branchRows.length === 0) {
