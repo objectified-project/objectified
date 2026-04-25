@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional
 import asyncio
 import json
 import logging
+import os
 import yaml
 
 from .database import db, Database
@@ -32,7 +33,7 @@ from .push_webhook_crypto import validate_webhook_signing_key
 from .change_report_routes import router as change_report_router
 from .version_change_report_routes import router as version_change_report_router
 from .change_report_template_routes import router as change_report_template_router
-from .repositories_routes import router as repositories_router
+from .repositories_routes import process_pending_repository_scans, router as repositories_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -109,6 +110,7 @@ app.include_router(repositories_router)
 
 
 _webhook_delivery_task: asyncio.Task | None = None
+_repository_scan_worker_task: asyncio.Task | None = None
 
 
 @app.on_event("startup")
@@ -164,11 +166,30 @@ async def startup_event():
     global _webhook_delivery_task
     _webhook_delivery_task = asyncio.create_task(_webhook_delivery_sweep())
 
+    async def _repository_scan_worker_loop() -> None:
+        log = logging.getLogger(__name__)
+        while True:
+            await asyncio.sleep(2)
+            try:
+                drained = process_pending_repository_scans()
+                if drained > 0:
+                    log.info("Processed %s pending repository scans", drained)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("repository scan worker loop")
+
+    # Keep deterministic unit tests by disabling the worker under pytest.
+    if "PYTEST_CURRENT_TEST" not in os.environ:
+        global _repository_scan_worker_task
+        _repository_scan_worker_task = asyncio.create_task(_repository_scan_worker_loop())
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Close database connection on shutdown."""
     global _webhook_delivery_task
+    global _repository_scan_worker_task
     if _webhook_delivery_task is not None:
         _webhook_delivery_task.cancel()
         try:
@@ -176,6 +197,13 @@ async def shutdown_event():
         except asyncio.CancelledError:
             pass
         _webhook_delivery_task = None
+    if _repository_scan_worker_task is not None:
+        _repository_scan_worker_task.cancel()
+        try:
+            await _repository_scan_worker_task
+        except asyncio.CancelledError:
+            pass
+        _repository_scan_worker_task = None
     db.close()
 
 

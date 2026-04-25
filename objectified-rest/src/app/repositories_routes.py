@@ -473,6 +473,87 @@ def _make_pending_scan(
     )
 
 
+def process_pending_repository_scans(max_scans: int = 25) -> int:
+    """Process pending repository scans in-memory.
+
+    This is a lightweight queue-drain worker used by the REST service runtime.
+    It finalizes queued scans so UI/consumers do not remain stuck in ``pending``.
+    """
+    if max_scans <= 0:
+        return 0
+
+    pending_audit_rows: List[Dict[str, Any]] = []
+    processed = 0
+    with _STORE_LOCK:
+        for tenant_id, repositories in _REPO_STORE.items():
+            for repository in repositories.values():
+                history = _REPO_SCAN_HISTORY_STORE.get(repository.id, [])
+                if not history:
+                    continue
+
+                timeline = _REPO_SCAN_STORE.setdefault(repository.id, repository.timeline)
+                for index, scan in enumerate(history):
+                    if scan.status != "pending":
+                        continue
+
+                    now = _utc_now_iso()
+                    completed_scan = scan.model_copy(
+                        update={
+                            "status": "complete",
+                            "finishedAt": now,
+                            "durationMs": 0,
+                            "filesSeen": 0,
+                            "filesClassified": 0,
+                            "filesUnknown": 0,
+                            "filesFailed": 0,
+                            "eventLog": [*scan.eventLog, {"type": "repository.scan.complete", "at": now}],
+                            "diffSummary": _empty_scan_diff_summary(),
+                        }
+                    )
+                    history[index] = completed_scan
+                    _REPO_SCAN_FILE_HISTORY_STORE.setdefault(completed_scan.id, [])
+                    timeline.insert(
+                        0,
+                        RepositoryScanTimelineEntry(
+                            id=str(uuid4()),
+                            type="scan",
+                            status="completed",
+                            message="Scan completed.",
+                            createdAt=now,
+                        ),
+                    )
+                    repository.timeline = list(timeline)
+                    if repository.status not in {"archived", "paused"}:
+                        repository.status = "healthy"
+                    repository.updatedAt = now
+                    pending_audit_rows.append(
+                        _append_audit_row(
+                            tenant_id,
+                            repository.id,
+                            "repository.scanned",
+                            actor_id=_SYSTEM_ACTOR_ID,
+                            detail={
+                                "scanId": completed_scan.id,
+                                "branch": completed_scan.branch,
+                                "trigger": completed_scan.trigger,
+                                "status": completed_scan.status,
+                                "diffSummary": completed_scan.diffSummary,
+                            },
+                        )
+                    )
+                    processed += 1
+                    if processed >= max_scans:
+                        break
+                if processed >= max_scans:
+                    break
+            if processed >= max_scans:
+                break
+
+    for audit_row in pending_audit_rows:
+        _persist_audit_row(audit_row)
+    return processed
+
+
 def _make_skipped_unchanged_scan(
     *,
     repository_id: str,
