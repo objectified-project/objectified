@@ -47,6 +47,7 @@ export interface WebhookTarget {
 export type RepositoryProviderErrorCode =
   | 'RATE_LIMITED'
   | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'NETWORK'
   | 'SCAN_LIMIT_EXCEEDED'

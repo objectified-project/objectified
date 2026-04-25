@@ -36,6 +36,7 @@ export interface RepositoryProvider {
     branch: string,
     path: string
   ): Promise<{ contentBase64: string; sha: string; sizeBytes: number }>;
+  probeIdentity(token: string): Promise<void>;
 
   registerWebhook?(token: string, repo: RepoRef, target: WebhookTarget): Promise<{ id: string; secret: string }>;
   removeWebhook?(token: string, repo: RepoRef, id: string): Promise<void>;
