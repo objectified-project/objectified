@@ -2,6 +2,7 @@
 
 ## Completed
 
+- REPO-6.1 (#2794): Added an ADE repositories index experience with provider/status/search filters, sortable repository health and last-scan columns, skeleton-loading rows, and quick row actions for scan-now, pause/resume, and detail navigation from Account -> Repositories.
 - REPO-5.6 (#2791): Added manifest-driven promotion gates by defaulting repository sync promotions to `manual`, preserving `repository.sync_committed` audit + change-report persistence for `promote: auto`, and forcing manual review whenever `onBreakingChange: block` is configured.
 - REPO-5.5 (#2790): Added repository-sync conflict detection against the current draft by reusing import-pipeline conflict taxonomy, exposing conflict + resolution event history through sync-history endpoints for REPO-6.2 UI consumption, and persisting resolution choices on each `import_job.event_log`.
 - REPO-5.4 (#2789): Added repository-sync dry-run change report previews by generating a persisted `ChangeReportModel` per dispatched import job (`source_kind='repository_sync'`), keeping manual promotions in review while auto promotions proceed, and preventing dry-run scans from mutating resolved version-head state.

@@ -1,13 +1,14 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { GitBranchPlus, Search, Loader2 } from 'lucide-react';
+import { GitBranchPlus, Search } from 'lucide-react';
 import { SiGithub } from 'react-icons/si';
 import { Button } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
 import { Alert } from '@/app/components/ui/Alert';
 import { EmptyState } from '@/app/components/ui/EmptyState';
+import { Skeleton } from '@/app/components/ui/Skeleton';
 import {
   Dialog,
   DialogContent,
@@ -58,6 +59,7 @@ interface RegisteredRepository {
   fullName: string;
   status: string;
   branches: string[];
+  lastScanAt?: string | null;
 }
 
 function formatRepositoryStatus(status: string): string {
@@ -66,12 +68,43 @@ function formatRepositoryStatus(status: string): string {
   return status.replace(/_/g, ' ');
 }
 
+type RepositorySortField = 'name' | 'lastScan' | 'status';
+type RepositorySortDirection = 'asc' | 'desc';
+
+function formatLastScan(lastScanAt: string | null | undefined): string {
+  if (!lastScanAt) return 'Never';
+  return new Date(lastScanAt).toLocaleString();
+}
+
+function statusChipClass(status: string): string {
+  if (status === 'healthy') {
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200';
+  }
+  if (status === 'warnings') {
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-200';
+  }
+  if (status === 'error') {
+    return 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200';
+  }
+  if (status === 'scan_in_progress') {
+    return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-200';
+  }
+  if (status === 'archived') {
+    return 'bg-slate-200 text-slate-700 dark:bg-slate-700/70 dark:text-slate-200';
+  }
+  return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+}
+
 const RepositoriesPage = () => {
   const router = useRouter();
   const copy = getRepositoriesI18nBundle('en');
 
   const [repositories, setRepositories] = useState<RegisteredRepository[]>([]);
   const [search, setSearch] = useState('');
+  const [providerFilter, setProviderFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortField, setSortField] = useState<RepositorySortField>('lastScan');
+  const [sortDirection, setSortDirection] = useState<RepositorySortDirection>('desc');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -89,25 +122,26 @@ const RepositoriesPage = () => {
   const [manifest, setManifest] = useState('');
   const [isWizardBusy, setIsWizardBusy] = useState(false);
 
-  useEffect(() => {
-    const loadRepositories = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch('/api/repositories');
-        const data = await response.json();
-        if (!response.ok || !data.success) {
-          throw new Error(data.error || 'Failed to load repositories');
-        }
-        setRepositories(data.repositories || []);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to load repositories';
-        setErrorMessage(message);
-      } finally {
-        setIsLoading(false);
+  const loadRepositories = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/repositories');
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to load repositories');
       }
-    };
-    void loadRepositories();
+      setRepositories(data.repositories || []);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load repositories';
+      setErrorMessage(message);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadRepositories();
+  }, [loadRepositories]);
 
   const openWizard = async () => {
     setWizardOpen(true);
@@ -193,11 +227,91 @@ const RepositoriesPage = () => {
     );
   }, [githubRepos, repoSearch]);
 
-  const filteredRegisteredRepos = useMemo(() => {
+  const providerOptions = useMemo(() => {
+    return Array.from(new Set(repositories.map((repo) => repo.provider))).sort((a, b) => a.localeCompare(b));
+  }, [repositories]);
+
+  const statusOptions = useMemo(() => {
+    return Array.from(new Set(repositories.map((repo) => repo.status))).sort((a, b) => a.localeCompare(b));
+  }, [repositories]);
+
+  const filteredAndSortedRepos = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return repositories;
-    return repositories.filter((repo) => repo.fullName.toLowerCase().includes(q));
-  }, [repositories, search]);
+    const filtered = repositories.filter((repo) => {
+      const matchesSearch =
+        q.length === 0 ||
+        repo.fullName.toLowerCase().includes(q) ||
+        repo.name.toLowerCase().includes(q) ||
+        repo.owner.toLowerCase().includes(q);
+      const matchesProvider = providerFilter === 'all' || repo.provider === providerFilter;
+      const matchesStatus = statusFilter === 'all' || repo.status === statusFilter;
+      return matchesSearch && matchesProvider && matchesStatus;
+    });
+
+    const sorted = [...filtered].sort((left, right) => {
+      if (sortField === 'name') {
+        return left.fullName.localeCompare(right.fullName);
+      }
+      if (sortField === 'status') {
+        return formatRepositoryStatus(left.status).localeCompare(formatRepositoryStatus(right.status));
+      }
+      const leftStamp = left.lastScanAt ? Date.parse(left.lastScanAt) : 0;
+      const rightStamp = right.lastScanAt ? Date.parse(right.lastScanAt) : 0;
+      return leftStamp - rightStamp;
+    });
+
+    return sortDirection === 'asc' ? sorted : sorted.reverse();
+  }, [repositories, providerFilter, search, sortDirection, sortField, statusFilter]);
+
+  const handleSort = (field: RepositorySortField) => {
+    if (sortField !== field) {
+      setSortField(field);
+      setSortDirection(field === 'lastScan' ? 'desc' : 'asc');
+      return;
+    }
+    setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+  };
+
+  const triggerScanNow = async (repository: RegisteredRepository) => {
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const fallbackBranch = repository.branches[0] || 'main';
+      const response = await fetch(`/api/repositories/${repository.id}/scans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branch: fallbackBranch, force: true }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to queue repository scan');
+      }
+      await loadRepositories();
+      setSuccessMessage(copy.scanQueuedMessage);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to queue repository scan';
+      setErrorMessage(message);
+    }
+  };
+
+  const togglePauseState = async (repository: RegisteredRepository) => {
+    setErrorMessage('');
+    setSuccessMessage('');
+    const isArchived = repository.status === 'archived';
+    const action = isArchived ? 'unarchive' : 'archive';
+    try {
+      const response = await fetch(`/api/repositories/${repository.id}/${action}`, { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `Failed to ${isArchived ? 'resume' : 'pause'} repository`);
+      }
+      await loadRepositories();
+      setSuccessMessage(isArchived ? copy.resumedMessage : copy.pausedMessage);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `Failed to ${isArchived ? 'resume' : 'pause'} repository`;
+      setErrorMessage(message);
+    }
+  };
 
   const toggleBranch = (branchName: string) => {
     setSelectedBranches((prev) => {
@@ -343,67 +457,155 @@ const RepositoriesPage = () => {
           )}
 
           <section className={`${dashboardPanelClass} p-4`}>
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={copy.searchPlaceholder}
-                className="pl-8"
-              />
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={copy.searchPlaceholder}
+                  className="pl-8"
+                />
+              </div>
+              <select
+                className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                value={providerFilter}
+                onChange={(event) => setProviderFilter(event.target.value)}
+                aria-label={copy.tableProvider}
+              >
+                <option value="all">{copy.providerAll}</option>
+                {providerOptions.map((provider) => (
+                  <option key={provider} value={provider}>
+                    {provider}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                aria-label={copy.tableStatus}
+              >
+                <option value="all">{copy.statusAll}</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {formatRepositoryStatus(status)}
+                  </option>
+                ))}
+              </select>
             </div>
           </section>
 
           <section>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-10 text-sm text-gray-500 dark:text-gray-400">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                {copy.loadingRepositories}
-              </div>
-            ) : filteredRegisteredRepos.length === 0 ? (
+            {!isLoading && filteredAndSortedRepos.length === 0 ? (
               <EmptyState
                 icon={<GitBranchPlus className="h-10 w-10" />}
                 title={copy.emptyTitle}
                 description={copy.emptyDescription}
+                action={<Button onClick={() => void openWizard()}>{copy.emptyAction}</Button>}
               />
             ) : (
               <div className={dashboardTableWrapClass}>
                 <table className="min-w-full">
                   <thead className={dashboardTableTheadClass}>
                     <tr>
-                      <th className={dashboardThClass}>{copy.tableRepo}</th>
+                      <th
+                        className={dashboardThClass}
+                        aria-sort={sortField === 'name' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      >
+                        <button type="button" onClick={() => handleSort('name')} className="inline-flex items-center gap-1">
+                          {copy.tableRepo}
+                          {sortField === 'name' ? (sortDirection === 'asc' ? '↑' : '↓') : null}
+                          <span className="sr-only">
+                            {sortField === 'name'
+                              ? `, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}`
+                              : ', not sorted'}
+                          </span>
+                        </button>
+                      </th>
                       <th className={dashboardThClass}>{copy.tableProvider}</th>
                       <th className={dashboardThClass}>{copy.tableBranches}</th>
-                      <th className={dashboardThClass}>{copy.tableStatus}</th>
-                      <th className={dashboardThRightClass} />
+                      <th
+                        className={dashboardThClass}
+                        aria-sort={sortField === 'status' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      >
+                        <button type="button" onClick={() => handleSort('status')} className="inline-flex items-center gap-1">
+                          {copy.tableStatus}
+                          {sortField === 'status' ? (sortDirection === 'asc' ? '↑' : '↓') : null}
+                          <span className="sr-only">
+                            {sortField === 'status'
+                              ? `, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}`
+                              : ', not sorted'}
+                          </span>
+                        </button>
+                      </th>
+                      <th
+                        className={dashboardThClass}
+                        aria-sort={sortField === 'lastScan' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      >
+                        <button type="button" onClick={() => handleSort('lastScan')} className="inline-flex items-center gap-1">
+                          {copy.tableLastScan}
+                          {sortField === 'lastScan' ? (sortDirection === 'asc' ? '↑' : '↓') : null}
+                          <span className="sr-only">
+                            {sortField === 'lastScan'
+                              ? `, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}`
+                              : ', not sorted'}
+                          </span>
+                        </button>
+                      </th>
+                      <th className={dashboardThRightClass}>{copy.tableActions}</th>
                     </tr>
                   </thead>
                   <tbody className={dashboardTbodyClass}>
-                    {filteredRegisteredRepos.map((repo) => (
-                      <tr key={repo.id} className={dashboardTrHoverClass}>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {repo.fullName}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 capitalize">
-                          {repo.provider}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-                          {(repo.branches || []).join(', ')}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-                          {formatRepositoryStatus(repo.status)}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => router.push(`/ade/dashboard/repositories/${repo.id}`)}
-                          >
-                            {copy.viewButton}
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                    {isLoading
+                      ? Array.from({ length: 6 }).map((_, idx) => (
+                          <tr key={`skeleton-${idx}`} className={dashboardTrHoverClass}>
+                            <td className="px-6 py-4"><Skeleton className="h-4 w-52" /></td>
+                            <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>
+                            <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                            <td className="px-6 py-4"><Skeleton className="h-6 w-28 rounded-full" /></td>
+                            <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
+                            <td className="px-6 py-4"><Skeleton className="h-8 w-60" /></td>
+                          </tr>
+                        ))
+                      : filteredAndSortedRepos.map((repo) => (
+                          <tr key={repo.id} className={dashboardTrHoverClass}>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {repo.fullName}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 capitalize">
+                              {repo.provider}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                              {(repo.branches || []).join(', ')}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                              <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${statusChipClass(repo.status)}`}>
+                                {formatRepositoryStatus(repo.status)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                              {formatLastScan(repo.lastScanAt)}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button size="sm" variant="outline" onClick={() => void triggerScanNow(repo)}>
+                                  {copy.scanNowButton}
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => void togglePauseState(repo)}>
+                                  {repo.status === 'archived' ? copy.resumeButton : copy.pauseButton}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => router.push(`/ade/dashboard/repositories/${repo.id}`)}
+                                >
+                                  {copy.openDetailButton}
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                   </tbody>
                 </table>
               </div>

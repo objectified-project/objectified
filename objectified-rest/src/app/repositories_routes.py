@@ -510,7 +510,20 @@ def _normalize_branches(branches: List[RepositoryBranchInput]) -> List[Repositor
     return normalized_branches
 
 
+def _get_repository_last_scan_at(repository_id: str) -> Optional[str]:
+    with _STORE_LOCK:
+        scan_timestamps = [
+            scan.createdAt or scan.startedAt or scan.finishedAt
+            for scan in _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
+            if scan.createdAt or scan.startedAt or scan.finishedAt
+        ]
+    return max(scan_timestamps) if scan_timestamps else None
+
+
 def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
+    timeline_created_at = [entry.createdAt for entry in repo.timeline if entry.createdAt]
+    timeline_last_scan_at = max(timeline_created_at) if timeline_created_at else None
+    last_scan_at = _get_repository_last_scan_at(repo.id) or timeline_last_scan_at
     return {
         "id": repo.id,
         "provider": repo.provider,
@@ -519,6 +532,7 @@ def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
         "fullName": repo.fullName,
         "status": repo.status,
         "branches": [b.branch for b in repo.branches],
+        "lastScanAt": last_scan_at,
         "createdAt": repo.createdAt,
         "updatedAt": repo.updatedAt,
     }
