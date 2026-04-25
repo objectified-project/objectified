@@ -152,7 +152,7 @@ describe('Repository detail page tabs', () => {
     await waitFor(() => expect(screen.getByText('services/orders/openapi.yaml')).toBeInTheDocument());
     fireEvent.click(screen.getByText('services/orders/openapi.yaml'));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Promote to project' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Promotion UI coming soon' })).toBeInTheDocument());
     expect(screen.getByText('Classification details')).toBeInTheDocument();
   });
 });

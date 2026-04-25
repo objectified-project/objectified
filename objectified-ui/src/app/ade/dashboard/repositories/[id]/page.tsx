@@ -2,8 +2,6 @@
 
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Ajv2020 from 'ajv/dist/2020';
-import { parse as parseYaml } from 'yaml';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, FileCode2, GitBranchPlus, History, Loader2, ScanSearch, Settings2 } from 'lucide-react';
 import { Button } from '@/app/components/ui/Button';
@@ -24,8 +22,6 @@ import { getRepositoriesI18nBundle } from '../i18n';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
-const ajv = new Ajv2020({ allErrors: true, strict: false });
-const validateRepositoryManifest = ajv.compile(repositoryManifestSchema);
 const rowHeightPx = 88;
 const fileViewportHeightPx = 420;
 const repo63IssueUrl = 'https://github.com/KenSuenobu/objectified-commercial/issues/2796';
@@ -177,23 +173,41 @@ export default function RepositoryDetailPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const fileViewportRef = useRef<HTMLDivElement | null>(null);
+  const fileDrawerRef = useRef<HTMLElement | null>(null);
 
-  const manifestValidation = useMemo(() => {
+  const [manifestValidation, setManifestValidation] = useState<{ valid: boolean; errors: string[] }>({ valid: true, errors: [] });
+
+  useEffect(() => {
     const source = manifestDraft.trim();
-    if (!source) return { valid: true, errors: [] as string[] };
-    try {
-      const parsed = parseYaml(source);
-      const valid = validateRepositoryManifest(parsed);
-      if (valid) return { valid: true, errors: [] as string[] };
-      const errors = (validateRepositoryManifest.errors || []).map((error) => {
-        const target = error.instancePath || '/';
-        return `${target}: ${error.message || 'Invalid manifest content'}`;
-      });
-      return { valid: false, errors };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Invalid YAML';
-      return { valid: false, errors: [message] };
+    if (!source) {
+      setManifestValidation({ valid: true, errors: [] });
+      return;
     }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [{ default: Ajv2020 }, { parse: parseYaml }] = await Promise.all([
+          import('ajv/dist/2020'),
+          import('yaml'),
+        ]);
+        if (cancelled) return;
+        const ajv = new Ajv2020({ allErrors: true, strict: false });
+        const validate = ajv.compile(repositoryManifestSchema);
+        const parsed = parseYaml(source);
+        const valid = validate(parsed);
+        if (cancelled) return;
+        if (valid) {
+          setManifestValidation({ valid: true, errors: [] });
+        } else {
+          const errors = (validate.errors ?? []).map((e) => `${e.instancePath || '/'}: ${e.message ?? 'Invalid'}`);
+          setManifestValidation({ valid: false, errors });
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setManifestValidation({ valid: false, errors: [e instanceof Error ? e.message : 'Invalid YAML'] });
+      }
+    })();
+    return () => { cancelled = true; };
   }, [manifestDraft]);
 
   const setTab = useCallback((nextTab: RepositoryTab) => {
@@ -328,6 +342,25 @@ export default function RepositoryDetailPage() {
     }
   }, [activeTab, loadScanFiles, selectedScanId]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && selectedFile) {
+        setSelectedFile(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedFile]);
+
+  useEffect(() => {
+    if (selectedFile && fileDrawerRef.current) {
+      const firstFocusable = fileDrawerRef.current.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      firstFocusable?.focus();
+    }
+  }, [selectedFile]);
+
   const filteredFiles = useMemo(() => {
     return scanFiles.filter((file) => {
       if (formatFilter !== 'all' && (file.format || 'unknown') !== formatFilter) return false;
@@ -371,7 +404,17 @@ export default function RepositoryDetailPage() {
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to update branches');
       }
-      setRepository(data.repository as RepositoryDetail);
+      const updatedRepository = data.repository as RepositoryDetail;
+      setRepository(updatedRepository);
+      setBranchRows(
+        updatedRepository.branches.map((branch, index) =>
+          Object.assign({}, branchRows[index], {
+            branch: branch.branch,
+            subpathGlob: branch.subpathGlob ?? '',
+            pollIntervalSec: branch.pollIntervalSec ?? undefined,
+          }),
+        ),
+      );
       setSuccessMessage(copy.branchesUpdatedMessage);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update branches';
@@ -402,7 +445,10 @@ export default function RepositoryDetailPage() {
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to update repository settings');
       }
-      setRepository(data.repository as RepositoryDetail);
+      const updatedRepository = data.repository as RepositoryDetail;
+      setRepository(updatedRepository);
+      setOwnerInput(updatedRepository.owner);
+      setNameInput(updatedRepository.name);
       setSuccessMessage(copy.settingsUpdatedMessage);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update repository settings';
@@ -865,8 +911,10 @@ export default function RepositoryDetailPage() {
       {selectedFile ? (
         <div className="fixed inset-0 z-50 bg-black/30" role="presentation" onClick={() => setSelectedFile(null)}>
           <aside
+            ref={fileDrawerRef}
             className="absolute right-0 top-0 h-full w-full max-w-xl bg-white dark:bg-gray-900 shadow-xl p-5 overflow-auto"
             role="dialog"
+            aria-modal="true"
             aria-label="File detail drawer"
             onClick={(event) => event.stopPropagation()}
           >
@@ -890,14 +938,14 @@ export default function RepositoryDetailPage() {
                 <div>Version strategy: {selectedFile.versionStrategy || 'n/a'}</div>
                 <div>Quality score: {selectedFile.qualityScore ?? 'n/a'}</div>
               </section>
-              {selectedFile.tracked && (selectedFile.status === 'new' || selectedFile.status === 'modified') ? (
+              {selectedFile.tracked && selectedFile.promote === 'manual' && (selectedFile.status === 'new' || selectedFile.status === 'modified') ? (
                 <Button
                   onClick={() => {
-                    setSuccessMessage(`Promote queued for ${selectedFile.path}.`);
+                    setSuccessMessage(`Promotion UI coming soon for ${selectedFile.path}.`);
                     setSelectedFile(null);
                   }}
                 >
-                  Promote to project
+                  Promotion UI coming soon
                 </Button>
               ) : null}
             </div>
