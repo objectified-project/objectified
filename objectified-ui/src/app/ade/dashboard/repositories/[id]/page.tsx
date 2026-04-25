@@ -407,13 +407,11 @@ export default function RepositoryDetailPage() {
       const updatedRepository = data.repository as RepositoryDetail;
       setRepository(updatedRepository);
       setBranchRows(
-        updatedRepository.branches.map((branch, index) =>
-          Object.assign({}, branchRows[index], {
-            branch: branch.branch,
-            subpathGlob: branch.subpathGlob ?? '',
-            pollIntervalSec: branch.pollIntervalSec ?? undefined,
-          }),
-        ),
+        updatedRepository.branches.map((branch) => ({
+          branch: branch.branch,
+          subpathGlob: branch.subpathGlob ?? '',
+          pollIntervalSec: branch.pollIntervalSec ?? undefined,
+        })),
       );
       setSuccessMessage(copy.branchesUpdatedMessage);
     } catch (error) {
