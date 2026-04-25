@@ -555,7 +555,7 @@ def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
     }
 
 
-def _write_audit_row(
+def _append_audit_row(
     tenant_id: str,
     repository_id: str,
     event_type: RepositoryAuditEvent,
@@ -563,34 +563,52 @@ def _write_audit_row(
     actor_id: str | None,
     detail: Dict[str, Any] | None = None,
     outcome: Literal["success", "failure"] = "success",
-) -> None:
+) -> Dict[str, Any]:
+    """Append an audit row to the in-memory store and return it.
+
+    This function is safe to call while holding ``_STORE_LOCK`` because it
+    performs no I/O.  Pass the returned dict to :func:`_persist_audit_row`
+    *after* releasing the lock to write the row to the database.
+    """
     created_at = _utc_now_iso()
     normalized_actor_id = actor_id if actor_id else _SYSTEM_ACTOR_ID
     payload = dict(detail or {})
-    _REPO_AUDIT_STORE.append(
-        {
-            "id": str(uuid4()),
-            "tenantId": tenant_id,
-            "repositoryId": repository_id,
-            "eventType": event_type,
-            "actorId": normalized_actor_id,
-            "detail": payload,
-            "outcome": outcome,
-            "createdAt": created_at,
-        }
-    )
-    db.insert_workflow_audit(
-        tenant_id=tenant_id,
-        project_id=None,
-        version_id=None,
-        action=event_type,
-        outcome=outcome,
-        actor_id=normalized_actor_id,
-        detail={
-            "repositoryId": repository_id,
-            **payload,
-        },
-    )
+    row: Dict[str, Any] = {
+        "id": str(uuid4()),
+        "tenantId": tenant_id,
+        "repositoryId": repository_id,
+        "eventType": event_type,
+        "actorId": normalized_actor_id,
+        "detail": payload,
+        "outcome": outcome,
+        "createdAt": created_at,
+    }
+    _REPO_AUDIT_STORE.append(row)
+    return row
+
+
+def _persist_audit_row(row: Dict[str, Any]) -> None:
+    """Persist a previously-built audit row to the database.
+
+    Must be called **outside** ``_STORE_LOCK`` to avoid blocking other
+    repository operations on slow DB connections.  All DB failures are
+    swallowed so that audit persistence is always best-effort.
+    """
+    try:
+        db.insert_workflow_audit(
+            tenant_id=row["tenantId"],
+            project_id=None,
+            version_id=None,
+            action=row["eventType"],
+            outcome=row["outcome"],
+            actor_id=row["actorId"],
+            detail={
+                **row["detail"],
+                "repositoryId": row["repositoryId"],
+            },
+        )
+    except Exception:
+        pass
 
 
 def _resolve_actor_id(auth_data: Dict[str, Any] | None) -> str:
@@ -923,9 +941,10 @@ def _dispatch_import_jobs_for_scan(
     commit_sha: str,
     scan_files: List[RepositoryFileRecord],
     actor_id: str,
-) -> None:
+) -> List[Dict[str, Any]]:
     repository_jobs = _REPO_IMPORT_JOB_STORE.setdefault(repository_id, [])
     manifest_project_slug_by_path = _manifest_project_slug_by_path(repository_id)
+    pending_audit_rows: List[Dict[str, Any]] = []
     for file_row in scan_files:
         if file_row.status not in {"new", "modified", "removed"}:
             continue
@@ -1021,7 +1040,7 @@ def _dispatch_import_jobs_for_scan(
         if failure_message:
             file_row.status = "parse_error"
             file_row.discriminator = failure_message
-            _write_audit_row(
+            pending_audit_rows.append(_append_audit_row(
                 tenant_id,
                 repository_id,
                 "repository.sync_failed",
@@ -1034,9 +1053,9 @@ def _dispatch_import_jobs_for_scan(
                     "operation": operation,
                     "error": failure_message,
                 },
-            )
+            ))
         elif promote == "auto":
-            _write_audit_row(
+            pending_audit_rows.append(_append_audit_row(
                 tenant_id,
                 repository_id,
                 "repository.sync_committed",
@@ -1048,9 +1067,9 @@ def _dispatch_import_jobs_for_scan(
                     "operation": operation,
                     "promotion": promote,
                 },
-            )
+            ))
         else:
-            _write_audit_row(
+            pending_audit_rows.append(_append_audit_row(
                 tenant_id,
                 repository_id,
                 "repository.sync_pending_review",
@@ -1062,7 +1081,8 @@ def _dispatch_import_jobs_for_scan(
                     "operation": operation,
                     "promotion": promote,
                 },
-            )
+            ))
+    return pending_audit_rows
 
 
 def _list_poll_targets_for_tenant(tenant_id: str) -> List[Dict[str, str]]:
@@ -1185,7 +1205,7 @@ async def register_repository(
             and _is_manifest_project_auto_create_enabled(auth_data),
         }
         tenant_repos[repository.id] = repository
-        _write_audit_row(
+        _audit_token_row = _append_audit_row(
             tenant_id,
             repository_id,
             "repository.token_resolved",
@@ -1195,7 +1215,7 @@ async def register_repository(
                 "linkedAccountId": request.linkedAccountId,
             },
         )
-        _write_audit_row(
+        _audit_registered_row = _append_audit_row(
             tenant_id,
             repository_id,
             "repository.registered",
@@ -1207,6 +1227,8 @@ async def register_repository(
             },
         )
 
+    _persist_audit_row(_audit_token_row)
+    _persist_audit_row(_audit_registered_row)
     return RegisterRepositoryResponse(
         repository=repository,
         initialScanJobId=initial_scan_job_id,
@@ -1314,14 +1336,15 @@ async def archive_repository(
         repository.status = "archived"
         repository.archivedAt = now
         repository.updatedAt = now
-        _write_audit_row(
+        _audit_row = _append_audit_row(
             tenant_id,
             repository_id,
             "repository.archived",
             actor_id=actor_id,
             detail={"status": repository.status},
         )
-        return repository
+    _persist_audit_row(_audit_row)
+    return repository
 
 
 @router.post("/{tenant_slug}/{repository_id}/unarchive", response_model=RepositoryRecord)
@@ -1340,14 +1363,15 @@ async def unarchive_repository(
         repository.status = "healthy"
         repository.archivedAt = None
         repository.updatedAt = _utc_now_iso()
-        _write_audit_row(
+        _audit_row = _append_audit_row(
             tenant_id,
             repository_id,
             "repository.unarchived",
             actor_id=actor_id,
             detail={"status": repository.status},
         )
-        return repository
+    _persist_audit_row(_audit_row)
+    return repository
 
 
 @router.post("/{tenant_slug}/{repository_id}/pause", response_model=RepositoryRecord)
@@ -1365,14 +1389,15 @@ async def pause_repository(
         now = _utc_now_iso()
         repository.status = "paused"
         repository.updatedAt = now
-        _write_audit_row(
+        _audit_row = _append_audit_row(
             tenant_id,
             repository_id,
             "repository.paused",
             actor_id=actor_id,
             detail={"status": repository.status},
         )
-        return repository
+    _persist_audit_row(_audit_row)
+    return repository
 
 
 @router.post("/{tenant_slug}/{repository_id}/auto-pause", response_model=RepositoryRecord)
@@ -1390,14 +1415,15 @@ async def auto_pause_repository(
         now = _utc_now_iso()
         repository.status = "paused"
         repository.updatedAt = now
-        _write_audit_row(
+        _audit_row = _append_audit_row(
             tenant_id,
             repository_id,
             "repository.auto_paused",
             actor_id=actor_id,
             detail={"status": repository.status},
         )
-        return repository
+    _persist_audit_row(_audit_row)
+    return repository
 
 
 @router.delete("/{tenant_slug}/{repository_id}", status_code=204)
@@ -1425,7 +1451,7 @@ async def delete_repository(
         for scan in scan_history:
             _REPO_SCAN_FILE_HISTORY_STORE.pop(scan.id, None)
         _REPO_CREDENTIAL_REF_STORE.pop(repository_id, None)
-        _write_audit_row(
+        _audit_row = _append_audit_row(
             tenant_id,
             repository_id,
             "repository.removed",
@@ -1433,6 +1459,7 @@ async def delete_repository(
             detail={"fullName": repository.fullName},
         )
 
+    _persist_audit_row(_audit_row)
     return Response(status_code=204)
 
 
@@ -1669,7 +1696,7 @@ async def create_repository_scan(
             )
         history.insert(0, scan)
         _REPO_SCAN_FILE_HISTORY_STORE[scan.id] = []
-        _write_audit_row(
+        _audit_row = _append_audit_row(
             tenant_id,
             repository_id,
             "repository.polled",
@@ -1681,7 +1708,8 @@ async def create_repository_scan(
                 "scanId": scan.id,
             },
         )
-        return scan
+    _persist_audit_row(_audit_row)
+    return scan
 
 
 def _reset_repository_state_for_tests() -> None:
@@ -1827,7 +1855,7 @@ def _complete_repository_scan_for_tests(
             previous_files=previous_files,
         )
         tenant_id = _find_tenant_id_for_repository(repository_id)
-        _dispatch_import_jobs_for_scan(
+        pending_audit_rows = _dispatch_import_jobs_for_scan(
             tenant_id=tenant_id,
             repository_id=repository_id,
             scan_id=scan_id,
@@ -1853,7 +1881,7 @@ def _complete_repository_scan_for_tests(
             }
         )
         history[scan_idx] = completed_scan
-        _write_audit_row(
+        pending_audit_rows.append(_append_audit_row(
             tenant_id,
             repository_id,
             "repository.scanned",
@@ -1865,8 +1893,11 @@ def _complete_repository_scan_for_tests(
                 "status": completed_scan.status,
                 "diffSummary": completed_scan.diffSummary,
             },
-        )
-        return completed_scan
+        ))
+
+    for _audit_row in pending_audit_rows:
+        _persist_audit_row(_audit_row)
+    return completed_scan
 
 
 def _seed_repository_relations_for_tests(repository_id: str) -> None:

@@ -103,8 +103,8 @@ Repository connector events use the same ledger and filter surface through `acti
 - `repository.token_resolved`
 - `repository.polled`
 
-Each repository row includes tenant scope (`tenant_id`), repository context in `detail.repositoryId`,
-an `actor_id` (user or system identity), and a structured `detail` JSON payload with no secrets.
+Each repository row includes tenant scope (`tenantId`, underlying DB column `tenant_id`), repository context in `detail.repositoryId`,
+an `actorId` (underlying DB column `actor_id`, user or system identity), and a structured `detail` JSON payload with no secrets.
 
 ## Errors
 
