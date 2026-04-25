@@ -20,6 +20,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from .auth import validate_authentication
+from .openapi_change_report import build_change_report
 from .repositories.manifest import parse_repo_manifest, resolve_repository_file_mapping
 
 router = APIRouter(prefix="/v1/repositories", tags=["repositories"])
@@ -171,6 +172,17 @@ class RepositoryImportJobRecord(BaseModel):
     errorDetail: str | None = None
     targetProjectSlug: str | None = None
     targetVersionId: str | None = None
+    changeReportId: str | None = None
+    createdAt: str
+
+
+class RepositorySyncChangeReportRecord(BaseModel):
+    id: str
+    sourceKind: Literal["repository_sync"]
+    repositoryId: str
+    importJobId: str
+    scanId: str
+    changeModelJson: Dict[str, Any] = Field(default_factory=dict)
     createdAt: str
 
 
@@ -217,6 +229,7 @@ _REPO_SCAN_HISTORY_STORE: Dict[str, List[RepositoryScanRecord]] = {}
 _REPO_SCAN_FILE_HISTORY_STORE: Dict[str, List[RepositoryFileRecord]] = {}
 _REPO_CREDENTIAL_REF_STORE: Dict[str, List[Dict[str, Any]]] = {}
 _REPO_IMPORT_JOB_STORE: Dict[str, List[RepositoryImportJobRecord]] = {}
+_REPO_CHANGE_REPORT_STORE: Dict[str, List[RepositorySyncChangeReportRecord]] = {}
 _REPO_AUDIT_STORE: List[Dict[str, Any]] = []
 _REPO_IMPORT_POLICY_STORE: Dict[str, Dict[str, bool]] = {}
 _REPO_PROJECT_STORE: Dict[str, Dict[str, RepositoryResolvedProjectRecord]] = {}
@@ -657,6 +670,76 @@ def _build_diff_snapshot(file_row: RepositoryFileRecord) -> Dict[str, Any]:
     }
 
 
+def _build_repository_sync_change_report_model(file_row: RepositoryFileRecord) -> Dict[str, Any]:
+    schema_name = f"repo_{uuid4().hex[:8]}"
+    baseline_openapi: Dict[str, Any] = {
+        "openapi": "3.1.0",
+        "info": {"title": "Repository Sync Baseline", "version": "0.0.0"},
+        "paths": {},
+        "components": {"schemas": {}},
+    }
+    candidate_openapi: Dict[str, Any] = {
+        "openapi": "3.1.0",
+        "info": {"title": "Repository Sync Candidate", "version": "0.0.0"},
+        "paths": {},
+        "components": {"schemas": {}},
+    }
+
+    baseline_payload = {
+        "type": "object",
+        "properties": {"status": {"type": "string", "const": "baseline"}},
+    }
+    candidate_payload = {
+        "type": "object",
+        "properties": {"status": {"type": "string", "const": "candidate"}},
+    }
+    path_key = f"/repository-sync/{file_row.path.lstrip('/')}"
+
+    if file_row.status == "new":
+        candidate_openapi["components"]["schemas"][schema_name] = candidate_payload
+        candidate_openapi["paths"][path_key] = {"get": {"responses": {"200": {"description": "candidate"}}}}
+    elif file_row.status == "removed":
+        baseline_openapi["components"]["schemas"][schema_name] = baseline_payload
+        baseline_openapi["paths"][path_key] = {"get": {"responses": {"200": {"description": "baseline"}}}}
+    elif file_row.status == "modified":
+        baseline_openapi["components"]["schemas"][schema_name] = baseline_payload
+        candidate_openapi["components"]["schemas"][schema_name] = candidate_payload
+    else:
+        baseline_openapi["components"]["schemas"][schema_name] = baseline_payload
+        candidate_openapi["components"]["schemas"][schema_name] = baseline_payload
+
+    return build_change_report(baseline_openapi, candidate_openapi)
+
+
+def _preview_target_version_id_for_dry_run(commit_sha: str, created_at_iso: str) -> str:
+    created_at = _parse_iso8601(created_at_iso, "createdAt")
+    if created_at is None:
+        created_at = datetime.now(timezone.utc)
+    return _build_version_id_for_commit(commit_sha, created_at)
+
+
+def _resolve_target_project_slug_for_dry_run(
+    *,
+    repository_id: str,
+    file_row: RepositoryFileRecord,
+    manifest_project_slug_by_path: Dict[str, str],
+) -> str | None:
+    normalized_project_slug = _normalize_slug(file_row.projectSlug)
+    if normalized_project_slug is None:
+        return None
+    tenant_id = _find_tenant_id_for_repository(repository_id)
+    tenant_projects = _REPO_PROJECT_STORE.get(tenant_id, {})
+    if normalized_project_slug in tenant_projects:
+        return normalized_project_slug
+
+    policy = _REPO_IMPORT_POLICY_STORE.get(repository_id, {})
+    allow_auto_create = bool(policy.get("allowManifestProjectAutoCreate"))
+    manifest_slug = manifest_project_slug_by_path.get(file_row.path)
+    if allow_auto_create and manifest_slug == normalized_project_slug:
+        return normalized_project_slug
+    return None
+
+
 def _dispatch_import_jobs_for_scan(
     *,
     tenant_id: str,
@@ -699,23 +782,24 @@ def _dispatch_import_jobs_for_scan(
         target_project_slug: str | None = None
         target_version_id: str | None = None
         if file_row.versionStrategy == "commit-sha":
-            resolved_project = _ensure_project_for_scan_file(
-                tenant_id=tenant_id,
+            resolved_project_slug = _resolve_target_project_slug_for_dry_run(
                 repository_id=repository_id,
                 file_row=file_row,
                 manifest_project_slug_by_path=manifest_project_slug_by_path,
             )
-            if resolved_project is not None:
-                resolved_version = _ensure_commit_sha_version(
-                    tenant_id=tenant_id,
-                    project_slug=resolved_project.slug,
-                    commit_sha=commit_sha,
-                    repository_id=repository_id,
-                    branch=branch,
-                    path=file_row.path,
-                )
-                target_project_slug = resolved_project.slug
-                target_version_id = resolved_version.versionId
+            if resolved_project_slug is not None:
+                target_project_slug = resolved_project_slug
+                target_version_id = _preview_target_version_id_for_dry_run(commit_sha, file_row.createdAt)
+
+        change_report = RepositorySyncChangeReportRecord(
+            id=str(uuid4()),
+            sourceKind="repository_sync",
+            repositoryId=repository_id,
+            importJobId="",
+            scanId=scan_id,
+            changeModelJson=_build_repository_sync_change_report_model(file_row),
+            createdAt=file_row.createdAt,
+        )
 
         import_job = RepositoryImportJobRecord(
             id=str(uuid4()),
@@ -734,9 +818,12 @@ def _dispatch_import_jobs_for_scan(
             errorDetail=failure_message,
             targetProjectSlug=target_project_slug,
             targetVersionId=target_version_id,
+            changeReportId=change_report.id,
             createdAt=file_row.createdAt,
         )
+        change_report.importJobId = import_job.id
         repository_jobs.insert(0, import_job)
+        _REPO_CHANGE_REPORT_STORE.setdefault(repository_id, []).insert(0, change_report)
         file_row.lastImportJobId = import_job.id
 
         if failure_message:
@@ -1182,6 +1269,7 @@ def _reset_repository_state_for_tests() -> None:
         _REPO_SCAN_FILE_HISTORY_STORE.clear()
         _REPO_CREDENTIAL_REF_STORE.clear()
         _REPO_IMPORT_JOB_STORE.clear()
+        _REPO_CHANGE_REPORT_STORE.clear()
         _REPO_AUDIT_STORE.clear()
         _REPO_IMPORT_POLICY_STORE.clear()
         _REPO_PROJECT_STORE.clear()
@@ -1391,6 +1479,24 @@ def _get_repository_relations_exist_for_tests(repository_id: str) -> Dict[str, b
 def _get_repository_import_jobs_for_tests(repository_id: str) -> List[RepositoryImportJobRecord]:
     with _STORE_LOCK:
         return list(_REPO_IMPORT_JOB_STORE.get(repository_id, []))
+
+
+def _get_repository_change_reports_for_tests(repository_id: str) -> List[RepositorySyncChangeReportRecord]:
+    with _STORE_LOCK:
+        return list(_REPO_CHANGE_REPORT_STORE.get(repository_id, []))
+
+
+def _build_repository_sync_change_report_for_test_status(status: RepositoryFileStatus) -> Dict[str, Any]:
+    file_row = RepositoryFileRecord(
+        id=str(uuid4()),
+        repositoryId=str(uuid4()),
+        scanId=str(uuid4()),
+        path="apis/stable.yaml",
+        tracked=True,
+        status=status,
+        createdAt=_utc_now_iso(),
+    )
+    return _build_repository_sync_change_report_model(file_row)
 
 
 def _get_repository_resolved_versions_for_tests(tenant_id: str) -> List[RepositoryResolvedVersionRecord]:

@@ -6,8 +6,10 @@ from fastapi.testclient import TestClient
 from app.auth import validate_authentication
 from app.main import app
 from app.repositories_routes import (
+    _build_repository_sync_change_report_for_test_status,
     _complete_repository_scan_for_tests,
     _get_repository_audit_rows_for_tests,
+    _get_repository_change_reports_for_tests,
     _get_repository_import_jobs_for_tests,
     _get_repository_relations_exist_for_tests,
     _get_repository_resolved_versions_for_tests,
@@ -518,6 +520,7 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
             f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{second_scan_id}/files",
         )
         import_jobs = _get_repository_import_jobs_for_tests(repository_id)
+        change_reports = _get_repository_change_reports_for_tests(repository_id)
         audit_rows = _get_repository_audit_rows_for_tests(repository_id)
     finally:
         app.dependency_overrides.pop(validate_authentication, None)
@@ -545,6 +548,16 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
     assert failed_job.state == "failed"
     assert failed_job.errorDetail == "parser exploded"
     assert failed_job.diffSnapshot["status"] == "modified"
+    assert failed_job.changeReportId is not None
+
+    reports_by_job_id = {report.importJobId: report for report in change_reports}
+    assert removed_job.id in reports_by_job_id
+    assert failed_job.id in reports_by_job_id
+    removed_report = reports_by_job_id[removed_job.id]
+    failed_report = reports_by_job_id[failed_job.id]
+    assert removed_report.sourceKind == "repository_sync"
+    assert removed_report.changeModelJson["schemas"]["removed"] != []
+    assert failed_report.changeModelJson["schemas"]["modified"] != []
 
     files_by_path = {row["path"]: row for row in second_scan_files.json()["items"]}
     assert files_by_path["apis/stable.yaml"]["status"] == "unchanged"
@@ -693,22 +706,14 @@ def test_commit_sha_jobs_bind_to_idempotent_auto_created_versions() -> None:
     assert second_scan_response.status_code == 200
     assert len(first_jobs) == 1
     assert len(second_jobs) == 1
-    assert len(first_versions) == 1
-    assert len(second_versions) == 1
+    assert first_versions == []
+    assert second_versions == []
 
     first_job = first_jobs[0]
     second_job = second_jobs[0]
-    created_version = first_versions[0]
     assert first_job.targetProjectSlug == "checkout-core"
-    assert first_job.targetVersionId == created_version.versionId
-    assert second_job.targetVersionId == created_version.versionId
-    assert created_version.versionId == f"{expected_date_prefix}-abc123def456"
-    assert created_version.metadata["repositorySource"] == {
-        "repositoryId": repository_id,
-        "branch": "main",
-        "commitSha": "abc123def4567890",
-        "path": "services/orders/openapi.yaml",
-    }
+    assert first_job.targetVersionId == f"{expected_date_prefix}-abc123def456"
+    assert second_job.targetVersionId == f"{expected_date_prefix}-abc123def456"
 
 
 def test_manifest_project_does_not_autocreate_without_flag_or_tenant_admin() -> None:
@@ -749,3 +754,54 @@ def test_manifest_project_does_not_autocreate_without_flag_or_tenant_admin() -> 
     assert jobs[0].targetProjectSlug is None
     assert jobs[0].targetVersionId is None
     assert versions == []
+
+
+def test_noop_dry_run_change_report_is_zero_diff_for_unchanged_file() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000029",
+                "provider": "github",
+                "owner": "acme",
+                "name": "zero-diff",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        first_scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            first_scan_id,
+            commit_sha="unchanged-seed",
+            files=[
+                {"path": "apis/stable.yaml", "blobSha": "same", "tracked": True},
+            ],
+        )
+
+        second_scan_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans",
+            json={"branch": "main", "force": True},
+        )
+        second_scan_id = second_scan_response.json()["id"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            second_scan_id,
+            commit_sha="unchanged-seed",
+            files=[
+                {"path": "apis/stable.yaml", "blobSha": "same", "tracked": True},
+            ],
+        )
+        second_scan_jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == second_scan_id]
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert second_scan_response.status_code == 200
+    assert second_scan_jobs == []
+
+    unchanged_report = _build_repository_sync_change_report_for_test_status("unchanged")
+    assert unchanged_report["schemas"]["added"] == []
+    assert unchanged_report["schemas"]["removed"] == []
+    assert unchanged_report["schemas"]["modified"] == []
