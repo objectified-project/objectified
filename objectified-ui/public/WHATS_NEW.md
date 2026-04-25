@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added REPO-5.5 repository-sync conflict handling so modified-file import jobs now carry import-taxonomy conflict records (`duplicate_schema`/`property_conflict`/`reference_conflict`/`type_mismatch`/`semantic_conflict`), sync-history endpoints expose resolver-ready conflict context for REPO-6.2, and conflict-resolution choices are persisted to each job `eventLog`.
 - Added REPO-5.4 dry-run repository sync previews so each dispatched sync import job now stores a `repository_sync` change report snapshot, manual promotions have inline diff context before commit, auto promotions remain non-blocking, and dry-run scans no longer mutate resolved version-head state.
 - Added REPO-5.3 commit-SHA version auto-creation so repository scan import jobs now bind to idempotent draft versions named `<datestamp>-<short-sha>`, capture `metadata.repositorySource` (repository/branch/SHA/path), and allow manifest-declared missing project auto-creation only when a tenant-admin feature flag is enabled.
 - Added REPO-5.2 project/version mapping rules so manifest `specs[].project` + `specs[].versionStrategy` now take precedence, auto mapping falls back to path-derived project + `commit-sha`, and unmapped root-level specs persist `tracked=false` with `settingsJson.mappingRequired=true` for UI mapping prompts.

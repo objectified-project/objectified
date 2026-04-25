@@ -75,6 +75,14 @@ RepositoryFileStatus = Literal[
 ImportJobPromotion = Literal["auto", "manual"]
 ImportJobOperation = Literal["import", "removal"]
 ImportJobStatus = Literal["pending_review", "committed", "failed"]
+ImportConflictKind = Literal[
+    "duplicate_schema",
+    "property_conflict",
+    "reference_conflict",
+    "type_mismatch",
+    "semantic_conflict",
+]
+ImportConflictResolutionChoice = Literal["merge", "replace", "keep", "rename"]
 
 
 class RepositoryScanTimelineEntry(BaseModel):
@@ -169,6 +177,8 @@ class RepositoryImportJobRecord(BaseModel):
     dryRun: bool = True
     state: ImportJobStatus
     diffSnapshot: Dict[str, Any] = Field(default_factory=dict)
+    conflictRecords: List[Dict[str, Any]] = Field(default_factory=list)
+    eventLog: List[Dict[str, Any]] = Field(default_factory=list)
     errorDetail: str | None = None
     targetProjectSlug: str | None = None
     targetVersionId: str | None = None
@@ -201,6 +211,19 @@ class RepositoryScanFilePage(BaseModel):
     items: List[RepositoryFileRecord]
     limit: int
     nextCursor: str | None = None
+
+
+class RepositoryImportJobPage(BaseModel):
+    items: List[RepositoryImportJobRecord]
+    limit: int
+    nextCursor: str | None = None
+
+
+class RepositorySyncConflictResolutionRequest(BaseModel):
+    schemaName: str = Field(min_length=1)
+    choice: ImportConflictResolutionChoice
+    conflictKinds: List[ImportConflictKind] = Field(min_length=1)
+    note: str | None = None
 
 
 class RepositoryResolvedProjectRecord(BaseModel):
@@ -677,6 +700,95 @@ def _schema_name_from_path(path: str) -> str:
     return sanitized[:64] if sanitized else "repo_sync"
 
 
+def _coerce_conflict_kinds(raw_kinds: Any) -> List[ImportConflictKind]:
+    allowed: set[str] = {
+        "duplicate_schema",
+        "property_conflict",
+        "reference_conflict",
+        "type_mismatch",
+        "semantic_conflict",
+    }
+    if not isinstance(raw_kinds, list):
+        return []
+    kinds: List[ImportConflictKind] = []
+    for raw in raw_kinds:
+        if isinstance(raw, str) and raw in allowed and raw not in kinds:
+            kinds.append(raw)
+    return kinds
+
+
+def _derive_import_conflicts(
+    *,
+    file_row: RepositoryFileRecord,
+    operation: ImportJobOperation,
+    settings_json: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    configured_conflicts = settings_json.get("simulatedConflicts")
+    if isinstance(configured_conflicts, list):
+        conflicts: List[Dict[str, Any]] = []
+        for item in configured_conflicts:
+            if not isinstance(item, dict):
+                continue
+            schema_name = item.get("schemaName")
+            if not isinstance(schema_name, str) or not schema_name.strip():
+                continue
+            kinds = _coerce_conflict_kinds(item.get("kinds"))
+            if not kinds:
+                continue
+            message = item.get("message")
+            detail = item.get("detail")
+            conflicts.append(
+                {
+                    "schemaName": schema_name.strip(),
+                    "kinds": kinds,
+                    "message": message.strip() if isinstance(message, str) and message.strip() else "Conflict detected",
+                    "detail": detail.strip() if isinstance(detail, str) and detail.strip() else None,
+                }
+            )
+        return conflicts
+
+    if operation != "import" or file_row.status != "modified":
+        return []
+    schema_name = _schema_name_from_path(file_row.path)
+    return [
+        {
+            "schemaName": schema_name,
+            "kinds": ["duplicate_schema"],
+            "message": "Existing draft class and discovered schema both changed.",
+            "detail": f"Resolve '{schema_name}' before promotion.",
+        }
+    ]
+
+
+def _build_import_job_event_log(
+    *,
+    file_row: RepositoryFileRecord,
+    operation: ImportJobOperation,
+    state: ImportJobStatus,
+    conflicts: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    events: List[Dict[str, Any]] = [
+        {
+            "type": "repository.sync.job_dispatched",
+            "at": file_row.createdAt,
+            "path": file_row.path,
+            "operation": operation,
+            "state": state,
+        }
+    ]
+    if conflicts:
+        events.append(
+            {
+                "type": "repository.sync.conflicts_detected",
+                "at": file_row.createdAt,
+                "taxonomy": "import_pipeline",
+                "resolver": "import_conflict_resolver",
+                "conflicts": conflicts,
+            }
+        )
+    return events
+
+
 def _build_repository_sync_change_report_model(file_row: RepositoryFileRecord) -> Dict[str, Any]:
     schema_name = _schema_name_from_path(file_row.path)
     baseline_openapi: Dict[str, Any] = {
@@ -805,6 +917,17 @@ def _dispatch_import_jobs_for_scan(
             changeModelJson=_build_repository_sync_change_report_model(file_row),
             createdAt=file_row.createdAt,
         )
+        conflict_records = _derive_import_conflicts(
+            file_row=file_row,
+            operation=operation,
+            settings_json=settings_json,
+        )
+        event_log = _build_import_job_event_log(
+            file_row=file_row,
+            operation=operation,
+            state=state,
+            conflicts=conflict_records,
+        )
 
         import_job = RepositoryImportJobRecord(
             id=str(uuid4()),
@@ -820,6 +943,8 @@ def _dispatch_import_jobs_for_scan(
             dryRun=True,
             state=state,
             diffSnapshot=_build_diff_snapshot(file_row),
+            conflictRecords=conflict_records,
+            eventLog=event_log,
             errorDetail=failure_message,
             targetProjectSlug=target_project_slug,
             targetVersionId=target_version_id,
@@ -849,6 +974,14 @@ def _list_poll_targets_for_tenant(tenant_id: str) -> List[Dict[str, str]]:
         for branch in _REPO_BRANCH_STORE.get(repository.id, repository.branches):
             poll_targets.append({"repositoryId": repository.id, "branch": branch.branch})
     return poll_targets
+
+
+def _find_import_job_for_repository(repository_id: str, import_job_id: str) -> RepositoryImportJobRecord | None:
+    jobs = _REPO_IMPORT_JOB_STORE.get(repository_id, [])
+    for job in jobs:
+        if job.id == import_job_id:
+            return job
+    return None
 
 
 @router.post("/{tenant_slug}", status_code=201, response_model=RegisterRepositoryResponse)
@@ -1227,6 +1360,88 @@ async def list_repository_scan_files(
         tail = page_items[-1]
         next_cursor = _encode_cursor(tail.createdAt, tail.id)
     return RepositoryScanFilePage(items=page_items, limit=limit, nextCursor=next_cursor)
+
+
+@router.get("/{tenant_slug}/{repository_id}/sync-history", response_model=RepositoryImportJobPage)
+async def list_repository_sync_history(
+    tenant_slug: str,
+    repository_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    state: ImportJobStatus | None = Query(default=None),
+    has_conflicts: bool | None = Query(default=None, alias="hasConflicts"),
+    limit: int = Query(default=_DEFAULT_SCAN_PAGE_SIZE, ge=1, le=_MAX_SCAN_PAGE_SIZE),
+    cursor: str | None = Query(default=None),
+) -> RepositoryImportJobPage:
+    tenant_id = auth_data["tenant_id"]
+    cursor_key: Tuple[datetime, str] | None = None
+    if cursor:
+        cursor_dt, cursor_id = _decode_cursor(cursor)
+        cursor_key = (cursor_dt, cursor_id)
+
+    with _STORE_LOCK:
+        _find_repository_for_tenant(tenant_id, repository_id)
+        jobs = list(_REPO_IMPORT_JOB_STORE.get(repository_id, []))
+
+    filtered: List[RepositoryImportJobRecord] = []
+    for job in jobs:
+        if state is not None and job.state != state:
+            continue
+        if has_conflicts is not None and (len(job.conflictRecords) > 0) != has_conflicts:
+            continue
+        created_dt = _parse_iso8601(job.createdAt, "createdAt")
+        if created_dt is None:
+            continue
+        if cursor_key is not None and (created_dt, job.id) >= cursor_key:
+            continue
+        filtered.append(job)
+
+    filtered.sort(key=lambda item: _to_sort_key(item.createdAt, item.id), reverse=True)
+    page_rows = filtered[: limit + 1]
+    has_more = len(page_rows) > limit
+    page_items = page_rows[:limit]
+    next_cursor = None
+    if has_more and page_items:
+        tail = page_items[-1]
+        next_cursor = _encode_cursor(tail.createdAt, tail.id)
+    return RepositoryImportJobPage(items=page_items, limit=limit, nextCursor=next_cursor)
+
+
+@router.post(
+    "/{tenant_slug}/{repository_id}/sync-history/{import_job_id}/resolve-conflict",
+    response_model=RepositoryImportJobRecord,
+)
+async def resolve_repository_sync_conflict(
+    tenant_slug: str,
+    repository_id: str,
+    import_job_id: str,
+    request: RepositorySyncConflictResolutionRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositoryImportJobRecord:
+    tenant_id = auth_data["tenant_id"]
+    with _STORE_LOCK:
+        _find_repository_for_tenant(tenant_id, repository_id)
+        import_job = _find_import_job_for_repository(repository_id, import_job_id)
+        if import_job is None:
+            raise HTTPException(status_code=404, detail=f"Import job not found: {import_job_id}")
+        normalized_schema_name = request.schemaName.strip()
+        conflict_record = next(
+            (conflict for conflict in import_job.conflictRecords if conflict.get("schemaName") == normalized_schema_name),
+            None,
+        )
+        if conflict_record is None:
+            raise HTTPException(status_code=404, detail=f"Conflict not found for schema: {normalized_schema_name}")
+        canonical_conflict_kinds = list(dict.fromkeys(conflict_record.get("kinds") or []))
+        import_job.eventLog.append(
+            {
+                "type": "repository.sync.conflict_resolved",
+                "at": _utc_now_iso(),
+                "schemaName": normalized_schema_name,
+                "choice": request.choice,
+                "conflictKinds": canonical_conflict_kinds,
+                "note": request.note.strip() if request.note and request.note.strip() else None,
+            }
+        )
+        return import_job
 
 
 @router.post("/{tenant_slug}/{repository_id}/scans", response_model=RepositoryScanRecord)
