@@ -17,6 +17,8 @@ specs:
     format: openapi_3_1
     project: checkout
     versionStrategy: branch
+    promote: auto
+    onBreakingChange: autoCreateNewMajor
     pollIntervalSec: 300
 ignore:
   - "**/node_modules/**"
@@ -29,6 +31,8 @@ ignore:
     assert outcome.manifest.specs[0].format == "openapi_3_1"
     assert outcome.manifest.specs[0].project == "checkout"
     assert outcome.manifest.specs[0].version_strategy == "branch"
+    assert outcome.manifest.specs[0].promote == "auto"
+    assert outcome.manifest.specs[0].on_breaking_change == "autoCreateNewMajor"
 
 
 def test_parse_repo_manifest_returns_manifest_error_row_but_allows_scan_to_continue() -> None:
@@ -68,6 +72,8 @@ specs:
     format: asyncapi_3
     project: Orders API
     versionStrategy: file-version
+    promote: auto
+    onBreakingChange: warn
     pollIntervalSec: 30
   - path: apis/events.yaml
 """
@@ -92,12 +98,15 @@ specs:
     # Manifest mapping values win over auto rules.
     assert by_path["apis/openapi.yaml"].project_slug == "orders-api"
     assert by_path["apis/openapi.yaml"].version_strategy == "file-version"
+    assert by_path["apis/openapi.yaml"].promote == "auto"
+    assert by_path["apis/openapi.yaml"].settings_json == {"onBreakingChange": "warn"}
 
     # Missing per-spec pollIntervalSec falls back to branch-level interval.
     assert by_path["apis/events.yaml"].poll_interval_sec == 120
     # Auto mapping derives project slug from path + commit-sha strategy.
     assert by_path["apis/events.yaml"].project_slug == "apis"
     assert by_path["apis/events.yaml"].version_strategy == "commit-sha"
+    assert by_path["apis/events.yaml"].promote == "manual"
     # Files omitted from manifest can still be auto-mapped.
     assert by_path["apis/unlisted.yaml"].tracked is True
     assert by_path["apis/unlisted.yaml"].format == "json_schema"

@@ -876,6 +876,9 @@ def _dispatch_import_jobs_for_scan(
         operation: ImportJobOperation = "import"
         promote: ImportJobPromotion = file_row.promote if file_row.promote in {"auto", "manual"} else "manual"
         settings_json: Dict[str, Any] = dict(file_row.settingsJson or {})
+        if settings_json.get("onBreakingChange") == "block":
+            promote = "manual"
+            settings_json["requiresExplicitApproval"] = True
         if file_row.status == "removed":
             operation = "removal"
             promote = "manual"
@@ -1552,6 +1555,8 @@ def _complete_repository_scan_for_tests(
             if settings_json_raw is not None and not isinstance(settings_json_raw, dict):
                 raise ValueError("settingsJson must be an object when provided")
             settings_json_value = dict(settings_json_raw or {})
+            if mapping.on_breaking_change is not None:
+                settings_json_value["onBreakingChange"] = mapping.on_breaking_change
             if mapping.settings_json is not None:
                 for key, value in mapping.settings_json.items():
                     settings_json_value[key] = value
@@ -1560,6 +1565,12 @@ def _complete_repository_scan_for_tests(
             promote_raw = item.get("promote")
             if promote_raw is not None and promote_raw not in {"auto", "manual"}:
                 raise ValueError("promote must be either 'auto' or 'manual' when provided")
+            if manifest_spec is not None:
+                promote_value: ImportJobPromotion = mapping.promote
+            elif promote_raw in {"auto", "manual"}:
+                promote_value = promote_raw
+            else:
+                promote_value = mapping.promote
 
             project_slug_value = item.get("projectSlug")
             version_strategy_value = item.get("versionStrategy")
@@ -1586,7 +1597,7 @@ def _complete_repository_scan_for_tests(
                     projectSlug=project_slug_value,
                     versionStrategy=version_strategy_value,
                     settingsJson=settings_json_value,
-                    promote=promote_raw,
+                    promote=promote_value,
                     status="new",
                     qualityScore=item.get("qualityScore"),
                     lastImportJobId=item.get("lastImportJobId"),
