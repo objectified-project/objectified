@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Folder,
   GitBranch,
+  GitBranchPlus,
   Box,
   Code,
   Clock,
+  Timer,
   TrendingUp,
   LayoutDashboard,
 } from 'lucide-react';
@@ -17,6 +20,12 @@ import {
   dashboardMainClass,
   dashboardPanelClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
+import { RepositoryKpiCard } from '@/app/components/ade/dashboard/RepositoryKpiCard';
+import {
+  deriveRepositoryKpis,
+  formatScanDuration,
+  type RepositoryKpiRow,
+} from '@/app/components/ade/dashboard/repositoryKpis';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
 import { cn } from '../../../../lib/utils';
@@ -46,6 +55,12 @@ interface RecentActivity {
   tenant_slug: string;
 }
 
+interface DashboardRepository extends RepositoryKpiRow {
+  fullName: string;
+}
+
+const REPOSITORIES_HREF = '/ade/dashboard/repositories';
+
 const Dashboard = () => {
   const { data: session } = useSession();
   const router = useRouter();
@@ -63,7 +78,9 @@ const Dashboard = () => {
     last_activity: null,
   });
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [repositories, setRepositories] = useState<DashboardRepository[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRepositoriesLoading, setIsRepositoriesLoading] = useState(true);
 
   const userId = (session?.user as any)?.user_id;
   const userName = session?.user?.name || 'User';
@@ -90,6 +107,36 @@ const Dashboard = () => {
 
     loadDashboardData();
   }, [userId]);
+
+  // Repository KPIs come from a separate REST endpoint and are loaded in
+  // parallel. We deliberately don't gate the rest of the dashboard on this:
+  // a 500 from /api/repositories should leave the home page usable.
+  useEffect(() => {
+    let cancelled = false;
+    const loadRepositories = async () => {
+      try {
+        const response = await fetch('/api/repositories');
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Failed to load repositories');
+        }
+        if (!cancelled) {
+          setRepositories((data.repositories || []) as DashboardRepository[]);
+        }
+      } catch (error) {
+        console.error('Error loading repository KPIs:', error);
+        if (!cancelled) setRepositories([]);
+      } finally {
+        if (!cancelled) setIsRepositoriesLoading(false);
+      }
+    };
+    loadRepositories();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const repositoryKpis = useMemo(() => deriveRepositoryKpis(repositories), [repositories]);
 
   const getActivityIcon = (type: string) => {
     const iconClass = "h-5 w-5";
@@ -194,7 +241,7 @@ const Dashboard = () => {
       <main className={dashboardMainClass}>
         <div className={dashboardContentStackClass}>
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         {statsConfig.map((stat) => {
           const IconComponent = stat.icon;
           return (
@@ -222,6 +269,70 @@ const Dashboard = () => {
             </div>
           );
         })}
+
+        {/*
+          Repository KPI cards. Visual style matches the redesigned Repositories
+          dashboard (mockup-styled) by intent — clicking either card jumps to
+          the full Repositories surface for drill-down.
+        */}
+        {isRepositoriesLoading ? (
+          <>
+            <div className={`${dashboardPanelClass} p-4`}>
+              <div className="space-y-3">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+            <div className={`${dashboardPanelClass} p-4`}>
+              <div className="space-y-3">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <Link
+              href={REPOSITORIES_HREF}
+              aria-label="View all repositories"
+              className="block rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 hover:-translate-y-0.5 transition-transform"
+            >
+              <RepositoryKpiCard
+                label="Repositories tracked"
+                value={repositoryKpis.tracked}
+                subtitle={
+                  repositoryKpis.tracked === 0
+                    ? 'no repositories registered yet'
+                    : `${repositoryKpis.healthy} healthy · ${repositoryKpis.warnings} need attention`
+                }
+                tone="indigo"
+                icon={<GitBranchPlus className="w-4 h-4" />}
+              />
+            </Link>
+            <Link
+              href={REPOSITORIES_HREF}
+              aria-label="View repository scan timing"
+              className="block rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 hover:-translate-y-0.5 transition-transform"
+            >
+              <RepositoryKpiCard
+                label="Avg scan time"
+                value={formatScanDuration(repositoryKpis.avgScanMs, '—')}
+                subtitle={
+                  repositoryKpis.avgScanMs == null
+                    ? 'no scan timing data yet'
+                    : repositoryKpis.slowestScan
+                    ? `slowest: ${repositoryKpis.slowestScan.fullName}`
+                    : 'across last 7 d scans'
+                }
+                tone="violet"
+                icon={<Timer className="w-4 h-4" />}
+                sparkline={repositoryKpis.scannedSeries}
+              />
+            </Link>
+          </>
+        )}
       </div>
 
       {/* Recent Activity */}

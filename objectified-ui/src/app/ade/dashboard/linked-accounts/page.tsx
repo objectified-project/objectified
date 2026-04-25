@@ -1,8 +1,18 @@
 'use client';
 
 import { useSession, signIn } from 'next-auth/react';
-import { useEffect, useState } from 'react';
-import { Plus, Trash2, Link as LinkIcon, Key } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  GitBranchPlus,
+  Hourglass,
+  Link as LinkIcon,
+  RefreshCw,
+  Search,
+  TimerReset,
+  X as XIcon,
+} from 'lucide-react';
 import { SiAmazon, SiBitbucket, SiGithub, SiGitlab, SiGoogle } from 'react-icons/si';
 import {
   Dialog,
@@ -18,22 +28,26 @@ import { Label } from '../../../components/ui/Label';
 import { Alert } from '../../../components/ui/Alert';
 import { LoadingState } from '../../../components/ui/LoadingState';
 import { EmptyState } from '../../../components/ui/EmptyState';
-import { Card, CardContent } from '../../../components/ui/Card';
-import { Badge } from '../../../components/ui/Badge';
-import { cn } from '../../../../../lib/utils';
 import { useDialog } from '@/app/components/providers/DialogProvider';
 import { getLinkedAccountsForUser, unlinkExternalAccount, updatePersonalAccessToken, removePersonalAccessToken } from '../../../../../lib/db/helper';
 import {
   dashboardContentStackClass,
   dashboardMainClass,
   dashboardPanelClass,
-  dashboardTableWrapClass,
-  dashboardTableTheadClass,
-  dashboardThClass,
-  dashboardThRightClass,
-  dashboardTbodyClass,
-  dashboardTrHoverClass,
+  repositoryHeaderEyebrowClass,
+  repositoryHeaderIconTileClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
+import { RepositoryKpiCard } from '@/app/components/ade/dashboard/RepositoryKpiCard';
+import { deriveLinkedAccountKpis } from '@/app/components/ade/dashboard/linkedAccountKpis';
+import { LinkedAccountRow } from '@/app/components/ade/dashboard/LinkedAccountRow';
+import {
+  LinkedAccountsIdentityCard,
+  LinkedAccountsProviderList,
+  LinkedAccountsTipsCard,
+} from '@/app/components/ade/dashboard/LinkedAccountsRightColumn';
+import { LinkedAccountActivityTimeline } from '@/app/components/ade/dashboard/LinkedAccountActivityTimeline';
+import { deriveLinkedAccountActivity } from '@/app/components/ade/dashboard/linkedAccountActivity';
+import { LinkedAccountReconnectDialog } from '@/app/components/ade/dashboard/LinkedAccountReconnectDialog';
 
 interface LinkedAccount {
   id: string;
@@ -43,6 +57,8 @@ interface LinkedAccount {
   provider_username: string | null;
   /** Last 6 characters of PAT when set (for display only; full token never sent to client) */
   access_token_suffix?: string | null;
+  /** OAuth access-token expiry. Null for providers that don't expose one. */
+  token_expires_at?: string | null;
   created_at: string;
   last_login_at: string | null;
   repository_count: number;
@@ -53,17 +69,19 @@ interface LinkedAccount {
 interface ProviderConfig {
   name: string;
   displayName: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
   color: string;
   available: boolean;
+  /** Provider supports a Personal Access Token alongside OAuth. */
+  patSupported: boolean;
 }
 
 const providerConfigs: Record<string, ProviderConfig> = {
-  github: { name: 'github', displayName: 'GitHub', icon: SiGithub, color: '#24292e', available: true },
-  gitlab: { name: 'gitlab', displayName: 'GitLab', icon: SiGitlab, color: '#fc6d26', available: true },
-  bitbucket: { name: 'bitbucket', displayName: 'Bitbucket', icon: SiBitbucket, color: '#0052cc', available: true },
-  google: { name: 'google', displayName: 'Google / GCP', icon: SiGoogle, color: '#4285f4', available: false },
-  aws: { name: 'aws', displayName: 'AWS', icon: SiAmazon, color: '#ff9900', available: false },
+  github:    { name: 'github',    displayName: 'GitHub',       icon: SiGithub,    color: '#24292e', available: true,  patSupported: true  },
+  gitlab:    { name: 'gitlab',    displayName: 'GitLab',       icon: SiGitlab,    color: '#fc6d26', available: true,  patSupported: true  },
+  bitbucket: { name: 'bitbucket', displayName: 'Bitbucket',    icon: SiBitbucket, color: '#0052cc', available: true,  patSupported: false },
+  google:    { name: 'google',    displayName: 'Google / GCP', icon: SiGoogle,    color: '#4285f4', available: false, patSupported: false },
+  aws:       { name: 'aws',       displayName: 'AWS',          icon: SiAmazon,    color: '#ff9900', available: false, patSupported: false },
 };
 
 const LinkedAccounts = () => {
@@ -77,6 +95,13 @@ const LinkedAccounts = () => {
   const [patProvider, setPatProvider] = useState<string>('');
   const [patToken, setPatToken] = useState('');
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [methodFilter, setMethodFilter] = useState<'all' | 'oauth' | 'pat'>('all');
+  const [healthFilter, setHealthFilter] = useState<'all' | 'healthy' | 'attention'>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+
+  const [reconnectAccount, setReconnectAccount] = useState<LinkedAccount | null>(null);
 
   const userId = (session?.user as any)?.user_id;
 
@@ -112,6 +137,7 @@ const LinkedAccounts = () => {
               ? account.health_status
               : null,
           health_checked_at: typeof account.health_checked_at === 'string' ? account.health_checked_at : null,
+          token_expires_at: typeof account.token_expires_at === 'string' ? account.token_expires_at : null,
         }))
       );
     } catch (error: any) {
@@ -239,10 +265,6 @@ const LinkedAccounts = () => {
     }
   };
 
-  const getProviderIcon = (provider: string) => providerConfigs[provider]?.icon || LinkIcon;
-  const getProviderDisplayName = (provider: string) => providerConfigs[provider]?.displayName || provider.charAt(0).toUpperCase() + provider.slice(1);
-  const isProviderLinked = (provider: string) => linkedAccounts.some((account) => account.provider === provider);
-
   const formatDate = (dateString: string) => {
     const d = new Date(dateString);
     const datePart = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
@@ -250,35 +272,125 @@ const LinkedAccounts = () => {
     return `${datePart} ${timePart}`;
   };
 
-  const formatVerificationAge = (checkedAt: string | null) => {
-    if (!checkedAt) {
-      return 'not yet verified';
-    }
-    const deltaMs = Date.now() - new Date(checkedAt).getTime();
-    if (!Number.isFinite(deltaMs) || deltaMs < 0) {
-      return 'just now';
-    }
-    const hours = Math.floor(deltaMs / (60 * 60 * 1000));
-    if (hours < 1) {
-      return 'just now';
-    }
-    return `${hours}h ago`;
+  const filteredAccounts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return linkedAccounts.filter((account) => {
+      if (methodFilter === 'pat' && !account.access_token_suffix) return false;
+      if (methodFilter === 'oauth' && account.access_token_suffix) return false;
+      if (healthFilter === 'healthy' && account.health_status !== 'healthy') return false;
+      if (healthFilter === 'attention') {
+        const needs =
+          account.health_status === 'scope_missing' ||
+          account.health_status === 'revoked' ||
+          account.health_status === 'network_error';
+        if (!needs) return false;
+      }
+      if (!q) return true;
+      const handle = (account.provider_username || '').toLowerCase();
+      const email = (account.provider_email || '').toLowerCase();
+      const provider = account.provider.toLowerCase();
+      return handle.includes(q) || email.includes(q) || provider.includes(q);
+    });
+  }, [linkedAccounts, searchQuery, methodFilter, healthFilter]);
+
+  // Trim selection to currently-visible rows on every filter change so
+  // a hidden row can't quietly be acted on by the bulk toolbar.
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const visible = new Set(filteredAccounts.map((a) => a.id));
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (visible.has(id)) next.add(id);
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [filteredAccounts]);
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
-  const getHealthPresentation = (status: LinkedAccount['health_status']) => {
-    switch (status) {
-      case 'healthy':
-        return { label: '\u2713 healthy', toneClass: 'text-emerald-600 dark:text-emerald-400', needsReconnect: false };
-      case 'scope_missing':
-        return { label: '\u26a0 scope missing', toneClass: 'text-amber-600 dark:text-amber-400', needsReconnect: true };
-      case 'revoked':
-        return { label: '\u2716 revoked', toneClass: 'text-red-600 dark:text-red-400', needsReconnect: true };
-      case 'network_error':
-        return { label: '\u26a0 network error', toneClass: 'text-amber-600 dark:text-amber-400', needsReconnect: true };
-      default:
-        return { label: '\u2026 pending verification', toneClass: 'text-gray-500 dark:text-gray-400', needsReconnect: false };
+  const allVisibleSelected =
+    filteredAccounts.length > 0 && filteredAccounts.every((a) => selectedIds.has(a.id));
+
+  const toggleAllVisible = () => {
+    setSelectedIds((prev) => {
+      if (allVisibleSelected) {
+        const next = new Set(prev);
+        filteredAccounts.forEach((a) => next.delete(a.id));
+        return next;
+      }
+      const next = new Set(prev);
+      filteredAccounts.forEach((a) => next.add(a.id));
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  // No per-user "verify now" endpoint exists yet — only the admin-protected
+  // health-monitor cron at /api/admin/credential-health. Refresh from the
+  // cached probe results so the UI surfaces the latest known state.
+  // TODO(linked-accounts/phase5): expose a user-scoped verify endpoint that
+  // re-runs token-health-monitor for one or many linked-account ids.
+  const handleVerifyAccounts = async (ids: string[]) => {
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      await loadLinkedAccounts();
+      const count = ids.length;
+      setSuccessMessage(
+        count === 0
+          ? 'Refreshed health for all linked accounts.'
+          : `Refreshed health for ${count} ${count === 1 ? 'account' : 'accounts'}.`,
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const availableProviderCount = useMemo(
+    () => Object.values(providerConfigs).filter((p) => p.available).length,
+    [],
+  );
+  const kpis = useMemo(
+    () => deriveLinkedAccountKpis(linkedAccounts, availableProviderCount),
+    [linkedAccounts, availableProviderCount],
+  );
+  const recentActivity = useMemo(
+    () => deriveLinkedAccountActivity(linkedAccounts, { limit: 5 }),
+    [linkedAccounts],
+  );
+
+  // Open the scope-diff modal first instead of jumping straight to OAuth.
+  // Initial linking from the right column still uses `handleLinkAccount`
+  // directly — there's no existing token to reconcile against on first link.
+  const openReconnectDialog = (account: LinkedAccount) => {
+    setReconnectAccount(account);
+  };
+  const confirmReconnect = () => {
+    if (!reconnectAccount) return;
+    handleLinkAccount(reconnectAccount.provider);
+    setReconnectAccount(null);
+  };
+
+  // Eyebrow summarizes posture in one line; mirrors the repositories header.
+  // Read once on render — no need to memo a string concatenation.
+  const headerEyebrow = (() => {
+    const parts: string[] = [];
+    parts.push(`${kpis.linked} linked`);
+    parts.push(`${kpis.healthy} healthy`);
+    if (kpis.needsAttention > 0) parts.push(`${kpis.needsAttention} needs attention`);
+    if (kpis.nextExpiryDays !== null) parts.push(`next token expires in ${kpis.nextExpiryDays} d`);
+    return parts.join(' · ');
+  })();
 
   if (!session) {
     return (
@@ -292,15 +404,21 @@ const LinkedAccounts = () => {
     <>
       <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <LinkIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                Linked Accounts
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-                Link external accounts for single sign-on and repository access
-              </p>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className={repositoryHeaderIconTileClass} aria-hidden="true">
+                <LinkIcon className="w-5 h-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">
+                  Linked accounts
+                </h2>
+                <p className={repositoryHeaderEyebrowClass}>
+                  {linkedAccounts.length === 0
+                    ? 'Link external accounts for single sign-on and repository access'
+                    : headerEyebrow}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -313,190 +431,279 @@ const LinkedAccounts = () => {
       {successMessage && <Alert variant="success" className="mb-4" onClose={() => setSuccessMessage('')}>{successMessage}</Alert>}
       {errorMessage && <Alert variant="error" className="mb-4" onClose={() => setErrorMessage('')}>{errorMessage}</Alert>}
 
-      {/* Linked Accounts - same list container as Published */}
-      <section className="mb-10">
+      {linkedAccounts.length > 0 && (
+        <section
+          aria-label="Linked account KPIs"
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+        >
+          <RepositoryKpiCard
+            label="Linked providers"
+            value={
+              <>
+                {kpis.linked}
+                <span className="text-lg font-semibold text-gray-400 dark:text-gray-500 ml-0.5">
+                  /{kpis.available}
+                </span>
+              </>
+            }
+            subtitle={
+              kpis.linked === 0
+                ? 'No providers linked yet'
+                : linkedAccounts.map((a) => a.provider).join(' · ')
+            }
+            tone="indigo"
+            icon={<LinkIcon className="w-4 h-4" />}
+          />
+          <RepositoryKpiCard
+            label="Healthy"
+            value={kpis.healthy}
+            subtitle={
+              kpis.linked === 0
+                ? '—'
+                : `${Math.round((kpis.healthy / kpis.linked) * 100)}% of linked providers`
+            }
+            tone="emerald"
+            icon={<CheckCircle2 className="w-4 h-4" />}
+          />
+          <RepositoryKpiCard
+            label="Needs attention"
+            value={kpis.needsAttention}
+            subtitle={
+              kpis.needsAttention === 0
+                ? 'All linked providers passing health probes'
+                : 'Scope missing, revoked, or unreachable'
+            }
+            subtitleTone={kpis.needsAttention > 0 ? 'warning' : 'default'}
+            tone="amber"
+            icon={<AlertTriangle className="w-4 h-4" />}
+          />
+          <RepositoryKpiCard
+            label="Repos credentialed"
+            value={kpis.reposCredentialed}
+            subtitle={
+              kpis.reposCredentialed === 0
+                ? 'No repositories using these credentials yet'
+                : `Across ${kpis.linked} ${kpis.linked === 1 ? 'account' : 'accounts'}`
+            }
+            tone="violet"
+            icon={<GitBranchPlus className="w-4 h-4" />}
+          />
+          <RepositoryKpiCard
+            label="Avg token age"
+            value={
+              kpis.avgTokenAgeDays === null ? (
+                '—'
+              ) : (
+                <>
+                  {kpis.avgTokenAgeDays}
+                  <span className="text-lg font-semibold text-gray-400 dark:text-gray-500 ml-0.5">
+                    d
+                  </span>
+                </>
+              )
+            }
+            subtitle={
+              kpis.linked === 0
+                ? '—'
+                : `${kpis.oauthOnlyCount} OAuth-only · ${kpis.patCount} with PAT`
+            }
+            tone="sky"
+            icon={<Hourglass className="w-4 h-4" />}
+          />
+          <RepositoryKpiCard
+            label="Next expiry"
+            value={
+              kpis.nextExpiryDays === null ? (
+                <span className="text-gray-400 dark:text-gray-500">—</span>
+              ) : (
+                <>
+                  {kpis.nextExpiryDays}
+                  <span className="text-lg font-semibold text-rose-300 dark:text-rose-300/70 ml-0.5">
+                    d
+                  </span>
+                </>
+              )
+            }
+            subtitle={
+              kpis.nextExpiryRow
+                ? `${kpis.nextExpiryRow.provider} · ${
+                    (kpis.nextExpiryRow as LinkedAccount).provider_username ||
+                    (kpis.nextExpiryRow as LinkedAccount).provider_email
+                  }`
+                : 'No tracked expirations'
+            }
+            subtitleTone={
+              kpis.nextExpiryDays !== null && kpis.nextExpiryDays <= 14 ? 'negative' : 'default'
+            }
+            tone="rose"
+            icon={<TimerReset className="w-4 h-4" />}
+          />
+        </section>
+      )}
+
+      {/* Two-column layout: linked accounts list (2/3) + right rail (1/3) */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+        <div className="lg:col-span-2 min-w-0">
         {linkedAccounts.length === 0 ? (
           <EmptyState
             icon={<LinkIcon className="h-10 w-10" />}
             title="No Linked Accounts"
-            description="Link a provider below to sign in with SSO and manage repository access."
+            description="Link a provider on the right to sign in with SSO and manage repository access."
             iconContainerClassName="from-cyan-500 to-blue-600 shadow-cyan-500/30"
           />
         ) : (
-          <div className={dashboardTableWrapClass}>
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className={dashboardTableTheadClass}>
-                  <tr>
-                    <th className={dashboardThClass}>Account</th>
-                    <th className={dashboardThClass}>Linked</th>
-                    <th className={dashboardThClass}>Last login</th>
-                    <th className={dashboardThRightClass}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody className={dashboardTbodyClass}>
-                  {linkedAccounts.map((account) => {
-                    const Icon = getProviderIcon(account.provider);
-                    const displayName = getProviderDisplayName(account.provider);
-                    const config = providerConfigs[account.provider];
-                    const health = getHealthPresentation(account.health_status);
+          <div className={`${dashboardPanelClass} overflow-hidden`}>
+            {selectedIds.size === 0 ? (
+              <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/30 flex items-center gap-3 flex-wrap">
+                <div className="relative flex-1 min-w-[14rem] max-w-md">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Filter by provider, username, or email…"
+                    className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+                  />
+                </div>
+                <select
+                  value={methodFilter}
+                  onChange={(e) => setMethodFilter(e.target.value as 'all' | 'oauth' | 'pat')}
+                  className="text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-2 py-1.5"
+                  aria-label="Filter by method"
+                >
+                  <option value="all">All methods</option>
+                  <option value="oauth">OAuth only</option>
+                  <option value="pat">With PAT</option>
+                </select>
+                <select
+                  value={healthFilter}
+                  onChange={(e) => setHealthFilter(e.target.value as 'all' | 'healthy' | 'attention')}
+                  className="text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-2 py-1.5"
+                  aria-label="Filter by health"
+                >
+                  <option value="all">All statuses</option>
+                  <option value="healthy">Healthy</option>
+                  <option value="attention">Needs attention</option>
+                </select>
+                <div className="flex-1" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleVerifyAccounts([])}
+                  disabled={isLoading}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Verify all
+                </Button>
+              </div>
+            ) : (
+              <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-indigo-50/70 dark:bg-indigo-950/30 flex items-center gap-3 flex-wrap">
+                <label className="flex items-center gap-2 text-sm text-indigo-900 dark:text-indigo-100 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleAllVisible}
+                    className="h-4 w-4 rounded border-indigo-300 text-indigo-600"
+                  />
+                  <span>
+                    {selectedIds.size} selected
+                    {filteredAccounts.length !== selectedIds.size && (
+                      <span className="text-indigo-700/70 dark:text-indigo-300/70">
+                        {' '}
+                        of {filteredAccounts.length}
+                      </span>
+                    )}
+                  </span>
+                </label>
+                <div className="flex-1" />
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => handleVerifyAccounts(Array.from(selectedIds))}
+                  disabled={isLoading}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Verify selected
+                </Button>
+                <Button variant="ghost" size="sm" onClick={clearSelection} disabled={isLoading}>
+                  <XIcon className="w-3.5 h-3.5" />
+                  Clear
+                </Button>
+              </div>
+            )}
 
-                    return (
-                      <tr key={account.id} className={dashboardTrHoverClass}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700"
-                              style={{ color: config?.color }}
-                            >
-                              <Icon size={20} />
-                            </div>
-                            <div>
-                              <div className="text-sm font-semibold text-gray-900 dark:text-white">{displayName}</div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">{account.provider_username || account.provider_email}</div>
-                              <div className={`text-xs mt-1 ${health.toneClass}`}>
-                                {`Used by ${account.repository_count} ${account.repository_count === 1 ? 'repository' : 'repositories'} \u00b7 last verified ${formatVerificationAge(account.health_checked_at)} \u00b7 ${health.label}`}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {formatDate(account.created_at)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {account.last_login_at ? formatDate(account.last_login_at) : '—'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="flex justify-end items-center gap-2">
-                            {health.needsReconnect && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleLinkAccount(account.provider)}
-                                disabled={isLoading}
-                              >
-                                Reconnect
-                              </Button>
-                            )}
-                            <Button variant="outline" size="sm" onClick={() => handleUnlinkAccount(account)} disabled={isLoading} className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300">
-                              <Trash2 className="h-4 w-4" />
-                              Unlink
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {filteredAccounts.length === 0 ? (
+              <div className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                No accounts match the current filters.
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredAccounts.map((account) => {
+                  const provider = providerConfigs[account.provider];
+                  if (!provider) return null;
+                  return (
+                    <LinkedAccountRow
+                      key={account.id}
+                      account={account}
+                      provider={provider}
+                      selected={selectedIds.has(account.id)}
+                      onToggleSelect={() => toggleSelected(account.id)}
+                      onVerify={() => handleVerifyAccounts([account.id])}
+                      onUpdatePat={() => handleOpenPatDialog(account.provider, account.id)}
+                      onReconnect={() => openReconnectDialog(account)}
+                      onUnlink={() => handleUnlinkAccount(account)}
+                      reposHref={`/ade/dashboard/repositories?linkedAccountId=${account.id}`}
+                      disabled={isLoading}
+                      formatDate={formatDate}
+                    />
+                  );
+                })}
+              </ul>
+            )}
           </div>
         )}
-      </section>
-
-      {/* Available providers */}
-      <section>
-        <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">Add a provider</h2>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {Object.values(providerConfigs).map((provider) => {
-            const Icon = provider.icon;
-            const isLinked = isProviderLinked(provider.name);
-            const isAvailable = provider.available;
-            const linkedAccount = linkedAccounts.find(a => a.provider === provider.name);
-            const hasPAT = !!linkedAccount?.access_token_suffix;
-
-            return (
-              <Card
-                key={provider.name}
-                className={cn(
-                  dashboardPanelClass,
-                  'transition-colors shadow-none',
-                  !isAvailable && 'opacity-50',
-                  isAvailable && 'hover:border-gray-300 dark:hover:border-gray-600'
-                )}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700"
-                        style={{ color: provider.color }}
-                      >
-                        <Icon size={20} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-900 dark:text-white">{provider.displayName}</p>
-                        <div className="mt-0.5 flex flex-wrap gap-1.5">
-                          {!isAvailable && <Badge variant="secondary" className="text-xs">Coming soon</Badge>}
-                          {isLinked && <Badge variant="success" className="text-xs">Linked</Badge>}
-                          {hasPAT && (
-                            <Badge variant="secondary" className="text-xs font-mono">
-                              <Key className="h-3 w-3 mr-0.5 inline" />
-                              PAT ••••••{linkedAccount?.access_token_suffix}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {isLinked ? null : (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleLinkAccount(provider.name)}
-                        disabled={isLoading || !isAvailable}
-                        className="shrink-0"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Link
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* PAT for GitHub/GitLab when linked */}
-                  {(provider.name === 'github' || provider.name === 'gitlab') && isAvailable && isLinked && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="text-xs font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
-                          <Key className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
-                          Personal Access Token
-                        </div>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {linkedAccount?.access_token_suffix ? (
-                            <>PAT set (ends in <span className="font-mono font-medium text-gray-700 dark:text-gray-300">••••••{linkedAccount.access_token_suffix}</span>).</>
-                          ) : (
-                            'Optional: add a PAT for direct repo access.'
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenPatDialog(provider.name, linkedAccount?.id)}
-                          disabled={isLoading}
-                          className="text-xs h-7"
-                        >
-                          {linkedAccount?.access_token_suffix ? 'Update' : 'Add'}
-                        </Button>
-                        {linkedAccount?.access_token_suffix && (
-                          <Button variant="ghost" size="sm" onClick={() => handleRemovePatToken(provider.name, linkedAccount.id)} disabled={isLoading} className="text-xs h-7 text-red-600 hover:text-red-700 dark:text-red-400">
-                            Remove
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
         </div>
 
-        <Alert variant="info" className="mt-6">
-          You can link multiple providers. Once linked, you can sign in with any of them.
-        </Alert>
+        <aside className="lg:col-span-1 space-y-6">
+          <LinkedAccountsIdentityCard
+            displayName={session?.user?.name}
+            primaryEmail={session?.user?.email}
+            accounts={linkedAccounts}
+            providers={providerConfigs}
+          />
+          <LinkedAccountsProviderList
+            providers={Object.values(providerConfigs)}
+            linkedProviderNames={
+              new Set(linkedAccounts.map((a) => a.provider))
+            }
+            onLink={handleLinkAccount}
+            disabled={isLoading}
+          />
+          <LinkedAccountsTipsCard />
+        </aside>
       </section>
+
+      {linkedAccounts.length > 0 && (
+        <section className="mb-10">
+          <LinkedAccountActivityTimeline events={recentActivity} />
+        </section>
+      )}
+
+      <LinkedAccountReconnectDialog
+        open={!!reconnectAccount}
+        onOpenChange={(open) => {
+          if (!open) setReconnectAccount(null);
+        }}
+        provider={
+          reconnectAccount ? providerConfigs[reconnectAccount.provider] ?? null : null
+        }
+        accountHandle={
+          reconnectAccount?.provider_username ?? reconnectAccount?.provider_email ?? null
+        }
+        healthStatus={reconnectAccount?.health_status}
+        onConfirm={confirmReconnect}
+        isSubmitting={isLoading}
+      />
 
       {/* Personal Access Token Dialog */}
       <Dialog open={patDialogOpen} onOpenChange={(open) => !open && handleClosePatDialog()}>
@@ -525,6 +732,23 @@ const LinkedAccounts = () => {
             )}
           </div>
           <DialogFooter>
+            {/* When editing an existing PAT, expose a destructive Remove on
+                the left so removal stays one click away after we dropped
+                the per-provider card grid. */}
+            {linkedAccounts.find((a) => a.id === editingAccountId)?.access_token_suffix && (
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  if (!editingAccountId) return;
+                  await handleRemovePatToken(patProvider, editingAccountId);
+                  handleClosePatDialog();
+                }}
+                disabled={isLoading}
+                className="mr-auto text-red-600 hover:text-red-700 dark:text-red-400"
+              >
+                Remove token
+              </Button>
+            )}
             <Button variant="outline" onClick={handleClosePatDialog}>Cancel</Button>
             <Button onClick={handleSavePatToken} disabled={isLoading}>
               {linkedAccounts.find(a => a.id === editingAccountId)?.access_token_suffix ? 'Update token' : 'Add token'}

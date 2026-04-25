@@ -2613,6 +2613,7 @@ export async function getLinkedAccountsForUser(userId: string) {
     const result = await connectionPool.query(
       `SELECT id, provider, provider_user_id, provider_email, provider_username,
               (CASE WHEN access_token IS NOT NULL THEN RIGHT(access_token, 6) ELSE NULL END) AS access_token_suffix,
+              token_expires_at,
               created_at, last_login_at,
               COALESCE(repo_usage.repository_count, 0) AS repository_count,
               credential_health.status AS health_status,

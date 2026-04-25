@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linked accounts · Polished mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+    .icon-fill { fill: currentColor !important; }
+    /* Soft pulsing dot used for "needs attention" KPI */
+    @keyframes pulse-soft { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }
+    .pulse-soft { animation: pulse-soft 2.6s ease-in-out infinite; }
+    /* Icon-only method badge: subtle pill showing OAuth vs PAT next to @username */
+    .method-badge { display: inline-flex; align-items: center; gap: 0.25rem; height: 1.125rem; padding: 0 0.375rem; border-radius: 0.25rem; font-size: 0.625rem; line-height: 1; }
+    .method-badge.oauth  { background: rgb(238 242 255); color: rgb(67 56 202); }
+    .method-badge.pat    { background: rgb(245 243 255); color: rgb(91 33 182); font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .dark .method-badge.oauth { background: rgba(99 102 241 / 0.18); color: rgb(199 210 254); }
+    .dark .method-badge.pat   { background: rgba(139 92 246 / 0.18); color: rgb(221 214 254); }
+    /* Provider tile colors — mirrors react-icons brand colors */
+    .gh-tile { background: #24292e; color: #fff; }
+    .gl-tile { background: #fc6d26; color: #fff; }
+    .bb-tile { background: #0052cc; color: #fff; }
+    .gg-tile { background: #4285f4; color: #fff; }
+    .aws-tile { background: #ff9900; color: #1f1f1f; }
+    .dark .gh-tile { background: #f6f8fa; color: #24292e; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <!-- Top platform bar -->
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center"><i data-lucide="layout-dashboard" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Control panel</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Linked accounts</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="../" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+
+    <!-- Sidebar (mirrors DashboardSideNav) -->
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto h-full flex flex-col">
+        <div class="p-3">
+          <button class="w-full flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-left">
+            <div class="w-8 h-8 rounded-md bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white font-semibold text-xs">AC</div>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs text-gray-500 dark:text-gray-400">Workspace</p>
+              <p class="text-sm font-semibold truncate">Acme Corp</p>
+            </div>
+            <i data-lucide="chevrons-up-down" class="w-4 h-4 text-gray-400"></i>
+          </button>
+        </div>
+        <hr class="border-indigo-500/10 mx-3" />
+        <div class="p-4 flex-1">
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Overview</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Control panel</span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Identity</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="user-round" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Profile</span></a></li>
+              <li><a href="dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10"><i data-lucide="link-2" class="w-5 h-5 text-indigo-500"></i><span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Linked accounts</span><span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Workspace</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="building-2" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Tenants</span></a></li>
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="key-round" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">API keys</span></a></li>
+              <li><a href="../repositories/dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-branch-plus" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Repositories</span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Specifications</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="folders" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Projects</span></a></li>
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-branch" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Versions</span></a></li>
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="globe-2" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Published</span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div>
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Governance</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="atom" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Primitives</span></a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main column -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- Page header (matches repositoryHeaderShellClass pattern) -->
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div class="px-6 py-4 flex items-end justify-between gap-4">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shrink-0"><i data-lucide="link-2" class="w-5 h-5 text-white"></i></div>
+            <div class="min-w-0">
+              <h2 class="text-2xl font-bold leading-tight">Linked accounts</h2>
+              <p class="text-gray-600 dark:text-gray-400 text-xs mt-1 mono">5 linked · 4 healthy · 1 needs reauth · next token expires in 12 d · last verified 6 m ago</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4"></i> Verify all</button>
+            <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4"></i> Scope reference</button>
+            <button class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i> Link provider</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-6 space-y-6">
+
+        <!-- KPI strip -->
+        <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Linked providers</p><i data-lucide="link-2" class="w-4 h-4 text-indigo-400"></i></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono">3<span class="text-lg font-semibold text-gray-400 ml-0.5">/5</span></p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,18 L13,18 L26,15 L40,15 L53,9 L66,9 L80,7" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="7" r="1.5" fill="#6366f1"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-1">github · gitlab · bitbucket</p>
+          </div>
+
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Healthy</p><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono text-emerald-500">4</p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,12 L13,11 L26,12 L40,9 L53,8 L66,7 L80,7" fill="none" stroke="#10b981" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="7" r="1.5" fill="#10b981"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-1">verified within last 24 h</p>
+          </div>
+
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700/40 bg-amber-50/40 dark:bg-amber-950/10 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-300 font-semibold">Needs attention</p><span class="relative flex items-center justify-center"><span class="absolute inline-flex h-3 w-3 rounded-full bg-amber-300 opacity-60 pulse-soft"></span><i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500 relative"></i></span></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono text-amber-500">1</p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,18 L13,17 L26,18 L40,15 L53,14 L66,11 L80,9" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="9" r="1.5" fill="#f59e0b"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-amber-700 dark:text-amber-300 mt-1">gitlab · scope missing</p>
+          </div>
+
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Repos credentialed</p><i data-lucide="git-branch-plus" class="w-4 h-4 text-violet-400"></i></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono">12</p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,18 L13,17 L26,15 L40,12 L53,11 L66,9 L80,7" fill="none" stroke="#8b5cf6" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="7" r="1.5" fill="#8b5cf6"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1"><i data-lucide="trending-up" class="w-3 h-3"></i> +2 this week</p>
+          </div>
+
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Avg token age</p><i data-lucide="hourglass" class="w-4 h-4 text-sky-400"></i></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono">47<span class="text-lg font-semibold text-gray-400 ml-0.5">d</span></p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,7 L13,9 L26,10 L40,12 L53,14 L66,15 L80,17" fill="none" stroke="#0ea5e9" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="17" r="1.5" fill="#0ea5e9"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-1">across 3 OAuth · 2 PAT</p>
+          </div>
+
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-rose-200 dark:border-rose-700/40 bg-rose-50/40 dark:bg-rose-950/10 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-rose-700 dark:text-rose-300 font-semibold">Next expiry</p><i data-lucide="timer-reset" class="w-4 h-4 text-rose-400"></i></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono text-rose-500">12<span class="text-lg font-semibold text-rose-300 ml-0.5">d</span></p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,4 L13,6 L26,8 L40,11 L53,14 L66,17 L80,20" fill="none" stroke="#f43f5e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="20" r="1.5" fill="#f43f5e"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-1 mono truncate">gitlab · acme-platform PAT</p>
+          </div>
+        </section>
+
+        <!-- Linked accounts list (2/3) + Identity / Add provider (1/3) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          <!-- Linked accounts list -->
+          <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 lg:col-span-2 overflow-hidden flex flex-col">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 shrink-0">
+              <div class="flex items-center gap-3">
+                <i data-lucide="link-2" class="w-5 h-5 text-indigo-500 shrink-0"></i>
+                <div class="flex-1 min-w-0">
+                  <h3 class="text-base font-semibold">Connected providers</h3>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Sign-in identity + repository credentials. Click a row to drill into the repos using it.</p>
+                </div>
+                <span class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">3 linked</span>
+              </div>
+              <div class="mt-3 flex items-center gap-2">
+                <div class="relative flex-1 min-w-0">
+                  <i data-lucide="search" class="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"></i>
+                  <input type="text" placeholder="Filter by provider, username, or repo…" class="h-8 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 pl-7 pr-2 text-xs" />
+                </div>
+                <select aria-label="Method" class="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs shrink-0">
+                  <option>All methods</option><option>OAuth only</option><option>PAT only</option><option>OAuth + PAT</option>
+                </select>
+                <select aria-label="Health" class="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs shrink-0">
+                  <option>All health</option><option>Healthy</option><option>Scope missing</option><option>Revoked</option><option>Network error</option><option>Pending</option>
+                </select>
+                <button class="h-8 px-2.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5 shrink-0"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Verify all</button>
+              </div>
+            </div>
+
+            <!-- Selection bar (visible because 1 row is selected — for mockup) -->
+            <div class="px-5 py-2 border-b border-indigo-200 dark:border-indigo-700/40 bg-indigo-50 dark:bg-indigo-950/30 flex items-center gap-3 text-xs">
+              <label class="inline-flex items-center gap-2 text-indigo-700 dark:text-indigo-300 font-medium" title="Select all rows">
+                <input type="checkbox" aria-label="Select all" class="h-3.5 w-3.5 rounded border-indigo-300 text-indigo-600" />
+                <span>1 of 3 selected</span>
+              </label>
+              <span class="text-gray-300 dark:text-gray-600">·</span>
+              <button class="px-2 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1.5"><i data-lucide="shield-check" class="w-3 h-3"></i> Verify selected</button>
+              <button class="px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 inline-flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-3 h-3"></i> Re-check scopes</button>
+              <button class="px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 text-rose-600 hover:bg-white dark:hover:bg-gray-800 inline-flex items-center gap-1.5"><i data-lucide="trash-2" class="w-3 h-3"></i> Unlink…</button>
+              <span class="ml-auto text-[11px] text-indigo-600 dark:text-indigo-300 hover:underline cursor-pointer">Clear selection</span>
+            </div>
+
+            <ul class="divide-y divide-gray-100 dark:divide-gray-700/60">
+
+              <!-- GitHub: healthy + OAuth + PAT -->
+              <li class="px-5 py-4 hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                <div class="flex items-start gap-4">
+                  <input type="checkbox" aria-label="Select GitHub @octocat" class="mt-3.5 h-4 w-4 rounded border-gray-300 text-indigo-600 shrink-0" />
+                  <div class="w-10 h-10 rounded-md gh-tile flex items-center justify-center shrink-0"><i data-lucide="github" class="w-5 h-5"></i></div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <p class="font-semibold">GitHub</p>
+                      <span class="mono text-xs text-gray-500">@octocat</span>
+                      <span class="method-badge oauth" title="Signed in via OAuth"><i data-lucide="link-2" class="w-3 h-3"></i> OAuth</span>
+                      <span class="method-badge pat" title="Personal Access Token ending in a3f9"><i data-lucide="key" class="w-3 h-3"></i> ••••a3f9</span>
+                      <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 inline-flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3 h-3"></i> Healthy</span>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mono truncate">octocat@github.com · linked Mar 14 · last sign-in 12 m ago · last verified 6 m ago</p>
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2 text-xs">
+                      <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300"><i data-lucide="shield-check" class="w-3.5 h-3.5 text-gray-400"></i> Scopes <span class="mono text-[11px] text-gray-500">repo · read:org · read:user · user:email</span></div>
+                      <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300"><i data-lucide="git-branch-plus" class="w-3.5 h-3.5 text-gray-400"></i> Repos <a href="#" class="mono text-indigo-500 hover:underline">9 using this account →</a></div>
+                      <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300"><i data-lucide="hourglass" class="w-3.5 h-3.5 text-gray-400"></i> Token age <span class="mono text-[11px] text-gray-500">42 d · OAuth never expires · PAT in 187 d</span></div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button title="Verify now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button>
+                    <button title="Update PAT" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="key" class="w-3.5 h-3.5"></i></button>
+                    <button title="Reconnect OAuth" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="link-2" class="w-3.5 h-3.5"></i></button>
+                    <button title="Unlink" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 inline-flex items-center justify-center"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                  </div>
+                </div>
+              </li>
+
+              <!-- GitLab: scope missing + OAuth + PAT expiring (pre-selected for bulk demo) -->
+              <li class="px-5 py-4 hover:bg-gray-50/60 dark:hover:bg-gray-900/30 bg-amber-50/30 dark:bg-amber-950/10">
+                <div class="flex items-start gap-4">
+                  <input type="checkbox" checked aria-label="Select GitLab @acme-platform" class="mt-3.5 h-4 w-4 rounded border-indigo-300 text-indigo-600 shrink-0" />
+                  <div class="w-10 h-10 rounded-md gl-tile flex items-center justify-center shrink-0"><i data-lucide="gitlab" class="w-5 h-5"></i></div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <p class="font-semibold">GitLab</p>
+                      <span class="mono text-xs text-gray-500">@acme-platform</span>
+                      <span class="method-badge oauth" title="Signed in via OAuth"><i data-lucide="link-2" class="w-3 h-3"></i> OAuth</span>
+                      <span class="method-badge pat" style="background: rgb(255 241 242); color: rgb(190 18 60);" title="PAT ending in 7c41 · expires in 12 days"><i data-lucide="key" class="w-3 h-3"></i> ••••7c41 · 12 d</span>
+                      <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 inline-flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3 h-3"></i> Scope missing</span>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mono truncate">platform@acme-corp.io · linked Feb 02 · last sign-in 2 h ago · last verified 4 h ago</p>
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2 text-xs">
+                      <div class="flex items-center gap-1.5 text-amber-700 dark:text-amber-300"><i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> Scopes <span class="mono text-[11px]">read_api · read_user <span class="text-rose-500">(missing read_repository)</span></span></div>
+                      <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300"><i data-lucide="git-branch-plus" class="w-3.5 h-3.5 text-gray-400"></i> Repos <a href="#" class="mono text-indigo-500 hover:underline">2 using this account →</a></div>
+                      <div class="flex items-center gap-1.5 text-rose-600 dark:text-rose-400"><i data-lucide="timer-reset" class="w-3.5 h-3.5"></i> Token age <span class="mono text-[11px]">81 d · PAT expires Apr 7</span></div>
+                    </div>
+                    <div class="mt-3 flex items-center gap-2">
+                      <button class="px-2.5 py-1 text-xs rounded-md bg-amber-500 hover:bg-amber-600 text-white inline-flex items-center gap-1.5"><i data-lucide="link-2" class="w-3 h-3"></i> Reconnect with required scopes</button>
+                      <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5"><i data-lucide="key" class="w-3 h-3"></i> Rotate PAT</button>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button title="Verify now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button>
+                    <button title="Unlink" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 inline-flex items-center justify-center"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                  </div>
+                </div>
+              </li>
+
+              <!-- Bitbucket: healthy + OAuth only -->
+              <li class="px-5 py-4 hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                <div class="flex items-start gap-4">
+                  <input type="checkbox" aria-label="Select Bitbucket @acme-bb" class="mt-3.5 h-4 w-4 rounded border-gray-300 text-indigo-600 shrink-0" />
+                  <div class="w-10 h-10 rounded-md bb-tile flex items-center justify-center shrink-0"><span class="font-bold">B</span></div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <p class="font-semibold">Bitbucket</p>
+                      <span class="mono text-xs text-gray-500">@acme-bb</span>
+                      <span class="method-badge oauth" title="Signed in via OAuth"><i data-lucide="link-2" class="w-3 h-3"></i> OAuth</span>
+                      <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 inline-flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3 h-3"></i> Healthy</span>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mono truncate">bb-bot@acme-corp.io · linked Jan 18 · last sign-in 1 d ago · last verified 18 m ago</p>
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2 text-xs">
+                      <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300"><i data-lucide="shield-check" class="w-3.5 h-3.5 text-gray-400"></i> Scopes <span class="mono text-[11px] text-gray-500">account · repository · pullrequest</span></div>
+                      <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300"><i data-lucide="git-branch-plus" class="w-3.5 h-3.5 text-gray-400"></i> Repos <a href="#" class="mono text-indigo-500 hover:underline">1 using this account →</a></div>
+                      <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300"><i data-lucide="hourglass" class="w-3.5 h-3.5 text-gray-400"></i> Token age <span class="mono text-[11px] text-gray-500">96 d · OAuth refresh enabled</span></div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button title="Verify now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button>
+                    <button title="Reconnect OAuth" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="link-2" class="w-3.5 h-3.5"></i></button>
+                    <button title="Unlink" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 inline-flex items-center justify-center"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                  </div>
+                </div>
+              </li>
+
+            </ul>
+
+            <div class="px-5 py-2.5 border-t border-gray-100 dark:border-gray-700/60 text-[11px] text-gray-500 mono flex items-center justify-between shrink-0 bg-white dark:bg-gray-800">
+              <span>Showing 3 of 3 linked · 2 providers available to add</span>
+              <a href="#" class="text-indigo-500 hover:underline">Audit log →</a>
+            </div>
+          </section>
+
+          <!-- Right column: Identity summary + Add provider + Tips -->
+          <div class="space-y-6">
+
+            <!-- Identity summary -->
+            <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center gap-3">
+                <i data-lucide="user-round" class="w-5 h-5 text-indigo-500"></i>
+                <div class="flex-1 min-w-0"><h3 class="text-base font-semibold">Your identity</h3><p class="text-xs text-gray-500 dark:text-gray-400">How you sign in across linked providers</p></div>
+              </div>
+              <div class="p-5">
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold">KS</div>
+                  <div class="min-w-0">
+                    <p class="font-semibold">Kenji Sellers</p>
+                    <p class="text-xs text-gray-500 mono truncate">kenji@acme-corp.io · primary email</p>
+                  </div>
+                </div>
+                <ul class="mt-4 space-y-2 text-xs">
+                  <li class="flex items-center justify-between gap-2"><span class="flex items-center gap-2"><i data-lucide="github" class="w-3.5 h-3.5"></i> octocat@github.com</span><span class="mono text-[10px] text-gray-400">verified · primary</span></li>
+                  <li class="flex items-center justify-between gap-2"><span class="flex items-center gap-2"><i data-lucide="gitlab" class="w-3.5 h-3.5"></i> platform@acme-corp.io</span><span class="mono text-[10px] text-gray-400">verified</span></li>
+                  <li class="flex items-center justify-between gap-2"><span class="flex items-center gap-2"><i data-lucide="circle" class="w-3.5 h-3.5"></i> bb-bot@acme-corp.io</span><span class="mono text-[10px] text-gray-400">unverified</span></li>
+                </ul>
+                <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/60 flex items-center gap-2">
+                  <a href="#" class="text-xs text-indigo-500 hover:underline inline-flex items-center gap-1">Manage profile <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+                </div>
+              </div>
+            </section>
+
+            <!-- Add provider -->
+            <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center gap-3">
+                <i data-lucide="plus-circle" class="w-5 h-5 text-indigo-500"></i>
+                <div class="flex-1 min-w-0"><h3 class="text-base font-semibold">Available providers</h3><p class="text-xs text-gray-500 dark:text-gray-400">Add another sign-in or repo source</p></div>
+              </div>
+              <ul class="divide-y divide-gray-100 dark:divide-gray-700/60">
+                <li class="px-5 py-3 flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-md gh-tile flex items-center justify-center shrink-0"><i data-lucide="github" class="w-4 h-4"></i></div>
+                  <div class="flex-1 min-w-0"><p class="text-sm font-medium">GitHub</p><p class="text-[11px] text-gray-500">OAuth · PAT</p></div>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Linked</span>
+                </li>
+                <li class="px-5 py-3 flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-md gl-tile flex items-center justify-center shrink-0"><i data-lucide="gitlab" class="w-4 h-4"></i></div>
+                  <div class="flex-1 min-w-0"><p class="text-sm font-medium">GitLab</p><p class="text-[11px] text-gray-500">OAuth · PAT</p></div>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Linked</span>
+                </li>
+                <li class="px-5 py-3 flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-md bb-tile flex items-center justify-center shrink-0"><span class="font-bold text-sm">B</span></div>
+                  <div class="flex-1 min-w-0"><p class="text-sm font-medium">Bitbucket</p><p class="text-[11px] text-gray-500">OAuth</p></div>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Linked</span>
+                </li>
+                <li class="px-5 py-3 flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-md gg-tile flex items-center justify-center shrink-0"><span class="font-bold text-sm">G</span></div>
+                  <div class="flex-1 min-w-0"><p class="text-sm font-medium">Google / GCP</p><p class="text-[11px] text-gray-500">OAuth · workspace</p></div>
+                  <button class="text-xs px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Link</button>
+                </li>
+                <li class="px-5 py-3 flex items-center gap-3 opacity-60">
+                  <div class="w-8 h-8 rounded-md aws-tile flex items-center justify-center shrink-0"><span class="font-bold text-sm">A</span></div>
+                  <div class="flex-1 min-w-0"><p class="text-sm font-medium">AWS</p><p class="text-[11px] text-gray-500">IAM Identity Center</p></div>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200">Coming soon</span>
+                </li>
+              </ul>
+            </section>
+
+            <!-- Tips / docs -->
+            <section class="bg-gradient-to-br from-indigo-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:to-purple-500/10 rounded-lg border border-indigo-500/20 dark:border-indigo-700/30 p-5">
+              <div class="flex items-start gap-3">
+                <i data-lucide="lightbulb" class="w-5 h-5 text-indigo-500 mt-0.5 shrink-0"></i>
+                <div class="text-xs space-y-2">
+                  <p class="font-semibold text-gray-700 dark:text-gray-200">Why link more than one provider?</p>
+                  <p class="text-gray-600 dark:text-gray-400">OAuth covers sign-in. A PAT lets us read private repos and react to webhook deliveries even when you're offline. We never store the full token — only the last 4 characters for display.</p>
+                  <a href="#" class="text-indigo-500 hover:underline inline-flex items-center gap-1">Scope reference <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </div>
+
+        <!-- Recent activity (audit) -->
+        <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center gap-3">
+            <i data-lucide="history" class="w-5 h-5 text-indigo-500"></i>
+            <div class="flex-1 min-w-0"><h3 class="text-base font-semibold">Recent activity</h3><p class="text-xs text-gray-500 dark:text-gray-400">Linking, rotation, and verification events for this user</p></div>
+            <a href="#" class="text-xs text-indigo-500 hover:underline">Full audit log →</a>
+          </div>
+          <ol class="divide-y divide-gray-100 dark:divide-gray-700/60 text-sm">
+            <li class="px-5 py-3 flex items-center gap-4">
+              <div class="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0"><i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300"></i></div>
+              <div class="flex-1 min-w-0"><p>Verified <span class="mono">github @octocat</span> — <span class="text-emerald-600 dark:text-emerald-400">healthy · 4 scopes confirmed</span></p></div>
+              <p class="text-[11px] mono text-gray-500">6 m ago · 04/25 14:08</p>
+            </li>
+            <li class="px-5 py-3 flex items-center gap-4">
+              <div class="w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-300"></i></div>
+              <div class="flex-1 min-w-0"><p>Verification failed for <span class="mono">gitlab @acme-platform</span> — <span class="text-amber-600 dark:text-amber-400">missing scope read_repository</span></p></div>
+              <p class="text-[11px] mono text-gray-500">4 h ago · 04/25 09:52</p>
+            </li>
+            <li class="px-5 py-3 flex items-center gap-4">
+              <div class="w-7 h-7 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center shrink-0"><i data-lucide="key" class="w-3.5 h-3.5 text-violet-600 dark:text-violet-300"></i></div>
+              <div class="flex-1 min-w-0"><p>PAT rotated for <span class="mono">github @octocat</span> — old suffix <span class="mono">••••2bd1</span> → <span class="mono">••••a3f9</span></p></div>
+              <p class="text-[11px] mono text-gray-500">1 d ago · 04/24 16:21</p>
+            </li>
+            <li class="px-5 py-3 flex items-center gap-4">
+              <div class="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0"><i data-lucide="link-2" class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-300"></i></div>
+              <div class="flex-1 min-w-0"><p>Linked <span class="mono">bitbucket @acme-bb</span> via OAuth — 3 scopes granted</p></div>
+              <p class="text-[11px] mono text-gray-500">3 d ago · 04/22 11:04</p>
+            </li>
+            <li class="px-5 py-3 flex items-center gap-4">
+              <div class="w-7 h-7 rounded-full bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600 dark:text-rose-300"></i></div>
+              <div class="flex-1 min-w-0"><p>Unlinked <span class="mono">github @experiments-bot</span> — 2 repos detached, will need re-credentialing</p></div>
+              <p class="text-[11px] mono text-gray-500">9 d ago · 04/16 22:19</p>
+            </li>
+          </ol>
+        </section>
+
+        <!-- Empty-state preview -->
+        <section class="bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 overflow-hidden">
+          <div class="px-5 py-3 border-b border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/40 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="eye" class="w-4 h-4 text-gray-400"></i>
+              <p class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Empty-state preview</p>
+            </div>
+            <p class="text-[11px] text-gray-400 mono">visible only in mockup</p>
+          </div>
+          <div class="p-12 flex flex-col items-center justify-center text-center">
+            <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500/15 to-blue-500/15 flex items-center justify-center mb-4">
+              <i data-lucide="link-2" class="w-7 h-7 text-cyan-500"></i>
+            </div>
+            <h3 class="text-lg font-semibold">No linked accounts yet</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-md">Link a provider to sign in with SSO and credential repository scans. You can link more than one — we'll use them in priority order.</p>
+            <div class="mt-4 flex items-center gap-2">
+              <button class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-2"><i data-lucide="github" class="w-4 h-4"></i> Link GitHub</button>
+              <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-2"><i data-lucide="gitlab" class="w-4 h-4"></i> Link GitLab</button>
+              <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-2"><span class="font-bold text-xs">B</span> Link Bitbucket</button>
+            </div>
+            <p class="mt-3 text-[11px] text-gray-400">Need a non-OAuth login? <a href="#" class="text-indigo-500 hover:underline">Use a Personal Access Token →</a></p>
+          </div>
+        </section>
+
+        <!-- PAT dialog preview (shown inline so we can iterate on dialog look) -->
+        <section class="bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 overflow-hidden">
+          <div class="px-5 py-3 border-b border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/40 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="message-square" class="w-4 h-4 text-gray-400"></i>
+              <p class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">PAT dialog preview</p>
+            </div>
+            <p class="text-[11px] text-gray-400 mono">visible only in mockup · two states</p>
+          </div>
+          <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50/40 dark:bg-gray-900/30">
+
+            <!-- Dialog: GitHub PAT -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-xl">
+              <div class="px-5 pt-5 pb-3 border-b border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-md gh-tile flex items-center justify-center"><i data-lucide="github" class="w-4 h-4"></i></div>
+                  <div>
+                    <h4 class="text-base font-semibold">Add GitHub Personal Access Token</h4>
+                    <p class="text-[11px] mono text-gray-500">github · @octocat · linked Mar 14</p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-5 space-y-4">
+                <div>
+                  <label class="text-xs font-medium text-gray-600 dark:text-gray-300 block mb-1.5">Token</label>
+                  <div class="flex items-center gap-2">
+                    <input type="password" placeholder="ghp_••••••••••••••••" value="ghp_AbCdEfGhIjKlMnOpQrStUvWxYz" class="mono text-xs flex-1 h-9 px-3 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900" />
+                    <button class="h-9 w-9 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center" title="Show / hide"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
+                  </div>
+                  <p class="text-[11px] text-gray-500 mt-1">We store only the last 4 chars (<span class="mono">••••WxYz</span>) and the encrypted token.</p>
+                </div>
+                <div class="rounded-md border border-indigo-200 dark:border-indigo-700/40 bg-indigo-50/60 dark:bg-indigo-950/20 p-3">
+                  <p class="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 mb-1.5 flex items-center gap-1.5"><i data-lucide="shield-check" class="w-3 h-3"></i> Required scopes</p>
+                  <div class="flex flex-wrap gap-1">
+                    <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-700/40 text-indigo-700 dark:text-indigo-300">repo</span>
+                    <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-700/40 text-indigo-700 dark:text-indigo-300">read:org</span>
+                    <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-700/40 text-indigo-700 dark:text-indigo-300">read:user</span>
+                    <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-700/40 text-indigo-700 dark:text-indigo-300">user:email</span>
+                  </div>
+                  <a href="#" class="text-[11px] text-indigo-500 hover:underline inline-flex items-center gap-1 mt-2"><i data-lucide="external-link" class="w-3 h-3"></i> Generate one on github.com</a>
+                </div>
+                <div class="rounded-md border border-emerald-200 dark:border-emerald-700/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-3 flex items-start gap-2">
+                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300 mt-0.5"></i>
+                  <div class="text-[11px] text-emerald-700 dark:text-emerald-300"><p class="font-semibold">Live verification</p><p>We'll hit <span class="mono">/user</span> and <span class="mono">/user/repos</span> before saving — invalid tokens are rejected.</p></div>
+                </div>
+              </div>
+              <div class="px-5 py-3 border-t border-gray-100 dark:border-gray-700/60 flex items-center justify-end gap-2">
+                <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+                <button class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1.5"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Verify &amp; save</button>
+              </div>
+            </div>
+
+            <!-- Dialog: Reconnect with required scopes -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-xl">
+              <div class="px-5 pt-5 pb-3 border-b border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-md gl-tile flex items-center justify-center"><i data-lucide="gitlab" class="w-4 h-4"></i></div>
+                  <div>
+                    <h4 class="text-base font-semibold">Reconnect GitLab</h4>
+                    <p class="text-[11px] mono text-gray-500">gitlab · @acme-platform · scope missing</p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-5 space-y-4">
+                <div class="rounded-md border border-amber-200 dark:border-amber-700/40 bg-amber-50/60 dark:bg-amber-950/20 p-3">
+                  <p class="text-[11px] font-semibold text-amber-700 dark:text-amber-300 mb-1.5 flex items-center gap-1.5"><i data-lucide="alert-triangle" class="w-3 h-3"></i> What's changing</p>
+                  <p class="text-[11px] text-amber-700 dark:text-amber-300">Your existing OAuth token is missing <span class="mono font-semibold">read_repository</span>. Reconnecting will redirect you to GitLab and request the additional scope. No data is lost.</p>
+                </div>
+                <ul class="text-xs space-y-2">
+                  <li class="flex items-center gap-2"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i> <span class="mono text-gray-500">read_api</span> <span class="text-gray-400">(already granted)</span></li>
+                  <li class="flex items-center gap-2"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i> <span class="mono text-gray-500">read_user</span> <span class="text-gray-400">(already granted)</span></li>
+                  <li class="flex items-center gap-2"><i data-lucide="plus" class="w-3.5 h-3.5 text-indigo-500"></i> <span class="mono text-indigo-600 dark:text-indigo-300 font-semibold">read_repository</span> <span class="text-gray-400">(will be requested)</span></li>
+                </ul>
+                <div class="text-[11px] text-gray-500 flex items-center gap-1.5"><i data-lucide="info" class="w-3 h-3"></i> 2 repositories will resume scanning automatically once reconnected.</div>
+              </div>
+              <div class="px-5 py-3 border-t border-gray-100 dark:border-gray-700/60 flex items-center justify-end gap-2">
+                <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+                <button class="px-3 py-1.5 text-sm rounded-md bg-amber-500 hover:bg-amber-600 text-white inline-flex items-center gap-1.5"><i data-lucide="link-2" class="w-3.5 h-3.5"></i> Continue to GitLab</button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'linked-accounts-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>

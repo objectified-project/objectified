@@ -48,6 +48,10 @@ import {
 } from '@/app/components/ade/dashboard/RepositoryStatusChip';
 import { RepositoryKpiCard } from '@/app/components/ade/dashboard/RepositoryKpiCard';
 import {
+  deriveRepositoryKpis,
+  formatScanDuration,
+} from '@/app/components/ade/dashboard/repositoryKpis';
+import {
   loadRepositoryFavorites,
   toggleRepositoryFavorite,
 } from '@/app/utils/repository-favorites';
@@ -92,39 +96,6 @@ const SORT_OPTIONS: ReadonlyArray<{
 function formatLastScan(lastScanAt: string | null | undefined): string {
   if (!lastScanAt) return 'Never';
   return new Date(lastScanAt).toLocaleString();
-}
-
-/**
- * Compose the "Xm Ys" value used in the Avg/Slowest scan KPI cards. The unit
- * suffix ("m"/"s") renders smaller and tinted via `suffixToneClass` so the
- * card matches the mockup typography (numeral dominant, unit accent).
- * Returns `fallback` when no duration data is available.
- */
-function formatScanDuration(
-  ms: number | null | undefined,
-  fallback: string,
-  suffixToneClass = 'text-gray-400 dark:text-gray-500',
-): React.ReactNode {
-  if (ms == null || !Number.isFinite(ms)) return fallback;
-  const totalSeconds = Math.max(0, Math.round(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  const suffix = `text-lg font-semibold ${suffixToneClass} ml-0.5`;
-  if (minutes === 0) {
-    return (
-      <>
-        {seconds}
-        <span className={suffix}>s</span>
-      </>
-    );
-  }
-  return (
-    <>
-      {minutes}
-      <span className={suffix}>m</span> {seconds}
-      <span className={suffix}>s</span>
-    </>
-  );
 }
 
 const PROVIDER_BAR_TONE: Record<string, string> = {
@@ -249,87 +220,7 @@ const RepositoriesPage = () => {
     favorites,
   ]);
 
-  const kpis = useMemo(() => {
-    const tracked = repositories.length;
-    const healthy = repositories.filter((repo) => repo.status === 'healthy').length;
-    const scanning = repositories.filter((repo) => repo.status === 'scan_in_progress').length;
-    const warnings = repositories.filter(
-      (repo) => repo.status === 'warnings' || repo.status === 'error' || repo.status === 'failed'
-    ).length;
-
-    const now = Date.now();
-    const dayMs = 24 * 60 * 60 * 1000;
-    const dayThreshold = now - dayMs;
-    const scanned24h = repositories.filter(
-      (repo) => repo.lastScanAt && Date.parse(repo.lastScanAt) >= dayThreshold
-    ).length;
-    const stale = repositories.filter(
-      (repo) => !repo.lastScanAt || Date.parse(repo.lastScanAt) < dayThreshold
-    ).length;
-    const healthyPct = tracked === 0 ? 0 : Math.round((healthy / tracked) * 100);
-
-    /**
-     * 7-day daily scan-activity series, derived from each repo's most recent
-     * scan timestamp. This is the only sparkline we can ship honestly today —
-     * the other cards lack the historical signal needed for a real trend.
-     */
-    const scannedSeries = Array.from({ length: 7 }, (_, idx) => {
-      const bucketEnd = now - (6 - idx) * dayMs;
-      const bucketStart = bucketEnd - dayMs;
-      return repositories.filter((repo) => {
-        if (!repo.lastScanAt) return false;
-        const ts = Date.parse(repo.lastScanAt);
-        return ts >= bucketStart && ts < bucketEnd;
-      }).length;
-    });
-
-    /**
-     * Average and slowest "last scan" durations. We pull from each repo's
-     * most recent scan so the dashboard reflects current pipeline health
-     * without an extra aggregate API call. Repos that have never been scanned
-     * (or where the backend hasn't surfaced timing data yet) are skipped.
-     */
-    const sevenDayThreshold = now - 7 * dayMs;
-    const recentTimedScans = repositories.filter(
-      (repo) =>
-        repo.lastScanDurationMs != null &&
-        repo.lastScanAt &&
-        Date.parse(repo.lastScanAt) >= sevenDayThreshold,
-    );
-    const avgScanMs =
-      recentTimedScans.length === 0
-        ? null
-        : Math.round(
-            recentTimedScans.reduce(
-              (sum, repo) => sum + (repo.lastScanDurationMs ?? 0),
-              0,
-            ) / recentTimedScans.length,
-          );
-
-    let slowestScan: RegisteredRepository | null = null;
-    for (const repo of repositories) {
-      if (repo.lastScanDurationMs == null) continue;
-      if (
-        slowestScan === null ||
-        (repo.lastScanDurationMs ?? 0) > (slowestScan.lastScanDurationMs ?? 0)
-      ) {
-        slowestScan = repo;
-      }
-    }
-
-    return {
-      tracked,
-      healthy,
-      scanning,
-      warnings,
-      scanned24h,
-      stale,
-      healthyPct,
-      scannedSeries,
-      avgScanMs,
-      slowestScan,
-    };
-  }, [repositories]);
+  const kpis = useMemo(() => deriveRepositoryKpis(repositories), [repositories]);
 
   const providerMix = useMemo(() => {
     if (repositories.length === 0) return [] as Array<{ provider: string; count: number; percent: number }>;
