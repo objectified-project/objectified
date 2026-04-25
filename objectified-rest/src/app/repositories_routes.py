@@ -676,13 +676,17 @@ def _persist_audit_row(row: Dict[str, Any]) -> None:
     swallowed so that audit persistence is always best-effort.
     """
     try:
+        # System-originated repository events do not have a backing user row.
+        # Persist them with a NULL actor_id to satisfy workflow_audit FK rules.
+        actor_id = row.get("actorId")
+        persisted_actor_id = None if actor_id == _SYSTEM_ACTOR_ID else actor_id
         db.insert_workflow_audit(
             tenant_id=row["tenantId"],
             project_id=None,
             version_id=None,
             action=row["eventType"],
             outcome=row["outcome"],
-            actor_id=row["actorId"],
+            actor_id=persisted_actor_id,
             detail={
                 **row["detail"],
                 "repositoryId": row["repositoryId"],
