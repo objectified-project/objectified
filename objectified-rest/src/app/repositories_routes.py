@@ -511,6 +511,8 @@ def _normalize_branches(branches: List[RepositoryBranchInput]) -> List[Repositor
 
 
 def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
+    timeline_created_at = [entry.createdAt for entry in repo.timeline if entry.createdAt]
+    last_scan_at = max(timeline_created_at) if timeline_created_at else None
     return {
         "id": repo.id,
         "provider": repo.provider,
@@ -519,6 +521,7 @@ def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
         "fullName": repo.fullName,
         "status": repo.status,
         "branches": [b.branch for b in repo.branches],
+        "lastScanAt": last_scan_at,
         "createdAt": repo.createdAt,
         "updatedAt": repo.updatedAt,
     }

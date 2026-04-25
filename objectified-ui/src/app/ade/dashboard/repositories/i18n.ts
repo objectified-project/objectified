@@ -7,12 +7,22 @@ export interface RepositoriesI18nBundle {
   searchPlaceholder: string;
   providerAll: string;
   statusAll: string;
+  tableLastScan: string;
+  tableActions: string;
   emptyTitle: string;
   emptyDescription: string;
+  emptyAction: string;
   tableRepo: string;
   tableProvider: string;
   tableBranches: string;
   tableStatus: string;
+  scanNowButton: string;
+  pauseButton: string;
+  resumeButton: string;
+  openDetailButton: string;
+  scanQueuedMessage: string;
+  pausedMessage: string;
+  resumedMessage: string;
   wizardTitle: string;
   wizardDescription: string;
   wizardBack: string;
@@ -77,12 +87,22 @@ export const repositoriesI18n: Record<RepositoriesLocale, RepositoriesI18nBundle
     searchPlaceholder: 'Search repositories...',
     providerAll: 'All providers',
     statusAll: 'All statuses',
+    tableLastScan: 'Last scan',
+    tableActions: 'Actions',
     emptyTitle: 'No repositories yet',
     emptyDescription: 'Register a repository to start scan and sync workflows.',
+    emptyAction: 'Register your first repository',
     tableRepo: 'Repository',
     tableProvider: 'Provider',
     tableBranches: 'Branches',
     tableStatus: 'Status',
+    scanNowButton: 'Scan now',
+    pauseButton: 'Pause',
+    resumeButton: 'Resume',
+    openDetailButton: 'Open detail',
+    scanQueuedMessage: 'Scan queued.',
+    pausedMessage: 'Repository paused.',
+    resumedMessage: 'Repository resumed.',
     wizardTitle: 'Add Repository',
     wizardDescription: 'Connect a repository and kick off an initial scan.',
     wizardBack: 'Back',
