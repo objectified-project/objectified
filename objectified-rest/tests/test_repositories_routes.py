@@ -542,6 +542,8 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
     assert removed_job.settingsJson["requiresExplicitApproval"] is True
     assert removed_job.sourceType == "git"
     assert removed_job.sourceUri == f"repo://{repository_id}/apis/removed.yaml@main/commit-second"
+    assert removed_job.conflictRecords == []
+    assert removed_job.eventLog[0]["type"] == "repository.sync.job_dispatched"
 
     failed_job = by_path["apis/error.yaml"]
     assert failed_job.operation == "import"
@@ -549,6 +551,13 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
     assert failed_job.errorDetail == "parser exploded"
     assert failed_job.diffSnapshot["status"] == "modified"
     assert failed_job.changeReportId is not None
+    assert len(failed_job.conflictRecords) == 1
+    assert failed_job.conflictRecords[0]["kinds"] == ["duplicate_schema"]
+    assert failed_job.eventLog[0]["type"] == "repository.sync.job_dispatched"
+    assert failed_job.eventLog[1]["type"] == "repository.sync.conflicts_detected"
+    assert failed_job.eventLog[1]["taxonomy"] == "import_pipeline"
+    assert failed_job.eventLog[1]["resolver"] == "import_conflict_resolver"
+    assert failed_job.eventLog[1]["conflicts"][0]["kinds"] == ["duplicate_schema"]
 
     reports_by_job_id = {report.importJobId: report for report in change_reports}
     assert removed_job.id in reports_by_job_id
@@ -571,6 +580,96 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
         "repository.sync_pending_review",
         "repository.sync_pending_review",
     ]
+
+
+def test_sync_history_routes_persist_conflict_resolution_on_import_job_event_log() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000030",
+                "provider": "github",
+                "owner": "acme",
+                "name": "sync-history-conflicts",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        first_scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            first_scan_id,
+            commit_sha="commit-primer",
+            files=[{"path": "apis/orders.yaml", "blobSha": "111", "tracked": True}],
+        )
+        second_scan_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans",
+            json={"branch": "main", "force": True},
+        )
+        second_scan_id = second_scan_response.json()["id"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            second_scan_id,
+            commit_sha="commit-with-conflict",
+            files=[
+                {
+                    "path": "apis/orders.yaml",
+                    "blobSha": "999",
+                    "tracked": True,
+                    "settingsJson": {
+                        "simulatedConflicts": [
+                            {
+                                "schemaName": "Order",
+                                "kinds": ["duplicate_schema", "property_conflict"],
+                                "message": "Schema differs from draft.",
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
+        sync_history_response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/sync-history",
+            params={"hasConflicts": "true"},
+        )
+        conflict_job_id = sync_history_response.json()["items"][0]["id"]
+        resolve_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/sync-history/{conflict_job_id}/resolve-conflict",
+            json={
+                "schemaName": "Order",
+                "choice": "merge",
+                "conflictKinds": ["duplicate_schema", "property_conflict"],
+                "note": "Use additive merge strategy from import resolver.",
+            },
+        )
+        refreshed_sync_history_response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/sync-history",
+            params={"hasConflicts": "true"},
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert second_scan_response.status_code == 200
+    assert sync_history_response.status_code == 200
+    sync_history_body = sync_history_response.json()
+    assert sync_history_body["items"]
+    assert sync_history_body["items"][0]["conflictRecords"][0]["schemaName"] == "Order"
+    assert sync_history_body["items"][0]["conflictRecords"][0]["kinds"] == ["duplicate_schema", "property_conflict"]
+
+    assert resolve_response.status_code == 200
+    resolve_body = resolve_response.json()
+    assert resolve_body["eventLog"][-1]["type"] == "repository.sync.conflict_resolved"
+    assert resolve_body["eventLog"][-1]["schemaName"] == "Order"
+    assert resolve_body["eventLog"][-1]["choice"] == "merge"
+    assert resolve_body["eventLog"][-1]["conflictKinds"] == ["duplicate_schema", "property_conflict"]
+    assert resolve_body["eventLog"][-1]["note"] == "Use additive merge strategy from import resolver."
+
+    assert refreshed_sync_history_response.status_code == 200
+    refreshed_job = refreshed_sync_history_response.json()["items"][0]
+    assert refreshed_job["id"] == conflict_job_id
+    assert refreshed_job["eventLog"][-1]["type"] == "repository.sync.conflict_resolved"
 
 
 def test_complete_scan_applies_manifest_first_mapping_and_auto_fallback_rules():

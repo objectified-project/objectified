@@ -2,6 +2,7 @@
 
 ## Completed
 
+- REPO-5.5 (#2790): Added repository-sync conflict detection against the current draft by reusing import-pipeline conflict taxonomy, exposing conflict + resolution event history through sync-history endpoints for REPO-6.2 UI consumption, and persisting resolution choices on each `import_job.event_log`.
 - REPO-5.4 (#2789): Added repository-sync dry-run change report previews by generating a persisted `ChangeReportModel` per dispatched import job (`source_kind='repository_sync'`), keeping manual promotions in review while auto promotions proceed, and preventing dry-run scans from mutating resolved version-head state.
 - REPO-5.3 (#2788): Added commit-SHA draft version auto-binding for repository import jobs by creating `<datestamp>-<short-sha>` versions per resolved project with `(project, sha)` idempotency, recording `metadata.repositorySource` on created versions, and feature-gating manifest-driven project auto-creation to tenant administrators.
 - REPO-5.2 (#2787): Added manifest-first project/version mapping resolution (`specs[].project`, `specs[].versionStrategy`) with persisted `repository_file.project_slug` / `repository_file.version_strategy` decisions, documented auto fallback rules (`project` derived from path segment, `version_strategy='commit-sha'`), and unmapped-file UI affordance metadata via `tracked=false` + `settings_json.mappingRequired=true`.
