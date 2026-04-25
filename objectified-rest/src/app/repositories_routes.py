@@ -1192,6 +1192,8 @@ async def register_repository(
         createdAt=now,
     )
 
+    _audit_token_row: Dict[str, Any] | None = None
+    _audit_registered_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         tenant_repos = _REPO_STORE.setdefault(tenant_id, {})
         _REPO_BRANCH_STORE[repository.id] = list(normalized_branches)
@@ -1227,8 +1229,10 @@ async def register_repository(
             },
         )
 
-    _persist_audit_row(_audit_token_row)
-    _persist_audit_row(_audit_registered_row)
+    if _audit_token_row is not None:
+        _persist_audit_row(_audit_token_row)
+    if _audit_registered_row is not None:
+        _persist_audit_row(_audit_registered_row)
     return RegisterRepositoryResponse(
         repository=repository,
         initialScanJobId=initial_scan_job_id,
@@ -1327,6 +1331,7 @@ async def archive_repository(
 ) -> RepositoryRecord:
     tenant_id = auth_data["tenant_id"]
     actor_id = _resolve_actor_id(auth_data)
+    _audit_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
         if repository is None:
@@ -1343,7 +1348,8 @@ async def archive_repository(
             actor_id=actor_id,
             detail={"status": repository.status},
         )
-    _persist_audit_row(_audit_row)
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
     return repository
 
 
@@ -1355,6 +1361,7 @@ async def unarchive_repository(
 ) -> RepositoryRecord:
     tenant_id = auth_data["tenant_id"]
     actor_id = _resolve_actor_id(auth_data)
+    _audit_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
         if repository is None:
@@ -1370,7 +1377,8 @@ async def unarchive_repository(
             actor_id=actor_id,
             detail={"status": repository.status},
         )
-    _persist_audit_row(_audit_row)
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
     return repository
 
 
@@ -1382,6 +1390,7 @@ async def pause_repository(
 ) -> RepositoryRecord:
     tenant_id = auth_data["tenant_id"]
     actor_id = _resolve_actor_id(auth_data)
+    _audit_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
         if repository is None:
@@ -1396,7 +1405,8 @@ async def pause_repository(
             actor_id=actor_id,
             detail={"status": repository.status},
         )
-    _persist_audit_row(_audit_row)
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
     return repository
 
 
@@ -1408,6 +1418,7 @@ async def auto_pause_repository(
 ) -> RepositoryRecord:
     tenant_id = auth_data["tenant_id"]
     actor_id = _resolve_actor_id(auth_data)
+    _audit_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
         if repository is None:
@@ -1422,7 +1433,8 @@ async def auto_pause_repository(
             actor_id=actor_id,
             detail={"status": repository.status},
         )
-    _persist_audit_row(_audit_row)
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
     return repository
 
 
@@ -1435,6 +1447,7 @@ async def delete_repository(
 ) -> Response:
     tenant_id = auth_data["tenant_id"]
     actor_id = _resolve_actor_id(auth_data)
+    _audit_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         tenant_repos = _REPO_STORE.get(tenant_id, {})
         repository = tenant_repos.get(repository_id)
@@ -1459,7 +1472,8 @@ async def delete_repository(
             detail={"fullName": repository.fullName},
         )
 
-    _persist_audit_row(_audit_row)
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
     return Response(status_code=204)
 
 
@@ -1676,6 +1690,7 @@ async def create_repository_scan(
     if not branch_name:
         raise HTTPException(status_code=400, detail="branch is required")
 
+    _audit_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         _find_repository_for_tenant(tenant_id, repository_id)
         history = _REPO_SCAN_HISTORY_STORE.setdefault(repository_id, [])
@@ -1708,7 +1723,8 @@ async def create_repository_scan(
                 "scanId": scan.id,
             },
         )
-    _persist_audit_row(_audit_row)
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
     return scan
 
 
