@@ -21,6 +21,8 @@ type RepoRow = {
   lastScanAt?: string | null;
 };
 
+let originalFetch: typeof global.fetch;
+
 function setupFetchMock(repositories: RepoRow[]) {
   const fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
@@ -55,7 +57,12 @@ function setupFetchMock(repositories: RepoRow[]) {
 }
 
 describe('Repositories index page', () => {
-  beforeEach(() => {
+  beforeAll(() => {
+    originalFetch = global.fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
     mockPush.mockReset();
   });
 
@@ -130,5 +137,109 @@ describe('Repositories index page', () => {
         expect.objectContaining({ method: 'POST' })
       )
     );
+  });
+
+  it('renders skeleton rows while loading', async () => {
+    let resolveFetch!: (value: unknown) => void;
+    const fetchPromise = new Promise((resolve) => { resolveFetch = resolve; });
+    global.fetch = jest.fn(() => fetchPromise) as unknown as typeof fetch;
+
+    render(<RepositoriesPage />);
+
+    const skeletons = document.querySelectorAll('.animate-pulse');
+    expect(skeletons.length).toBeGreaterThan(0);
+
+    resolveFetch({
+      ok: true,
+      json: async () => ({ success: true, repositories: [] }),
+    });
+  });
+
+  it('sorts repositories by name ascending then descending when name header is clicked', async () => {
+    setupFetchMock([
+      {
+        id: 'repo-2',
+        provider: 'github',
+        owner: 'acme',
+        name: 'billing',
+        fullName: 'acme/billing',
+        status: 'healthy',
+        branches: ['main'],
+        lastScanAt: '2026-04-23T10:00:00Z',
+      },
+      {
+        id: 'repo-1',
+        provider: 'github',
+        owner: 'acme',
+        name: 'orders',
+        fullName: 'acme/orders',
+        status: 'healthy',
+        branches: ['main'],
+        lastScanAt: '2026-04-24T14:00:00Z',
+      },
+    ]);
+
+    render(<RepositoriesPage />);
+    await waitFor(() => expect(screen.getByText('acme/orders')).toBeInTheDocument());
+
+    const nameButton = screen.getByRole('button', { name: /Repository/i });
+    fireEvent.click(nameButton);
+
+    await waitFor(() => {
+      const cells = screen.getAllByText(/acme\//);
+      expect(cells[0].textContent).toBe('acme/billing');
+      expect(cells[1].textContent).toBe('acme/orders');
+    });
+
+    fireEvent.click(nameButton);
+
+    await waitFor(() => {
+      const cells = screen.getAllByText(/acme\//);
+      expect(cells[0].textContent).toBe('acme/orders');
+      expect(cells[1].textContent).toBe('acme/billing');
+    });
+  });
+
+  it('sorts repositories by last scan descending by default and toggles to ascending on click', async () => {
+    setupFetchMock([
+      {
+        id: 'repo-1',
+        provider: 'github',
+        owner: 'acme',
+        name: 'alpha',
+        fullName: 'acme/alpha',
+        status: 'healthy',
+        branches: ['main'],
+        lastScanAt: '2026-04-22T10:00:00Z',
+      },
+      {
+        id: 'repo-2',
+        provider: 'github',
+        owner: 'acme',
+        name: 'zeta',
+        fullName: 'acme/zeta',
+        status: 'healthy',
+        branches: ['main'],
+        lastScanAt: '2026-04-24T14:00:00Z',
+      },
+    ]);
+
+    render(<RepositoriesPage />);
+    await waitFor(() => expect(screen.getByText('acme/alpha')).toBeInTheDocument());
+
+    // Default sort is lastScan desc: most recent (zeta) first
+    const initialCells = screen.getAllByText(/acme\//);
+    expect(initialCells[0].textContent).toBe('acme/zeta');
+    expect(initialCells[1].textContent).toBe('acme/alpha');
+
+    // Click lastScan to toggle to ascending
+    const lastScanButton = screen.getByRole('button', { name: /Last scan/i });
+    fireEvent.click(lastScanButton);
+
+    await waitFor(() => {
+      const cells = screen.getAllByText(/acme\//);
+      expect(cells[0].textContent).toBe('acme/alpha');
+      expect(cells[1].textContent).toBe('acme/zeta');
+    });
   });
 });

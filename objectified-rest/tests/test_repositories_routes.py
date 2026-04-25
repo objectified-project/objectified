@@ -97,7 +97,8 @@ def test_repository_list_and_detail_are_tenant_scoped():
     assert create_response.status_code == 201
     assert list_response.status_code == 200
     assert detail_response.status_code == 200
-    list_item = next(item for item in list_response.json()["repositories"] if item["id"] == repository_id)
+    list_item = next((item for item in list_response.json()["repositories"] if item["id"] == repository_id), None)
+    assert list_item is not None
     assert list_item["lastScanAt"] == create_response.json()["repository"]["timeline"][0]["createdAt"]
     assert detail_response.json()["id"] == repository_id
 

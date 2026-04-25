@@ -509,24 +509,48 @@ const RepositoriesPage = () => {
                 <table className="min-w-full">
                   <thead className={dashboardTableTheadClass}>
                     <tr>
-                      <th className={dashboardThClass}>
+                      <th
+                        className={dashboardThClass}
+                        aria-sort={sortField === 'name' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      >
                         <button type="button" onClick={() => handleSort('name')} className="inline-flex items-center gap-1">
                           {copy.tableRepo}
                           {sortField === 'name' ? (sortDirection === 'asc' ? '↑' : '↓') : null}
+                          <span className="sr-only">
+                            {sortField === 'name'
+                              ? `, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}`
+                              : ', not sorted'}
+                          </span>
                         </button>
                       </th>
                       <th className={dashboardThClass}>{copy.tableProvider}</th>
                       <th className={dashboardThClass}>{copy.tableBranches}</th>
-                      <th className={dashboardThClass}>
+                      <th
+                        className={dashboardThClass}
+                        aria-sort={sortField === 'status' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      >
                         <button type="button" onClick={() => handleSort('status')} className="inline-flex items-center gap-1">
                           {copy.tableStatus}
                           {sortField === 'status' ? (sortDirection === 'asc' ? '↑' : '↓') : null}
+                          <span className="sr-only">
+                            {sortField === 'status'
+                              ? `, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}`
+                              : ', not sorted'}
+                          </span>
                         </button>
                       </th>
-                      <th className={dashboardThClass}>
+                      <th
+                        className={dashboardThClass}
+                        aria-sort={sortField === 'lastScan' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      >
                         <button type="button" onClick={() => handleSort('lastScan')} className="inline-flex items-center gap-1">
                           {copy.tableLastScan}
                           {sortField === 'lastScan' ? (sortDirection === 'asc' ? '↑' : '↓') : null}
+                          <span className="sr-only">
+                            {sortField === 'lastScan'
+                              ? `, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}`
+                              : ', not sorted'}
+                          </span>
                         </button>
                       </th>
                       <th className={dashboardThRightClass}>{copy.tableActions}</th>
