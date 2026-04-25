@@ -121,6 +121,7 @@ const RepositoriesPage = () => {
   const [customBranchPattern, setCustomBranchPattern] = useState('');
   const [manifest, setManifest] = useState('');
   const [isWizardBusy, setIsWizardBusy] = useState(false);
+  const [wizardBusyMessage, setWizardBusyMessage] = useState('');
 
   const loadRepositories = useCallback(async () => {
     setIsLoading(true);
@@ -174,6 +175,7 @@ const RepositoriesPage = () => {
     setSelectedBranches([]);
     setCustomBranchPattern('');
     setIsWizardBusy(true);
+    setWizardBusyMessage(copy.refreshingRepositoriesMessage);
     try {
       const response = await fetch(`/api/sso/github/repos?accountId=${encodeURIComponent(account.id)}`);
       const data = await response.json();
@@ -186,13 +188,14 @@ const RepositoriesPage = () => {
       setErrorMessage(message);
     } finally {
       setIsWizardBusy(false);
+      setWizardBusyMessage('');
     }
   };
 
-  const loadBranchesForRepo = async (repo: RepoSummary) => {
-    if (!selectedAccount) return;
-    setSelectedRepo(repo);
+  const loadBranchesForRepo = async (repo: RepoSummary): Promise<boolean> => {
+    if (!selectedAccount) return false;
     setIsWizardBusy(true);
+    setWizardBusyMessage(copy.refreshingRepositoryDataMessage);
     try {
       const response = await fetch(
         `/api/sso/github/branches?accountId=${encodeURIComponent(selectedAccount.id)}&repo=${encodeURIComponent(repo.full_name)}`
@@ -210,11 +213,14 @@ const RepositoriesPage = () => {
           : [];
       setBranches(availableBranches);
       setSelectedBranches(defaultBranch);
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load branches';
       setErrorMessage(message);
+      return false;
     } finally {
       setIsWizardBusy(false);
+      setWizardBusyMessage('');
     }
   };
 
@@ -356,7 +362,7 @@ const RepositoriesPage = () => {
     setCustomBranchPattern('');
   };
 
-  const goNext = () => {
+  const goNext = async () => {
     if (wizardStep === 0 && !selectedAccount) {
       setErrorMessage(copy.accountRequired);
       return;
@@ -364,6 +370,12 @@ const RepositoriesPage = () => {
     if (wizardStep === 1 && !selectedRepo) {
       setErrorMessage(copy.repoRequired);
       return;
+    }
+    if (wizardStep === 1 && selectedRepo) {
+      const loaded = await loadBranchesForRepo(selectedRepo);
+      if (!loaded) {
+        return;
+      }
     }
     if (wizardStep === 2 && selectedBranches.length === 0) {
       setErrorMessage(copy.branchesRequired);
@@ -615,13 +627,18 @@ const RepositoriesPage = () => {
       </main>
 
       <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl sm:max-w-4xl max-h-[85vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>{copy.wizardTitle}</DialogTitle>
             <DialogDescription>{copy.wizardDescription}</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 max-h-[62vh] overflow-y-auto pr-1">
+            {isWizardBusy && wizardBusyMessage ? (
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
+                {wizardBusyMessage}
+              </div>
+            ) : null}
             {wizardStep === 0 && (
               <div className="space-y-3">
                 {!showNoLinkedAccountsPrompt ? (
@@ -682,12 +699,17 @@ const RepositoriesPage = () => {
                   onChange={(event) => setRepoSearch(event.target.value)}
                   placeholder={copy.searchPlaceholder}
                 />
-                <div className="max-h-44 overflow-auto space-y-2">
+                <div className="max-h-64 overflow-auto space-y-2">
                   {filteredSourceRepos.map((repo) => (
                     <button
                       key={repo.id}
                       type="button"
-                      onClick={() => void loadBranchesForRepo(repo)}
+                      onClick={() => {
+                        setSelectedRepo(repo);
+                        setBranches([]);
+                        setSelectedBranches([]);
+                        setErrorMessage('');
+                      }}
                       className={`w-full rounded-lg border px-3 py-2 text-left ${
                         selectedRepo?.id === repo.id
                           ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30'
@@ -701,6 +723,7 @@ const RepositoriesPage = () => {
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{copy.repoSelectionHint}</p>
                 {selectedRepo?.default_branch ? (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {copy.defaultBranchLabel}: <span className="font-medium">{selectedRepo.default_branch}</span>
@@ -819,8 +842,8 @@ const RepositoriesPage = () => {
                 </Button>
               ) : null}
               {wizardStep < 3 ? (
-                <Button onClick={goNext} disabled={isWizardBusy}>
-                  {copy.wizardNext}
+                <Button onClick={() => void goNext()} disabled={isWizardBusy}>
+                  {isWizardBusy ? copy.refreshingButton : copy.wizardNext}
                 </Button>
               ) : (
                 <Button onClick={() => void submitRegistration()} disabled={isWizardBusy}>

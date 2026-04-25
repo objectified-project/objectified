@@ -27,6 +27,7 @@ export interface RepositoriesI18nBundle {
   wizardDescription: string;
   wizardBack: string;
   wizardNext: string;
+  refreshingButton: string;
   wizardCancel: string;
   wizardSubmit: string;
   stepAccountTitle: string;
@@ -44,12 +45,15 @@ export interface RepositoriesI18nBundle {
   savingButton: string;
   accountRequired: string;
   repoRequired: string;
+  repoSelectionHint: string;
   branchesRequired: string;
   successMessage: string;
   branchesUpdatedMessage: string;
   scanTimelineMessage: string;
   loadingRepositories: string;
   loadingRepository: string;
+  refreshingRepositoriesMessage: string;
+  refreshingRepositoryDataMessage: string;
   viewButton: string;
   backButton: string;
   providerLabel: string;
@@ -107,6 +111,7 @@ export const repositoriesI18n: Record<RepositoriesLocale, RepositoriesI18nBundle
     wizardDescription: 'Connect a repository and kick off an initial scan.',
     wizardBack: 'Back',
     wizardNext: 'Next',
+    refreshingButton: 'Refreshing...',
     wizardCancel: 'Cancel',
     wizardSubmit: 'Register repository',
     stepAccountTitle: 'Step 1: Pick linked account',
@@ -124,12 +129,15 @@ export const repositoriesI18n: Record<RepositoriesLocale, RepositoriesI18nBundle
     savingButton: 'Saving...',
     accountRequired: 'Select a linked account before continuing.',
     repoRequired: 'Select a repository before continuing.',
+    repoSelectionHint: 'Select a repository, then click Next to refresh branch data.',
     branchesRequired: 'Select at least one branch.',
     successMessage: 'Repository registered. Initial scan started.',
     branchesUpdatedMessage: 'Repository branches updated.',
     scanTimelineMessage: 'Scan in progress...',
     loadingRepositories: 'Loading repositories...',
     loadingRepository: 'Loading repository...',
+    refreshingRepositoriesMessage: 'Refreshing repositories for the selected account...',
+    refreshingRepositoryDataMessage: 'Refreshing repository data and loading branches...',
     viewButton: 'View',
     backButton: 'Back',
     providerLabel: 'Provider',
