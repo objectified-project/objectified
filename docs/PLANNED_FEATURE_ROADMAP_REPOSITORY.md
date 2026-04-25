@@ -2,6 +2,7 @@
 
 ## Completed
 
+- REPO-5.6 (#2791): Added manifest-driven promotion gates by defaulting repository sync promotions to `manual`, preserving `repository.sync_committed` audit + change-report persistence for `promote: auto`, and forcing manual review whenever `onBreakingChange: block` is configured.
 - REPO-5.5 (#2790): Added repository-sync conflict detection against the current draft by reusing import-pipeline conflict taxonomy, exposing conflict + resolution event history through sync-history endpoints for REPO-6.2 UI consumption, and persisting resolution choices on each `import_job.event_log`.
 - REPO-5.4 (#2789): Added repository-sync dry-run change report previews by generating a persisted `ChangeReportModel` per dispatched import job (`source_kind='repository_sync'`), keeping manual promotions in review while auto promotions proceed, and preventing dry-run scans from mutating resolved version-head state.
 - REPO-5.3 (#2788): Added commit-SHA draft version auto-binding for repository import jobs by creating `<datestamp>-<short-sha>` versions per resolved project with `(project, sha)` idempotency, recording `metadata.repositorySource` on created versions, and feature-gating manifest-driven project auto-creation to tenant administrators.

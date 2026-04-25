@@ -904,3 +904,121 @@ def test_noop_dry_run_change_report_is_zero_diff_for_unchanged_file() -> None:
     assert unchanged_report["schemas"]["added"] == []
     assert unchanged_report["schemas"]["removed"] == []
     assert unchanged_report["schemas"]["modified"] == []
+
+
+def test_default_promotion_mode_is_manual_for_new_repositories() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000041",
+                "provider": "github",
+                "owner": "acme",
+                "name": "manual-by-default",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="default-manual-sha",
+            files=[{"path": "apis/default.yaml", "blobSha": "111", "tracked": True}],
+        )
+        files_response = client.get(f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{scan_id}/files")
+        jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == scan_id]
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert files_response.status_code == 200
+    assert len(jobs) == 1
+    assert jobs[0].state == "pending_review"
+    assert files_response.json()["items"][0]["promote"] == "manual"
+
+
+def test_auto_promotion_records_change_report_and_sync_committed_audit() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000042",
+                "provider": "github",
+                "owner": "acme",
+                "name": "auto-commit-audit",
+                "branches": [{"branch": "main"}],
+                "manifest": (
+                    "version: 1\n"
+                    "specs:\n"
+                    "  - path: apis/auto.yaml\n"
+                    "    project: payments\n"
+                    "    promote: auto\n"
+                    "    onBreakingChange: warn\n"
+                ),
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="auto-commit-sha",
+            files=[{"path": "apis/auto.yaml", "blobSha": "111"}],
+        )
+        jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == scan_id]
+        change_reports = _get_repository_change_reports_for_tests(repository_id)
+        audit_rows = _get_repository_audit_rows_for_tests(repository_id)
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert len(jobs) == 1
+    assert jobs[0].state == "committed"
+    assert jobs[0].changeReportId is not None
+    assert any(report.importJobId == jobs[0].id for report in change_reports)
+    assert [row["eventType"] for row in audit_rows] == ["repository.sync_committed"]
+
+
+def test_on_breaking_change_block_forces_manual_even_when_promote_is_auto() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000043",
+                "provider": "github",
+                "owner": "acme",
+                "name": "blocking-change-gate",
+                "branches": [{"branch": "main"}],
+                "manifest": (
+                    "version: 1\n"
+                    "specs:\n"
+                    "  - path: apis/blocked.yaml\n"
+                    "    project: payments\n"
+                    "    promote: auto\n"
+                    "    onBreakingChange: block\n"
+                ),
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="blocked-commit-sha",
+            files=[{"path": "apis/blocked.yaml", "blobSha": "111"}],
+        )
+        jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == scan_id]
+        audit_rows = _get_repository_audit_rows_for_tests(repository_id)
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert len(jobs) == 1
+    assert jobs[0].state == "pending_review"
+    assert jobs[0].settingsJson["onBreakingChange"] == "block"
+    assert jobs[0].settingsJson["requiresExplicitApproval"] is True
+    assert [row["eventType"] for row in audit_rows] == ["repository.sync_pending_review"]

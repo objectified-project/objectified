@@ -38,6 +38,8 @@ class RepoManifestSpec:
     format: DetectedRepositorySpecFormat | None
     project: str | None
     version_strategy: str | None
+    promote: Literal["auto", "manual"] | None
+    on_breaking_change: Literal["warn", "block", "autoCreateNewMajor"] | None
     poll_interval_sec: int | None
 
 
@@ -58,6 +60,7 @@ class RepositoryFileRow:
     version_strategy: str | None
     poll_interval_sec: int | None
     status: str
+    promote: Literal["auto", "manual"] | None = None
     metadata: dict[str, Any] | None = None
     settings_json: dict[str, Any] | None = None
 
@@ -79,6 +82,8 @@ class RepositoryMappingDecision:
     tracked: bool
     project_slug: str | None
     version_strategy: str
+    promote: Literal["auto", "manual"]
+    on_breaking_change: Literal["warn", "block", "autoCreateNewMajor"] | None
     settings_json: dict[str, Any] | None = None
 
 
@@ -131,18 +136,29 @@ def resolve_repository_file_mapping(path: str, spec: RepoManifestSpec | None) ->
         if spec is not None and isinstance(spec.version_strategy, str) and spec.version_strategy.strip()
         else _DEFAULT_VERSION_STRATEGY
     )
+    promote: Literal["auto", "manual"] = (
+        spec.promote if spec is not None and spec.promote in {"auto", "manual"} else "manual"
+    )
+    on_breaking_change: Literal["warn", "block", "autoCreateNewMajor"] | None = (
+        spec.on_breaking_change
+        if spec is not None and spec.on_breaking_change in {"warn", "block", "autoCreateNewMajor"}
+        else None
+    )
     tracked = project_slug is not None
-    settings_json = None
+    settings_json: dict[str, Any] = {}
+    if on_breaking_change is not None:
+        settings_json["onBreakingChange"] = on_breaking_change
     if not tracked:
-        settings_json = {
-            "mappingRequired": True,
-            "mappingReason": "project_slug_not_resolved",
-        }
+        settings_json["mappingRequired"] = True
+        settings_json["mappingReason"] = "project_slug_not_resolved"
+    settings_json_or_none = settings_json or None
     return RepositoryMappingDecision(
         tracked=tracked,
         project_slug=project_slug,
         version_strategy=version_strategy,
-        settings_json=settings_json,
+        promote=promote,
+        on_breaking_change=on_breaking_change,
+        settings_json=settings_json_or_none,
     )
 
 
@@ -174,6 +190,7 @@ def build_repository_file_rows(
                 tracked=mapping.tracked,
                 project_slug=mapping.project_slug,
                 version_strategy=mapping.version_strategy,
+                promote=mapping.promote,
                 poll_interval_sec=manifest_spec_poll
                 if manifest_spec_poll is not None
                 else effective_branch_poll_interval,
@@ -207,6 +224,8 @@ def _to_repo_manifest(parsed: dict[str, Any]) -> RepoManifest:
                 format=spec.get("format"),
                 project=spec.get("project"),
                 version_strategy=spec.get("versionStrategy"),
+                promote=spec.get("promote"),
+                on_breaking_change=spec.get("onBreakingChange"),
                 poll_interval_sec=spec.get("pollIntervalSec"),
             )
             for spec in specs
@@ -222,6 +241,7 @@ def _manifest_error_row(message: str) -> RepositoryFileRow:
         tracked=True,
         project_slug=None,
         version_strategy=None,
+        promote=None,
         poll_interval_sec=None,
         status="manifest_error",
         metadata={"error": message},
