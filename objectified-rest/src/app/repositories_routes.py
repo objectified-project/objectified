@@ -863,20 +863,34 @@ def _normalize_branches(branches: List[RepositoryBranchInput]) -> List[Repositor
     return normalized_branches
 
 
-def _get_repository_last_scan_at(repository_id: str) -> Optional[str]:
+def _get_repository_last_scan(repository_id: str) -> Optional[RepositoryScanRecord]:
+    """Most recent scan record for the repository, or None when no history exists."""
     with _STORE_LOCK:
-        scan_timestamps = [
-            scan.createdAt or scan.startedAt or scan.finishedAt
-            for scan in _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
-            if scan.createdAt or scan.startedAt or scan.finishedAt
-        ]
-    return max(scan_timestamps) if scan_timestamps else None
+        history = list(_REPO_SCAN_HISTORY_STORE.get(repository_id, []))
+    if not history:
+        return None
+    return max(
+        history,
+        key=lambda scan: scan.createdAt or scan.startedAt or scan.finishedAt or "",
+    )
+
+
+def _get_repository_last_scan_at(repository_id: str) -> Optional[str]:
+    last_scan = _get_repository_last_scan(repository_id)
+    if last_scan is None:
+        return None
+    return last_scan.createdAt or last_scan.startedAt or last_scan.finishedAt
 
 
 def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
     timeline_created_at = [entry.createdAt for entry in repo.timeline if entry.createdAt]
     timeline_last_scan_at = max(timeline_created_at) if timeline_created_at else None
-    last_scan_at = _get_repository_last_scan_at(repo.id) or timeline_last_scan_at
+    last_scan = _get_repository_last_scan(repo.id)
+    last_scan_at = (
+        (last_scan.createdAt or last_scan.startedAt or last_scan.finishedAt)
+        if last_scan
+        else None
+    ) or timeline_last_scan_at
     return {
         "id": repo.id,
         "provider": repo.provider,
@@ -886,6 +900,8 @@ def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
         "status": repo.status,
         "branches": [b.branch for b in repo.branches],
         "lastScanAt": last_scan_at,
+        "lastScanDurationMs": last_scan.durationMs if last_scan else None,
+        "lastScanBranch": last_scan.branch if last_scan else None,
         "createdAt": repo.createdAt,
         "updatedAt": repo.updatedAt,
     }

@@ -1,14 +1,13 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import RepositoriesPage from '../src/app/ade/dashboard/repositories/page';
 
 const mockPush = jest.fn();
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
-
-const RepositoriesPage = require('../src/app/ade/dashboard/repositories/page').default as React.ComponentType;
 
 type RepoRow = {
   id: string;
@@ -183,7 +182,7 @@ describe('Repositories index page', () => {
     render(<RepositoriesPage />);
     await waitFor(() => expect(screen.getByText('acme/orders')).toBeInTheDocument());
 
-    const nameButton = screen.getByRole('button', { name: /Repository/i });
+    const nameButton = screen.getByRole('button', { name: 'Sort by repository' });
     fireEvent.click(nameButton);
 
     await waitFor(() => {
@@ -234,7 +233,7 @@ describe('Repositories index page', () => {
     expect(initialCells[1].textContent).toBe('acme/alpha');
 
     // Click lastScan to toggle to ascending
-    const lastScanButton = screen.getByRole('button', { name: /Last scan/i });
+    const lastScanButton = screen.getByRole('button', { name: 'Sort by last scan' });
     fireEvent.click(lastScanButton);
 
     await waitFor(() => {

@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Repositories · acme/orders</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+    .panel-stack > section { scroll-margin-top: 80px; }
+    .mockup-only-pill { background: rgba(99,102,241,0.10); color: #6366f1; }
+    .dark .mockup-only-pill { background: rgba(99,102,241,0.18); color: #a5b4fc; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <!-- Top bar -->
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center"><i data-lucide="git-branch-plus" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Account</span>
+      <span class="text-xs text-gray-400">/</span>
+      <a href="dashboard.html" class="text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-500">Repositories</a>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300 mono">acme/orders</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="../" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+
+    <!-- Sidebar -->
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto p-4 h-full">
+        <div class="mb-6">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Account</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="user" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Profile</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="link" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Linked Accounts</span></a></li>
+            <li><a href="dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10"><i data-lucide="git-branch-plus" class="w-5 h-5 text-indigo-500"></i><span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Repositories</span><span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span></a></li>
+          </ul>
+        </div>
+        <hr class="my-4 border-indigo-500/10" />
+        <div class="mb-6">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Administration</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="building-2" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Tenants</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="key" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">API Keys</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-4 border-indigo-500/10" />
+        <div class="mb-6">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Data Management</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="database" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Primitives</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-4 border-indigo-500/10" />
+        <div>
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Specifications</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="folders" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Projects</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="file-digit" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Versions</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="sun" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Sunset timeline</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="eye" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Published</span></a></li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main column -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- Page header -->
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div class="px-6 py-4 flex items-end justify-between gap-4">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center flex-shrink-0"><i data-lucide="git-branch-plus" class="w-5 h-5 text-white"></i></div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h2 class="text-2xl font-bold leading-tight mono truncate">acme/orders</h2>
+                <span class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 flex-shrink-0">Healthy</span>
+              </div>
+              <p class="text-gray-600 dark:text-gray-400 text-xs mt-1 mono truncate">github · 3 branches tracked · last scan 4 m ago · 2.3 s · sha 4c12fa9</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"><i data-lucide="scan-search" class="w-4 h-4"></i> Scan now</button>
+            <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="pause" class="w-4 h-4"></i> Pause</button>
+            <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="arrow-left" class="w-4 h-4"></i> Back</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-6 space-y-6 panel-stack">
+
+        <!-- Summary strip (5 cards) -->
+        <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Status</p>
+            <p class="text-sm font-medium mt-2 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Healthy</p>
+            <p class="text-[10px] mono text-gray-400 mt-1">no open errors</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Branches tracked</p>
+            <p class="text-2xl font-bold mt-2 mono">3</p>
+            <p class="text-[10px] mono text-gray-400 mt-1">main · develop · release/2026-q2</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Files tracked</p>
+            <p class="text-2xl font-bold mt-2 mono">87</p>
+            <p class="text-[10px] mono text-emerald-500 mt-1">71 classified · 11 unknown · 5 failed</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Last scan</p>
+            <p class="text-2xl font-bold mt-2 mono">4 m</p>
+            <p class="text-[10px] mono text-gray-400 mt-1">scan #18 · 2.3 s · success</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Diff · vs prev scan</p>
+            <p class="text-base font-semibold mt-2 mono"><span class="text-emerald-500">+12</span> · <span class="text-amber-500">~28</span> · <span class="text-rose-500">-3</span></p>
+            <p class="text-[10px] mono text-gray-400 mt-1">added · modified · removed</p>
+          </div>
+        </section>
+
+        <!-- Tab strip (underline, all tabs visible; this mockup renders every tab body stacked beneath) -->
+        <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="px-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-1 text-sm overflow-x-auto">
+            <a href="#tab-branches" class="px-4 py-3 border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-2 whitespace-nowrap"><i data-lucide="git-branch" class="w-4 h-4"></i> Branches</a>
+            <a href="#tab-files" class="px-4 py-3 border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-2 whitespace-nowrap"><i data-lucide="file-search" class="w-4 h-4"></i> Files <span class="mono text-[10px]">87</span></a>
+            <a href="#tab-scans" class="px-4 py-3 border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-2 whitespace-nowrap"><i data-lucide="activity" class="w-4 h-4"></i> Scans <span class="mono text-[10px]">18</span></a>
+            <a href="#tab-sync" class="px-4 py-3 border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-2 whitespace-nowrap"><i data-lucide="git-pull-request-arrow" class="w-4 h-4"></i> Sync history <span class="mono text-[10px]">42</span></a>
+            <a href="#tab-manifest" class="px-4 py-3 border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-2 whitespace-nowrap"><i data-lucide="file-code" class="w-4 h-4"></i> Manifest</a>
+            <a href="#tab-settings" class="px-4 py-3 border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-2 whitespace-nowrap"><i data-lucide="settings-2" class="w-4 h-4"></i> Settings</a>
+            <span class="ml-auto px-3 text-[10px] text-gray-400 mono whitespace-nowrap">all tabs rendered for review</span>
+          </div>
+        </section>
+
+        <!-- ============== BRANCHES TAB ============== -->
+        <section id="tab-branches" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <i data-lucide="git-branch" class="w-5 h-5 text-indigo-500"></i>
+              <div>
+                <h3 class="text-base font-semibold">Tracked branches</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">3 of 12 branches monitored · re-fetch from GitHub to discover new branches</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync from GitHub</button>
+              <button class="px-2.5 py-1 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1.5"><i data-lucide="plus" class="w-3.5 h-3.5"></i> Track branch</button>
+            </div>
+          </div>
+
+          <div class="p-5 space-y-5">
+            <div>
+              <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-2">Available branches</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span class="px-2.5 py-1 text-xs rounded-full border border-indigo-300 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-700/60 dark:text-indigo-300 mono inline-flex items-center gap-1.5"><i data-lucide="check" class="w-3 h-3"></i> main</span>
+                <span class="px-2.5 py-1 text-xs rounded-full border border-indigo-300 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-700/60 dark:text-indigo-300 mono inline-flex items-center gap-1.5"><i data-lucide="check" class="w-3 h-3"></i> develop</span>
+                <span class="px-2.5 py-1 text-xs rounded-full border border-indigo-300 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-700/60 dark:text-indigo-300 mono inline-flex items-center gap-1.5"><i data-lucide="check" class="w-3 h-3"></i> release/2026-q2</span>
+                <span class="px-2.5 py-1 text-xs rounded-full border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 mono">staging</span>
+                <span class="px-2.5 py-1 text-xs rounded-full border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 mono">release/2026-q1</span>
+                <span class="px-2.5 py-1 text-xs rounded-full border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 mono">feature/webhook-retry</span>
+                <span class="px-2.5 py-1 text-xs rounded-full border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 mono">hotfix/order-id-cast</span>
+                <span class="px-2.5 py-1 text-xs rounded-full border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 mono">+ 5 more</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <!-- main branch card -->
+              <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="font-medium mono text-sm flex items-center gap-1.5"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-indigo-500"></i> main</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">default</span>
+                </div>
+                <div class="space-y-1.5 text-xs">
+                  <div class="flex justify-between"><span class="text-gray-500">Subpath glob</span><span class="mono">specs/**/*.yaml</span></div>
+                  <div class="flex justify-between"><span class="text-gray-500">Poll interval</span><span class="mono">300 s</span></div>
+                  <div class="flex justify-between"><span class="text-gray-500">Last scan</span><span class="mono text-emerald-500">4 m ago · ok</span></div>
+                  <div class="flex justify-between"><span class="text-gray-500">Files tracked</span><span class="mono">52</span></div>
+                </div>
+                <div class="flex items-center justify-end gap-1.5 pt-1">
+                  <button class="px-2 py-1 text-[11px] rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Edit</button>
+                  <button class="px-2 py-1 text-[11px] rounded border border-rose-200 dark:border-rose-700/40 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20">Remove</button>
+                </div>
+              </div>
+
+              <!-- develop branch card -->
+              <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="font-medium mono text-sm flex items-center gap-1.5"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-indigo-500"></i> develop</span>
+                </div>
+                <div class="space-y-1.5 text-xs">
+                  <div class="flex justify-between"><span class="text-gray-500">Subpath glob</span><span class="mono">specs/**/*.yaml</span></div>
+                  <div class="flex justify-between"><span class="text-gray-500">Poll interval</span><span class="mono">600 s</span></div>
+                  <div class="flex justify-between"><span class="text-gray-500">Last scan</span><span class="mono text-amber-500">11 m ago · 2 warnings</span></div>
+                  <div class="flex justify-between"><span class="text-gray-500">Files tracked</span><span class="mono">23</span></div>
+                </div>
+                <div class="flex items-center justify-end gap-1.5 pt-1">
+                  <button class="px-2 py-1 text-[11px] rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Edit</button>
+                  <button class="px-2 py-1 text-[11px] rounded border border-rose-200 dark:border-rose-700/40 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20">Remove</button>
+                </div>
+              </div>
+
+              <!-- release pattern card -->
+              <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="font-medium mono text-sm flex items-center gap-1.5"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-purple-500"></i> release/2026-q2</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">pattern</span>
+                </div>
+                <div class="space-y-1.5 text-xs">
+                  <div class="flex justify-between"><span class="text-gray-500">Subpath glob</span><span class="mono">specs/**/*.yaml</span></div>
+                  <div class="flex justify-between"><span class="text-gray-500">Poll interval</span><span class="mono">1 800 s</span></div>
+                  <div class="flex justify-between"><span class="text-gray-500">Last scan</span><span class="mono text-emerald-500">37 m ago · ok</span></div>
+                  <div class="flex justify-between"><span class="text-gray-500">Files tracked</span><span class="mono">12</span></div>
+                </div>
+                <div class="flex items-center justify-end gap-1.5 pt-1">
+                  <button class="px-2 py-1 text-[11px] rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Edit</button>
+                  <button class="px-2 py-1 text-[11px] rounded border border-rose-200 dark:border-rose-700/40 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============== FILES TAB ============== -->
+        <section id="tab-files" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <i data-lucide="file-search" class="w-5 h-5 text-indigo-500"></i>
+              <div>
+                <h3 class="text-base font-semibold">Repository files</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">87 files · scan #18 · 2 m 12 s ago · classification + quality scoring per file</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <select class="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs">
+                <option>Scan #18 · main</option><option>Scan #17 · main</option><option>Scan #16 · develop</option>
+              </select>
+              <select aria-label="Format" class="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs">
+                <option>All formats</option><option>openapi</option><option>json-schema</option><option>graphql</option><option>asyncapi</option>
+              </select>
+              <select aria-label="File status" class="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs">
+                <option>All statuses</option><option>classified</option><option>unknown</option><option>failed</option><option>new</option>
+              </select>
+              <div class="relative">
+                <i data-lucide="search" class="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"></i>
+                <input type="text" placeholder="Filter path..." class="h-8 w-44 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 pl-7 pr-2 text-xs" />
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-gray-100 dark:divide-gray-700">
+            <!-- File table -->
+            <div class="lg:col-span-7">
+              <table class="w-full text-sm">
+                <thead class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50/60 dark:bg-gray-900/40">
+                  <tr>
+                    <th class="text-left px-5 py-2 font-semibold">Path</th>
+                    <th class="text-left px-3 py-2 font-semibold">Format</th>
+                    <th class="text-left px-3 py-2 font-semibold">Status</th>
+                    <th class="text-right px-5 py-2 font-semibold">Quality</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700/60">
+                  <tr class="bg-indigo-50/60 dark:bg-indigo-900/20 cursor-pointer">
+                    <td class="px-5 py-2.5 mono text-xs"><i data-lucide="chevron-right" class="inline w-3 h-3 mr-1 text-indigo-500"></i>specs/orders/orders.openapi.yaml</td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">openapi</span></td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">classified</span></td>
+                    <td class="px-5 py-2.5 text-right"><div class="inline-flex items-center gap-2"><span class="mono text-xs text-emerald-500">94</span><span class="w-12 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden inline-block"><span class="block h-1 bg-emerald-500" style="width: 94%"></span></span></div></td>
+                  </tr>
+                  <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                    <td class="px-5 py-2.5 mono text-xs">specs/orders/order.json</td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">json-schema</span></td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">classified</span></td>
+                    <td class="px-5 py-2.5 text-right"><div class="inline-flex items-center gap-2"><span class="mono text-xs text-emerald-500">88</span><span class="w-12 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden inline-block"><span class="block h-1 bg-emerald-500" style="width: 88%"></span></span></div></td>
+                  </tr>
+                  <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                    <td class="px-5 py-2.5 mono text-xs">specs/orders/line-item.json</td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">json-schema</span></td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">classified</span></td>
+                    <td class="px-5 py-2.5 text-right"><div class="inline-flex items-center gap-2"><span class="mono text-xs text-emerald-500">91</span><span class="w-12 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden inline-block"><span class="block h-1 bg-emerald-500" style="width: 91%"></span></span></div></td>
+                  </tr>
+                  <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                    <td class="px-5 py-2.5 mono text-xs">specs/webhooks/order-paid.yaml</td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">asyncapi</span></td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">classified</span></td>
+                    <td class="px-5 py-2.5 text-right"><div class="inline-flex items-center gap-2"><span class="mono text-xs text-amber-500">72</span><span class="w-12 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden inline-block"><span class="block h-1 bg-amber-500" style="width: 72%"></span></span></div></td>
+                  </tr>
+                  <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                    <td class="px-5 py-2.5 mono text-xs">specs/internal/notes.md</td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">unknown</span></td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200">unknown</span></td>
+                    <td class="px-5 py-2.5 text-right mono text-xs text-gray-400">—</td>
+                  </tr>
+                  <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                    <td class="px-5 py-2.5 mono text-xs">specs/orders/refund.openapi.yaml</td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">openapi</span></td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">failed</span></td>
+                    <td class="px-5 py-2.5 text-right mono text-xs text-rose-500">parse error</td>
+                  </tr>
+                  <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                    <td class="px-5 py-2.5 mono text-xs">specs/orders/customer.json</td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">json-schema</span></td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">classified</span></td>
+                    <td class="px-5 py-2.5 text-right"><div class="inline-flex items-center gap-2"><span class="mono text-xs text-emerald-500">86</span><span class="w-12 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden inline-block"><span class="block h-1 bg-emerald-500" style="width: 86%"></span></span></div></td>
+                  </tr>
+                  <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                    <td class="px-5 py-2.5 mono text-xs">specs/graphql/orders.graphql</td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/40 dark:text-fuchsia-300">graphql</span></td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">classified</span></td>
+                    <td class="px-5 py-2.5 text-right"><div class="inline-flex items-center gap-2"><span class="mono text-xs text-amber-500">68</span><span class="w-12 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden inline-block"><span class="block h-1 bg-amber-500" style="width: 68%"></span></span></div></td>
+                  </tr>
+                  <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                    <td class="px-5 py-2.5 mono text-xs">specs/orders/discount.openapi.yaml</td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">openapi</span></td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">new</span></td>
+                    <td class="px-5 py-2.5 text-right"><div class="inline-flex items-center gap-2"><span class="mono text-xs text-emerald-500">90</span><span class="w-12 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden inline-block"><span class="block h-1 bg-emerald-500" style="width: 90%"></span></span></div></td>
+                  </tr>
+                  <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                    <td class="px-5 py-2.5 mono text-xs">.github/workflows/ci.yml</td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">unknown</span></td>
+                    <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200">ignored</span></td>
+                    <td class="px-5 py-2.5 text-right mono text-xs text-gray-400">—</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="px-5 py-2.5 border-t border-gray-100 dark:border-gray-700/60 text-[11px] text-gray-500 mono flex items-center justify-between">
+                <span>Showing 10 of 87 · virtualized scroll</span>
+                <span>↑↓ select · enter open drawer</span>
+              </div>
+            </div>
+
+            <!-- File drawer (open state, mockup) -->
+            <div class="lg:col-span-5 bg-gray-50/30 dark:bg-gray-900/20">
+              <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Classification details</p>
+                  <p class="text-sm font-medium mono mt-1 truncate" title="specs/orders/orders.openapi.yaml">specs/orders/orders.openapi.yaml</p>
+                </div>
+                <button class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"><i data-lucide="x" class="w-4 h-4 text-gray-500"></i></button>
+              </div>
+              <div class="p-5 space-y-4 text-xs">
+                <div class="rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700/60">
+                  <div class="px-3 py-2 flex justify-between"><span class="text-gray-500">Format</span><span class="mono">openapi 3.1</span></div>
+                  <div class="px-3 py-2 flex justify-between"><span class="text-gray-500">Discriminator</span><span class="mono">title:OrdersAPI · servers[0].url</span></div>
+                  <div class="px-3 py-2 flex justify-between"><span class="text-gray-500">Confidence</span><span class="mono text-emerald-500">98 %</span></div>
+                  <div class="px-3 py-2 flex justify-between"><span class="text-gray-500">Blob SHA</span><span class="mono truncate max-w-[180px]" title="0a4f9c2bd...">0a4f9c2b…</span></div>
+                  <div class="px-3 py-2 flex justify-between"><span class="text-gray-500">Project</span><span class="mono">acme-orders-api</span></div>
+                  <div class="px-3 py-2 flex justify-between"><span class="text-gray-500">Version strategy</span><span class="mono">semver-from-info</span></div>
+                  <div class="px-3 py-2 flex justify-between"><span class="text-gray-500">Tracked</span><span class="mono text-emerald-500">yes · auto-promote</span></div>
+                </div>
+
+                <div>
+                  <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1.5">Settings JSON</p>
+                  <pre class="rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 mono text-[11px] whitespace-pre overflow-x-auto leading-relaxed">{
+  "promote": "auto",
+  "version_strategy": "semver-from-info",
+  "ignore_breaking": false,
+  "owner_team": "@acme-orders"
+}</pre>
+                </div>
+
+                <div>
+                  <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1.5">Quality gate</p>
+                  <ul class="rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700/60">
+                    <li class="px-3 py-2 flex justify-between"><span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-500"></i> docs/require_description</span><span class="mono text-emerald-500">pass</span></li>
+                    <li class="px-3 py-2 flex justify-between"><span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-500"></i> naming/pascal_case</span><span class="mono text-emerald-500">pass</span></li>
+                    <li class="px-3 py-2 flex justify-between"><span class="flex items-center gap-1.5"><i data-lucide="alert-triangle" class="w-3 h-3 text-amber-500"></i> security/no_pii_in_url</span><span class="mono text-amber-500">1 warn</span></li>
+                  </ul>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-1">
+                  <button class="px-2.5 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">View raw</button>
+                  <button class="px-2.5 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed" disabled>Promotion UI coming soon</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============== SCANS TAB ============== -->
+        <section id="tab-scans" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <i data-lucide="activity" class="w-5 h-5 text-indigo-500"></i>
+              <div>
+                <h3 class="text-base font-semibold">Scan timeline</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Last 18 scans across all branches · click a scan to expand event log</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Branch: main</button>
+              <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Trigger: All</button>
+              <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Status: failed</button>
+              <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Show errors</button>
+            </div>
+          </div>
+
+          <div class="p-5">
+            <ol class="relative border-l border-gray-200 dark:border-gray-700 ml-3 space-y-5">
+
+              <!-- in-progress -->
+              <li class="ml-5">
+                <span class="absolute -left-[7px] w-3.5 h-3.5 rounded-full bg-indigo-500 border-2 border-white dark:border-gray-800 animate-pulse"></span>
+                <div class="flex items-center gap-2 text-sm">
+                  <span class="font-medium">Scan #18</span>
+                  <span class="mono text-xs text-gray-500">main · sha 4c12fa9</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span> Running</span>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mono">Files seen 11 · classified 7 · unknown 2 · failed 2 · trigger=manual · started 4 m ago · ETA 30 s</p>
+              </li>
+
+              <!-- complete -->
+              <li class="ml-5">
+                <span class="absolute -left-[7px] w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-gray-800"></span>
+                <div class="flex items-center gap-2 text-sm">
+                  <span class="font-medium">Scan #17</span>
+                  <span class="mono text-xs text-gray-500">main · sha 2a1f8eb</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Complete</span>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mono">Files seen 87 · classified 71 · unknown 11 · failed 5 · trigger=scheduled · 2 m 12 s · diff +12 / ~28 / -3</p>
+              </li>
+
+              <!-- complete with warnings -->
+              <li class="ml-5">
+                <span class="absolute -left-[7px] w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white dark:border-gray-800"></span>
+                <div class="flex items-center gap-2 text-sm">
+                  <span class="font-medium">Scan #16</span>
+                  <span class="mono text-xs text-gray-500">develop · sha 9d3c0aa</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Warnings</span>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mono">Files seen 23 · classified 18 · unknown 4 · failed 1 · trigger=push · 1 m 41 s · 2 quality warnings</p>
+              </li>
+
+              <!-- failed (expanded with error console) -->
+              <li class="ml-5">
+                <span class="absolute -left-[7px] w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-white dark:border-gray-800"></span>
+                <div class="flex items-center gap-2 text-sm">
+                  <span class="font-medium">Scan #15</span>
+                  <span class="mono text-xs text-gray-500">main · sha b4127d5</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">Failed</span>
+                  <button class="ml-1 px-2 py-0.5 text-[11px] rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1"><i data-lucide="chevron-up" class="w-3 h-3"></i> Hide errors</button>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mono">Files seen 11 · classified 7 · unknown 2 · failed 2 · trigger=scheduled · 0 m 9 s · failure: parser error</p>
+                <pre class="mt-2 rounded-md border border-rose-200 dark:border-rose-700/40 bg-rose-50/60 dark:bg-rose-900/20 p-3 mono text-[11px] whitespace-pre overflow-x-auto leading-relaxed text-rose-900 dark:text-rose-200">
+[2026-04-22 09:13:09 UTC] FATAL parser/yaml: mapping values are not allowed here
+  in specs/orders/refund.openapi.yaml:142:18
+  hint: indentation mismatch · expected 4 spaces, got tab
+[2026-04-22 09:13:09 UTC] FATAL classifier/aborted: 2 of 11 files unparseable
+[2026-04-22 09:13:09 UTC] INFO  retention: scan log preserved · 90 d</pre>
+              </li>
+
+              <!-- complete -->
+              <li class="ml-5">
+                <span class="absolute -left-[7px] w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-gray-800"></span>
+                <div class="flex items-center gap-2 text-sm">
+                  <span class="font-medium">Scan #14</span>
+                  <span class="mono text-xs text-gray-500">main · sha 5e89a1c</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Complete</span>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mono">Files seen 84 · classified 70 · unknown 10 · failed 4 · trigger=scheduled · 2 m 04 s</p>
+              </li>
+
+              <!-- pattern branch complete -->
+              <li class="ml-5">
+                <span class="absolute -left-[7px] w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-gray-800"></span>
+                <div class="flex items-center gap-2 text-sm">
+                  <span class="font-medium">Scan #13</span>
+                  <span class="mono text-xs text-gray-500">release/2026-q2 · sha 11ab093</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Complete</span>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mono">Files seen 12 · classified 12 · unknown 0 · failed 0 · trigger=push · 0 m 38 s</p>
+              </li>
+
+              <!-- init -->
+              <li class="ml-5">
+                <span class="absolute -left-[7px] w-3.5 h-3.5 rounded-full bg-gray-400 border-2 border-white dark:border-gray-800"></span>
+                <div class="flex items-center gap-2 text-sm">
+                  <span class="font-medium">Repository registered</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">init</span>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-indigo-500 text-white text-[9px] font-semibold flex items-center justify-center">KS</span> Kenji Shiratori · <span class="mono">2026-04-15 11:02:08 UTC</span></p>
+                <p class="text-xs mt-1 mono text-gray-600 dark:text-gray-300">connected via linked-account=octocat · branches=[main, develop, release/*] · manifest=true</p>
+              </li>
+
+            </ol>
+          </div>
+        </section>
+
+        <!-- ============== SYNC HISTORY TAB ============== -->
+        <section id="tab-sync" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <i data-lucide="git-pull-request-arrow" class="w-5 h-5 text-indigo-500"></i>
+              <div>
+                <h3 class="text-base font-semibold">Sync history</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">42 sync events · pulls in from repo, pushes out to projects</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <select class="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs">
+                <option>All directions</option><option>inbound</option><option>outbound</option>
+              </select>
+              <select class="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs">
+                <option>All states</option><option>applied</option><option>conflict</option><option>skipped</option>
+              </select>
+            </div>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50/60 dark:bg-gray-900/40">
+              <tr>
+                <th class="text-left px-5 py-2 font-semibold">Time</th>
+                <th class="text-left px-3 py-2 font-semibold">Direction</th>
+                <th class="text-left px-3 py-2 font-semibold">Branch</th>
+                <th class="text-left px-3 py-2 font-semibold">File</th>
+                <th class="text-left px-3 py-2 font-semibold">Operation</th>
+                <th class="text-left px-3 py-2 font-semibold">State</th>
+                <th class="text-right px-5 py-2 font-semibold">Conflicts</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700/60">
+              <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                <td class="px-5 py-2.5 mono text-[11px] text-gray-500">4 m ago</td>
+                <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="arrow-down" class="w-3 h-3"></i> inbound</span></td>
+                <td class="px-3 py-2.5 mono text-xs">main</td>
+                <td class="px-3 py-2.5 mono text-xs">specs/orders/orders.openapi.yaml</td>
+                <td class="px-3 py-2.5 mono text-xs">upsert</td>
+                <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">applied</span></td>
+                <td class="px-5 py-2.5 text-right mono text-xs text-gray-400">0</td>
+              </tr>
+              <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                <td class="px-5 py-2.5 mono text-[11px] text-gray-500">8 m ago</td>
+                <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 inline-flex items-center gap-1"><i data-lucide="arrow-up" class="w-3 h-3"></i> outbound</span></td>
+                <td class="px-3 py-2.5 mono text-xs">main</td>
+                <td class="px-3 py-2.5 mono text-xs">specs/orders/order.json</td>
+                <td class="px-3 py-2.5 mono text-xs">commit</td>
+                <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">applied</span></td>
+                <td class="px-5 py-2.5 text-right mono text-xs text-gray-400">0</td>
+              </tr>
+              <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                <td class="px-5 py-2.5 mono text-[11px] text-gray-500">11 m ago</td>
+                <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="arrow-down" class="w-3 h-3"></i> inbound</span></td>
+                <td class="px-3 py-2.5 mono text-xs">develop</td>
+                <td class="px-3 py-2.5 mono text-xs">specs/webhooks/order-paid.yaml</td>
+                <td class="px-3 py-2.5 mono text-xs">upsert</td>
+                <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">conflict</span></td>
+                <td class="px-5 py-2.5 text-right mono text-xs text-amber-500">2</td>
+              </tr>
+              <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                <td class="px-5 py-2.5 mono text-[11px] text-gray-500">38 m ago</td>
+                <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="arrow-down" class="w-3 h-3"></i> inbound</span></td>
+                <td class="px-3 py-2.5 mono text-xs">main</td>
+                <td class="px-3 py-2.5 mono text-xs">specs/orders/refund.openapi.yaml</td>
+                <td class="px-3 py-2.5 mono text-xs">upsert</td>
+                <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">skipped</span></td>
+                <td class="px-5 py-2.5 text-right mono text-xs text-rose-500">parse</td>
+              </tr>
+              <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                <td class="px-5 py-2.5 mono text-[11px] text-gray-500">1 h 12 m ago</td>
+                <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="arrow-down" class="w-3 h-3"></i> inbound</span></td>
+                <td class="px-3 py-2.5 mono text-xs">release/2026-q2</td>
+                <td class="px-3 py-2.5 mono text-xs">specs/orders/discount.openapi.yaml</td>
+                <td class="px-3 py-2.5 mono text-xs">create</td>
+                <td class="px-3 py-2.5"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">applied</span></td>
+                <td class="px-5 py-2.5 text-right mono text-xs text-gray-400">0</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="px-5 py-2.5 border-t border-gray-100 dark:border-gray-700/60 text-[11px] text-gray-500 mono flex items-center justify-between">
+            <span>Showing 5 of 42</span>
+            <a href="#" class="text-indigo-500 hover:underline">View all sync events →</a>
+          </div>
+        </section>
+
+        <!-- ============== MANIFEST TAB ============== -->
+        <section id="tab-manifest" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <i data-lucide="file-code" class="w-5 h-5 text-indigo-500"></i>
+              <div>
+                <h3 class="text-base font-semibold">Manifest</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mono">.objectified/repo.yaml · committed at sha 4c12fa9 · loaded from main</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Validate</button>
+              <button class="px-2.5 py-1 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i> Save manifest</button>
+            </div>
+          </div>
+          <div class="p-5 space-y-4">
+            <div class="rounded-md border border-gray-200 dark:border-gray-700 bg-slate-950 text-slate-200 overflow-hidden">
+              <div class="px-3 py-2 text-[10px] uppercase tracking-wider text-slate-400 mono border-b border-slate-800 flex items-center justify-between">
+                <span>.objectified/repo.yaml</span>
+                <span class="text-slate-500">YAML · Monaco</span>
+              </div>
+              <pre class="p-4 mono text-[12px] leading-relaxed whitespace-pre overflow-x-auto"><span class="text-slate-500"> 1 </span><span class="text-rose-300">version</span>: <span class="text-amber-200">1</span>
+<span class="text-slate-500"> 2 </span><span class="text-rose-300">project</span>: <span class="text-emerald-300">acme-orders-api</span>
+<span class="text-slate-500"> 3 </span><span class="text-rose-300">defaults</span>:
+<span class="text-slate-500"> 4 </span>  <span class="text-rose-300">subpath_glob</span>: <span class="text-emerald-300">"specs/**/*.yaml"</span>
+<span class="text-slate-500"> 5 </span>  <span class="text-rose-300">poll_interval_sec</span>: <span class="text-amber-200">300</span>
+<span class="text-slate-500"> 6 </span>  <span class="text-rose-300">version_strategy</span>: <span class="text-emerald-300">semver-from-info</span>
+<span class="text-slate-500"> 7 </span>  <span class="text-rose-300">promote</span>: <span class="text-emerald-300">auto</span>
+<span class="text-slate-500"> 8 </span><span class="text-rose-300">files</span>:
+<span class="text-slate-500"> 9 </span>  - <span class="text-rose-300">path</span>: <span class="text-emerald-300">"specs/orders/orders.openapi.yaml"</span>
+<span class="text-slate-500">10 </span>    <span class="text-rose-300">format</span>: <span class="text-emerald-300">openapi</span>
+<span class="text-slate-500">11 </span>    <span class="text-rose-300">project</span>: <span class="text-emerald-300">acme-orders-api</span>
+<span class="text-slate-500">12 </span>    <span class="text-rose-300">owner_team</span>: <span class="text-emerald-300">"@acme-orders"</span>
+<span class="text-slate-500">13 </span>  - <span class="text-rose-300">path</span>: <span class="text-emerald-300">"specs/webhooks/*.yaml"</span>
+<span class="text-slate-500">14 </span>    <span class="text-rose-300">format</span>: <span class="text-emerald-300">asyncapi</span>
+<span class="text-slate-500">15 </span>    <span class="text-rose-300">promote</span>: <span class="text-emerald-300">manual</span>
+<span class="text-slate-500">16 </span><span class="text-rose-300">ignore</span>:
+<span class="text-slate-500">17 </span>  - <span class="text-emerald-300">"**/*.md"</span>
+<span class="text-slate-500">18 </span>  - <span class="text-emerald-300">".github/**"</span></pre>
+            </div>
+            <div class="rounded-md border border-emerald-200 dark:border-emerald-700/40 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-xs flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+              <i data-lucide="check-circle-2" class="w-4 h-4"></i> Manifest is valid · 18 lines · 2 file rules · last validated 4 m ago
+            </div>
+          </div>
+        </section>
+
+        <!-- ============== SETTINGS TAB ============== -->
+        <section id="tab-settings" class="space-y-6">
+
+          <!-- Scanning subsection -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <i data-lucide="settings-2" class="w-5 h-5 text-indigo-500"></i>
+                <div>
+                  <h3 class="text-base font-semibold">Scanning</h3>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Cadence + scope of repository scans</p>
+                </div>
+              </div>
+              <button class="px-2.5 py-1 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i> Save settings</button>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
+              <div class="space-y-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Default poll interval</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" value="300" class="h-9 w-32 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm mono" />
+                  <span class="text-xs text-gray-500 mono">seconds (15 – 86 400)</span>
+                </div>
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Default subpath glob</label>
+                <input type="text" value="specs/**/*.yaml" class="h-9 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm mono" />
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Default branch</label>
+                <select class="h-9 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm">
+                  <option>main</option><option>develop</option><option>trunk</option>
+                </select>
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Scans enabled</label>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                  <span class="relative inline-flex h-5 w-9 rounded-full bg-indigo-500"><span class="absolute top-0.5 left-[18px] h-4 w-4 rounded-full bg-white shadow"></span></span>
+                  <span class="text-sm">Scheduled scans run · push triggers active</span>
+                </label>
+              </div>
+              <div class="md:col-span-2 space-y-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Ignored paths</label>
+                <textarea rows="3" class="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-xs mono">**/*.md
+.github/**
+node_modules/**</textarea>
+                <p class="text-[11px] text-gray-500">One glob per line · evaluated after subpath glob.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notifications & alerts subsection (mockup-only proposal) -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <i data-lucide="bell-ring" class="w-5 h-5 text-indigo-500"></i>
+                <div>
+                  <h3 class="text-base font-semibold flex items-center gap-2">Notifications &amp; alerts <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded mockup-only-pill">mockup proposal</span></h3>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Where alerts go when this repo's health changes</p>
+                </div>
+              </div>
+              <button class="px-2.5 py-1 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i> Save</button>
+            </div>
+            <div class="p-5 space-y-5 text-sm">
+              <div class="space-y-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Destinations</label>
+                <div class="flex flex-wrap gap-1.5">
+                  <span class="px-2.5 py-1 text-xs rounded-full border border-indigo-300 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-700/60 dark:text-indigo-300 inline-flex items-center gap-1.5"><i data-lucide="mail" class="w-3 h-3"></i> Email <i data-lucide="x" class="w-3 h-3 ml-1 opacity-60"></i></span>
+                  <span class="px-2.5 py-1 text-xs rounded-full border border-indigo-300 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-700/60 dark:text-indigo-300 inline-flex items-center gap-1.5"><i data-lucide="message-square" class="w-3 h-3"></i> Slack #orders-platform <i data-lucide="x" class="w-3 h-3 ml-1 opacity-60"></i></span>
+                  <span class="px-2.5 py-1 text-xs rounded-full border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 inline-flex items-center gap-1.5 cursor-pointer"><i data-lucide="webhook" class="w-3 h-3"></i> + Add Webhook</span>
+                  <span class="px-2.5 py-1 text-xs rounded-full border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 inline-flex items-center gap-1.5 cursor-pointer"><i data-lucide="plus" class="w-3 h-3"></i> + Add PagerDuty</span>
+                </div>
+              </div>
+
+              <div class="space-y-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Trigger on</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                  <label class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-2 cursor-pointer"><input type="checkbox" checked class="rounded border-gray-300" /><span>Scan failed</span><span class="ml-auto text-[10px] mono text-gray-400">last 7 d: 1</span></label>
+                  <label class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-2 cursor-pointer"><input type="checkbox" checked class="rounded border-gray-300" /><span>Health degraded (warnings → error)</span><span class="ml-auto text-[10px] mono text-gray-400">last 7 d: 0</span></label>
+                  <label class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-2 cursor-pointer"><input type="checkbox" class="rounded border-gray-300" /><span>Manifest invalid</span><span class="ml-auto text-[10px] mono text-gray-400">last 7 d: 0</span></label>
+                  <label class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-2 cursor-pointer"><input type="checkbox" checked class="rounded border-gray-300" /><span>Sync conflict opened</span><span class="ml-auto text-[10px] mono text-gray-400">last 7 d: 2</span></label>
+                  <label class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-2 cursor-pointer"><input type="checkbox" class="rounded border-gray-300" /><span>New unknown file format</span><span class="ml-auto text-[10px] mono text-gray-400">last 7 d: 4</span></label>
+                  <label class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-2 cursor-pointer"><input type="checkbox" class="rounded border-gray-300" /><span>Repository auto-archived</span><span class="ml-auto text-[10px] mono text-gray-400">last 7 d: 0</span></label>
+                </div>
+              </div>
+
+              <div class="space-y-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Recipients (email)</label>
+                <textarea rows="2" class="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-xs mono">kenji@acme.com
+oncall-orders@acme.com</textarea>
+                <p class="text-[11px] text-gray-500">One per line · we send on the next minute boundary, batched.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lifecycle & retention subsection (mockup-only proposal) -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <i data-lucide="archive" class="w-5 h-5 text-indigo-500"></i>
+                <div>
+                  <h3 class="text-base font-semibold flex items-center gap-2">Lifecycle &amp; retention <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded mockup-only-pill">mockup proposal</span></h3>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">How long we keep history · who owns this repo</p>
+                </div>
+              </div>
+              <button class="px-2.5 py-1 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i> Save</button>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
+              <div class="space-y-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Scan history retention</label>
+                <select class="h-9 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm">
+                  <option>Keep last 30 days</option><option selected>Keep last 90 days</option><option>Keep last 1 year</option><option>Keep forever</option>
+                </select>
+                <p class="text-[11px] text-gray-500 mono">last purged: 2026-04-19 03:00 UTC · 142 scans archived</p>
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Auto-archive after consecutive failed scans</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" value="5" min="1" max="50" class="h-9 w-20 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm mono" />
+                  <span class="text-xs text-gray-500">consecutive failures · 0 = never auto-archive</span>
+                </div>
+              </div>
+              <div class="space-y-1.5 md:col-span-2">
+                <label class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Owner / responsible team</label>
+                <div class="flex flex-wrap gap-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-2">
+                  <span class="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 mono inline-flex items-center gap-1">@acme-platform-team <i data-lucide="x" class="w-3 h-3 opacity-60"></i></span>
+                  <span class="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 mono inline-flex items-center gap-1">@kenji <i data-lucide="x" class="w-3 h-3 opacity-60"></i></span>
+                  <input type="text" placeholder="Add @user or @team..." class="bg-transparent border-0 outline-none text-xs mono flex-1 min-w-[160px] py-0.5" />
+                </div>
+                <p class="text-[11px] text-gray-500">Used for routing alerts &amp; chargeback reporting.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Danger zone -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-rose-200 dark:border-rose-700/40 overflow-hidden">
+            <div class="px-5 py-4 border-b border-rose-200 dark:border-rose-700/40 bg-rose-50/50 dark:bg-rose-900/15 flex items-center gap-3">
+              <i data-lucide="alert-octagon" class="w-5 h-5 text-rose-500"></i>
+              <div>
+                <h3 class="text-base font-semibold text-rose-700 dark:text-rose-300">Danger zone</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Destructive actions · cannot be undone from the UI</p>
+              </div>
+            </div>
+            <div class="divide-y divide-rose-100 dark:divide-rose-800/40">
+              <div class="px-5 py-4 flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-medium">Disable scanning</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Pauses all scheduled and push-triggered scans · history is preserved.</p>
+                </div>
+                <button class="px-3 py-1.5 text-sm rounded-md border border-amber-300 dark:border-amber-700/40 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 inline-flex items-center gap-1.5"><i data-lucide="pause" class="w-4 h-4"></i> Disable</button>
+              </div>
+              <div class="px-5 py-4 flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-medium text-rose-700 dark:text-rose-300">Delete repository</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Removes all scans, files, and sync history. Source repo is untouched.</p>
+                </div>
+                <button class="px-3 py-1.5 text-sm rounded-md border border-rose-300 dark:border-rose-700/40 text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/20 inline-flex items-center gap-1.5"><i data-lucide="trash-2" class="w-4 h-4"></i> Delete</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'repositories-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>

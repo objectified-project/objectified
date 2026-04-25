@@ -21,3 +21,122 @@ export const dashboardTbodyClass = 'divide-y divide-gray-200 dark:divide-gray-70
 
 export const dashboardTrHoverClass =
   'hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors';
+
+/**
+ * Repositories surface tokens.
+ *
+ * These belong to the redesigned Repositories list/detail screens. Kept here so
+ * Phase B/C pages can import them via the same module the rest of the dashboard
+ * already uses.  All names are prefixed `repository*` so they don't collide
+ * with the generic dashboard tokens above.
+ */
+export const repositoryHeaderShellClass =
+  'border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-500/10 via-white to-fuchsia-500/5 dark:from-indigo-500/10 dark:via-gray-800 dark:to-fuchsia-500/10';
+
+export const repositoryHeaderIconTileClass =
+  'w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white shadow-sm';
+
+export const repositoryHeaderEyebrowClass =
+  'text-gray-600 dark:text-gray-400 text-xs mt-1 font-mono';
+
+export const repositoryPanelClass =
+  'bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden';
+
+export const repositoryPanelHeaderClass =
+  'px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900';
+
+export const repositoryPanelEyebrowClass =
+  'text-xs text-gray-500 dark:text-gray-400';
+
+export const repositoryMonoCellClass =
+  'font-mono text-[11px] text-gray-600 dark:text-gray-300';
+
+export const repositoryStatusChipBaseClass =
+  'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded';
+
+/**
+ * Color variants for {@link repositoryStatusChipBaseClass}, keyed by the
+ * canonical status returned from the API. Unknown statuses fall back to
+ * `neutral`.
+ */
+export const repositoryStatusChipToneClass = {
+  healthy: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+  warnings: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  error: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+  scanning: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+  disabled: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
+  neutral: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+} as const;
+
+export type RepositoryStatusChipTone = keyof typeof repositoryStatusChipToneClass;
+
+/**
+ * Card shell matches the dashboard mockup exactly: white surface, single
+ * border, 20px padding, no inner flex direction (children stack via natural
+ * block flow + the body row's `flex items-end justify-between`).
+ */
+export const repositoryKpiCardClass =
+  'bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5';
+
+/**
+ * Top-right icon stroke colour. The mockup uses a tone-400 weight so the icon
+ * reads as a gentle accent rather than the primary signal — that role is
+ * reserved for the value itself ({@link repositoryKpiValueToneClass}).
+ */
+export const repositoryKpiIconToneClass = {
+  indigo: 'text-indigo-400',
+  emerald: 'text-emerald-400',
+  amber: 'text-amber-400',
+  sky: 'text-sky-400',
+  violet: 'text-violet-400',
+  rose: 'text-rose-400',
+  slate: 'text-slate-400',
+} as const;
+
+/**
+ * Optional tint applied to the headline value. The mockup tints values for
+ * "Healthy" (emerald), "Warnings · scanning" (amber), and "Slowest scan"
+ * (rose). Other tones leave the value at the default ink colour.
+ */
+export const repositoryKpiValueToneClass = {
+  indigo: '',
+  emerald: 'text-emerald-500',
+  amber: 'text-amber-500',
+  sky: '',
+  violet: '',
+  rose: 'text-rose-500',
+  slate: '',
+} as const;
+
+/**
+ * Subtitle tone. Defaults to muted gray. Use `warning`/`positive`/`negative`
+ * for trend deltas (matches the trending-up/trending-down lines in the
+ * mockup).
+ */
+export const repositoryKpiSubtitleToneClass = {
+  default: 'text-gray-500 dark:text-gray-400',
+  positive: 'text-emerald-600 dark:text-emerald-400',
+  warning: 'text-amber-500 dark:text-amber-400',
+  negative: 'text-rose-500 dark:text-rose-400',
+} as const;
+
+/**
+ * Sparkline stroke colour per tone. Spelled out so Tailwind's JIT picks them
+ * up — dynamic `text-${tone}-500` composition would silently fail to ship the
+ * matching CSS.
+ */
+export const repositoryKpiSparkToneClass = {
+  indigo: 'text-indigo-500 dark:text-indigo-400',
+  emerald: 'text-emerald-500 dark:text-emerald-400',
+  amber: 'text-amber-500 dark:text-amber-400',
+  sky: 'text-sky-500 dark:text-sky-400',
+  violet: 'text-violet-500 dark:text-violet-400',
+  rose: 'text-rose-500 dark:text-rose-400',
+  slate: 'text-slate-500 dark:text-slate-400',
+} as const;
+
+export type RepositoryKpiTone = keyof typeof repositoryKpiIconToneClass;
+export type RepositoryKpiSubtitleTone = keyof typeof repositoryKpiSubtitleToneClass;
+
+export const repositoryActivityRowClass =
+  'flex items-start gap-3 px-5 py-3 border-b border-gray-100 dark:border-gray-700/60 last:border-b-0';

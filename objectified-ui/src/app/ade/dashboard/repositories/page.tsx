@@ -2,54 +2,56 @@
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { GitBranchPlus, Search } from 'lucide-react';
-import { SiGithub } from 'react-icons/si';
+import {
+  Activity,
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  CheckCircle2,
+  Eye,
+  GitBranch,
+  GitBranchPlus,
+  History,
+  Hourglass,
+  Pause,
+  Play,
+  Plus,
+  RefreshCw,
+  Search,
+  Star,
+  Timer,
+} from 'lucide-react';
 import { Button } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
 import { Alert } from '@/app/components/ui/Alert';
 import { EmptyState } from '@/app/components/ui/EmptyState';
 import { Skeleton } from '@/app/components/ui/Skeleton';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/app/components/ui/Dialog';
+  RepositoryWizardDialog,
+  type RegisteredRepositoryResult,
+} from '@/app/components/ade/dashboard/RepositoryWizardDialog';
 import {
   dashboardContentStackClass,
   dashboardMainClass,
-  dashboardPanelClass,
-  dashboardTableWrapClass,
-  dashboardTableTheadClass,
-  dashboardTbodyClass,
-  dashboardThClass,
-  dashboardThRightClass,
-  dashboardTrHoverClass,
+  repositoryHeaderShellClass,
+  repositoryHeaderIconTileClass,
+  repositoryHeaderEyebrowClass,
+  repositoryPanelClass,
+  repositoryPanelHeaderClass,
+  repositoryPanelEyebrowClass,
+  repositoryMonoCellClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
+import {
+  RepositoryStatusChip,
+  formatRepositoryStatusLabel,
+} from '@/app/components/ade/dashboard/RepositoryStatusChip';
+import { RepositoryKpiCard } from '@/app/components/ade/dashboard/RepositoryKpiCard';
+import {
+  loadRepositoryFavorites,
+  toggleRepositoryFavorite,
+} from '@/app/utils/repository-favorites';
 import { getRepositoriesI18nBundle } from './i18n';
-
-interface LinkedAccount {
-  id: string;
-  provider: string;
-  provider_username?: string;
-  provider_email?: string;
-}
-
-interface RepoSummary {
-  id: number;
-  name: string;
-  full_name: string;
-  description?: string | null;
-  default_branch?: string;
-}
-
-interface BranchItem {
-  branch: string;
-  subpathGlob: string;
-  pollIntervalSec?: number;
-}
 
 interface RegisteredRepository {
   id: string;
@@ -60,39 +62,79 @@ interface RegisteredRepository {
   status: string;
   branches: string[];
   lastScanAt?: string | null;
+  lastScanDurationMs?: number | null;
+  lastScanBranch?: string | null;
 }
 
-function formatRepositoryStatus(status: string): string {
-  if (status === 'archived') return 'Disabled';
-  if (status === 'scan_in_progress') return 'Scan in progress';
-  return status.replace(/_/g, ' ');
-}
-
-type RepositorySortField = 'name' | 'lastScan' | 'status';
+type RepositorySortField = 'name' | 'lastScan' | 'status' | 'favorite';
 type RepositorySortDirection = 'asc' | 'desc';
+
+const SORT_OPTIONS: ReadonlyArray<{
+  value: string;
+  field: RepositorySortField;
+  direction: RepositorySortDirection;
+  copyKey:
+    | 'sortLastScanDesc'
+    | 'sortLastScanAsc'
+    | 'sortNameAsc'
+    | 'sortNameDesc'
+    | 'sortStatus'
+    | 'sortFavoritesFirst';
+}> = [
+  { value: 'lastScan-desc', field: 'lastScan', direction: 'desc', copyKey: 'sortLastScanDesc' },
+  { value: 'lastScan-asc', field: 'lastScan', direction: 'asc', copyKey: 'sortLastScanAsc' },
+  { value: 'name-asc', field: 'name', direction: 'asc', copyKey: 'sortNameAsc' },
+  { value: 'name-desc', field: 'name', direction: 'desc', copyKey: 'sortNameDesc' },
+  { value: 'status-asc', field: 'status', direction: 'asc', copyKey: 'sortStatus' },
+  { value: 'favorite-desc', field: 'favorite', direction: 'desc', copyKey: 'sortFavoritesFirst' },
+];
 
 function formatLastScan(lastScanAt: string | null | undefined): string {
   if (!lastScanAt) return 'Never';
   return new Date(lastScanAt).toLocaleString();
 }
 
-function statusChipClass(status: string): string {
-  if (status === 'healthy') {
-    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200';
+/**
+ * Compose the "Xm Ys" value used in the Avg/Slowest scan KPI cards. The unit
+ * suffix ("m"/"s") renders smaller and tinted via `suffixToneClass` so the
+ * card matches the mockup typography (numeral dominant, unit accent).
+ * Returns `fallback` when no duration data is available.
+ */
+function formatScanDuration(
+  ms: number | null | undefined,
+  fallback: string,
+  suffixToneClass = 'text-gray-400 dark:text-gray-500',
+): React.ReactNode {
+  if (ms == null || !Number.isFinite(ms)) return fallback;
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const suffix = `text-lg font-semibold ${suffixToneClass} ml-0.5`;
+  if (minutes === 0) {
+    return (
+      <>
+        {seconds}
+        <span className={suffix}>s</span>
+      </>
+    );
   }
-  if (status === 'warnings') {
-    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-200';
-  }
-  if (status === 'error') {
-    return 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200';
-  }
-  if (status === 'scan_in_progress') {
-    return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-200';
-  }
-  if (status === 'archived') {
-    return 'bg-slate-200 text-slate-700 dark:bg-slate-700/70 dark:text-slate-200';
-  }
-  return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+  return (
+    <>
+      {minutes}
+      <span className={suffix}>m</span> {seconds}
+      <span className={suffix}>s</span>
+    </>
+  );
+}
+
+const PROVIDER_BAR_TONE: Record<string, string> = {
+  github: 'bg-gray-700 dark:bg-gray-300',
+  gitlab: 'bg-orange-500',
+  bitbucket: 'bg-sky-500',
+};
+
+function providerBarToneClass(provider: string): string {
+  return PROVIDER_BAR_TONE[provider] ?? 'bg-indigo-500';
 }
 
 const RepositoriesPage = () => {
@@ -100,31 +142,30 @@ const RepositoriesPage = () => {
   const copy = getRepositoriesI18nBundle('en');
 
   const [repositories, setRepositories] = useState<RegisteredRepository[]>([]);
+  const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
   const [search, setSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [sortField, setSortField] = useState<RepositorySortField>('lastScan');
   const [sortDirection, setSortDirection] = useState<RepositorySortDirection>('desc');
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardStep, setWizardStep] = useState(0);
-  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState<LinkedAccount | null>(null);
-  const [githubRepos, setGithubRepos] = useState<RepoSummary[]>([]);
-  const [repoSearch, setRepoSearch] = useState('');
-  const [selectedRepo, setSelectedRepo] = useState<RepoSummary | null>(null);
-  const [branches, setBranches] = useState<string[]>([]);
-  const [selectedBranches, setSelectedBranches] = useState<BranchItem[]>([]);
-  const [customBranchPattern, setCustomBranchPattern] = useState('');
-  const [manifest, setManifest] = useState('');
-  const [isWizardBusy, setIsWizardBusy] = useState(false);
-  const [wizardBusyMessage, setWizardBusyMessage] = useState('');
 
-  const loadRepositories = useCallback(async () => {
-    setIsLoading(true);
+  useEffect(() => {
+    setFavorites(loadRepositoryFavorites());
+  }, []);
+
+  const loadRepositories = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
+    if (mode === 'refresh') {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     try {
       const response = await fetch('/api/repositories');
       const data = await response.json();
@@ -137,101 +178,25 @@ const RepositoriesPage = () => {
       setErrorMessage(message);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadRepositories();
+    void loadRepositories('initial');
   }, [loadRepositories]);
 
-  const openWizard = async () => {
-    setWizardOpen(true);
-    setWizardStep(0);
-    setSelectedAccount(null);
-    setSelectedRepo(null);
-    setGithubRepos([]);
-    setBranches([]);
-    setSelectedBranches([]);
-    setCustomBranchPattern('');
-    setManifest('');
-    setRepoSearch('');
-    setErrorMessage('');
-    try {
-      const response = await fetch('/api/linked-accounts');
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to load linked accounts');
-      }
-      setLinkedAccounts((data.accounts || []).filter((account: LinkedAccount) => account.provider === 'github'));
-    } catch {
-      setLinkedAccounts([]);
-    }
-  };
+  const handleRepositoryRegistered = useCallback(
+    (repository: RegisteredRepositoryResult) => {
+      setRepositories((prev) => [repository, ...prev]);
+      router.push(`/ade/dashboard/repositories/${repository.id}`);
+    },
+    [router],
+  );
 
-  const loadReposForAccount = async (account: LinkedAccount) => {
-    setSelectedAccount(account);
-    setSelectedRepo(null);
-    setBranches([]);
-    setSelectedBranches([]);
-    setCustomBranchPattern('');
-    setIsWizardBusy(true);
-    setWizardBusyMessage(copy.refreshingRepositoriesMessage);
-    try {
-      const response = await fetch(`/api/sso/github/repos?accountId=${encodeURIComponent(account.id)}`);
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to load repositories');
-      }
-      setGithubRepos(data.repositories || []);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load repositories';
-      setErrorMessage(message);
-    } finally {
-      setIsWizardBusy(false);
-      setWizardBusyMessage('');
-    }
-  };
-
-  const loadBranchesForRepo = async (repo: RepoSummary): Promise<boolean> => {
-    if (!selectedAccount) return false;
-    setIsWizardBusy(true);
-    setWizardBusyMessage(copy.refreshingRepositoryDataMessage);
-    try {
-      const response = await fetch(
-        `/api/sso/github/branches?accountId=${encodeURIComponent(selectedAccount.id)}&repo=${encodeURIComponent(repo.full_name)}`
-      );
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to load branches');
-      }
-      const availableBranches = Array.isArray(data.branches) ? data.branches : [];
-      const defaultBranchName =
-        (typeof data.defaultBranch === 'string' && data.defaultBranch) || repo.default_branch || null;
-      const defaultBranch =
-        defaultBranchName && availableBranches.includes(defaultBranchName)
-          ? [{ branch: defaultBranchName, subpathGlob: '**/*' }]
-          : [];
-      setBranches(availableBranches);
-      setSelectedBranches(defaultBranch);
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load branches';
-      setErrorMessage(message);
-      return false;
-    } finally {
-      setIsWizardBusy(false);
-      setWizardBusyMessage('');
-    }
-  };
-
-  const filteredSourceRepos = useMemo(() => {
-    const q = repoSearch.trim().toLowerCase();
-    if (!q) return githubRepos;
-    return githubRepos.filter(
-      (repo) =>
-        repo.name.toLowerCase().includes(q) || (repo.description || '').toLowerCase().includes(q)
-    );
-  }, [githubRepos, repoSearch]);
+  const handleNavigateToLinkedAccounts = useCallback(() => {
+    router.push('/ade/dashboard/linked-accounts');
+  }, [router]);
 
   const providerOptions = useMemo(() => {
     return Array.from(new Set(repositories.map((repo) => repo.provider))).sort((a, b) => a.localeCompare(b));
@@ -251,7 +216,8 @@ const RepositoriesPage = () => {
         repo.owner.toLowerCase().includes(q);
       const matchesProvider = providerFilter === 'all' || repo.provider === providerFilter;
       const matchesStatus = statusFilter === 'all' || repo.status === statusFilter;
-      return matchesSearch && matchesProvider && matchesStatus;
+      const matchesFavorite = !favoritesOnly || favorites.has(repo.id);
+      return matchesSearch && matchesProvider && matchesStatus && matchesFavorite;
     });
 
     const sorted = [...filtered].sort((left, right) => {
@@ -259,7 +225,12 @@ const RepositoriesPage = () => {
         return left.fullName.localeCompare(right.fullName);
       }
       if (sortField === 'status') {
-        return formatRepositoryStatus(left.status).localeCompare(formatRepositoryStatus(right.status));
+        return formatRepositoryStatusLabel(left.status).localeCompare(formatRepositoryStatusLabel(right.status));
+      }
+      if (sortField === 'favorite') {
+        const leftFav = favorites.has(left.id) ? 1 : 0;
+        const rightFav = favorites.has(right.id) ? 1 : 0;
+        return leftFav - rightFav;
       }
       const leftStamp = left.lastScanAt ? Date.parse(left.lastScanAt) : 0;
       const rightStamp = right.lastScanAt ? Date.parse(right.lastScanAt) : 0;
@@ -267,7 +238,129 @@ const RepositoriesPage = () => {
     });
 
     return sortDirection === 'asc' ? sorted : sorted.reverse();
-  }, [repositories, providerFilter, search, sortDirection, sortField, statusFilter]);
+  }, [
+    repositories,
+    providerFilter,
+    search,
+    sortDirection,
+    sortField,
+    statusFilter,
+    favoritesOnly,
+    favorites,
+  ]);
+
+  const kpis = useMemo(() => {
+    const tracked = repositories.length;
+    const healthy = repositories.filter((repo) => repo.status === 'healthy').length;
+    const scanning = repositories.filter((repo) => repo.status === 'scan_in_progress').length;
+    const warnings = repositories.filter(
+      (repo) => repo.status === 'warnings' || repo.status === 'error' || repo.status === 'failed'
+    ).length;
+
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const dayThreshold = now - dayMs;
+    const scanned24h = repositories.filter(
+      (repo) => repo.lastScanAt && Date.parse(repo.lastScanAt) >= dayThreshold
+    ).length;
+    const stale = repositories.filter(
+      (repo) => !repo.lastScanAt || Date.parse(repo.lastScanAt) < dayThreshold
+    ).length;
+    const healthyPct = tracked === 0 ? 0 : Math.round((healthy / tracked) * 100);
+
+    /**
+     * 7-day daily scan-activity series, derived from each repo's most recent
+     * scan timestamp. This is the only sparkline we can ship honestly today —
+     * the other cards lack the historical signal needed for a real trend.
+     */
+    const scannedSeries = Array.from({ length: 7 }, (_, idx) => {
+      const bucketEnd = now - (6 - idx) * dayMs;
+      const bucketStart = bucketEnd - dayMs;
+      return repositories.filter((repo) => {
+        if (!repo.lastScanAt) return false;
+        const ts = Date.parse(repo.lastScanAt);
+        return ts >= bucketStart && ts < bucketEnd;
+      }).length;
+    });
+
+    /**
+     * Average and slowest "last scan" durations. We pull from each repo's
+     * most recent scan so the dashboard reflects current pipeline health
+     * without an extra aggregate API call. Repos that have never been scanned
+     * (or where the backend hasn't surfaced timing data yet) are skipped.
+     */
+    const sevenDayThreshold = now - 7 * dayMs;
+    const recentTimedScans = repositories.filter(
+      (repo) =>
+        repo.lastScanDurationMs != null &&
+        repo.lastScanAt &&
+        Date.parse(repo.lastScanAt) >= sevenDayThreshold,
+    );
+    const avgScanMs =
+      recentTimedScans.length === 0
+        ? null
+        : Math.round(
+            recentTimedScans.reduce(
+              (sum, repo) => sum + (repo.lastScanDurationMs ?? 0),
+              0,
+            ) / recentTimedScans.length,
+          );
+
+    let slowestScan: RegisteredRepository | null = null;
+    for (const repo of repositories) {
+      if (repo.lastScanDurationMs == null) continue;
+      if (
+        slowestScan === null ||
+        (repo.lastScanDurationMs ?? 0) > (slowestScan.lastScanDurationMs ?? 0)
+      ) {
+        slowestScan = repo;
+      }
+    }
+
+    return {
+      tracked,
+      healthy,
+      scanning,
+      warnings,
+      scanned24h,
+      stale,
+      healthyPct,
+      scannedSeries,
+      avgScanMs,
+      slowestScan,
+    };
+  }, [repositories]);
+
+  const providerMix = useMemo(() => {
+    if (repositories.length === 0) return [] as Array<{ provider: string; count: number; percent: number }>;
+    const counts = new Map<string, number>();
+    for (const repo of repositories) {
+      counts.set(repo.provider, (counts.get(repo.provider) ?? 0) + 1);
+    }
+    const total = repositories.length;
+    return Array.from(counts.entries())
+      .map(([provider, count]) => ({ provider, count, percent: Math.round((count / total) * 100) }))
+      .sort((a, b) => b.count - a.count);
+  }, [repositories]);
+
+  const headerEyebrow = useMemo(() => {
+    if (isLoading) return copy.loadingRepositories;
+    const parts = [
+      `${kpis.tracked} ${copy.kpiTrackedSubtitle}`,
+      `${favorites.size} ${copy.favoritesOnlyButton.toLowerCase()}`,
+      `${kpis.healthy} ${copy.kpiHealthyLabel.toLowerCase()}`,
+    ];
+    return parts.join(' · ');
+  }, [
+    copy.favoritesOnlyButton,
+    copy.kpiHealthyLabel,
+    copy.kpiTrackedSubtitle,
+    copy.loadingRepositories,
+    favorites.size,
+    isLoading,
+    kpis.healthy,
+    kpis.tracked,
+  ]);
 
   const handleSort = (field: RepositorySortField) => {
     if (sortField !== field) {
@@ -276,6 +369,25 @@ const RepositoriesPage = () => {
       return;
     }
     setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+  };
+
+  const handleSortMenuChange = (value: string) => {
+    const match = SORT_OPTIONS.find((option) => option.value === value);
+    if (!match) return;
+    setSortField(match.field);
+    setSortDirection(match.direction);
+  };
+
+  const currentSortValue = useMemo(() => {
+    const match = SORT_OPTIONS.find(
+      (option) => option.field === sortField && option.direction === sortDirection
+    );
+    return match?.value ?? 'lastScan-desc';
+  }, [sortField, sortDirection]);
+
+  const handleToggleFavorite = (repositoryId: string) => {
+    const next = toggleRepositoryFavorite(repositoryId);
+    setFavorites(new Set(next));
   };
 
   const triggerScanNow = async (repository: RegisteredRepository) => {
@@ -292,7 +404,7 @@ const RepositoriesPage = () => {
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to queue repository scan');
       }
-      await loadRepositories();
+      await loadRepositories('refresh');
       setSuccessMessage(copy.scanQueuedMessage);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to queue repository scan';
@@ -311,7 +423,7 @@ const RepositoriesPage = () => {
       if (!response.ok || !data.success) {
         throw new Error(data.error || `Failed to ${isArchived ? 'resume' : 'pause'} repository`);
       }
-      await loadRepositories();
+      await loadRepositories('refresh');
       setSuccessMessage(isArchived ? copy.resumedMessage : copy.pausedMessage);
     } catch (error) {
       const message = error instanceof Error ? error.message : `Failed to ${isArchived ? 'resume' : 'pause'} repository`;
@@ -319,138 +431,79 @@ const RepositoriesPage = () => {
     }
   };
 
-  const toggleBranch = (branchName: string) => {
-    setSelectedBranches((prev) => {
-      const exists = prev.some((entry) => entry.branch === branchName);
-      if (exists) {
-        return prev.filter((entry) => entry.branch !== branchName);
-      }
-      return [...prev, { branch: branchName, subpathGlob: '**/*' }];
-    });
-  };
+  const hasNoResults = !isLoading && filteredAndSortedRepos.length === 0;
+  const hasAnyRepositories = repositories.length > 0;
 
-  const updateSubpath = (branchName: string, value: string) => {
-    setSelectedBranches((prev) =>
-      prev.map((entry) =>
-        entry.branch === branchName
-          ? { ...entry, subpathGlob: value }
-          : entry
-      )
+  const renderSortHeader = (field: RepositorySortField, label: string, ariaLabel: string) => {
+    const isActive = sortField === field;
+    const ariaSort: 'ascending' | 'descending' | 'none' = isActive
+      ? sortDirection === 'asc'
+        ? 'ascending'
+        : 'descending'
+      : 'none';
+    return (
+      <th
+        scope="col"
+        aria-sort={ariaSort}
+        className="text-left px-3 py-2 font-semibold text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400"
+      >
+        <button
+          type="button"
+          onClick={() => handleSort(field)}
+          aria-label={ariaLabel}
+          className={`inline-flex items-center gap-1 ${
+            isActive
+              ? 'text-indigo-600 dark:text-indigo-400'
+              : 'hover:text-gray-700 dark:hover:text-gray-200'
+          }`}
+        >
+          {label}
+          {isActive ? (
+            sortDirection === 'asc' ? (
+              <ArrowUp className="w-3 h-3" />
+            ) : (
+              <ArrowDown className="w-3 h-3" />
+            )
+          ) : (
+            <ChevronsUpDown className="w-3 h-3 opacity-40" />
+          )}
+        </button>
+      </th>
     );
   };
-
-  const updatePollInterval = (branchName: string, value: string) => {
-    const next = Number.parseInt(value, 10);
-    setSelectedBranches((prev) =>
-      prev.map((entry) =>
-        entry.branch === branchName
-          ? { ...entry, pollIntervalSec: Number.isFinite(next) ? next : undefined }
-          : entry
-      )
-    );
-  };
-
-  const addCustomBranch = () => {
-    const branchPattern = customBranchPattern.trim();
-    if (!branchPattern) return;
-    setSelectedBranches((prev) => {
-      if (prev.some((entry) => entry.branch === branchPattern)) {
-        return prev;
-      }
-      return [...prev, { branch: branchPattern, subpathGlob: '**/*' }];
-    });
-    setCustomBranchPattern('');
-  };
-
-  const goNext = async () => {
-    if (wizardStep === 0 && !selectedAccount) {
-      setErrorMessage(copy.accountRequired);
-      return;
-    }
-    if (wizardStep === 1 && !selectedRepo) {
-      setErrorMessage(copy.repoRequired);
-      return;
-    }
-    if (wizardStep === 1 && selectedRepo) {
-      const loaded = await loadBranchesForRepo(selectedRepo);
-      if (!loaded) {
-        return;
-      }
-    }
-    if (wizardStep === 2 && selectedBranches.length === 0) {
-      setErrorMessage(copy.branchesRequired);
-      return;
-    }
-    setErrorMessage('');
-    setWizardStep((step) => Math.min(step + 1, 3));
-  };
-
-  const submitRegistration = async () => {
-    if (!selectedAccount || !selectedRepo || selectedBranches.length === 0) return;
-    setIsWizardBusy(true);
-    setErrorMessage('');
-    try {
-      const [owner, name] = selectedRepo.full_name.split('/');
-      const response = await fetch('/api/repositories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          linkedAccountId: selectedAccount.id,
-          provider: 'github',
-          owner,
-          name,
-          branches: selectedBranches.map((branch) => ({
-            branch: branch.branch.trim(),
-            subpathGlob: branch.subpathGlob.trim() || undefined,
-            pollIntervalSec: branch.pollIntervalSec,
-          })),
-          manifest: manifest.trim() ? manifest : undefined,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to register repository');
-      }
-      const normalizedRepository = {
-        ...data.repository,
-        branches: Array.isArray(data.repository?.branches)
-          ? data.repository.branches
-              .map((branch: string | { name?: string; branch?: string }) =>
-                typeof branch === 'string' ? branch : branch?.name ?? branch?.branch,
-              )
-              .filter((branchName: unknown): branchName is string => typeof branchName === 'string')
-          : [],
-      };
-      setWizardOpen(false);
-      setSuccessMessage(copy.successMessage);
-      setRepositories((prev) => [normalizedRepository, ...prev]);
-      router.push(`/ade/dashboard/repositories/${data.repository.id}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to register repository';
-      setErrorMessage(message);
-    } finally {
-      setIsWizardBusy(false);
-    }
-  };
-
-  const showNoLinkedAccountsPrompt = wizardStep === 0 && linkedAccounts.length === 0;
-  const selectedCustomBranches = selectedBranches.filter(
-    (entry) => !branches.includes(entry.branch)
-  );
 
   return (
     <>
-      <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+      <header className={repositoryHeaderShellClass}>
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <GitBranchPlus className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                {copy.pageTitle}
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{copy.pageSubtitle}</p>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <span className={repositoryHeaderIconTileClass} aria-hidden="true">
+                <GitBranchPlus className="w-5 h-5" />
+              </span>
+              <div>
+                <h2 className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">
+                  {copy.pageTitle}
+                </h2>
+                <p className={repositoryHeaderEyebrowClass}>{headerEyebrow}</p>
+              </div>
             </div>
-            <Button onClick={() => void openWizard()}>{copy.addRepositoryButton}</Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void loadRepositories('refresh')}
+                disabled={isRefreshing || isLoading}
+                aria-label="Refresh repositories"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? copy.refreshingButton : 'Refresh'}
+              </Button>
+              <Button onClick={() => setWizardOpen(true)} size="sm">
+                <Plus className="w-4 h-4" />
+                {copy.addRepositoryButton}
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -468,392 +521,376 @@ const RepositoriesPage = () => {
             </Alert>
           )}
 
-          <section className={`${dashboardPanelClass} p-4`}>
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={copy.searchPlaceholder}
-                  className="pl-8"
-                />
-              </div>
-              <select
-                className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                value={providerFilter}
-                onChange={(event) => setProviderFilter(event.target.value)}
-                aria-label={copy.tableProvider}
-              >
-                <option value="all">{copy.providerAll}</option>
-                {providerOptions.map((provider) => (
-                  <option key={provider} value={provider}>
-                    {provider}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                aria-label={copy.tableStatus}
-              >
-                <option value="all">{copy.statusAll}</option>
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {formatRepositoryStatus(status)}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <section
+            aria-label="Repository KPIs"
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+          >
+            <RepositoryKpiCard
+              label={copy.kpiTrackedLabel}
+              value={kpis.tracked}
+              subtitle={`${kpis.tracked} ${copy.kpiTrackedSubtitle}`}
+              tone="indigo"
+              icon={<GitBranchPlus className="w-4 h-4" />}
+            />
+            <RepositoryKpiCard
+              label={copy.kpiHealthyLabel}
+              value={kpis.healthy}
+              subtitle={copy.kpiHealthySubtitleFormat.replace('{pct}', String(kpis.healthyPct))}
+              tone="emerald"
+              icon={<CheckCircle2 className="w-4 h-4" />}
+            />
+            <RepositoryKpiCard
+              label={copy.kpiAttentionLabel}
+              value={kpis.warnings + kpis.scanning}
+              subtitle={copy.kpiAttentionSubtitleFormat
+                .replace('{warnings}', String(kpis.warnings))
+                .replace('{scanning}', String(kpis.scanning))}
+              subtitleTone={kpis.warnings + kpis.scanning > 0 ? 'warning' : 'default'}
+              tone="amber"
+              icon={<AlertTriangle className="w-4 h-4" />}
+            />
+            <RepositoryKpiCard
+              label={copy.kpiScannedLabel}
+              value={kpis.scanned24h}
+              subtitle={copy.kpiScannedSubtitleFormat.replace('{stale}', String(kpis.stale))}
+              tone="sky"
+              icon={<Activity className="w-4 h-4" />}
+              sparkline={kpis.scannedSeries}
+            />
+            <RepositoryKpiCard
+              label={copy.kpiAvgScanLabel}
+              value={formatScanDuration(kpis.avgScanMs, copy.scanDurationFallback)}
+              subtitle={kpis.avgScanMs == null ? copy.kpiAvgScanNoData : copy.kpiAvgScanSubtitle}
+              tone="violet"
+              icon={<Timer className="w-4 h-4" />}
+            />
+            <RepositoryKpiCard
+              label={copy.kpiSlowestLabel}
+              value={formatScanDuration(
+                kpis.slowestScan?.lastScanDurationMs ?? null,
+                copy.scanDurationFallback,
+                'text-rose-300',
+              )}
+              subtitle={
+                kpis.slowestScan
+                  ? `${kpis.slowestScan.fullName}${
+                      kpis.slowestScan.lastScanBranch ? ` · ${kpis.slowestScan.lastScanBranch}` : ''
+                    }`
+                  : copy.kpiSlowestNoData
+              }
+              tone="rose"
+              icon={<Hourglass className="w-4 h-4" />}
+            />
           </section>
 
-          <section>
-            {!isLoading && filteredAndSortedRepos.length === 0 ? (
-              <EmptyState
-                icon={<GitBranchPlus className="h-10 w-10" />}
-                title={copy.emptyTitle}
-                description={copy.emptyDescription}
-                action={<Button onClick={() => void openWizard()}>{copy.emptyAction}</Button>}
-              />
-            ) : (
-              <div className={dashboardTableWrapClass}>
-                <table className="min-w-full">
-                  <thead className={dashboardTableTheadClass}>
-                    <tr>
-                      <th
-                        className={dashboardThClass}
-                        aria-sort={sortField === 'name' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                      >
-                        <button type="button" onClick={() => handleSort('name')} className="inline-flex items-center gap-1">
-                          {copy.tableRepo}
-                          {sortField === 'name' ? (sortDirection === 'asc' ? '↑' : '↓') : null}
-                          <span className="sr-only">
-                            {sortField === 'name'
-                              ? `, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}`
-                              : ', not sorted'}
-                          </span>
-                        </button>
-                      </th>
-                      <th className={dashboardThClass}>{copy.tableProvider}</th>
-                      <th className={dashboardThClass}>{copy.tableBranches}</th>
-                      <th
-                        className={dashboardThClass}
-                        aria-sort={sortField === 'status' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                      >
-                        <button type="button" onClick={() => handleSort('status')} className="inline-flex items-center gap-1">
-                          {copy.tableStatus}
-                          {sortField === 'status' ? (sortDirection === 'asc' ? '↑' : '↓') : null}
-                          <span className="sr-only">
-                            {sortField === 'status'
-                              ? `, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}`
-                              : ', not sorted'}
-                          </span>
-                        </button>
-                      </th>
-                      <th
-                        className={dashboardThClass}
-                        aria-sort={sortField === 'lastScan' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                      >
-                        <button type="button" onClick={() => handleSort('lastScan')} className="inline-flex items-center gap-1">
-                          {copy.tableLastScan}
-                          {sortField === 'lastScan' ? (sortDirection === 'asc' ? '↑' : '↓') : null}
-                          <span className="sr-only">
-                            {sortField === 'lastScan'
-                              ? `, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}`
-                              : ', not sorted'}
-                          </span>
-                        </button>
-                      </th>
-                      <th className={dashboardThRightClass}>{copy.tableActions}</th>
-                    </tr>
-                  </thead>
-                  <tbody className={dashboardTbodyClass}>
-                    {isLoading
-                      ? Array.from({ length: 6 }).map((_, idx) => (
-                          <tr key={`skeleton-${idx}`} className={dashboardTrHoverClass}>
-                            <td className="px-6 py-4"><Skeleton className="h-4 w-52" /></td>
-                            <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>
-                            <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
-                            <td className="px-6 py-4"><Skeleton className="h-6 w-28 rounded-full" /></td>
-                            <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
-                            <td className="px-6 py-4"><Skeleton className="h-8 w-60" /></td>
-                          </tr>
-                        ))
-                      : filteredAndSortedRepos.map((repo) => (
-                          <tr key={repo.id} className={dashboardTrHoverClass}>
-                            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
-                              {repo.fullName}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 capitalize">
-                              {repo.provider}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-                              {(repo.branches || []).join(', ')}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-                              <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${statusChipClass(repo.status)}`}>
-                                {formatRepositoryStatus(repo.status)}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-                              {formatLastScan(repo.lastScanAt)}
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center justify-end gap-2">
-                                <Button size="sm" variant="outline" onClick={() => void triggerScanNow(repo)}>
-                                  {copy.scanNowButton}
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => void togglePauseState(repo)}>
-                                  {repo.status === 'archived' ? copy.resumeButton : copy.pauseButton}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => router.push(`/ade/dashboard/repositories/${repo.id}`)}
-                                >
-                                  {copy.openDetailButton}
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                  </tbody>
-                </table>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <section
+              className={`${repositoryPanelClass} lg:col-span-2 flex flex-col`}
+              aria-label="Recent scans"
+            >
+              <div className={repositoryPanelHeaderClass}>
+                <div className="flex items-center gap-3">
+                  <History className="w-5 h-5 text-indigo-500 shrink-0" />
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {copy.tableLastScan === 'Last scan' ? 'Recent scans' : copy.tableLastScan}
+                    </h3>
+                    <p className={repositoryPanelEyebrowClass}>{copy.recentScansEyebrow}</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  <div className="relative flex-1 min-w-[12rem]">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                    <Input
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      placeholder={copy.searchPlaceholder}
+                      className="h-8 pl-7 text-xs"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    aria-pressed={favoritesOnly}
+                    onClick={() => setFavoritesOnly((prev) => !prev)}
+                    className={`h-8 px-2.5 rounded-md border text-xs inline-flex items-center gap-1.5 shrink-0 transition-colors ${
+                      favoritesOnly
+                        ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <Star
+                      className={`w-3.5 h-3.5 ${favoritesOnly || favorites.size > 0 ? 'text-amber-400 fill-amber-400' : 'text-gray-400'}`}
+                    />
+                    {copy.favoritesOnlyButton}
+                    <span className="font-mono text-[10px] text-gray-400">({favorites.size})</span>
+                  </button>
+                  <select
+                    aria-label={copy.tableProvider}
+                    value={providerFilter}
+                    onChange={(event) => setProviderFilter(event.target.value)}
+                    className="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-200 shrink-0"
+                  >
+                    <option value="all">{copy.providerAll}</option>
+                    {providerOptions.map((provider) => (
+                      <option key={provider} value={provider}>
+                        {provider}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label={copy.tableStatus}
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value)}
+                    className="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-200 shrink-0"
+                  >
+                    <option value="all">{copy.statusAll}</option>
+                    {statusOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {formatRepositoryStatusLabel(status)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label={copy.sortLabel}
+                    value={currentSortValue}
+                    onChange={(event) => handleSortMenuChange(event.target.value)}
+                    className="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-200 shrink-0"
+                  >
+                    {SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {`${copy.sortLabel}: ${copy[option.copyKey]}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            )}
-          </section>
+
+              {hasNoResults && hasAnyRepositories ? (
+                <div className="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No repositories match the current filters.
+                </div>
+              ) : hasNoResults ? (
+                <div className="px-5 py-10">
+                  <EmptyState
+                    icon={<GitBranchPlus className="h-10 w-10" />}
+                    title={copy.emptyTitle}
+                    description={copy.emptyDescription}
+                    action={<Button onClick={() => setWizardOpen(true)}>{copy.emptyAction}</Button>}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50/60 dark:bg-gray-900/40 border-y border-gray-200 dark:border-gray-700">
+                        <tr>
+                          <th
+                            scope="col"
+                            className="px-2 py-2 w-8 text-center font-semibold"
+                            aria-label="Favorite"
+                          >
+                            <Star className="inline w-3.5 h-3.5 text-gray-400" />
+                          </th>
+                          {renderSortHeader('name', copy.tableRepo, `Sort by ${copy.tableRepo.toLowerCase()}`)}
+                          <th
+                            scope="col"
+                            className="text-left px-3 py-2 font-semibold text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                          >
+                            {copy.tableProvider}
+                          </th>
+                          <th
+                            scope="col"
+                            className="text-left px-3 py-2 font-semibold text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                          >
+                            {copy.tableBranches}
+                          </th>
+                          {renderSortHeader('status', copy.tableStatus, `Sort by ${copy.tableStatus.toLowerCase()}`)}
+                          {renderSortHeader('lastScan', copy.tableLastScan, `Sort by ${copy.tableLastScan.toLowerCase()}`)}
+                          <th
+                            scope="col"
+                            className="text-right px-5 py-2 font-semibold text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                          >
+                            {copy.tableActions}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
+                        {isLoading
+                          ? Array.from({ length: 6 }).map((_, idx) => (
+                              <tr key={`skeleton-${idx}`}>
+                                <td className="px-2 py-3"><Skeleton className="h-4 w-4 mx-auto" /></td>
+                                <td className="px-5 py-3"><Skeleton className="h-4 w-52" /></td>
+                                <td className="px-3 py-3"><Skeleton className="h-4 w-16" /></td>
+                                <td className="px-3 py-3"><Skeleton className="h-4 w-24" /></td>
+                                <td className="px-3 py-3"><Skeleton className="h-5 w-20 rounded" /></td>
+                                <td className="px-3 py-3"><Skeleton className="h-4 w-28" /></td>
+                                <td className="px-5 py-3"><Skeleton className="h-7 w-32 ml-auto" /></td>
+                              </tr>
+                            ))
+                          : filteredAndSortedRepos.map((repo) => {
+                              const isFavorite = favorites.has(repo.id);
+                              const isScanning = repo.status === 'scan_in_progress';
+                              const isArchived = repo.status === 'archived';
+                              const branchList = (repo.branches || []).join(', ');
+                              return (
+                                <tr
+                                  key={repo.id}
+                                  className="hover:bg-gray-50/60 dark:hover:bg-gray-900/30"
+                                >
+                                  <td className="px-2 py-3 w-8 text-center">
+                                    <button
+                                      type="button"
+                                      aria-label={isFavorite ? copy.unfavoriteAriaLabel : copy.favoriteAriaLabel}
+                                      aria-pressed={isFavorite}
+                                      onClick={() => handleToggleFavorite(repo.id)}
+                                      className="inline-flex p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    >
+                                      <Star
+                                        className={`w-3.5 h-3.5 ${
+                                          isFavorite
+                                            ? 'text-amber-400 fill-amber-400'
+                                            : 'text-gray-300 dark:text-gray-600 hover:text-amber-400'
+                                        }`}
+                                      />
+                                    </button>
+                                  </td>
+                                  <td className="px-5 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <GitBranch className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                      <span className="font-mono text-xs font-medium text-gray-900 dark:text-gray-100">
+                                        {repo.fullName}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400 capitalize">
+                                    {repo.provider}
+                                  </td>
+                                  <td className={`px-3 py-3 ${repositoryMonoCellClass}`}>
+                                    {branchList || '—'}
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <RepositoryStatusChip status={repo.status} />
+                                  </td>
+                                  <td className={`px-3 py-3 ${repositoryMonoCellClass}`}>
+                                    {formatLastScan(repo.lastScanAt)}
+                                  </td>
+                                  <td className="px-5 py-3">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <button
+                                        type="button"
+                                        aria-label={copy.scanNowButton}
+                                        title={copy.scanNowButton}
+                                        disabled={isScanning}
+                                        onClick={() => void triggerScanNow(repo)}
+                                        className="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                                      >
+                                        <Play className="w-3.5 h-3.5" />
+                                        <span className="sr-only">{copy.scanNowButton}</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        aria-label={isArchived ? copy.resumeButton : copy.pauseButton}
+                                        title={isArchived ? copy.resumeButton : copy.pauseButton}
+                                        onClick={() => void togglePauseState(repo)}
+                                        className="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"
+                                      >
+                                        <Pause className="w-3.5 h-3.5" />
+                                        <span className="sr-only">
+                                          {isArchived ? copy.resumeButton : copy.pauseButton}
+                                        </span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        aria-label={copy.openDetailButton}
+                                        title={copy.openDetailButton}
+                                        onClick={() =>
+                                          router.push(`/ade/dashboard/repositories/${repo.id}`)
+                                        }
+                                        className="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                        <span className="sr-only">{copy.openDetailButton}</span>
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {!isLoading ? (
+                    <div className="px-5 py-2.5 border-t border-gray-100 dark:border-gray-700/60 text-[11px] text-gray-500 font-mono flex items-center justify-between">
+                      <span>
+                        {copy.paginationFooterFormat
+                          .replace('{visible}', String(filteredAndSortedRepos.length))
+                          .replace('{total}', String(repositories.length))}
+                      </span>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </section>
+
+            <aside className={repositoryPanelClass} aria-label="Provider mix">
+              <div className={repositoryPanelHeaderClass}>
+                <div className="flex items-center gap-3">
+                  <Activity className="w-5 h-5 text-indigo-500 shrink-0" />
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {copy.tableProvider}
+                    </h3>
+                    <p className={repositoryPanelEyebrowClass}>{copy.providerMixEyebrow}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                {providerMix.length === 0 ? (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    No repositories tracked yet.
+                  </p>
+                ) : (
+                  providerMix.map((entry) => (
+                    <div key={entry.provider} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="capitalize text-gray-700 dark:text-gray-200">
+                          {entry.provider}
+                        </span>
+                        <span className="font-mono text-[11px] text-gray-500">
+                          {entry.count} · {entry.percent}%
+                        </span>
+                      </div>
+                      <div
+                        className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700/60 overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={entry.percent}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${entry.provider} share`}
+                      >
+                        <div
+                          className={`h-full ${providerBarToneClass(entry.provider)}`}
+                          style={{ width: `${entry.percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </aside>
+          </div>
         </div>
       </main>
 
-      <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
-        <DialogContent className="max-w-4xl sm:max-w-4xl max-h-[85vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>{copy.wizardTitle}</DialogTitle>
-            <DialogDescription>{copy.wizardDescription}</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2 max-h-[62vh] overflow-y-auto pr-1">
-            {isWizardBusy && wizardBusyMessage ? (
-              <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
-                {wizardBusyMessage}
-              </div>
-            ) : null}
-            {wizardStep === 0 && (
-              <div className="space-y-3">
-                {!showNoLinkedAccountsPrompt ? (
-                  <p className="text-sm font-medium">{copy.stepAccountTitle}</p>
-                ) : null}
-                {linkedAccounts.map((account) => (
-                  <button
-                    key={account.id}
-                    type="button"
-                    onClick={() => void loadReposForAccount(account)}
-                    className={`w-full rounded-lg border px-3 py-2 text-left ${
-                      selectedAccount?.id === account.id
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30'
-                        : 'border-gray-200 dark:border-gray-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <SiGithub className="h-4 w-4" />
-                      <span className="text-sm">{account.provider_username || account.provider_email}</span>
-                    </div>
-                  </button>
-                ))}
-                {linkedAccounts.length === 0 ? (
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-3">
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {copy.noLinkedAccountsQuestion}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => {
-                          setWizardOpen(false);
-                          router.push('/ade/dashboard/linked-accounts');
-                        }}
-                      >
-                        {copy.yesButton}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setWizardOpen(false)}
-                      >
-                        {copy.noButton}
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            {wizardStep === 1 && (
-              <div className="space-y-3">
-                <p className="text-sm font-medium">{copy.stepRepoTitle}</p>
-                <Input
-                  value={repoSearch}
-                  onChange={(event) => setRepoSearch(event.target.value)}
-                  placeholder={copy.searchPlaceholder}
-                />
-                <div className="max-h-64 overflow-auto space-y-2">
-                  {filteredSourceRepos.map((repo) => (
-                    <button
-                      key={repo.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedRepo(repo);
-                        setBranches([]);
-                        setSelectedBranches([]);
-                        setErrorMessage('');
-                      }}
-                      className={`w-full rounded-lg border px-3 py-2 text-left ${
-                        selectedRepo?.id === repo.id
-                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30'
-                          : 'border-gray-200 dark:border-gray-700'
-                      }`}
-                    >
-                      <div className="text-sm font-medium">{repo.full_name}</div>
-                      {repo.description ? (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{repo.description}</div>
-                      ) : null}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{copy.repoSelectionHint}</p>
-                {selectedRepo?.default_branch ? (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {copy.defaultBranchLabel}: <span className="font-medium">{selectedRepo.default_branch}</span>
-                  </p>
-                ) : null}
-              </div>
-            )}
-
-            {wizardStep === 2 && (
-              <div className="space-y-3">
-                <p className="text-sm font-medium">{copy.stepBranchesTitle}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{copy.availableBranchesLabel}</p>
-                <div className="max-h-52 overflow-auto space-y-2">
-                  {branches.map((branchName) => {
-                    const selected = selectedBranches.find((entry) => entry.branch === branchName);
-                    return (
-                      <div key={branchName} className="rounded-lg border border-gray-200 dark:border-gray-700 p-2">
-                        <label className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(selected)}
-                            onChange={() => toggleBranch(branchName)}
-                          />
-                          {branchName}
-                        </label>
-                        {selected ? (
-                          <div className="space-y-2 mt-2">
-                            <Input
-                              placeholder={copy.branchSubpathPlaceholder}
-                              value={selected.subpathGlob}
-                              onChange={(event) => updateSubpath(branchName, event.target.value)}
-                            />
-                            <Input
-                              type="number"
-                              min={15}
-                              max={86400}
-                              placeholder={copy.pollIntervalPlaceholder}
-                              value={selected.pollIntervalSec ?? ''}
-                              onChange={(event) => updatePollInterval(branchName, event.target.value)}
-                            />
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
-                  <p className="text-sm font-medium">{copy.addBranchPatternLabel}</p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={customBranchPattern}
-                      onChange={(event) => setCustomBranchPattern(event.target.value)}
-                      placeholder={copy.branchPatternPlaceholder}
-                    />
-                    <Button type="button" variant="outline" onClick={addCustomBranch}>
-                      {copy.addPatternButton}
-                    </Button>
-                  </div>
-                </div>
-                {selectedCustomBranches.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedCustomBranches.map((branch) => (
-                      <div key={branch.branch} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium">{branch.branch}</span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toggleBranch(branch.branch)}
-                          >
-                            {copy.removeButton}
-                          </Button>
-                        </div>
-                        <Input
-                          placeholder={copy.branchSubpathPlaceholder}
-                          value={branch.subpathGlob}
-                          onChange={(event) => updateSubpath(branch.branch, event.target.value)}
-                        />
-                        <Input
-                          type="number"
-                          min={15}
-                          max={86400}
-                          placeholder={copy.pollIntervalPlaceholder}
-                          value={branch.pollIntervalSec ?? ''}
-                          onChange={(event) => updatePollInterval(branch.branch, event.target.value)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            {wizardStep === 3 && (
-              <div className="space-y-3">
-                <p className="text-sm font-medium">{copy.stepManifestTitle}</p>
-                <textarea
-                  value={manifest}
-                  onChange={(event) => setManifest(event.target.value)}
-                  className="w-full min-h-40 rounded-lg border border-gray-200 dark:border-gray-700 p-3 text-sm bg-white dark:bg-gray-900"
-                  placeholder={copy.manifestPlaceholder}
-                />
-              </div>
-            )}
-          </div>
-
-          {!showNoLinkedAccountsPrompt ? (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setWizardOpen(false)} disabled={isWizardBusy}>
-                {copy.wizardCancel}
-              </Button>
-              {wizardStep > 0 ? (
-                <Button variant="outline" onClick={() => setWizardStep((step) => step - 1)} disabled={isWizardBusy}>
-                  {copy.wizardBack}
-                </Button>
-              ) : null}
-              {wizardStep < 3 ? (
-                <Button onClick={() => void goNext()} disabled={isWizardBusy}>
-                  {isWizardBusy ? copy.refreshingButton : copy.wizardNext}
-                </Button>
-              ) : (
-                <Button onClick={() => void submitRegistration()} disabled={isWizardBusy}>
-                  {copy.wizardSubmit}
-                </Button>
-              )}
-            </DialogFooter>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <RepositoryWizardDialog
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        copy={copy}
+        onError={setErrorMessage}
+        onSuccess={setSuccessMessage}
+        onRepositoryRegistered={handleRepositoryRegistered}
+        onNavigateToLinkedAccounts={handleNavigateToLinkedAccounts}
+      />
     </>
   );
 };

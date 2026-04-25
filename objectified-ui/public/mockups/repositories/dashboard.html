@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Repositories · Overview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+    .icon-fill { fill: currentColor !important; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <!-- Top bar -->
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center"><i data-lucide="git-branch-plus" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Account</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Repositories</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="../" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+
+    <!-- Sidebar (mirrors DashboardSideNav) -->
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto p-4 h-full">
+        <div class="mb-6">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Account</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="user" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Profile</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="link" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Linked Accounts</span></a></li>
+            <li><a href="dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10"><i data-lucide="git-branch-plus" class="w-5 h-5 text-indigo-500"></i><span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Repositories</span><span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span></a></li>
+          </ul>
+        </div>
+        <hr class="my-4 border-indigo-500/10" />
+        <div class="mb-6">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Administration</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="building-2" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Tenants</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="key" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">API Keys</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-4 border-indigo-500/10" />
+        <div class="mb-6">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Data Management</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="database" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Primitives</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-4 border-indigo-500/10" />
+        <div>
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Specifications</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="folders" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Projects</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="file-digit" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Versions</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="sun" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Sunset timeline</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="eye" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Published</span></a></li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main column -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- Page header -->
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div class="px-6 py-4 flex items-end justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center"><i data-lucide="git-branch-plus" class="w-5 h-5 text-white"></i></div>
+            <div>
+              <h2 class="text-2xl font-bold leading-tight">Repositories</h2>
+              <p class="text-gray-600 dark:text-gray-400 text-xs mt-1 mono">12 tracked · 2 favorites · 8 healthy · last scan 4 m ago</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="refresh-cw" class="w-4 h-4"></i> Refresh</button>
+            <button class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i> Add Repository</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-6 space-y-6">
+
+        <!-- KPI strip -->
+        <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <!-- Total tracked -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Total tracked</p><i data-lucide="git-branch-plus" class="w-4 h-4 text-indigo-400"></i></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono">12</p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,18 L11,16 L22,17 L33,12 L44,14 L55,9 L66,8 L80,6" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="6" r="1.5" fill="#6366f1"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1"><i data-lucide="trending-up" class="w-3 h-3"></i> +2 this week</p>
+          </div>
+
+          <!-- Healthy -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Healthy</p><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono text-emerald-500">8</p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,12 L11,11 L22,13 L33,9 L44,10 L55,8 L66,7 L80,6" fill="none" stroke="#10b981" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="6" r="1.5" fill="#10b981"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-1">67% of tracked repos</p>
+          </div>
+
+          <!-- Warnings / scanning -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Warnings · scanning</p><i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono text-amber-500">3</p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,18 L11,15 L22,17 L33,11 L44,14 L55,12 L66,9 L80,11" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="11" r="1.5" fill="#f59e0b"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-amber-500 mt-1">2 warnings · 1 scanning</p>
+          </div>
+
+          <!-- Last scan within 24h -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Scanned · 24 h</p><i data-lucide="activity" class="w-4 h-4 text-sky-400"></i></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono">9</p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,8 L11,12 L22,9 L33,14 L44,8 L55,10 L66,7 L80,9" fill="none" stroke="#0ea5e9" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="9" r="1.5" fill="#0ea5e9"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-1">3 stale · &gt; 24 h since last scan</p>
+          </div>
+
+          <!-- Avg scan duration -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Avg scan time</p><i data-lucide="timer" class="w-4 h-4 text-violet-400"></i></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono">1<span class="text-lg font-semibold text-gray-400 ml-0.5">m</span> 24<span class="text-lg font-semibold text-gray-400 ml-0.5">s</span></p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,9 L11,11 L22,10 L33,13 L44,12 L55,15 L66,16 L80,18" fill="none" stroke="#8b5cf6" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="18" r="1.5" fill="#8b5cf6"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1"><i data-lucide="trending-down" class="w-3 h-3"></i> −12 s vs last week</p>
+          </div>
+
+          <!-- Slowest scan -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Slowest last scan</p><i data-lucide="hourglass" class="w-4 h-4 text-rose-400"></i></div>
+            <div class="flex items-end justify-between mt-2">
+              <p class="text-3xl font-bold mono text-rose-500">3<span class="text-lg font-semibold text-rose-300 ml-0.5">m</span> 47<span class="text-lg font-semibold text-rose-300 ml-0.5">s</span></p>
+              <svg viewBox="0 0 80 24" class="w-20 h-6 flex-shrink-0">
+                <path d="M0,16 L11,14 L22,17 L33,12 L44,10 L55,8 L66,6 L80,4" fill="none" stroke="#f43f5e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="80" cy="4" r="1.5" fill="#f43f5e"/>
+              </svg>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-1 mono truncate">acme/api-platform · main</p>
+          </div>
+        </section>
+
+        <!-- Recent scans (2/3) + Provider mix (1/3) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 lg:col-span-2 overflow-hidden flex flex-col max-h-[640px]">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 shrink-0">
+              <div class="flex items-center gap-3">
+                <i data-lucide="history" class="w-5 h-5 text-indigo-500 shrink-0"></i>
+                <div>
+                  <h3 class="text-base font-semibold">Recent scans</h3>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">All tracked repositories · sortable</p>
+                </div>
+              </div>
+              <div class="mt-3 flex items-center gap-2">
+                <div class="relative flex-1 min-w-0">
+                  <i data-lucide="search" class="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"></i>
+                  <input type="text" placeholder="Search repositories..." class="h-8 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 pl-7 pr-2 text-xs" />
+                </div>
+                <button type="button" aria-pressed="false" class="h-8 px-2.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5 shrink-0">
+                  <i data-lucide="star" class="w-3.5 h-3.5 text-amber-400 icon-fill"></i> Favorites only <span class="mono text-[10px] text-gray-400">(2)</span>
+                </button>
+                <select aria-label="Provider" class="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs shrink-0">
+                  <option>All providers</option><option>github</option><option>gitlab</option><option>bitbucket</option>
+                </select>
+                <select aria-label="Status" class="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs shrink-0">
+                  <option>All statuses</option><option>Healthy</option><option>Warnings</option><option>Error</option><option>Scan in progress</option><option>Disabled</option>
+                </select>
+                <select aria-label="Sort by" class="h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs shrink-0">
+                  <option selected>Sort: Last scan ↓</option>
+                  <option>Last scan ↑ (oldest first)</option>
+                  <option>Repository A → Z</option>
+                  <option>Repository Z → A</option>
+                  <option>Status</option>
+                  <option>Favorites first</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex-1 min-h-0 overflow-y-auto">
+            <table class="w-full text-sm">
+              <thead class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 sticky top-0 z-10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.06)] dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]">
+                <tr>
+                  <th scope="col" class="px-2 py-2 w-8 text-center font-semibold" aria-label="Favorite">
+                    <i data-lucide="star" class="inline w-3.5 h-3.5 text-gray-400"></i>
+                  </th>
+                  <th scope="col" aria-sort="none" class="text-left px-5 py-2 font-semibold">
+                    <button type="button" class="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200">Repository <i data-lucide="chevrons-up-down" class="w-3 h-3 opacity-40"></i></button>
+                  </th>
+                  <th scope="col" aria-sort="none" class="text-left px-3 py-2 font-semibold">
+                    <button type="button" class="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200">Provider <i data-lucide="chevrons-up-down" class="w-3 h-3 opacity-40"></i></button>
+                  </th>
+                  <th scope="col" class="text-left px-3 py-2 font-semibold">Branches</th>
+                  <th scope="col" aria-sort="none" class="text-left px-3 py-2 font-semibold">
+                    <button type="button" class="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200">Status <i data-lucide="chevrons-up-down" class="w-3 h-3 opacity-40"></i></button>
+                  </th>
+                  <th scope="col" aria-sort="descending" class="text-left px-3 py-2 font-semibold">
+                    <button type="button" class="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400">Last scan <i data-lucide="arrow-down" class="w-3 h-3"></i></button>
+                  </th>
+                  <th scope="col" class="text-right px-5 py-2 font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-700/60">
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Unstar repository" aria-pressed="true" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-amber-400 icon-fill"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/orders</span></div><p class="text-[10px] text-gray-500 mt-0.5">Order intake &amp; webhook spec</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main, develop</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">4 m ago</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/payments</span></div><p class="text-[10px] text-gray-500 mt-0.5">Payments &amp; refunds API</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main, release/2026-q2</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Warnings</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">11 m ago</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Unstar repository" aria-pressed="true" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-amber-400 icon-fill"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/api-platform</span></div><p class="text-[10px] text-gray-500 mt-0.5">Core API repo</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Scanning</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-indigo-500"><span class="inline-flex items-center gap-1"><i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> running…</span></td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan in progress" aria-label="Scan in progress" disabled class="p-1.5 rounded border border-gray-200 dark:border-gray-700 text-indigo-500 cursor-not-allowed inline-flex items-center justify-center"><i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme-internal/billing</span></div><p class="text-[10px] text-gray-500 mt-0.5">Internal billing service</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">gitlab</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">Error</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-rose-500">38 m ago · failed</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/inventory</span></div><p class="text-[10px] text-gray-500 mt-0.5">Inventory &amp; stock movement</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main, staging</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">1 h 12 m ago</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/notifications</span></div><p class="text-[10px] text-gray-500 mt-0.5">Email + push notifications</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">3 h 41 m ago</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/legacy-soap</span></div><p class="text-[10px] text-gray-500 mt-0.5">Legacy SOAP gateway · paused</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">trunk</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200">Disabled</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">never</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" disabled class="p-1.5 rounded border border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Enable repository" aria-label="Enable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-left" class="w-3.5 h-3.5 text-gray-400"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/identity</span></div><p class="text-[10px] text-gray-500 mt-0.5">Identity, SSO &amp; tokens</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main, hardening</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">5 h 02 m ago</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme-internal/analytics</span></div><p class="text-[10px] text-gray-500 mt-0.5">Event pipeline &amp; reporting</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">gitlab</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Warnings</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">7 h 18 m ago</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/shipping</span></div><p class="text-[10px] text-gray-500 mt-0.5">Carrier integrations &amp; labels</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main, develop</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">9 h 44 m ago</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/catalog</span></div><p class="text-[10px] text-gray-500 mt-0.5">Product catalog &amp; pricing</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">bitbucket</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">14 h ago</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Unstar repository" aria-pressed="true" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-amber-400 icon-fill"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/search</span></div><p class="text-[10px] text-gray-500 mt-0.5">Search &amp; recommendations API</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main, perf/index-rewrite</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">1 d 02 h ago</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/audit-log</span></div><p class="text-[10px] text-gray-500 mt-0.5">Append-only audit + retention</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">1 d 09 h ago</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme-experiments/feature-flags</span></div><p class="text-[10px] text-gray-500 mt-0.5">Flag service · sandbox tenant</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">Error</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-rose-500">2 d ago · token expired</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+                <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-900/30">
+                  <td class="px-2 py-3 w-8 text-center"><button type="button" aria-label="Star repository" aria-pressed="false" class="inline-flex"><i data-lucide="star" class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 hover:text-amber-400"></i></button></td>
+                  <td class="px-5 py-3"><div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-gray-400"></i><span class="font-medium mono text-xs">acme/docs-portal</span></div><p class="text-[10px] text-gray-500 mt-0.5">Public docs &amp; OpenAPI portal</p></td>
+                  <td class="px-3 py-3 text-xs text-gray-500">github</td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-600 dark:text-gray-300">main</td>
+                  <td class="px-3 py-3"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Healthy</span></td>
+                  <td class="px-3 py-3 mono text-[11px] text-gray-500">2 d 06 h ago</td>
+                  <td class="px-5 py-3"><div class="flex items-center justify-end gap-1.5">
+                    <button title="Scan now" aria-label="Scan now" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                    <button title="Disable repository" aria-label="Disable repository" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="toggle-right" class="w-3.5 h-3.5 text-emerald-500"></i></button>
+                    <button title="Open detail" aria-label="Open detail" class="p-1.5 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i></button>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table>
+            </div>
+            <div class="px-5 py-2.5 border-t border-gray-100 dark:border-gray-700/60 text-[11px] text-gray-500 mono flex items-center justify-between shrink-0 bg-white dark:bg-gray-800">
+              <span>Showing 15 of 16</span>
+              <a href="#" class="text-indigo-500 hover:underline">View all repositories →</a>
+            </div>
+          </section>
+
+          <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+              <div class="flex items-center gap-3">
+                <i data-lucide="pie-chart" class="w-5 h-5 text-indigo-500"></i>
+                <div>
+                  <h3 class="text-base font-semibold">Provider mix</h3>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Where this tenant's repositories live</p>
+                </div>
+              </div>
+            </div>
+            <ul class="divide-y divide-gray-100 dark:divide-gray-700/60 text-sm">
+              <li class="px-5 py-3 space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-indigo-500"></i> github</span>
+                  <span class="mono text-xs">9 · 75 %</span>
+                </div>
+                <div class="w-full h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden"><div class="h-1 bg-indigo-500" style="width: 75%"></div></div>
+              </li>
+              <li class="px-5 py-3 space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-purple-500"></i> gitlab</span>
+                  <span class="mono text-xs">2 · 17 %</span>
+                </div>
+                <div class="w-full h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden"><div class="h-1 bg-purple-500" style="width: 17%"></div></div>
+              </li>
+              <li class="px-5 py-3 space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5 text-emerald-500"></i> bitbucket</span>
+                  <span class="mono text-xs">1 · 8 %</span>
+                </div>
+                <div class="w-full h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden"><div class="h-1 bg-emerald-500" style="width: 8%"></div></div>
+              </li>
+            </ul>
+            <div class="px-5 py-4 border-t border-gray-100 dark:border-gray-700/60 space-y-3">
+              <div>
+                <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Linked accounts</p>
+                <ul class="mt-2 space-y-1.5 text-xs">
+                  <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-5 h-5 rounded-full bg-indigo-500 text-white text-[9px] font-semibold flex items-center justify-center">@</span> octocat</span><span class="mono text-gray-500">github · 6 repos</span></li>
+                  <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-5 h-5 rounded-full bg-purple-500 text-white text-[9px] font-semibold flex items-center justify-center">@</span> acme-bot</span><span class="mono text-gray-500">github · 3 repos</span></li>
+                  <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-5 h-5 rounded-full bg-fuchsia-500 text-white text-[9px] font-semibold flex items-center justify-center">@</span> acme-platform</span><span class="mono text-gray-500">gitlab · 2 repos</span></li>
+                </ul>
+              </div>
+              <a href="#" class="text-[11px] text-indigo-500 hover:underline inline-flex items-center gap-1">Manage linked accounts <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+            </div>
+          </section>
+        </div>
+
+        <!-- Empty-state preview (shown on this mockup so we can iterate on the empty view too) -->
+        <section class="bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 overflow-hidden">
+          <div class="px-5 py-3 border-b border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/40 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="eye" class="w-4 h-4 text-gray-400"></i>
+              <p class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Empty-state preview</p>
+            </div>
+            <p class="text-[11px] text-gray-400 mono">visible only in mockup</p>
+          </div>
+          <div class="p-12 flex flex-col items-center justify-center text-center">
+            <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500/15 to-purple-500/15 flex items-center justify-center mb-4">
+              <i data-lucide="git-branch-plus" class="w-7 h-7 text-indigo-500"></i>
+            </div>
+            <h3 class="text-lg font-semibold">No repositories yet</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-md">Register a repository to start scan and sync workflows. We'll watch the branches you select and surface schema diffs as they land.</p>
+            <button class="mt-4 px-3 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i> Register your first repository</button>
+            <p class="mt-3 text-[11px] text-gray-400">No linked accounts? <a href="#" class="text-indigo-500 hover:underline">Add one first →</a></p>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'repositories-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>
