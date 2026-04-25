@@ -1687,12 +1687,13 @@ async def create_repository_scan(
     tenant_id = auth_data["tenant_id"]
     actor_id = _resolve_actor_id(auth_data)
     branch_name = request.branch.strip()
+    now = _utc_now_iso()
     if not branch_name:
         raise HTTPException(status_code=400, detail="branch is required")
 
     _audit_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
-        _find_repository_for_tenant(tenant_id, repository_id)
+        repository = _find_repository_for_tenant(tenant_id, repository_id)
         history = _REPO_SCAN_HISTORY_STORE.setdefault(repository_id, [])
         latest_for_branch = next((scan for scan in history if scan.branch == branch_name), None)
         if latest_for_branch is not None and not request.force:
@@ -1711,6 +1712,33 @@ async def create_repository_scan(
             )
         history.insert(0, scan)
         _REPO_SCAN_FILE_HISTORY_STORE[scan.id] = []
+        timeline = _REPO_SCAN_STORE.setdefault(repository_id, repository.timeline)
+        if scan.status == "pending":
+            repository.status = "scan_in_progress"
+            timeline.insert(
+                0,
+                RepositoryScanTimelineEntry(
+                    id=str(uuid4()),
+                    type="scan",
+                    status="in_progress",
+                    message="Scan in progress...",
+                    createdAt=now,
+                ),
+            )
+        elif scan.status == "skipped_unchanged" and repository.status not in {"archived", "paused"}:
+            repository.status = "healthy"
+            timeline.insert(
+                0,
+                RepositoryScanTimelineEntry(
+                    id=str(uuid4()),
+                    type="scan",
+                    status="completed",
+                    message="Scan skipped (unchanged).",
+                    createdAt=now,
+                ),
+            )
+        repository.timeline = list(timeline)
+        repository.updatedAt = now
         _audit_row = _append_audit_row(
             tenant_id,
             repository_id,

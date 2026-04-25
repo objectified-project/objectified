@@ -383,24 +383,32 @@ def test_post_scans_support_force_and_skipped_unchanged_with_single_audit_entry(
             f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans",
             json={"branch": "main", "force": False},
         )
+        skipped_repository_response = client.get(f"/v1/repositories/{_TENANT_SLUG}/{repository_id}")
         forced_response = client.post(
             f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans",
             json={"branch": "main", "force": True},
         )
+        forced_repository_response = client.get(f"/v1/repositories/{_TENANT_SLUG}/{repository_id}")
     finally:
         app.dependency_overrides.pop(validate_authentication, None)
 
     assert skipped_response.status_code == 200
+    assert skipped_repository_response.status_code == 200
     skipped_scan = skipped_response.json()
     assert skipped_scan["status"] == "skipped_unchanged"
     assert skipped_scan["filesSeen"] == 0
     assert len(skipped_scan["eventLog"]) == 1
     assert skipped_scan["eventLog"][0]["type"] == "repository.scan.skipped_unchanged"
+    assert skipped_repository_response.json()["status"] == "healthy"
+    assert skipped_repository_response.json()["timeline"][0]["status"] == "completed"
 
     assert forced_response.status_code == 200
+    assert forced_repository_response.status_code == 200
     forced_scan = forced_response.json()
     assert forced_scan["status"] == "pending"
     assert forced_scan["eventLog"][0]["force"] is True
+    assert forced_repository_response.json()["status"] == "scan_in_progress"
+    assert forced_repository_response.json()["timeline"][0]["status"] == "in_progress"
 
 
 def test_list_scans_and_files_support_cursor_pagination_and_filters():
