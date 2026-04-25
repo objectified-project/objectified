@@ -111,34 +111,48 @@ async function pauseRepositoriesForRevokedCredential(
       status = 'paused',
       updated_at = $2::timestamptz
     WHERE id = ANY($1::uuid[])
-      AND status <> 'paused'
+      AND status = 'active'
     RETURNING id, tenant_id, project_id`,
     [repositoryIds, checkedAt]
   );
 
-  for (const rawRow of pausedResult.rows) {
-    const repositoryId = typeof rawRow.id === 'string' ? rawRow.id : null;
-    const tenantId = typeof rawRow.tenant_id === 'string' ? rawRow.tenant_id : null;
-    const projectId = typeof rawRow.project_id === 'string' ? rawRow.project_id : null;
-    if (!repositoryId || !tenantId) {
-      continue;
+  if (pausedResult.rows.length > 0) {
+    const auditRows = pausedResult.rows
+      .filter(
+        (rawRow) => typeof rawRow.id === 'string' && typeof rawRow.tenant_id === 'string'
+      )
+      .map((rawRow) => ({
+        repositoryId: rawRow.id as string,
+        tenantId: rawRow.tenant_id as string,
+        projectId: typeof rawRow.project_id === 'string' ? rawRow.project_id : null,
+      }));
+
+    if (auditRows.length > 0) {
+      const PARAMS_PER_AUDIT_ROW = 5;
+      const valuePlaceholders = auditRows
+        .map((_, i) => `($${i * PARAMS_PER_AUDIT_ROW + 1}, $${i * PARAMS_PER_AUDIT_ROW + 2}, NULL, $${i * PARAMS_PER_AUDIT_ROW + 3}, $${i * PARAMS_PER_AUDIT_ROW + 4}, NULL, $${i * PARAMS_PER_AUDIT_ROW + 5}::jsonb)`)
+        .join(', ');
+      const flatParams: unknown[] = [];
+      for (const row of auditRows) {
+        flatParams.push(
+          row.tenantId,
+          row.projectId,
+          'repository.auto_paused',
+          'success',
+          JSON.stringify({
+            repository_id: row.repositoryId,
+            linked_account_id: linkedAccountId,
+            reason: 'credential_revoked',
+          })
+        );
+      }
+      await deps.query(
+        `INSERT INTO odb.workflow_audit (
+          tenant_id, project_id, version_id, action, outcome, actor_id, detail
+        ) VALUES ${valuePlaceholders}`,
+        flatParams
+      );
     }
-    await deps.query(
-      `INSERT INTO odb.workflow_audit (
-        tenant_id, project_id, version_id, action, outcome, actor_id, detail
-      ) VALUES ($1, $2, NULL, $3, $4, NULL, $5::jsonb)`,
-      [
-        tenantId,
-        projectId,
-        'repository.auto_paused',
-        'success',
-        JSON.stringify({
-          repository_id: repositoryId,
-          linked_account_id: linkedAccountId,
-          reason: 'credential_revoked',
-        }),
-      ]
-    );
   }
 
   return pausedResult.rowCount ?? 0;

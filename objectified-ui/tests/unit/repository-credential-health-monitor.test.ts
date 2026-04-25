@@ -98,20 +98,18 @@ describe('repository credential health monitor', () => {
       },
       (sql, params) => {
         expect(sql).toContain('INSERT INTO odb.workflow_audit');
+        // Batched insert: params are laid out as 5 values per row
         expect(params[2]).toBe('repository.auto_paused');
-        const detail = JSON.parse(String(params[4]));
-        expect(detail).toMatchObject({
+        const detailC = JSON.parse(String(params[4]));
+        expect(detailC).toMatchObject({
           repository_id: 'repo-c',
           linked_account_id: 'linked-revoked',
           reason: 'credential_revoked',
         });
-        return { rowCount: 1, rows: [] };
-      },
-      (sql, params) => {
-        expect(sql).toContain('INSERT INTO odb.workflow_audit');
-        const detail = JSON.parse(String(params[4]));
-        expect(detail.repository_id).toBe('repo-d');
-        return { rowCount: 1, rows: [] };
+        expect(params[7]).toBe('repository.auto_paused');
+        const detailD = JSON.parse(String(params[9]));
+        expect(detailD.repository_id).toBe('repo-d');
+        return { rowCount: 2, rows: [] };
       },
     ]);
 

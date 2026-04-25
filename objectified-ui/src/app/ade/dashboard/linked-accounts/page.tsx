@@ -355,7 +355,7 @@ const LinkedAccounts = () => {
                               <div className="text-sm font-semibold text-gray-900 dark:text-white">{displayName}</div>
                               <div className="text-sm text-gray-500 dark:text-gray-400">{account.provider_username || account.provider_email}</div>
                               <div className={`text-xs mt-1 ${health.toneClass}`}>
-                                {`Used by ${account.repository_count} repositories \u00b7 last verified ${formatVerificationAge(account.health_checked_at)} \u00b7 ${health.label}`}
+                                {`Used by ${account.repository_count} ${account.repository_count === 1 ? 'repository' : 'repositories'} \u00b7 last verified ${formatVerificationAge(account.health_checked_at)} \u00b7 ${health.label}`}
                               </div>
                             </div>
                           </div>
