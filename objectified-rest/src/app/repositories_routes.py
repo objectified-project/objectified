@@ -20,6 +20,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from .auth import validate_authentication
+from .database import db
 from .openapi_change_report import build_change_report
 from .repositories.manifest import parse_repo_manifest, resolve_repository_file_mapping
 
@@ -107,7 +108,7 @@ class RepositoryRecord(BaseModel):
     owner: str
     name: str
     fullName: str
-    status: Literal["healthy", "warnings", "error", "scan_in_progress", "archived"] = "scan_in_progress"
+    status: Literal["healthy", "warnings", "error", "scan_in_progress", "archived", "paused"] = "scan_in_progress"
     branches: List[RepositoryBranchRecord]
     manifest: str | None = None
     createdAt: str
@@ -258,6 +259,22 @@ _REPO_IMPORT_POLICY_STORE: Dict[str, Dict[str, bool]] = {}
 _REPO_PROJECT_STORE: Dict[str, Dict[str, RepositoryResolvedProjectRecord]] = {}
 _REPO_VERSION_STORE: Dict[str, Dict[str, Dict[str, RepositoryResolvedVersionRecord]]] = {}
 _STORE_LOCK = Lock()
+_SYSTEM_ACTOR_ID = "00000000-0000-0000-0000-000000000000"
+
+RepositoryAuditEvent = Literal[
+    "repository.registered",
+    "repository.scanned",
+    "repository.sync_committed",
+    "repository.sync_pending_review",
+    "repository.sync_failed",
+    "repository.removed",
+    "repository.archived",
+    "repository.unarchived",
+    "repository.paused",
+    "repository.auto_paused",
+    "repository.token_resolved",
+    "repository.polled",
+]
 
 _DEFAULT_SCAN_PAGE_SIZE = 50
 _MAX_SCAN_PAGE_SIZE = 200
@@ -538,26 +555,71 @@ def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
     }
 
 
-def _write_audit_row(
+def _append_audit_row(
     tenant_id: str,
     repository_id: str,
-    event_type: Literal[
-        "repository.archived",
-        "repository.unarchived",
-        "repository.removed",
-        "repository.sync_committed",
-        "repository.sync_pending_review",
-    ],
-) -> None:
-    _REPO_AUDIT_STORE.append(
-        {
-            "id": str(uuid4()),
-            "tenantId": tenant_id,
-            "repositoryId": repository_id,
-            "eventType": event_type,
-            "createdAt": _utc_now_iso(),
-        }
-    )
+    event_type: RepositoryAuditEvent,
+    *,
+    actor_id: str | None,
+    detail: Dict[str, Any] | None = None,
+    outcome: Literal["success", "failure"] = "success",
+) -> Dict[str, Any]:
+    """Append an audit row to the in-memory store and return it.
+
+    This function is safe to call while holding ``_STORE_LOCK`` because it
+    performs no I/O.  Pass the returned dict to :func:`_persist_audit_row`
+    *after* releasing the lock to write the row to the database.
+    """
+    created_at = _utc_now_iso()
+    normalized_actor_id = actor_id if actor_id else _SYSTEM_ACTOR_ID
+    payload = dict(detail or {})
+    row: Dict[str, Any] = {
+        "id": str(uuid4()),
+        "tenantId": tenant_id,
+        "repositoryId": repository_id,
+        "eventType": event_type,
+        "actorId": normalized_actor_id,
+        "detail": payload,
+        "outcome": outcome,
+        "createdAt": created_at,
+    }
+    _REPO_AUDIT_STORE.append(row)
+    return row
+
+
+def _persist_audit_row(row: Dict[str, Any]) -> None:
+    """Persist a previously-built audit row to the database.
+
+    Must be called **outside** ``_STORE_LOCK`` to avoid blocking other
+    repository operations on slow DB connections.  All DB failures are
+    swallowed so that audit persistence is always best-effort.
+    """
+    try:
+        db.insert_workflow_audit(
+            tenant_id=row["tenantId"],
+            project_id=None,
+            version_id=None,
+            action=row["eventType"],
+            outcome=row["outcome"],
+            actor_id=row["actorId"],
+            detail={
+                **row["detail"],
+                "repositoryId": row["repositoryId"],
+            },
+        )
+    except Exception:
+        pass
+
+
+def _resolve_actor_id(auth_data: Dict[str, Any] | None) -> str:
+    if auth_data:
+        raw_user_id = auth_data.get("user_id")
+        if isinstance(raw_user_id, str):
+            try:
+                return str(UUID(raw_user_id))
+            except ValueError:
+                pass
+    return _SYSTEM_ACTOR_ID
 
 
 def _build_repository_source_uri(repository_id: str, path: str, branch: str, commit_sha: str) -> str:
@@ -878,9 +940,11 @@ def _dispatch_import_jobs_for_scan(
     branch: str,
     commit_sha: str,
     scan_files: List[RepositoryFileRecord],
-) -> None:
+    actor_id: str,
+) -> List[Dict[str, Any]]:
     repository_jobs = _REPO_IMPORT_JOB_STORE.setdefault(repository_id, [])
     manifest_project_slug_by_path = _manifest_project_slug_by_path(repository_id)
+    pending_audit_rows: List[Dict[str, Any]] = []
     for file_row in scan_files:
         if file_row.status not in {"new", "modified", "removed"}:
             continue
@@ -976,17 +1040,55 @@ def _dispatch_import_jobs_for_scan(
         if failure_message:
             file_row.status = "parse_error"
             file_row.discriminator = failure_message
-            _write_audit_row(tenant_id, repository_id, "repository.sync_pending_review")
+            pending_audit_rows.append(_append_audit_row(
+                tenant_id,
+                repository_id,
+                "repository.sync_failed",
+                actor_id=actor_id,
+                outcome="failure",
+                detail={
+                    "scanId": scan_id,
+                    "importJobId": import_job.id,
+                    "path": file_row.path,
+                    "operation": operation,
+                    "error": failure_message,
+                },
+            ))
         elif promote == "auto":
-            _write_audit_row(tenant_id, repository_id, "repository.sync_committed")
+            pending_audit_rows.append(_append_audit_row(
+                tenant_id,
+                repository_id,
+                "repository.sync_committed",
+                actor_id=actor_id,
+                detail={
+                    "scanId": scan_id,
+                    "importJobId": import_job.id,
+                    "path": file_row.path,
+                    "operation": operation,
+                    "promotion": promote,
+                },
+            ))
         else:
-            _write_audit_row(tenant_id, repository_id, "repository.sync_pending_review")
+            pending_audit_rows.append(_append_audit_row(
+                tenant_id,
+                repository_id,
+                "repository.sync_pending_review",
+                actor_id=actor_id,
+                detail={
+                    "scanId": scan_id,
+                    "importJobId": import_job.id,
+                    "path": file_row.path,
+                    "operation": operation,
+                    "promotion": promote,
+                },
+            ))
+    return pending_audit_rows
 
 
 def _list_poll_targets_for_tenant(tenant_id: str) -> List[Dict[str, str]]:
     poll_targets: List[Dict[str, str]] = []
     for repository in _REPO_STORE.get(tenant_id, {}).values():
-        if repository.status == "archived":
+        if repository.status in {"archived", "paused"}:
             continue
         for branch in _REPO_BRANCH_STORE.get(repository.id, repository.branches):
             poll_targets.append({"repositoryId": repository.id, "branch": branch.branch})
@@ -1008,6 +1110,7 @@ async def register_repository(
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> RegisterRepositoryResponse:
     tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
 
     _validate_uuid(request.linkedAccountId, "linkedAccountId")
     owner = request.owner.strip()
@@ -1089,6 +1192,8 @@ async def register_repository(
         createdAt=now,
     )
 
+    _audit_token_row: Dict[str, Any] | None = None
+    _audit_registered_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         tenant_repos = _REPO_STORE.setdefault(tenant_id, {})
         _REPO_BRANCH_STORE[repository.id] = list(normalized_branches)
@@ -1102,7 +1207,32 @@ async def register_repository(
             and _is_manifest_project_auto_create_enabled(auth_data),
         }
         tenant_repos[repository.id] = repository
+        _audit_token_row = _append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.token_resolved",
+            actor_id=actor_id,
+            detail={
+                "provider": repository.provider,
+                "linkedAccountId": request.linkedAccountId,
+            },
+        )
+        _audit_registered_row = _append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.registered",
+            actor_id=actor_id,
+            detail={
+                "provider": repository.provider,
+                "fullName": repository.fullName,
+                "branchCount": len(normalized_branches),
+            },
+        )
 
+    if _audit_token_row is not None:
+        _persist_audit_row(_audit_token_row)
+    if _audit_registered_row is not None:
+        _persist_audit_row(_audit_registered_row)
     return RegisterRepositoryResponse(
         repository=repository,
         initialScanJobId=initial_scan_job_id,
@@ -1200,6 +1330,8 @@ async def archive_repository(
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> RepositoryRecord:
     tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
+    _audit_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
         if repository is None:
@@ -1209,8 +1341,16 @@ async def archive_repository(
         repository.status = "archived"
         repository.archivedAt = now
         repository.updatedAt = now
-        _write_audit_row(tenant_id, repository_id, "repository.archived")
-        return repository
+        _audit_row = _append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.archived",
+            actor_id=actor_id,
+            detail={"status": repository.status},
+        )
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
+    return repository
 
 
 @router.post("/{tenant_slug}/{repository_id}/unarchive", response_model=RepositoryRecord)
@@ -1220,6 +1360,8 @@ async def unarchive_repository(
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> RepositoryRecord:
     tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
+    _audit_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
         if repository is None:
@@ -1228,8 +1370,72 @@ async def unarchive_repository(
         repository.status = "healthy"
         repository.archivedAt = None
         repository.updatedAt = _utc_now_iso()
-        _write_audit_row(tenant_id, repository_id, "repository.unarchived")
-        return repository
+        _audit_row = _append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.unarchived",
+            actor_id=actor_id,
+            detail={"status": repository.status},
+        )
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
+    return repository
+
+
+@router.post("/{tenant_slug}/{repository_id}/pause", response_model=RepositoryRecord)
+async def pause_repository(
+    tenant_slug: str,
+    repository_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositoryRecord:
+    tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
+    _audit_row: Dict[str, Any] | None = None
+    with _STORE_LOCK:
+        repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
+        if repository is None:
+            raise HTTPException(status_code=404, detail=f"Repository not found: {repository_id}")
+        now = _utc_now_iso()
+        repository.status = "paused"
+        repository.updatedAt = now
+        _audit_row = _append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.paused",
+            actor_id=actor_id,
+            detail={"status": repository.status},
+        )
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
+    return repository
+
+
+@router.post("/{tenant_slug}/{repository_id}/auto-pause", response_model=RepositoryRecord)
+async def auto_pause_repository(
+    tenant_slug: str,
+    repository_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositoryRecord:
+    tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
+    _audit_row: Dict[str, Any] | None = None
+    with _STORE_LOCK:
+        repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
+        if repository is None:
+            raise HTTPException(status_code=404, detail=f"Repository not found: {repository_id}")
+        now = _utc_now_iso()
+        repository.status = "paused"
+        repository.updatedAt = now
+        _audit_row = _append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.auto_paused",
+            actor_id=actor_id,
+            detail={"status": repository.status},
+        )
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
+    return repository
 
 
 @router.delete("/{tenant_slug}/{repository_id}", status_code=204)
@@ -1240,6 +1446,8 @@ async def delete_repository(
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> Response:
     tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
+    _audit_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         tenant_repos = _REPO_STORE.get(tenant_id, {})
         repository = tenant_repos.get(repository_id)
@@ -1256,8 +1464,16 @@ async def delete_repository(
         for scan in scan_history:
             _REPO_SCAN_FILE_HISTORY_STORE.pop(scan.id, None)
         _REPO_CREDENTIAL_REF_STORE.pop(repository_id, None)
-        _write_audit_row(tenant_id, repository_id, "repository.removed")
+        _audit_row = _append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.removed",
+            actor_id=actor_id,
+            detail={"fullName": repository.fullName},
+        )
 
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
     return Response(status_code=204)
 
 
@@ -1469,10 +1685,12 @@ async def create_repository_scan(
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> RepositoryScanRecord:
     tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
     branch_name = request.branch.strip()
     if not branch_name:
         raise HTTPException(status_code=400, detail="branch is required")
 
+    _audit_row: Dict[str, Any] | None = None
     with _STORE_LOCK:
         _find_repository_for_tenant(tenant_id, repository_id)
         history = _REPO_SCAN_HISTORY_STORE.setdefault(repository_id, [])
@@ -1493,7 +1711,21 @@ async def create_repository_scan(
             )
         history.insert(0, scan)
         _REPO_SCAN_FILE_HISTORY_STORE[scan.id] = []
-        return scan
+        _audit_row = _append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.polled",
+            actor_id=actor_id,
+            detail={
+                "trigger": scan.trigger,
+                "branch": branch_name,
+                "force": request.force,
+                "scanId": scan.id,
+            },
+        )
+    if _audit_row is not None:
+        _persist_audit_row(_audit_row)
+    return scan
 
 
 def _reset_repository_state_for_tests() -> None:
@@ -1639,13 +1871,14 @@ def _complete_repository_scan_for_tests(
             previous_files=previous_files,
         )
         tenant_id = _find_tenant_id_for_repository(repository_id)
-        _dispatch_import_jobs_for_scan(
+        pending_audit_rows = _dispatch_import_jobs_for_scan(
             tenant_id=tenant_id,
             repository_id=repository_id,
             scan_id=scan_id,
             branch=target_scan.branch,
             commit_sha=commit_sha,
             scan_files=classified_files,
+            actor_id=_SYSTEM_ACTOR_ID,
         )
         _REPO_SCAN_FILE_HISTORY_STORE[scan_id] = classified_files
 
@@ -1664,7 +1897,23 @@ def _complete_repository_scan_for_tests(
             }
         )
         history[scan_idx] = completed_scan
-        return completed_scan
+        pending_audit_rows.append(_append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.scanned",
+            actor_id=_SYSTEM_ACTOR_ID,
+            detail={
+                "scanId": completed_scan.id,
+                "branch": completed_scan.branch,
+                "trigger": completed_scan.trigger,
+                "status": completed_scan.status,
+                "diffSummary": completed_scan.diffSummary,
+            },
+        ))
+
+    for _audit_row in pending_audit_rows:
+        _persist_audit_row(_audit_row)
+    return completed_scan
 
 
 def _seed_repository_relations_for_tests(repository_id: str) -> None:

@@ -73,6 +73,10 @@ def test_register_repository_returns_scan_job_and_timeline_entry():
     assert body["repository"]["status"] == "scan_in_progress"
     assert body["repository"]["timeline"][0]["message"] == "Scan in progress..."
     assert body["repository"]["branches"] == [{"branch": "main", "subpathGlob": "specs/**", "pollIntervalSec": None}]
+    audit_rows = _get_repository_audit_rows_for_tests(body["repository"]["id"])
+    assert [row["eventType"] for row in audit_rows] == ["repository.token_resolved", "repository.registered"]
+    assert all(row["actorId"] == _MOCK_AUTH["user_id"] for row in audit_rows)
+    assert all(isinstance(row["detail"], dict) for row in audit_rows)
 
 
 def test_repository_list_and_detail_are_tenant_scoped():
@@ -247,7 +251,48 @@ def test_archive_unarchive_writes_audit_and_scheduler_skips_archived():
     assert unarchive_response.json()["archivedAt"] is None
     assert sorted(target["branch"] for target in poll_targets_after_unarchive) == ["main", "release/*"]
 
-    assert [row["eventType"] for row in audit_rows] == ["repository.archived", "repository.unarchived"]
+    assert [row["eventType"] for row in audit_rows] == [
+        "repository.token_resolved",
+        "repository.registered",
+        "repository.archived",
+        "repository.unarchived",
+    ]
+
+
+def test_pause_and_auto_pause_write_audit_and_scheduler_skips_paused():
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000018",
+                "provider": "github",
+                "owner": "acme",
+                "name": "service-paused",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        pause_response = client.post(f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/pause")
+        poll_targets_after_pause = _list_poll_targets_for_tests(_MOCK_AUTH["tenant_id"])
+        auto_pause_response = client.post(f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/auto-pause")
+        poll_targets_after_auto_pause = _list_poll_targets_for_tests(_MOCK_AUTH["tenant_id"])
+        audit_rows = _get_repository_audit_rows_for_tests(repository_id)
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert pause_response.status_code == 200
+    assert pause_response.json()["status"] == "paused"
+    assert poll_targets_after_pause == []
+    assert auto_pause_response.status_code == 200
+    assert auto_pause_response.json()["status"] == "paused"
+    assert poll_targets_after_auto_pause == []
+    assert [row["eventType"] for row in audit_rows] == [
+        "repository.token_resolved",
+        "repository.registered",
+        "repository.paused",
+        "repository.auto_paused",
+    ]
 
 
 def test_delete_repository_requires_confirmation_and_cascades():
@@ -286,7 +331,11 @@ def test_delete_repository_requires_confirmation_and_cascades():
     assert delete_response.status_code == 204
     assert all(not exists for exists in relations_exist.values())
     assert detail_response.status_code == 404
-    assert [row["eventType"] for row in audit_rows] == ["repository.removed"]
+    assert [row["eventType"] for row in audit_rows] == [
+        "repository.token_resolved",
+        "repository.registered",
+        "repository.removed",
+    ]
 
 
 def test_list_scans_returns_initial_register_scan_with_default_page_limit():
@@ -579,8 +628,10 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
 
     new_audit_rows = audit_rows[baseline_audit_count:]
     assert [row["eventType"] for row in new_audit_rows] == [
+        "repository.polled",
         "repository.sync_pending_review",
-        "repository.sync_pending_review",
+        "repository.sync_failed",
+        "repository.scanned",
     ]
 
 
@@ -981,7 +1032,12 @@ def test_auto_promotion_records_change_report_and_sync_committed_audit() -> None
     assert jobs[0].state == "committed"
     assert jobs[0].changeReportId is not None
     assert any(report.importJobId == jobs[0].id for report in change_reports)
-    assert [row["eventType"] for row in audit_rows] == ["repository.sync_committed"]
+    assert [row["eventType"] for row in audit_rows] == [
+        "repository.token_resolved",
+        "repository.registered",
+        "repository.sync_committed",
+        "repository.scanned",
+    ]
 
 
 def test_on_breaking_change_block_forces_manual_even_when_promote_is_auto() -> None:
@@ -1023,4 +1079,9 @@ def test_on_breaking_change_block_forces_manual_even_when_promote_is_auto() -> N
     assert jobs[0].state == "pending_review"
     assert jobs[0].settingsJson["onBreakingChange"] == "block"
     assert jobs[0].settingsJson["requiresExplicitApproval"] is True
-    assert [row["eventType"] for row in audit_rows] == ["repository.sync_pending_review"]
+    assert [row["eventType"] for row in audit_rows] == [
+        "repository.token_resolved",
+        "repository.registered",
+        "repository.sync_pending_review",
+        "repository.scanned",
+    ]
