@@ -40,6 +40,7 @@ git checkout -b ticket-<number>
 
 ## Phase 3 - Implementation
 
+- Use the Context7 MCP service to fetch the latest support documentation for the task to be implemented.
 - Apply **CLAUDE.md** / **copilot-instructions.md** and other workspace rules (tests, version bumps, no edits to reference-only trees, etc.).
 - Implement the behavior **as specified in the issue**.
 - If the change is **large or risky**, outline a short plan in the chat and wait for alignment before proceeding.
