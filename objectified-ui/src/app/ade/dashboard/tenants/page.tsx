@@ -517,7 +517,7 @@ const Tenants = () => {
   const selectedUnfilteredMemberCount = selectedTenant ? getMembersForTenant(selectedTenant.id, '').length : 0;
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col bg-slate-50/80 dark:bg-gray-900/20">
       <header className="shrink-0 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="px-4 sm:px-6 py-4 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
@@ -581,17 +581,17 @@ const Tenants = () => {
       </header>
 
       {tenants.length === 0 ? (
-        <main className="flex-1 min-h-0 p-6">
+        <div className="flex flex-1 min-h-0 flex-col p-6">
           <EmptyState
             icon={<Building2 className="h-10 w-10" />}
             title="No Tenants Available"
             description="You are not a member of any tenants yet"
             iconContainerClassName="from-blue-500 to-cyan-600 shadow-blue-500/30"
           />
-        </main>
+        </div>
       ) : (
-        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-          <div className="flex flex-1 min-h-0 flex-col lg:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
             <aside
               className="w-full lg:w-[min(100%,24rem)] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col min-h-0 lg:max-w-[40vw]"
               aria-label="Workspaces you belong to"
@@ -695,7 +695,7 @@ const Tenants = () => {
 
             {selectedTenant && (
               <section
-                className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto bg-gray-50/80 dark:bg-gray-900/30"
+                className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-gray-50/90 dark:bg-gray-900/40"
                 aria-label={`${selectedTenant.name} details`}
               >
                 <div className="bg-gradient-to-br from-indigo-500/10 via-transparent to-transparent border-b border-gray-200 dark:border-gray-800 px-4 sm:px-6 py-5">
@@ -1170,7 +1170,7 @@ const Tenants = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 };
 

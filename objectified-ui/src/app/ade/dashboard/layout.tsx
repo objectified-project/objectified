@@ -20,10 +20,7 @@ export default function RootLayout({
     >
       <DashboardSideNav/>
 
-      <main
-        className="bg-transparent"
-        style={{ flex: 1, overflow: "auto" }}
-      >
+      <main className="bg-transparent flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
         {children}
       </main>
     </div>
