@@ -623,12 +623,29 @@ const RepositoriesPage = () => {
                               const isScanning = repo.status === 'scan_in_progress';
                               const isArchived = repo.status === 'archived';
                               const branchList = (repo.branches || []).join(', ');
+                              const openDetail = () =>
+                                router.push(`/ade/dashboard/repositories/${repo.id}`);
                               return (
                                 <tr
                                   key={repo.id}
-                                  className="hover:bg-gray-50/60 dark:hover:bg-gray-900/30"
+                                  role="button"
+                                  tabIndex={0}
+                                  aria-label={`${copy.openDetailButton}: ${repo.fullName}`}
+                                  onClick={openDetail}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault();
+                                      openDetail();
+                                    }
+                                  }}
+                                  className="cursor-pointer hover:bg-gray-50/60 dark:hover:bg-gray-900/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
                                 >
-                                  <td className="px-2 py-3 w-8 text-center">
+                                  {/* Favorite cell intercepts clicks so toggling
+                                      a star doesn't also navigate to the detail. */}
+                                  <td
+                                    className="px-2 py-3 w-8 text-center"
+                                    onClick={(event) => event.stopPropagation()}
+                                  >
                                     <button
                                       type="button"
                                       aria-label={isFavorite ? copy.unfavoriteAriaLabel : copy.favoriteAriaLabel}
@@ -665,7 +682,10 @@ const RepositoriesPage = () => {
                                   <td className={`px-3 py-3 ${repositoryMonoCellClass}`}>
                                     {formatLastScan(repo.lastScanAt)}
                                   </td>
-                                  <td className="px-5 py-3">
+                                  {/* Actions cell intercepts clicks so the row's
+                                      navigate-on-click doesn't fire when the user
+                                      really meant to scan/pause/open. */}
+                                  <td className="px-5 py-3" onClick={(event) => event.stopPropagation()}>
                                     <div className="flex items-center justify-end gap-1.5">
                                       <button
                                         type="button"
