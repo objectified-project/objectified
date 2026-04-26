@@ -21,6 +21,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   Activity,
@@ -47,6 +48,7 @@ import {
   deriveLifecycle,
   relativeTime,
 } from './versionsTab/versionLifecycle';
+import { NewVersionDialog } from './versionsTab/NewVersionDialog';
 
 export interface VersionsTabProps {
   projectId: string;
@@ -61,6 +63,7 @@ interface SessionUserExtensions {
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export function VersionsTab({ projectId, onCountChange }: VersionsTabProps) {
+  const router = useRouter();
   const { data: session } = useSession();
   const currentUserId = (session?.user as SessionUserExtensions | undefined)?.user_id;
 
@@ -70,6 +73,7 @@ export function VersionsTab({ projectId, onCountChange }: VersionsTabProps) {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [filter, setFilter] = useState<VersionStatusFilter>('all');
   const [search, setSearch] = useState('');
+  const [newDialogOpen, setNewDialogOpen] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -144,13 +148,42 @@ export function VersionsTab({ projectId, onCountChange }: VersionsTabProps) {
     return <Alert variant="error">{error}</Alert>;
   }
 
+  /**
+   * Created handler is shared by the populated and empty paths: refetch so
+   * derived state (KPIs, kanban, table) sees the new row, select it, and
+   * deep-link to the detail page where the user computes quality + lint.
+   */
+  const handleCreated = (created: VersionRow) => {
+    setSelectedVersionId(created.id);
+    void load();
+    router.push(`/ade/dashboard/projects/${projectId}/versions/${created.id}`);
+  };
+
   if (versions.length === 0) {
     return (
-      <EmptyState
-        icon={<GitBranch className="w-8 h-8" />}
-        title="No versions yet"
-        description="Open the Studio editor to commit the first revision of this project's schema."
-      />
+      <>
+        <EmptyState
+          icon={<GitBranch className="w-8 h-8" />}
+          title="No versions yet"
+          description="Create the first revision of this project to start tracking schema changes."
+          action={
+            <button
+              type="button"
+              onClick={() => setNewDialogOpen(true)}
+              className="px-4 py-2 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-700 inline-flex items-center gap-2 shadow-sm shadow-indigo-500/25"
+            >
+              <GitBranchPlus className="w-4 h-4" aria-hidden="true" /> New version
+            </button>
+          }
+        />
+        <NewVersionDialog
+          open={newDialogOpen}
+          onOpenChange={setNewDialogOpen}
+          projectId={projectId}
+          versions={versions}
+          onCreated={handleCreated}
+        />
+      </>
     );
   }
 
@@ -165,8 +198,7 @@ export function VersionsTab({ projectId, onCountChange }: VersionsTabProps) {
           </h2>
           <p className="text-xs text-gray-500 font-mono truncate">{eyebrow}</p>
         </div>
-        {/* Action buttons are placeholders — the real wiring is on the version
-            detail page (Phase 5). Disabled here so we don't paint dead clicks. */}
+        {/* Export still pending its own server surface; New version is live. */}
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -178,9 +210,8 @@ export function VersionsTab({ projectId, onCountChange }: VersionsTabProps) {
           </button>
           <button
             type="button"
-            disabled
-            title="New-version workflow is wired in the version detail page"
-            className="px-3 py-1.5 text-sm rounded-md bg-indigo-600/50 text-white cursor-not-allowed inline-flex items-center gap-2"
+            onClick={() => setNewDialogOpen(true)}
+            className="px-3 py-1.5 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-700 inline-flex items-center gap-2 shadow-sm shadow-indigo-500/25"
           >
             <GitBranchPlus className="w-4 h-4" aria-hidden="true" /> New version
           </button>
@@ -263,6 +294,14 @@ export function VersionsTab({ projectId, onCountChange }: VersionsTabProps) {
           <VersionDetailRail projectId={projectId} version={selected} />
         </div>
       </section>
+
+      <NewVersionDialog
+        open={newDialogOpen}
+        onOpenChange={setNewDialogOpen}
+        projectId={projectId}
+        versions={versions}
+        onCreated={handleCreated}
+      />
     </div>
   );
 }
