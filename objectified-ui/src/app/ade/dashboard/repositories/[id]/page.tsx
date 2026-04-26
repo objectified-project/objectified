@@ -1744,7 +1744,13 @@ export default function RepositoryDetailPage() {
       </Dialog>
 
       {selectedFile ? (
-        <div className="fixed inset-0 z-50 bg-black/30" role="presentation" onClick={() => setSelectedFile(null)}>
+        // Anchor below the 48px platform bar so the drawer header isn't
+        // hidden behind it (dashboard layout uses `calc(100vh - 48px)`).
+        <div
+          className="fixed top-12 right-0 bottom-0 left-0 z-50 bg-black/30"
+          role="presentation"
+          onClick={() => setSelectedFile(null)}
+        >
           <aside
             ref={fileDrawerRef}
             className="absolute right-0 top-0 h-full w-full max-w-xl bg-white dark:bg-gray-900 shadow-xl overflow-auto"
