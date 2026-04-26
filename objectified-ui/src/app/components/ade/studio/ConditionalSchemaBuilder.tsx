@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
-import { GitBranch, ArrowRight, Check, X, Plus, Trash2, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
+import { GitBranch, Plus, Trash2, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 
 export interface ConditionalRule {
   id: string;
@@ -417,34 +417,157 @@ export const ConditionalSchemaBuilder: React.FC<ConditionalSchemaBuilderProps> =
     </div>
   );
 
-  const renderVisualFlow = (rule: ConditionalRule) => {
-    const hasCondition = rule.ifCondition.property && (rule.ifCondition.operator === 'required' || rule.ifCondition.value);
-    const hasThen = rule.thenSchema.requiredProperties.length > 0 || rule.thenSchema.propertyConstraints.length > 0;
-    const hasElse = rule.elseSchema && (rule.elseSchema.requiredProperties.length > 0 || rule.elseSchema.propertyConstraints.length > 0);
+  const renderRuleSummary = (rule: ConditionalRule) => {
+    const code = (text: string) => (
+      <code className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700/60 text-slate-800 dark:text-slate-100 font-mono text-[11px]">
+        {text}
+      </code>
+    );
+    const phrase = (text: string, tone: 'indigo' | 'green' | 'red' = 'indigo') => (
+      <span
+        className={
+          tone === 'green'
+            ? 'font-semibold text-green-700 dark:text-green-300'
+            : tone === 'red'
+              ? 'font-semibold text-red-700 dark:text-red-300'
+              : 'font-semibold text-indigo-700 dark:text-indigo-300'
+        }
+      >
+        {text}
+      </span>
+    );
+
+    const placeholder = <span className="italic text-slate-400 dark:text-slate-500">…</span>;
+
+    const propNode = rule.ifCondition.property ? code(rule.ifCondition.property) : placeholder;
+    const valueNode = rule.ifCondition.value ? code(rule.ifCondition.value) : placeholder;
+
+    const ifClause: React.ReactNode = (() => {
+      switch (rule.ifCondition.operator) {
+        case 'equals':
+        case 'const':
+          return <>{propNode} {phrase('is')} {valueNode}</>;
+        case 'enum':
+          return <>{propNode} {phrase('is one of')} {valueNode}</>;
+        case 'type':
+          return <>{propNode} {phrase('has type')} {valueNode}</>;
+        case 'pattern':
+          return <>{propNode} {phrase('matches')} {valueNode}</>;
+        case 'minimum':
+          return <>{propNode} {phrase('≥')} {valueNode}</>;
+        case 'maximum':
+          return <>{propNode} {phrase('≤')} {valueNode}</>;
+        case 'required':
+          return <>{propNode} {phrase('is present')}</>;
+        default:
+          return <>{propNode} {phrase(rule.ifCondition.operator)} {valueNode}</>;
+      }
+    })();
+
+    const formatConstraint = (
+      c: { property: string; constraint: string; value: string },
+      tone: 'green' | 'red',
+    ): React.ReactNode => {
+      const propEl = c.property ? code(c.property) : placeholder;
+      const valEl = c.value ? code(c.value) : placeholder;
+      switch (c.constraint) {
+        case 'minLength':
+          return <>{propEl} {phrase('length ≥', tone)} {valEl}</>;
+        case 'maxLength':
+          return <>{propEl} {phrase('length ≤', tone)} {valEl}</>;
+        case 'minimum':
+          return <>{propEl} {phrase('≥', tone)} {valEl}</>;
+        case 'maximum':
+          return <>{propEl} {phrase('≤', tone)} {valEl}</>;
+        case 'pattern':
+          return <>{propEl} {phrase('matches', tone)} {valEl}</>;
+        case 'const':
+          return <>{propEl} {phrase('is', tone)} {valEl}</>;
+        case 'enum':
+          return <>{propEl} {phrase('is one of', tone)} {valEl}</>;
+        case 'type':
+          return <>{propEl} {phrase('has type', tone)} {valEl}</>;
+        default:
+          return <>{propEl} {phrase(c.constraint, tone)} {valEl}</>;
+      }
+    };
+
+    const buildBranch = (
+      schema: ConditionalRule['thenSchema'] | undefined,
+      tone: 'green' | 'red',
+    ): React.ReactNode[] => {
+      if (!schema) return [];
+      const parts: React.ReactNode[] = [];
+      if (schema.requiredProperties.length > 0) {
+        const reqs = schema.requiredProperties.filter(Boolean);
+        if (reqs.length > 0) {
+          const list: React.ReactNode[] = [];
+          reqs.forEach((p, i) => {
+            if (i > 0) list.push(<span key={`sep-${i}`}>, </span>);
+            list.push(<React.Fragment key={`p-${i}`}>{code(p)}</React.Fragment>);
+          });
+          parts.push(
+            <span key="req">
+              {list} {phrase(reqs.length === 1 ? 'is required' : 'are required', tone)}
+            </span>,
+          );
+        }
+      }
+      schema.propertyConstraints.forEach((c, i) => {
+        parts.push(<span key={`c-${i}`}>{formatConstraint(c, tone)}</span>);
+      });
+      return parts;
+    };
+
+    const thenParts = buildBranch(rule.thenSchema, 'green');
+    const elseParts = buildBranch(rule.elseSchema, 'red');
+
+    const joinParts = (parts: React.ReactNode[]): React.ReactNode => {
+      if (parts.length === 0) return null;
+      const out: React.ReactNode[] = [];
+      parts.forEach((p, i) => {
+        if (i > 0) out.push(<span key={`and-${i}`} className="text-slate-500"> and </span>);
+        out.push(<React.Fragment key={`pp-${i}`}>{p}</React.Fragment>);
+      });
+      return out;
+    };
+
+    const isEmpty =
+      !rule.ifCondition.property &&
+      thenParts.length === 0 &&
+      elseParts.length === 0;
+
+    if (isEmpty) {
+      return (
+        <span className="text-[12px] italic text-slate-500 dark:text-slate-400">
+          New rule — fill in the condition and outcomes below.
+        </span>
+      );
+    }
 
     return (
-      <div className="flex items-center gap-2 py-2 px-4 rounded bg-slate-100 dark:bg-slate-900 mb-4 flex-wrap">
-        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${hasCondition ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}`}>
-          <GitBranch size={14} />
-          {hasCondition ? `${rule.ifCondition.property} ${rule.ifCondition.operator} ${rule.ifCondition.value || ''}` : 'No condition'}
-        </span>
-        <ArrowRight size={16} className="text-slate-500" />
-        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${hasThen ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}`}>
-          <Check size={14} />
-          {hasThen ? `Then: ${rule.thenSchema.requiredProperties.length} required` : 'No then'}
-        </span>
-        {rule.elseSchema && (
+      <span className="text-[12px] leading-relaxed text-slate-700 dark:text-slate-200">
+        <span className="text-slate-500 dark:text-slate-400">When </span>
+        {ifClause}
+        <span className="text-slate-500 dark:text-slate-400">, then </span>
+        {thenParts.length > 0 ? joinParts(thenParts) : <span className="italic text-slate-400">…no constraints</span>}
+        {elseParts.length > 0 && (
           <>
-            <span className="text-xs text-slate-500">/</span>
-            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${hasElse ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}`}>
-              <X size={14} />
-              {hasElse ? `Else: ${rule.elseSchema.requiredProperties.length} required` : 'No else'}
-            </span>
+            <span className="text-slate-500 dark:text-slate-400">. Otherwise, </span>
+            {joinParts(elseParts)}
           </>
         )}
-      </div>
+        <span className="text-slate-500 dark:text-slate-400">.</span>
+      </span>
     );
   };
+
+  const renderVisualFlow = (rule: ConditionalRule) => (
+    <div className="py-2 px-3 rounded-md bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 mb-4 flex items-start gap-2 min-w-0 flex-1">
+      <GitBranch size={14} className="text-indigo-500 mt-0.5 shrink-0" />
+      <div className="min-w-0 flex-1">{renderRuleSummary(rule)}</div>
+    </div>
+  );
 
   return (
     <div>
@@ -500,15 +623,17 @@ export const ConditionalSchemaBuilder: React.FC<ConditionalSchemaBuilderProps> =
               <button
                 type="button"
                 onClick={() => toggleExpanded(rule.id)}
-                className={`w-full flex items-center justify-between p-3 text-left ${isDark ? 'bg-slate-900' : 'bg-slate-50'} border-b border-slate-200 dark:border-slate-700`}
+                className={`w-full flex items-start justify-between gap-2 p-3 text-left ${isDark ? 'bg-slate-900' : 'bg-slate-50'} border-b border-slate-200 dark:border-slate-700`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 min-w-[60px]">
+                <div className="flex items-start gap-2 min-w-0 flex-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 shrink-0 pt-0.5">
                     Rule {index + 1}
                   </span>
-                  {!expandedRules.has(rule.id) && renderVisualFlow(rule)}
+                  {!expandedRules.has(rule.id) && (
+                    <div className="min-w-0 flex-1 pt-0.5">{renderRuleSummary(rule)}</div>
+                  )}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); deleteRule(rule.id); }}

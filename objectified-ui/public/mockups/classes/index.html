@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Designer · Edit class · Subscription</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+    /* Faux backdrop showing this is a modal dialog */
+    .backdrop-blur-page::before {
+      content: ''; position: fixed; inset: 0;
+      background: radial-gradient(circle at 30% 20%, rgba(99,102,241,0.18), transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(217,70,239,0.12), transparent 45%),
+                  rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(6px);
+      z-index: 0;
+    }
+    .dark .backdrop-blur-page::before {
+      background: radial-gradient(circle at 30% 20%, rgba(99,102,241,0.22), transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(217,70,239,0.18), transparent 45%),
+                  rgba(2, 6, 23, 0.7);
+    }
+
+    .dialog-shell {
+      box-shadow: 0 30px 80px -20px rgba(15, 23, 42, 0.35),
+                  0 16px 32px -12px rgba(15, 23, 42, 0.25);
+    }
+    .dark .dialog-shell {
+      box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7),
+                  0 16px 32px -12px rgba(0, 0, 0, 0.6);
+    }
+
+    .ring-meter {
+      transform: rotate(-90deg);
+    }
+    .ring-track { stroke: rgba(148, 163, 184, 0.25); }
+    .ring-fill  { stroke: #6366f1; stroke-linecap: round; transition: stroke-dashoffset 0.4s ease; }
+
+    .section-card {
+      transition: box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+    .section-card:hover { border-color: rgba(99, 102, 241, 0.35); }
+    .section-card.is-active {
+      border-color: rgba(99, 102, 241, 0.55);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .nav-item.is-active {
+      background: rgba(99, 102, 241, 0.1);
+      color: rgb(79, 70, 229);
+      border-color: rgba(99, 102, 241, 0.35);
+    }
+    .dark .nav-item.is-active {
+      color: rgb(165, 180, 252);
+    }
+
+    .pill {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    /* Custom radio-card */
+    .radio-card {
+      border: 1px solid rgb(229 231 235);
+      border-radius: 0.5rem;
+      padding: 0.625rem 0.75rem;
+      display: flex; align-items: flex-start; gap: 0.5rem;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .dark .radio-card { border-color: rgb(55 65 81); background: rgba(15, 23, 42, 0.5); }
+    .radio-card:hover { border-color: rgba(99, 102, 241, 0.4); background: rgba(99, 102, 241, 0.04); }
+    .radio-card.is-selected {
+      border-color: rgb(99, 102, 241);
+      background: rgba(99, 102, 241, 0.08);
+    }
+    .dark .radio-card.is-selected {
+      background: rgba(99, 102, 241, 0.18);
+    }
+
+    /* Schema preview syntax highlighting */
+    .json-key   { color: #93c5fd; }
+    .json-str   { color: #86efac; }
+    .json-num   { color: #fbbf24; }
+    .json-bool  { color: #fb7185; }
+    .json-punc  { color: #94a3b8; }
+
+    .change-dot {
+      width: 6px; height: 6px; border-radius: 9999px;
+      background: rgb(99 102 241);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+    .warn-dot { background: rgb(245 158 11); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2); }
+    .err-dot  { background: rgb(239 68 68);  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2); }
+
+    /* Sticky preview that scrolls within itself */
+    .preview-pane { max-height: calc(100vh - 18rem); }
+
+    .kbd {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 0.6875rem;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      border: 1px solid rgb(226 232 240);
+      background: rgb(248 250 252);
+      color: rgb(71 85 105);
+    }
+    .dark .kbd { border-color: rgb(51 65 85); background: rgb(30 41 59); color: rgb(203 213 225); }
+
+    /* AI sparkle accent button */
+    .ai-btn {
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(99, 102, 241, 0.12));
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      color: rgb(126, 34, 206);
+    }
+    .dark .ai-btn {
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(99, 102, 241, 0.22));
+      color: rgb(216, 180, 254);
+    }
+    .ai-btn:hover { background: linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(99, 102, 241, 0.22)); }
+
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    details[open] > summary .chev { transform: rotate(90deg); }
+    .chev { transition: transform 0.15s; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 backdrop-blur-page">
+
+  <!-- A faint app shell behind the dialog (so this reads as a modal overlay) -->
+  <div class="fixed inset-0 opacity-30 dark:opacity-15 pointer-events-none -z-10">
+    <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"></div>
+    <div class="flex h-[calc(100vh-3rem)]">
+      <div class="w-[280px] bg-white/60 dark:bg-gray-800/60 border-r border-gray-200 dark:border-gray-700"></div>
+      <div class="flex-1"></div>
+    </div>
+  </div>
+
+  <!-- Theme toggle floats above the modal -->
+  <div class="fixed top-4 right-6 z-20 flex items-center gap-2">
+    <a href="../" class="text-xs text-white/80 hover:text-white px-3 py-1.5 rounded-md bg-black/30 backdrop-blur">← Mockup hub</a>
+    <button id="themeBtn" class="w-8 h-8 rounded-md bg-black/30 backdrop-blur text-white hover:bg-black/40 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+  </div>
+
+  <!-- ────────────────────  DIALOG  ──────────────────── -->
+  <div class="relative z-10 mx-auto my-6 max-w-[1480px] px-4">
+    <div class="dialog-shell rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col" style="height: calc(100vh - 3rem);">
+
+      <!-- ────  HEADER  ───── -->
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-50/60 via-white to-fuchsia-50/40 dark:from-indigo-950/40 dark:via-gray-900 dark:to-fuchsia-950/30">
+        <div class="px-6 pt-4 pb-3 flex items-start justify-between gap-6">
+          <!-- Title block -->
+          <div class="flex items-start gap-4 min-w-0">
+            <!-- Completeness ring -->
+            <div class="relative flex-shrink-0 w-14 h-14">
+              <svg viewBox="0 0 36 36" class="w-14 h-14 ring-meter">
+                <circle class="ring-track" cx="18" cy="18" r="15.5" fill="none" stroke-width="3" />
+                <circle class="ring-fill"  cx="18" cy="18" r="15.5" fill="none" stroke-width="3"
+                        stroke-dasharray="97.39" stroke-dashoffset="37" />
+              </svg>
+              <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <span class="text-[13px] font-bold leading-none text-indigo-600 dark:text-indigo-300">62%</span>
+                <span class="text-[8px] uppercase tracking-wider text-gray-400 mt-0.5">filled</span>
+              </div>
+            </div>
+
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <i data-lucide="square-pen" class="w-3.5 h-3.5"></i>
+                <span>Edit class</span>
+                <span class="text-gray-300 dark:text-gray-600">·</span>
+                <span class="mono">billing-api · v2.4-draft</span>
+              </div>
+              <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                <h1 class="text-xl font-bold mono">Subscription</h1>
+                <span class="pill bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/40 dark:text-fuchsia-300">billing</span>
+                <span class="pill bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">stateful</span>
+                <span class="pill bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> 4 unsaved</span>
+              </div>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mono">cls_sub · 11 properties · 4 references · used by 6 paths</p>
+            </div>
+          </div>
+
+          <!-- Header actions -->
+          <div class="flex items-center gap-2 shrink-0">
+            <!-- AI sidekick toggle (off in this view; see ai-mode.html for on state) -->
+            <button class="ai-btn px-3 py-1.5 text-sm rounded-md flex items-center gap-2 font-medium" title="Open AI sidekick">
+              <i data-lucide="sparkles" class="w-4 h-4"></i> AI sidekick
+            </button>
+
+            <!-- View menu: read-only artifacts in a side sheet -->
+            <div class="relative">
+              <button class="px-2.5 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-1.5" title="View artifacts">
+                <i data-lucide="eye" class="w-4 h-4"></i> View <i data-lucide="chevron-down" class="w-3 h-3"></i>
+              </button>
+              <!-- Open menu (always shown in this mockup so reviewers can see contents) -->
+              <div class="absolute right-0 top-full mt-1 z-30 w-56 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden hidden" data-mock-show="false">
+                <button class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="braces" class="w-3.5 h-3.5 text-indigo-500"></i> JSON Schema</button>
+                <button class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="file-code-2" class="w-3.5 h-3.5 text-amber-500"></i> YAML</button>
+                <button class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="code-2" class="w-3.5 h-3.5 text-emerald-500"></i> Example payload</button>
+                <button class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="globe" class="w-3.5 h-3.5 text-sky-500"></i> OpenAPI fragment</button>
+              </div>
+            </div>
+
+            <button class="px-2.5 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-1.5" title="Validate (⌘⏎)">
+              <i data-lucide="flask-conical" class="w-4 h-4 text-emerald-500"></i> Validate
+            </button>
+            <button class="w-8 h-8 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center text-gray-500" title="More">
+              <i data-lucide="more-horizontal" class="w-4 h-4"></i>
+            </button>
+            <button class="w-8 h-8 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center text-gray-500" title="Close (Esc)">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- View-mode toggle row -->
+        <div class="px-6 py-2 flex items-center justify-between border-t border-gray-200/60 dark:border-gray-700/60 bg-white/40 dark:bg-gray-900/30">
+          <div class="flex items-center gap-3 text-xs text-gray-500">
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              <span class="font-medium text-amber-700 dark:text-amber-400">Unsaved changes</span>
+              <span class="text-gray-400">·</span>
+              <span>Last saved 2m ago by Kenji</span>
+            </span>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-gray-500 hidden md:inline">View as</span>
+            <div class="inline-flex p-0.5 rounded-md bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <button class="px-2.5 py-1 text-xs rounded bg-white dark:bg-gray-700 shadow-sm font-medium flex items-center gap-1" aria-pressed="true">
+                <i data-lucide="layout-list" class="w-3 h-3"></i> Advanced
+              </button>
+              <a href="wizard.html" class="px-2.5 py-1 text-xs rounded text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1">
+                <i data-lucide="signpost" class="w-3 h-3"></i> Wizard
+              </a>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ────  BODY  ─────  3-column: nav | form | preview -->
+      <div class="flex-1 grid grid-cols-12 min-h-0">
+
+        <!-- ── Section nav (left) ── -->
+        <nav class="col-span-2 border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/40 overflow-y-auto">
+          <div class="p-3">
+            <div class="flex items-center justify-between px-2 py-1 mb-1">
+              <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Sections</span>
+              <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Search sections">
+                <i data-lucide="search" class="w-3 h-3"></i>
+              </button>
+            </div>
+
+            <div class="space-y-0.5">
+              <!-- Group: Identity -->
+              <div class="px-2 pt-2 pb-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Identity</div>
+              <a href="#sec-basics" class="nav-item is-active flex items-center gap-2 px-2 py-1.5 rounded-md text-sm border border-transparent">
+                <i data-lucide="badge-info" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">Basics</span>
+                <span class="change-dot" title="Changed"></span>
+              </a>
+
+              <!-- Group: Validation -->
+              <div class="px-2 pt-3 pb-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Validation</div>
+              <a href="#sec-constraints" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="settings-2" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">Object constraints</span>
+              </a>
+              <a href="#sec-additional" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">Additional props</span>
+                <span class="change-dot" title="Changed"></span>
+              </a>
+              <a href="#sec-unevaluated" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">Unevaluated props</span>
+              </a>
+
+              <!-- Group: Composition -->
+              <div class="px-2 pt-3 pb-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Composition</div>
+              <a href="#sec-composition" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="git-merge" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">Inheritance</span>
+                <span class="change-dot" title="Changed"></span>
+              </a>
+
+              <!-- Group: Conditional & Dynamic -->
+              <div class="px-2 pt-3 pb-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Conditional & Dynamic</div>
+              <a href="#sec-pattern" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="regex" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">Pattern properties</span>
+              </a>
+              <a href="#sec-dep-schemas" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="link-2" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">Dependent schemas</span>
+              </a>
+              <a href="#sec-dep-required" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="list-checks" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">Dependent required</span>
+              </a>
+              <a href="#sec-conditional" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="git-branch" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">If / then / else</span>
+                <span class="change-dot" title="Changed"></span>
+              </a>
+
+              <!-- Group: Documentation -->
+              <div class="px-2 pt-3 pb-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Documentation</div>
+              <a href="#sec-examples" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">Examples</span>
+                <span class="warn-dot" title="Missing"></span>
+              </a>
+              <a href="#sec-external" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">External docs</span>
+              </a>
+              <a href="#sec-metadata" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="hash" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">Schema metadata</span>
+              </a>
+
+              <!-- Group: Advanced -->
+              <div class="px-2 pt-3 pb-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Advanced</div>
+              <a href="#sec-xml" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="file-code-2" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">XML representation</span>
+              </a>
+              <a href="#sec-extensions" class="nav-item flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent">
+                <i data-lucide="puzzle" class="w-3.5 h-3.5"></i>
+                <span class="flex-1 truncate">Extensions</span>
+              </a>
+            </div>
+          </div>
+        </nav>
+
+        <!-- ── Form (center) ── -->
+        <main class="col-span-7 overflow-y-auto" id="formScroll">
+          <div class="p-6 space-y-5 max-w-3xl mx-auto">
+
+            <!-- ── BASICS ── -->
+            <section id="sec-basics" class="section-card is-active rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60">
+              <header class="px-5 py-3.5 flex items-center justify-between border-b border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-7 h-7 rounded-md bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 flex items-center justify-center"><i data-lucide="badge-info" class="w-4 h-4"></i></span>
+                  <div>
+                    <h3 class="text-sm font-semibold flex items-center gap-2">Basics <span class="change-dot"></span></h3>
+                    <p class="text-xs text-gray-500">Identity, description, tags, deprecation.</p>
+                  </div>
+                </div>
+                <span class="text-[10px] mono text-gray-400">2 of 4 fields</span>
+              </header>
+              <div class="p-5 space-y-4">
+                <div class="grid grid-cols-3 gap-4">
+                  <label class="block">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium">Class name <span class="text-rose-500">*</span></span>
+                      <span class="text-[10px] text-gray-400 mono">PascalCase</span>
+                    </div>
+                    <input value="Subscription" class="w-full px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono text-sm focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none" />
+                  </label>
+                  <label class="col-span-2 block">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium">Description</span>
+                      <span class="text-[10px] text-gray-400">Markdown supported</span>
+                    </div>
+                    <textarea rows="2" class="w-full px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none">A recurring billing arrangement between a Customer and a Plan. Drives invoice generation on the next_invoice_at cadence.</textarea>
+                  </label>
+                </div>
+
+                <label class="block">
+                  <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium block mb-1">Tags</span>
+                  <div class="flex flex-wrap gap-1.5 px-2 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 min-h-[40px]">
+                    <span class="pill bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/40 dark:text-fuchsia-300"><span style="color: rgb(217 70 239)">●</span> billing <button class="ml-0.5 hover:bg-black/10 rounded"><i data-lucide="x" class="w-3 h-3"></i></button></span>
+                    <span class="pill bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"><span style="color: rgb(139 92 246)">●</span> stateful <button class="ml-0.5 hover:bg-black/10 rounded"><i data-lucide="x" class="w-3 h-3"></i></button></span>
+                    <span class="pill bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"><span style="color: rgb(14 165 233)">●</span> customer-facing <button class="ml-0.5 hover:bg-black/10 rounded"><i data-lucide="x" class="w-3 h-3"></i></button></span>
+                    <button class="pill border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 hover:border-indigo-400 hover:text-indigo-500"><i data-lucide="plus" class="w-3 h-3"></i> Add tag</button>
+                  </div>
+                </label>
+
+                <!-- Deprecation toggle card -->
+                <div class="rounded-lg border border-amber-200/70 dark:border-amber-800/40 bg-amber-50/40 dark:bg-amber-900/10 p-3">
+                  <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" class="mt-0.5 accent-amber-500 w-4 h-4" />
+                    <div class="flex-1">
+                      <div class="flex items-center gap-2">
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-500"></i>
+                        <span class="text-sm font-medium">Mark as deprecated</span>
+                      </div>
+                      <p class="text-xs text-gray-500 mt-0.5">Consumers will see a warning in generated SDKs and the API portal.</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </section>
+
+            <!-- ── COMPOSITION (collapsed-ish but expanded for review) ── -->
+            <section id="sec-composition" class="section-card rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60">
+              <header class="px-5 py-3.5 flex items-center justify-between border-b border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-7 h-7 rounded-md bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300 flex items-center justify-center"><i data-lucide="git-merge" class="w-4 h-4"></i></span>
+                  <div>
+                    <h3 class="text-sm font-semibold flex items-center gap-2">Composition & Inheritance <span class="change-dot"></span></h3>
+                    <p class="text-xs text-gray-500">Combine with other classes via <span class="mono">allOf</span> / <span class="mono">anyOf</span> / <span class="mono">oneOf</span>.</p>
+                  </div>
+                </div>
+                <span class="text-[10px] mono text-gray-400">2 base · 0 alt · 0 exclusive</span>
+              </header>
+
+              <div class="p-5 space-y-4">
+                <!-- Composition kind picker -->
+                <div class="grid grid-cols-3 gap-3">
+                  <div class="radio-card is-selected">
+                    <input type="radio" name="comp" class="mt-0.5 accent-indigo-500" checked />
+                    <div class="flex-1">
+                      <div class="text-sm font-semibold flex items-center gap-1.5"><i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-500"></i> allOf</div>
+                      <p class="text-[11px] text-gray-500 mt-0.5">Inherits from all base schemas (merged)</p>
+                      <p class="text-[10px] mono text-indigo-500 mt-1">2 selected</p>
+                    </div>
+                  </div>
+                  <div class="radio-card">
+                    <input type="radio" name="comp" class="mt-0.5 accent-amber-500" />
+                    <div class="flex-1">
+                      <div class="text-sm font-semibold flex items-center gap-1.5"><i data-lucide="layers" class="w-3.5 h-3.5 text-amber-500"></i> anyOf</div>
+                      <p class="text-[11px] text-gray-500 mt-0.5">Matches one or more alternatives</p>
+                      <p class="text-[10px] text-gray-400 mt-1">none selected</p>
+                    </div>
+                  </div>
+                  <div class="radio-card">
+                    <input type="radio" name="comp" class="mt-0.5 accent-purple-500" />
+                    <div class="flex-1">
+                      <div class="text-sm font-semibold flex items-center gap-1.5"><i data-lucide="layers" class="w-3.5 h-3.5 text-purple-500"></i> oneOf</div>
+                      <p class="text-[11px] text-gray-500 mt-0.5">Matches exactly one variant</p>
+                      <p class="text-[10px] text-gray-400 mt-1">none selected</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Selected base schemas (drag-sortable) -->
+                <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40 p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium">Base schemas (allOf)</span>
+                    <button class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Add base</button>
+                  </div>
+                  <ul class="space-y-1.5">
+                    <li class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-700">
+                      <i data-lucide="grip-vertical" class="w-4 h-4 text-gray-400 cursor-grab"></i>
+                      <span class="mono text-sm font-semibold">BaseEntity</span>
+                      <span class="text-xs text-gray-500 flex-1 mono truncate">id · tenant_id · created_at · updated_at</span>
+                      <button class="text-xs text-indigo-500 hover:underline">View</button>
+                      <button class="text-gray-400 hover:text-rose-500 p-1"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                    </li>
+                    <li class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-700">
+                      <i data-lucide="grip-vertical" class="w-4 h-4 text-gray-400 cursor-grab"></i>
+                      <span class="mono text-sm font-semibold">Auditable</span>
+                      <span class="text-xs text-gray-500 flex-1 mono truncate">version · last_actor · last_correlation_id</span>
+                      <button class="text-xs text-indigo-500 hover:underline">View</button>
+                      <button class="text-gray-400 hover:text-rose-500 p-1"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                    </li>
+                  </ul>
+                </div>
+
+                <!-- Discriminator (auto-shown when allOf/oneOf has refs) -->
+                <details class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40">
+                  <summary class="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/60 rounded-lg">
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400 chev"></i>
+                    <i data-lucide="git-branch" class="w-3.5 h-3.5 text-violet-500"></i>
+                    <span class="text-sm font-medium flex-1">Discriminator</span>
+                    <span class="text-[10px] text-gray-400 mono">optional</span>
+                  </summary>
+                  <div class="px-4 pb-4 pt-1 space-y-3">
+                    <p class="text-xs text-gray-500">Polymorphic helper for OpenAPI consumers — picks the right schema variant based on a property value.</p>
+                    <div class="grid grid-cols-2 gap-3">
+                      <label class="block">
+                        <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium block mb-1">Discriminator property</span>
+                        <input placeholder="e.g., type, kind, petType" class="w-full px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono text-sm" />
+                      </label>
+                      <label class="flex items-center gap-2 mt-6">
+                        <input type="checkbox" class="accent-indigo-500" checked />
+                        <span class="text-sm">Use automatic mapping (by schema name)</span>
+                      </label>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </section>
+
+            <!-- ── ADDITIONAL PROPS ── -->
+            <section id="sec-additional" class="section-card rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60">
+              <header class="px-5 py-3.5 flex items-center justify-between border-b border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-7 h-7 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-300 flex items-center justify-center"><i data-lucide="layers" class="w-4 h-4"></i></span>
+                  <div>
+                    <h3 class="text-sm font-semibold flex items-center gap-2">Additional properties <span class="change-dot"></span></h3>
+                    <p class="text-xs text-gray-500">How to handle keys not declared in this schema.</p>
+                  </div>
+                </div>
+                <a class="text-[11px] text-gray-400 hover:text-indigo-500 hover:underline" href="#"><i data-lucide="help-circle" class="w-3 h-3 inline"></i> Learn more</a>
+              </header>
+              <div class="p-5">
+                <div class="grid grid-cols-5 gap-2">
+                  <label class="radio-card flex-col items-start text-center"><input type="radio" name="addl" class="hidden" /><span class="text-xs font-semibold">Default</span><span class="text-[10px] text-gray-500">unset</span></label>
+                  <label class="radio-card is-selected flex-col items-start text-center"><input type="radio" name="addl" class="hidden" checked /><span class="text-xs font-semibold text-emerald-600">Allow any</span><span class="text-[10px] text-gray-500">true</span></label>
+                  <label class="radio-card flex-col items-start text-center"><input type="radio" name="addl" class="hidden" /><span class="text-xs font-semibold text-rose-600">Disallow</span><span class="text-[10px] text-gray-500">false</span></label>
+                  <label class="radio-card flex-col items-start text-center"><input type="radio" name="addl" class="hidden" /><span class="text-xs font-semibold">Must be type</span><span class="text-[10px] text-gray-500">string · number…</span></label>
+                  <label class="radio-card flex-col items-start text-center"><input type="radio" name="addl" class="hidden" /><span class="text-xs font-semibold">Match schema</span><span class="text-[10px] text-gray-500">$ref class</span></label>
+                </div>
+              </div>
+            </section>
+
+            <!-- ── COLLAPSED stub sections (compact when not yet configured) ── -->
+            <section id="sec-constraints" class="section-card rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-900/30">
+              <header class="px-5 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 flex items-center justify-center"><i data-lucide="settings-2" class="w-4 h-4"></i></span>
+                  <div>
+                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Object constraints</h3>
+                    <p class="text-xs text-gray-500">Min / max number of properties an instance may have.</p>
+                  </div>
+                </div>
+                <button class="text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 text-gray-500 flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Configure</button>
+              </header>
+            </section>
+
+            <section id="sec-conditional" class="section-card rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60">
+              <header class="px-5 py-3.5 flex items-center justify-between border-b border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-7 h-7 rounded-md bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-300 flex items-center justify-center"><i data-lucide="git-branch" class="w-4 h-4"></i></span>
+                  <div>
+                    <h3 class="text-sm font-semibold flex items-center gap-2">If / then / else rules <span class="change-dot"></span></h3>
+                    <p class="text-xs text-gray-500">Branch validation depending on property values.</p>
+                  </div>
+                </div>
+                <button class="text-xs px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Add rule</button>
+              </header>
+              <div class="p-5 space-y-2">
+                <!-- One conditional rule with visual builder -->
+                <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40 p-3">
+                  <div class="flex items-center gap-2 flex-wrap text-xs">
+                    <span class="pill bg-sky-500 text-white">IF</span>
+                    <select class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono text-xs"><option>status</option><option>plan_id</option></select>
+                    <select class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"><option>equals</option><option>is one of</option><option>matches</option></select>
+                    <input value="trialing" class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono text-xs w-24" />
+                    <span class="pill bg-emerald-500 text-white">THEN</span>
+                    <span class="text-gray-500">require</span>
+                    <span class="pill bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 mono">trial_end</span>
+                    <button class="ml-auto text-gray-400 hover:text-rose-500"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                  </div>
+                  <button class="text-[11px] text-indigo-500 hover:underline mt-2 flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Add ELSE branch</button>
+                </div>
+                <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40 p-3">
+                  <div class="flex items-center gap-2 flex-wrap text-xs">
+                    <span class="pill bg-sky-500 text-white">IF</span>
+                    <select class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono text-xs"><option>status</option></select>
+                    <select class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"><option>equals</option></select>
+                    <input value="canceled" class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono text-xs w-24" />
+                    <span class="pill bg-emerald-500 text-white">THEN</span>
+                    <span class="text-gray-500">require</span>
+                    <span class="pill bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 mono">cancel_at_period_end == true</span>
+                    <button class="ml-auto text-gray-400 hover:text-rose-500"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ── EXAMPLES (warning state) ── -->
+            <section id="sec-examples" class="section-card rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/30 dark:bg-amber-900/10">
+              <header class="px-5 py-3.5 flex items-center justify-between border-b border-amber-100 dark:border-amber-800/30">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-7 h-7 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300 flex items-center justify-center"><i data-lucide="code-xml" class="w-4 h-4"></i></span>
+                  <div>
+                    <h3 class="text-sm font-semibold flex items-center gap-2">Examples <span class="warn-dot"></span></h3>
+                    <p class="text-xs text-gray-500">No example instances provided. Add at least one for richer SDKs and docs.</p>
+                  </div>
+                </div>
+                <button class="text-xs px-2 py-1 rounded border border-amber-300 dark:border-amber-700/50 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-300 flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Add example</button>
+              </header>
+            </section>
+
+            <!-- ── Stub list for the rest (collapsed) ── -->
+            <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 divide-y divide-gray-100 dark:divide-gray-700/60">
+              <button id="sec-unevaluated" class="w-full px-5 py-3 flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                <span class="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 flex items-center justify-center"><i data-lucide="layers" class="w-4 h-4"></i></span>
+                <div class="flex-1">
+                  <span class="text-sm font-medium">Unevaluated properties</span>
+                  <span class="text-xs text-gray-500 ml-2">unset</span>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+              </button>
+              <button id="sec-pattern" class="w-full px-5 py-3 flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                <span class="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 flex items-center justify-center"><i data-lucide="regex" class="w-4 h-4"></i></span>
+                <div class="flex-1">
+                  <span class="text-sm font-medium">Pattern properties</span>
+                  <span class="text-xs text-gray-500 ml-2">none</span>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+              </button>
+              <button id="sec-dep-schemas" class="w-full px-5 py-3 flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                <span class="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 flex items-center justify-center"><i data-lucide="link-2" class="w-4 h-4"></i></span>
+                <div class="flex-1">
+                  <span class="text-sm font-medium">Dependent schemas</span>
+                  <span class="text-xs text-gray-500 ml-2">none</span>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+              </button>
+              <button id="sec-dep-required" class="w-full px-5 py-3 flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                <span class="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 flex items-center justify-center"><i data-lucide="list-checks" class="w-4 h-4"></i></span>
+                <div class="flex-1">
+                  <span class="text-sm font-medium">Dependent required</span>
+                  <span class="text-xs text-gray-500 ml-2">none</span>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+              </button>
+              <button id="sec-external" class="w-full px-5 py-3 flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                <span class="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 flex items-center justify-center"><i data-lucide="external-link" class="w-4 h-4"></i></span>
+                <div class="flex-1">
+                  <span class="text-sm font-medium">External documentation</span>
+                  <span class="text-xs text-gray-500 ml-2">none</span>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+              </button>
+              <button id="sec-metadata" class="w-full px-5 py-3 flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                <span class="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 flex items-center justify-center"><i data-lucide="hash" class="w-4 h-4"></i></span>
+                <div class="flex-1">
+                  <span class="text-sm font-medium">Schema metadata</span>
+                  <span class="text-xs text-gray-500 ml-2">$id, $anchor, $comment</span>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+              </button>
+              <button id="sec-xml" class="w-full px-5 py-3 flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                <span class="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 flex items-center justify-center"><i data-lucide="file-code-2" class="w-4 h-4"></i></span>
+                <div class="flex-1">
+                  <span class="text-sm font-medium">XML representation</span>
+                  <span class="text-xs text-gray-500 ml-2">unset</span>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+              </button>
+              <button id="sec-extensions" class="w-full px-5 py-3 flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                <span class="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 flex items-center justify-center"><i data-lucide="puzzle" class="w-4 h-4"></i></span>
+                <div class="flex-1">
+                  <span class="text-sm font-medium">Custom extensions</span>
+                  <span class="text-xs text-gray-500 ml-2">x-* vendor extensions</span>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+              </button>
+            </div>
+
+            <!-- footer spacing -->
+            <div class="h-4"></div>
+          </div>
+        </main>
+
+        <!-- ── Live preview (right) ── -->
+        <aside class="col-span-3 border-l border-gray-200 dark:border-gray-700 bg-gray-50/40 dark:bg-gray-900/30 overflow-y-auto">
+          <div class="p-4 space-y-4">
+
+            <!-- Lint summary -->
+            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+              <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700/60 flex items-center gap-2">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-500"></i>
+                <span class="text-xs font-semibold">Validation</span>
+                <span class="ml-auto pill bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">passes</span>
+              </div>
+              <ul class="divide-y divide-gray-100 dark:divide-gray-700/60 text-xs">
+                <li class="px-3 py-2 flex items-start gap-2">
+                  <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500 mt-0.5"></i>
+                  <span>Schema is structurally valid (JSON Schema 2020-12)</span>
+                </li>
+                <li class="px-3 py-2 flex items-start gap-2">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-500 mt-0.5"></i>
+                  <div class="flex-1">
+                    <span>Examples missing</span>
+                    <a href="ai-mode.html" class="text-indigo-500 hover:underline block mt-0.5 text-[11px] flex items-center gap-1"><i data-lucide="sparkles" class="w-3 h-3"></i> Ask sidekick to generate →</a>
+                  </div>
+                </li>
+                <li class="px-3 py-2 flex items-start gap-2">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-500 mt-0.5"></i>
+                  <div class="flex-1">
+                    <span>Inline enum on <span class="mono">status</span></span>
+                    <button class="text-indigo-500 hover:underline block mt-0.5 text-[11px]">Promote to reference data →</button>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Live JSON Schema preview -->
+            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-900 overflow-hidden">
+              <div class="px-3 py-2 border-b border-gray-700 bg-gray-800 flex items-center gap-2">
+                <i data-lucide="braces" class="w-3.5 h-3.5 text-indigo-400"></i>
+                <span class="text-xs font-semibold text-gray-200">Live schema</span>
+                <div class="ml-auto inline-flex p-0.5 rounded bg-gray-700 text-[10px]">
+                  <button class="px-1.5 rounded bg-gray-600 text-white">JSON</button>
+                  <button class="px-1.5 text-gray-400">YAML</button>
+                </div>
+                <button class="text-gray-400 hover:text-white" title="Copy"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+              </div>
+              <pre class="preview-pane p-3 text-[11px] mono leading-relaxed overflow-auto text-gray-300"><span class="json-punc">{</span>
+  <span class="json-key">"$id"</span><span class="json-punc">:</span> <span class="json-str">"billing/Subscription.json"</span><span class="json-punc">,</span>
+  <span class="json-key">"type"</span><span class="json-punc">:</span> <span class="json-str">"object"</span><span class="json-punc">,</span>
+  <span class="json-key">"description"</span><span class="json-punc">:</span> <span class="json-str">"A recurring billing arrangement…"</span><span class="json-punc">,</span>
+  <span class="json-key">"allOf"</span><span class="json-punc">: [</span>
+    <span class="json-punc">{ </span><span class="json-key">"$ref"</span><span class="json-punc">:</span> <span class="json-str">"#/$defs/BaseEntity"</span> <span class="json-punc">},</span>
+    <span class="json-punc">{ </span><span class="json-key">"$ref"</span><span class="json-punc">:</span> <span class="json-str">"#/$defs/Auditable"</span> <span class="json-punc">}</span>
+  <span class="json-punc">],</span>
+  <span class="json-key">"properties"</span><span class="json-punc">: {</span>
+    <span class="json-key">"customer_id"</span><span class="json-punc">: {</span> <span class="json-key">"$ref"</span><span class="json-punc">:</span> <span class="json-str">"#/Customer/id"</span> <span class="json-punc">},</span>
+    <span class="json-key">"plan_id"</span><span class="json-punc">: {</span> <span class="json-key">"$ref"</span><span class="json-punc">:</span> <span class="json-str">"#/Plan/id"</span> <span class="json-punc">},</span>
+    <span class="json-key">"status"</span><span class="json-punc">: {</span>
+      <span class="json-key">"type"</span><span class="json-punc">:</span> <span class="json-str">"string"</span><span class="json-punc">,</span>
+      <span class="json-key">"enum"</span><span class="json-punc">: [</span><span class="json-str">"trialing"</span><span class="json-punc">,</span><span class="json-str">"active"</span><span class="json-punc">,</span><span class="json-str">"past_due"</span><span class="json-punc">,</span><span class="json-str">"canceled"</span><span class="json-punc">]</span>
+    <span class="json-punc">},</span>
+    <span class="json-key">"trial_end"</span><span class="json-punc">: {</span> <span class="json-key">"type"</span><span class="json-punc">:</span> <span class="json-str">"string"</span><span class="json-punc">,</span> <span class="json-key">"format"</span><span class="json-punc">:</span> <span class="json-str">"date-time"</span> <span class="json-punc">},</span>
+    <span class="json-key">"discount_pct"</span><span class="json-punc">: {</span> <span class="json-key">"type"</span><span class="json-punc">:</span> <span class="json-str">"number"</span><span class="json-punc">,</span> <span class="json-key">"minimum"</span><span class="json-punc">:</span> <span class="json-num">0</span><span class="json-punc">,</span> <span class="json-key">"maximum"</span><span class="json-punc">:</span> <span class="json-num">100</span> <span class="json-punc">}</span>
+  <span class="json-punc">},</span>
+  <span class="json-key">"required"</span><span class="json-punc">: [</span><span class="json-str">"customer_id"</span><span class="json-punc">,</span><span class="json-str">"plan_id"</span><span class="json-punc">,</span><span class="json-str">"status"</span><span class="json-punc">],</span>
+  <span class="json-key">"if"</span><span class="json-punc">:</span>   <span class="json-punc">{ </span><span class="json-key">"properties"</span><span class="json-punc">: { </span><span class="json-key">"status"</span><span class="json-punc">: { </span><span class="json-key">"const"</span><span class="json-punc">:</span> <span class="json-str">"trialing"</span> <span class="json-punc">}}}</span><span class="json-punc">,</span>
+  <span class="json-key">"then"</span><span class="json-punc">: { </span><span class="json-key">"required"</span><span class="json-punc">: [</span><span class="json-str">"trial_end"</span><span class="json-punc">] }</span>
+<span class="json-punc">}</span></pre>
+            </div>
+
+            <!-- References / impact -->
+            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+              <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700/60 flex items-center gap-2">
+                <i data-lucide="link-2" class="w-3.5 h-3.5 text-indigo-500"></i>
+                <span class="text-xs font-semibold">Used by</span>
+                <span class="ml-auto text-[10px] text-gray-400 mono">6 paths · 3 classes</span>
+              </div>
+              <ul class="divide-y divide-gray-100 dark:divide-gray-700/60 text-xs">
+                <li class="px-3 py-2 flex items-center gap-2 mono"><span class="pill bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">GET</span><span class="flex-1 truncate">/subscriptions/{id}</span></li>
+                <li class="px-3 py-2 flex items-center gap-2 mono"><span class="pill bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">POST</span><span class="flex-1 truncate">/subscriptions</span></li>
+                <li class="px-3 py-2 flex items-center gap-2 mono"><span class="pill bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">PATCH</span><span class="flex-1 truncate">/subscriptions/{id}</span></li>
+                <li class="px-3 py-2 text-center"><a href="#" class="text-indigo-500 hover:underline">Show all 6 →</a></li>
+              </ul>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- ────  FOOTER  ───── -->
+      <footer class="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-6 py-3 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3 text-xs text-gray-500">
+          <span class="hidden md:inline-flex items-center gap-1.5">
+            <span class="kbd">⌘ S</span> Save
+          </span>
+          <span class="hidden md:inline-flex items-center gap-1.5">
+            <span class="kbd">⌘ ⏎</span> Validate
+          </span>
+          <span class="hidden md:inline-flex items-center gap-1.5">
+            <span class="kbd">Esc</span> Close
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-1.5 text-sm rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5">
+            <i data-lucide="undo" class="w-3.5 h-3.5"></i> Discard
+          </button>
+          <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1.5">
+            Cancel
+          </button>
+          <button class="px-4 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 shadow-sm">
+            <i data-lucide="save" class="w-3.5 h-3.5"></i> Save · 4 changes
+          </button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'designer-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+
+    // Activate nav item on scroll (basic scroll-spy demo)
+    const sections = Array.from(document.querySelectorAll('section[id], button[id^="sec-"]'));
+    const navItems = Array.from(document.querySelectorAll('.nav-item'));
+    const idToNav = Object.fromEntries(navItems.map(a => [a.getAttribute('href'), a]));
+    const formScroll = document.getElementById('formScroll');
+    formScroll.addEventListener('scroll', () => {
+      const top = formScroll.scrollTop + 80;
+      let active = sections[0];
+      for (const s of sections) {
+        if (s.offsetTop <= top) active = s;
+      }
+      navItems.forEach(n => n.classList.remove('is-active'));
+      sections.forEach(s => s.classList && s.classList.remove('is-active'));
+      const navLink = idToNav['#' + active.id];
+      if (navLink) navLink.classList.add('is-active');
+      if (active.classList) active.classList.add('is-active');
+    });
+  </script>
+</body>
+</html>

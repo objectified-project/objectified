@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Designer · Edit class · Wizard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .backdrop-blur-page::before {
+      content: ''; position: fixed; inset: 0;
+      background: radial-gradient(circle at 30% 20%, rgba(99,102,241,0.18), transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(217,70,239,0.12), transparent 45%),
+                  rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(6px); z-index: 0;
+    }
+    .dark .backdrop-blur-page::before {
+      background: radial-gradient(circle at 30% 20%, rgba(99,102,241,0.22), transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(217,70,239,0.18), transparent 45%),
+                  rgba(2, 6, 23, 0.7);
+    }
+    .dialog-shell { box-shadow: 0 30px 80px -20px rgba(15, 23, 42, 0.35), 0 16px 32px -12px rgba(15, 23, 42, 0.25); }
+    .dark .dialog-shell { box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7), 0 16px 32px -12px rgba(0, 0, 0, 0.6); }
+    .pill { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; }
+    .kbd { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.6875rem; padding: 0.125rem 0.375rem; border-radius: 0.25rem; border: 1px solid rgb(226 232 240); background: rgb(248 250 252); color: rgb(71 85 105); }
+    .dark .kbd { border-color: rgb(51 65 85); background: rgb(30 41 59); color: rgb(203 213 225); }
+
+    /* Wizard step pills */
+    .step { position: relative; display: flex; align-items: center; gap: 0.625rem; }
+    .step + .step::before {
+      content: ''; position: absolute; left: -1.5rem; top: 1rem; width: 1.25rem; height: 2px;
+      background: rgb(226 232 240);
+    }
+    .dark .step + .step::before { background: rgb(51 65 85); }
+    .step.complete + .step::before,
+    .step.current + .step::before { background: rgb(99 102 241); }
+    .step-bubble {
+      width: 2rem; height: 2rem; border-radius: 9999px; display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 600;
+      border: 2px solid rgb(226 232 240); background: rgb(248 250 252); color: rgb(100 116 139);
+    }
+    .dark .step-bubble { border-color: rgb(51 65 85); background: rgb(30 41 59); color: rgb(148 163 184); }
+    .step.complete .step-bubble { background: rgb(99 102 241); border-color: rgb(99 102 241); color: white; }
+    .step.current  .step-bubble { background: white; border-color: rgb(99 102 241); color: rgb(99 102 241); box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15); }
+    .dark .step.current .step-bubble { background: rgb(30 41 59); }
+    .step-label { font-size: 0.75rem; font-weight: 500; color: rgb(100 116 139); }
+    .step.current .step-label, .step.complete .step-label { color: rgb(99 102 241); font-weight: 600; }
+    .dark .step.current .step-label, .dark .step.complete .step-label { color: rgb(165 180 252); }
+    .json-key { color: #93c5fd; } .json-str { color: #86efac; } .json-num { color: #fbbf24; } .json-punc { color: #94a3b8; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 backdrop-blur-page">
+  <div class="fixed top-4 right-6 z-20 flex items-center gap-2">
+    <a href="./" class="text-xs text-white/80 hover:text-white px-3 py-1.5 rounded-md bg-black/30 backdrop-blur">← Back to mockup set</a>
+    <button id="themeBtn" class="w-8 h-8 rounded-md bg-black/30 backdrop-blur text-white hover:bg-black/40 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+  </div>
+
+  <div class="relative z-10 mx-auto my-6 max-w-[1480px] px-4">
+    <div class="dialog-shell rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col" style="height: calc(100vh - 3rem);">
+
+      <!-- Header (compact for wizard) -->
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-50/60 via-white to-fuchsia-50/40 dark:from-indigo-950/40 dark:via-gray-900 dark:to-fuchsia-950/30">
+        <div class="px-6 pt-4 pb-3 flex items-start justify-between gap-6">
+          <div class="flex items-start gap-4 min-w-0">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-500 text-white flex items-center justify-center"><i data-lucide="signpost" class="w-5 h-5"></i></div>
+            <div>
+              <div class="flex items-center gap-2 text-xs text-gray-500"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i><span>New class</span><span class="text-gray-300">·</span><span class="mono">billing-api · v2.4-draft</span></div>
+              <div class="flex items-center gap-2 mt-1.5"><h1 class="text-xl font-bold mono">Subscription</h1><span class="pill bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">draft</span></div>
+              <p class="text-xs text-gray-500 mt-1">Step 2 of 5 · Validation</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button class="px-3 py-1.5 text-sm rounded-md flex items-center gap-2 font-medium border border-purple-300/50 bg-gradient-to-br from-purple-50 to-indigo-50 text-purple-700 dark:from-purple-900/30 dark:to-indigo-900/30 dark:text-purple-200 dark:border-purple-700/40">
+              <i data-lucide="sparkles" class="w-4 h-4"></i> AI sidekick
+            </button>
+            <div class="inline-flex p-0.5 rounded-md bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <a href="index.html" class="px-2.5 py-1 text-xs rounded text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1"><i data-lucide="layout-list" class="w-3 h-3"></i> Advanced</a>
+              <button class="px-2.5 py-1 text-xs rounded bg-white dark:bg-gray-700 shadow-sm font-medium flex items-center gap-1"><i data-lucide="signpost" class="w-3 h-3"></i> Wizard</button>
+            </div>
+            <button class="w-8 h-8 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center text-gray-500"><i data-lucide="x" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+
+        <!-- Stepper -->
+        <div class="px-6 pb-3 pt-1 flex items-center gap-6 overflow-x-auto">
+          <div class="step complete">
+            <div class="step-bubble"><i data-lucide="check" class="w-3.5 h-3.5"></i></div>
+            <div><div class="step-label">Basics</div><div class="text-[10px] text-gray-400">Name, tags, deprecation</div></div>
+          </div>
+          <div class="step current">
+            <div class="step-bubble">2</div>
+            <div><div class="step-label">Validation</div><div class="text-[10px] text-gray-400">Property limits & policy</div></div>
+          </div>
+          <div class="step">
+            <div class="step-bubble">3</div>
+            <div><div class="step-label">Composition</div><div class="text-[10px] text-gray-400">allOf / anyOf / oneOf</div></div>
+          </div>
+          <div class="step">
+            <div class="step-bubble">4</div>
+            <div><div class="step-label">Conditional</div><div class="text-[10px] text-gray-400">if / then / else, dynamic</div></div>
+          </div>
+          <div class="step">
+            <div class="step-bubble">5</div>
+            <div><div class="step-label">Documentation</div><div class="text-[10px] text-gray-400">Examples, docs, metadata</div></div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Body: single step content + right inspector -->
+      <div class="flex-1 grid grid-cols-12 min-h-0">
+        <main class="col-span-9 overflow-y-auto">
+          <div class="p-8 max-w-3xl mx-auto space-y-6">
+
+            <div>
+              <div class="flex items-center gap-3 mb-1">
+                <span class="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Step 2</span>
+                <span class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></span>
+              </div>
+              <h2 class="text-2xl font-bold flex items-center gap-2">Validation</h2>
+              <p class="text-sm text-gray-500 mt-1">How loosely or strictly should instances of <span class="mono font-semibold">Subscription</span> be validated?</p>
+            </div>
+
+            <!-- Object constraints -->
+            <section class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 p-6">
+              <h3 class="text-sm font-semibold flex items-center gap-2 mb-3"><i data-lucide="settings-2" class="w-4 h-4 text-indigo-500"></i> Object constraints</h3>
+              <p class="text-xs text-gray-500 mb-4">Limit the number of properties an instance may carry. Most classes don't need this — leave blank to skip.</p>
+              <div class="grid grid-cols-2 gap-4">
+                <label class="block">
+                  <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium block mb-1">Min properties</span>
+                  <input type="number" placeholder="e.g., 1" class="w-full px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono text-sm" />
+                </label>
+                <label class="block">
+                  <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium block mb-1">Max properties</span>
+                  <input type="number" placeholder="e.g., 10" class="w-full px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono text-sm" />
+                </label>
+              </div>
+            </section>
+
+            <!-- Additional properties -->
+            <section class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 p-6">
+              <h3 class="text-sm font-semibold flex items-center gap-2 mb-1"><i data-lucide="layers" class="w-4 h-4 text-emerald-500"></i> Additional properties</h3>
+              <p class="text-xs text-gray-500 mb-4">What happens when an instance has keys you didn't declare?</p>
+              <div class="grid grid-cols-5 gap-2">
+                <label class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700"><input type="radio" name="addl" class="hidden" /><div class="text-xs font-semibold text-center">Default</div><div class="text-[10px] text-gray-500 text-center mt-1">unset</div></label>
+                <label class="border-2 border-indigo-500 bg-indigo-50/60 dark:bg-indigo-900/20 rounded-lg p-3 cursor-pointer"><input type="radio" name="addl" class="hidden" checked /><div class="text-xs font-semibold text-emerald-600 text-center">Allow any</div><div class="text-[10px] text-gray-500 text-center mt-1">true</div></label>
+                <label class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700"><input type="radio" name="addl" class="hidden" /><div class="text-xs font-semibold text-rose-600 text-center">Disallow</div><div class="text-[10px] text-gray-500 text-center mt-1">false</div></label>
+                <label class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700"><input type="radio" name="addl" class="hidden" /><div class="text-xs font-semibold text-center">Must be type</div><div class="text-[10px] text-gray-500 text-center mt-1">string · number…</div></label>
+                <label class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700"><input type="radio" name="addl" class="hidden" /><div class="text-xs font-semibold text-center">Match schema</div><div class="text-[10px] text-gray-500 text-center mt-1">$ref class</div></label>
+              </div>
+            </section>
+
+            <!-- Unevaluated properties (collapsed advanced) -->
+            <details class="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/40 dark:bg-gray-900/30">
+              <summary class="px-6 py-4 cursor-pointer hover:bg-white dark:hover:bg-gray-800/60 rounded-xl flex items-center gap-2">
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+                <i data-lucide="layers" class="w-4 h-4 text-gray-500"></i>
+                <span class="text-sm font-medium">Unevaluated properties</span>
+                <span class="text-xs text-gray-400 ml-2">advanced · for allOf / anyOf / oneOf interactions</span>
+              </summary>
+              <div class="px-6 pb-6 -mt-2">
+                <p class="text-xs text-gray-500 mb-3">Unlike additional properties, this rule applies <em>after</em> composition keywords merge their schemas.</p>
+                <div class="grid grid-cols-5 gap-2 opacity-70">
+                  <label class="border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 cursor-pointer text-center"><div class="text-xs font-semibold">Default</div></label>
+                  <label class="border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 cursor-pointer text-center"><div class="text-xs font-semibold">Allow any</div></label>
+                  <label class="border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 cursor-pointer text-center"><div class="text-xs font-semibold">Disallow</div></label>
+                  <label class="border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 cursor-pointer text-center"><div class="text-xs font-semibold">Type</div></label>
+                  <label class="border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 cursor-pointer text-center"><div class="text-xs font-semibold">Schema</div></label>
+                </div>
+              </div>
+            </details>
+
+            <!-- Hint -->
+            <div class="flex items-start gap-3 p-3 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/15 border border-indigo-200/50 dark:border-indigo-700/30">
+              <i data-lucide="lightbulb" class="w-4 h-4 text-indigo-500 mt-0.5"></i>
+              <div class="text-xs text-indigo-900 dark:text-indigo-200">
+                <span class="font-semibold">Tip · </span>
+                If you're not sure, leave everything unset. You can come back any time via Advanced view.
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <!-- Right inspector (slim — schema preview only in wizard) -->
+        <aside class="col-span-3 border-l border-gray-200 dark:border-gray-700 bg-gray-50/40 dark:bg-gray-900/30 overflow-y-auto p-4 space-y-4">
+          <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+            <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700/60 flex items-center gap-2">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-500"></i>
+              <span class="text-xs font-semibold">Validation</span>
+              <span class="ml-auto pill bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">passes</span>
+            </div>
+            <ul class="divide-y divide-gray-100 dark:divide-gray-700/60 text-xs">
+              <li class="px-3 py-2 flex items-start gap-2"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500 mt-0.5"></i><span>No issues so far</span></li>
+            </ul>
+          </div>
+
+          <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-900 overflow-hidden">
+            <div class="px-3 py-2 border-b border-gray-700 bg-gray-800 flex items-center gap-2">
+              <i data-lucide="braces" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span class="text-xs font-semibold text-gray-200">Live schema</span>
+            </div>
+            <pre class="p-3 text-[11px] mono leading-relaxed overflow-auto text-gray-300"><span class="json-punc">{</span>
+  <span class="json-key">"$id"</span><span class="json-punc">:</span> <span class="json-str">"billing/Subscription.json"</span><span class="json-punc">,</span>
+  <span class="json-key">"type"</span><span class="json-punc">:</span> <span class="json-str">"object"</span><span class="json-punc">,</span>
+  <span class="json-key">"additionalProperties"</span><span class="json-punc">:</span> <span class="json-num">true</span>
+<span class="json-punc">}</span></pre>
+          </div>
+
+          <div class="text-xs text-gray-500 px-1 leading-relaxed">
+            Wizard mode focuses on one decision at a time. Switch to <a href="index.html" class="text-indigo-500 hover:underline">Advanced</a> to see all sections.
+          </div>
+        </aside>
+      </div>
+
+      <!-- Wizard footer: prev / next / skip -->
+      <footer class="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-6 py-3 flex items-center justify-between">
+        <button class="px-3 py-1.5 text-sm rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Back · Basics
+        </button>
+        <div class="flex items-center gap-2 text-xs text-gray-500">
+          <span class="kbd">⌘ ↵</span> Next step
+          <span class="text-gray-300">·</span>
+          <span class="kbd">Esc</span> Cancel
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-1.5 text-sm rounded-md text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Skip step</button>
+          <button class="px-4 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 shadow-sm">
+            Next · Composition <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'designer-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>

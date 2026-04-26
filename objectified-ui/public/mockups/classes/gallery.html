@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Class editor mockup · gallery</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .hero {
+      background:
+        radial-gradient(circle at 20% 10%, rgba(99,102,241,0.18), transparent 50%),
+        radial-gradient(circle at 80% 60%, rgba(217,70,239,0.14), transparent 45%),
+        linear-gradient(180deg, rgb(15 23 42), rgb(2 6 23));
+    }
+    .card {
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover { transform: translateY(-3px); border-color: rgb(99 102 241); box-shadow: 0 16px 40px -16px rgba(99, 102, 241, 0.4); }
+    .pill { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600; }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+  <!-- Hero -->
+  <section class="hero text-white">
+    <div class="max-w-6xl mx-auto px-6 py-16">
+      <div class="flex items-center gap-2 text-xs uppercase tracking-wider text-indigo-200/80 mb-4">
+        <i data-lucide="square-pen" class="w-3.5 h-3.5"></i>
+        Mockup · Designer · Class editor
+      </div>
+      <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">A polish pass on the class editor.</h1>
+      <p class="mt-4 text-lg text-gray-300 max-w-2xl">A three-pane layout, a togglable AI sidekick, and progressive disclosure for the 14 form sections that make up <span class="mono">ClassEditDialog</span>.</p>
+      <div class="flex flex-wrap items-center gap-3 mt-6 text-xs">
+        <span class="pill bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">decisions locked</span>
+        <span class="pill bg-indigo-500/20 text-indigo-200 border border-indigo-400/30">6 variants</span>
+        <span class="pill bg-fuchsia-500/20 text-fuchsia-200 border border-fuchsia-400/30">ready to implement</span>
+        <a href="README.md" class="ml-auto text-indigo-200 hover:text-white text-sm flex items-center gap-1.5">
+          <i data-lucide="book-open" class="w-3.5 h-3.5"></i> Read the rationale (README)
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Variants grid -->
+  <section class="max-w-6xl mx-auto px-6 -mt-10 pb-16">
+    <div class="grid md:grid-cols-2 gap-4">
+      <!-- index.html -->
+      <a href="index.html" class="card block rounded-2xl border-2 border-indigo-200 dark:border-indigo-700/60 bg-white dark:bg-gray-900 overflow-hidden">
+        <div class="aspect-[16/9] bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50 dark:from-indigo-950/40 dark:via-gray-900 dark:to-fuchsia-950/30 relative overflow-hidden">
+          <div class="absolute inset-4 grid grid-cols-12 gap-1.5 opacity-90">
+            <div class="col-span-2 bg-gray-100 dark:bg-gray-800 rounded"></div>
+            <div class="col-span-7 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700"></div>
+            <div class="col-span-3 bg-gray-50 dark:bg-gray-800/60 rounded border border-gray-200 dark:border-gray-700"></div>
+          </div>
+          <div class="absolute bottom-3 left-4 text-[10px] uppercase tracking-wider text-gray-500 mono">three-pane · default</div>
+        </div>
+        <div class="p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="pill bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">primary</span>
+            <span class="text-xs text-gray-500 mono">index.html</span>
+          </div>
+          <h3 class="text-lg font-bold flex items-center gap-2"><i data-lucide="layout-list" class="w-4 h-4 text-indigo-500"></i> Advanced view</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1.5">Section nav, full form, and the always-visible right inspector with validation, live schema, and impact.</p>
+        </div>
+      </a>
+
+      <!-- wizard.html -->
+      <a href="wizard.html" class="card block rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
+        <div class="aspect-[16/9] bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50 dark:from-indigo-950/40 dark:via-gray-900 dark:to-fuchsia-950/30 relative overflow-hidden">
+          <div class="absolute top-6 left-4 right-4 flex gap-2">
+            <div class="w-7 h-7 rounded-full bg-indigo-500"></div>
+            <div class="w-7 h-7 rounded-full bg-white border-2 border-indigo-500"></div>
+            <div class="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+            <div class="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+            <div class="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+          </div>
+          <div class="absolute inset-4 top-16 grid grid-cols-12 gap-1.5">
+            <div class="col-span-9 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700"></div>
+            <div class="col-span-3 bg-gray-50 dark:bg-gray-800/60 rounded border border-gray-200 dark:border-gray-700"></div>
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="pill bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">guided</span>
+            <span class="text-xs text-gray-500 mono">wizard.html</span>
+          </div>
+          <h3 class="text-lg font-bold flex items-center gap-2"><i data-lucide="signpost" class="w-4 h-4 text-amber-500"></i> Wizard mode</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1.5">Step-by-step flow with a top stepper. Same chrome, focused on one decision at a time.</p>
+        </div>
+      </a>
+
+      <!-- empty-state.html -->
+      <a href="empty-state.html" class="card block rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
+        <div class="aspect-[16/9] bg-gradient-to-br from-emerald-50 via-white to-indigo-50 dark:from-emerald-950/30 dark:via-gray-900 dark:to-indigo-950/30 relative overflow-hidden">
+          <div class="absolute inset-x-6 top-6 grid grid-cols-3 gap-2">
+            <div class="aspect-[3/2] bg-white dark:bg-gray-800 rounded border-2 border-dashed border-gray-300 dark:border-gray-700"></div>
+            <div class="aspect-[3/2] bg-gradient-to-br from-purple-200 to-indigo-200 dark:from-purple-900/40 dark:to-indigo-900/40 rounded border-2 border-purple-400"></div>
+            <div class="aspect-[3/2] bg-white dark:bg-gray-800 rounded border-2 border-dashed border-gray-300 dark:border-gray-700"></div>
+          </div>
+          <div class="absolute inset-x-6 bottom-6 h-10 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700"></div>
+        </div>
+        <div class="p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="pill bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">onboarding</span>
+            <span class="text-xs text-gray-500 mono">empty-state.html</span>
+          </div>
+          <h3 class="text-lg font-bold flex items-center gap-2"><i data-lucide="rocket" class="w-4 h-4 text-emerald-500"></i> New class · empty state</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1.5">Quick-start cards (blank · AI · template), an inline AI prompt, and a minimal name+description form.</p>
+        </div>
+      </a>
+
+      <!-- ai-mode.html -->
+      <a href="ai-mode.html" class="card block rounded-2xl border border-purple-300 dark:border-purple-700/60 bg-white dark:bg-gray-900 overflow-hidden">
+        <div class="aspect-[16/9] bg-gradient-to-br from-purple-100 via-white to-indigo-100 dark:from-purple-950/30 dark:via-gray-900 dark:to-indigo-950/30 relative overflow-hidden">
+          <div class="absolute inset-4 grid grid-cols-12 gap-1.5">
+            <div class="col-span-2 bg-gray-100 dark:bg-gray-800 rounded"></div>
+            <div class="col-span-6 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700"></div>
+            <div class="col-span-4 bg-gradient-to-b from-purple-100 to-indigo-100 dark:from-purple-900/40 dark:to-indigo-900/40 rounded border border-purple-300 dark:border-purple-700"></div>
+          </div>
+          <div class="absolute bottom-3 right-4 text-[10px] uppercase tracking-wider text-purple-700 dark:text-purple-300 mono flex items-center gap-1">
+            <i data-lucide="sparkles" class="w-3 h-3"></i> sidekick on
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="pill bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">ai</span>
+            <span class="text-xs text-gray-500 mono">ai-mode.html</span>
+          </div>
+          <h3 class="text-lg font-bold flex items-center gap-2"><i data-lucide="sparkles" class="w-4 h-4 text-purple-500"></i> Sidekick open</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1.5">Persistent chat panel replaces the inspector. Suggestions are queued in the form as accept/reject patches.</p>
+        </div>
+      </a>
+
+      <!-- errors.html -->
+      <a href="errors.html" class="card block rounded-2xl border border-rose-200 dark:border-rose-800/60 bg-white dark:bg-gray-900 overflow-hidden">
+        <div class="aspect-[16/9] bg-gradient-to-br from-rose-50 via-white to-amber-50 dark:from-rose-950/30 dark:via-gray-900 dark:to-amber-950/20 relative overflow-hidden">
+          <div class="absolute inset-x-4 top-4 h-6 bg-rose-100 dark:bg-rose-900/30 border border-rose-300 dark:border-rose-700/50 rounded flex items-center gap-2 px-2">
+            <div class="w-2 h-2 bg-rose-500 rounded-full"></div>
+            <div class="h-1.5 w-32 bg-rose-300 dark:bg-rose-700/60 rounded"></div>
+          </div>
+          <div class="absolute inset-x-4 top-12 grid grid-cols-12 gap-1.5 bottom-4">
+            <div class="col-span-2 bg-gray-100 dark:bg-gray-800 rounded"></div>
+            <div class="col-span-7 bg-white dark:bg-gray-800 rounded border-2 border-rose-300 dark:border-rose-700/60"></div>
+            <div class="col-span-3 bg-rose-50/60 dark:bg-rose-900/20 rounded border border-rose-200 dark:border-rose-800/50"></div>
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="pill bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">errors</span>
+            <span class="text-xs text-gray-500 mono">errors.html</span>
+          </div>
+          <h3 class="text-lg font-bold flex items-center gap-2"><i data-lucide="alert-octagon" class="w-4 h-4 text-rose-500"></i> Validation blocking save</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1.5">Discriminator references undeclared property. Save disabled. Quick-fix suggestions inline. Section + nav both flag the error.</p>
+        </div>
+      </a>
+
+      <!-- with-properties.html -->
+      <a href="with-properties.html" class="card block rounded-2xl border border-amber-200 dark:border-amber-800/50 bg-white dark:bg-gray-900 overflow-hidden">
+        <div class="aspect-[16/9] bg-gradient-to-br from-amber-50 via-white to-yellow-50 dark:from-amber-950/30 dark:via-gray-900 dark:to-yellow-950/20 relative overflow-hidden">
+          <div class="absolute inset-x-4 top-4 h-6 bg-amber-200/60 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700/50 rounded text-[10px] flex items-center justify-center text-amber-800 dark:text-amber-200 font-medium">
+            exploratory · not chosen
+          </div>
+          <div class="absolute inset-x-4 top-12 bottom-4 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-2">
+            <div class="space-y-1">
+              <div class="h-2 bg-gray-100 dark:bg-gray-700 rounded"></div>
+              <div class="h-2 bg-gray-100 dark:bg-gray-700 rounded"></div>
+              <div class="h-2 bg-gray-100 dark:bg-gray-700 rounded w-5/6"></div>
+              <div class="h-2 bg-emerald-100 dark:bg-emerald-900/30 rounded"></div>
+              <div class="h-2 bg-gray-100 dark:bg-gray-700 rounded"></div>
+              <div class="h-2 bg-gray-100 dark:bg-gray-700 rounded"></div>
+              <div class="h-2 bg-gray-100 dark:bg-gray-700 rounded w-2/3"></div>
+            </div>
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="pill bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">exploratory</span>
+            <span class="text-xs text-gray-500 mono">with-properties.html</span>
+          </div>
+          <h3 class="text-lg font-bold flex items-center gap-2"><i data-lucide="list-tree" class="w-4 h-4 text-amber-500"></i> Properties inside the dialog</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1.5">Alternative direction we did <em>not</em> pick — embeds the property row table. Kept for reference.</p>
+        </div>
+      </a>
+    </div>
+
+    <!-- Decisions panel -->
+    <section class="mt-12 rounded-2xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/30 dark:bg-emerald-900/10 overflow-hidden">
+      <header class="px-6 py-4 border-b border-emerald-100 dark:border-emerald-800/40 flex items-center gap-3">
+        <i data-lucide="circle-check-big" class="w-5 h-5 text-emerald-600 dark:text-emerald-400"></i>
+        <h2 class="text-base font-bold">Decisions locked in for the build phase</h2>
+      </header>
+      <div class="p-6 grid md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+        <div class="flex items-start gap-3"><i data-lucide="signpost" class="w-4 h-4 text-indigo-500 mt-0.5"></i><div><div class="font-semibold">Wizard mode stays</div><div class="text-xs text-gray-500">First-class toggle next to Advanced.</div></div></div>
+        <div class="flex items-start gap-3"><i data-lucide="list-tree" class="w-4 h-4 text-indigo-500 mt-0.5"></i><div><div class="font-semibold">Properties stay outside</div><div class="text-xs text-gray-500">Edited in canvas / PropertyDialog.</div></div></div>
+        <div class="flex items-start gap-3"><i data-lucide="eye" class="w-4 h-4 text-indigo-500 mt-0.5"></i><div><div class="font-semibold">View ▾ menu, not tabs</div><div class="text-xs text-gray-500">JSON / YAML / Example open in a Monaco side sheet.</div></div></div>
+        <div class="flex items-start gap-3"><i data-lucide="save" class="w-4 h-4 text-indigo-500 mt-0.5"></i><div><div class="font-semibold">Explicit save</div><div class="text-xs text-gray-500">Warn on close; no autosave.</div></div></div>
+        <div class="flex items-start gap-3"><i data-lucide="git-compare" class="w-4 h-4 text-indigo-500 mt-0.5"></i><div><div class="font-semibold">No diff card here</div><div class="text-xs text-gray-500">Diff lives in the Versions screen.</div></div></div>
+        <div class="flex items-start gap-3"><i data-lucide="sparkles" class="w-4 h-4 text-indigo-500 mt-0.5"></i><div><div class="font-semibold">Persistent AI sidekick</div><div class="text-xs text-gray-500">Toggleable side panel; emits accept/reject patches.</div></div></div>
+      </div>
+    </section>
+
+    <p class="text-center text-xs text-gray-400 mt-8">
+      Source files in <span class="mono">objectified-ui/public/mockups/classes/</span> · Read the
+      <a href="README.md" class="text-indigo-500 hover:underline">README</a> for the full rationale.
+    </p>
+  </section>
+
+  <script>lucide.createIcons();</script>
+</body>
+</html>

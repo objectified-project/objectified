@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Designer · Edit class · Validation errors</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .backdrop-blur-page::before {
+      content: ''; position: fixed; inset: 0;
+      background: radial-gradient(circle at 30% 20%, rgba(99,102,241,0.18), transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(217,70,239,0.12), transparent 45%),
+                  rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(6px); z-index: 0;
+    }
+    .dark .backdrop-blur-page::before {
+      background: radial-gradient(circle at 30% 20%, rgba(99,102,241,0.22), transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(217,70,239,0.18), transparent 45%),
+                  rgba(2, 6, 23, 0.7);
+    }
+    .dialog-shell { box-shadow: 0 30px 80px -20px rgba(15, 23, 42, 0.35); }
+    .dark .dialog-shell { box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7); }
+    .pill { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600; }
+    .kbd { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.6875rem; padding: 0.125rem 0.375rem; border-radius: 0.25rem; border: 1px solid rgb(226 232 240); background: rgb(248 250 252); color: rgb(71 85 105); }
+    .dark .kbd { border-color: rgb(51 65 85); background: rgb(30 41 59); color: rgb(203 213 225); }
+    .err-dot { width: 6px; height: 6px; border-radius: 9999px; background: rgb(239 68 68);  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2); }
+    .warn-dot { width: 6px; height: 6px; border-radius: 9999px; background: rgb(245 158 11); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2); }
+    .json-key { color: #93c5fd; } .json-str { color: #86efac; } .json-punc { color: #94a3b8; }
+    .field-error { border-color: rgb(239 68 68) !important; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15); }
+    .field-warn  { border-color: rgb(245 158 11) !important; }
+    .ai-btn { background: linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(99, 102, 241, 0.12)); border: 1px solid rgba(168, 85, 247, 0.35); color: rgb(126, 34, 206); }
+    .dark .ai-btn { background: linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(99, 102, 241, 0.22)); color: rgb(216, 180, 254); }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 backdrop-blur-page">
+  <div class="fixed top-4 right-6 z-20 flex items-center gap-2">
+    <a href="./" class="text-xs text-white/80 hover:text-white px-3 py-1.5 rounded-md bg-black/30 backdrop-blur">← Back to mockup set</a>
+    <button id="themeBtn" class="w-8 h-8 rounded-md bg-black/30 backdrop-blur text-white hover:bg-black/40 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+  </div>
+
+  <div class="relative z-10 mx-auto my-6 max-w-[1480px] px-4">
+    <div class="dialog-shell rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col" style="height: calc(100vh - 3rem);">
+
+      <!-- Header (status pill is rose because save is blocked) -->
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-rose-50/60 via-white to-amber-50/40 dark:from-rose-950/30 dark:via-gray-900 dark:to-amber-950/20">
+        <div class="px-6 pt-4 pb-3 flex items-start justify-between gap-6">
+          <div class="flex items-start gap-4 min-w-0">
+            <div class="relative flex-shrink-0 w-14 h-14">
+              <svg viewBox="0 0 36 36" class="w-14 h-14" style="transform: rotate(-90deg)">
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke-width="3" style="stroke: rgba(148, 163, 184, 0.25);" />
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke-width="3" stroke-linecap="round" style="stroke: #ef4444; stroke-dasharray: 97.39; stroke-dashoffset: 60;" />
+              </svg>
+              <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <i data-lucide="x" class="w-5 h-5 text-rose-500"></i>
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 text-xs text-gray-500"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i><span>Edit class</span><span class="text-gray-300">·</span><span class="mono">billing-api · v2.4-draft</span></div>
+              <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                <h1 class="text-xl font-bold mono">Subscription</h1>
+                <span class="pill bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"><i data-lucide="alert-octagon" class="w-3 h-3"></i> 1 error</span>
+                <span class="pill bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"><i data-lucide="alert-triangle" class="w-3 h-3"></i> 3 warnings</span>
+                <span class="pill bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">5 unsaved</span>
+              </div>
+              <p class="text-xs text-rose-700 dark:text-rose-300 mt-1 font-medium"><i data-lucide="alert-circle" class="w-3 h-3 inline -mt-0.5"></i> Save blocked — fix the error in <span class="mono">Composition → discriminator</span> first.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button class="ai-btn px-3 py-1.5 text-sm rounded-md flex items-center gap-2 font-medium"><i data-lucide="sparkles" class="w-4 h-4"></i> AI sidekick</button>
+            <button class="px-2.5 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-1.5"><i data-lucide="eye" class="w-4 h-4"></i> View <i data-lucide="chevron-down" class="w-3 h-3"></i></button>
+            <button class="px-2.5 py-1.5 text-sm rounded-md bg-rose-50 dark:bg-rose-900/30 border border-rose-300 dark:border-rose-700/50 text-rose-700 dark:text-rose-300 flex items-center gap-1.5"><i data-lucide="flask-conical" class="w-4 h-4"></i> 1 error</button>
+            <button class="w-8 h-8 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center text-gray-500"><i data-lucide="x" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Banner -->
+      <div class="px-6 py-2.5 bg-rose-50/70 dark:bg-rose-900/20 border-b border-rose-200 dark:border-rose-800/50 flex items-center gap-3">
+        <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-500"></i>
+        <span class="text-sm text-rose-900 dark:text-rose-200 flex-1"><span class="font-semibold">discriminator.propertyName</span> "kind" is not declared on any subschema in <span class="mono">oneOf</span>.</span>
+        <button class="text-xs px-2 py-1 rounded bg-white dark:bg-rose-900/40 border border-rose-300 dark:border-rose-700/50 text-rose-700 dark:text-rose-200 hover:bg-rose-100 dark:hover:bg-rose-900/60 flex items-center gap-1">
+          <i data-lucide="arrow-down" class="w-3 h-3"></i> Jump to error
+        </button>
+        <button class="text-xs px-2 py-1 rounded text-rose-700 dark:text-rose-200 hover:bg-rose-100 dark:hover:bg-rose-900/30">Dismiss</button>
+      </div>
+
+      <!-- Body -->
+      <div class="flex-1 grid grid-cols-12 min-h-0">
+        <!-- Left nav with error/warning markers -->
+        <nav class="col-span-2 border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/40 overflow-y-auto p-3 text-sm space-y-0.5">
+          <div class="px-2 pb-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Identity</div>
+          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"><i data-lucide="badge-info" class="w-3.5 h-3.5"></i><span class="flex-1 truncate">Basics</span><span class="warn-dot" title="1 warning"></span></a>
+
+          <div class="px-2 pt-3 pb-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Validation</div>
+          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"><i data-lucide="layers" class="w-3.5 h-3.5"></i><span class="flex-1 truncate">Additional props</span></a>
+
+          <div class="px-2 pt-3 pb-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Composition</div>
+          <a href="#err-section" class="flex items-center gap-2 px-2 py-1.5 rounded-md bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-300"><i data-lucide="git-merge" class="w-3.5 h-3.5"></i><span class="flex-1 truncate font-medium">Inheritance</span><span class="err-dot" title="1 error"></span></a>
+
+          <div class="px-2 pt-3 pb-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Documentation</div>
+          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"><i data-lucide="code-xml" class="w-3.5 h-3.5"></i><span class="flex-1 truncate">Examples</span><span class="warn-dot"></span></a>
+          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"><i data-lucide="hash" class="w-3.5 h-3.5"></i><span class="flex-1 truncate">Schema metadata</span><span class="warn-dot"></span></a>
+        </nav>
+
+        <!-- Form (focused on the section with the error) -->
+        <main class="col-span-7 overflow-y-auto p-6 space-y-5 max-w-3xl mx-auto">
+          <!-- The error section -->
+          <section id="err-section" class="rounded-xl border-2 border-rose-300 dark:border-rose-700/60 bg-rose-50/30 dark:bg-rose-900/10 ring-4 ring-rose-200/30">
+            <header class="px-5 py-3.5 flex items-center justify-between border-b border-rose-200/60 dark:border-rose-800/40">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-md bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-300 flex items-center justify-center"><i data-lucide="git-merge" class="w-4 h-4"></i></span>
+                <div>
+                  <h3 class="text-sm font-semibold flex items-center gap-2">Composition & Inheritance <span class="err-dot"></span></h3>
+                  <p class="text-xs text-rose-700 dark:text-rose-300 font-medium">1 error · 0 warnings</p>
+                </div>
+              </div>
+            </header>
+            <div class="p-5 space-y-4">
+              <!-- Composition kind: oneOf selected -->
+              <div class="grid grid-cols-3 gap-3">
+                <div class="border rounded-lg p-3 border-gray-200 dark:border-gray-700"><div class="text-sm font-semibold flex items-center gap-1.5"><i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-500"></i> allOf</div><p class="text-[10px] text-gray-400 mt-1">none selected</p></div>
+                <div class="border rounded-lg p-3 border-gray-200 dark:border-gray-700"><div class="text-sm font-semibold flex items-center gap-1.5"><i data-lucide="layers" class="w-3.5 h-3.5 text-amber-500"></i> anyOf</div><p class="text-[10px] text-gray-400 mt-1">none selected</p></div>
+                <div class="border-2 border-purple-500 bg-purple-50/60 dark:bg-purple-900/20 rounded-lg p-3"><div class="text-sm font-semibold flex items-center gap-1.5"><i data-lucide="layers" class="w-3.5 h-3.5 text-purple-500"></i> oneOf</div><p class="text-[10px] text-purple-500 mt-1 mono">3 selected</p></div>
+              </div>
+
+              <!-- Selected oneOf -->
+              <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3">
+                <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium block mb-2">oneOf variants</span>
+                <ul class="space-y-1.5">
+                  <li class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md"><i data-lucide="grip-vertical" class="w-4 h-4 text-gray-400"></i><span class="mono text-sm font-semibold">FixedSubscription</span><span class="text-xs text-gray-500 flex-1 truncate">price · billing_cycle</span></li>
+                  <li class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md"><i data-lucide="grip-vertical" class="w-4 h-4 text-gray-400"></i><span class="mono text-sm font-semibold">UsageSubscription</span><span class="text-xs text-gray-500 flex-1 truncate">unit_price · meter_id</span></li>
+                  <li class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md"><i data-lucide="grip-vertical" class="w-4 h-4 text-gray-400"></i><span class="mono text-sm font-semibold">TieredSubscription</span><span class="text-xs text-gray-500 flex-1 truncate">tiers</span></li>
+                </ul>
+              </div>
+
+              <!-- Discriminator with the error -->
+              <div class="rounded-lg border-2 border-rose-300 dark:border-rose-700/60 bg-rose-50/40 dark:bg-rose-900/15 p-3">
+                <div class="flex items-center gap-2 mb-2">
+                  <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-500"></i>
+                  <span class="text-sm font-semibold text-rose-700 dark:text-rose-300">Discriminator error</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <label class="block">
+                    <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium block mb-1">Discriminator property</span>
+                    <input value="kind" class="field-error w-full px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono text-sm outline-none" />
+                    <p class="text-[11px] text-rose-700 dark:text-rose-300 mt-1.5 flex items-start gap-1"><i data-lucide="alert-circle" class="w-3 h-3 mt-0.5 shrink-0"></i> <span><span class="mono">kind</span> isn't declared on any of <span class="mono">FixedSubscription</span>, <span class="mono">UsageSubscription</span>, or <span class="mono">TieredSubscription</span>. The discriminator property must exist on every variant.</span></p>
+                  </label>
+                  <div>
+                    <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium block mb-1">Suggested fixes</span>
+                    <div class="space-y-1.5">
+                      <button class="w-full text-left text-xs px-2.5 py-2 rounded-md border border-rose-200 dark:border-rose-800/50 bg-white dark:bg-gray-900 hover:bg-rose-50 dark:hover:bg-rose-900/30 flex items-start gap-2"><i data-lucide="wand" class="w-3 h-3 text-rose-500 mt-0.5"></i><span><span class="font-semibold">Use <span class="mono">type</span></span> — already declared on all 3 variants</span></button>
+                      <button class="w-full text-left text-xs px-2.5 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-start gap-2"><i data-lucide="plus" class="w-3 h-3 text-gray-500 mt-0.5"></i><span>Add <span class="mono">kind</span> to all 3 variants</span></button>
+                      <button class="w-full text-left text-xs px-2.5 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-start gap-2"><i data-lucide="x" class="w-3 h-3 text-gray-500 mt-0.5"></i><span>Remove discriminator (auto-detection still works)</span></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- A warning section (Basics: missing description) -->
+          <section class="rounded-xl border border-amber-200/70 dark:border-amber-800/40 bg-amber-50/20 dark:bg-amber-900/10">
+            <header class="px-5 py-3.5 flex items-center justify-between border-b border-amber-100/60 dark:border-amber-800/30">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300 flex items-center justify-center"><i data-lucide="badge-info" class="w-4 h-4"></i></span>
+                <div>
+                  <h3 class="text-sm font-semibold flex items-center gap-2">Basics <span class="warn-dot"></span></h3>
+                  <p class="text-xs text-amber-700 dark:text-amber-300">1 warning · description is empty</p>
+                </div>
+              </div>
+            </header>
+            <div class="p-5 space-y-3">
+              <div class="grid grid-cols-3 gap-4">
+                <label class="block">
+                  <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium block mb-1">Class name</span>
+                  <input value="Subscription" class="w-full px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono text-sm outline-none" />
+                </label>
+                <label class="col-span-2 block">
+                  <span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium block mb-1">Description</span>
+                  <textarea rows="2" placeholder="Brief description of what this class represents…" class="field-warn w-full px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm outline-none"></textarea>
+                  <p class="text-[11px] text-amber-700 dark:text-amber-300 mt-1.5 flex items-start gap-1"><i data-lucide="alert-triangle" class="w-3 h-3 mt-0.5 shrink-0"></i> Empty descriptions reduce SDK doc quality. Recommended.</p>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <!-- Other warnings collapsed -->
+          <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 divide-y divide-gray-100 dark:divide-gray-700/60">
+            <button class="w-full px-5 py-3 flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60">
+              <span class="w-7 h-7 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 flex items-center justify-center"><i data-lucide="code-xml" class="w-4 h-4"></i></span>
+              <div class="flex-1"><span class="text-sm font-medium">Examples</span><span class="text-xs text-amber-700 dark:text-amber-300 ml-2">missing — recommended</span></div>
+              <span class="warn-dot"></span><i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+            </button>
+            <button class="w-full px-5 py-3 flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60">
+              <span class="w-7 h-7 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 flex items-center justify-center"><i data-lucide="hash" class="w-4 h-4"></i></span>
+              <div class="flex-1"><span class="text-sm font-medium">Schema metadata</span><span class="text-xs text-amber-700 dark:text-amber-300 ml-2">$id missing — required for $ref</span></div>
+              <span class="warn-dot"></span><i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+            </button>
+          </div>
+        </main>
+
+        <!-- Right inspector with full lint list -->
+        <aside class="col-span-3 border-l border-gray-200 dark:border-gray-700 bg-gray-50/40 dark:bg-gray-900/30 overflow-y-auto p-4 space-y-4">
+          <div class="rounded-lg border border-rose-200 dark:border-rose-800/50 bg-rose-50/40 dark:bg-rose-900/20 overflow-hidden">
+            <div class="px-3 py-2 border-b border-rose-200/60 dark:border-rose-800/40 bg-white/40 dark:bg-rose-900/10 flex items-center gap-2">
+              <i data-lucide="shield-x" class="w-3.5 h-3.5 text-rose-500"></i>
+              <span class="text-xs font-semibold">Validation</span>
+              <span class="ml-auto pill bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">1 error</span>
+            </div>
+            <ul class="divide-y divide-rose-200/60 dark:divide-rose-800/30 text-xs">
+              <li class="px-3 py-2.5">
+                <div class="flex items-start gap-2">
+                  <i data-lucide="alert-octagon" class="w-3.5 h-3.5 text-rose-500 mt-0.5"></i>
+                  <div class="flex-1">
+                    <span class="font-medium">Discriminator property not declared</span>
+                    <p class="text-[11px] text-gray-600 dark:text-gray-400 mt-0.5"><span class="mono">kind</span> isn't on FixedSubscription, UsageSubscription, TieredSubscription</p>
+                    <a href="#err-section" class="text-rose-600 hover:underline block mt-1 text-[11px]">Jump to field →</a>
+                  </div>
+                </div>
+              </li>
+              <li class="px-3 py-2.5">
+                <div class="flex items-start gap-2">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-500 mt-0.5"></i>
+                  <div class="flex-1">
+                    <span class="font-medium">Description is empty</span>
+                    <p class="text-[11px] text-gray-600 dark:text-gray-400 mt-0.5">Recommended for SDK doc quality</p>
+                    <a href="#" class="text-indigo-500 hover:underline block mt-1 text-[11px] flex items-center gap-1"><i data-lucide="sparkles" class="w-3 h-3"></i> Ask sidekick →</a>
+                  </div>
+                </div>
+              </li>
+              <li class="px-3 py-2.5">
+                <div class="flex items-start gap-2">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-500 mt-0.5"></i>
+                  <div class="flex-1">
+                    <span class="font-medium">No examples provided</span>
+                    <a href="ai-mode.html" class="text-indigo-500 hover:underline block mt-1 text-[11px] flex items-center gap-1"><i data-lucide="sparkles" class="w-3 h-3"></i> Generate from schema →</a>
+                  </div>
+                </div>
+              </li>
+              <li class="px-3 py-2.5">
+                <div class="flex items-start gap-2">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-500 mt-0.5"></i>
+                  <div class="flex-1">
+                    <span class="font-medium">Inline enum on <span class="mono">status</span></span>
+                    <a href="#" class="text-indigo-500 hover:underline block mt-1 text-[11px]">Promote to reference data →</a>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <!-- References / impact -->
+          <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+            <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700/60 flex items-center gap-2">
+              <i data-lucide="link-2" class="w-3.5 h-3.5 text-indigo-500"></i>
+              <span class="text-xs font-semibold">Used by</span>
+              <span class="ml-auto text-[10px] text-gray-400 mono">6 paths · 3 classes</span>
+            </div>
+            <p class="px-3 py-2 text-[11px] text-gray-500">Saving will revalidate downstream consumers.</p>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Footer with disabled save -->
+      <footer class="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3 text-xs text-gray-500"><span class="kbd">⌘ S</span> Save · <span class="kbd">⌘ ⏎</span> Validate · <span class="kbd">Esc</span> Close</div>
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-1.5 text-sm rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5"><i data-lucide="undo" class="w-3.5 h-3.5"></i> Discard</button>
+          <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+          <span class="text-xs text-rose-600 dark:text-rose-400 font-medium mr-1 inline-flex items-center gap-1"><i data-lucide="alert-octagon" class="w-3 h-3"></i> Fix 1 error to save</span>
+          <button class="px-4 py-1.5 text-sm rounded-md bg-rose-300 text-white cursor-not-allowed flex items-center gap-1.5 opacity-70" disabled>
+            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Save · 5 changes
+          </button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'designer-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>

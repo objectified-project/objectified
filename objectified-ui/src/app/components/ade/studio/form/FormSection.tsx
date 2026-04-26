@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { cn } from '../../../../../../lib/utils';
 
 /**
@@ -37,6 +38,14 @@ const ACCENT_EYEBROW: Record<AccentColor, string> = {
 
 export type AccentColor = 'indigo' | 'amber' | 'orange' | 'purple' | 'emerald' | 'slate';
 
+/**
+ * Per-section status used by the dot-state nav and the collapsed-stub
+ * affordance. `empty` is the default for untouched optional sections;
+ * `filled` means the user has changed at least one default; `warn` and
+ * `error` come from the lint pass and dominate over filled.
+ */
+export type FormSectionStatus = 'empty' | 'filled' | 'warn' | 'error';
+
 export interface FormSectionProps {
   /** Stable id used by the sidebar nav and scroll-spy. */
   id?: string;
@@ -54,15 +63,48 @@ export interface FormSectionProps {
   action?: React.ReactNode;
   /** Subtle amber ring and dot signalling this section contains non-default values. */
   changed?: boolean;
+  /**
+   * Richer status replacing the boolean `changed`. When provided, drives the
+   * header dot color (rose / amber / indigo / outline) and the collapsed-stub
+   * call-to-action copy. `changed` is still respected for backwards-compat
+   * with sections that haven't been migrated yet.
+   */
+  status?: FormSectionStatus;
   /** Color accent applied to icon and eyebrow. Defaults to indigo. */
   accent?: AccentColor;
   /** Tightens vertical padding. Use inside already-padded containers. */
   dense?: boolean;
+  /**
+   * Lets the section render as a collapsed stub (header only) until clicked.
+   * Use sparingly — required sections should always render expanded.
+   */
+  collapsible?: boolean;
+  /** Controlled expanded state. When provided, `defaultExpanded` is ignored. */
+  expanded?: boolean;
+  /** Initial expanded state for the uncontrolled case. Defaults to true. */
+  defaultExpanded?: boolean;
+  /** Fires when the user clicks the collapsed-stub header to toggle. */
+  onExpandedChange?: (next: boolean) => void;
   className?: string;
   headerClassName?: string;
   bodyClassName?: string;
   children: React.ReactNode;
 }
+
+const STATUS_DOT: Record<FormSectionStatus, string> = {
+  empty:
+    'border-2 border-slate-300 dark:border-slate-600 bg-transparent',
+  filled: 'bg-amber-400',
+  warn: 'bg-amber-500 ring-2 ring-amber-400/30',
+  error: 'bg-rose-500 ring-2 ring-rose-400/30',
+};
+
+const STATUS_LABEL: Record<FormSectionStatus, string> = {
+  empty: 'Empty section',
+  filled: 'Contains non-default values',
+  warn: 'Section has a lint warning',
+  error: 'Section has a validation error',
+};
 
 export const FormSection = React.forwardRef<HTMLElement, FormSectionProps>(
   (
@@ -75,8 +117,13 @@ export const FormSection = React.forwardRef<HTMLElement, FormSectionProps>(
       badge,
       action,
       changed,
+      status,
       accent = 'indigo',
       dense,
+      collapsible,
+      expanded: controlledExpanded,
+      defaultExpanded = true,
+      onExpandedChange,
       className,
       headerClassName,
       bodyClassName,
@@ -84,63 +131,189 @@ export const FormSection = React.forwardRef<HTMLElement, FormSectionProps>(
     },
     ref,
   ) => {
+    const [internalExpanded, setInternalExpanded] = React.useState(defaultExpanded);
+    const isControlled = controlledExpanded !== undefined;
+    const expanded = collapsible ? (isControlled ? controlledExpanded : internalExpanded) : true;
+    const toggle = React.useCallback(() => {
+      const next = !expanded;
+      if (!isControlled) setInternalExpanded(next);
+      onExpandedChange?.(next);
+    }, [expanded, isControlled, onExpandedChange]);
+
+    // Derive an effective status. If a caller still passes the legacy
+    // `changed` boolean we treat it as `filled` so old call-sites keep
+    // working without touching them.
+    const effectiveStatus: FormSectionStatus = status ?? (changed ? 'filled' : 'empty');
+    // Only show the dot when a caller has opted into status semantics
+    // (status prop or legacy changed=true). Untouched legacy call-sites
+    // continue to render with no dot.
+    const showDot = status !== undefined || !!changed;
+
+    const renderDot = () =>
+      showDot ? (
+        <span
+          className={cn(
+            'inline-flex h-2 w-2 rounded-full shrink-0',
+            STATUS_DOT[effectiveStatus],
+          )}
+          aria-label={STATUS_LABEL[effectiveStatus]}
+          title={STATUS_LABEL[effectiveStatus]}
+        />
+      ) : null;
+
+    const showEdgeStripe = effectiveStatus !== 'empty';
+    const stripeClass =
+      effectiveStatus === 'error'
+        ? 'before:bg-rose-400/80'
+        : effectiveStatus === 'warn'
+          ? 'before:bg-amber-500/80'
+          : 'before:bg-amber-400/80';
+
     return (
       <section
         ref={ref}
         id={id}
         data-section-id={id}
+        data-section-status={effectiveStatus}
+        data-section-collapsed={collapsible && !expanded ? 'true' : undefined}
         className={cn(
           'relative scroll-mt-24 border-b border-slate-200 dark:border-slate-800 last:border-b-0',
-          dense ? 'px-6 py-5' : 'px-8 py-7',
-          changed &&
-            'before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-amber-400/80',
+          collapsible && !expanded
+            ? dense
+              ? 'px-6 py-3'
+              : 'px-8 py-4'
+            : dense
+              ? 'px-6 py-5'
+              : 'px-8 py-7',
+          showEdgeStripe &&
+            cn(
+              'before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full',
+              stripeClass,
+            ),
           className,
         )}
       >
-        <header
-          className={cn(
-            'mb-5 flex flex-wrap items-start justify-between gap-x-6 gap-y-2',
-            headerClassName,
-          )}
-        >
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            {eyebrow && (
-              <span
-                className={cn(
-                  'text-[11px] font-semibold uppercase tracking-[0.1em]',
-                  ACCENT_EYEBROW[accent],
-                )}
-              >
-                {eyebrow}
-              </span>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={toggle}
+            aria-expanded={expanded}
+            className={cn(
+              'group flex w-full items-start justify-between gap-x-6 gap-y-2 text-left rounded-md',
+              expanded ? 'mb-5' : 'mb-0',
+              'hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60',
+              '-mx-2 px-2 py-1',
+              headerClassName,
             )}
-            <div className="flex flex-wrap items-center gap-2">
-              {icon && (
-                <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center', ACCENT_ICON[accent])}>
-                  {icon}
+          >
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              {eyebrow && (
+                <span
+                  className={cn(
+                    'text-[11px] font-semibold uppercase tracking-[0.1em]',
+                    ACCENT_EYEBROW[accent],
+                  )}
+                >
+                  {eyebrow}
                 </span>
               )}
-              <h3 className="text-base font-semibold leading-6 tracking-[-0.01em] text-slate-900 dark:text-slate-100">
-                {title}
-              </h3>
-              {changed && (
+              <span className="flex flex-wrap items-center gap-2">
                 <span
-                  className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"
-                  aria-label="Contains non-default values"
-                  title="Contains non-default values"
-                />
+                  className={cn(
+                    'inline-flex h-4 w-4 shrink-0 items-center justify-center text-slate-400',
+                    expanded ? 'rotate-0' : 'group-hover:translate-x-0.5 transition-transform',
+                  )}
+                  aria-hidden
+                >
+                  {expanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </span>
+                {icon && (
+                  <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center', ACCENT_ICON[accent])}>
+                    {icon}
+                  </span>
+                )}
+                <h3 className="text-base font-semibold leading-6 tracking-[-0.01em] text-slate-900 dark:text-slate-100">
+                  {title}
+                </h3>
+                {renderDot()}
+                {badge && <span className="ml-1 flex items-center">{badge}</span>}
+              </span>
+              {description && expanded && (
+                <span className="mt-1 max-w-3xl block text-sm leading-5 text-slate-500 dark:text-slate-400">
+                  {description}
+                </span>
               )}
-              {badge && <span className="ml-1 flex items-center">{badge}</span>}
-            </div>
-            {description && (
-              <p className="mt-1 max-w-3xl text-sm leading-5 text-slate-500 dark:text-slate-400">
-                {description}
-              </p>
+              {!expanded && (
+                <span className="text-[12px] leading-5 text-slate-500 dark:text-slate-400 inline-flex items-center gap-1">
+                  {effectiveStatus === 'empty' ? (
+                    <>
+                      <Plus className="h-3 w-3" />
+                      Configure
+                    </>
+                  ) : effectiveStatus === 'error' ? (
+                    'Has a validation error — click to fix'
+                  ) : effectiveStatus === 'warn' ? (
+                    'Has a recommendation — click to review'
+                  ) : (
+                    'Configured · click to edit'
+                  )}
+                </span>
+              )}
+            </span>
+            {action && expanded && (
+              <span
+                className="flex shrink-0 items-center gap-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {action}
+              </span>
             )}
-          </div>
-          {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
-        </header>
-        <div className={cn('space-y-5', bodyClassName)}>{children}</div>
+          </button>
+        ) : (
+          <header
+            className={cn(
+              'mb-5 flex flex-wrap items-start justify-between gap-x-6 gap-y-2',
+              headerClassName,
+            )}
+          >
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              {eyebrow && (
+                <span
+                  className={cn(
+                    'text-[11px] font-semibold uppercase tracking-[0.1em]',
+                    ACCENT_EYEBROW[accent],
+                  )}
+                >
+                  {eyebrow}
+                </span>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {icon && (
+                  <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center', ACCENT_ICON[accent])}>
+                    {icon}
+                  </span>
+                )}
+                <h3 className="text-base font-semibold leading-6 tracking-[-0.01em] text-slate-900 dark:text-slate-100">
+                  {title}
+                </h3>
+                {renderDot()}
+                {badge && <span className="ml-1 flex items-center">{badge}</span>}
+              </div>
+              {description && (
+                <p className="mt-1 max-w-3xl text-sm leading-5 text-slate-500 dark:text-slate-400">
+                  {description}
+                </p>
+              )}
+            </div>
+            {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
+          </header>
+        )}
+        {expanded && <div className={cn('space-y-5', bodyClassName)}>{children}</div>}
       </section>
     );
   },

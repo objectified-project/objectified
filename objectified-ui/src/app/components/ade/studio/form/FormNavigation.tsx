@@ -72,14 +72,25 @@ export const FormViewModeToggle: React.FC<FormViewModeToggleProps> = ({
   );
 };
 
+export type FormSectionNavStatus = 'empty' | 'filled' | 'warn' | 'error';
+
 export interface FormSectionNavItem {
   id: string;
   label: string;
   icon?: React.ReactNode;
   /** Optional group label that renders as an uppercase eyebrow above this item. */
   group?: string;
+  /**
+   * Explicit four-state status. When provided, takes precedence over
+   * the legacy `changed`/`warn`/`error` booleans.
+   */
+  status?: FormSectionNavStatus;
   /** Indicates that this section currently has non-default values. */
   changed?: boolean;
+  /** Section has lint warnings (recommended fixes, but save is allowed). */
+  warn?: boolean;
+  /** Section has a blocking validation error (save should be disabled). */
+  error?: boolean;
 }
 
 export interface FormSectionNavProps {
@@ -134,6 +145,28 @@ export const FormSectionNav: React.FC<FormSectionNavProps> = ({
             )}
             {group.items.map((item) => {
               const active = item.id === activeId;
+              // Resolve the four-state status with backwards-compat
+              // fallbacks. Boolean flags are still honored for callers
+              // that haven't migrated yet.
+              const status: FormSectionNavStatus =
+                item.status ??
+                (item.error ? 'error' : item.warn ? 'warn' : item.changed ? 'filled' : 'empty');
+              const dotClass =
+                status === 'error'
+                  ? 'bg-rose-500 ring-rose-500/20'
+                  : status === 'warn'
+                    ? 'bg-amber-400 ring-amber-400/20'
+                    : status === 'filled'
+                      ? 'bg-indigo-500 ring-indigo-500/20'
+                      : 'bg-transparent border border-slate-300 dark:border-slate-600 ring-0';
+              const dotLabel =
+                status === 'error'
+                  ? 'Section has a validation error'
+                  : status === 'warn'
+                    ? 'Section has a lint warning'
+                    : status === 'filled'
+                      ? 'Section has non-default values'
+                      : 'Empty section';
               return (
                 <li key={item.id}>
                   <button
@@ -158,12 +191,14 @@ export const FormSectionNav: React.FC<FormSectionNavProps> = ({
                       </span>
                     )}
                     <span className="truncate">{item.label}</span>
-                    {item.changed && (
-                      <span
-                        className="ml-auto inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400"
-                        aria-label="Contains non-default values"
-                      />
-                    )}
+                    <span
+                      className={cn(
+                        'ml-auto inline-flex h-2 w-2 shrink-0 rounded-full ring-2',
+                        dotClass,
+                      )}
+                      aria-label={dotLabel}
+                      title={dotLabel}
+                    />
                   </button>
                 </li>
               );

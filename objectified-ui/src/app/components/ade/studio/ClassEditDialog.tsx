@@ -1,15 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
-import dynamic from 'next/dynamic';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '../../ui/Dialog';
-import { Markdown } from '../../ui/Markdown';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Label } from '../../ui/Label';
@@ -17,12 +13,8 @@ import { Textarea } from '../../ui/Textarea';
 import { Alert } from '../../ui/Alert';
 import { Badge } from '../../ui/Badge';
 import { Checkbox } from '../../ui/Checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/Tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/Select';
-import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code, Plus, Trash2, Regex, Link, ListChecks, X, ChevronDown, GitBranch, ArrowRight, Sparkles, Bot, User, Send, Loader2, ArrowLeft } from 'lucide-react';
-import * as SelectRadix from '@radix-ui/react-select';
-import YAML from 'yaml';
-import jsf from 'json-schema-faker';
+import { Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code, Plus, Trash2, Regex, Link, ListChecks, X, GitBranch, ArrowRight } from 'lucide-react';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
 import { assignTagToClass, removeTagFromClass, getTagsForClass } from '../../../../../lib/db/helper';
 import { createClassWithSession, updateClassWithSession, getClassWithPropertiesAndTagsWithSession } from '../../../../../lib/api/rest-client';
@@ -32,6 +24,15 @@ import ConditionalSchemaBuilder, {
   conditionalRulesToJsonSchema,
   jsonSchemaToConditionalRules
 } from './ConditionalSchemaBuilder';
+import { ClassEditHeader, ClassEditStatusBar, ClassEditFooter } from './ClassEditChrome';
+import { ClassEditInspector, type LintIssue, type ClassReference } from './ClassEditInspector';
+import { ClassEditViewSheet, type ClassViewFormat } from './ClassEditViewSheet';
+import {
+  ClassEditAiSidekick,
+  type AiClassDefinition,
+  type PatchState,
+} from './ClassEditAiSidekick';
+import { ClassCompositionPicker } from './ClassCompositionPicker';
 import {
   FormSection,
   FormSubsection,
@@ -75,94 +76,6 @@ const useDarkMode = () => {
   }, []);
   return isDark;
 };
-
-// Multi-select component for class references
-interface MultiSelectProps {
-  options: string[];
-  value: string[];
-  onChange: (value: string[]) => void;
-  placeholder?: string;
-  disabled?: boolean;
-  colorScheme?: 'indigo' | 'amber' | 'purple';
-}
-
-const MultiSelect = ({ options, value, onChange, placeholder = 'Select...', disabled = false, colorScheme = 'indigo' }: MultiSelectProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const colorClasses: Record<string, string> = {
-    indigo: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200',
-    amber: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
-    purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200',
-  };
-
-  const availableOptions = options.filter(opt => !value.includes(opt));
-
-  return (
-    <div ref={ref} className="relative">
-      <div
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`min-h-[38px] w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm cursor-pointer flex flex-wrap gap-1 items-center ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-      >
-        {value.length === 0 ? (
-          <span className="text-gray-400">{placeholder}</span>
-        ) : (
-          value.map((v) => (
-            <span key={v} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${colorClasses[colorScheme]}`}>
-              {v}
-              {!disabled && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onChange(value.filter(item => item !== v));
-                  }}
-                  className="hover:bg-black/10 rounded"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </span>
-          ))
-        )}
-        <ChevronDown className="h-4 w-4 ml-auto text-gray-400 shrink-0" />
-      </div>
-      {isOpen && availableOptions.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg max-h-48 overflow-auto">
-          {availableOptions.map((opt) => (
-            <div
-              key={opt}
-              onClick={() => onChange([...value, opt])}
-              className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-            >
-              {opt}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Dynamically import Monaco Editor with SSR disabled
-const Editor = dynamic(() => import('@monaco-editor/react'), {
-  ssr: false,
-  loading: () => (
-    <div className="h-full flex items-center justify-center">
-      <div className="text-gray-500 dark:text-gray-400">Loading editor...</div>
-    </div>
-  ),
-});
 
 /**
  * Canonical ordering of class-edit sections.
@@ -238,9 +151,8 @@ interface ClassEditDialogProps {
 const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false, onSave, projectId = '', versionId = '', projectTags = [], projectMetadata }: ClassEditDialogProps) => {
   const isDark = useDarkMode();
 
-  const [activeTab, setActiveTab] = useState('edit');
-  const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
-  const [copied, setCopied] = useState(false);
+  const [viewSheetOpen, setViewSheetOpen] = useState(false);
+  const [viewSheetFormat, setViewSheetFormat] = useState<ClassViewFormat>('schema-json');
   const [saving, setSaving] = useState(false);
   const [openApiDoc, setOpenApiDoc] = useState<any>(null);
   const [loadingOpenApiDoc, setLoadingOpenApiDoc] = useState(false);
@@ -265,8 +177,9 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     rootMarginTop: 24,
   });
 
-  // AI Assistant (Create Class) chat mode
-  const [showAIChatMode, setShowAIChatMode] = useState(false);
+  // AI Assistant — persistent sidekick panel (chat + patch suggestions)
+  const [aiSidekickOpen, setAiSidekickOpen] = useState(false);
+  const [aiPatchStates, setAiPatchStates] = useState<Record<number, PatchState>>({});
   const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -277,8 +190,24 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   const [aiCreateError, setAiCreateError] = useState('');
   const [aiProjectProperties, setAiProjectProperties] = useState<Array<{ id: string; name: string; description?: string | null; data: any }>>([]);
   const [newDependentSchemaProperty, setNewDependentSchemaProperty] = useState('');
-  const aiMessagesEndRef = useRef<HTMLDivElement>(null);
   const aiAbortControllerRef = useRef<AbortController | null>(null);
+
+  // Snapshot of the last saved/hydrated formData. Used to drive the "X
+  // unsaved" pill and the per-section dot indicator vs. just the
+  // "non-default" indicator. We bump `snapshotTick` from the load and
+  // save handlers, then a follow-up effect captures whatever formData
+  // value won the latest setFormData race and stores it as the
+  // snapshot.
+  const [savedSnapshotJson, setSavedSnapshotJson] = useState<string>('');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [snapshotTick, setSnapshotTick] = useState(0);
+  // Tick once a minute so the "Last saved Xm ago" label stays fresh.
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setInterval(() => setNowTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, [open]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -364,17 +293,250 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     };
   }, [formData]);
 
+  /**
+   * Count of distinct top-level fields the user has touched since the
+   * last load/save. Excludes the local `error` flag so transient validation
+   * messages don't bump the counter.
+   */
+  const unsavedKeys = useMemo<string[]>(() => {
+    if (!savedSnapshotJson) return [];
+    let saved: Record<string, unknown>;
+    try {
+      saved = JSON.parse(savedSnapshotJson) as Record<string, unknown>;
+    } catch {
+      return [];
+    }
+    const keys = Object.keys(formData) as Array<keyof typeof formData>;
+    const out: string[] = [];
+    for (const k of keys) {
+      if (k === 'error') continue;
+      const a = formData[k];
+      const b = saved[k as string];
+      if (JSON.stringify(a) !== JSON.stringify(b)) out.push(String(k));
+    }
+    return out;
+  }, [formData, savedSnapshotJson]);
+  const unsavedCount = unsavedKeys.length;
+
+  /**
+   * Header progress ring. A class is considered "filled" when its name
+   * is set (required) and a healthy spread of optional sections have
+   * been touched. We weight name strongly so empty new-class dialogs
+   * read as low completeness even after one or two sections are filled.
+   */
+  const completenessPercent = useMemo(() => {
+    const totalSections = CLASS_SECTION_ORDER.length;
+    const filledSections = (Object.keys(changedSections) as ClassSectionId[])
+      .filter((id) => changedSections[id]).length;
+    const nameWeight = formData.name.trim() ? 1 : 0;
+    // 30% from name presence, 70% from filled sections coverage.
+    return Math.round(nameWeight * 30 + (filledSections / totalSections) * 70);
+  }, [formData.name, changedSections]);
+
+  /**
+   * Lightweight lint pass for Phase 1. Real validation (schema cycles,
+   * dangling $ref, regex sanity, etc.) is added in a later phase. Each
+   * issue carries an optional `sectionId` so the inspector can scroll
+   * the form into view.
+   */
+  const lintIssues = useMemo<LintIssue[]>(() => {
+    const issues: LintIssue[] = [];
+    if (!formData.name.trim()) {
+      issues.push({
+        id: 'missing-name',
+        severity: 'error',
+        message: 'Class name is required',
+        detail: 'Use PascalCase, letters and digits only (e.g. UserAccount).',
+        sectionId: 'basics',
+      });
+    }
+    if (
+      formData.deprecated &&
+      !formData.deprecationMessage.trim()
+    ) {
+      issues.push({
+        id: 'deprecation-empty',
+        severity: 'warn',
+        message: 'Deprecated class has no replacement note',
+        detail: 'Tell consumers what to migrate to.',
+        sectionId: 'basics',
+      });
+    }
+    if (formData.examples.length === 0) {
+      issues.push({
+        id: 'missing-examples',
+        severity: 'warn',
+        message: 'No examples provided',
+        detail: 'Examples improve generated docs and let consumers preview real-looking payloads.',
+        sectionId: 'examples',
+      });
+    }
+    if (
+      formData.minProperties.trim() &&
+      formData.maxProperties.trim() &&
+      Number(formData.minProperties) > Number(formData.maxProperties)
+    ) {
+      issues.push({
+        id: 'min-greater-than-max',
+        severity: 'error',
+        message: 'minProperties is greater than maxProperties',
+        detail: 'Adjust the bounds in Object Constraints so min ≤ max.',
+        sectionId: 'object-constraints',
+      });
+    }
+    return issues;
+  }, [formData.name, formData.deprecated, formData.deprecationMessage, formData.examples, formData.minProperties, formData.maxProperties]);
+
+  const errorCount = lintIssues.filter((i) => i.severity === 'error').length;
+  const warnCount = lintIssues.filter((i) => i.severity === 'warn').length;
+
+  /**
+   * Sections that contain a lint error / warning, used to colour the
+   * dots in the section nav.
+   */
+  const sectionLintMap = useMemo(() => {
+    const map: Record<string, { error?: boolean; warn?: boolean }> = {};
+    for (const issue of lintIssues) {
+      if (!issue.sectionId) continue;
+      const slot = (map[issue.sectionId] ||= {});
+      if (issue.severity === 'error') slot.error = true;
+      else if (issue.severity === 'warn') slot.warn = true;
+    }
+    return map;
+  }, [lintIssues]);
+
+  /**
+   * Four-state per-section status used by the dot-state nav and the
+   * collapsed-stub headers. Lint errors win over warnings, which win
+   * over the "filled" indicator from `changedSections`.
+   */
+  type SectionStatus = 'empty' | 'filled' | 'warn' | 'error';
+  const sectionStatus = useMemo<Record<ClassSectionId, SectionStatus>>(() => {
+    const out: Partial<Record<ClassSectionId, SectionStatus>> = {};
+    for (const id of CLASS_SECTION_ORDER) {
+      const lint = sectionLintMap[id];
+      if (lint?.error) out[id] = 'error';
+      else if (lint?.warn) out[id] = 'warn';
+      else if (changedSections[id]) out[id] = 'filled';
+      else out[id] = 'empty';
+    }
+    return out as Record<ClassSectionId, SectionStatus>;
+  }, [changedSections, sectionLintMap]);
+
+  /**
+   * Sections the user has explicitly opened in Advanced view. Empty
+   * optional sections start collapsed; touching the section (via the
+   * sidebar nav or a programmatic scroll) auto-expands it. Required
+   * sections (basics) are always expanded regardless of this set.
+   */
+  const ALWAYS_EXPANDED: ReadonlySet<ClassSectionId> = useMemo(
+    () => new Set<ClassSectionId>(['basics']),
+    [],
+  );
+  const [expandedSections, setExpandedSections] = useState<Set<ClassSectionId>>(
+    () => new Set<ClassSectionId>(),
+  );
+
+  /**
+   * A section is expanded if (a) it's always expanded, (b) the user
+   * has explicitly expanded it, or (c) it has non-default values or
+   * lint signal — keeping live data visible.
+   */
+  const isSectionExpanded = useCallback(
+    (id: ClassSectionId): boolean => {
+      if (ALWAYS_EXPANDED.has(id)) return true;
+      if (expandedSections.has(id)) return true;
+      const status = sectionStatus[id];
+      return status !== 'empty';
+    },
+    [ALWAYS_EXPANDED, expandedSections, sectionStatus],
+  );
+
+  const setSectionExpanded = useCallback((id: ClassSectionId, next: boolean) => {
+    setExpandedSections((prev) => {
+      const out = new Set(prev);
+      if (next) out.add(id);
+      else out.delete(id);
+      return out;
+    });
+  }, []);
+
+  /**
+   * Reset the per-section expand overrides whenever the dialog reopens
+   * with a new class so we get a clean default each time.
+   */
+  useEffect(() => {
+    if (open) setExpandedSections(new Set<ClassSectionId>());
+  }, [open]);
+
+  /**
+   * Reference summary for the "Used by" inspector card. We look at
+   * `nodes` for any class whose schema mentions our class name in
+   * composition (allOf/anyOf/oneOf) or via $ref. This is intentionally
+   * approximate — a full graph traversal lives in the canvas.
+   */
+  const inspectorReferences = useMemo<ClassReference[]>(() => {
+    const myName = (editingClassData?.name as string | undefined) ?? formData.name;
+    if (!myName || !Array.isArray(nodes)) return [{ kind: 'classes', count: 0 }];
+    let classCount = 0;
+    const haystackNeedle = `"$ref":"#/components/schemas/${myName}"`;
+    for (const node of nodes) {
+      const data = node?.data;
+      if (!data || data.name === myName) continue;
+      const schemaJson = JSON.stringify(data.schema ?? {});
+      if (schemaJson.includes(haystackNeedle)) {
+        classCount += 1;
+        continue;
+      }
+      const composition = [
+        ...(data.allOf ?? []),
+        ...(data.anyOf ?? []),
+        ...(data.oneOf ?? []),
+      ];
+      if (composition.includes(myName)) classCount += 1;
+    }
+    return [{ kind: classCount === 1 ? 'class' : 'classes', count: classCount }];
+  }, [nodes, editingClassData?.name, formData.name]);
+
+  /** Human-friendly relative timestamp for "Last saved Xm ago". */
+  const lastSavedLabel = useMemo<string | undefined>(() => {
+    if (!lastSavedAt) return undefined;
+    const diffMs = Date.now() - lastSavedAt;
+    const min = Math.floor(diffMs / 60_000);
+    if (min < 1) return 'just now';
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    return `${Math.floor(hr / 24)}d ago`;
+    // re-evaluates as `setNowTick` ticks every minute via the effect above
+  }, [lastSavedAt]);
+
   // Reset view and form when dialog opens
   useEffect(() => {
     if (open) {
-      setActiveTab('edit');
-      setExampleRefreshKey(0);
-      setShowAIChatMode(false);
+      setViewSheetOpen(false);
+      setViewSheetFormat('schema-json');
+      setAiSidekickOpen(false);
       setAiMessages([]);
       setAiInput('');
       setAiCreateError('');
+      setAiPatchStates({});
       setNewDependentSchemaProperty('');
       setCurrentStepIndex(0);
+      // Mirrors `editingClassData?.updated_at` when present; falls back
+      // to `created_at` so newly hydrated classes still show "saved Xm
+      // ago" instead of looking unsaved.
+      setLastSavedAt(
+        editingClassData
+          ? Date.parse(
+              editingClassData.updated_at ||
+                editingClassData.updatedAt ||
+                editingClassData.created_at ||
+                editingClassData.createdAt ||
+                ''
+            ) || null
+          : null,
+      );
 
       if (editingClassData) {
         // Edit mode - populate form with existing class data
@@ -546,6 +708,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               schemaComment: schema.$comment || '',
               error: ''
             });
+            setSnapshotTick((t) => t + 1);
           } catch (error) {
             console.error('Error loading tags:', error);
             // Determine additionalProperties type and schema for error case
@@ -656,6 +819,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               schemaComment: schema.$comment || '',
               error: ''
             });
+            setSnapshotTick((t) => t + 1);
           }
         };
 
@@ -703,13 +867,15 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           schemaComment: '',
           error: ''
         });
+        setSnapshotTick((t) => t + 1);
       }
     }
   }, [open, editingClassData]);
 
-  // Load Ollama models and project properties when AI chat mode is shown
+  // Load Ollama models and project properties the first time the
+  // sidekick is opened in this session.
   useEffect(() => {
-    if (open && showAIChatMode) {
+    if (open && aiSidekickOpen) {
       let cancelled = false;
       (async () => {
         setAiLoadingModels(true);
@@ -738,11 +904,16 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       })();
       return () => { cancelled = true; };
     }
-  }, [open, showAIChatMode, projectId]);
+  }, [open, aiSidekickOpen, projectId]);
 
+  // Capture the saved snapshot of formData. Bumped from the open effect
+  // and after a successful save; runs on the next render so it picks up
+  // whichever setFormData call won the race (sync add-mode reset or
+  // async edit-mode hydration).
   useEffect(() => {
-    aiMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [aiMessages, aiStreamingContent]);
+    if (snapshotTick === 0) return;
+    setSavedSnapshotJson(JSON.stringify(formData));
+  }, [snapshotTick, formData]);
 
   // Extract class definition JSON from assistant message (```json ... ```)
   const extractClassDefinition = (content: string): { name: string; description: string | null; schema: any } | null => {
@@ -840,7 +1011,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     }
   };
 
-  const handleAiCreateClass = async (content: string) => {
+  const handleAiCreateClass = async (content: string, messageIndex?: number) => {
     const def = extractClassDefinition(content);
     if (!def || !versionId) {
       setAiCreateError(def ? 'No version selected.' : 'No valid class definition in this message.');
@@ -904,11 +1075,77 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           console.warn(`Could not add property "${propName}" to class: ${addData.error}`);
         }
       }
+      if (messageIndex != null) {
+        setAiPatchStates((prev) => ({ ...prev, [messageIndex]: 'created' }));
+      }
       onSave?.();
       onClose();
     } catch (e: any) {
       setAiCreateError(e?.message || 'Failed to create class');
     }
+  };
+
+  /**
+   * Apply an AI-suggested class definition to the in-memory form. We
+   * deliberately keep this conservative: name, description, composition
+   * refs ($ref under allOf/anyOf/oneOf), and the discriminator property
+   * name. Property creation requires API round-trips and stays in the
+   * "Create class" flow. Anything not patched is still visible in the
+   * raw JSON inside the message bubble.
+   */
+  const handleAiApplyToForm = (def: AiClassDefinition, messageIndex: number) => {
+    setAiCreateError('');
+    if (def.name && !/^[A-Za-z0-9_]*$/.test(def.name)) {
+      setAiCreateError('Class name can only contain letters, numbers, and underscores.');
+      return;
+    }
+    const schema = (def.schema ?? {}) as Record<string, unknown>;
+    const refToName = (item: unknown): string | null => {
+      if (!item || typeof item !== 'object') return null;
+      const ref = (item as { $ref?: unknown }).$ref;
+      if (typeof ref !== 'string') return null;
+      const tail = ref.split('/').pop();
+      return tail || null;
+    };
+    const collectRefs = (key: 'allOf' | 'anyOf' | 'oneOf'): string[] => {
+      const v = schema[key];
+      if (!Array.isArray(v)) return [];
+      return v.map(refToName).filter((s): s is string => !!s);
+    };
+    const allOfNames = collectRefs('allOf');
+    const anyOfNames = collectRefs('anyOf');
+    const oneOfNames = collectRefs('oneOf');
+    const discriminator = schema.discriminator as { propertyName?: unknown } | undefined;
+    const discriminatorProperty =
+      typeof discriminator?.propertyName === 'string' ? discriminator.propertyName : '';
+
+    setFormData((prev) => ({
+      ...prev,
+      name: def.name || prev.name,
+      description: typeof def.description === 'string' ? def.description : prev.description,
+      allOf: allOfNames.length > 0 ? allOfNames : prev.allOf,
+      anyOf: anyOfNames.length > 0 ? anyOfNames : prev.anyOf,
+      oneOf: oneOfNames.length > 0 ? oneOfNames : prev.oneOf,
+      discriminatorProperty: discriminatorProperty || prev.discriminatorProperty,
+      error: '',
+    }));
+    setAiPatchStates((prev) => ({ ...prev, [messageIndex]: 'applied' }));
+  };
+
+  const handleAiRejectPatch = (messageIndex: number) => {
+    setAiPatchStates((prev) => ({ ...prev, [messageIndex]: 'rejected' }));
+  };
+
+  const handleAiAbort = () => {
+    aiAbortControllerRef.current?.abort();
+  };
+
+  const handleAiResetConversation = () => {
+    aiAbortControllerRef.current?.abort();
+    setAiMessages([]);
+    setAiInput('');
+    setAiCreateError('');
+    setAiPatchStates({});
   };
 
   // Helper function to build schema from form data
@@ -980,8 +1217,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       }
     }
 
-    // Add dependentSchemas if defined
-    // Add dependentSchemas if defined - preserve full schema objects
+    // Preserve full schema objects (if/then/else, $ref, etc.) on dependentSchemas
     if (Object.keys(formData.dependentSchemas).length > 0) {
       schema.dependentSchemas = formData.dependentSchemas;
     } else {
@@ -1097,7 +1333,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   // Create a stable stringified version of formData for dependency tracking
   const formDataString = useMemo(() => JSON.stringify(formData), [formData]);
 
-  // Memoize the built schema from current form so Example/JSON/YAML tabs stay in sync
+  // Memoize the built schema from current form so the View ▾ side sheet stays in sync
   const builtSchema = useMemo(() => {
     if (editingClassData && !formData.name) {
       // Form not yet initialized (first frame after open) – use class schema
@@ -1112,6 +1348,18 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   const allClasses = useMemo(() => {
     return nodes.map(node => node.data).filter(data => data && data.name);
   }, [nodes]);
+
+  /**
+   * Pretty-printed schema for the inspector's Live Preview card.
+   * Computed off `builtSchema` so it stays in sync as the user edits.
+   */
+  const inspectorPreviewJson = useMemo(() => {
+    try {
+      return JSON.stringify(builtSchema, null, 2);
+    } catch {
+      return '// Could not serialize schema';
+    }
+  }, [builtSchema]);
 
   // Generate OpenAPI doc asynchronously with debouncing
   useEffect(() => {
@@ -1252,7 +1500,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         }
       }
 
-      // Success - call onSave callback and close
+      setLastSavedAt(Date.now());
+      setSnapshotTick((t) => t + 1);
       if (onSave) {
         onSave();
       }
@@ -1272,506 +1521,91 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     schema: { type: 'object', properties: {} }
   };
 
-  // Get the class schema from the generated OpenAPI doc (with null check)
-  const openApiClassSchema = openApiDoc?.components?.schemas?.[previewClassData.name];
-
-  // Helper function to resolve $ref references in a schema
-  const resolveRefs = (schema: any, schemas: any, visited: Set<string> = new Set(), path: string = ''): any => {
-    if (!schema || typeof schema !== 'object') return schema;
-
-    // Preprocess: Convert prefixItems to items array format for json-schema-faker compatibility
-    // json-schema-faker doesn't support prefixItems (JSON Schema 2020-12), so we convert it
-    if (schema.prefixItems && Array.isArray(schema.prefixItems)) {
-      const processedSchema = { ...schema };
-
-      // If items is true or an empty object, it means "allow any additional items"
-      // For json-schema-faker, we'll use the prefixItems as a tuple
-      if (schema.items === true || (schema.items && Object.keys(schema.items).length === 0)) {
-        // Use prefixItems as items for tuple generation
-        processedSchema.items = schema.prefixItems;
-        delete processedSchema.prefixItems;
-
-        // Set minItems and maxItems to match prefixItems length for consistent generation
-        if (!processedSchema.minItems) {
-          processedSchema.minItems = schema.prefixItems.length;
-        }
-        if (!processedSchema.maxItems) {
-          processedSchema.maxItems = schema.prefixItems.length;
-        }
-      } else if (schema.items) {
-        // If there's both prefixItems and items, merge them
-        // This is tricky - for now, just use prefixItems as the tuple
-        processedSchema.items = schema.prefixItems;
-        delete processedSchema.prefixItems;
-        processedSchema.minItems = schema.prefixItems.length;
-        processedSchema.maxItems = schema.prefixItems.length;
-      } else {
-        // No items specified, use prefixItems as items
-        processedSchema.items = schema.prefixItems;
-        delete processedSchema.prefixItems;
-        processedSchema.minItems = schema.prefixItems.length;
-        processedSchema.maxItems = schema.prefixItems.length;
-      }
-
-      schema = processedSchema;
-    }
-
-    // Handle $ref
-    if (schema.$ref && typeof schema.$ref === 'string') {
-      const refPath = schema.$ref.split('/');
-      const refName = refPath[refPath.length - 1];
-
-      // Prevent circular references
-      if (visited.has(refName)) {
-        return { type: 'object', description: `Circular reference to ${refName}` };
-      }
-
-      const referencedSchema = schemas[refName];
-      if (referencedSchema) {
-        const newVisited = new Set(visited);
-        newVisited.add(refName);
-        return resolveRefs(referencedSchema, schemas, newVisited, `${path}/${refName}`);
-      }
-      return schema; // Can't resolve, return as-is
-    }
-
-    // Handle allOf by merging schemas
-    if (Array.isArray(schema.allOf)) {
-      const merged: any = {};
-      const requiredSet = new Set<string>();
-
-      schema.allOf.forEach((subSchema: any, index: number) => {
-        const resolved = resolveRefs(subSchema, schemas, visited, `${path}/allOf[${index}]`);
-
-        // Extract required before merging to handle it separately
-        const { required: resolvedRequired, properties: resolvedProperties, ...resolvedRest } = resolved;
-
-        // Merge non-properties/required fields
-        Object.assign(merged, resolvedRest);
-
-        // Merge properties
-        if (resolvedProperties) {
-          merged.properties = { ...merged.properties, ...resolvedProperties };
-        }
-
-        // Merge required arrays (use Set to avoid duplicates)
-        if (resolvedRequired) {
-          resolvedRequired.forEach((field: string) => requiredSet.add(field));
-        }
-      });
-
-      // Convert Set back to array if there are required fields
-      if (requiredSet.size > 0) {
-        merged.required = Array.from(requiredSet);
-      }
-
-      // Keep other properties from the original schema
-      const { allOf, required: restRequired, properties: restProperties, ...rest } = schema;
-
-      // Merge properties from original schema (these are additional properties)
-      if (restProperties) {
-        merged.properties = { ...merged.properties, ...restProperties };
-      }
-
-      // Merge required from original schema
-      if (restRequired) {
-        restRequired.forEach((field: string) => requiredSet.add(field));
-        merged.required = Array.from(requiredSet);
-      }
-
-      return { ...merged, ...rest };
-    }
-
-    // Handle anyOf and oneOf
-    if (Array.isArray(schema.anyOf)) {
-      return {
-        ...schema,
-        anyOf: schema.anyOf.map((s: any, index: number) =>
-          resolveRefs(s, schemas, visited, `${path}/anyOf[${index}]`)
-        )
-      };
-    }
-
-    if (Array.isArray(schema.oneOf)) {
-      return {
-        ...schema,
-        oneOf: schema.oneOf.map((s: any, index: number) =>
-          resolveRefs(s, schemas, visited, `${path}/oneOf[${index}]`)
-        )
-      };
-    }
-
-    // Recursively resolve nested objects and arrays
-    const resolved: any = Array.isArray(schema) ? [] : {};
-    for (const key in schema) {
-      if (schema.hasOwnProperty(key)) {
-        // Don't recursively resolve primitive values or strings that aren't schemas
-        const value = schema[key];
-        if (value && typeof value === 'object') {
-          resolved[key] = resolveRefs(value, schemas, visited, `${path}/${key}`);
-        } else {
-          resolved[key] = value;
-        }
-      }
-    }
-    return resolved;
-  };
-
-  // Generate schema content based on current tab
-  let schemaContent: string = '';
-
-  if (loadingOpenApiDoc || !openApiDoc) {
-    schemaContent = '// Loading schema...';
-  } else if (activeTab === 'json') {
-    schemaContent = JSON.stringify(openApiDoc, null, 2);
-  } else if (activeTab === 'yaml') {
-    schemaContent = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false } as any);
-  } else if (activeTab === 'example') {
-    // Example view - regenerate when exampleRefreshKey changes
-    try {
-      // Resolve all $ref references for json-schema-faker
-      const resolvedSchema = resolveRefs(openApiClassSchema, openApiDoc.components.schemas);
-
-      // Debug: Log the resolved schema to verify allOf merging
-      console.log('Original schema:', openApiClassSchema);
-      console.log('Resolved schema for example generation:', resolvedSchema);
-      console.log('Resolved schema properties:', resolvedSchema.properties);
-
-      // Use exampleRefreshKey in random seed to force regeneration
-      jsf.option({
-        random: () => {
-          // Mix in exampleRefreshKey to ensure different results on each refresh
-          const seed = Math.random() * (exampleRefreshKey + 1);
-          return seed - Math.floor(seed);
-        }
-      });
-
-      const fakeData = jsf.generate(resolvedSchema);
-      schemaContent = JSON.stringify(fakeData, null, 2);
-    } catch (error) {
-      console.error('Error generating fake data:', error);
-      schemaContent = JSON.stringify({
-        error: 'Could not generate example data',
-        message: error instanceof Error ? error.message : String(error)
-      }, null, 2);
-    }
-  }
-
-  const handleCopy = () => {
-    if (!openApiDoc) return;
-
-    let content: string;
-    if (activeTab === 'example') {
-      try {
-        const resolvedSchema = resolveRefs(openApiClassSchema, openApiDoc.components.schemas);
-        const fakeData = jsf.generate(resolvedSchema);
-        content = JSON.stringify(fakeData, null, 2);
-      } catch (error) {
-        console.error('Error generating fake data:', error);
-        content = JSON.stringify({ error: 'Could not generate example data' }, null, 2);
-      }
-    } else if (activeTab === 'yaml') {
-      content = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false } as any);
-    } else {
-      content = JSON.stringify(openApiDoc, null, 2);
-    }
-
-    navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleExport = () => {
-    if (!openApiDoc) return;
-
-    let content: string;
-    let filenameSuffix: string;
-    let mimeType: string;
-    let extension: string;
-
-    if (activeTab === 'example') {
-      try {
-        const resolvedSchema = resolveRefs(openApiClassSchema, openApiDoc.components.schemas);
-        const fakeData = jsf.generate(resolvedSchema);
-        content = JSON.stringify(fakeData, null, 2);
-      } catch (error) {
-        console.error('Error generating fake data:', error);
-        content = JSON.stringify({ error: 'Could not generate example data' }, null, 2);
-      }
-      filenameSuffix = 'example';
-      mimeType = 'application/json';
-      extension = 'json';
-    } else if (activeTab === 'yaml') {
-      content = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false } as any);
-      filenameSuffix = 'schema';
-      mimeType = 'text/yaml';
-      extension = 'yaml';
-    } else {
-      content = JSON.stringify(openApiDoc, null, 2);
-      filenameSuffix = 'schema';
-      mimeType = 'application/json';
-      extension = 'json';
-    }
-
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${previewClassData.name.toLowerCase()}-${filenameSuffix}.${extension}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()} modal={true}>
       <DialogContent
-        className="max-w-7xl h-[90vh] max-h-[900px] p-0 flex flex-col overflow-hidden"
-        showCloseButton={true}
+        className="max-w-[1480px] w-[96vw] h-[92vh] max-h-[940px] p-0 flex flex-col overflow-hidden"
+        showCloseButton={false}
         aria-describedby={undefined}
       >
-        <DialogHeader className="pl-6 pr-10 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-            <div className="flex items-center gap-3 flex-wrap min-w-0">
-              {showAIChatMode ? (
+        {/* Visually-hidden DialogTitle keeps Radix happy without
+            duplicating the rich header below. */}
+        <DialogTitle className="sr-only">
+          {!editingClassData
+            ? 'Add class'
+            : isReadOnly
+              ? `View class ${formData.name || editingClassData.name}`
+              : `Edit class ${formData.name || editingClassData.name}`}
+        </DialogTitle>
+        <ClassEditHeader
+          className={formData.name}
+          originalName={editingClassData?.name}
+          isCreating={!editingClassData}
+          isReadOnly={isReadOnly}
+          tags={formData.selectedTags.flatMap((tagId) => {
+            const tag = (projectTags || []).find(
+              (t: { id: string }) => t.id === tagId,
+            ) as { id: string; name: string; color?: string } | undefined;
+            return tag
+              ? [{ id: tag.id, name: tag.name, color: tag.color }]
+              : [];
+          })}
+          contextLabel={editingClassData?.id ? `id ${String(editingClassData.id).slice(0, 8)}` : undefined}
+          subtitle={
+            editingClassData
+              ? [
+                  Array.isArray(editingClassData.properties)
+                    ? `${editingClassData.properties.length} propert${editingClassData.properties.length === 1 ? 'y' : 'ies'}`
+                    : null,
+                  inspectorReferences[0]?.count
+                    ? `${inspectorReferences[0].count} reference${inspectorReferences[0].count === 1 ? '' : 's'}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || undefined
+              : undefined
+          }
+          completenessPercent={completenessPercent}
+          unsavedCount={unsavedCount}
+          errorCount={errorCount}
+          warnCount={warnCount}
+          onClose={onClose}
+          sidekickOpen={aiSidekickOpen}
+          onToggleSidekick={() => setAiSidekickOpen((o) => !o)}
+          onOpenViewMenu={() => {
+            setViewSheetFormat('schema-json');
+            setViewSheetOpen(true);
+          }}
+        />
+
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {formData.error && <Alert variant="error" className="m-4 mb-0">{formData.error}</Alert>}
+
+            <ClassEditStatusBar
+              unsavedCount={unsavedCount}
+              lastSavedLabel={lastSavedLabel}
+              leftLabel={
+                viewMode === 'guided' ? (
+                  <>
+                    <span className="font-semibold uppercase tracking-[0.1em] text-[10px] text-slate-500 dark:text-slate-400">
+                      Wizard
+                    </span>
+                    <span className="text-slate-400">·</span>
+                    <span>
+                      Step {currentStepIndex + 1} of {CLASS_WIZARD_STEPS.length}
+                      <span className="text-slate-400 mx-1">·</span>
+                      {CLASS_WIZARD_STEPS[currentStepIndex].label}
+                    </span>
+                  </>
+                ) : undefined
+              }
+              rightSlot={
                 <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAIChatMode(false)}
-                    className="flex items-center gap-1 text-gray-600 dark:text-gray-400"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to form
-                  </Button>
-                  <DialogTitle className="text-lg font-semibold">
-                    Create Class with AI
-                  </DialogTitle>
+                  <span className="text-slate-500">View as</span>
+                  <FormViewModeToggle value={viewMode} onChange={setViewMode} />
                 </>
-              ) : (
-                <>
-                  <DialogTitle className="text-lg font-semibold">
-                    {!editingClassData ? 'Add Class' : isReadOnly ? `View Class: ${formData.name || editingClassData.name}` : `Edit Class: ${formData.name || editingClassData.name}`}
-                  </DialogTitle>
-                  {!editingClassData && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowAIChatMode(true)}
-                      className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      Use AI Assistant
-                    </Button>
-                  )}
-                </>
-              )}
-              {isReadOnly && !showAIChatMode && (
-                <span className="px-2 py-0.5 bg-amber-400 text-black text-xs font-semibold rounded">
-                  Read Only
-                </span>
-              )}
-            </div>
-          </div>
-        </DialogHeader>
-
-        {showAIChatMode ? (
-          <>
-            <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Model:</label>
-              <SelectRadix.Root value={aiSelectedModel} onValueChange={setAiSelectedModel} disabled={aiLoadingModels || aiLoading}>
-                <SelectRadix.Trigger className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
-                  <SelectRadix.Value placeholder={aiLoadingModels ? 'Loading models...' : 'Select a model'} />
-                  <SelectRadix.Icon>
-                    <ChevronDown className="h-4 w-4" />
-                  </SelectRadix.Icon>
-                </SelectRadix.Trigger>
-                <SelectRadix.Portal>
-                  <SelectRadix.Content className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-1 z-[10000]">
-                    <SelectRadix.Viewport>
-                      {aiModels.map(m => (
-                        <SelectRadix.Item key={m.name} value={m.name} className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                          <SelectRadix.ItemText>{m.name}</SelectRadix.ItemText>
-                        </SelectRadix.Item>
-                      ))}
-                    </SelectRadix.Viewport>
-                  </SelectRadix.Content>
-                </SelectRadix.Portal>
-              </SelectRadix.Root>
-              {aiMessages.length > 0 && (
-                <button type="button" onClick={() => { setAiMessages([]); setAiInput(''); setAiCreateError(''); }} className="ml-auto px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-                  Reset conversation
-                </button>
-              )}
-            </div>
-            {aiCreateError && <Alert variant="error" className="m-4 mb-0">{aiCreateError}</Alert>}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
-              {aiMessages.length === 0 && !aiStreamingContent && (
-                <div className="flex flex-col items-center justify-center text-center py-8">
-                  <div className="w-16 h-16 mb-4 bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center">
-                    <Bot className="h-8 w-8 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Describe the class you want</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mb-6">
-                    Tell me what the class should represent and which properties it should have. I'll generate a JSON Schema class definition you can create in one click.
-                  </p>
-                  <div className="grid grid-cols-1 gap-2 w-full max-w-lg">
-                    <button type="button" onClick={() => setAiInput('Create a User class with email, displayName, and createdAt')} className="px-4 py-3 text-sm text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700">
-                      👤 User with email, displayName, and createdAt
-                    </button>
-                    <button type="button" onClick={() => setAiInput('Create an Order class with orderId, items array, totalAmount, and status')} className="px-4 py-3 text-sm text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700">
-                      🛒 Order with items, totalAmount, and status
-                    </button>
-                    <button type="button" onClick={() => setAiInput('Create a Product class with name, sku, price, and optional description')} className="px-4 py-3 text-sm text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700">
-                      📦 Product with name, sku, price, description
-                    </button>
-                    <button type="button" onClick={() => setAiInput('Create an Address class with street, city, postalCode, and country')} className="px-4 py-3 text-sm text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700">
-                      📍 Address with street, city, postalCode, country
-                    </button>
-                  </div>
-                </div>
-              )}
-              {aiMessages.map((message, index) => {
-                const classDef = message.role === 'assistant' ? extractClassDefinition(message.content) : null;
-                const hasClassDef = classDef !== null;
-                return (
-                  <div key={index} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    {message.role === 'assistant' && (
-                      <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
-                        <Bot className="h-5 w-5 text-white" />
-                      </div>
-                    )}
-                    <div className={`flex flex-col max-w-[80%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
-                      <div className={`px-4 py-3 rounded-lg ${message.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'}`}>
-                        {message.role === 'assistant' && hasClassDef && classDef ? (
-                          <div className="rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
-                            <div className="bg-gray-800 dark:bg-gray-900 px-3 py-1.5 border-b border-gray-700">
-                              <span className="text-xs font-mono text-gray-300">JSON</span>
-                            </div>
-                            <pre className="bg-gray-900 dark:bg-black p-4 overflow-x-auto m-0 text-left">
-                              <code className="text-sm font-mono text-green-400 dark:text-green-300 whitespace-pre">
-                                {JSON.stringify({ name: classDef.name, description: classDef.description, schema: classDef.schema }, null, 2)}
-                              </code>
-                            </pre>
-                          </div>
-                        ) : (
-                          <Markdown variant="default" fallback={null}>
-                            {message.content}
-                          </Markdown>
-                        )}
-                      </div>
-                      {message.role === 'assistant' && hasClassDef && (
-                        <Button type="button" variant="outline" size="sm" className="mt-2 gap-2 text-indigo-600 dark:text-indigo-400" onClick={() => handleAiCreateClass(message.content)}>
-                          <Plus className="h-4 w-4" />
-                          Create this class
-                        </Button>
-                      )}
-                    </div>
-                    {message.role === 'user' && (
-                      <div className="flex-shrink-0 w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
-                        <User className="h-5 w-5 text-white" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {aiLoading && !aiStreamingContent && (
-                <div className="flex gap-3 justify-start">
-                  <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
-                    <Bot className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center gap-2">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Thinking...</span>
-                  </div>
-                </div>
-              )}
-              {aiStreamingContent && (
-                <div className="flex gap-3 justify-start">
-                  <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
-                    <Bot className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white">
-                    <Markdown variant="default" fallback={null}>
-                      {aiStreamingContent}
-                    </Markdown>
-                    <span className="inline-block w-2 h-4 ml-1 bg-gray-900 dark:bg-white animate-pulse align-middle" />
-                  </div>
-                </div>
-              )}
-              <div ref={aiMessagesEndRef} />
-            </div>
-            <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={aiInput}
-                  onChange={e => setAiInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAiSendMessage()}
-                  placeholder="Describe the class you want to create..."
-                  disabled={aiLoading || !aiSelectedModel}
-                  className="flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50"
-                />
-                <Button onClick={handleAiSendMessage} disabled={aiLoading || !aiInput.trim() || !aiSelectedModel} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-2">
-                  {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Send
-                </Button>
-              </div>
-              <p className="mt-2 mb-0 text-xs text-gray-500 dark:text-gray-400 text-center">AI can make mistakes — review the generated schema before creating.</p>
-            </div>
-          </>
-        ) : (
-        <>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex flex-nowrap items-center border-b border-gray-200 dark:border-gray-700 px-6 shrink-0">
-            <TabsList className="h-auto p-0 rounded-none bg-transparent justify-start gap-0 -ml-2 shrink-0">
-              <TabsTrigger
-              value="edit"
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
-            >
-              Edit
-            </TabsTrigger>
-            <TabsTrigger
-              value="json"
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
-            >
-              JSON
-            </TabsTrigger>
-            <TabsTrigger
-              value="yaml"
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
-            >
-              YAML
-            </TabsTrigger>
-            <TabsTrigger
-              value="example"
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
-            >
-              Example
-            </TabsTrigger>
-            </TabsList>
-          </div>
-
-          {/* Edit Tab */}
-          <TabsContent value="edit" className="flex-1 flex flex-col overflow-hidden mt-0 p-0">
-            {formData.error && <Alert variant="error" className="m-4 mb-0">{formData.error}</Alert>}
-
-            {/* View-mode toolbar — the toggle is intentionally the only
-                control here; guided mode's stepper renders immediately below
-                and advanced mode uses the sidebar nav for context. */}
-            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/60 px-6 py-2.5 dark:border-slate-800 dark:bg-slate-900/40 shrink-0">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">
-                {viewMode === 'guided' ? 'Wizard' : 'All sections'}
-              </span>
-              <FormViewModeToggle value={viewMode} onChange={setViewMode} />
-            </div>
+              }
+            />
             {viewMode === 'guided' && (
               <FormWizardStepper
                 steps={CLASS_WIZARD_STEPS.map((step, idx) => ({
@@ -1784,29 +1618,36 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               />
             )}
 
-            {/* Body: sidebar nav + scrolling sections (advanced), or single-pane (guided) */}
+            {/* Body: section nav (advanced) | scrolling sections | inspector (advanced) */}
             <div className="flex-1 flex overflow-hidden min-h-0">
               {viewMode === 'advanced' && (
                 <FormSectionNav
                   title="Sections"
                   items={[
-                    { id: 'basics', label: 'Basic Information', icon: <FileText className="h-3.5 w-3.5" />, group: 'Basics', changed: changedSections.basics },
-                    { id: 'object-constraints', label: 'Object Constraints', icon: <Settings className="h-3.5 w-3.5" />, group: 'Validation', changed: changedSections['object-constraints'] },
-                    { id: 'additional-props', label: 'Additional Properties', icon: <Layers className="h-3.5 w-3.5" />, group: 'Validation', changed: changedSections['additional-props'] },
-                    { id: 'unevaluated-props', label: 'Unevaluated Properties', icon: <Layers className="h-3.5 w-3.5" />, group: 'Validation', changed: changedSections['unevaluated-props'] },
-                    { id: 'composition', label: 'Composition', icon: <GitBranch className="h-3.5 w-3.5" />, group: 'Composition', changed: changedSections.composition },
-                    { id: 'pattern-props', label: 'Pattern Properties', icon: <Regex className="h-3.5 w-3.5" />, group: 'Dynamic Properties', changed: changedSections['pattern-props'] },
-                    { id: 'dependent-schemas', label: 'Dependent Schemas', icon: <Link className="h-3.5 w-3.5" />, group: 'Dynamic Properties', changed: changedSections['dependent-schemas'] },
-                    { id: 'dependent-required', label: 'Dependent Required', icon: <ListChecks className="h-3.5 w-3.5" />, group: 'Dynamic Properties', changed: changedSections['dependent-required'] },
-                    { id: 'conditional', label: 'Conditional Schema', icon: <GitBranch className="h-3.5 w-3.5" />, group: 'Dynamic Properties', changed: changedSections.conditional },
-                    { id: 'examples', label: 'Examples', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', changed: changedSections.examples },
-                    { id: 'xml', label: 'XML Representation', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', changed: changedSections.xml },
-                    { id: 'schema-metadata', label: 'Schema Metadata', icon: <FileText className="h-3.5 w-3.5" />, group: 'Documentation', changed: changedSections['schema-metadata'] },
-                    { id: 'external-docs', label: 'External Docs', icon: <ExternalLink className="h-3.5 w-3.5" />, group: 'Documentation', changed: changedSections['external-docs'] },
-                    { id: 'extensions', label: 'Extensions', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', changed: changedSections.extensions },
+                    { id: 'basics', label: 'Basic Information', icon: <FileText className="h-3.5 w-3.5" />, group: 'Basics', status: sectionStatus.basics },
+                    { id: 'object-constraints', label: 'Object Constraints', icon: <Settings className="h-3.5 w-3.5" />, group: 'Validation', status: sectionStatus['object-constraints'] },
+                    { id: 'additional-props', label: 'Additional Properties', icon: <Layers className="h-3.5 w-3.5" />, group: 'Validation', status: sectionStatus['additional-props'] },
+                    { id: 'unevaluated-props', label: 'Unevaluated Properties', icon: <Layers className="h-3.5 w-3.5" />, group: 'Validation', status: sectionStatus['unevaluated-props'] },
+                    { id: 'composition', label: 'Composition', icon: <GitBranch className="h-3.5 w-3.5" />, group: 'Composition', status: sectionStatus.composition },
+                    { id: 'pattern-props', label: 'Pattern Properties', icon: <Regex className="h-3.5 w-3.5" />, group: 'Dynamic Properties', status: sectionStatus['pattern-props'] },
+                    { id: 'dependent-schemas', label: 'Dependent Schemas', icon: <Link className="h-3.5 w-3.5" />, group: 'Dynamic Properties', status: sectionStatus['dependent-schemas'] },
+                    { id: 'dependent-required', label: 'Dependent Required', icon: <ListChecks className="h-3.5 w-3.5" />, group: 'Dynamic Properties', status: sectionStatus['dependent-required'] },
+                    { id: 'conditional', label: 'Conditional Schema', icon: <GitBranch className="h-3.5 w-3.5" />, group: 'Dynamic Properties', status: sectionStatus.conditional },
+                    { id: 'examples', label: 'Examples', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus.examples },
+                    { id: 'xml', label: 'XML Representation', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus.xml },
+                    { id: 'schema-metadata', label: 'Schema Metadata', icon: <FileText className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus['schema-metadata'] },
+                    { id: 'external-docs', label: 'External Docs', icon: <ExternalLink className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus['external-docs'] },
+                    { id: 'extensions', label: 'Extensions', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus.extensions },
                   ]}
                   activeId={activeSectionId}
-                  onSelect={(id) => scrollToSection(advancedScrollRef.current, id, 24)}
+                  onSelect={(id) => {
+                    setSectionExpanded(id as ClassSectionId, true);
+                    // Scroll on the next paint so the section has expanded
+                    // before the scroll target is computed.
+                    requestAnimationFrame(() => {
+                      scrollToSection(advancedScrollRef.current, id, 24);
+                    });
+                  }}
                   className="h-full"
                 />
               )}
@@ -1824,7 +1665,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 eyebrow="Identity"
                 title="Basic Information"
                 description="Name, description, tags, and deprecation metadata."
-                changed={changedSections.basics}
+                status={sectionStatus.basics}
               >
                 <FormGrid cols={3} gap="md">
                   <FormFieldGroup label="Class Name" htmlFor="className" required helper="PascalCase recommended">
@@ -1928,7 +1769,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 title="Object Constraints"
                 description="Limits on the number of properties an instance of this class may contain."
                 badge={<Badge variant="secondary" className="text-xs">OpenAPI 3.1</Badge>}
-                changed={changedSections['object-constraints']}
+                status={sectionStatus['object-constraints']}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('object-constraints')}
+                onExpandedChange={(next) => setSectionExpanded('object-constraints', next)}
               >
                 <FormGrid cols={2} gap="md">
                   <FormFieldGroup label="Min Properties" helper="Minimum number of properties required">
@@ -1963,7 +1807,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 eyebrow="Validation"
                 title="Additional Properties"
                 description="Controls validation for properties not defined in the schema."
-                changed={changedSections['additional-props']}
+                status={sectionStatus['additional-props']}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('additional-props')}
+                onExpandedChange={(next) => setSectionExpanded('additional-props', next)}
               >
                 <div className="space-y-2">
                       {(['default', 'allow', 'disallow', 'type', 'schema'] as const).map((value) => (
@@ -2047,7 +1894,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 eyebrow="Validation"
                 title="Unevaluated Properties"
                 description="For properties not matched by allOf / oneOf / anyOf subschemas."
-                changed={changedSections['unevaluated-props']}
+                status={sectionStatus['unevaluated-props']}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('unevaluated-props')}
+                onExpandedChange={(next) => setSectionExpanded('unevaluated-props', next)}
               >
                 <div className="space-y-2">
                       {(['default', 'allow', 'disallow', 'type', 'schema'] as const).map((value) => (
@@ -2131,57 +1981,28 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 eyebrow="Composition"
                 title="Composition & Inheritance"
                 description="Define relationships with other classes using OpenAPI composition keywords."
-                changed={changedSections.composition}
+                status={sectionStatus.composition}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('composition')}
+                onExpandedChange={(next) => setSectionExpanded('composition', next)}
               >
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <FormSubsection
-                    accent="indigo"
-                    icon={<Layers className="h-4 w-4" />}
-                    title="allOf (Inheritance)"
-                    description="Must match ALL listed schemas."
-                  >
-                    <MultiSelect
-                      options={availableClasses}
-                      value={formData.allOf}
-                      onChange={(newValue) => setFormData(prev => ({ ...prev, allOf: newValue }))}
-                      placeholder="Select classes..."
-                      disabled={isReadOnly}
-                      colorScheme="indigo"
-                    />
-                  </FormSubsection>
-
-                  <FormSubsection
-                    accent="amber"
-                    icon={<Layers className="h-4 w-4" />}
-                    title="anyOf (Alternatives)"
-                    description="Must match AT LEAST one schema."
-                  >
-                    <MultiSelect
-                      options={availableClasses}
-                      value={formData.anyOf}
-                      onChange={(newValue) => setFormData(prev => ({ ...prev, anyOf: newValue }))}
-                      placeholder="Select classes..."
-                      disabled={isReadOnly}
-                      colorScheme="amber"
-                    />
-                  </FormSubsection>
-
-                  <FormSubsection
-                    accent="purple"
-                    icon={<Layers className="h-4 w-4" />}
-                    title="oneOf (Exclusive)"
-                    description="Must match EXACTLY one schema."
-                  >
-                    <MultiSelect
-                      options={availableClasses}
-                      value={formData.oneOf}
-                      onChange={(newValue) => setFormData(prev => ({ ...prev, oneOf: newValue }))}
-                      placeholder="Select classes..."
-                      disabled={isReadOnly}
-                      colorScheme="purple"
-                    />
-                  </FormSubsection>
-                </div>
+                <ClassCompositionPicker
+                  value={{
+                    allOf: formData.allOf,
+                    anyOf: formData.anyOf,
+                    oneOf: formData.oneOf,
+                  }}
+                  availableClasses={availableClasses}
+                  disabled={isReadOnly}
+                  onChange={(next) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      allOf: next.allOf,
+                      anyOf: next.anyOf,
+                      oneOf: next.oneOf,
+                    }))
+                  }
+                />
 
                 {/* Discriminator */}
                 {(formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0) && (
@@ -2316,7 +2137,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 eyebrow="Dynamic Properties"
                 title="Pattern Properties"
                 description="Define regex patterns that map dynamic property names to schemas."
-                changed={changedSections['pattern-props']}
+                status={sectionStatus['pattern-props']}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('pattern-props')}
+                onExpandedChange={(next) => setSectionExpanded('pattern-props', next)}
                 action={!isReadOnly ? (
                   <Button
                     size="sm"
@@ -2433,7 +2257,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 eyebrow="Dynamic Properties"
                 title="Dependent Schemas"
                 description="Apply additional constraints conditionally when a property has a specific value."
-                changed={changedSections['dependent-schemas']}
+                status={sectionStatus['dependent-schemas']}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('dependent-schemas')}
+                onExpandedChange={(next) => setSectionExpanded('dependent-schemas', next)}
               >
                 {!isReadOnly && (
                   <div className="flex gap-2 mb-4 w-full">
@@ -2730,7 +2557,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 eyebrow="Dynamic Properties"
                 title="Dependent Required"
                 description="When a trigger property is present, other properties become required."
-                changed={changedSections['dependent-required']}
+                status={sectionStatus['dependent-required']}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('dependent-required')}
+                onExpandedChange={(next) => setSectionExpanded('dependent-required', next)}
                 action={!isReadOnly ? (
                   <Button
                     size="sm"
@@ -2811,7 +2641,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 eyebrow="Dynamic Properties"
                 title="Conditional Schema"
                 description="Apply branching validation rules using if / then / else."
-                changed={changedSections.conditional}
+                status={sectionStatus.conditional}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('conditional')}
+                onExpandedChange={(next) => setSectionExpanded('conditional', next)}
               >
                 <ConditionalSchemaBuilder
                   rules={formData.conditionalRules}
@@ -2838,7 +2671,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 title="Examples"
                 description="Add example instances of this class schema (JSON format)."
                 badge={<Badge variant="secondary" className="text-xs">JSON Schema</Badge>}
-                changed={changedSections.examples}
+                status={sectionStatus.examples}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('examples')}
+                onExpandedChange={(next) => setSectionExpanded('examples', next)}
               >
                 <div className="space-y-2">
                       {formData.examples.map((example, index) => (
@@ -2889,7 +2725,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 description="Configure how this class is serialized to XML."
                 badge={<Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">OpenAPI 3.1</Badge>}
                 accent="orange"
-                changed={changedSections.xml}
+                status={sectionStatus.xml}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('xml')}
+                onExpandedChange={(next) => setSectionExpanded('xml', next)}
               >
                 <FormGrid cols={3} gap="md">
                   <FormFieldGroup label="XML Name">
@@ -2929,7 +2768,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 title="Schema Metadata"
                 description="Advanced schema identification and authoring metadata."
                 badge={<Badge variant="secondary" className="text-xs">JSON Schema 2020-12</Badge>}
-                changed={changedSections['schema-metadata']}
+                status={sectionStatus['schema-metadata']}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('schema-metadata')}
+                onExpandedChange={(next) => setSectionExpanded('schema-metadata', next)}
               >
                 <FormFieldGroup label="$id" helper="Unique identifier URI for this schema">
                   <Input
@@ -2967,7 +2809,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 eyebrow="Documentation"
                 title="External Documentation"
                 description="Link out to human-readable docs, tutorials, or spec references."
-                changed={changedSections['external-docs']}
+                status={sectionStatus['external-docs']}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('external-docs')}
+                onExpandedChange={(next) => setSectionExpanded('external-docs', next)}
               >
                 <FormFieldGroup label="Documentation URL">
                   <Input
@@ -2998,7 +2843,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 eyebrow="Documentation"
                 title="Custom Extensions"
                 description="Add x- prefixed vendor extensions for tooling and codegen."
-                changed={changedSections.extensions}
+                status={sectionStatus.extensions}
+                collapsible={viewMode === 'advanced'}
+                expanded={isSectionExpanded('extensions')}
+                onExpandedChange={(next) => setSectionExpanded('extensions', next)}
               >
                 <ExtensionsEditor
                   value={formData.extensions}
@@ -3025,99 +2873,87 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 </div>
               )}
               </div>
-            </div>
-          </TabsContent>
 
-          {/* JSON Tab */}
-          <TabsContent value="json" className="flex-1 flex flex-col mt-0 overflow-hidden">
-            <div className="flex gap-2 p-4 border-b border-gray-200 dark:border-gray-700">
-              <Button size="sm" variant="outline" onClick={handleCopy} disabled={copied || loadingOpenApiDoc || !openApiDoc}>
-                {copied ? <Check size={16} className="mr-1" /> : <Copy size={16} className="mr-1" />}
-                {copied ? 'Copied' : 'Copy'}
-              </Button>
-              <Button size="sm" onClick={handleExport} disabled={loadingOpenApiDoc || !openApiDoc}>
-                <Download size={16} className="mr-1" /> Export
-              </Button>
-            </div>
-            <div className="flex-1">
-              <Editor
-                height="100%"
-                language="json"
-                value={schemaContent}
-                theme={isDark ? 'vs-dark' : 'light'}
-                options={{ readOnly: true, minimap: { enabled: false }, scrollBeyondLastLine: false, fontSize: 13, wordWrap: 'on' }}
+              {/* Right-side inspector: Validation, Live preview, Impact.
+                  Hidden in guided mode where the wizard already provides
+                  per-step focus, and yields to the sidekick when open. */}
+              {viewMode === 'advanced' && !aiSidekickOpen && (
+                <ClassEditInspector
+                  className="w-72 max-w-[20rem] h-full"
+                  issues={lintIssues}
+                  previewJson={inspectorPreviewJson}
+                  previewLanguage="JSON Schema"
+                  previewLoading={loadingOpenApiDoc}
+                  references={inspectorReferences}
+                  onJumpToSection={(id) =>
+                    scrollToSection(advancedScrollRef.current, id, 24)
+                  }
+                />
+              )}
+
+              <ClassEditAiSidekick
+                open={aiSidekickOpen}
+                onClose={() => setAiSidekickOpen(false)}
+                messages={aiMessages}
+                streamingContent={aiStreamingContent}
+                loading={aiLoading}
+                input={aiInput}
+                onInputChange={setAiInput}
+                onSend={handleAiSendMessage}
+                onAbort={handleAiAbort}
+                onReset={handleAiResetConversation}
+                models={aiModels}
+                loadingModels={aiLoadingModels}
+                selectedModel={aiSelectedModel}
+                onSelectModel={setAiSelectedModel}
+                error={aiCreateError || undefined}
+                extractClassDefinition={extractClassDefinition}
+                patchStates={aiPatchStates}
+                onApplyToForm={handleAiApplyToForm}
+                onCreateClass={handleAiCreateClass}
+                onRejectPatch={handleAiRejectPatch}
+                canCreateClass={!editingClassData && !!versionId}
+                isReadOnly={isReadOnly}
+                isDark={isDark}
               />
             </div>
-          </TabsContent>
+        </div>
 
-          {/* YAML Tab */}
-          <TabsContent value="yaml" className="flex-1 flex flex-col mt-0 overflow-hidden">
-            <div className="flex gap-2 p-4 border-b border-gray-200 dark:border-gray-700">
-              <Button size="sm" variant="outline" onClick={handleCopy} disabled={copied || loadingOpenApiDoc || !openApiDoc}>
-                {copied ? <Check size={16} className="mr-1" /> : <Copy size={16} className="mr-1" />}
-                {copied ? 'Copied' : 'Copy'}
-              </Button>
-              <Button size="sm" onClick={handleExport} disabled={loadingOpenApiDoc || !openApiDoc}>
-                <Download size={16} className="mr-1" /> Export
-              </Button>
-            </div>
-            <div className="flex-1">
-              <Editor
-                height="100%"
-                language="yaml"
-                value={schemaContent}
-                theme={isDark ? 'vs-dark' : 'light'}
-                options={{ readOnly: true, minimap: { enabled: false }, scrollBeyondLastLine: false, fontSize: 13, wordWrap: 'on' }}
-              />
-            </div>
-          </TabsContent>
-
-          {/* Example Tab */}
-          <TabsContent value="example" className="flex-1 flex flex-col mt-0 overflow-hidden">
-            <div className="flex gap-2 p-4 border-b border-gray-200 dark:border-gray-700">
-              <Button size="sm" variant="outline" onClick={() => setExampleRefreshKey(prev => prev + 1)} disabled={loadingOpenApiDoc || !openApiDoc}>
-                <RefreshCw size={16} className="mr-1" /> Refresh
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleCopy} disabled={copied || loadingOpenApiDoc || !openApiDoc}>
-                {copied ? <Check size={16} className="mr-1" /> : <Copy size={16} className="mr-1" />}
-                {copied ? 'Copied' : 'Copy'}
-              </Button>
-              <Button size="sm" onClick={handleExport} disabled={loadingOpenApiDoc || !openApiDoc}>
-                <Download size={16} className="mr-1" /> Export
-              </Button>
-            </div>
-            <div className="flex-1">
-              <Editor
-                key={`example-${exampleRefreshKey}`}
-                height="100%"
-                language="json"
-                value={schemaContent}
-                theme={isDark ? 'vs-dark' : 'light'}
-                options={{ readOnly: true, minimap: { enabled: false }, scrollBeyondLastLine: false, fontSize: 13, wordWrap: 'on' }}
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {/* Hide the dialog footer on the Edit tab in guided mode — wizard
-            controls live inside the scroll pane so the Back/Next buttons are
-            always adjacent to the current step. Other tabs keep the familiar
-            Cancel/Close footer. */}
-        {!(activeTab === 'edit' && viewMode === 'guided') && (
-          <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            {!isReadOnly && activeTab === 'edit' && (
-              <Button onClick={handleSave} disabled={saving || !formData.name.trim()}>
-                {saving ? 'Saving...' : (editingClassData ? 'Save Changes' : 'Create Class')}
-              </Button>
-            )}
-            {activeTab !== 'edit' && (
-              <Button onClick={onClose}>Close</Button>
-            )}
-          </DialogFooter>
+        {/* Footer: only rendered in advanced mode. Guided mode keeps its
+            wizard controls inline at the bottom of the scroll pane. */}
+        {viewMode === 'advanced' && (
+          <ClassEditFooter
+            saving={saving}
+            unsavedCount={unsavedCount}
+            errorCount={errorCount}
+            saveLabel={editingClassData ? 'Save changes' : 'Create class'}
+            canSave={!isReadOnly && !!formData.name.trim() && errorCount === 0}
+            onSave={handleSave}
+            onClose={onClose}
+            onDiscard={
+              unsavedCount > 0 && !isReadOnly && !!savedSnapshotJson
+                ? () => {
+                    try {
+                      const restored = JSON.parse(savedSnapshotJson);
+                      setFormData(restored);
+                    } catch {
+                      /* swallow — snapshot was invalid */
+                    }
+                  }
+                : undefined
+            }
+          />
         )}
-        </>
-        )}
+
+        <ClassEditViewSheet
+          open={viewSheetOpen}
+          onClose={() => setViewSheetOpen(false)}
+          openApiDoc={openApiDoc}
+          loadingOpenApiDoc={loadingOpenApiDoc}
+          className={previewClassData.name}
+          initialFormat={viewSheetFormat}
+          isDark={isDark}
+        />
       </DialogContent>
     </Dialog>
   );
