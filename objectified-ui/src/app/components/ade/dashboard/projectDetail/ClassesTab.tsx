@@ -169,8 +169,8 @@ export function ClassesTab({
   }
 
   return (
-    <div className="space-y-6">
-      <section className="flex items-center justify-between gap-3 flex-wrap">
+    <div className="h-full min-h-0 flex flex-col gap-6">
+      <section className="flex items-center justify-between gap-3 flex-wrap shrink-0">
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-indigo-500" />
           <span className="text-xs text-gray-500">Version</span>
@@ -241,8 +241,8 @@ export function ClassesTab({
           description="Add classes in the Studio editor for this version to see them here."
         />
       ) : (
-        <section className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          <div className={`${projectPanelClass} xl:col-span-5`}>
+        <section className="grid grid-cols-1 xl:grid-cols-12 gap-6 flex-1 min-h-0">
+          <div className={`${projectPanelClass} xl:col-span-5 h-full min-h-0 flex flex-col`}>
             <div className={projectPanelHeaderClass}>
               <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
                 {filtered.length === classes.length
@@ -250,9 +250,15 @@ export function ClassesTab({
                   : `${filtered.length} of ${classes.length} match`}
               </p>
             </div>
-            <div className={layout === 'cards' ? 'p-3 grid grid-cols-1 md:grid-cols-2 gap-3' : ''}>
+            <div
+              className={`flex-1 min-h-0 ${
+                layout === 'cards'
+                  ? 'p-3 grid grid-cols-1 md:grid-cols-2 gap-3 overflow-y-auto'
+                  : ''
+              }`}
+            >
               {layout === 'list' ? (
-                <ul className="divide-y divide-gray-100 dark:divide-gray-700/60 max-h-[640px] overflow-y-auto">
+                <ul className="divide-y divide-gray-100 dark:divide-gray-700/60 h-full overflow-y-auto">
                   {filtered.map((cls) => (
                     <ClassListRow
                       key={cls.id}
@@ -275,7 +281,7 @@ export function ClassesTab({
             </div>
           </div>
 
-          <div className={`${projectPanelClass} xl:col-span-7 flex flex-col`}>
+          <div className={`${projectPanelClass} xl:col-span-7 h-full min-h-0 flex flex-col`}>
             <div className={`${projectPanelHeaderClass} flex items-center justify-between gap-3`}>
               <div className="flex items-center gap-3 min-w-0">
                 <Box className="w-5 h-5 text-indigo-500 shrink-0" />
@@ -320,7 +326,7 @@ export function ClassesTab({
             </div>
             {selected ? (
               detailView === 'properties' ? (
-                <div className="p-5 space-y-4">
+                <div className="p-5 space-y-4 flex-1 min-h-0 overflow-y-auto">
                   <div className="grid grid-cols-3 gap-4 text-xs">
                     <DetailKpi label="Properties" value={selected.properties?.length ?? 0} />
                     <DetailKpi label="Tags" value={selected.tags?.length ?? 0} />

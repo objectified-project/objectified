@@ -102,7 +102,11 @@ export default function ProjectDetailPage() {
 
   if (isLoading) {
     return (
-      <main className={dashboardMainClass}>
+      <main
+        className={`${dashboardMainClass} ${
+          activeTab === 'classes' ? 'overflow-hidden' : ''
+        }`}
+      >
         <LoadingState message="Loading project…" />
       </main>
     );
@@ -110,7 +114,11 @@ export default function ProjectDetailPage() {
 
   if (loadError || !project) {
     return (
-      <main className={dashboardMainClass}>
+      <main
+        className={`${dashboardMainClass} ${
+          activeTab === 'classes' ? 'overflow-hidden' : ''
+        }`}
+      >
         <div className={dashboardContentStackClass}>
           <Alert variant="error">{loadError || 'Project not available'}</Alert>
           <EmptyState
@@ -134,7 +142,11 @@ export default function ProjectDetailPage() {
         <DetailTabs projectId={project.id} active={activeTab} counts={tabCounts} />
       </DetailHeader>
 
-      <main className={dashboardMainClass}>
+      <main
+        className={`${dashboardMainClass} ${
+          activeTab === 'classes' ? 'overflow-hidden' : ''
+        }`}
+      >
         {activeTab === 'overview' ? <OverviewTab project={project} /> : null}
 
         {activeTab === 'versions' ? (

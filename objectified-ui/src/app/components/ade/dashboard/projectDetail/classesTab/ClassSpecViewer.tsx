@@ -163,7 +163,7 @@ export function ClassSpecViewer({
   }, [result, selected.name, versionId, format, serialization]);
 
   return (
-    <div className="flex flex-col h-full min-h-[480px]">
+    <div className="flex flex-col h-full min-h-0">
       {/* Format + serialization toolbar. Lives just under the panel header
           so the viewer reads as a single connected surface. */}
       <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700/60 flex items-center gap-2 flex-wrap">
