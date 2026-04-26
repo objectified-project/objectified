@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   Box,
   Boxes,
+  Code2,
   GitFork,
   Layers,
   LayoutGrid,
@@ -19,9 +20,12 @@ import { LoadingState } from '../../../ui/LoadingState';
 import { EmptyState } from '../../../ui/EmptyState';
 import { Alert } from '../../../ui/Alert';
 import { Input } from '../../../ui/Input';
+import { ClassSpecViewer } from './classesTab/ClassSpecViewer';
 
 export interface ClassesTabProps {
   projectId: string;
+  /** Project display name passed through to the spec viewer's title metadata. */
+  projectName?: string;
   /** Notifies the parent so it can refresh the tab's count badge. */
   onCountChange?: (count: number | null) => void;
   /** Notifies the parent when the user toggles to the graph view. */
@@ -59,7 +63,12 @@ function pickDefaultVersion(versions: VersionRow[]): VersionRow | null {
   return versions[0];
 }
 
-export function ClassesTab({ projectId, onCountChange, onSwitchToGraph }: ClassesTabProps) {
+export function ClassesTab({
+  projectId,
+  projectName,
+  onCountChange,
+  onSwitchToGraph,
+}: ClassesTabProps) {
   const [versions, setVersions] = useState<VersionRow[]>([]);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [classes, setClasses] = useState<ClassRow[]>([]);
@@ -135,6 +144,17 @@ export function ClassesTab({ projectId, onCountChange, onSwitchToGraph }: Classe
     () => classes.find((c) => c.id === selectedClassId) ?? null,
     [classes, selectedClassId]
   );
+
+  /* The viewer wants the semver string ("1.4.0") for spec metadata, but
+   * `versionId` holds the row UUID. Map back through the versions list. */
+  const selectedVersionLabel = useMemo(
+    () => versions.find((v) => v.id === versionId)?.version_id ?? '1.0.0',
+    [versions, versionId]
+  );
+
+  /* Right-panel representation. The Properties summary is the default — the
+   * spec viewer is an alternate read of the same class data. */
+  const [detailView, setDetailView] = useState<'properties' | 'spec'>('properties');
 
   if (isLoading) return <LoadingState message="Loading classes…" />;
   if (error) return <Alert variant="error">{error}</Alert>;
@@ -255,12 +275,12 @@ export function ClassesTab({ projectId, onCountChange, onSwitchToGraph }: Classe
             </div>
           </div>
 
-          <div className={`${projectPanelClass} xl:col-span-7`}>
-            <div className={projectPanelHeaderClass}>
-              <div className="flex items-center gap-3">
-                <Box className="w-5 h-5 text-indigo-500" />
-                <div>
-                  <h3 className="text-base font-semibold">
+          <div className={`${projectPanelClass} xl:col-span-7 flex flex-col`}>
+            <div className={`${projectPanelHeaderClass} flex items-center justify-between gap-3`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <Box className="w-5 h-5 text-indigo-500 shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="text-base font-semibold truncate">
                     {selected?.name ?? 'Select a class'}
                   </h3>
                   {selected ? (
@@ -270,43 +290,81 @@ export function ClassesTab({ projectId, onCountChange, onSwitchToGraph }: Classe
                   ) : null}
                 </div>
               </div>
+              {/* Properties / Spec toggle — only meaningful with a selection. */}
+              {selected ? (
+                <div className="flex items-center text-xs rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setDetailView('properties')}
+                    className={`px-2.5 py-1.5 inline-flex items-center gap-1.5 ${
+                      detailView === 'properties'
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-500'
+                    }`}
+                  >
+                    <ListIcon className="w-3.5 h-3.5" /> Properties
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDetailView('spec')}
+                    className={`px-2.5 py-1.5 inline-flex items-center gap-1.5 ${
+                      detailView === 'spec'
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-500'
+                    }`}
+                  >
+                    <Code2 className="w-3.5 h-3.5" /> Spec
+                  </button>
+                </div>
+              ) : null}
             </div>
             {selected ? (
-              <div className="p-5 space-y-4">
-                <div className="grid grid-cols-3 gap-4 text-xs">
-                  <DetailKpi label="Properties" value={selected.properties?.length ?? 0} />
-                  <DetailKpi label="Tags" value={selected.tags?.length ?? 0} />
-                  <DetailKpi
-                    label="$ref properties"
-                    value={
-                      selected.properties?.filter((p) =>
-                        JSON.stringify(p.data ?? {}).includes('"$ref"')
-                      ).length ?? 0
-                    }
+              detailView === 'properties' ? (
+                <div className="p-5 space-y-4">
+                  <div className="grid grid-cols-3 gap-4 text-xs">
+                    <DetailKpi label="Properties" value={selected.properties?.length ?? 0} />
+                    <DetailKpi label="Tags" value={selected.tags?.length ?? 0} />
+                    <DetailKpi
+                      label="$ref properties"
+                      value={
+                        selected.properties?.filter((p) =>
+                          JSON.stringify(p.data ?? {}).includes('"$ref"')
+                        ).length ?? 0
+                      }
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-2">
+                      Properties
+                    </p>
+                    {selected.properties && selected.properties.length > 0 ? (
+                      <ul className="rounded-md border border-gray-100 dark:border-gray-700/60 divide-y divide-gray-100 dark:divide-gray-700/60 text-sm">
+                        {selected.properties.map((prop) => (
+                          <li key={prop.id} className="px-3 py-2 flex items-baseline gap-3">
+                            <span className="font-mono text-xs">{prop.name}</span>
+                            {prop.description ? (
+                              <span className="text-xs text-gray-500 truncate">
+                                {prop.description}
+                              </span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-gray-500 italic">No properties.</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <ClassSpecViewer
+                    selected={selected}
+                    allClasses={classes}
+                    projectName={projectName ?? 'API'}
+                    versionId={selectedVersionLabel}
                   />
                 </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-2">
-                    Properties
-                  </p>
-                  {selected.properties && selected.properties.length > 0 ? (
-                    <ul className="rounded-md border border-gray-100 dark:border-gray-700/60 divide-y divide-gray-100 dark:divide-gray-700/60 text-sm">
-                      {selected.properties.map((prop) => (
-                        <li key={prop.id} className="px-3 py-2 flex items-baseline gap-3">
-                          <span className="font-mono text-xs">{prop.name}</span>
-                          {prop.description ? (
-                            <span className="text-xs text-gray-500 truncate">
-                              {prop.description}
-                            </span>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-xs text-gray-500 italic">No properties.</p>
-                  )}
-                </div>
-              </div>
+              )
             ) : (
               <div className="p-8 text-center text-sm text-gray-500 italic">
                 Select a class on the left to inspect its properties.

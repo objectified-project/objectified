@@ -142,7 +142,11 @@ export default function ProjectDetailPage() {
         ) : null}
 
         {activeTab === 'classes' && !isGraphView ? (
-          <ClassesTab projectId={project.id} onCountChange={setCount('classes')} />
+          <ClassesTab
+            projectId={project.id}
+            projectName={project.name}
+            onCountChange={setCount('classes')}
+          />
         ) : null}
 
         {activeTab === 'classes' && isGraphView ? (
