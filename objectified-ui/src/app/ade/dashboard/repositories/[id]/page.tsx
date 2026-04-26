@@ -55,7 +55,10 @@ import { getRepositoriesI18nBundle } from '../i18n';
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 const rowHeightPx = 56;
-const fileViewportHeightPx = 420;
+const fileViewportMinHeightPx = 420;
+// Reserved for everything between the viewport's top and the bottom of the window
+// (panel footer + page padding). Used as a safety margin when sizing the viewport.
+const fileViewportBottomReservePx = 64;
 const repo63IssueUrl = 'https://github.com/KenSuenobu/objectified-commercial/issues/2796';
 
 type RepositoryTab = 'branches' | 'files' | 'scans' | 'sync' | 'manifest' | 'settings';
@@ -405,6 +408,7 @@ export default function RepositoryDetailPage() {
   const [selectedScanId, setSelectedScanId] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<ScanFileRecord | null>(null);
   const [fileScrollTop, setFileScrollTop] = useState(0);
+  const [fileViewportHeightPx, setFileViewportHeightPx] = useState(fileViewportMinHeightPx);
   const [formatFilter, setFormatFilter] = useState('all');
   const [fileStatusFilter, setFileStatusFilter] = useState('all');
   const [filePathFilter, setFilePathFilter] = useState('');
@@ -620,7 +624,24 @@ export default function RepositoryDetailPage() {
     const start = Math.max(0, Math.floor(fileScrollTop / rowHeightPx) - 6);
     const end = Math.min(filteredFiles.length, Math.ceil((fileScrollTop + fileViewportHeightPx) / rowHeightPx) + 6);
     return { start, end };
-  }, [fileScrollTop, filteredFiles.length]);
+  }, [fileScrollTop, fileViewportHeightPx, filteredFiles.length]);
+
+  useEffect(() => {
+    if (activeTab !== 'files') return;
+    const measure = () => {
+      const node = fileViewportRef.current;
+      if (!node) return;
+      const top = node.getBoundingClientRect().top;
+      const next = Math.max(
+        fileViewportMinHeightPx,
+        Math.floor(window.innerHeight - top - fileViewportBottomReservePx),
+      );
+      setFileViewportHeightPx((current) => (current === next ? current : next));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [activeTab, isLoadingFiles]);
 
   const visibleFiles = useMemo(
     () => filteredFiles.slice(visibleRange.start, visibleRange.end),
@@ -1198,7 +1219,7 @@ export default function RepositoryDetailPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:flex-1 sm:min-w-[24rem] sm:justify-end">
                       <select
                         className="h-8 rounded-md border border-gray-200 bg-white px-2 text-xs dark:border-gray-700 dark:bg-gray-900"
                         value={selectedScanId}
@@ -1233,13 +1254,15 @@ export default function RepositoryDetailPage() {
                           <option key={status} value={status}>{status}</option>
                         ))}
                       </select>
-                      <Input
-                        value={filePathFilter}
-                        onChange={(event) => setFilePathFilter(event.target.value)}
-                        placeholder="Filter path..."
-                        className="h-8 w-44 text-xs"
-                        aria-label="Filter path"
-                      />
+                      <div className="flex-1 min-w-[16rem]">
+                        <Input
+                          value={filePathFilter}
+                          onChange={(event) => setFilePathFilter(event.target.value)}
+                          placeholder="Filter by path substring..."
+                          className="h-8 w-full text-xs font-mono"
+                          aria-label="Filter path"
+                        />
+                      </div>
                     </div>
                   </div>
 
