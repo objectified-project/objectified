@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tenants · Workspaces</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+    .detail-gradient { background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.08) 45%, transparent 100%); }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shrink-0"><i data-lucide="building-2" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold shrink-0">Objectified</span>
+      <span class="text-xs text-gray-400 shrink-0">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300 truncate">Dashboard</span>
+      <span class="text-xs text-gray-400 shrink-0">/</span>
+      <span class="text-sm text-indigo-600 dark:text-indigo-400 font-medium truncate">Tenants</span>
+    </div>
+    <div class="flex items-center gap-3 shrink-0">
+      <a href="../" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockups</a>
+      <button id="themeBtn" type="button" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center" aria-label="Toggle theme"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto h-full flex flex-col">
+        <div class="p-3">
+          <button type="button" class="w-full flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-left">
+            <div class="w-8 h-8 rounded-md bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white font-semibold text-xs">AP</div>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs text-gray-500 dark:text-gray-400">Active workspace</p>
+              <p class="text-sm font-semibold truncate">Acme Platform</p>
+            </div>
+            <i data-lucide="chevrons-up-down" class="w-4 h-4 text-gray-400 shrink-0"></i>
+          </button>
+        </div>
+        <hr class="border-indigo-500/10 mx-3" />
+        <div class="p-4 flex-1">
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Account</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="user-round" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Profile</span></a></li>
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="link-2" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Linked Accounts</span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Administration</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li>
+                <a href="index.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10">
+                  <i data-lucide="building-2" class="w-5 h-5 text-indigo-500"></i>
+                  <span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Tenants</span>
+                  <span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
+                </a>
+              </li>
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="key-round" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">API Keys</span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div>
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Specifications</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="../projects/dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="folders" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Projects</span></a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-gray-900">
+
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div class="px-6 py-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div class="flex items-start gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
+              <i data-lucide="building-2" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="min-w-0">
+              <h1 class="text-2xl font-bold leading-tight">Tenants</h1>
+              <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                Switch your active workspace and manage people on tenants you administer.
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-500 mt-1 mono">
+                4 workspaces · you administer 2 · 52 members across your tenants
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-center gap-2 h-9 px-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-gray-400 shrink-0"></i>
+              <input class="bg-transparent outline-none w-40 sm:w-52 placeholder:text-gray-400" placeholder="Search by name, slug, or email…" />
+              <kbd class="hidden sm:inline text-[10px] mono px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500">⌘K</kbd>
+            </div>
+            <div class="flex items-center gap-1 border border-gray-200 dark:border-gray-700 rounded-lg p-0.5 bg-white dark:bg-gray-900">
+              <button type="button" class="px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">All</button>
+              <button type="button" class="px-2.5 py-1 rounded-md text-xs font-medium text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400">I administer</button>
+              <button type="button" class="px-2.5 py-1 rounded-md text-xs font-medium text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400">Member only</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0">
+
+        <!-- KPI strip (full width on small screens, then integrates visually above list on lg via order) -->
+        <div class="lg:hidden shrink-0 px-4 pt-4 pb-2 space-y-3 overflow-x-auto">
+          <div class="grid grid-cols-2 gap-3 min-w-0">
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Workspaces</p>
+              <p class="text-2xl font-bold mt-1 mono">4</p>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">You administer</p>
+              <p class="text-2xl font-bold mt-1 mono">2</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tenant list rail -->
+        <aside class="w-full lg:w-[380px] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col min-h-0 lg:max-w-[40vw]">
+          <div class="hidden lg:grid grid-cols-2 gap-2 p-4 border-b border-gray-100 dark:border-gray-700/80">
+            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 p-3">
+              <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold flex items-center gap-1"><i data-lucide="layers" class="w-3 h-3"></i> Workspaces</p>
+              <p class="text-xl font-bold mt-0.5 mono">4</p>
+            </div>
+            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 p-3">
+              <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold flex items-center gap-1"><i data-lucide="shield-check" class="w-3 h-3"></i> You administer</p>
+              <p class="text-xl font-bold mt-0.5 mono">2</p>
+            </div>
+            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 p-3 col-span-2">
+              <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> Members in your tenants</p>
+              <p class="text-xl font-bold mt-0.5 mono">52 <span class="text-xs font-normal text-gray-500">· 9 admins</span></p>
+            </div>
+          </div>
+          <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700/80 flex items-center justify-between">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Directory</span>
+            <span class="text-[11px] text-gray-400">Showing 4</span>
+          </div>
+          <div class="flex-1 overflow-y-auto p-2 space-y-1">
+            <!-- Selected row -->
+            <button type="button" class="w-full text-left rounded-xl border-2 border-indigo-400 dark:border-indigo-500 bg-indigo-50/80 dark:bg-indigo-950/40 px-3 py-3 shadow-sm">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-600 flex items-center justify-center text-white text-sm font-bold shrink-0">AP</div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-semibold text-sm truncate">Acme Platform</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-indigo-500 to-blue-500 text-white shadow-sm shrink-0">Active</span>
+                  </div>
+                  <p class="mono text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">acme-platform</p>
+                  <div class="flex items-center gap-2 mt-2 flex-wrap">
+                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Enabled
+                    </span>
+                    <span class="text-[10px] font-medium px-2 py-0.5 rounded-md bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-200/70 dark:border-violet-800">Admin</span>
+                  </div>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-indigo-500 shrink-0 mt-1"></i>
+              </div>
+            </button>
+            <button type="button" class="w-full text-left rounded-xl border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-gray-50 dark:hover:bg-gray-800/80 px-3 py-3 transition-colors">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-sm font-bold shrink-0">BD</div>
+                <div class="flex-1 min-w-0">
+                  <span class="font-semibold text-sm truncate block">Billing &amp; Disputes</span>
+                  <p class="mono text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">acme-billing</p>
+                  <div class="flex items-center gap-2 mt-2 flex-wrap">
+                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Enabled
+                    </span>
+                    <span class="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-600">Member</span>
+                  </div>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-300 shrink-0 mt-1"></i>
+              </div>
+            </button>
+            <button type="button" class="w-full text-left rounded-xl border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-gray-50 dark:hover:bg-gray-800/80 px-3 py-3 transition-colors">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-fuchsia-600 flex items-center justify-center text-white text-sm font-bold shrink-0">DX</div>
+                <div class="flex-1 min-w-0">
+                  <span class="font-semibold text-sm truncate block">Developer Experience</span>
+                  <p class="mono text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">acme-dx</p>
+                  <div class="flex items-center gap-2 mt-2 flex-wrap">
+                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Enabled
+                    </span>
+                    <span class="text-[10px] font-medium px-2 py-0.5 rounded-md bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-200/70 dark:border-violet-800">Admin</span>
+                  </div>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-300 shrink-0 mt-1"></i>
+              </div>
+            </button>
+            <button type="button" class="w-full text-left rounded-xl border border-gray-200 dark:border-gray-700 opacity-75 hover:opacity-100 px-3 py-3 transition-opacity">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center text-white text-sm font-bold shrink-0">AR</div>
+                <div class="flex-1 min-w-0">
+                  <span class="font-semibold text-sm truncate block">Archived · Legacy API</span>
+                  <p class="mono text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">acme-legacy</p>
+                  <div class="flex items-center gap-2 mt-2 flex-wrap">
+                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-red-500/15 text-red-700 dark:text-red-300 border border-red-200/80 dark:border-red-900">
+                      <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Disabled
+                    </span>
+                    <span class="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-600">Member</span>
+                  </div>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-300 shrink-0 mt-1"></i>
+              </div>
+            </button>
+          </div>
+        </aside>
+
+        <!-- Detail pane -->
+        <section class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+          <div class="detail-gradient border-b border-gray-200 dark:border-gray-700 px-6 py-5">
+            <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+              <div class="flex items-start gap-4 min-w-0">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-600 flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-emerald-500/25 shrink-0">AP</div>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h2 class="text-xl font-bold">Acme Platform</h2>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-indigo-500 to-blue-500 text-white">Your active workspace</span>
+                  </div>
+                  <div class="flex items-center gap-2 mt-2 flex-wrap">
+                    <code class="mono text-xs px-2 py-1 rounded-md bg-white/80 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300">acme-platform</code>
+                    <button type="button" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+                      <i data-lucide="copy" class="w-3 h-3"></i> Copy slug
+                    </button>
+                    <span class="text-xs text-gray-400">·</span>
+                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Enabled
+                    </span>
+                  </div>
+                  <p class="text-sm text-gray-600 dark:text-gray-400 mt-3 max-w-2xl">
+                    Primary product engineering tenant. Owns customer-facing APIs, shared primitives, and publishing pipelines for the Acme developer portal.
+                  </p>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 shrink-0">
+                <button type="button" class="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                  <i data-lucide="user-plus" class="w-4 h-4 text-indigo-500"></i> Invite member
+                </button>
+                <button type="button" class="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                  <i data-lucide="pencil" class="w-4 h-4"></i> Edit tenant
+                </button>
+                <button type="button" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium flex items-center gap-2 shadow-sm shadow-indigo-500/20">
+                  <i data-lucide="check-circle" class="w-4 h-4"></i> Active workspace
+                </button>
+              </div>
+            </div>
+
+            <!-- Sub-nav -->
+            <div class="mt-6 flex flex-wrap gap-1 border-b border-gray-200/80 dark:border-gray-700/80 -mb-px">
+              <button type="button" class="px-3 py-2 text-sm font-semibold border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 -mb-px">Overview</button>
+              <button type="button" class="px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 border-b-2 border-transparent">Members <span class="ml-1 text-xs font-mono text-gray-400">18</span></button>
+              <button type="button" class="px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 border-b-2 border-transparent">Activity</button>
+              <button type="button" class="px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 border-b-2 border-transparent">Danger zone</button>
+            </div>
+          </div>
+
+          <div class="p-6 space-y-6">
+
+            <!-- Overview cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Tenant ID</p>
+                <p class="mono text-xs mt-2 break-all text-gray-700 dark:text-gray-300">tn_01HZZKXQV88N8QZQJ9Y2A3BC4D</p>
+                <button type="button" class="text-[11px] text-indigo-600 dark:text-indigo-400 mt-2 hover:underline">Copy</button>
+              </div>
+              <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Created · Updated</p>
+                <p class="text-sm mt-2 text-gray-700 dark:text-gray-300">Mar 12, 2024 · <span class="text-gray-500">Apr 22, 2026</span></p>
+              </div>
+              <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Your role</p>
+                <p class="text-sm mt-2 font-semibold text-violet-700 dark:text-violet-300 flex items-center gap-2">
+                  <i data-lucide="shield" class="w-4 h-4"></i> Tenant administrator
+                </p>
+                <p class="text-xs text-gray-500 mt-1">You can invite people and edit workspace settings.</p>
+              </div>
+            </div>
+
+            <!-- Slug impact callout -->
+            <div class="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 p-4 flex gap-3">
+              <div class="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+                <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-700 dark:text-amber-400"></i>
+              </div>
+              <div class="min-w-0">
+                <p class="font-semibold text-sm text-amber-900 dark:text-amber-200">Changing the slug affects URLs</p>
+                <p class="text-sm text-amber-800/90 dark:text-amber-100/80 mt-1">
+                  Published specs and integration webhooks that embed <code class="mono text-xs bg-white/60 dark:bg-black/20 px-1 rounded">acme-platform</code> in paths should be updated after a rename. Show a confirmation with a before/after diff before saving.
+                </p>
+              </div>
+            </div>
+
+            <!-- Members preview (tab content teaser) -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="users" class="w-4 h-4 text-indigo-500"></i>
+                  <h3 class="font-semibold text-sm">Members</h3>
+                  <span class="text-xs text-gray-500">18 people · 4 administrators</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input class="text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-transparent w-full sm:w-48" placeholder="Filter members…" />
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="text-[11px] uppercase tracking-wider text-gray-500 bg-gray-50 dark:bg-gray-900/50">
+                    <tr>
+                      <th class="text-left px-4 py-2 font-semibold">Person</th>
+                      <th class="text-left py-2 font-semibold hidden sm:table-cell">Joined</th>
+                      <th class="text-left py-2 font-semibold">Role</th>
+                      <th class="text-right px-4 py-2 font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/50">
+                      <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                          <div class="w-8 h-8 rounded-full bg-indigo-500 text-white text-[11px] font-semibold flex items-center justify-center">KS</div>
+                          <div>
+                            <p class="font-semibold">Kenji Saito</p>
+                            <p class="text-[11px] text-gray-500">kenji@acme.dev</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="py-3 text-xs text-gray-500 hidden sm:table-cell">Mar 14, 2024</td>
+                      <td class="py-3"><span class="text-[11px] px-2 py-0.5 rounded-md bg-violet-500/15 text-violet-700 dark:text-violet-300 font-semibold">Admin</span></td>
+                      <td class="px-4 py-3 text-right"><button type="button" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"><i data-lucide="more-vertical" class="w-4 h-4"></i></button></td>
+                    </tr>
+                    <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/50">
+                      <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                          <div class="w-8 h-8 rounded-full bg-fuchsia-500 text-white text-[11px] font-semibold flex items-center justify-center">AR</div>
+                          <div>
+                            <p class="font-semibold">Anya Rao</p>
+                            <p class="text-[11px] text-gray-500">anya@acme.dev</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="py-3 text-xs text-gray-500 hidden sm:table-cell">Jan 08, 2025</td>
+                      <td class="py-3"><span class="text-[11px] px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-700 dark:text-slate-300 font-semibold">Member</span></td>
+                      <td class="px-4 py-3 text-right"><button type="button" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"><i data-lucide="more-vertical" class="w-4 h-4"></i></button></td>
+                    </tr>
+                    <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/50">
+                      <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                          <div class="w-8 h-8 rounded-full bg-amber-500 text-white text-[11px] font-semibold flex items-center justify-center">DM</div>
+                          <div>
+                            <p class="font-semibold">Devin Mehta</p>
+                            <p class="text-[11px] text-gray-500">devin@contractor.io</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="py-3 text-xs text-gray-500 hidden sm:table-cell">Sep 21, 2025</td>
+                      <td class="py-3"><span class="text-[11px] px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-700 dark:text-slate-300 font-semibold">Member</span></td>
+                      <td class="px-4 py-3 text-right"><button type="button" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"><i data-lucide="more-vertical" class="w-4 h-4"></i></button></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="px-4 py-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
+                <button type="button" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">View all members →</button>
+              </div>
+            </div>
+
+            <!-- Activity teaser -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-sm flex items-center gap-2"><i data-lucide="activity" class="w-4 h-4 text-indigo-500"></i> Recent activity</h3>
+                <span class="text-[11px] text-gray-500">Last 7 days</span>
+              </div>
+              <ul class="space-y-3 text-sm">
+                <li class="flex gap-3">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span>
+                  <div>
+                    <p><span class="font-medium">Anya Rao</span> published <span class="mono text-xs">billing-api v2.4.0</span></p>
+                    <p class="text-xs text-gray-500">Apr 24, 2026 · 09:14</p>
+                  </div>
+                </li>
+                <li class="flex gap-3">
+                  <span class="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shrink-0"></span>
+                  <div>
+                    <p><span class="font-medium">Kenji Saito</span> invited <span class="mono text-xs">devin@contractor.io</span> to the tenant</p>
+                    <p class="text-xs text-gray-500">Apr 23, 2026 · 16:02</p>
+                  </div>
+                </li>
+                <li class="flex gap-3">
+                  <span class="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0"></span>
+                  <div>
+                    <p>Tenant slug reviewed — no change applied</p>
+                    <p class="text-xs text-gray-500">Apr 21, 2026 · 11:41</p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'tenants-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>
