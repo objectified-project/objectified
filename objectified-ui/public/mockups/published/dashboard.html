@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Published · API catalog</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .icon-fill { fill: currentColor !important; }
+
+    /* Chrome — mirrors versions/ */
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+    .header-shell { background: linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(99,102,241,0.05) 60%, transparent 100%); }
+    .header-shell-dark { background: linear-gradient(135deg, rgba(16,185,129,0.10) 0%, rgba(99,102,241,0.08) 60%, transparent 100%); }
+
+    /* Card */
+    .pub-card { transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease; }
+    .pub-card:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -16px rgba(15,23,42,0.30); border-color: rgba(99,102,241,0.55); }
+    .pub-card:hover .row-cta { background-color: rgb(79 70 229); color: #fff; border-color: rgb(79 70 229); }
+
+    /* Project gradients (consistent with versions/) */
+    .grad-bl { background: linear-gradient(135deg, #6366f1, #a855f7); }
+    .grad-pa { background: linear-gradient(135deg, #10b981, #06b6d4); }
+    .grad-cm { background: linear-gradient(135deg, #f59e0b, #f97316); }
+    .grad-or { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+    .grad-in { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+    .grad-rd { background: linear-gradient(135deg, #0ea5e9, #06b6d4); }
+    .grad-mt { background: linear-gradient(135deg, #ef4444, #f59e0b); }
+    .grad-cl { background: linear-gradient(135deg, #14b8a6, #22c55e); }
+
+    /* Sparklines + bars */
+    .spark-stroke { stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .spark-area   { fill: currentColor; fill-opacity: 0.15; }
+
+    /* Visibility pills */
+    .pill-public  { background: rgba(16,185,129,0.10); color: #047857; border: 1px solid rgba(16,185,129,0.35); }
+    .dark .pill-public { background: rgba(16,185,129,0.16); color: #6ee7b7; border-color: rgba(16,185,129,0.45); }
+    .pill-private { background: rgba(100,116,139,0.10); color: #475569; border: 1px solid rgba(100,116,139,0.35); }
+    .dark .pill-private { background: rgba(100,116,139,0.20); color: #cbd5e1; border-color: rgba(100,116,139,0.45); }
+
+    /* Accent strips on card top */
+    .accent-public  { background: linear-gradient(90deg, #10b981, #06b6d4); }
+    .accent-private { background: linear-gradient(90deg, #94a3b8, #64748b); }
+    .accent-stale   { background: linear-gradient(90deg, #f59e0b, #f97316); }
+    .accent-hot     { background: linear-gradient(90deg, #6366f1, #a855f7); }
+
+    /* URL row */
+    .url-block { background: rgba(99,102,241,0.05); border: 1px dashed rgba(99,102,241,0.25); }
+    .dark .url-block { background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.35); }
+
+    /* Catalog banner */
+    .catalog-banner { background: linear-gradient(135deg, rgba(16,185,129,0.10), rgba(99,102,241,0.08) 60%, rgba(217,70,239,0.06)); }
+    .dark .catalog-banner { background: linear-gradient(135deg, rgba(16,185,129,0.14), rgba(99,102,241,0.12) 60%, rgba(217,70,239,0.10)); }
+
+    /* QR code (faux, dotted grid) */
+    .qr {
+      background-image:
+        radial-gradient(circle, currentColor 1px, transparent 1.4px);
+      background-size: 6px 6px;
+      background-position: 0 0;
+    }
+
+    /* Trend arrows */
+    .delta-up   { color: #10b981; }
+    .delta-down { color: #ef4444; }
+    .delta-flat { color: #94a3b8; }
+
+    /* Subtle row stripe for table view */
+    tbody.zebra > tr:nth-child(even) { background: rgba(148,163,184,0.04); }
+    .dark tbody.zebra > tr:nth-child(even) { background: rgba(148,163,184,0.06); }
+
+    /* Row state inset bars (left edge tint) */
+    .row-hot     { box-shadow: inset 3px 0 0 0 #6366f1; }
+    .row-problem { box-shadow: inset 3px 0 0 0 #f43f5e; }
+    .row-stale   { box-shadow: inset 3px 0 0 0 #f59e0b; }
+    .row-selected{ background: rgba(99,102,241,0.06); }
+    .dark .row-selected { background: rgba(99,102,241,0.12); }
+
+    /* Sortable column header */
+    .th-sortable { cursor: pointer; user-select: none; }
+    .th-sortable:hover { color: #4f46e5; }
+    .dark .th-sortable:hover { color: #a5b4fc; }
+    .th-active { color: #4f46e5; }
+    .dark .th-active { color: #c7d2fe; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <!-- Top bar -->
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center"><i data-lucide="folders" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Acme Corp</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-700 dark:text-gray-200">Published</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="../" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center" title="Toggle theme"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+
+    <!-- Sidebar (Published active) -->
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto h-full flex flex-col">
+        <div class="p-3">
+          <button class="w-full flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-left">
+            <div class="w-8 h-8 rounded-md bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white font-semibold text-xs">AC</div>
+            <div class="flex-1 min-w-0"><p class="text-xs text-gray-500 dark:text-gray-400">Tenant</p><p class="text-sm font-semibold truncate">Acme Corp</p></div>
+            <i data-lucide="chevrons-up-down" class="w-4 h-4 text-gray-400"></i>
+          </button>
+        </div>
+        <hr class="border-indigo-500/10 mx-3" />
+        <div class="p-4 flex-1">
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Account</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="user-round" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Profile</span></a></li>
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="link-2" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Linked Accounts</span></a></li>
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-branch-plus" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Repositories</span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Administration</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="building-2" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Tenants</span></a></li>
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="key-round" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">API Keys</span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Data Management</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="atom" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Primitives</span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div>
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Specifications</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="../projects/dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="folders" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Projects</span></a></li>
+              <li><a href="../versions/dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-branch" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Versions</span></a></li>
+              <li><a href="dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10"><i data-lucide="globe-2" class="w-5 h-5 text-indigo-500"></i><span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Published</span><span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span></a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main column -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- Page header -->
+      <header class="border-b border-gray-200 dark:border-gray-700 header-shell dark:header-shell-dark">
+        <div class="px-6 py-5 flex items-end justify-between gap-4 flex-wrap">
+          <div class="flex items-start gap-4 min-w-0">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center shadow-md shrink-0"><i data-lucide="globe-2" class="w-6 h-6 text-white"></i></div>
+            <div class="min-w-0">
+              <h1 class="text-2xl font-bold leading-tight">Published</h1>
+              <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 mono">Live, locked API endpoints serving consumers · share, monitor, control access.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="hidden md:flex items-center gap-2 h-8 px-2.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-gray-400"></i>
+              <input class="bg-transparent outline-none w-64 placeholder:text-gray-400" placeholder="Search project, version, slug, consumer…">
+              <kbd class="text-[10px] mono px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500">⌘K</kbd>
+            </div>
+            <button class="h-8 px-2.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-xs inline-flex items-center gap-1.5"><i data-lucide="download" class="w-3.5 h-3.5"></i> Export</button>
+            <button class="h-8 px-2.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-xs inline-flex items-center gap-1.5"><i data-lucide="rss" class="w-3.5 h-3.5"></i> Subscribe</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-6 space-y-6">
+
+        <!-- KPI band -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Published versions</p><i data-lucide="layers" class="w-4 h-4 text-indigo-500"></i></div>
+            <p class="text-2xl font-bold mono mt-2">12</p>
+            <p class="text-[11px] text-gray-500 mono mt-1">across 7 projects · <span class="delta-up">+2</span> this month</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Visibility</p><i data-lucide="globe" class="w-4 h-4 text-emerald-500"></i></div>
+            <div class="mt-2 flex items-baseline gap-2">
+              <p class="text-2xl font-bold mono text-emerald-600 dark:text-emerald-400">5</p>
+              <p class="text-xs text-gray-400 mono">/12 public</p>
+            </div>
+            <!-- proportion bar -->
+            <div class="mt-2 h-1.5 rounded-full bg-gray-100 dark:bg-gray-900 overflow-hidden flex">
+              <div class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400" style="width: 42%"></div>
+              <div class="h-full bg-gradient-to-r from-slate-400 to-slate-500" style="width: 58%"></div>
+            </div>
+            <p class="text-[11px] text-gray-500 mono mt-1">7 private · <span class="text-amber-500">3 missing API key</span></p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Requests · 7 d</p><i data-lucide="activity" class="w-4 h-4 text-sky-500"></i></div>
+            <div class="mt-2 flex items-end justify-between gap-2">
+              <div>
+                <p class="text-2xl font-bold mono">3.42M</p>
+                <p class="text-[11px] mono mt-0.5"><span class="delta-up">▲ 12.4%</span> <span class="text-gray-400">w/w</span></p>
+              </div>
+              <div class="text-emerald-500"><svg viewBox="0 0 100 28" class="w-24 h-7"><path class="spark-area" d="M2,22 L12,20 L22,18 L32,16 L42,14 L52,11 L62,12 L72,8 L82,6 L94,4 L94,28 L2,28 Z"/><path class="spark-stroke" d="M2,22 L12,20 L22,18 L32,16 L42,14 L52,11 L62,12 L72,8 L82,6 L94,4"/></svg></div>
+            </div>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Active consumers</p><i data-lucide="users-round" class="w-4 h-4 text-purple-500"></i></div>
+            <p class="text-2xl font-bold mono mt-2">84</p>
+            <p class="text-[11px] text-gray-500 mono mt-1">12 API keys · <span class="delta-up">+3</span> new this week</p>
+          </div>
+        </section>
+
+        <!-- Public catalog banner -->
+        <section class="catalog-banner rounded-lg border border-emerald-200 dark:border-emerald-700/40 p-4 flex items-center gap-4 flex-wrap">
+          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white shrink-0"><i data-lucide="book-open" class="w-5 h-5"></i></div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold">Your tenant has a public catalog</p>
+            <p class="text-[11px] text-gray-600 dark:text-gray-400 mono">Public versions are auto-listed for discovery. Share this link with consumers.</p>
+          </div>
+          <div class="flex items-center gap-2 url-block px-3 py-1.5 rounded-md max-w-full">
+            <i data-lucide="link" class="w-3.5 h-3.5 text-indigo-500 shrink-0"></i>
+            <code class="text-xs mono truncate">https://api.objectified.dev/catalog/acme-corp</code>
+            <button class="p-1 rounded hover:bg-white/60 dark:hover:bg-gray-700/60" title="Copy"><i data-lucide="copy" class="w-3.5 h-3.5 text-gray-500"></i></button>
+            <button class="p-1 rounded hover:bg-white/60 dark:hover:bg-gray-700/60" title="QR"><i data-lucide="qr-code" class="w-3.5 h-3.5 text-gray-500"></i></button>
+            <button class="p-1 rounded hover:bg-white/60 dark:hover:bg-gray-700/60" title="Open"><i data-lucide="external-link" class="w-3.5 h-3.5 text-gray-500"></i></button>
+          </div>
+          <button class="h-8 px-2.5 rounded-md text-xs bg-indigo-600 hover:bg-indigo-500 text-white inline-flex items-center gap-1.5"><i data-lucide="settings-2" class="w-3.5 h-3.5"></i> Catalog settings</button>
+        </section>
+
+        <!-- Filters + view switcher -->
+        <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 flex items-center gap-3 flex-wrap">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button class="px-2.5 py-1 text-xs font-semibold rounded-md bg-indigo-600 text-white inline-flex items-center gap-1.5">All <span class="mono text-[10px] px-1 rounded bg-white/20">12</span></button>
+            <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5"><i data-lucide="globe" class="w-3 h-3 text-emerald-500"></i> Public <span class="mono text-[10px] text-gray-400">5</span></button>
+            <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5"><i data-lucide="lock" class="w-3 h-3 text-slate-500"></i> Private <span class="mono text-[10px] text-gray-400">7</span></button>
+            <span class="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1"></span>
+            <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5"><i data-lucide="flame" class="w-3 h-3 text-rose-500"></i> Top used <span class="mono text-[10px] text-gray-400">4</span></button>
+            <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5"><i data-lucide="moon" class="w-3 h-3 text-amber-500"></i> Stale <span class="mono text-[10px] text-gray-400">2</span></button>
+            <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5"><i data-lucide="alert-triangle" class="w-3 h-3 text-rose-500"></i> Errors &gt; 1% <span class="mono text-[10px] text-gray-400">1</span></button>
+          </div>
+          <div class="flex-1"></div>
+          <div class="flex items-center gap-2 text-xs text-gray-500">
+            <span class="mono">Group</span>
+            <div class="flex items-center gap-1 border border-gray-200 dark:border-gray-700 rounded-md p-0.5">
+              <button class="px-2 py-1 rounded text-xs bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium">Flat</button>
+              <button class="px-2 py-1 rounded text-xs text-gray-500 hover:text-indigo-500">By project</button>
+            </div>
+            <span class="mono ml-2">Sort</span>
+            <button class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 inline-flex items-center gap-1.5 hover:bg-gray-50 dark:hover:bg-gray-700">
+              <i data-lucide="arrow-down-narrow-wide" class="w-3.5 h-3.5"></i> Most used <i data-lucide="chevron-down" class="w-3 h-3 text-gray-400"></i>
+            </button>
+            <span class="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1"></span>
+            <div class="flex items-center gap-1 border border-gray-200 dark:border-gray-700 rounded-md p-0.5">
+              <button class="px-2 py-1 rounded text-xs text-gray-500 hover:text-indigo-500 flex items-center gap-1"><i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> Cards</button>
+              <button class="px-2 py-1 rounded text-xs bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1"><i data-lucide="list" class="w-3.5 h-3.5"></i> Table</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Table view (default) -->
+        <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 dark:bg-gray-800/95 border-b border-gray-200 dark:border-gray-700">
+                <tr class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                  <th class="px-3 py-2.5 w-8"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></th>
+                  <th class="px-3 py-2.5 text-left th-sortable">Version</th>
+                  <th class="px-3 py-2.5 text-left">Visibility</th>
+                  <th class="px-3 py-2.5 text-left">Access URL</th>
+                  <th class="px-3 py-2.5 text-right th-sortable th-active whitespace-nowrap">Req · 24h <i data-lucide="arrow-down" class="inline w-3 h-3 -mt-0.5"></i></th>
+                  <th class="px-3 py-2.5 text-right th-sortable">p50</th>
+                  <th class="px-3 py-2.5 text-right th-sortable">Errors</th>
+                  <th class="px-3 py-2.5 text-right th-sortable">Cons.</th>
+                  <th class="px-3 py-2.5 text-left">Activity</th>
+                  <th class="px-3 py-2.5 w-10 text-right"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-700/60">
+
+                <!-- analytics-events v0.5.1 — private, hot -->
+                <tr class="row-hot hover:bg-indigo-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-mt flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">AE</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">analytics-events</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v0.5.1</span>
+                          <span class="mono text-[10px] uppercase tracking-wider px-1 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="flame" class="w-3 h-3"></i> hot</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">3 d ago · Sasha P.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-private inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> Private</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/analytics-events/0.5.1</code>
+                      <span class="text-[10px] mono px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1" title="Requires API key"><i data-lucide="key-round" class="w-3 h-3"></i> key</span>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold">1.2M</span><span class="mono text-[10px] delta-up ml-1">▲ 18%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">28<span class="text-gray-400 text-xs">ms</span></span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-emerald-600 dark:text-emerald-400">0.04%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">12</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-emerald-500 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,18 L12,16 L22,15 L32,12 L42,10 L52,8 L62,6 L72,4 L78,3"/></svg></span>
+                      <span class="text-[10px] mono text-gray-500 whitespace-nowrap">just now</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+                <!-- orders-public v4.0.1 — public, hot -->
+                <tr class="row-hot hover:bg-indigo-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-or flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">OR</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">orders-public</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v4.0.1</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">22 d ago · Devon R.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Public</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/orders-public/4.0.1</code>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="QR"><i data-lucide="qr-code" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold">1.1M</span><span class="mono text-[10px] delta-up ml-1">▲ 4%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">22<span class="text-gray-400 text-xs">ms</span></span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-emerald-600 dark:text-emerald-400">0.05%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">31</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-emerald-500 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,14 L12,13 L22,12 L32,12 L42,11 L52,10 L62,10 L72,9 L78,9"/></svg></span>
+                      <span class="text-[10px] mono text-gray-500 whitespace-nowrap">3 s ago</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+                <!-- billing-api v2.5.0 — public -->
+                <tr class="hover:bg-indigo-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-bl flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">BL</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">billing-api</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v2.5.0</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">12 d ago · Jordan K.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Public</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/billing-api/2.5.0</code>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="QR"><i data-lucide="qr-code" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold">412k</span><span class="mono text-[10px] delta-up ml-1">▲ 8%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">38<span class="text-gray-400 text-xs">ms</span></span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-emerald-600 dark:text-emerald-400">0.2%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">18</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-emerald-500 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,18 L12,16 L22,15 L32,12 L42,10 L52,9 L62,7 L72,5 L78,4"/></svg></span>
+                      <span class="text-[10px] mono text-gray-500 whitespace-nowrap">2 m ago</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+                <!-- payments-core v3.1.0 — public -->
+                <tr class="hover:bg-indigo-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-pa flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">PA</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">payments-core</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v3.1.0</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">2 d ago · Sasha P.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Public</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/payments-core/3.1.0</code>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="QR"><i data-lucide="qr-code" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold">198k</span><span class="mono text-[10px] delta-up ml-1">▲ 3%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">52<span class="text-gray-400 text-xs">ms</span></span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-emerald-600 dark:text-emerald-400">0.1%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">9</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-emerald-500 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,16 L12,14 L22,15 L32,12 L42,11 L52,10 L62,9 L72,8 L78,7"/></svg></span>
+                      <span class="text-[10px] mono text-gray-500 whitespace-nowrap">14 s ago</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+                <!-- customer-mdm v1.8.2 — private -->
+                <tr class="hover:bg-indigo-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-cm flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">CM</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">customer-mdm</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v1.8.2</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">8 d ago · Mira L.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-private inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> Private</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/customer-mdm/1.8.2</code>
+                      <span class="text-[10px] mono px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1" title="Requires API key"><i data-lucide="key-round" class="w-3 h-3"></i> key</span>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold">86k</span><span class="mono text-[10px] delta-flat ml-1">— 0%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">71<span class="text-gray-400 text-xs">ms</span></span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-amber-600 dark:text-amber-400">0.6%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">5</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-amber-500 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,12 L12,11 L22,13 L32,12 L42,14 L52,11 L62,13 L72,12 L78,11"/></svg></span>
+                      <span class="text-[10px] mono text-gray-500 whitespace-nowrap">38 m ago</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+                <!-- orders-internal v2.2.0 — private -->
+                <tr class="hover:bg-indigo-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-rd flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">OI</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">orders-internal</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v2.2.0</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">17 d ago · Devon R.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-private inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> Private</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/orders-internal/2.2.0</code>
+                      <span class="text-[10px] mono px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1" title="Requires API key"><i data-lucide="key-round" class="w-3 h-3"></i> key</span>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold">73k</span><span class="mono text-[10px] delta-up ml-1">▲ 2%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">33<span class="text-gray-400 text-xs">ms</span></span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-emerald-600 dark:text-emerald-400">0.1%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">6</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-emerald-500 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,15 L12,14 L22,13 L32,12 L42,11 L52,11 L62,10 L72,10 L78,9"/></svg></span>
+                      <span class="text-[10px] mono text-gray-500 whitespace-nowrap">1 m ago</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+                <!-- inventory v0.9.4 — private, errors > 1% -->
+                <tr class="row-problem hover:bg-rose-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-in flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">IN</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">inventory</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v0.9.4</span>
+                          <span class="text-[10px] mono uppercase px-1 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 inline-flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3 h-3"></i> err</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">5 d ago · Riley T.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-private inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> Private</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/inventory/0.9.4</code>
+                      <span class="text-[10px] mono px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1" title="Requires API key"><i data-lucide="key-round" class="w-3 h-3"></i> key</span>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold">42k</span><span class="mono text-[10px] delta-down ml-1">▼ 6%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">94<span class="text-gray-400 text-xs">ms</span></span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-rose-600 dark:text-rose-400 font-semibold">1.4%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">3</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-rose-500 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,12 L12,11 L22,9 L32,12 L42,8 L52,14 L62,11 L72,15 L78,16"/></svg></span>
+                      <span class="text-[10px] mono text-gray-500 whitespace-nowrap">1 m ago</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+                <!-- shipments v1.0.0 — public, errors high -->
+                <tr class="row-problem hover:bg-rose-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-rd flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">SH</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">shipments</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v1.0.0</span>
+                          <span class="text-[10px] mono uppercase px-1 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 inline-flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3 h-3"></i> err</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">31 d ago · Mira L.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Public</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/shipments/1.0.0</code>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="QR"><i data-lucide="qr-code" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold">4.2k</span><span class="mono text-[10px] delta-down ml-1">▼ 12%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">110<span class="text-gray-400 text-xs">ms</span></span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-rose-600 dark:text-rose-400 font-semibold">2.1%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">1</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-rose-500 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,10 L12,11 L22,12 L32,11 L42,14 L52,15 L62,16 L72,17 L78,18"/></svg></span>
+                      <span class="text-[10px] mono text-gray-500 whitespace-nowrap">9 m ago</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+                <!-- payments-core v3.0.4 — older patch line -->
+                <tr class="hover:bg-indigo-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-pa flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">PA</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">payments-core</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v3.0.4</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">47 d ago · Sasha P.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Public</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/payments-core/3.0.4</code>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="QR"><i data-lucide="qr-code" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold">24k</span><span class="mono text-[10px] delta-down ml-1">▼ 18%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">48<span class="text-gray-400 text-xs">ms</span></span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-emerald-600 dark:text-emerald-400">0.2%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">4</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-gray-400 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,9 L12,10 L22,11 L32,12 L42,13 L52,14 L62,15 L72,16 L78,16"/></svg></span>
+                      <span class="text-[10px] mono text-gray-500 whitespace-nowrap">22 m ago</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+                <!-- billing-api v2.4.6 — older -->
+                <tr class="hover:bg-indigo-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-bl flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">BL</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">billing-api</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v2.4.6</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">68 d ago · Jordan K.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Public</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/billing-api/2.4.6</code>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="QR"><i data-lucide="qr-code" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold">11k</span><span class="mono text-[10px] delta-down ml-1">▼ 9%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">41<span class="text-gray-400 text-xs">ms</span></span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-emerald-600 dark:text-emerald-400">0.3%</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">2</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-gray-400 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,8 L12,9 L22,10 L32,11 L42,12 L52,13 L62,14 L72,15 L78,16"/></svg></span>
+                      <span class="text-[10px] mono text-gray-500 whitespace-nowrap">2 h ago</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+                <!-- catalog v1.2.0 — public, stale -->
+                <tr class="row-stale hover:bg-amber-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-cl flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">CL</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">catalog</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v1.2.0</span>
+                          <span class="text-[10px] mono uppercase px-1 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 inline-flex items-center gap-1"><i data-lucide="moon" class="w-3 h-3"></i> stale</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">4 mo ago · Devon R.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Public</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/catalog/1.2.0</code>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="QR"><i data-lucide="qr-code" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold text-gray-400">—</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-gray-400">—</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-gray-400">—</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">0</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-gray-400 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,18 L78,18"/></svg></span>
+                      <span class="text-[10px] mono text-amber-500 whitespace-nowrap">29 d ago</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+                <!-- customer-mdm v1.7.0 — private, stale -->
+                <tr class="row-stale hover:bg-amber-500/5 transition-colors">
+                  <td class="px-3 py-3 align-middle"><input type="checkbox" class="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600"></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-md grad-cm flex items-center justify-center text-white font-bold mono text-[11px] shrink-0">CM</div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <a href="detail.html" class="text-sm font-semibold leading-tight hover:text-indigo-500">customer-mdm</a>
+                          <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v1.7.0</span>
+                          <span class="text-[10px] mono uppercase px-1 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 inline-flex items-center gap-1"><i data-lucide="moon" class="w-3 h-3"></i> stale</span>
+                        </div>
+                        <p class="text-[11px] mono text-gray-500 mt-0.5">5 mo ago · Mira L.</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle"><button class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-private inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> Private</button></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="url-block rounded-md px-2.5 py-1.5 flex items-center gap-1.5 max-w-[320px]">
+                      <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/customer-mdm/1.7.0</code>
+                      <span class="text-[10px] mono px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1" title="Requires API key"><i data-lucide="key-round" class="w-3 h-3"></i> key</span>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                      <button class="p-0.5 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm font-semibold text-gray-400">—</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-gray-400">—</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm text-gray-400">—</span></td>
+                  <td class="px-3 py-3 align-middle text-right whitespace-nowrap"><span class="mono text-sm">0</span></td>
+                  <td class="px-3 py-3 align-middle">
+                    <div class="flex items-center gap-2">
+                      <span class="text-gray-400 shrink-0"><svg viewBox="0 0 80 22" class="w-14 h-4"><path class="spark-stroke" d="M2,18 L78,18"/></svg></span>
+                      <span class="text-[10px] mono text-amber-500 whitespace-nowrap">42 d ago</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-3 align-middle text-right"><button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                </tr>
+
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pager -->
+          <div class="flex items-center justify-between px-3 py-2 border-t border-gray-100 dark:border-gray-700/60 text-[11px] mono text-gray-500">
+            <span><span class="text-gray-700 dark:text-gray-300 font-semibold">12</span> of 12 published versions · row state: <span class="text-indigo-500">hot</span> · <span class="text-rose-500">errors</span> · <span class="text-amber-500">stale</span></span>
+            <div class="flex items-center gap-2">
+              <span>Rows</span>
+              <button class="px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700 inline-flex items-center gap-1 hover:bg-gray-50 dark:hover:bg-gray-700">25 <i data-lucide="chevron-down" class="w-3 h-3"></i></button>
+              <span class="w-px h-4 bg-gray-200 dark:bg-gray-700"></span>
+              <button class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400" disabled><i data-lucide="chevron-left" class="w-3 h-3"></i></button>
+              <span class="px-1">1 / 1</span>
+              <button class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400" disabled><i data-lucide="chevron-right" class="w-3 h-3"></i></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Card grid (alternate; rendered for visual reference) -->
+        <details class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden group">
+          <summary class="px-4 py-3 cursor-pointer flex items-center gap-2 text-[10px] uppercase tracking-wider text-gray-500 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700/40">
+            <i data-lucide="layout-grid" class="w-3.5 h-3.5 text-gray-400 group-open:text-indigo-500"></i>
+            Cards view (alternate)
+            <span class="mono normal-case font-normal text-gray-400 ml-1">— same data, denser view for browsing &lt; 24 publications</span>
+            <span class="flex-1"></span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400 group-open:rotate-180 transition-transform"></i>
+          </summary>
+          <div class="p-4 border-t border-gray-200 dark:border-gray-700/60 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+
+          <!-- Card 1: billing-api v2.5.0 — public, hot -->
+          <a href="detail.html" class="pub-card block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="h-1 accent-hot"></div>
+            <div class="p-4 flex items-start gap-3">
+              <div class="w-12 h-12 rounded-lg grad-bl flex items-center justify-center text-white font-bold mono text-base shadow-sm shrink-0">BL</div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h3 class="text-base font-semibold leading-tight truncate">billing-api</h3>
+                  <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v2.5.0</span>
+                </div>
+                <p class="text-[11px] mono text-gray-500 truncate">acme-corp · published 12 d ago by Jordan K.</p>
+              </div>
+              <span class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1 shrink-0"><i data-lucide="globe" class="w-3 h-3"></i> Public</span>
+            </div>
+
+            <div class="px-4 pb-4 space-y-3">
+              <!-- URL block -->
+              <div class="url-block rounded-md px-2.5 py-2 flex items-center gap-2">
+                <i data-lucide="link" class="w-3.5 h-3.5 text-indigo-500 shrink-0"></i>
+                <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/billing-api/2.5.0</code>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="QR"><i data-lucide="qr-code" class="w-3 h-3 text-gray-500"></i></button>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+              </div>
+
+              <!-- Stats -->
+              <div class="grid grid-cols-4 gap-2 text-[10px] text-center mono">
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1">
+                  <p class="text-gray-400">Req · 24h</p><p class="font-semibold text-gray-700 dark:text-gray-200">412k</p>
+                </div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1">
+                  <p class="text-gray-400">p50</p><p class="font-semibold">38<span class="text-gray-400">ms</span></p>
+                </div>
+                <div class="rounded-md bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/40 py-1.5 px-1">
+                  <p class="text-emerald-600">Errors</p><p class="font-semibold text-emerald-700 dark:text-emerald-300">0.2%</p>
+                </div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1">
+                  <p class="text-gray-400">Consumers</p><p class="font-semibold">18</p>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-1.5 text-[10px] mono text-gray-500">
+                  <span class="text-emerald-500"><svg viewBox="0 0 80 22" class="w-16 h-5"><path class="spark-stroke" d="M2,18 L12,16 L22,15 L32,12 L42,10 L52,9 L62,7 L72,5 L78,4"/></svg></span>
+                  <span>last hit <span class="text-gray-700 dark:text-gray-300">2 m ago</span></span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button>
+                  <span class="row-cta text-[11px] mono px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 inline-flex items-center gap-1 transition-colors">View detail <i data-lucide="arrow-right" class="w-3 h-3"></i></span>
+                </div>
+              </div>
+            </div>
+          </a>
+
+          <!-- Card 2: payments-core v3.1.0 — public -->
+          <a href="detail.html" class="pub-card block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="h-1 accent-public"></div>
+            <div class="p-4 flex items-start gap-3">
+              <div class="w-12 h-12 rounded-lg grad-pa flex items-center justify-center text-white font-bold mono text-base shadow-sm shrink-0">PA</div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h3 class="text-base font-semibold leading-tight truncate">payments-core</h3>
+                  <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v3.1.0</span>
+                </div>
+                <p class="text-[11px] mono text-gray-500 truncate">acme-corp · published 2 d ago by Sasha P.</p>
+              </div>
+              <span class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1 shrink-0"><i data-lucide="globe" class="w-3 h-3"></i> Public</span>
+            </div>
+
+            <div class="px-4 pb-4 space-y-3">
+              <div class="url-block rounded-md px-2.5 py-2 flex items-center gap-2">
+                <i data-lucide="link" class="w-3.5 h-3.5 text-indigo-500 shrink-0"></i>
+                <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/payments-core/3.1.0</code>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="QR"><i data-lucide="qr-code" class="w-3 h-3 text-gray-500"></i></button>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+              </div>
+
+              <div class="grid grid-cols-4 gap-2 text-[10px] text-center mono">
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">Req · 24h</p><p class="font-semibold">198k</p></div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">p50</p><p class="font-semibold">52<span class="text-gray-400">ms</span></p></div>
+                <div class="rounded-md bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/40 py-1.5 px-1"><p class="text-emerald-600">Errors</p><p class="font-semibold text-emerald-700 dark:text-emerald-300">0.1%</p></div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">Consumers</p><p class="font-semibold">9</p></div>
+              </div>
+
+              <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-1.5 text-[10px] mono text-gray-500">
+                  <span class="text-emerald-500"><svg viewBox="0 0 80 22" class="w-16 h-5"><path class="spark-stroke" d="M2,16 L12,14 L22,15 L32,12 L42,11 L52,10 L62,9 L72,8 L78,7"/></svg></span>
+                  <span>last hit <span class="text-gray-700 dark:text-gray-300">14 s ago</span></span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button>
+                  <span class="row-cta text-[11px] mono px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 inline-flex items-center gap-1 transition-colors">View detail <i data-lucide="arrow-right" class="w-3 h-3"></i></span>
+                </div>
+              </div>
+            </div>
+          </a>
+
+          <!-- Card 3: customer-mdm v1.8.2 — private with API key -->
+          <a href="detail.html" class="pub-card block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="h-1 accent-private"></div>
+            <div class="p-4 flex items-start gap-3">
+              <div class="w-12 h-12 rounded-lg grad-cm flex items-center justify-center text-white font-bold mono text-base shadow-sm shrink-0">CM</div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h3 class="text-base font-semibold leading-tight truncate">customer-mdm</h3>
+                  <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v1.8.2</span>
+                </div>
+                <p class="text-[11px] mono text-gray-500 truncate">acme-corp · published 8 d ago by Mira L.</p>
+              </div>
+              <span class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-private inline-flex items-center gap-1 shrink-0"><i data-lucide="lock" class="w-3 h-3"></i> Private</span>
+            </div>
+
+            <div class="px-4 pb-4 space-y-3">
+              <div class="url-block rounded-md px-2.5 py-2 flex items-center gap-2">
+                <i data-lucide="link" class="w-3.5 h-3.5 text-indigo-500 shrink-0"></i>
+                <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/customer-mdm/1.8.2</code>
+                <span class="text-[10px] mono px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1" title="Requires API key"><i data-lucide="key-round" class="w-3 h-3"></i> key</span>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+              </div>
+
+              <div class="grid grid-cols-4 gap-2 text-[10px] text-center mono">
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">Req · 24h</p><p class="font-semibold">86k</p></div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">p50</p><p class="font-semibold">71<span class="text-gray-400">ms</span></p></div>
+                <div class="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 py-1.5 px-1"><p class="text-amber-600">Errors</p><p class="font-semibold text-amber-700 dark:text-amber-300">0.6%</p></div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">Consumers</p><p class="font-semibold">5</p></div>
+              </div>
+
+              <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-1.5 text-[10px] mono text-gray-500">
+                  <span class="text-amber-500"><svg viewBox="0 0 80 22" class="w-16 h-5"><path class="spark-stroke" d="M2,12 L12,11 L22,13 L32,12 L42,14 L52,11 L62,13 L72,12 L78,11"/></svg></span>
+                  <span>last hit <span class="text-gray-700 dark:text-gray-300">38 m ago</span></span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button>
+                  <span class="row-cta text-[11px] mono px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 inline-flex items-center gap-1 transition-colors">View detail <i data-lucide="arrow-right" class="w-3 h-3"></i></span>
+                </div>
+              </div>
+            </div>
+          </a>
+
+          <!-- Card 4: orders-public v4.0.1 — public, stable -->
+          <a href="detail.html" class="pub-card block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="h-1 accent-public"></div>
+            <div class="p-4 flex items-start gap-3">
+              <div class="w-12 h-12 rounded-lg grad-or flex items-center justify-center text-white font-bold mono text-base shadow-sm shrink-0">OR</div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h3 class="text-base font-semibold leading-tight truncate">orders-public</h3>
+                  <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v4.0.1</span>
+                </div>
+                <p class="text-[11px] mono text-gray-500 truncate">acme-corp · published 22 d ago by Devon R.</p>
+              </div>
+              <span class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1 shrink-0"><i data-lucide="globe" class="w-3 h-3"></i> Public</span>
+            </div>
+            <div class="px-4 pb-4 space-y-3">
+              <div class="url-block rounded-md px-2.5 py-2 flex items-center gap-2">
+                <i data-lucide="link" class="w-3.5 h-3.5 text-indigo-500 shrink-0"></i>
+                <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/orders-public/4.0.1</code>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="QR"><i data-lucide="qr-code" class="w-3 h-3 text-gray-500"></i></button>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+              </div>
+              <div class="grid grid-cols-4 gap-2 text-[10px] text-center mono">
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">Req · 24h</p><p class="font-semibold">1.1M</p></div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">p50</p><p class="font-semibold">22<span class="text-gray-400">ms</span></p></div>
+                <div class="rounded-md bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/40 py-1.5 px-1"><p class="text-emerald-600">Errors</p><p class="font-semibold text-emerald-700 dark:text-emerald-300">0.05%</p></div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">Consumers</p><p class="font-semibold">31</p></div>
+              </div>
+              <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-1.5 text-[10px] mono text-gray-500">
+                  <span class="text-emerald-500"><svg viewBox="0 0 80 22" class="w-16 h-5"><path class="spark-stroke" d="M2,14 L12,13 L22,12 L32,12 L42,11 L52,10 L62,10 L72,9 L78,9"/></svg></span>
+                  <span>last hit <span class="text-gray-700 dark:text-gray-300">3 s ago</span></span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button>
+                  <span class="row-cta text-[11px] mono px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 inline-flex items-center gap-1 transition-colors">View detail <i data-lucide="arrow-right" class="w-3 h-3"></i></span>
+                </div>
+              </div>
+            </div>
+          </a>
+
+          <!-- Card 5: inventory v0.9.4 — private, errors high (warn) -->
+          <a href="detail.html" class="pub-card block bg-white dark:bg-gray-800 rounded-lg border border-rose-200 dark:border-rose-700/40 overflow-hidden">
+            <div class="h-1 bg-gradient-to-r from-rose-500 to-amber-500"></div>
+            <div class="p-4 flex items-start gap-3">
+              <div class="w-12 h-12 rounded-lg grad-in flex items-center justify-center text-white font-bold mono text-base shadow-sm shrink-0">IN</div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h3 class="text-base font-semibold leading-tight truncate">inventory</h3>
+                  <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v0.9.4</span>
+                  <span class="text-[10px] mono uppercase px-1 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">err 1.4%</span>
+                </div>
+                <p class="text-[11px] mono text-gray-500 truncate">acme-corp · published 5 d ago by Riley T.</p>
+              </div>
+              <span class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-private inline-flex items-center gap-1 shrink-0"><i data-lucide="lock" class="w-3 h-3"></i> Private</span>
+            </div>
+            <div class="px-4 pb-4 space-y-3">
+              <div class="url-block rounded-md px-2.5 py-2 flex items-center gap-2">
+                <i data-lucide="link" class="w-3.5 h-3.5 text-indigo-500 shrink-0"></i>
+                <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/inventory/0.9.4</code>
+                <span class="text-[10px] mono px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1" title="Requires API key"><i data-lucide="key-round" class="w-3 h-3"></i> key</span>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+              </div>
+              <div class="grid grid-cols-4 gap-2 text-[10px] text-center mono">
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">Req · 24h</p><p class="font-semibold">42k</p></div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">p50</p><p class="font-semibold">94<span class="text-gray-400">ms</span></p></div>
+                <div class="rounded-md bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-700/40 py-1.5 px-1"><p class="text-rose-600">Errors</p><p class="font-semibold text-rose-700 dark:text-rose-300">1.4%</p></div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">Consumers</p><p class="font-semibold">3</p></div>
+              </div>
+              <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-1.5 text-[10px] mono text-gray-500">
+                  <span class="text-rose-500"><svg viewBox="0 0 80 22" class="w-16 h-5"><path class="spark-stroke" d="M2,12 L12,11 L22,9 L32,12 L42,8 L52,14 L62,11 L72,15 L78,16"/></svg></span>
+                  <span>last hit <span class="text-gray-700 dark:text-gray-300">1 m ago</span></span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button>
+                  <span class="row-cta text-[11px] mono px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 inline-flex items-center gap-1 transition-colors">View detail <i data-lucide="arrow-right" class="w-3 h-3"></i></span>
+                </div>
+              </div>
+            </div>
+          </a>
+
+          <!-- Card 6: catalog v1.2.0 — public, stale -->
+          <a href="detail.html" class="pub-card block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="h-1 accent-stale"></div>
+            <div class="p-4 flex items-start gap-3">
+              <div class="w-12 h-12 rounded-lg grad-cl flex items-center justify-center text-white font-bold mono text-base shadow-sm shrink-0">CL</div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h3 class="text-base font-semibold leading-tight truncate">catalog</h3>
+                  <span class="mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> v1.2.0</span>
+                  <span class="text-[10px] mono uppercase px-1 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">stale</span>
+                </div>
+                <p class="text-[11px] mono text-gray-500 truncate">acme-corp · published 4 mo ago by Devon R.</p>
+              </div>
+              <span class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1 shrink-0"><i data-lucide="globe" class="w-3 h-3"></i> Public</span>
+            </div>
+            <div class="px-4 pb-4 space-y-3">
+              <div class="url-block rounded-md px-2.5 py-2 flex items-center gap-2">
+                <i data-lucide="link" class="w-3.5 h-3.5 text-indigo-500 shrink-0"></i>
+                <code class="text-[11px] mono truncate flex-1">/schema/acme-corp/catalog/1.2.0</code>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Copy"><i data-lucide="copy" class="w-3 h-3 text-gray-500"></i></button>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="QR"><i data-lucide="qr-code" class="w-3 h-3 text-gray-500"></i></button>
+                <button class="p-1 rounded hover:bg-indigo-500/10" title="Open"><i data-lucide="external-link" class="w-3 h-3 text-gray-500"></i></button>
+              </div>
+              <div class="grid grid-cols-4 gap-2 text-[10px] text-center mono">
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">Req · 24h</p><p class="font-semibold text-gray-400">— </p></div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">p50</p><p class="font-semibold text-gray-400">—</p></div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">Errors</p><p class="font-semibold text-gray-400">—</p></div>
+                <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-1.5 px-1"><p class="text-gray-400">Consumers</p><p class="font-semibold">0</p></div>
+              </div>
+              <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                <div class="flex items-center gap-1.5 text-[10px] mono text-gray-500">
+                  <span class="text-gray-400"><svg viewBox="0 0 80 22" class="w-16 h-5"><path class="spark-stroke" d="M2,18 L78,18"/></svg></span>
+                  <span>last hit <span class="text-amber-500">29 d ago</span></span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Actions"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button>
+                  <span class="row-cta text-[11px] mono px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 inline-flex items-center gap-1 transition-colors">View detail <i data-lucide="arrow-right" class="w-3 h-3"></i></span>
+                </div>
+              </div>
+            </div>
+          </a>
+
+          </div>
+        </details>
+
+        <!-- Visual references (bulk-action bar + per-row action menu) -->
+        <section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-4">
+          <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Visual references</p>
+
+          <!-- Bulk action toolbar (appears when ≥ 1 row is checked) -->
+          <div>
+            <p class="text-[11px] mono text-gray-500 mb-1.5">Bulk action toolbar — <span class="text-gray-700 dark:text-gray-300">replaces the filter row when ≥ 1 row is selected</span></p>
+            <div class="flex items-center gap-3 px-3 py-2 rounded-lg border border-indigo-300 dark:border-indigo-700/60 bg-indigo-50 dark:bg-indigo-900/20 flex-wrap">
+              <span class="text-xs font-semibold text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1.5"><i data-lucide="check-square" class="w-3.5 h-3.5"></i> 3 selected</span>
+              <span class="w-px h-4 bg-indigo-300/40 dark:bg-indigo-700/40"></span>
+              <button class="px-2.5 py-1 text-xs rounded-md border border-emerald-300 dark:border-emerald-700/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 inline-flex items-center gap-1.5"><i data-lucide="globe" class="w-3 h-3"></i> Make public</button>
+              <button class="px-2.5 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-800 inline-flex items-center gap-1.5"><i data-lucide="lock" class="w-3 h-3"></i> Make private</button>
+              <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5"><i data-lucide="copy" class="w-3 h-3"></i> Copy URLs</button>
+              <button class="px-2.5 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-1.5"><i data-lucide="download" class="w-3 h-3"></i> Export CSV</button>
+              <button class="px-2.5 py-1 text-xs rounded-md border border-rose-300 dark:border-rose-700/60 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/30 inline-flex items-center gap-1.5"><i data-lucide="archive" class="w-3 h-3"></i> Unpublish…</button>
+              <span class="flex-1"></span>
+              <button class="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center gap-1"><i data-lucide="x" class="w-3 h-3"></i> Clear</button>
+            </div>
+          </div>
+
+          <!-- Per-row action menu + notes -->
+          <div>
+            <p class="text-[11px] mono text-gray-500 mb-1.5">Per-row action menu — <span class="text-gray-700 dark:text-gray-300">opens from the trailing <code class="mono">⋯</code> button</span></p>
+            <div class="flex items-start gap-6 flex-wrap">
+              <div class="w-60 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden text-sm">
+                <div class="px-3 py-2 text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-b border-gray-100 dark:border-gray-700">View</div>
+                <button class="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2.5"><i data-lucide="file-code-2" class="w-4 h-4 text-blue-500"></i> OpenAPI</button>
+                <button class="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2.5"><i data-lucide="git-merge" class="w-4 h-4 text-emerald-500"></i> Arazzo</button>
+                <button class="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2.5"><i data-lucide="braces" class="w-4 h-4 text-violet-500"></i> JSON Schema</button>
+                <button class="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2.5"><i data-lucide="layout-template" class="w-4 h-4 text-fuchsia-500"></i> Swagger UI</button>
+                <div class="border-t border-gray-100 dark:border-gray-700"></div>
+                <button class="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2.5"><i data-lucide="copy" class="w-4 h-4 text-blue-500"></i> Copy URL</button>
+                <button class="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2.5"><i data-lucide="qr-code" class="w-4 h-4 text-gray-500"></i> Show QR code</button>
+                <button class="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2.5"><i data-lucide="terminal" class="w-4 h-4 text-amber-500"></i> Copy as cURL</button>
+                <div class="border-t border-gray-100 dark:border-gray-700"></div>
+                <button class="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2.5"><i data-lucide="lock" class="w-4 h-4 text-slate-500"></i> Make private</button>
+                <button class="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2.5 text-rose-600 dark:text-rose-400"><i data-lucide="archive" class="w-4 h-4"></i> Unpublish…</button>
+              </div>
+
+              <div class="flex-1 min-w-[280px] space-y-3 text-xs text-gray-600 dark:text-gray-400 mono">
+                <p class="text-gray-700 dark:text-gray-300 font-semibold not-italic mono">What's new vs. today's page</p>
+                <ul class="space-y-1.5">
+                  <li>· KPI band — published count, public/private split, request volume, consumers (today: nothing)</li>
+                  <li>· Public catalog banner — discoverable share link + QR (today: per-row only)</li>
+                  <li>· Filter chips for Public · Private · Top used · Stale · Errors &gt; 1% (today: text search only)</li>
+                  <li>· Table gains: row-state inset bars (hot · errors · stale), sortable headers, per-row sparkline + last-hit cell, inline copy/QR/open on the URL cell</li>
+                  <li>· Bulk-select with multi-row visibility flips, copy URLs, CSV export, and unpublish (today: per-row only)</li>
+                  <li>· Pager with rows-per-page so the table scales to hundreds of publications</li>
+                  <li>· Cards view kept as a collapsible alternate above (denser browsing for &lt; 24 publications)</li>
+                  <li>· Drill-in target <span class="text-indigo-500">detail.html</span> for analytics + code snippets (Phase 2)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'published-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>

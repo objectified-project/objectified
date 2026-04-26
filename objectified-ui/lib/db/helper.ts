@@ -1202,6 +1202,174 @@ export async function getPublishedVersionsForTenant(tenantId: string) {
   }
 }
 
+/**
+ * Detail-page helper: fetch one published version (scoped to the
+ * caller's tenant) plus its lineage neighbours, in a single round-trip
+ * shape. Returns `{ success: false }` when the version is not
+ * published, soft-deleted, or doesn't belong to `tenantId`.
+ *
+ * Lineage is derived from `odb.versions` itself — there are no
+ * dedicated parent/child columns today:
+ *
+ *   parent → most recent *published* version of the same project
+ *            with `published_at` strictly earlier than self. Always
+ *            labelled `deprecated` (superseded by self).
+ *   child  → next version (published OR not) of the same project
+ *            with `created_at` strictly later than self. Labelled
+ *            `published` / `rc` / `draft` from its own state.
+ *
+ * Metrics, consumers, alerts, and per-event activity remain fixture-
+ * driven on the client until their analytics/audit data sources land
+ * (see `_internal/fixtures.ts`). This helper covers only what the DB
+ * already knows.
+ */
+export async function getPublishedVersionDetail(tenantId: string, versionRecordId: string) {
+  try {
+    const baseResult = await connectionPool.query(
+      `SELECT
+        v.id,
+        v.version_id,
+        v.description,
+        v.visibility,
+        v.published_at,
+        v.created_at,
+        v.project_id,
+        p.name as project_name,
+        p.slug as project_slug,
+        t.id as tenant_id,
+        t.name as tenant_name,
+        t.slug as tenant_slug,
+        u.name as creator_name,
+        u.email as creator_email
+       FROM odb.versions v
+       JOIN odb.projects p ON v.project_id = p.id
+       JOIN odb.tenants t ON p.tenant_id = t.id
+       LEFT JOIN odb.users u ON v.creator_id = u.id
+       WHERE v.id = $1
+         AND p.tenant_id = $2
+         AND v.published = true
+         AND v.deleted_at IS NULL
+         AND p.deleted_at IS NULL
+         AND t.deleted_at IS NULL
+       LIMIT 1`,
+      [versionRecordId, tenantId]
+    );
+
+    if (baseResult.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'not_found' });
+    }
+
+    const row = baseResult.rows[0] as {
+      id: string;
+      version_id: string;
+      description: string | null;
+      visibility: 'public' | 'private';
+      published_at: string;
+      created_at: string;
+      project_id: string;
+      project_name: string;
+      project_slug: string;
+      tenant_id: string;
+      tenant_name: string;
+      tenant_slug: string;
+      creator_name: string | null;
+      creator_email: string | null;
+    };
+
+    const [parentResult, childResult] = await Promise.all([
+      connectionPool.query(
+        `SELECT id, version_id, published, published_at, created_at
+         FROM odb.versions
+         WHERE project_id = $1
+           AND id <> $2
+           AND published = true
+           AND deleted_at IS NULL
+           AND published_at < $3
+         ORDER BY published_at DESC, created_at DESC
+         LIMIT 1`,
+        [row.project_id, row.id, row.published_at]
+      ),
+      connectionPool.query(
+        `SELECT id, version_id, published, published_at, created_at
+         FROM odb.versions
+         WHERE project_id = $1
+           AND id <> $2
+           AND deleted_at IS NULL
+           AND created_at > $3
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [row.project_id, row.id, row.created_at]
+      ),
+    ]);
+
+    const ageInDays = (iso: string): number => {
+      const t = new Date(iso).getTime();
+      if (Number.isNaN(t)) return 0;
+      return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+    };
+
+    type LineageState = 'published' | 'deprecated' | 'draft' | 'rc';
+    const PRERELEASE_RE = /-(rc|alpha|beta|pre)\d*\b|-(rc|alpha|beta|pre)\b|[a-z]\d*$/i;
+
+    const buildChildState = (
+      published: boolean,
+      versionId: string,
+    ): LineageState => {
+      if (PRERELEASE_RE.test(versionId)) return 'rc';
+      if (published) return 'published';
+      return 'draft';
+    };
+
+    const parent = parentResult.rowCount === 0
+      ? null
+      : (() => {
+          const r = parentResult.rows[0] as {
+            id: string;
+            version_id: string;
+            published: boolean;
+            published_at: string | null;
+            created_at: string;
+          };
+          const anchor = r.published_at ?? r.created_at;
+          return {
+            id: r.id,
+            versionId: `v${r.version_id}`,
+            state: 'deprecated' as LineageState,
+            ageDays: ageInDays(anchor),
+          };
+        })();
+
+    const child = childResult.rowCount === 0
+      ? null
+      : (() => {
+          const r = childResult.rows[0] as {
+            id: string;
+            version_id: string;
+            published: boolean;
+            published_at: string | null;
+            created_at: string;
+          };
+          const anchor = r.published_at ?? r.created_at;
+          return {
+            id: r.id,
+            versionId: `v${r.version_id}`,
+            state: buildChildState(r.published, r.version_id),
+            ageDays: ageInDays(anchor),
+          };
+        })();
+
+    return JSON.stringify({
+      success: true,
+      row,
+      lineage: { parent, child },
+    });
+  } catch (error: unknown) {
+    console.error('Error fetching published version detail:', error);
+    const message = error instanceof Error ? error.message : 'unknown_error';
+    return JSON.stringify({ success: false, error: message });
+  }
+}
+
 export async function updateVersionVisibility(versionRecordId: string, visibility: 'public' | 'private') {
   try {
     await connectionPool.query(

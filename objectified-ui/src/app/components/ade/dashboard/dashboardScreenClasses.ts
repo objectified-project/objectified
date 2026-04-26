@@ -190,3 +190,160 @@ export const projectAvatarGradientClasses = [
   'from-violet-500 to-indigo-500',
   'from-teal-500 to-emerald-500',
 ] as const;
+
+/**
+ * Published surface tokens.
+ *
+ * Mirrors `repository*` / `project*`. The redesigned Published listing &
+ * detail pages live at `src/app/ade/dashboard/published/**` and consume
+ * these tokens so future tweaks (state palette, header gradient, row-state
+ * inset bars) ripple through both screens.
+ *
+ * Header reuses the project shell on purpose — Published is "a project's
+ * locked face" and visually belongs to the same screen family.
+ */
+export const publishedHeaderShellClass = projectHeaderShellClass;
+export const publishedHeaderIconTileClass =
+  'w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-emerald-500 via-indigo-500 to-fuchsia-500 text-white shadow-sm';
+export const publishedPanelClass = repositoryPanelClass;
+export const publishedPanelHeaderClass = repositoryPanelHeaderClass;
+
+/**
+ * Public-catalog banner — the dashed indigo strip that surfaces the
+ * tenant-level catalog URL on the listing.
+ */
+export const publishedCatalogBannerClass =
+  'rounded-lg border border-dashed border-indigo-300 dark:border-indigo-700/60 bg-gradient-to-r from-indigo-500/5 via-emerald-500/5 to-fuchsia-500/5 dark:from-indigo-500/10 dark:via-emerald-500/10 dark:to-fuchsia-500/10';
+
+/**
+ * URL-preview block (used inline in the table's Access URL cell, on each
+ * card, and on the detail page's Access endpoints rows). Dashed indigo
+ * border + soft indigo wash + mono path inside.
+ */
+export const publishedUrlBlockClass =
+  'rounded-md border border-dashed border-indigo-300/70 dark:border-indigo-700/50 bg-indigo-50/40 dark:bg-indigo-500/10';
+
+/**
+ * Visibility pill tones — public emerald, private slate. Mirrors the
+ * `Badge` `success`/`secondary` variants but pinned here so the table cell
+ * and the detail header can share an exact look.
+ */
+export const publishedVisibilityPillClass = {
+  public:
+    'inline-flex items-center gap-1 text-[10px] font-mono font-semibold uppercase tracking-wider px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/40',
+  private:
+    'inline-flex items-center gap-1 text-[10px] font-mono font-semibold uppercase tracking-wider px-2 py-0.5 rounded border bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-500/20 dark:text-slate-200 dark:border-slate-500/40',
+} as const;
+
+export type PublishedVisibility = keyof typeof publishedVisibilityPillClass;
+
+/**
+ * Row-state palette. Each row carries at most one inset bar + matching
+ * card-accent + state chip tone. The semantic mapping is:
+ *   - hot     : indigo  → top-traffic / "people are using this"
+ *   - problem : rose    → error rate above threshold
+ *   - stale   : amber   → no requests in a long while
+ *   - ok      : (none)  → boring is good
+ */
+export type PublishedRowState = 'hot' | 'problem' | 'stale' | 'ok';
+
+/**
+ * 3px left-edge inset bar applied to a `<tr>` so a long table still
+ * telegraphs which rows the eye should hit first. Implemented as a
+ * `box-shadow: inset 3px 0 0 0 <color>` so it doesn't reflow the row
+ * (a `border-l` would).
+ */
+export const publishedRowStateInsetClass: Record<PublishedRowState, string> = {
+  hot: 'shadow-[inset_3px_0_0_0_#6366f1]',
+  problem: 'shadow-[inset_3px_0_0_0_#f43f5e]',
+  stale: 'shadow-[inset_3px_0_0_0_#f59e0b]',
+  ok: '',
+};
+
+/**
+ * Card top-accent strip — gradient version of the row-state palette,
+ * for the cards-view alternate.
+ */
+export const publishedCardAccentClass: Record<PublishedRowState | PublishedVisibility, string> = {
+  hot: 'bg-gradient-to-r from-indigo-500 to-purple-500',
+  problem: 'bg-gradient-to-r from-rose-500 to-amber-500',
+  stale: 'bg-gradient-to-r from-amber-500 to-orange-500',
+  ok: 'bg-gradient-to-r from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700',
+  public: 'bg-gradient-to-r from-emerald-500 to-cyan-500',
+  private: 'bg-gradient-to-r from-slate-400 to-slate-500 dark:from-slate-600 dark:to-slate-700',
+};
+
+/**
+ * State chip — the small uppercase tag rendered next to the semver pill
+ * ("hot", "errors", "stale"). Sits inline; not a full pill.
+ */
+export const publishedRowStateChipClass: Record<PublishedRowState, string> = {
+  hot: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+  problem: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+  stale: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  ok: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+};
+
+export const publishedRowStateChipLabel: Record<PublishedRowState, string | null> = {
+  hot: 'top used',
+  problem: 'errors',
+  stale: 'stale',
+  ok: null,
+};
+
+/**
+ * Errors-cell tone — the table column tint based on tier. Cell renders
+ * mono with this class applied.
+ */
+export type PublishedErrorTier = 'good' | 'warn' | 'bad';
+
+export function publishedErrorTier(rate: number): PublishedErrorTier {
+  if (rate <= 0.002) return 'good'; // ≤ 0.2 %
+  if (rate <= 0.01) return 'warn'; // ≤ 1 %
+  return 'bad';
+}
+
+export const publishedErrorTierClass: Record<PublishedErrorTier, string> = {
+  good: 'text-emerald-600 dark:text-emerald-400',
+  warn: 'text-amber-600 dark:text-amber-400',
+  bad: 'text-rose-600 dark:text-rose-400',
+};
+
+/**
+ * Sortable column header — applied to a `<th>` along with the active
+ * indicator class when that column is the current sort target. Pure
+ * styling; the page owns sort state.
+ */
+export const publishedThSortableClass =
+  'cursor-pointer select-none hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors';
+export const publishedThActiveClass = 'text-indigo-600 dark:text-indigo-300';
+
+/**
+ * Method chips for operation lists (top-ops, swagger preview, etc.).
+ * Borders + bg keep them legible against both card and table surfaces.
+ */
+export type PublishedMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+
+export const publishedMethodChipClass: Record<PublishedMethod, string> = {
+  GET: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/40',
+  POST: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/40',
+  PUT: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:border-orange-500/40',
+  DELETE: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/40',
+  PATCH: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/40',
+};
+
+/**
+ * Lineage rail nodes — three vertically stacked cards on the detail page.
+ * `this` carries the indigo tint; siblings are flat.
+ */
+export const publishedLineageNodeClass =
+  'block rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 hover:border-indigo-300 dark:hover:border-indigo-700/70 transition-colors';
+export const publishedLineageThisClass =
+  'rounded-md border border-indigo-300/70 dark:border-indigo-700/70 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent dark:from-indigo-500/15 dark:via-purple-500/10 px-3 py-2';
+
+/**
+ * QR card — the dotted-grid faux QR used on the detail page rail. Real
+ * QR rendering is a Phase 5 hand-off.
+ */
+export const publishedQrFauxClass =
+  'qr-faux text-gray-900 dark:text-gray-100 [background-image:radial-gradient(circle,_currentColor_1.4px,_transparent_1.6px)] [background-size:6px_6px]';

@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Published · billing-api v2.5.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .icon-fill { fill: currentColor !important; }
+
+    /* Chrome */
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+    .header-shell { background: linear-gradient(135deg, rgba(16,185,129,0.10) 0%, rgba(99,102,241,0.06) 50%, rgba(217,70,239,0.04) 100%); }
+    .header-shell-dark { background: linear-gradient(135deg, rgba(16,185,129,0.14) 0%, rgba(99,102,241,0.10) 50%, rgba(217,70,239,0.08) 100%); }
+
+    /* Project gradients */
+    .grad-bl { background: linear-gradient(135deg, #6366f1, #a855f7); }
+    .grad-pa { background: linear-gradient(135deg, #10b981, #06b6d4); }
+    .grad-cm { background: linear-gradient(135deg, #f59e0b, #f97316); }
+    .grad-or { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+    .grad-in { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+    .grad-rd { background: linear-gradient(135deg, #0ea5e9, #06b6d4); }
+    .grad-mt { background: linear-gradient(135deg, #ef4444, #f59e0b); }
+
+    /* Sparklines */
+    .spark-stroke { stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .spark-area   { fill: currentColor; fill-opacity: 0.15; }
+
+    /* Visibility pills */
+    .pill-public  { background: rgba(16,185,129,0.10); color: #047857; border: 1px solid rgba(16,185,129,0.35); }
+    .dark .pill-public { background: rgba(16,185,129,0.16); color: #6ee7b7; border-color: rgba(16,185,129,0.45); }
+    .pill-private { background: rgba(100,116,139,0.10); color: #475569; border: 1px solid rgba(100,116,139,0.35); }
+    .dark .pill-private { background: rgba(100,116,139,0.20); color: #cbd5e1; border-color: rgba(100,116,139,0.45); }
+
+    /* URL block */
+    .url-block { background: rgba(99,102,241,0.05); border: 1px dashed rgba(99,102,241,0.25); }
+    .dark .url-block { background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.35); }
+
+    /* Tabs */
+    .tab { padding: 0.625rem 0.75rem; font-size: 0.8125rem; font-weight: 500; color: #64748b; border-bottom: 2px solid transparent; display: inline-flex; align-items: center; gap: 0.4rem; transition: color 120ms ease, border-color 120ms ease; }
+    .tab:hover { color: #4f46e5; }
+    .dark .tab { color: #94a3b8; }
+    .dark .tab:hover { color: #c7d2fe; }
+    .tab-active { color: #4f46e5; border-bottom-color: #4f46e5; }
+    .dark .tab-active { color: #c7d2fe; border-bottom-color: #818cf8; }
+
+    /* Code editor (reuses version-viewer styling) */
+    .editor { background: #0b1120; color: #cbd5e1; }
+    .gutter { background: #0a1020; color: #475569; border-right: 1px solid #1e293b; }
+    .tok-key  { color: #fbbf24; }
+    .tok-str  { color: #86efac; }
+    .tok-num  { color: #c4b5fd; }
+    .tok-com  { color: #64748b; font-style: italic; }
+    .tok-bool { color: #c4b5fd; }
+    .tok-kw   { color: #f472b6; }
+    .tok-var  { color: #93c5fd; }
+
+    /* QR code (faux dotted grid) */
+    .qr-faux {
+      background-image:
+        radial-gradient(circle, currentColor 1.4px, transparent 1.6px);
+      background-size: 6px 6px;
+    }
+
+    /* Method chips */
+    .m-get    { background: #ecfdf5; color: #047857; border: 1px solid #6ee7b7; }
+    .m-post   { background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; }
+    .m-put    { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; }
+    .m-del    { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .m-patch  { background: #faf5ff; color: #6b21a8; border: 1px solid #d8b4fe; }
+    .dark .m-get   { background: rgba(16,185,129,0.15); color: #6ee7b7; border-color: rgba(16,185,129,0.45); }
+    .dark .m-post  { background: rgba(59,130,246,0.18); color: #93c5fd; border-color: rgba(59,130,246,0.45); }
+    .dark .m-put   { background: rgba(249,115,22,0.18); color: #fdba74; border-color: rgba(249,115,22,0.45); }
+    .dark .m-del   { background: rgba(239,68,68,0.18); color: #fca5a5; border-color: rgba(239,68,68,0.45); }
+    .dark .m-patch { background: rgba(168,85,247,0.18); color: #d8b4fe; border-color: rgba(168,85,247,0.45); }
+
+    /* Lineage rail */
+    .lineage-node { background: #ffffff; border: 1px solid #e2e8f0; }
+    .dark .lineage-node { background: #1f2937; border-color: #334155; }
+    .lineage-this { background: linear-gradient(135deg, rgba(99,102,241,0.10), rgba(168,85,247,0.06)); border: 1px solid rgba(99,102,241,0.45); }
+    .dark .lineage-this { background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(168,85,247,0.12)); border-color: rgba(99,102,241,0.55); }
+
+    /* Subtle row stripe */
+    tbody.zebra > tr:nth-child(even) { background: rgba(148,163,184,0.04); }
+    .dark tbody.zebra > tr:nth-child(even) { background: rgba(148,163,184,0.06); }
+
+    /* Trend deltas */
+    .delta-up   { color: #10b981; }
+    .delta-down { color: #ef4444; }
+    .delta-flat { color: #94a3b8; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <!-- Top bar -->
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center"><i data-lucide="folders" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Acme Corp</span>
+      <span class="text-xs text-gray-400">/</span>
+      <a href="dashboard.html" class="text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-500">Published</a>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-700 dark:text-gray-200 mono">billing-api</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm font-medium text-indigo-600 dark:text-indigo-400 mono">v2.5.0</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="../" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center" title="Toggle theme"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+
+    <!-- Sidebar -->
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto h-full flex flex-col">
+        <div class="p-3">
+          <button class="w-full flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 text-left">
+            <div class="w-8 h-8 rounded-md bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white font-semibold text-xs">AC</div>
+            <div class="flex-1 min-w-0"><p class="text-xs text-gray-500 dark:text-gray-400">Tenant</p><p class="text-sm font-semibold truncate">Acme Corp</p></div>
+            <i data-lucide="chevrons-up-down" class="w-4 h-4 text-gray-400"></i>
+          </button>
+        </div>
+        <hr class="border-indigo-500/10 mx-3" />
+        <div class="p-4 flex-1">
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Account</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="user-round" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Profile</span></a></li>
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="link-2" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Linked Accounts</span></a></li>
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-branch-plus" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Repositories</span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Administration</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="building-2" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Tenants</span></a></li>
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="key-round" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">API Keys</span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div class="mb-5">
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Data Management</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="atom" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Primitives</span></a></li>
+            </ul>
+          </div>
+          <hr class="my-3 border-indigo-500/10" />
+          <div>
+            <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Specifications</div>
+            <ul class="m-0 mt-1 list-none space-y-1 p-0">
+              <li><a href="../projects/dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="folders" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Projects</span></a></li>
+              <li><a href="../versions/dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-branch" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Versions</span></a></li>
+              <li><a href="dashboard.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10"><i data-lucide="globe-2" class="w-5 h-5 text-indigo-500"></i><span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Published</span><span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span></a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main column -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- Sub-page header (publication identity + actions) -->
+      <header class="border-b border-gray-200 dark:border-gray-700 header-shell dark:header-shell-dark">
+        <div class="px-6 py-4">
+          <a href="dashboard.html" class="text-[11px] mono text-gray-500 hover:text-indigo-500 inline-flex items-center gap-1 mb-2"><i data-lucide="arrow-left" class="w-3 h-3"></i> All published versions</a>
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <div class="flex items-start gap-4 min-w-0">
+              <div class="w-14 h-14 rounded-xl grad-bl flex items-center justify-center text-white font-bold mono text-xl shadow-md shrink-0">BL</div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h1 class="text-2xl font-bold leading-tight">billing-api</h1>
+                  <span class="mono text-sm px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1.5"><i data-lucide="lock" class="w-3.5 h-3.5"></i> v2.5.0</span>
+                  <span class="text-[10px] mono uppercase tracking-wider px-2 py-0.5 rounded pill-public inline-flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Public</span>
+                  <span class="text-[10px] mono uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 inline-flex items-center gap-1"><i data-lucide="flame" class="w-3 h-3"></i> top used</span>
+                </div>
+                <p class="text-sm text-gray-700 dark:text-gray-300 mt-1 max-w-2xl">Recurring billing, dunning, and invoice retrieval. Replaces v2.4.x patch line — adds <code class="mono text-indigo-600 dark:text-indigo-400">/subscriptions</code> and breaking changes to <code class="mono text-indigo-600 dark:text-indigo-400">POST /charges</code>.</p>
+                <p class="text-[11px] mono text-gray-500 mt-1.5">published 12 d ago by <span class="text-gray-700 dark:text-gray-300">Jordan K.</span> · locked · 24 paths · 87 ops · 152 schemas</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button class="h-8 px-2.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-xs inline-flex items-center gap-1.5"><i data-lucide="qr-code" class="w-3.5 h-3.5"></i> QR</button>
+              <button class="h-8 px-2.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-xs inline-flex items-center gap-1.5"><i data-lucide="share-2" class="w-3.5 h-3.5"></i> Share</button>
+              <button class="h-8 px-2.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-xs inline-flex items-center gap-1.5"><i data-lucide="pencil-line" class="w-3.5 h-3.5"></i> Edit notes</button>
+              <button class="h-8 px-2.5 rounded-md border border-slate-300 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs inline-flex items-center gap-1.5"><i data-lucide="lock" class="w-3.5 h-3.5"></i> Make private</button>
+              <button class="h-8 px-2.5 rounded-md text-xs bg-indigo-600 hover:bg-indigo-500 text-white inline-flex items-center gap-1.5"><i data-lucide="external-link" class="w-3.5 h-3.5"></i> Open spec</button>
+              <button class="h-8 w-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center justify-center" title="More"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-6 space-y-6">
+
+        <!-- Hero KPI strip (6 cells) -->
+        <section class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Req · 24h</p><i data-lucide="activity" class="w-3.5 h-3.5 text-sky-500"></i></div>
+            <div class="flex items-end justify-between gap-2 mt-1">
+              <div>
+                <p class="text-xl font-bold mono">412k</p>
+                <p class="text-[10px] mono delta-up">▲ 8% w/w</p>
+              </div>
+              <div class="text-emerald-500"><svg viewBox="0 0 80 22" class="w-16 h-5"><path class="spark-area" d="M2,18 L12,16 L22,15 L32,12 L42,10 L52,9 L62,7 L72,5 L78,4 L78,22 L2,22 Z"/><path class="spark-stroke" d="M2,18 L12,16 L22,15 L32,12 L42,10 L52,9 L62,7 L72,5 L78,4"/></svg></div>
+            </div>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">p50</p><i data-lucide="gauge" class="w-3.5 h-3.5 text-emerald-500"></i></div>
+            <p class="text-xl font-bold mono mt-1">38<span class="text-sm text-gray-400 font-normal">ms</span></p>
+            <p class="text-[10px] mono text-gray-500">target ≤ 75ms</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">p95</p><i data-lucide="gauge" class="w-3.5 h-3.5 text-amber-500"></i></div>
+            <p class="text-xl font-bold mono mt-1">104<span class="text-sm text-gray-400 font-normal">ms</span></p>
+            <p class="text-[10px] mono text-gray-500">target ≤ 250ms</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Errors</p><i data-lucide="circle-alert" class="w-3.5 h-3.5 text-emerald-500"></i></div>
+            <p class="text-xl font-bold mono mt-1 text-emerald-600 dark:text-emerald-400">0.2<span class="text-sm font-normal">%</span></p>
+            <p class="text-[10px] mono text-gray-500">823 of 412k</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Consumers</p><i data-lucide="users-round" class="w-3.5 h-3.5 text-purple-500"></i></div>
+            <p class="text-xl font-bold mono mt-1">18</p>
+            <p class="text-[10px] mono text-gray-500"><span class="delta-up">+3</span> new · 12 keys</p>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <div class="flex items-center justify-between"><p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Schema</p><i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-500"></i></div>
+            <p class="text-xl font-bold mono mt-1">152 <span class="text-sm font-normal text-gray-500">schemas</span></p>
+            <p class="text-[10px] mono text-gray-500">24 paths · 87 ops</p>
+          </div>
+        </section>
+
+        <!-- Two-column body -->
+        <section class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
+
+          <!-- LEFT: Tabs + active tab content -->
+          <div class="space-y-6 min-w-0">
+
+            <!-- Tab strip -->
+            <div class="border-b border-gray-200 dark:border-gray-700 -mb-2">
+              <nav class="flex items-center gap-1 flex-wrap">
+                <a href="#overview" class="tab tab-active"><i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> Overview</a>
+                <a href="#code"     class="tab"><i data-lucide="terminal" class="w-3.5 h-3.5"></i> Code <span class="text-[10px] mono text-gray-400 ml-1">5</span></a>
+                <a href="#swagger"  class="tab"><i data-lucide="layout-template" class="w-3.5 h-3.5"></i> Swagger</a>
+                <a href="#consumers" class="tab"><i data-lucide="users-round" class="w-3.5 h-3.5"></i> Consumers <span class="text-[10px] mono text-gray-400 ml-1">12</span></a>
+                <a href="#activity" class="tab"><i data-lucide="history" class="w-3.5 h-3.5"></i> Activity</a>
+                <span class="flex-1"></span>
+                <span class="text-[10px] mono text-gray-400 px-2">spec format · OpenAPI 3.1.0</span>
+              </nav>
+            </div>
+
+            <!-- Overview tab body -->
+            <div id="overview" class="space-y-6">
+
+              <!-- Access endpoints -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2"><i data-lucide="link" class="w-4 h-4 text-indigo-500"></i><h2 class="text-sm font-semibold">Access endpoints</h2></div>
+                  <span class="text-[10px] mono text-gray-400 inline-flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3 text-emerald-500"></i> Public · no API key required</span>
+                </div>
+                <div class="divide-y divide-gray-100 dark:divide-gray-700/60">
+                  <!-- Schema -->
+                  <div class="px-4 py-3 flex items-center gap-3 flex-wrap">
+                    <div class="w-8 h-8 rounded-md bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0"><i data-lucide="file-code-2" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i></div>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-semibold flex items-center gap-2">OpenAPI spec <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500">YAML · JSON</span></p>
+                      <code class="text-[11px] mono text-gray-500 truncate block">https://api.objectified.dev/v1/schema/acme-corp/billing-api/2.5.0</code>
+                    </div>
+                    <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1"><i data-lucide="copy" class="w-3 h-3"></i> Copy</button>
+                    <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1"><i data-lucide="qr-code" class="w-3 h-3"></i> QR</button>
+                    <button class="h-7 px-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] inline-flex items-center gap-1"><i data-lucide="external-link" class="w-3 h-3"></i> Open</button>
+                  </div>
+                  <!-- Swagger -->
+                  <div class="px-4 py-3 flex items-center gap-3 flex-wrap">
+                    <div class="w-8 h-8 rounded-md bg-fuchsia-50 dark:bg-fuchsia-900/30 flex items-center justify-center shrink-0"><i data-lucide="layout-template" class="w-4 h-4 text-fuchsia-600 dark:text-fuchsia-400"></i></div>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-semibold">Swagger UI</p>
+                      <code class="text-[11px] mono text-gray-500 truncate block">https://api.objectified.dev/v1/swagger/acme-corp/billing-api/2.5.0</code>
+                    </div>
+                    <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1"><i data-lucide="copy" class="w-3 h-3"></i> Copy</button>
+                    <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1"><i data-lucide="external-link" class="w-3 h-3"></i> Open</button>
+                  </div>
+                  <!-- Arazzo -->
+                  <div class="px-4 py-3 flex items-center gap-3 flex-wrap">
+                    <div class="w-8 h-8 rounded-md bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0"><i data-lucide="git-merge" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i></div>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-semibold">Arazzo workflows</p>
+                      <code class="text-[11px] mono text-gray-500 truncate block">https://api.objectified.dev/v1/arazzo/acme-corp/billing-api/2.5.0</code>
+                    </div>
+                    <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1"><i data-lucide="copy" class="w-3 h-3"></i> Copy</button>
+                    <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1"><i data-lucide="external-link" class="w-3 h-3"></i> Open</button>
+                  </div>
+                  <!-- JSON Schema -->
+                  <div class="px-4 py-3 flex items-center gap-3 flex-wrap">
+                    <div class="w-8 h-8 rounded-md bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center shrink-0"><i data-lucide="braces" class="w-4 h-4 text-violet-600 dark:text-violet-400"></i></div>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-semibold">JSON Schema bundle</p>
+                      <code class="text-[11px] mono text-gray-500 truncate block">https://api.objectified.dev/v1/json/acme-corp/billing-api/2.5.0</code>
+                    </div>
+                    <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1"><i data-lucide="copy" class="w-3 h-3"></i> Copy</button>
+                    <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1"><i data-lucide="external-link" class="w-3 h-3"></i> Open</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Release notes + Schema summary, side by side -->
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                <!-- Release notes -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <div class="flex items-center gap-2"><i data-lucide="file-text" class="w-4 h-4 text-indigo-500"></i><h2 class="text-sm font-semibold">Release notes</h2></div>
+                    <a href="#" class="text-[11px] mono text-indigo-500 hover:underline inline-flex items-center gap-1">View commit <i data-lucide="external-link" class="w-3 h-3"></i></a>
+                  </div>
+                  <div class="p-4 prose prose-sm max-w-none text-sm text-gray-700 dark:text-gray-300 space-y-3">
+                    <div>
+                      <p class="text-base font-semibold text-gray-900 dark:text-white">v2.5.0 — Recurring billing &amp; dunning</p>
+                      <p class="text-[11px] mono text-gray-500 mt-0.5">released 12 d ago · supersedes <span class="text-indigo-500">v2.4.6</span></p>
+                    </div>
+
+                    <!-- Breaking changes callout -->
+                    <div class="rounded-md border border-rose-200 dark:border-rose-700/50 bg-rose-50/60 dark:bg-rose-900/20 p-3">
+                      <p class="text-[11px] uppercase tracking-wider font-semibold text-rose-700 dark:text-rose-300 inline-flex items-center gap-1.5"><i data-lucide="alert-octagon" class="w-3.5 h-3.5"></i> Breaking changes</p>
+                      <ul class="mt-1.5 space-y-1 text-[13px]">
+                        <li>· <code class="mono text-rose-700 dark:text-rose-300">POST /charges</code> requires <code class="mono">currency</code> in the body (was query param).</li>
+                        <li>· Response field <code class="mono">amount</code> is now an integer in minor units (was decimal).</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <p class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Added</p>
+                      <ul class="mt-1.5 space-y-1 text-[13px]">
+                        <li>· <code class="mono text-emerald-600 dark:text-emerald-400">/subscriptions</code> — list, create, update, cancel.</li>
+                        <li>· <code class="mono text-emerald-600 dark:text-emerald-400">/dunning</code> — retry policy &amp; webhooks.</li>
+                        <li>· Webhook <code class="mono">invoice.payment_retry</code>.</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Improved</p>
+                      <ul class="mt-1.5 space-y-1 text-[13px]">
+                        <li>· Idempotency keys honored on <code class="mono">/refunds</code>.</li>
+                        <li>· Pagination cursor format unified across resources.</li>
+                      </ul>
+                    </div>
+                    <div class="pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                      <a href="#" class="text-[11px] mono text-indigo-500 hover:underline inline-flex items-center gap-1"><i data-lucide="map" class="w-3 h-3"></i> Migration guide v2.4 → v2.5</a>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Schema summary + top operations -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <div class="flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-indigo-500"></i><h2 class="text-sm font-semibold">Schema &amp; usage</h2></div>
+                    <span class="text-[10px] mono text-gray-400">last 7 d</span>
+                  </div>
+
+                  <div class="grid grid-cols-4 gap-2 p-4 text-center mono">
+                    <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-2"><p class="text-[10px] text-gray-400">Paths</p><p class="text-base font-semibold">24</p></div>
+                    <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-2"><p class="text-[10px] text-gray-400">Operations</p><p class="text-base font-semibold">87</p></div>
+                    <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-2"><p class="text-[10px] text-gray-400">Schemas</p><p class="text-base font-semibold">152</p></div>
+                    <div class="rounded-md bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 py-2"><p class="text-[10px] text-gray-400">Webhooks</p><p class="text-base font-semibold">7</p></div>
+                  </div>
+
+                  <div class="px-4 pb-4">
+                    <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-2">Top operations by request volume</p>
+                    <ul class="divide-y divide-gray-100 dark:divide-gray-700/60">
+                      <li class="py-1.5 flex items-center gap-2 text-[12px]">
+                        <span class="mono text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded m-get">GET</span>
+                        <code class="mono text-gray-700 dark:text-gray-300 truncate">/invoices/&#123;id&#125;</code>
+                        <span class="flex-1 text-emerald-500"><svg viewBox="0 0 80 16" class="w-full h-3"><path class="spark-stroke" d="M2,12 L10,11 L18,10 L26,9 L34,8 L42,6 L50,7 L58,5 L66,4 L78,3"/></svg></span>
+                        <span class="mono text-gray-700 dark:text-gray-300 w-14 text-right">128k</span>
+                      </li>
+                      <li class="py-1.5 flex items-center gap-2 text-[12px]">
+                        <span class="mono text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded m-post">POST</span>
+                        <code class="mono text-gray-700 dark:text-gray-300 truncate">/charges</code>
+                        <span class="flex-1 text-emerald-500"><svg viewBox="0 0 80 16" class="w-full h-3"><path class="spark-stroke" d="M2,11 L10,9 L18,10 L26,8 L34,9 L42,7 L50,8 L58,6 L66,7 L78,5"/></svg></span>
+                        <span class="mono text-gray-700 dark:text-gray-300 w-14 text-right">94k</span>
+                      </li>
+                      <li class="py-1.5 flex items-center gap-2 text-[12px]">
+                        <span class="mono text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded m-get">GET</span>
+                        <code class="mono text-gray-700 dark:text-gray-300 truncate">/subscriptions</code>
+                        <span class="flex-1 text-indigo-500"><svg viewBox="0 0 80 16" class="w-full h-3"><path class="spark-stroke" d="M2,14 L10,12 L18,11 L26,9 L34,8 L42,7 L50,5 L58,4 L66,3 L78,2"/></svg></span>
+                        <span class="mono text-gray-700 dark:text-gray-300 w-14 text-right">62k</span>
+                      </li>
+                      <li class="py-1.5 flex items-center gap-2 text-[12px]">
+                        <span class="mono text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded m-post">POST</span>
+                        <code class="mono text-gray-700 dark:text-gray-300 truncate">/refunds</code>
+                        <span class="flex-1 text-amber-500"><svg viewBox="0 0 80 16" class="w-full h-3"><path class="spark-stroke" d="M2,8 L10,9 L18,10 L26,9 L34,11 L42,10 L50,11 L58,12 L66,11 L78,12"/></svg></span>
+                        <span class="mono text-gray-700 dark:text-gray-300 w-14 text-right">31k</span>
+                      </li>
+                      <li class="py-1.5 flex items-center gap-2 text-[12px]">
+                        <span class="mono text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded m-del">DEL</span>
+                        <code class="mono text-gray-700 dark:text-gray-300 truncate">/subscriptions/&#123;id&#125;</code>
+                        <span class="flex-1 text-rose-500"><svg viewBox="0 0 80 16" class="w-full h-3"><path class="spark-stroke" d="M2,12 L10,10 L18,11 L26,9 L34,8 L42,11 L50,9 L58,10 L66,12 L78,13"/></svg></span>
+                        <span class="mono text-gray-700 dark:text-gray-300 w-14 text-right">5.2k</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Swagger preview (embedded operations list) -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                  <div class="flex items-center gap-2"><i data-lucide="layout-template" class="w-4 h-4 text-fuchsia-500"></i><h2 class="text-sm font-semibold">Swagger preview</h2><span class="text-[10px] mono text-gray-400">first 5 of 87</span></div>
+                  <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1"><i data-lucide="external-link" class="w-3 h-3"></i> Open full Swagger UI</button>
+                </div>
+                <div class="divide-y divide-gray-100 dark:divide-gray-700/60">
+                  <div class="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer">
+                    <span class="mono text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded m-get w-12 text-center shrink-0">GET</span>
+                    <code class="mono text-[12px] text-gray-700 dark:text-gray-300 flex-1 truncate">/invoices</code>
+                    <span class="text-[11px] text-gray-500 truncate hidden md:inline">List invoices for the authenticated tenant</span>
+                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400"></i>
+                  </div>
+                  <div class="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer">
+                    <span class="mono text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded m-get w-12 text-center shrink-0">GET</span>
+                    <code class="mono text-[12px] text-gray-700 dark:text-gray-300 flex-1 truncate">/invoices/&#123;id&#125;</code>
+                    <span class="text-[11px] text-gray-500 truncate hidden md:inline">Retrieve an invoice by id</span>
+                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400"></i>
+                  </div>
+                  <div class="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer">
+                    <span class="mono text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded m-post w-12 text-center shrink-0">POST</span>
+                    <code class="mono text-[12px] text-gray-700 dark:text-gray-300 flex-1 truncate">/charges</code>
+                    <span class="text-[11px] text-rose-600 dark:text-rose-400 truncate hidden md:inline">⚠ Breaking — currency moved to body</span>
+                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400"></i>
+                  </div>
+                  <div class="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer">
+                    <span class="mono text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded m-post w-12 text-center shrink-0">POST</span>
+                    <code class="mono text-[12px] text-gray-700 dark:text-gray-300 flex-1 truncate">/refunds</code>
+                    <span class="text-[11px] text-gray-500 truncate hidden md:inline">Create a refund against a charge</span>
+                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400"></i>
+                  </div>
+                  <div class="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer">
+                    <span class="mono text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded m-del w-12 text-center shrink-0">DEL</span>
+                    <code class="mono text-[12px] text-gray-700 dark:text-gray-300 flex-1 truncate">/subscriptions/&#123;id&#125;</code>
+                    <span class="text-[11px] text-emerald-600 dark:text-emerald-400 truncate hidden md:inline">+ new in v2.5.0</span>
+                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400"></i>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          <!-- RIGHT RAIL -->
+          <aside class="space-y-4">
+
+            <!-- QR card -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2"><i data-lucide="qr-code" class="w-4 h-4 text-indigo-500"></i><h3 class="text-sm font-semibold">Quick share</h3></div>
+                <span class="text-[10px] mono text-gray-400">opens spec</span>
+              </div>
+              <div class="flex items-start gap-3">
+                <div class="w-28 h-28 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center justify-center shrink-0">
+                  <div class="w-24 h-24 qr-faux text-gray-900 dark:text-gray-100"></div>
+                </div>
+                <div class="flex-1 min-w-0 space-y-1.5">
+                  <p class="text-[11px] mono text-gray-500">Scan to open the OpenAPI spec on a phone, or download the QR for docs.</p>
+                  <div class="flex items-center gap-1.5">
+                    <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1"><i data-lucide="image" class="w-3 h-3"></i> PNG</button>
+                    <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1"><i data-lucide="file-image" class="w-3 h-3"></i> SVG</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Visibility card -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2"><i data-lucide="globe" class="w-4 h-4 text-emerald-500"></i><h3 class="text-sm font-semibold">Visibility</h3></div>
+                <span class="text-[10px] mono uppercase tracking-wider px-1.5 py-0.5 rounded pill-public inline-flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Public</span>
+              </div>
+              <p class="text-[12px] text-gray-600 dark:text-gray-400">Consumers can fetch the spec without an API key. Listed in the public catalog.</p>
+              <button class="mt-3 w-full h-8 rounded-md border border-slate-300 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs inline-flex items-center justify-center gap-1.5"><i data-lucide="lock" class="w-3.5 h-3.5"></i> Switch to private</button>
+              <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/60 space-y-1.5 text-[11px] mono text-gray-500">
+                <p class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold not-italic">Audit</p>
+                <p>· made <span class="text-emerald-500">public</span> 12 d ago by Jordan K.</p>
+                <p>· published 12 d ago by Jordan K.</p>
+                <p>· created from draft 14 d ago by Jordan K.</p>
+              </div>
+            </div>
+
+            <!-- Lineage rail -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2"><i data-lucide="git-branch" class="w-4 h-4 text-indigo-500"></i><h3 class="text-sm font-semibold">Lineage</h3></div>
+                <a href="../versions/dashboard.html" class="text-[10px] mono text-indigo-500 hover:underline">All versions →</a>
+              </div>
+              <div class="space-y-2.5">
+                <a href="#" class="lineage-node block rounded-md px-3 py-2 hover:border-indigo-300">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[10px] mono uppercase tracking-wider px-1 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">parent</span>
+                    <span class="mono text-sm font-semibold">v2.4.6</span>
+                    <span class="ml-auto text-[10px] mono text-gray-400">deprecated · 68 d</span>
+                  </div>
+                  <p class="text-[11px] mono text-gray-500 mt-0.5">11k req · 24h · 2 consumers</p>
+                </a>
+                <div class="flex justify-center text-gray-300 dark:text-gray-600"><i data-lucide="arrow-down" class="w-3.5 h-3.5"></i></div>
+                <div class="lineage-this rounded-md px-3 py-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[10px] mono uppercase tracking-wider px-1 py-0.5 rounded bg-indigo-600 text-white">this</span>
+                    <span class="mono text-sm font-semibold">v2.5.0</span>
+                    <span class="ml-auto text-[10px] mono text-emerald-600 dark:text-emerald-400">published · 12 d</span>
+                  </div>
+                  <p class="text-[11px] mono text-gray-500 mt-0.5">412k req · 24h · 18 consumers</p>
+                </div>
+                <div class="flex justify-center text-gray-300 dark:text-gray-600"><i data-lucide="arrow-down" class="w-3.5 h-3.5"></i></div>
+                <a href="#" class="lineage-node block rounded-md px-3 py-2 hover:border-indigo-300">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[10px] mono uppercase tracking-wider px-1 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200">child</span>
+                    <span class="mono text-sm font-semibold">v2.6.0-rc1</span>
+                    <span class="ml-auto text-[10px] mono text-sky-600 dark:text-sky-400">draft · 3 d</span>
+                  </div>
+                  <p class="text-[11px] mono text-gray-500 mt-0.5">in review · Jordan K.</p>
+                </a>
+              </div>
+            </div>
+
+            <!-- Lifecycle alerts -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2"><i data-lucide="bell" class="w-4 h-4 text-amber-500"></i><h3 class="text-sm font-semibold">Alerts</h3></div>
+                <span class="text-[10px] mono text-gray-400">2 active</span>
+              </div>
+              <div class="space-y-2">
+                <div class="rounded-md border border-amber-200 dark:border-amber-700/40 bg-amber-50/60 dark:bg-amber-900/15 px-3 py-2">
+                  <p class="text-[12px] font-semibold text-amber-800 dark:text-amber-200 inline-flex items-center gap-1.5"><i data-lucide="trending-up" class="w-3.5 h-3.5"></i> Errors trending up</p>
+                  <p class="text-[11px] mono text-amber-700/80 dark:text-amber-200/70 mt-0.5">0.18% → 0.21% over 7 d, mostly on <code class="mono">POST /charges</code>.</p>
+                </div>
+                <div class="rounded-md border border-rose-200 dark:border-rose-700/40 bg-rose-50/60 dark:bg-rose-900/15 px-3 py-2">
+                  <p class="text-[12px] font-semibold text-rose-800 dark:text-rose-200 inline-flex items-center gap-1.5"><i data-lucide="key-round" class="w-3.5 h-3.5"></i> Consumer key expiring</p>
+                  <p class="text-[11px] mono text-rose-700/80 dark:text-rose-200/70 mt-0.5"><code class="mono">partner-stripe-prod</code> expires in 9 d (1.2k req/day on this version).</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent activity -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2"><i data-lucide="history" class="w-4 h-4 text-indigo-500"></i><h3 class="text-sm font-semibold">Recent activity</h3></div>
+                <a href="#activity" class="text-[10px] mono text-indigo-500 hover:underline">All →</a>
+              </div>
+              <ul class="space-y-2.5">
+                <li class="flex items-start gap-2.5 text-[12px]">
+                  <span class="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0"><i data-lucide="rocket" class="w-3.5 h-3.5"></i></span>
+                  <div class="min-w-0 flex-1">
+                    <p>Published <span class="mono">v2.5.0</span> · <span class="text-gray-500">Jordan K.</span></p>
+                    <p class="text-[10px] mono text-gray-400">12 d ago</p>
+                  </div>
+                </li>
+                <li class="flex items-start gap-2.5 text-[12px]">
+                  <span class="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0"><i data-lucide="globe" class="w-3.5 h-3.5"></i></span>
+                  <div class="min-w-0 flex-1">
+                    <p>Visibility set to <span class="text-emerald-600 dark:text-emerald-400">public</span> · <span class="text-gray-500">Jordan K.</span></p>
+                    <p class="text-[10px] mono text-gray-400">12 d ago</p>
+                  </div>
+                </li>
+                <li class="flex items-start gap-2.5 text-[12px]">
+                  <span class="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0"><i data-lucide="user-plus" class="w-3.5 h-3.5"></i></span>
+                  <div class="min-w-0 flex-1">
+                    <p>3 new consumers in 24h</p>
+                    <p class="text-[10px] mono text-gray-400">today</p>
+                  </div>
+                </li>
+                <li class="flex items-start gap-2.5 text-[12px]">
+                  <span class="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0"><i data-lucide="trending-up" class="w-3.5 h-3.5"></i></span>
+                  <div class="min-w-0 flex-1">
+                    <p>Error rate alert opened</p>
+                    <p class="text-[10px] mono text-gray-400">2 d ago</p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+          </aside>
+        </section>
+
+        <!-- Other tabs (rendered as collapsibles for design review) -->
+        <section class="space-y-4">
+          <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mt-4">Other tab content (preview)</p>
+
+          <!-- CODE TAB -->
+          <details id="code" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden group">
+            <summary class="px-4 py-3 cursor-pointer flex items-center gap-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/40">
+              <i data-lucide="terminal" class="w-4 h-4 text-amber-500"></i>
+              <span class="font-semibold">Code tab</span>
+              <span class="mono text-[11px] text-gray-400 ml-1">— ready-to-paste snippets in cURL · fetch · axios · python · go</span>
+              <span class="flex-1"></span>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400 group-open:rotate-180 transition-transform"></i>
+            </summary>
+            <div class="border-t border-gray-200 dark:border-gray-700/60">
+              <div class="px-4 pt-3 flex items-center gap-1 flex-wrap border-b border-gray-200 dark:border-gray-700/60">
+                <button class="px-3 py-1.5 text-xs mono rounded-t-md border border-b-0 border-gray-200 dark:border-gray-700 bg-gray-900 text-white -mb-px">cURL</button>
+                <button class="px-3 py-1.5 text-xs mono rounded-t-md text-gray-500 hover:text-indigo-500">fetch</button>
+                <button class="px-3 py-1.5 text-xs mono rounded-t-md text-gray-500 hover:text-indigo-500">axios</button>
+                <button class="px-3 py-1.5 text-xs mono rounded-t-md text-gray-500 hover:text-indigo-500">python</button>
+                <button class="px-3 py-1.5 text-xs mono rounded-t-md text-gray-500 hover:text-indigo-500">go</button>
+                <span class="flex-1"></span>
+                <button class="h-7 px-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-[11px] inline-flex items-center gap-1 mb-2"><i data-lucide="copy" class="w-3 h-3"></i> Copy</button>
+              </div>
+              <div class="editor mono text-[12px] leading-6 p-4 overflow-x-auto">
+<pre class="m-0"><span class="tok-com"># Fetch the OpenAPI spec for billing-api v2.5.0 (public — no key needed)</span>
+curl <span class="tok-str">"https://api.objectified.dev/v1/schema/acme-corp/billing-api/2.5.0"</span> \
+  -H <span class="tok-str">"Accept: application/yaml"</span>
+
+<span class="tok-com"># Or, with a tenant API key (only required for private versions):</span>
+curl <span class="tok-str">"https://api.objectified.dev/v1/schema/acme-corp/billing-api/2.5.0"</span> \
+  -H <span class="tok-str">"Accept: application/yaml"</span> \
+  -H <span class="tok-str">"X-API-Key: $OBJECTIFIED_API_KEY"</span></pre>
+              </div>
+            </div>
+          </details>
+
+          <!-- CONSUMERS TAB -->
+          <details id="consumers" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden group">
+            <summary class="px-4 py-3 cursor-pointer flex items-center gap-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/40">
+              <i data-lucide="users-round" class="w-4 h-4 text-purple-500"></i>
+              <span class="font-semibold">Consumers tab</span>
+              <span class="mono text-[11px] text-gray-400 ml-1">— who's pulling this spec, by API key</span>
+              <span class="flex-1"></span>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400 group-open:rotate-180 transition-transform"></i>
+            </summary>
+            <div class="border-t border-gray-200 dark:border-gray-700/60 overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-800/95 border-b border-gray-200 dark:border-gray-700">
+                  <tr class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                    <th class="px-3 py-2.5 text-left">API key</th>
+                    <th class="px-3 py-2.5 text-left">Owner</th>
+                    <th class="px-3 py-2.5 text-right">Req · 24h</th>
+                    <th class="px-3 py-2.5 text-right">Req · 7d</th>
+                    <th class="px-3 py-2.5 text-right">Errors</th>
+                    <th class="px-3 py-2.5 text-left">Last seen</th>
+                    <th class="px-3 py-2.5 text-left">Expires</th>
+                    <th class="px-3 py-2.5 w-10 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody class="zebra divide-y divide-gray-100 dark:divide-gray-700/60">
+                  <tr class="hover:bg-indigo-500/5">
+                    <td class="px-3 py-2.5"><code class="mono text-[12px] inline-flex items-center gap-1.5"><i data-lucide="key-round" class="w-3 h-3 text-amber-500"></i> partner-stripe-prod</code></td>
+                    <td class="px-3 py-2.5 text-[12px]">Stripe Inc.</td>
+                    <td class="px-3 py-2.5 text-right mono">128k</td>
+                    <td class="px-3 py-2.5 text-right mono">812k</td>
+                    <td class="px-3 py-2.5 text-right mono text-emerald-600 dark:text-emerald-400">0.1%</td>
+                    <td class="px-3 py-2.5 text-[11px] mono text-gray-500">14 s ago</td>
+                    <td class="px-3 py-2.5 text-[11px] mono text-rose-500">in 9 d</td>
+                    <td class="px-3 py-2.5 text-right"><button class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                  </tr>
+                  <tr class="hover:bg-indigo-500/5">
+                    <td class="px-3 py-2.5"><code class="mono text-[12px] inline-flex items-center gap-1.5"><i data-lucide="key-round" class="w-3 h-3 text-amber-500"></i> internal-billing-svc</code></td>
+                    <td class="px-3 py-2.5 text-[12px]">Platform · Acme</td>
+                    <td class="px-3 py-2.5 text-right mono">94k</td>
+                    <td class="px-3 py-2.5 text-right mono">658k</td>
+                    <td class="px-3 py-2.5 text-right mono text-emerald-600 dark:text-emerald-400">0.04%</td>
+                    <td class="px-3 py-2.5 text-[11px] mono text-gray-500">3 s ago</td>
+                    <td class="px-3 py-2.5 text-[11px] mono text-gray-500">never</td>
+                    <td class="px-3 py-2.5 text-right"><button class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                  </tr>
+                  <tr class="hover:bg-indigo-500/5">
+                    <td class="px-3 py-2.5"><code class="mono text-[12px] inline-flex items-center gap-1.5"><i data-lucide="key-round" class="w-3 h-3 text-amber-500"></i> partner-shopify-staging</code></td>
+                    <td class="px-3 py-2.5 text-[12px]">Shopify Inc.</td>
+                    <td class="px-3 py-2.5 text-right mono">42k</td>
+                    <td class="px-3 py-2.5 text-right mono">281k</td>
+                    <td class="px-3 py-2.5 text-right mono text-amber-600 dark:text-amber-400">0.6%</td>
+                    <td class="px-3 py-2.5 text-[11px] mono text-gray-500">2 m ago</td>
+                    <td class="px-3 py-2.5 text-[11px] mono text-gray-500">in 87 d</td>
+                    <td class="px-3 py-2.5 text-right"><button class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                  </tr>
+                  <tr class="hover:bg-indigo-500/5">
+                    <td class="px-3 py-2.5"><code class="mono text-[12px] inline-flex items-center gap-1.5"><i data-lucide="key-round" class="w-3 h-3 text-amber-500"></i> mobile-app-ios-prod</code></td>
+                    <td class="px-3 py-2.5 text-[12px]">Mobile · Acme</td>
+                    <td class="px-3 py-2.5 text-right mono">36k</td>
+                    <td class="px-3 py-2.5 text-right mono">241k</td>
+                    <td class="px-3 py-2.5 text-right mono text-emerald-600 dark:text-emerald-400">0.2%</td>
+                    <td class="px-3 py-2.5 text-[11px] mono text-gray-500">8 s ago</td>
+                    <td class="px-3 py-2.5 text-[11px] mono text-gray-500">in 134 d</td>
+                    <td class="px-3 py-2.5 text-right"><button class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                  </tr>
+                  <tr class="hover:bg-indigo-500/5 opacity-60">
+                    <td class="px-3 py-2.5"><code class="mono text-[12px] inline-flex items-center gap-1.5"><i data-lucide="key-round" class="w-3 h-3 text-gray-400"></i> legacy-finance-etl</code></td>
+                    <td class="px-3 py-2.5 text-[12px]">Finance · Acme</td>
+                    <td class="px-3 py-2.5 text-right mono text-gray-400">—</td>
+                    <td class="px-3 py-2.5 text-right mono">1.1k</td>
+                    <td class="px-3 py-2.5 text-right mono text-gray-400">—</td>
+                    <td class="px-3 py-2.5 text-[11px] mono text-amber-500">12 d ago</td>
+                    <td class="px-3 py-2.5 text-[11px] mono text-rose-500">expired</td>
+                    <td class="px-3 py-2.5 text-right"><button class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"><i data-lucide="more-vertical" class="w-3.5 h-3.5"></i></button></td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="px-3 py-2 text-[11px] mono text-gray-500 border-t border-gray-100 dark:border-gray-700/60">5 of 12 keys with traffic on this version · <a href="#" class="text-indigo-500 hover:underline">Manage keys →</a></div>
+            </div>
+          </details>
+
+          <!-- ACTIVITY TAB -->
+          <details id="activity" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden group">
+            <summary class="px-4 py-3 cursor-pointer flex items-center gap-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/40">
+              <i data-lucide="history" class="w-4 h-4 text-indigo-500"></i>
+              <span class="font-semibold">Activity tab</span>
+              <span class="mono text-[11px] text-gray-400 ml-1">— full audit trail scoped to this version</span>
+              <span class="flex-1"></span>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400 group-open:rotate-180 transition-transform"></i>
+            </summary>
+            <div class="border-t border-gray-200 dark:border-gray-700/60 p-4">
+              <ol class="relative ml-3 space-y-4 border-l-2 border-gray-200 dark:border-gray-700">
+
+                <li class="ml-4">
+                  <span class="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-900/40 border-2 border-emerald-500 flex items-center justify-center"><i data-lucide="rocket" class="w-2.5 h-2.5 text-emerald-600"></i></span>
+                  <p class="text-sm font-semibold">Published v2.5.0</p>
+                  <p class="text-[11px] mono text-gray-500">Jordan K. · 12 d ago · from draft <code class="mono">v2.5.0-rc4</code> · approved by Mira L., Devon R.</p>
+                </li>
+
+                <li class="ml-4">
+                  <span class="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-900/40 border-2 border-emerald-500 flex items-center justify-center"><i data-lucide="globe" class="w-2.5 h-2.5 text-emerald-600"></i></span>
+                  <p class="text-sm font-semibold">Visibility set to public</p>
+                  <p class="text-[11px] mono text-gray-500">Jordan K. · 12 d ago · was: private (during pre-release window)</p>
+                </li>
+
+                <li class="ml-4">
+                  <span class="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-purple-100 dark:bg-purple-900/40 border-2 border-purple-500 flex items-center justify-center"><i data-lucide="user-plus" class="w-2.5 h-2.5 text-purple-600"></i></span>
+                  <p class="text-sm font-semibold">3 new consumers</p>
+                  <p class="text-[11px] mono text-gray-500"><code class="mono">partner-shopify-staging</code>, <code class="mono">mobile-app-ios-prod</code>, <code class="mono">analytics-internal</code> · last 24 h</p>
+                </li>
+
+                <li class="ml-4">
+                  <span class="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-amber-100 dark:bg-amber-900/40 border-2 border-amber-500 flex items-center justify-center"><i data-lucide="trending-up" class="w-2.5 h-2.5 text-amber-600"></i></span>
+                  <p class="text-sm font-semibold">Errors trending up</p>
+                  <p class="text-[11px] mono text-gray-500">Auto alert · 2 d ago · 0.18% → 0.21% over 7 d, mostly <code class="mono">POST /charges</code> 4xx</p>
+                </li>
+
+                <li class="ml-4">
+                  <span class="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-500 flex items-center justify-center"><i data-lucide="download" class="w-2.5 h-2.5 text-blue-600"></i></span>
+                  <p class="text-sm font-semibold">Spec downloaded · 2.4k times</p>
+                  <p class="text-[11px] mono text-gray-500">Last 24 h · 87% YAML, 13% JSON</p>
+                </li>
+
+                <li class="ml-4">
+                  <span class="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-gray-100 dark:bg-gray-700 border-2 border-gray-400 flex items-center justify-center"><i data-lucide="git-branch" class="w-2.5 h-2.5 text-gray-500"></i></span>
+                  <p class="text-sm font-semibold">Lineage updated</p>
+                  <p class="text-[11px] mono text-gray-500">Child draft <code class="mono">v2.6.0-rc1</code> created from this version · 3 d ago</p>
+                </li>
+
+              </ol>
+            </div>
+          </details>
+
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'published-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>

@@ -1,183 +1,210 @@
-# Published Versions Dashboard Feature
+# Published Versions — API Catalog & Detail
+
+Status: redesigned April 2026. The original implementation lived as a
+single table page; the surface is now a two-screen API catalog
+experience (listing + per-version detail).
 
 ## Overview
-A new dashboard view that displays all published (locked) versions from the `odb.versions` table, showing their visibility settings and access URLs.
 
-## Implementation
+The Published surface lets a tenant treat its locked versions as a
+discoverable API catalog. It answers four questions in one place:
 
-### 1. Database Helper Function
-**File**: `lib/db/helper.ts`
+1. **What's shippable?** Every version with `published = true` for the
+   current tenant, with visibility, schema size, and headline traffic.
+2. **What's healthy?** Per-version request volume, p50/p95 latency,
+   error rate, and lifecycle alerts (errors trending, keys expiring,
+   stale catalog).
+3. **Who's using it?** Per-API-key consumer breakdowns and a 7-day
+   activity sparkline on every row.
+4. **How do I integrate?** Copy-paste snippets in cURL, fetch, axios,
+   python, and go that adapt to public vs. private specs.
 
-Added `getPublishedVersionsForTenant()` function that:
-- Joins `versions`, `projects`, `tenants`, and `users` tables
-- Filters for published versions (`published = true`)
-- Returns comprehensive data including:
-  - Version details (id, version_id, description, visibility, published_at)
-  - Project information (project_id, project_name, project_slug)
-  - Tenant information (tenant_id, tenant_name, tenant_slug)
-  - Creator information (creator_name, creator_email)
-- Excludes soft-deleted records
-- Orders by published date (newest first)
+## Routes
 
-```typescript
-export async function getPublishedVersionsForTenant(tenantId: string)
+| Route | Surface |
+|---|---|
+| `/ade/dashboard/published` | Listing — KPI band, catalog banner, dense table (default), card grid (alternate). |
+| `/ade/dashboard/published/[versionId]` | Detail — sub-page header, 6-cell hero KPI strip, tabs (Overview / Code / Consumers / Activity), right rail (QR / Visibility / Lineage / Alerts / Recent activity). |
+
+## Database helpers (`lib/db/helper.ts`)
+
+### `getPublishedVersionsForTenant(tenantId)`
+
+The original listing helper. Joins `odb.versions`, `odb.projects`,
+`odb.tenants`, and `odb.users`. Filters for `published = true`,
+non-deleted rows. Orders by `published_at DESC`. Returns a JSON-encoded
+array of rows.
+
+### `getPublishedVersionDetail(tenantId, versionRecordId)` *(new)*
+
+Detail-page helper. Two phases:
+
+1. **Base row.** Same join chain as the listing helper, scoped to a
+   single `versions.id` and bounded by `tenant_id` for isolation.
+2. **Lineage neighbours.** Two parallel queries against
+   `odb.versions` for the row's project:
+   - `parent` — the most recent *published* version with
+     `published_at < self.published_at`. Always labelled `deprecated`
+     since self has superseded it.
+   - `child` — the next version (published or draft) with
+     `created_at > self.created_at`. State derived from its
+     `published` flag and version_id suffix
+     (`-rc` / `-alpha` / `-beta` / `-pre` → `rc`, otherwise `published`
+     if `published = true` else `draft`).
+
+Returns:
+
+```ts
+{
+  success: true,
+  row: { /* PublishedVersionRow */ },
+  lineage: {
+    parent: { id, versionId, state, ageDays } | null,
+    child:  { id, versionId, state, ageDays } | null,
+  }
+}
+| { success: false, error: string }
 ```
 
-### 2. Published Versions Page
-**File**: `src/app/ade/dashboard/published/page.tsx`
+Tenant scoping is enforced in the SQL — a version that exists but
+belongs to a different tenant returns `not_found`.
 
-Features:
-- **Table Display**: Shows published versions in a clean, responsive table
-- **Project/Version Info**: Displays project name, version ID (with lock icon), and description
-- **Visibility Badge**: 
-  - Green "Public" badge with globe icon for public versions
-  - Gray "Private" badge with lock icon for private versions
-- **Access URL**: Displays the API URL path in the format:
-  ```
-  {tenant-slug}/{project-slug}/{version-id}
-  ```
-- **Full URL Construction**: Constructs complete API URL:
-  ```
-  {origin}/api/{tenant-slug}/{project-slug}/{version-id}
-  ```
-- **Actions**:
-  - Copy URL to clipboard (with visual feedback)
-  - Open URL in new tab
-- **Published Date**: Shows when the version was published and by whom
-- **Dark Mode Support**: Fully styled for both light and dark themes
+### `updateVersionVisibility(versionRecordId, visibility)`
 
-### 3. Navigation Integration
-**File**: `src/app/components/ade/dashboard/DashboardSideNav.tsx`
+Unchanged. Toggles `versions.visibility` between `public` and
+`private`. Used from both the listing's per-row pill and the detail
+header / right rail.
 
-Added "Published" menu item to the Specifications section:
-- Icon: Eye (from lucide-react)
-- Route: `/ade/dashboard/published`
-- Positioned after "Versions"
+## Component map
 
-## URL Format
-
-The access URL follows the pattern:
 ```
-/api/{tenant-slug}/{project-slug}/{version-id}
+src/app/ade/dashboard/published/
+├── page.tsx                          listing orchestrator
+├── PublishedKpiBand.tsx              4-card KPI strip (versions, visibility split, requests, consumers)
+├── PublishedCatalogBanner.tsx        public catalog URL strip
+├── PublishedTable.tsx                default dense table view
+├── PublishedCardsAlternate.tsx       card-grid alternate (also exports PublishedCardsGrid)
+├── [versionId]/
+│   └── page.tsx                      detail orchestrator
+└── _internal/
+    ├── types.ts                      shared TS shapes
+    ├── fixtures.ts                   deterministic mock data (metrics/consumers/activity/alerts)
+    ├── Sparkline.tsx                 reusable inline SVG sparkline
+    ├── PublishedDetailHeader.tsx     sub-page header (back link, title pills, action row)
+    ├── PublishedDetailHero.tsx       6-cell hero KPI strip
+    ├── OverviewTab.tsx               access endpoints + release notes + schema/usage + swagger preview
+    ├── CodeTab.tsx                   cURL / fetch / axios / python / go snippets
+    ├── ConsumersTab.tsx              per-API-key consumer table
+    ├── ActivityTab.tsx               vertical audit timeline
+    └── DetailRightRail.tsx           QR / Visibility / Lineage / Alerts / Recent activity rail
 ```
 
-Example:
+All visual tokens live in `src/app/components/ade/dashboard/dashboardScreenClasses.ts`
+under the `published*` family (header shell, panel, banner, URL block,
+visibility pills, row-state inset bars, error tiers, sortable headers,
+method chips, lineage nodes, faux QR, etc.).
+
+## Data sources & fixtures
+
+The DB only knows about rows, projects, tenants, and lineage
+relationships derivable from `odb.versions`. Everything else on the
+detail page — request volume, latency percentiles, error rate, consumer
+identities, audit events, alert triggers — is **fixture-generated
+client-side** today, keyed deterministically by `versions.id` so the
+same row renders the same numbers across reloads.
+
+Fixtures live in `_internal/fixtures.ts`. They implement the same TS
+contracts (`types.ts`) that real helpers will need to satisfy when
+their data sources land:
+
+| Fixture | Replacement target |
+|---|---|
+| `fakeMetricsForVersion` | analytics rollup table (24h request volume, p50/p95, error rate, hourly buckets) |
+| `fakeTopOperations` | per-operation request counters |
+| `fakeConsumers` | per-API-key request counters scoped to a version |
+| `fakeActivity` | `odb.version_protection_audit` + visibility-change audit log scoped to one version |
+| `fakeAlerts` | derived from real metrics + key expiry table |
+| `fakeReleaseNotes` | persisted release-notes column on `odb.versions` |
+| `fakeLineage` | replaced by `getPublishedVersionDetail` lineage block |
+
+Lineage has already cut over from fixture to real data — the page
+overlays the helper's `parent` / `child` onto the fixture bundle's
+`self` (which still synthesises traffic meta).
+
+## URL format
+
+Spec URLs are built client-side from `NEXT_PUBLIC_REST_API_BASE_URL`:
+
 ```
-/api/acme-corp/customer-api/1.0.0
+{base}/schema/{tenant-slug}/{project-slug}/{version-id}     OpenAPI YAML/JSON
+{base}/swagger/{tenant-slug}/{project-slug}/{version-id}    Swagger UI
+{base}/arazzo/{tenant-slug}/{project-slug}/{version-id}     Arazzo workflows
+{base}/json/{tenant-slug}/{project-slug}/{version-id}       JSON Schema bundle
 ```
 
-This allows for clean, hierarchical API endpoints that include:
-1. **Tenant isolation**: Each tenant has their own namespace
-2. **Project organization**: Projects are grouped under tenants
-3. **Version specification**: Specific version of the API specification
+Private versions surface an API key dialog before opening — the entered
+key is appended as `?api_key=…` for the redirect (the URL is never
+persisted server-side).
 
-## Features
+## States
 
-### Empty States
-1. **No Tenant Selected**: Prompts user to select a tenant
-2. **No Published Versions**: Friendly message encouraging users to publish versions
+- **Loading.** Listing and detail render `LoadingState`. Detail keeps
+  the URL stable so a hard refresh remounts cleanly.
+- **No tenant.** A blocking amber callout pointing at the Tenants page.
+- **No published versions.** Listing renders an empty state with a
+  link to the Versions screen.
+- **Detail not found.** Empty state with a `Back to Published`
+  button — fires when the version is unpublished, soft-deleted, or
+  belongs to a different tenant.
 
-### Loading States
-- Shows loading indicator while fetching data
-- Prevents interaction during data loading
+## Visibility lifecycle
 
-### User Feedback
-- Copy URL shows temporary "Copied!" tooltip
-- Hover states on all interactive elements
-- Clear visual hierarchy
+Toggling visibility from any of the three entry points (listing
+per-row pill, detail header button, detail rail card button) shares
+one server action (`updateVersionVisibility`) and one confirmation
+dialog. After success the optimistic update flips the local state so
+the visibility pill, KPI band, and rail card all reflect the new
+value without a refetch.
 
-### Accessibility
-- Proper semantic HTML (table structure)
-- Tooltips on action buttons
-- Keyboard-accessible controls
-- ARIA labels where needed
+## Accessibility
 
-## Data Flow
+- Sortable table headers carry `aria-sort` and respond to
+  Enter / Space.
+- Tab navigation on the detail page uses `role="tablist"` /
+  `role="tab"` / `aria-selected`.
+- Action menus on row hover are keyboard-reachable (button focus +
+  click-outside dismissal).
+- All icon-only buttons carry visible text or `title` attributes.
 
-1. User navigates to `/ade/dashboard/published`
-2. Page component reads `current_tenant_id` from session
-3. Calls `getPublishedVersionsForTenant(tenantId)`
-4. Database query joins versions, projects, tenants, and users
-5. Results are displayed in the table
-6. User can copy or open URLs for API access
+## Security
 
-## Database Schema Dependencies
-
-### Required Tables
-- `odb.versions` - Version records with `published` and `visibility` columns
-- `odb.projects` - Project records with `slug` column
-- `odb.tenants` - Tenant records with `slug` column
-- `odb.users` - User records for creator information
-
-### Required Columns
-- `versions.published` (boolean) - Marks version as published/locked
-- `versions.visibility` (enum: 'public' | 'private') - Access control
-- `versions.published_at` (timestamp) - When version was published
-- `projects.slug` (varchar) - URL-friendly project identifier
-- `tenants.slug` (varchar) - URL-friendly tenant identifier
-
-## Styling
-
-### Colors & Themes
-- Light mode: Clean whites and grays
-- Dark mode: Dark grays with proper contrast
-- Accent colors: Blue for actions, green for public, gray for private
-- Border colors adapt to theme
-
-### Typography
-- Headers: Bold, larger text
-- Body: Standard readable size
-- Code/URLs: Monospace font with background highlight
-- Helper text: Smaller, muted color
-
-### Layout
-- Responsive table design
-- Fixed header for easy scanning
-- Proper spacing and padding
-- Hover effects for interactivity
-
-## Future Enhancements
-
-1. **Filtering**: Add filters for visibility, project, or date range
-2. **Search**: Search by project name or version ID
-3. **Sorting**: Allow sorting by any column
-4. **Bulk Actions**: Select multiple versions for batch operations
-5. **Analytics**: Show usage statistics for each published version
-6. **Version History**: Link to version comparison or changelog
-7. **QR Code**: Generate QR codes for mobile access to API URLs
-8. **Visibility Toggle**: Allow changing visibility from this view (if not locked)
-9. **Export**: Export list as CSV or JSON
-
-## Testing Checklist
-
-- [ ] View loads with valid tenant selected
-- [ ] Empty state shows when no published versions exist
-- [ ] Table displays all published versions correctly
-- [ ] Visibility badges show correct colors and icons
-- [ ] Access URLs are formatted correctly
-- [ ] Copy URL function works and shows feedback
-- [ ] Open URL function opens in new tab
-- [ ] Published dates format correctly
-- [ ] Creator names display correctly
-- [ ] Dark mode styles work properly
-- [ ] Responsive design works on mobile
-- [ ] Navigation highlight works on active page
-- [ ] Loading state shows while fetching data
-- [ ] Error handling works for failed API calls
-
-## Security Considerations
-
-- Only shows versions for the current tenant (tenant isolation)
-- Respects soft-delete flags (deleted records not shown)
-- Does not expose internal IDs in URLs (uses slugs)
-- Full URLs only constructed client-side (not stored in DB)
-- Visibility flag can control access at API level
+- Tenant isolation is SQL-enforced in both helpers (the join chain
+  filters by `p.tenant_id`).
+- Soft-delete flags are respected at every level (versions, projects,
+  tenants).
+- Visibility changes go through the existing audit-aware helper —
+  the listing and detail pages do not write to `odb.versions` directly.
+- API keys entered into the dialog stay client-side; the URL is opened
+  via `window.open` rather than persisted.
 
 ## Performance
 
-- Single database query with JOINs (efficient)
-- No N+1 query problems
-- Indexes on `published`, `deleted_at`, and foreign keys
-- Minimal client-side processing
-- Fast table rendering with React
+- Listing fetches one query (with sort + joins) and caches the result
+  in component state.
+- Detail fetches one query (base row) plus two parallel lineage
+  queries via `Promise.all`.
+- Heavy fixtures are computed once per row via `useMemo` keyed by row
+  id, so re-renders of the listing don't recompute traffic data.
 
+## Deferred work
+
+1. Real metrics helper (24h request volume, p50/p95, error rate,
+   hourly buckets, consumer counts).
+2. Per-API-key per-version request rollup for the Consumers tab.
+3. Audit-event helper feeding the Activity tab and rail recap.
+4. Alert engine (errors trending, key expiring, stale catalog) — once
+   metrics and audit data exist, the alert derivation in `fakeAlerts`
+   becomes a real query.
+5. Persisted release notes editor (the rail's "Edit notes" button is
+   currently a toast placeholder).
+6. QR generation for the rail card and detail-header `QR` button.
