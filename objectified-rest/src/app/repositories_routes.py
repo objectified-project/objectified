@@ -11,6 +11,7 @@ import base64
 import binascii
 import json
 import re
+import time
 from urllib import error as urllib_error
 from urllib import parse as urllib_parse
 from urllib import request as urllib_request
@@ -20,6 +21,7 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .auth import validate_authentication
@@ -178,6 +180,9 @@ class RepositoryFileRecord(BaseModel):
     createdAt: str
 
 
+RepositoryImportJobSourceKind = Literal["repository_auto_import", "repository_manual_import"]
+
+
 class RepositoryImportJobRecord(BaseModel):
     id: str
     repositoryId: str
@@ -185,6 +190,7 @@ class RepositoryImportJobRecord(BaseModel):
     scanId: str
     branch: str
     sourceType: Literal["git"]
+    sourceKind: RepositoryImportJobSourceKind = "repository_auto_import"
     sourceUri: str
     operation: ImportJobOperation
     format: str | None = None
@@ -252,6 +258,7 @@ class RepositoryFileAutoImportEnabledRequest(BaseModel):
 
 
 RepositorySpecSelectionStatus = Literal[
+    "importing",
     "imported",
     "parse_error",
     "manifest_error",
@@ -299,6 +306,15 @@ class RepositorySpecBulkUpdateResponse(BaseModel):
     items: List[RepositorySpecRecord]
 
 
+class RepositorySpecImportNowRequest(BaseModel):
+    branch: str | None = None
+    force: bool = False
+
+
+class RepositorySpecImportNowResponse(BaseModel):
+    importJobId: str
+
+
 class RepositoryResolvedProjectRecord(BaseModel):
     id: str
     tenantId: str
@@ -330,6 +346,8 @@ _REPO_AUDIT_STORE: List[Dict[str, Any]] = []
 _REPO_IMPORT_POLICY_STORE: Dict[str, Dict[str, bool]] = {}
 _REPO_PROJECT_STORE: Dict[str, Dict[str, RepositoryResolvedProjectRecord]] = {}
 _REPO_VERSION_STORE: Dict[str, Dict[str, Dict[str, RepositoryResolvedVersionRecord]]] = {}
+# (repository_id, file_id, branch) -> (import_job_id, monotonic_timestamp) for 30s idempotency (REPO-9.5)
+_REPO_IMPORT_NOW_IDEMPOTENCY: Dict[Tuple[str, str, str], Tuple[str, float]] = {}
 _STORE_LOCK = Lock()
 _SYSTEM_ACTOR_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -348,6 +366,7 @@ RepositoryAuditEvent = Literal[
     "repository.auto_paused",
     "repository.token_resolved",
     "repository.polled",
+    "repository.spec.import_now_triggered",
 ]
 
 _DEFAULT_SCAN_PAGE_SIZE = 50
@@ -1206,6 +1225,8 @@ def _derive_repository_spec_status(
     file_row: RepositoryFileRecord,
     latest_import_job: RepositoryImportJobRecord | None,
 ) -> RepositorySpecSelectionStatus:
+    if latest_import_job is not None and latest_import_job.state == "pending_review":
+        return "importing"
     if latest_import_job is not None and latest_import_job.state == "committed":
         return "imported"
     if file_row.status == "parse_error":
@@ -1716,6 +1737,176 @@ def _precompute_latest_checksums(
     return result
 
 
+def _prune_import_now_idempotency() -> None:
+    now = time.monotonic()
+    for key, (_job_id, t0) in list(_REPO_IMPORT_NOW_IDEMPOTENCY.items()):
+        if now - t0 > 30.0:
+            _REPO_IMPORT_NOW_IDEMPOTENCY.pop(key, None)
+
+
+def _import_now_idempotency_lookup(repository_id: str, file_id: str, branch: str) -> str | None:
+    _prune_import_now_idempotency()
+    rec = _REPO_IMPORT_NOW_IDEMPOTENCY.get((repository_id, file_id, branch))
+    if rec is None:
+        return None
+    return rec[0]
+
+
+def _import_now_idempotency_store(repository_id: str, file_id: str, branch: str, import_job_id: str) -> None:
+    _prune_import_now_idempotency()
+    _REPO_IMPORT_NOW_IDEMPOTENCY[(repository_id, file_id, branch)] = (import_job_id, time.monotonic())
+
+
+def _materialize_repository_dry_run_import_job(
+    *,
+    tenant_id: str,
+    repository_id: str,
+    scan_id: str,
+    branch: str,
+    commit_sha: str,
+    file_row: RepositoryFileRecord,
+    actor_id: str,
+    source_kind: RepositoryImportJobSourceKind,
+) -> tuple[RepositoryImportJobRecord, List[Dict[str, Any]]]:
+    """Build and persist a dry-run repository import job + change report (REPO-8.3 / 9.5)."""
+    repository_jobs = _REPO_IMPORT_JOB_STORE.setdefault(repository_id, [])
+    manifest_project_slug_by_path = _manifest_project_slug_by_path(repository_id)
+    operation: ImportJobOperation = "import"
+    promote: ImportJobPromotion = file_row.promote if file_row.promote in {"auto", "manual"} else "manual"
+    settings_json: Dict[str, Any] = dict(file_row.settingsJson or {})
+    if settings_json.get("onBreakingChange") == "block":
+        promote = "manual"
+        settings_json["requiresExplicitApproval"] = True
+    if file_row.status == "removed":
+        operation = "removal"
+        promote = "manual"
+        settings_json["requiresExplicitApproval"] = True
+
+    source_uri = _build_repository_source_uri(repository_id, file_row.path, branch, commit_sha)
+    forced_failure = settings_json.get("forceImportFailure")
+    failure_message: str | None = None
+    if isinstance(forced_failure, str) and forced_failure.strip():
+        failure_message = forced_failure.strip()
+    elif forced_failure is True:
+        failure_message = "forced import failure for test coverage"
+
+    state: ImportJobStatus = "pending_review"
+    if failure_message:
+        state = "failed"
+    elif promote == "auto":
+        state = "committed"
+
+    target_project_slug: str | None = None
+    target_version_id: str | None = None
+    if file_row.versionStrategy == "commit-sha":
+        resolved_project_slug = _resolve_target_project_slug_for_dry_run(
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            file_row=file_row,
+            manifest_project_slug_by_path=manifest_project_slug_by_path,
+        )
+        if resolved_project_slug is not None:
+            target_project_slug = resolved_project_slug
+            target_version_id = _preview_target_version_id_for_dry_run(commit_sha, file_row.createdAt)
+
+    change_report = RepositorySyncChangeReportRecord(
+        id=str(uuid4()),
+        sourceKind="repository_sync",
+        repositoryId=repository_id,
+        importJobId="",
+        scanId=scan_id,
+        changeModelJson=_build_repository_sync_change_report_model(file_row),
+        createdAt=file_row.createdAt,
+    )
+    conflict_records = _derive_import_conflicts(
+        file_row=file_row,
+        operation=operation,
+        settings_json=settings_json,
+    )
+    event_log = _build_import_job_event_log(
+        file_row=file_row,
+        operation=operation,
+        state=state,
+        conflicts=conflict_records,
+    )
+
+    import_job = RepositoryImportJobRecord(
+        id=str(uuid4()),
+        repositoryId=repository_id,
+        repositoryFileId=file_row.id,
+        scanId=scan_id,
+        branch=branch,
+        sourceType="git",
+        sourceKind=source_kind,
+        sourceUri=source_uri,
+        operation=operation,
+        format=file_row.format,
+        settingsJson=settings_json,
+        dryRun=True,
+        state=state,
+        diffSnapshot=_build_diff_snapshot(file_row),
+        conflictRecords=conflict_records,
+        eventLog=event_log,
+        errorDetail=failure_message,
+        targetProjectSlug=target_project_slug,
+        targetVersionId=target_version_id,
+        changeReportId=change_report.id,
+        createdAt=file_row.createdAt,
+    )
+    change_report.importJobId = import_job.id
+    repository_jobs.insert(0, import_job)
+    _REPO_CHANGE_REPORT_STORE.setdefault(repository_id, []).insert(0, change_report)
+    file_row.lastImportJobId = import_job.id
+
+    pending_audit_rows: List[Dict[str, Any]] = []
+    if failure_message:
+        file_row.status = "parse_error"
+        file_row.discriminator = failure_message
+        pending_audit_rows.append(_append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.sync_failed",
+            actor_id=actor_id,
+            outcome="failure",
+            detail={
+                "scanId": scan_id,
+                "importJobId": import_job.id,
+                "path": file_row.path,
+                "operation": operation,
+                "error": failure_message,
+            },
+        ))
+    elif promote == "auto":
+        pending_audit_rows.append(_append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.sync_committed",
+            actor_id=actor_id,
+            detail={
+                "scanId": scan_id,
+                "importJobId": import_job.id,
+                "path": file_row.path,
+                "operation": operation,
+                "promotion": promote,
+            },
+        ))
+    else:
+        pending_audit_rows.append(_append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.sync_pending_review",
+            actor_id=actor_id,
+            detail={
+                "scanId": scan_id,
+                "importJobId": import_job.id,
+                "path": file_row.path,
+                "operation": operation,
+                "promotion": promote,
+            },
+        ))
+    return import_job, pending_audit_rows
+
+
 def _dispatch_import_jobs_for_scan(
     *,
     tenant_id: str,
@@ -1729,8 +1920,6 @@ def _dispatch_import_jobs_for_scan(
     diff_summary: Dict[str, int],
     precomputed_checksums: Dict[str, str | None] | None = None,
 ) -> List[Dict[str, Any]]:
-    repository_jobs = _REPO_IMPORT_JOB_STORE.setdefault(repository_id, [])
-    manifest_project_slug_by_path = _manifest_project_slug_by_path(repository_id)
     pending_audit_rows: List[Dict[str, Any]] = []
     checksums = precomputed_checksums or {}
     for file_row in scan_files:
@@ -1767,137 +1956,18 @@ def _dispatch_import_jobs_for_scan(
                     )
                     continue
 
-        operation: ImportJobOperation = "import"
-        promote: ImportJobPromotion = file_row.promote if file_row.promote in {"auto", "manual"} else "manual"
-        settings_json: Dict[str, Any] = dict(file_row.settingsJson or {})
-        if settings_json.get("onBreakingChange") == "block":
-            promote = "manual"
-            settings_json["requiresExplicitApproval"] = True
-        if file_row.status == "removed":
-            operation = "removal"
-            promote = "manual"
-            settings_json["requiresExplicitApproval"] = True
-
-        source_uri = _build_repository_source_uri(repository_id, file_row.path, branch, commit_sha)
-        forced_failure = settings_json.get("forceImportFailure")
-        failure_message: str | None = None
-        if isinstance(forced_failure, str) and forced_failure.strip():
-            failure_message = forced_failure.strip()
-        elif forced_failure is True:
-            failure_message = "forced import failure for test coverage"
-
-        state: ImportJobStatus = "pending_review"
-        if failure_message:
-            state = "failed"
-        elif promote == "auto":
-            state = "committed"
-
-        target_project_slug: str | None = None
-        target_version_id: str | None = None
-        if file_row.versionStrategy == "commit-sha":
-            resolved_project_slug = _resolve_target_project_slug_for_dry_run(
-                tenant_id=tenant_id,
-                repository_id=repository_id,
-                file_row=file_row,
-                manifest_project_slug_by_path=manifest_project_slug_by_path,
-            )
-            if resolved_project_slug is not None:
-                target_project_slug = resolved_project_slug
-                target_version_id = _preview_target_version_id_for_dry_run(commit_sha, file_row.createdAt)
-
-        change_report = RepositorySyncChangeReportRecord(
-            id=str(uuid4()),
-            sourceKind="repository_sync",
-            repositoryId=repository_id,
-            importJobId="",
-            scanId=scan_id,
-            changeModelJson=_build_repository_sync_change_report_model(file_row),
-            createdAt=file_row.createdAt,
-        )
-        conflict_records = _derive_import_conflicts(
-            file_row=file_row,
-            operation=operation,
-            settings_json=settings_json,
-        )
-        event_log = _build_import_job_event_log(
-            file_row=file_row,
-            operation=operation,
-            state=state,
-            conflicts=conflict_records,
-        )
-
-        import_job = RepositoryImportJobRecord(
-            id=str(uuid4()),
-            repositoryId=repository_id,
-            repositoryFileId=file_row.id,
-            scanId=scan_id,
+        _created_job, materialize_audits = _materialize_repository_dry_run_import_job(
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            scan_id=scan_id,
             branch=branch,
-            sourceType="git",
-            sourceUri=source_uri,
-            operation=operation,
-            format=file_row.format,
-            settingsJson=settings_json,
-            dryRun=True,
-            state=state,
-            diffSnapshot=_build_diff_snapshot(file_row),
-            conflictRecords=conflict_records,
-            eventLog=event_log,
-            errorDetail=failure_message,
-            targetProjectSlug=target_project_slug,
-            targetVersionId=target_version_id,
-            changeReportId=change_report.id,
-            createdAt=file_row.createdAt,
+            commit_sha=commit_sha,
+            file_row=file_row,
+            actor_id=actor_id,
+            source_kind="repository_auto_import",
         )
-        change_report.importJobId = import_job.id
-        repository_jobs.insert(0, import_job)
-        _REPO_CHANGE_REPORT_STORE.setdefault(repository_id, []).insert(0, change_report)
-        file_row.lastImportJobId = import_job.id
-
-        if failure_message:
-            file_row.status = "parse_error"
-            file_row.discriminator = failure_message
-            pending_audit_rows.append(_append_audit_row(
-                tenant_id,
-                repository_id,
-                "repository.sync_failed",
-                actor_id=actor_id,
-                outcome="failure",
-                detail={
-                    "scanId": scan_id,
-                    "importJobId": import_job.id,
-                    "path": file_row.path,
-                    "operation": operation,
-                    "error": failure_message,
-                },
-            ))
-        elif promote == "auto":
-            pending_audit_rows.append(_append_audit_row(
-                tenant_id,
-                repository_id,
-                "repository.sync_committed",
-                actor_id=actor_id,
-                detail={
-                    "scanId": scan_id,
-                    "importJobId": import_job.id,
-                    "path": file_row.path,
-                    "operation": operation,
-                    "promotion": promote,
-                },
-            ))
-        else:
-            pending_audit_rows.append(_append_audit_row(
-                tenant_id,
-                repository_id,
-                "repository.sync_pending_review",
-                actor_id=actor_id,
-                detail={
-                    "scanId": scan_id,
-                    "importJobId": import_job.id,
-                    "path": file_row.path,
-                    "operation": operation,
-                    "promotion": promote,
-                },
-            ))
+        pending_audit_rows.extend(materialize_audits)
+        _ = _created_job
     return pending_audit_rows
 
 
@@ -2554,6 +2624,195 @@ async def update_repository_spec_selection(
 
 
 @router.post(
+    "/{tenant_slug}/{repository_id}/specs/{file_id}:importNow",
+    status_code=202,
+    response_model=RepositorySpecImportNowResponse,
+    responses={202: {"model": RepositorySpecImportNowResponse}},
+)
+async def import_repository_spec_now(
+    tenant_slug: str,
+    repository_id: str,
+    file_id: str,
+    request: RepositorySpecImportNowRequest = Body(...),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> JSONResponse:
+    """Dispatch a one-shot dry-run import for the latest scan snapshot (REPO-9.5)."""
+    tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_WRITE)
+    _validate_uuid(file_id, "fileId")
+
+    with _STORE_LOCK:
+        repository = _find_repository_for_tenant(tenant_id, repository_id)
+        if not repository.branches:
+            raise HTTPException(status_code=400, detail="Repository has no branch configuration")
+
+        requested_branch = (request.branch or "").strip()
+        if not requested_branch:
+            effective_branch = repository.branches[0].branch
+        else:
+            if not any(branch.branch == requested_branch for branch in repository.branches):
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Branch {requested_branch!r} is not configured for this repository",
+                )
+            effective_branch = requested_branch
+
+        _TERMINAL = {"complete", "skipped_unchanged"}
+        scans = _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
+        latest_scan: RepositoryScanRecord | None = next(
+            (scan for scan in scans if scan.branch == effective_branch and scan.status in _TERMINAL),
+            None,
+        )
+        if latest_scan is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No completed scan for branch: {effective_branch}",
+            )
+        file_list = _REPO_SCAN_FILE_HISTORY_STORE.get(latest_scan.id, [])
+        file_row: RepositoryFileRecord | None = next(
+            (row for row in file_list if row.id == file_id),
+            None,
+        )
+        if file_row is None:
+            raise HTTPException(status_code=404, detail=f"Repository file not found: {file_id}")
+        if file_row.status == "removed":
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "SPEC_REMOVED",
+                    "message": "This path was removed in the latest scan; re-import is not available.",
+                },
+            )
+        if not file_row.tracked:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "SPEC_NOT_TRACKED", "message": "This path is not tracked in the scan manifest."},
+            )
+        if not file_row.importEnabled:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "IMPORT_NOT_ENABLED",
+                    "message": "import_enabled is false; enable import for this spec before using Import Now.",
+                },
+            )
+
+        dup_id = _import_now_idempotency_lookup(repository_id, file_id, effective_branch)
+        if dup_id is not None:
+            return JSONResponse(
+                status_code=202,
+                content=RepositorySpecImportNowResponse(importJobId=dup_id).model_dump(),
+            )
+
+    assert file_row is not None
+    if not request.force:
+        current_checksum = _normalize_content_checksum(file_row.contentChecksum)
+        if current_checksum is not None:
+            try:
+                latest_checksum = _latest_repository_source_checksum_for_file(
+                    tenant_id=tenant_id,
+                    repository_id=repository_id,
+                    file_row=file_row,
+                )
+            except Exception:
+                latest_checksum = None
+            if latest_checksum is not None and latest_checksum == current_checksum:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "IMPORT_UNCHANGED_CHECKSUM",
+                        "message": "No import dispatched; file content matches the last imported snapshot (re-run with force: true to bypass).",
+                    },
+                )
+
+    with _STORE_LOCK:
+        dup_id2 = _import_now_idempotency_lookup(repository_id, file_id, effective_branch)
+        if dup_id2 is not None:
+            return JSONResponse(
+                status_code=202,
+                content=RepositorySpecImportNowResponse(importJobId=dup_id2).model_dump(),
+            )
+
+        _TERMINAL2 = {"complete", "skipped_unchanged"}
+        latest_scan2 = next(
+            (
+                scan
+                for scan in _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
+                if scan.branch == effective_branch and scan.status in _TERMINAL2
+            ),
+            None,
+        )
+        if latest_scan2 is None or latest_scan2.id != latest_scan.id:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "REPOSITORY_STALE",
+                    "message": "The repository scan changed; refresh and try again.",
+                },
+            )
+        file_list2 = _REPO_SCAN_FILE_HISTORY_STORE.get(latest_scan2.id, [])
+        file_idx = next(
+            (idx for idx, row in enumerate(file_list2) if row.id == file_id),
+            None,
+        )
+        if file_idx is None:
+            raise HTTPException(status_code=404, detail=f"Repository file not found: {file_id}")
+        working_row = file_list2[file_idx]
+        if not working_row.importEnabled or not working_row.tracked or working_row.status == "removed":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "REPOSITORY_STALE",
+                    "message": "The spec state changed; refresh and try again.",
+                },
+            )
+
+        commit_sha = latest_scan2.commitSha
+        if not (isinstance(commit_sha, str) and commit_sha.strip()):
+            raise HTTPException(
+                status_code=500,
+                detail="Repository scan is missing a commit reference for import dispatch.",
+            )
+
+        new_job, job_audits = _materialize_repository_dry_run_import_job(
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            scan_id=latest_scan2.id,
+            branch=effective_branch,
+            commit_sha=commit_sha,
+            file_row=working_row,
+            actor_id=actor_id,
+            source_kind="repository_manual_import",
+        )
+        _import_now_idempotency_store(repository_id, file_id, effective_branch, new_job.id)
+
+        import_audit = _append_audit_row(
+            tenant_id,
+            repository_id,
+            "repository.spec.import_now_triggered",
+            actor_id=actor_id,
+            detail={
+                "path": working_row.path,
+                "fileId": file_id,
+                "branch": effective_branch,
+                "force": request.force,
+                "actorId": actor_id,
+                "importJobId": new_job.id,
+                "scanId": latest_scan2.id,
+            },
+        )
+        all_audits = job_audits + [import_audit]
+
+    for row in all_audits:
+        _persist_audit_row(row)
+    return JSONResponse(
+        status_code=202,
+        content=RepositorySpecImportNowResponse(importJobId=new_job.id).model_dump(),
+    )
+
+
+@router.post(
     "/{tenant_slug}/{repository_id}/specs:bulkUpdate",
     response_model=RepositorySpecBulkUpdateResponse,
 )
@@ -2930,6 +3189,7 @@ def _reset_repository_state_for_tests() -> None:
         _REPO_IMPORT_POLICY_STORE.clear()
         _REPO_PROJECT_STORE.clear()
         _REPO_VERSION_STORE.clear()
+        _REPO_IMPORT_NOW_IDEMPOTENCY.clear()
 
 
 def _complete_repository_scan_for_tests(

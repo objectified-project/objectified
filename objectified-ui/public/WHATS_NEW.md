@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added REPO-9.5 **Import Now** (`POST .../specs/{fileId}:importNow`) to queue a manual dry-run import when `import_enabled` is on (independent of auto-import), with 30s idempotency per file/branch, `repository_manual_import` job `sourceKind`, `repository.spec.import_now_triggered` audit, and Specs tab / drawer actions that link to the Sync history tab; specs list a new `importing` status while a job is `pending_review`.
 - Added REPO-9.4 ADE Repository Detail "Specs" tab listing importable specs (confidence ≥ 50%) with format/status/last-import metadata, optimistic Import + Auto-Import toggles with REST 4xx rollback and atomic auto-import cleanup, deep-linkable filter chips (`?status=…`), bulk-edit toolbar, an Import Now overflow action, and a spec detail drawer.
 - Added REPO-9.3 repository specs REST endpoints for cursor-paginated listing (`GET /v1/repositories/{tenant_slug}/{repository_id}/specs`), single-spec selection updates, and transactional bulk selection updates with typed invariant errors and `repository.spec.selection_changed` audit rows.
 - Added REPO-9.2 per-spec `auto_import_enabled` on `repository_file` (default false), including `PATCH /v1/repositories/{tenant_slug}/{repository_id}/files/{file_id}/auto-import-enabled`, independent `repository.spec.selection_changed` audit discrimination by `field`, scan dispatch gating that requires both import and auto-import enabled, and automatic clearing of auto-import whenever import is disabled.

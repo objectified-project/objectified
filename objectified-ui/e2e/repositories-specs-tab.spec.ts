@@ -7,7 +7,7 @@ interface MockSpec {
   format: string | null;
   confidence: number | null;
   discriminator: string | null;
-  status: 'imported' | 'parse_error' | 'manifest_error' | 'not_imported' | 'unchanged_checksum';
+  status: 'importing' | 'imported' | 'parse_error' | 'manifest_error' | 'not_imported' | 'unchanged_checksum';
   importEnabled: boolean;
   autoImportEnabled: boolean;
   lastImportedVersionId: string | null;

@@ -19,6 +19,7 @@ import { Input } from '@/app/components/ui/Input';
 import { Switch } from '@/app/components/ui/Switch';
 
 export type RepositorySpecStatus =
+  | 'importing'
   | 'imported'
   | 'parse_error'
   | 'manifest_error'
@@ -111,6 +112,7 @@ function getFormatPillClass(format: string | null | undefined): string {
 }
 
 const statusPillClass: Record<RepositorySpecStatus, string> = {
+  importing: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
   imported: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
   parse_error: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
   manifest_error: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
@@ -119,6 +121,7 @@ const statusPillClass: Record<RepositorySpecStatus, string> = {
 };
 
 const statusLabel: Record<RepositorySpecStatus, string> = {
+  importing: 'Importing',
   imported: 'Imported',
   parse_error: 'Parse error',
   manifest_error: 'Manifest error',
@@ -129,6 +132,8 @@ const statusLabel: Record<RepositorySpecStatus, string> = {
 function StatusPill({ status }: { status: RepositorySpecStatus }) {
   const Icon = status === 'imported'
     ? CheckCircle2
+    : status === 'importing'
+      ? Loader2
     : status === 'parse_error' || status === 'manifest_error'
       ? AlertCircle
       : status === 'unchanged_checksum'
@@ -139,7 +144,7 @@ function StatusPill({ status }: { status: RepositorySpecStatus }) {
       className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${statusPillClass[status]}`}
       data-testid={`spec-status-${status}`}
     >
-      <Icon className="w-3 h-3" />
+      <Icon className={status === 'importing' ? 'w-3 h-3 animate-spin' : 'w-3 h-3'} />
       {statusLabel[status]}
     </span>
   );
@@ -180,6 +185,7 @@ export function RepositorySpecsTab({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [importNowJobId, setImportNowJobId] = useState<string | null>(null);
   const [openMenuFileId, setOpenMenuFileId] = useState<string | null>(null);
   const [selectedSpec, setSelectedSpec] = useState<RepositorySpecRecord | null>(null);
   const [pendingPatchIds, setPendingPatchIds] = useState<Set<string>>(new Set());
@@ -329,6 +335,7 @@ export function RepositorySpecsTab({
       setIsBulkPending(true);
       setErrorMessage('');
       setSuccessMessage('');
+      setImportNowJobId(null);
       try {
         const response = await fetch(`/api/repositories/${repositoryId}/specs/bulk-update`, {
           method: 'POST',
@@ -354,11 +361,43 @@ export function RepositorySpecsTab({
   );
 
   const handleImportNow = useCallback(
-    (spec: RepositorySpecRecord) => {
+    async (spec: RepositorySpecRecord) => {
       setOpenMenuFileId(null);
-      setSuccessMessage(`Queued import for ${spec.path}. Tracking will appear in Sync history once REPO-9.5 lands.`);
+      setErrorMessage('');
+      try {
+        const response = await fetch(
+          `/api/repositories/${repositoryId}/specs/${spec.fileId}/import-now`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ branch: spec.branch, force: false }),
+          },
+        );
+        const data = (await response.json()) as { success?: boolean; importJobId?: string; error?: string; detail?: unknown };
+        if (!response.ok || !data.success) {
+          const d = data.detail as { message?: string } | undefined;
+          const msg = (typeof d === 'object' && d?.message) || data.error || 'Import Now failed';
+          throw new Error(msg);
+        }
+        const jobId = data.importJobId ?? '';
+        setSpecs((current) =>
+          current.map((row) => (row.fileId === spec.fileId ? { ...row, status: 'importing' } : row)),
+        );
+        setSelectedSpec((prev) =>
+          prev && prev.fileId === spec.fileId ? { ...prev, status: 'importing' } : prev,
+        );
+        setImportNowJobId(jobId);
+        setSuccessMessage(
+          `Import started (job ${jobId ? `${jobId.slice(0, 8)}…` : 'queued'}).`,
+        );
+        setTimeout(() => { void loadSpecs(); }, 1500);
+        setTimeout(() => { void loadSpecs(); }, 5000);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Import Now failed';
+        setErrorMessage(message);
+      }
     },
-    [],
+    [loadSpecs, repositoryId],
   );
 
   const filteredSpecs = useMemo(() => {
@@ -453,11 +492,24 @@ export function RepositorySpecsTab({
           className="mx-5 rounded-md border border-emerald-200 dark:border-emerald-700/40 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300 flex items-center justify-between gap-3"
           data-testid="spec-success"
         >
-          <span>{successMessage}</span>
+          <span>
+            {successMessage}
+            {importNowJobId ? (
+              <a
+                className="ml-2 text-indigo-600 hover:text-indigo-700 font-medium"
+                href={`/ade/dashboard/repositories/${repositoryId}?tab=sync&importJobId=${encodeURIComponent(importNowJobId)}`}
+              >
+                View in Sync history
+              </a>
+            ) : null}
+          </span>
           <button
             type="button"
             aria-label="Dismiss success"
-            onClick={() => setSuccessMessage('')}
+            onClick={() => {
+              setSuccessMessage('');
+              setImportNowJobId(null);
+            }}
             className="text-emerald-600 hover:text-emerald-800"
           >
             <X className="w-3.5 h-3.5" />
@@ -656,7 +708,7 @@ export function RepositorySpecsTab({
                             type="button"
                             role="menuitem"
                             className="w-full px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
-                            onClick={() => handleImportNow(spec)}
+                            onClick={() => { void handleImportNow(spec); }}
                             data-testid={`spec-import-now-${spec.path}`}
                           >
                             <Download className="w-3.5 h-3.5" />
@@ -783,6 +835,18 @@ export function RepositorySpecsTab({
                     <span className="font-mono text-gray-400">—</span>
                   )}
                 </DrawerRow>
+              </div>
+              <div className="pt-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => { void handleImportNow(selectedSpec); }}
+                  data-testid="spec-drawer-import-now"
+                >
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
+                  Import now
+                </Button>
               </div>
               <p className="text-[11px] text-gray-500">
                 Full spec detail UI ships with REPO-9.6. The drawer above shows the values
