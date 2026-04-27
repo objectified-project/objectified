@@ -25,7 +25,12 @@ from pydantic import BaseModel, Field
 from .auth import validate_authentication
 from .database import db
 from .openapi_change_report import build_change_report
-from .repositories.manifest import parse_repo_manifest, resolve_repository_file_mapping
+from .repositories.manifest import (
+    RepoManifest,
+    initial_import_enabled_for_path,
+    parse_repo_manifest,
+    resolve_repository_file_mapping,
+)
 
 router = APIRouter(prefix="/v1/repositories", tags=["repositories"])
 
@@ -160,6 +165,7 @@ class RepositoryFileRecord(BaseModel):
     confidence: float | None = None
     discriminator: str | None = None
     tracked: bool
+    importEnabled: bool = False
     projectSlug: str | None = None
     versionStrategy: str | None = None
     settingsJson: Dict[str, Any] | None = None
@@ -233,6 +239,11 @@ class RepositorySyncConflictResolutionRequest(BaseModel):
     note: str | None = None
 
 
+class RepositoryFileImportEnabledRequest(BaseModel):
+    importEnabled: bool
+    source: Literal["ui", "api", "manifest"] = "api"
+
+
 class RepositoryResolvedProjectRecord(BaseModel):
     id: str
     tenantId: str
@@ -271,6 +282,7 @@ RepositoryAuditEvent = Literal[
     "repository.registered",
     "repository.scanned",
     "repository.scan.skipped_checksum",
+    "repository.spec.selection_changed",
     "repository.sync_committed",
     "repository.sync_pending_review",
     "repository.sync_failed",
@@ -490,6 +502,8 @@ def _classify_scan_files_against_previous(
     for path in sorted(current_by_path):
         current = current_by_path[path]
         previous = previous_by_path.get(path)
+        if previous is not None:
+            current = current.model_copy(update={"importEnabled": previous.importEnabled})
         if previous is None:
             next_status: RepositoryFileStatus = "new"
             summary["added"] += 1
@@ -668,6 +682,10 @@ def _build_scan_file_rows(
         path = item["path"]
         manifest_spec = manifest_specs_by_path.get(path)
         mapping = resolve_repository_file_mapping(path, manifest_spec)
+        import_enabled = initial_import_enabled_for_path(
+            manifest=manifest_outcome.manifest,
+            spec=manifest_spec,
+        )
         settings_json = dict(mapping.settings_json or {})
         content_checksum = _normalize_content_checksum(item.get("contentChecksum"))
         content_algo = _normalize_content_algo(item.get("contentAlgo"), has_checksum=content_checksum is not None)
@@ -687,6 +705,7 @@ def _build_scan_file_rows(
                 confidence=0.9 if _guess_scan_format(path) else 0.2,
                 discriminator=None,
                 tracked=mapping.tracked,
+                importEnabled=import_enabled,
                 projectSlug=mapping.project_slug if mapping.tracked else None,
                 versionStrategy=mapping.version_strategy,
                 settingsJson=settings_json or None,
@@ -1510,6 +1529,8 @@ def _dispatch_import_jobs_for_scan(
             continue
         if not file_row.tracked:
             continue
+        if not file_row.importEnabled:
+            continue
         if file_row.status == "modified" and not force:
             current_checksum = _normalize_content_checksum(file_row.contentChecksum)
             if current_checksum is not None:
@@ -2179,6 +2200,60 @@ async def list_repository_scan_files(
     return RepositoryScanFilePage(items=page_items, limit=limit, nextCursor=next_cursor)
 
 
+@router.patch(
+    "/{tenant_slug}/{repository_id}/files/{file_id}/import-enabled",
+    response_model=RepositoryFileRecord,
+)
+async def update_repository_file_import_enabled(
+    tenant_slug: str,
+    repository_id: str,
+    file_id: str,
+    request: RepositoryFileImportEnabledRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositoryFileRecord:
+    """Toggle whether a spec path may dispatch import work (per REPO-9.1)."""
+    tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
+    _validate_uuid(file_id, "fileId")
+
+    audit_to_persist: Dict[str, Any] | None = None
+    with _STORE_LOCK:
+        _find_repository_for_tenant(tenant_id, repository_id)
+        out_row: RepositoryFileRecord | None = None
+        for _scan in _REPO_SCAN_HISTORY_STORE.get(repository_id, []):
+            file_list = _REPO_SCAN_FILE_HISTORY_STORE.get(_scan.id, [])
+            for idx, file_row in enumerate(file_list):
+                if file_row.id == file_id:
+                    before = file_row.importEnabled
+                    after = request.importEnabled
+                    if before == after:
+                        return file_row
+                    updated = file_row.model_copy(update={"importEnabled": after})
+                    file_list[idx] = updated
+                    out_row = updated
+                    audit_to_persist = _append_audit_row(
+                        tenant_id,
+                        repository_id,
+                        "repository.spec.selection_changed",
+                        actor_id=actor_id,
+                        detail={
+                            "path": file_row.path,
+                            "before": before,
+                            "after": after,
+                            "actorId": actor_id,
+                            "source": request.source,
+                        },
+                    )
+                    break
+            if out_row is not None:
+                break
+        if out_row is None:
+            raise HTTPException(status_code=404, detail=f"Repository file not found: {file_id}")
+    if audit_to_persist is not None:
+        _persist_audit_row(audit_to_persist)
+    return out_row
+
+
 @router.get("/{tenant_slug}/{repository_id}/sync-history", response_model=RepositoryImportJobPage)
 async def list_repository_sync_history(
     tenant_slug: str,
@@ -2373,8 +2448,10 @@ def _complete_repository_scan_for_tests(
         target_scan = history[scan_idx]
         repository = _REPO_STORE.get(_find_tenant_id_for_repository(repository_id), {}).get(repository_id)
         manifest_specs_by_path: Dict[str, Any] = {}
+        manifest_parsed: RepoManifest | None = None
         if repository is not None:
             manifest_outcome = parse_repo_manifest(repository.manifest)
+            manifest_parsed = manifest_outcome.manifest
             if manifest_outcome.manifest is not None:
                 manifest_specs_by_path = {spec.path: spec for spec in manifest_outcome.manifest.specs}
         now = _utc_now_iso()
@@ -2442,6 +2519,15 @@ def _complete_repository_scan_for_tests(
 
             content_checksum = _normalize_content_checksum(item.get("contentChecksum"))
             content_algo = _normalize_content_algo(item.get("contentAlgo"), has_checksum=content_checksum is not None)
+            if "importEnabled" in item and item.get("importEnabled") is not None:
+                if not isinstance(item.get("importEnabled"), bool):
+                    raise ValueError("importEnabled must be a boolean when provided")
+                import_enabled_value = item["importEnabled"]
+            else:
+                import_enabled_value = initial_import_enabled_for_path(
+                    manifest=manifest_parsed,
+                    spec=manifest_spec,
+                )
             current_files.append(
                 RepositoryFileRecord(
                     id=str(uuid4()),
@@ -2456,6 +2542,7 @@ def _complete_repository_scan_for_tests(
                     confidence=item.get("confidence"),
                     discriminator=item.get("discriminator"),
                     tracked=tracked_value,
+                    importEnabled=import_enabled_value,
                     projectSlug=project_slug_value,
                     versionStrategy=version_strategy_value,
                     settingsJson=settings_json_value,

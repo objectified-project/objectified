@@ -91,6 +91,10 @@ specs:
     )
     by_path = {row.path: row for row in rows}
 
+    # Listed in manifest: import_enabled defaults to True when importEnabled is omitted in YAML.
+    assert by_path["apis/openapi.yaml"].import_enabled is True
+    # Not listed: import not offered until an explicit list + opt-in in manifest or UI.
+    assert by_path["apis/unlisted.yaml"].import_enabled is False
     # Per-spec format override wins over scanner phase-B detection.
     assert by_path["apis/openapi.yaml"].format == "asyncapi_3"
     # Per-spec pollIntervalSec wins over branch-level interval.
@@ -112,6 +116,26 @@ specs:
     assert by_path["apis/unlisted.yaml"].format == "json_schema"
 
 
+def test_listed_spec_explicit_import_enabled_false() -> None:
+    outcome = parse_repo_manifest(
+        """
+version: 1
+specs:
+  - path: apis/held-back.yaml
+    importEnabled: false
+    project: x
+    versionStrategy: commit-sha
+"""
+    )
+    assert outcome.manifest is not None
+    rows = build_repository_file_rows(
+        discoveries=[RepositoryDiscoveryCandidate(path="apis/held-back.yaml", detected_format="openapi_3_0")],
+        manifest=outcome.manifest,
+    )
+    assert len(rows) == 1
+    assert rows[0].import_enabled is False
+
+
 def test_unmapped_root_file_gets_mapping_affordance() -> None:
     rows = build_repository_file_rows(
         discoveries=[RepositoryDiscoveryCandidate(path="openapi.yaml", detected_format="openapi_3_0")],
@@ -119,6 +143,7 @@ def test_unmapped_root_file_gets_mapping_affordance() -> None:
         branch_poll_interval_sec=120,
     )
     assert len(rows) == 1
+    assert rows[0].import_enabled is False
     assert rows[0].tracked is False
     assert rows[0].project_slug is None
     assert rows[0].version_strategy == "commit-sha"

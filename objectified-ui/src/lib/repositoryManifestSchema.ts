@@ -77,6 +77,11 @@ export const repositoryManifestSchema = {
             minimum: 15,
             maximum: 86400,
           },
+          importEnabled: {
+            type: 'boolean',
+            default: true,
+            description: 'When false, the file remains discovered but is not offered for import until enabled in the Specs tab or re-listed with importEnabled: true in the manifest.',
+          },
         },
       },
     },
