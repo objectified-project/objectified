@@ -5,6 +5,9 @@
 
 import jwt from 'jsonwebtoken';
 
+/** Default OAuth-style scopes for session JWTs to objectified-rest (see auth.py for API keys). */
+export const DEFAULT_SESSION_REPOSITORY_SCOPES = 'repository.read repository.write';
+
 export interface SessionUserForRest {
   user_id?: string;
   email?: string | null;
@@ -31,6 +34,8 @@ export function createRestAuthHeaders(user: SessionUserForRest): Record<string, 
       email: user.email,
       name: user.name,
       current_tenant_id: user.current_tenant_id,
+      // Required by repositories_routes specs endpoints (repository.read / repository.write).
+      scope: DEFAULT_SESSION_REPOSITORY_SCOPES,
     },
     secret,
     { algorithm: 'HS256', expiresIn: '1h' }
