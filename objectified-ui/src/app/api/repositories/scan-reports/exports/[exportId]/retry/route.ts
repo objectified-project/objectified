@@ -40,7 +40,13 @@ export async function POST(_req: NextRequest, ctx: RouteCtx) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      return NextResponse.json({ success: false, error: 'Retry failed' }, { status: response.status });
+      const errorMessage =
+        typeof (data as { detail?: string }).detail === 'string'
+          ? (data as { detail: string }).detail
+          : typeof (data as { message?: string }).message === 'string'
+            ? (data as { message: string }).message
+            : 'Retry failed';
+      return NextResponse.json({ success: false, error: errorMessage }, { status: response.status });
     }
     return NextResponse.json({ success: true, data });
   } catch (error) {

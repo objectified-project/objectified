@@ -38,10 +38,9 @@ export async function GET(request: NextRequest, ctx: RouteCtx) {
       { status: response.status },
     );
   }
-  const buf = await response.arrayBuffer();
   const contentType = response.headers.get('content-type') || 'application/octet-stream';
   const disposition = response.headers.get('content-disposition') || 'attachment';
-  return new NextResponse(buf, {
+  return new NextResponse(response.body, {
     status: 200,
     headers: { 'Content-Type': contentType, 'Content-Disposition': disposition },
   });

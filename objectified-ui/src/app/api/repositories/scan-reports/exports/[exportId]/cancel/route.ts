@@ -43,7 +43,11 @@ export async function POST(_req: NextRequest, ctx: RouteCtx) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      return NextResponse.json({ success: false, error: 'Cancel failed' }, { status: response.status });
+      const errorMessage =
+        typeof (data as { detail?: string }).detail === 'string'
+          ? (data as { detail: string }).detail
+          : 'Cancel failed';
+      return NextResponse.json({ success: false, error: errorMessage }, { status: response.status });
     }
     return NextResponse.json({ success: true, data });
   } catch (error) {

@@ -3091,7 +3091,7 @@ def count_scan_report_export_row_candidates(
             pl = report.get("payloadJson")
             if not isinstance(pl, list):
                 continue
-            n += len([1 for p in pl if isinstance(p, dict)])
+            n += sum(1 for p in pl if isinstance(p, dict))
     return n
 
 
@@ -3143,7 +3143,14 @@ def iter_scan_report_export_rows(
                     job = j_by.get(frow.path)
                     spec = _build_repository_spec_record(frow, branch, job)
                 else:
-                    p_status = pitem.get("status")
+                    _VALID_SPEC_STATUSES = {
+                        "importing", "imported", "parse_error", "manifest_error",
+                        "not_imported", "unchanged_checksum",
+                    }
+                    raw_status = pitem.get("status")
+                    spec_status: RepositorySpecSelectionStatus = (
+                        raw_status if raw_status in _VALID_SPEC_STATUSES else "not_imported"
+                    )
                     spec = RepositorySpecRecord(
                         fileId=fid,
                         repositoryId=repo.id,
@@ -3157,7 +3164,7 @@ def iter_scan_report_export_rows(
                         if pitem.get("confidence") is not None
                         else None,
                         discriminator=None,
-                        status="not_imported",
+                        status=spec_status,
                         importEnabled=bool(pitem.get("importEnabled")),
                         autoImportEnabled=bool(pitem.get("autoImportEnabled")),
                         lastImportedVersionId=None,

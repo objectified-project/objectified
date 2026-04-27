@@ -121,9 +121,10 @@ def _jobs(tenant_id: str) -> list[dict[str, Any]]:
 
 
 def _get(tid: str, eid: str) -> dict[str, Any] | None:
-    for j in _jobs(tid):
-        if str(j.get("id")) == eid:
-            return j
+    with _EXPORT_LOCK:
+        for j in _EXPORT.get(tid, []):
+            if str(j.get("id")) == eid:
+                return j
     return None
 
 
@@ -223,7 +224,6 @@ def register_routes(router: APIRouter) -> None:
         auth_data: dict[str, Any] = Depends(validate_authentication),
         background_tasks: BackgroundTasks = BackgroundTasks(),  # noqa: B008
     ) -> JSONResponse:
-        _ = tenant_slug
         if request.format not in ("csv", "json"):
             raise HTTPException(
                 status_code=400, detail="format must be 'csv' or 'json' (ndjson for json).",
@@ -262,6 +262,7 @@ def register_routes(router: APIRouter) -> None:
             "error": None,
             "request": pl,
             "downloadToken": tok,
+            "tenantSlug": tenant_slug,
             "contentType": (
                 "text/csv; charset=utf-8" if request.format == "csv" else "application/x-ndjson; charset=utf-8"
             ),
@@ -353,7 +354,7 @@ def register_routes(router: APIRouter) -> None:
         j0 = _get(tid, export_id)
         if not j0:
             raise HTTPException(status_code=404, detail="Export not found")
-        o = {k: v for k, v in j0.items() if k not in ("bytes", "downloadToken")}
+        o = {k: v for k, v in j0.items() if k not in ("bytes", "downloadToken", "tenantSlug")}
         o["downloadUrl"] = (
             f"/v1/repositories/{tenant_slug}/scan-reports/exports/{export_id}/content"
             f"?token={j0.get('downloadToken', '')}"
@@ -364,12 +365,15 @@ def register_routes(router: APIRouter) -> None:
     def download_scan_report_export(
         tenant_slug: str, export_id: str, token: str = Query(..., min_length=1)
     ) -> Response:
-        _ = tenant_slug
         t2, j0 = _find_by_token(export_id, token)
         if not t2 or not j0 or j0.get("downloadToken") != token:
             raise HTTPException(status_code=404, detail="Not found or invalid token")
+        # Verify the token belongs to the requested tenant to prevent cross-tenant access.
+        if j0.get("tenantSlug") and j0.get("tenantSlug") != tenant_slug:
+            raise HTTPException(status_code=404, detail="Not found or invalid token")
+        status0 = str(j0.get("status") or "")
         b0 = j0.get("bytes")
-        if b0 is None or (isinstance(b0, (bytes, bytearray)) and len(b0) == 0) or b0 is False:
+        if status0 != "completed" or b0 is None:
             raise HTTPException(
                 status_code=409, detail="Export is still building; call GET for status first.",
             )
@@ -401,7 +405,9 @@ def register_routes(router: APIRouter) -> None:
         j0["cancelled"] = True
         if s == "pending":
             j0["status"] = "cancelled"
-        return JSONResponse(status_code=200, content={"ok": True, "status": "cancelling"})
+        elif s == "running":
+            j0["status"] = "cancelling"
+        return JSONResponse(status_code=200, content={"ok": True, "status": j0["status"]})
 
     @router.post("/{tenant_slug}/scan-reports/exports/{export_id}:retry", status_code=202)
     def retry_scan_report_export(
@@ -410,7 +416,6 @@ def register_routes(router: APIRouter) -> None:
         auth_data: dict[str, Any] = Depends(validate_authentication),
         background_tasks: BackgroundTasks = BackgroundTasks(),  # noqa: B008
     ) -> JSONResponse:
-        _ = tenant_slug
         rr._require_repository_scope(auth_data, SCOPE)  # type: ignore[attr-defined]
         tid = str(auth_data["tenant_id"])
         old = _get(tid, export_id)
@@ -449,6 +454,7 @@ def register_routes(router: APIRouter) -> None:
             "error": None,
             "request": p0,
             "downloadToken": tok2,
+            "tenantSlug": tenant_slug,
             "contentType": (
                 "text/csv; charset=utf-8" if fmt0 == "csv" else "application/x-ndjson; charset=utf-8"
             ),

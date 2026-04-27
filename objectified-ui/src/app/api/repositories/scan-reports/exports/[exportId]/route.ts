@@ -40,7 +40,11 @@ export async function GET(_req: NextRequest, ctx: RouteCtx) {
     const response = await fetch(base, { headers: createRestAuthHeaders(auth.sessionUser) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      return NextResponse.json({ success: false, error: 'Not found' }, { status: response.status });
+      const errorMessage =
+        typeof (data as { detail?: string }).detail === 'string'
+          ? (data as { detail: string }).detail
+          : 'Failed to fetch scan report export';
+      return NextResponse.json({ success: false, error: errorMessage }, { status: response.status });
     }
     return NextResponse.json({ success: true, data });
   } catch (error) {
