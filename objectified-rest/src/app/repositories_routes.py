@@ -501,6 +501,10 @@ _REPO_SCAN_REPORT_STORE: Dict[str, List[Dict[str, Any]]] = {}
 # Per-tenant roll-up of corpus metrics for REPO-10.3 / #2949, refreshed on scan
 # report append, repository register, and repository delete.
 _REPO_CORPUS_ROLLUP: Dict[str, Dict[str, Any]] = {}
+# Per-repo snapshot of the latest scan report totals, updated in _append_scan_report_row
+# (under _STORE_LOCK). Used by _refresh_repository_corpus_rollup_unsafe to avoid
+# scanning the full scan-report list on every rollup, reducing lock hold time.
+_REPO_LATEST_REPORT_TOTALS: Dict[str, Dict[str, Any]] = {}
 _STORE_LOCK = Lock()
 _SYSTEM_ACTOR_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -1485,6 +1489,7 @@ def _append_scan_report_row(
     bucket.append(row)
     if len(bucket) > 200:
         bucket[:] = bucket[-200:]
+    _REPO_LATEST_REPORT_TOTALS[repository_id] = row["totalsJson"]
     try:
         _rollup_tid = _find_tenant_id_for_repository(repository_id)
     except ValueError:
@@ -1501,19 +1506,12 @@ def _refresh_repository_corpus_rollup_unsafe(tenant_id: str) -> Dict[str, Any]:
     parse_errors = 0
     manifest_errors = 0
     for repo in tenant_repos:
-        rlist = [r for r in _REPO_SCAN_REPORT_STORE.get(repo.id, []) if isinstance(r, dict)]
-        latest: Dict[str, Any] | None
-        if rlist:
-            latest = max(rlist, key=lambda r: str(r.get("generatedAt", "")))
-        else:
-            latest = None
-        if latest is not None:
-            tj = latest.get("totalsJson")
-            if isinstance(tj, dict):
-                importable_specs += int(tj.get("importable", 0) or 0)
-                awaiting_selection += int(tj.get("awaitingSelection", 0) or 0)
-                parse_errors += int(tj.get("parseError", 0) or 0)
-                manifest_errors += int(tj.get("manifestError", 0) or 0)
+        tj = _REPO_LATEST_REPORT_TOTALS.get(repo.id)
+        if isinstance(tj, dict):
+            importable_specs += int(tj.get("importable", 0) or 0)
+            awaiting_selection += int(tj.get("awaitingSelection", 0) or 0)
+            parse_errors += int(tj.get("parseError", 0) or 0)
+            manifest_errors += int(tj.get("manifestError", 0) or 0)
     payload: Dict[str, Any] = {
         "repositoriesTracked": repositories_tracked,
         "importableSpecs": importable_specs,
@@ -3267,6 +3265,7 @@ async def delete_repository(
             _REPO_SCAN_FILE_HISTORY_STORE.pop(scan.id, None)
         _REPO_CREDENTIAL_REF_STORE.pop(repository_id, None)
         _REPO_SCAN_REPORT_STORE.pop(repository_id, None)
+        _REPO_LATEST_REPORT_TOTALS.pop(repository_id, None)
         _refresh_repository_corpus_rollup_unsafe(tenant_id)
         _audit_row = _append_audit_row(
             tenant_id,

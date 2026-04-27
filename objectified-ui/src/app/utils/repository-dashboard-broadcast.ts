@@ -27,8 +27,10 @@ export function subscribeRepositoryCorpusStatsRefresh(onRefresh: () => void): ()
     return () => {};
   }
   const channel = new BroadcastChannel(REPOSITORY_DASHBOARD_BROADCAST);
-  channel.onmessage = () => {
-    onRefresh();
+  channel.onmessage = (event: MessageEvent) => {
+    if ((event.data as CorpusRefreshMessage)?.type === 'corpus-refresh') {
+      onRefresh();
+    }
   };
   return () => {
     channel.onmessage = null;

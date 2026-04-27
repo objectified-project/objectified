@@ -119,6 +119,7 @@ export default function ScanReportsPage() {
 
   const urlProvider = searchParams.get('provider') || 'all';
   const urlStatus = searchParams.get('status') || 'all';
+  const urlSubtype = searchParams.get('subtype') || '';
   const urlQ = searchParams.get('q') || '';
   const urlPage = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
   const [qDraft, setQDraft] = useState(urlQ);
@@ -305,7 +306,7 @@ export default function ScanReportsPage() {
                   label: 'Repositories',
                   sub: 'tracked',
                   match: () => urlStatus === 'all',
-                  onSelect: () => setQuery({ status: 'all', page: 1 }),
+                  onSelect: () => setQuery({ status: 'all', subtype: null, page: 1 }),
                 },
                 {
                   id: 'importable' as const,
@@ -313,7 +314,7 @@ export default function ScanReportsPage() {
                   label: 'Importable',
                   sub: 'specs',
                   match: () => urlStatus === 'importable',
-                  onSelect: () => setQuery({ status: 'importable', page: 1 }),
+                  onSelect: () => setQuery({ status: 'importable', subtype: null, page: 1 }),
                 },
                 {
                   id: 'awaiting' as const,
@@ -321,23 +322,23 @@ export default function ScanReportsPage() {
                   label: 'Awaiting',
                   sub: 'selection',
                   match: () => urlStatus === 'awaiting',
-                  onSelect: () => setQuery({ status: 'awaiting', page: 1 }),
+                  onSelect: () => setQuery({ status: 'awaiting', subtype: null, page: 1 }),
                 },
                 {
                   id: 'parse' as const,
                   stat: (c: RepositoryCorpusStats) => c.parseErrors,
                   label: 'Parse',
                   sub: 'errors',
-                  match: () => urlStatus === 'failing',
-                  onSelect: () => setQuery({ status: 'failing', page: 1 }),
+                  match: () => urlStatus === 'failing' && urlSubtype === 'parse',
+                  onSelect: () => setQuery({ status: 'failing', subtype: 'parse', page: 1 }),
                 },
                 {
                   id: 'manifest' as const,
                   stat: (c: RepositoryCorpusStats) => c.manifestErrors,
                   label: 'Manifest',
                   sub: 'errors',
-                  match: () => urlStatus === 'failing',
-                  onSelect: () => setQuery({ status: 'failing', page: 1 }),
+                  match: () => urlStatus === 'failing' && urlSubtype === 'manifest',
+                  onSelect: () => setQuery({ status: 'failing', subtype: 'manifest', page: 1 }),
                 },
               ] as const
             ).map((card) => {
@@ -420,7 +421,7 @@ export default function ScanReportsPage() {
                       <button
                         type="button"
                         key={p.id}
-                        onClick={() => setQuery({ status: p.id, page: 1 })}
+                        onClick={() => setQuery({ status: p.id, subtype: null, page: 1 })}
                         aria-pressed={active}
                         className={cn(
                           'px-3 py-1.5 text-sm rounded-md border transition-colors',
