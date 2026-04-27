@@ -152,6 +152,8 @@ class RepositoryFileRecord(BaseModel):
     scanId: str
     path: str
     blobSha: str | None = None
+    contentAlgo: str | None = None
+    contentChecksum: str | None = None
     sizeBytes: int | None = None
     format: str | None = None
     confidence: float | None = None
@@ -281,6 +283,8 @@ RepositoryAuditEvent = Literal[
 
 _DEFAULT_SCAN_PAGE_SIZE = 50
 _MAX_SCAN_PAGE_SIZE = 200
+_CONTENT_CHECKSUM_ALGO = "sha256"
+_CONTENT_CHECKSUM_SHORT_LEN = 12
 _SLUG_SANITIZER = re.compile(r"[^a-z0-9]+")
 _VERSION_SHA_SANITIZER = re.compile(r"[^a-z0-9]+")
 _MANIFEST_PROJECT_AUTO_CREATE_FLAG_KEYS = (
@@ -368,6 +372,67 @@ def _empty_scan_diff_summary() -> Dict[str, int]:
     return {"added": 0, "modified": 0, "removed": 0, "unchanged": 0}
 
 
+def _normalize_content_checksum(raw: Any) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    normalized = raw.strip().lower()
+    if len(normalized) != 64:
+        return None
+    if not all(ch in "0123456789abcdef" for ch in normalized):
+        return None
+    return normalized
+
+
+def _normalize_content_algo(raw: Any, *, has_checksum: bool) -> str | None:
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip().lower()
+    if has_checksum:
+        return _CONTENT_CHECKSUM_ALGO
+    return None
+
+
+def _short_checksum(checksum: str | None, length: int = _CONTENT_CHECKSUM_SHORT_LEN) -> str | None:
+    if not checksum:
+        return None
+    normalized = checksum.strip().lower()
+    if not normalized:
+        return None
+    return normalized[:length]
+
+
+def _build_hashed_event_log_entries(files: Sequence[RepositoryFileRecord], *, at: str) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for file_row in files:
+        short_checksum = _short_checksum(file_row.contentChecksum)
+        if short_checksum is None:
+            continue
+        rows.append(
+            {
+                "type": "repository.scan.hashed",
+                "at": at,
+                "path": file_row.path,
+                "content_algo": file_row.contentAlgo or _CONTENT_CHECKSUM_ALGO,
+                "content_checksum_short": short_checksum,
+            }
+        )
+    return rows
+
+
+def _reuse_checksum_from_previous_scan(current: RepositoryFileRecord, previous: RepositoryFileRecord) -> RepositoryFileRecord:
+    if current.contentChecksum:
+        return current
+    if not current.blobSha or current.blobSha != previous.blobSha:
+        return current
+    if not previous.contentChecksum:
+        return current
+    return current.model_copy(
+        update={
+            "contentAlgo": previous.contentAlgo or _CONTENT_CHECKSUM_ALGO,
+            "contentChecksum": previous.contentChecksum,
+        }
+    )
+
+
 def _first_duplicate(items: List[str]) -> Optional[str]:
     """Return the first duplicate value in *items*, or ``None`` if all are unique."""
     seen: set[str] = set()
@@ -418,6 +483,7 @@ def _classify_scan_files_against_previous(
         elif current.blobSha == previous.blobSha:
             next_status = "unchanged"
             summary["unchanged"] += 1
+            current = _reuse_checksum_from_previous_scan(current, previous)
         else:
             next_status = "modified"
             summary["modified"] += 1
@@ -564,6 +630,8 @@ def _fetch_github_scan_inputs(repository: RepositoryRecord, branch: str) -> Tupl
             {
                 "path": path,
                 "blobSha": entry.get("sha") if isinstance(entry.get("sha"), str) else None,
+                "contentAlgo": None,
+                "contentChecksum": None,
                 "sizeBytes": entry.get("size") if isinstance(entry.get("size"), int) else None,
             }
         )
@@ -588,6 +656,8 @@ def _build_scan_file_rows(
         manifest_spec = manifest_specs_by_path.get(path)
         mapping = resolve_repository_file_mapping(path, manifest_spec)
         settings_json = dict(mapping.settings_json or {})
+        content_checksum = _normalize_content_checksum(item.get("contentChecksum"))
+        content_algo = _normalize_content_algo(item.get("contentAlgo"), has_checksum=content_checksum is not None)
         if mapping.on_breaking_change is not None:
             settings_json["onBreakingChange"] = mapping.on_breaking_change
         rows.append(
@@ -597,6 +667,8 @@ def _build_scan_file_rows(
                 scanId=scan_id,
                 path=path,
                 blobSha=item.get("blobSha"),
+                contentChecksum=content_checksum,
+                contentAlgo=content_algo,
                 sizeBytes=item.get("sizeBytes"),
                 format=_guess_scan_format(path),
                 confidence=0.9 if _guess_scan_format(path) else 0.2,
@@ -739,7 +811,11 @@ def _process_single_pending_repository_scan(
                 "filesClassified": len(classified_files),
                 "filesUnknown": sum(1 for row in classified_files if not row.format),
                 "filesFailed": 0,
-                "eventLog": [*history[scan_index].eventLog, {"type": "repository.scan.complete", "at": now}],
+                "eventLog": [
+                    *history[scan_index].eventLog,
+                    *_build_hashed_event_log_entries(classified_files, at=now),
+                    {"type": "repository.scan.complete", "at": now},
+                ],
                 "diffSummary": diff_summary,
             }
         )
@@ -1120,6 +1196,8 @@ def _build_diff_snapshot(file_row: RepositoryFileRecord) -> Dict[str, Any]:
         "path": file_row.path,
         "status": file_row.status,
         "blobSha": file_row.blobSha,
+                    "contentAlgo": file_row.contentAlgo,
+                    "contentChecksum": file_row.contentChecksum,
         "format": file_row.format,
         "tracked": file_row.tracked,
     }
@@ -2212,6 +2290,8 @@ def _complete_repository_scan_for_tests(
             else:
                 project_slug_value = None
 
+            content_checksum = _normalize_content_checksum(item.get("contentChecksum"))
+            content_algo = _normalize_content_algo(item.get("contentAlgo"), has_checksum=content_checksum is not None)
             current_files.append(
                 RepositoryFileRecord(
                     id=str(uuid4()),
@@ -2219,6 +2299,8 @@ def _complete_repository_scan_for_tests(
                     scanId=scan_id,
                     path=normalized_path,
                     blobSha=item.get("blobSha"),
+                    contentChecksum=content_checksum,
+                    contentAlgo=content_algo,
                     sizeBytes=item.get("sizeBytes"),
                     format=item.get("format"),
                     confidence=item.get("confidence"),
@@ -2276,7 +2358,11 @@ def _complete_repository_scan_for_tests(
                 "filesClassified": len(classified_files),
                 "filesUnknown": 0,
                 "filesFailed": 0,
-                "eventLog": [*target_scan.eventLog, {"type": "repository.scan.complete", "at": now}],
+                "eventLog": [
+                    *target_scan.eventLog,
+                    *_build_hashed_event_log_entries(classified_files, at=now),
+                    {"type": "repository.scan.complete", "at": now},
+                ],
                 "diffSummary": diff_summary,
             }
         )

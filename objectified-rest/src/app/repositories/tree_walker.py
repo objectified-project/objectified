@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
+import hashlib
 from inspect import isawaitable
-from typing import Any, AsyncIterator, Callable, Sequence
+from typing import Any, AsyncIterator, Callable, Iterable, Sequence
 
 from .providers import RepoRef, RepositoryProvider, RepositoryProviderError, RepositoryProviderErrorCode, TreeEntry
 
 WorkflowAuditEmitter = Callable[[str, dict[str, Any]], Any]
+CONTENT_CHECKSUM_ALGO_SHA256 = "sha256"
+DEFAULT_SNIFF_BYTES = 64 * 1024
 
 DEFAULT_SCAN_IGNORE_PATTERNS: tuple[str, ...] = (
     "**/.git/**",
@@ -36,6 +39,42 @@ class ScanLimit:
             raise ValueError("max_files must be >= 1 when provided")
         if self.max_bytes is not None and self.max_bytes < 1:
             raise ValueError("max_bytes must be >= 1 when provided")
+
+
+@dataclass(frozen=True)
+class HashedContent:
+    algo: str
+    checksum: str
+    sniff_prefix: bytes
+
+
+def hash_streamed_bytes(
+    chunks: Iterable[bytes],
+    *,
+    sniff_limit_bytes: int = DEFAULT_SNIFF_BYTES,
+    algo: str = CONTENT_CHECKSUM_ALGO_SHA256,
+) -> HashedContent:
+    """Hash file bytes while retaining only a small sniff prefix."""
+    if sniff_limit_bytes < 0:
+        raise ValueError("sniff_limit_bytes must be >= 0")
+    normalized_algo = algo.strip().lower()
+    if normalized_algo != CONTENT_CHECKSUM_ALGO_SHA256:
+        raise ValueError(f"unsupported content checksum algorithm: {algo}")
+
+    hasher = hashlib.sha256()
+    sniff_prefix = bytearray()
+    for chunk in chunks:
+        if not chunk:
+            continue
+        hasher.update(chunk)
+        remaining = sniff_limit_bytes - len(sniff_prefix)
+        if remaining > 0:
+            sniff_prefix.extend(chunk[:remaining])
+    return HashedContent(
+        algo=CONTENT_CHECKSUM_ALGO_SHA256,
+        checksum=hasher.hexdigest(),
+        sniff_prefix=bytes(sniff_prefix),
+    )
 
 
 async def walk_repository_tree(
