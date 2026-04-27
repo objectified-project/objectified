@@ -6760,6 +6760,73 @@ class Database:
                 return
             _logger.debug("notify_repository_attention: %s", e)
 
+    def list_repository_attention_for_tenant(
+        self, tenant_id: str, limit: int
+    ) -> Tuple[List[Dict[str, Any]], int, int]:
+        """
+        REPO-11.2 / #2942: top attention rows for a tenant (score > 0), one round-trip to PostgreSQL.
+        Returns (rows, total_tracked, needing_attention_count).
+        """
+        try:
+            conn = self.connect()
+        except Exception as e:
+            _logger.debug("list_repository_attention_for_tenant connect: %s", e)
+            return [], 0, 0
+        out_rows: List[Dict[str, Any]] = []
+        total_tracked = 0
+        needing = 0
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as c:
+                c.execute(
+                    """
+                    SELECT
+                      (SELECT count(*)::int
+                       FROM odb.repository r
+                       WHERE r.tenant_id = %s::uuid
+                         AND r.archived_at IS NULL) AS total_tracked,
+                      (SELECT count(*)::int
+                       FROM odb.repository_attention ra
+                       INNER JOIN odb.repository r ON r.id = ra.repository_id
+                       WHERE r.tenant_id = %s::uuid
+                         AND r.archived_at IS NULL
+                         AND ra.attention_score > 0) AS needing_count
+                    """,
+                    (tenant_id, tenant_id),
+                )
+                count_row = c.fetchone()
+                if count_row is not None:
+                    total_tracked = int(count_row.get("total_tracked") or 0)
+                    needing = int(count_row.get("needing_count") or 0)
+                c.execute(
+                    """
+                    SELECT
+                      ra.repository_id,
+                      ra.reasons,
+                      ra.open_count,
+                      ra.attention_score,
+                      ra.last_change_at,
+                      r.owner,
+                      r.name
+                    FROM odb.repository_attention ra
+                    INNER JOIN odb.repository r ON r.id = ra.repository_id
+                    WHERE r.tenant_id = %s::uuid
+                      AND r.archived_at IS NULL
+                      AND ra.attention_score > 0
+                    ORDER BY ra.attention_score DESC, ra.last_change_at DESC
+                    LIMIT %s
+                    """,
+                    (tenant_id, int(limit)),
+                )
+                for row in c.fetchall() or []:
+                    out_rows.append(dict(row))
+        except Exception as e:
+            _s = str(e).lower()
+            if "42p01" in _s or "does not exist" in _s or "undefinedtable" in _s:
+                return [], 0, 0
+            _logger.debug("list_repository_attention_for_tenant: %s", e)
+            return [], 0, 0
+        return out_rows, total_tracked, needing
+
 
 # Global database instance
 db = Database()

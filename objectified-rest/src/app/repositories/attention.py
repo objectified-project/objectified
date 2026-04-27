@@ -113,3 +113,33 @@ def compute_attention_row(inp: AttentionComputeInput) -> Tuple[Set[str], int, in
     open_count = len(open_paths)
     score = compute_attention_score(ordered)
     return set(ordered), open_count, score
+
+
+def top_reason_for_chips(valid_reasons: Sequence[str]) -> str:
+    """Pick the single reason to show as the row chip: highest weight, then lexicographic tie-break."""
+    best: str | None = None
+    best_w = -1
+    for r in valid_reasons:
+        w = REASON_WEIGHTS.get(r, 0)
+        if w > best_w or (w == best_w and best is not None and r < best):
+            best = r
+            best_w = w
+    if best is not None:
+        return best
+    if valid_reasons:
+        return str(sorted(valid_reasons)[0])
+    return "unknown"
+
+
+def attention_detail_query_tab(valid_reasons: Sequence[str]) -> str:
+    """`tab` query value for repository deep links (REPO-11.2 / #2942; Issues tab is REPO-11.4)."""
+    r = {x for x in valid_reasons if x in _VALID_REASONS}
+    if "stale_checksum" in r:
+        return "specs"
+    if r & {"parse_error", "manifest_error", "import_failed"}:
+        return "files"
+    if "token_revoked" in r or "scheduler_paused" in r:
+        return "settings"
+    if "repeated_failures" in r:
+        return "scans"
+    return "files"

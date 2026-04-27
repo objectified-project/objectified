@@ -8,8 +8,10 @@ from app.repositories.attention import (
     AttentionFileInput,
     REASON_WEIGHTS,
     STALE_CHECKSUM_AGE,
+    attention_detail_query_tab,
     compute_attention_row,
     compute_attention_score,
+    top_reason_for_chips,
 )
 
 
@@ -94,3 +96,15 @@ def test_stale_checksum_only_after_24h_ready_to_promote() -> None:
     )
     assert "stale_checksum" not in rsn2
     assert ocnt2 == 0
+
+
+def test_top_reason_for_chips_prefers_highest_weight() -> None:
+    assert top_reason_for_chips(["stale_checksum", "token_revoked"]) == "token_revoked"
+    assert top_reason_for_chips(["parse_error", "manifest_error"]) == "manifest_error"
+
+
+def test_attention_detail_query_tab() -> None:
+    assert attention_detail_query_tab(["stale_checksum", "parse_error"]) == "specs"
+    assert attention_detail_query_tab(["parse_error"]) == "files"
+    assert attention_detail_query_tab(["token_revoked"]) == "settings"
+    assert attention_detail_query_tab(["repeated_failures"]) == "scans"
