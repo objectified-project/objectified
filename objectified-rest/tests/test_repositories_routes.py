@@ -2407,6 +2407,41 @@ def test_repository_attention_shape_and_tenant_rollup() -> None:
         assert "lastChangeAt" in it
 
 
+def test_repository_attention_full_name_uses_rid_when_owner_or_name_missing() -> None:
+    """Regression: fullName must not produce 'owner/' or '/name' when one part is absent."""
+    fake_rows = [
+        {
+            "repository_id": "repo-only-owner",
+            "owner": "myorg",
+            "name": "",
+            "reasons": ["parse_error"],
+            "open_count": 1,
+            "attention_score": 20,
+            "last_change_at": "2025-01-01T00:00:00+00:00",
+        },
+        {
+            "repository_id": "repo-only-name",
+            "owner": "",
+            "name": "myrepo",
+            "reasons": ["parse_error"],
+            "open_count": 1,
+            "attention_score": 20,
+            "last_change_at": "2025-01-01T00:00:00+00:00",
+        },
+    ]
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    try:
+        with patch("app.dashboard_routes.db") as mdb:
+            mdb.list_repository_attention_for_tenant.return_value = (fake_rows, 2, 2)
+            r = client.get(f"/v1/dashboard/{_TENANT_SLUG}/repository_attention?limit=5")
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+    assert r.status_code == 200, r.text
+    items = {it["repositoryId"]: it["fullName"] for it in r.json()["items"]}
+    assert items["repo-only-owner"] == "myorg"
+    assert items["repo-only-name"] == "myrepo"
+
+
 def test_repository_corpus_stats_matches_latest_scan_rollup() -> None:
     app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
     try:

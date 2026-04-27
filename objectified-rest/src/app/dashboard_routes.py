@@ -91,7 +91,7 @@ async def read_repository_attention(
         rid = str(row.get("repository_id", "") or row.get("repositoryId", ""))
         owner = str(row.get("owner", "") or "")
         name = str(row.get("name", "") or "")
-        full = f"{owner}/{name}" if owner or name else rid
+        full = f"{owner}/{name}" if (owner and name) else (owner or name or rid)
         raw_reasons = row.get("reasons") or []
         if isinstance(raw_reasons, (list, tuple)):
             reasons = [str(x) for x in raw_reasons]
