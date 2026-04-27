@@ -273,6 +273,31 @@ test.describe('REPO-9.4 — Specs tab', () => {
         importEnabled?: boolean;
         autoImportEnabled?: boolean;
       };
+      for (const fileId of body.fileIds) {
+        const current = state.get(fileId);
+        if (!current) {
+          await route.fulfill({
+            status: 404,
+            contentType: 'application/json',
+            body: JSON.stringify({ success: false, error: 'not found' }),
+          });
+          return;
+        }
+        if (body.autoImportEnabled === true && body.importEnabled === undefined && !current.importEnabled) {
+          await route.fulfill({
+            status: 400,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              success: false,
+              detail: {
+                code: 'SELECTION_INVARIANT_VIOLATION',
+                message: 'autoImportEnabled cannot be true when importEnabled is false',
+              },
+            }),
+          });
+          return;
+        }
+      }
       const updated: MockSpec[] = [];
       for (const fileId of body.fileIds) {
         const current = state.get(fileId);
@@ -334,6 +359,32 @@ test.describe('REPO-9.4 — Specs tab', () => {
     await page.getByTestId('spec-bulk-enable-import').click();
     await expect(page.getByTestId('spec-import-toggle-openapi/legacy.yaml')).toBeChecked();
     await expect(page.getByTestId('spec-import-toggle-asyncapi/orders.yaml')).toBeChecked();
+  });
+
+  test('REPO-9.7 — set auto-import is only enabled when all selected have import on', async ({ page }) => {
+    await login(page);
+    if (page.url().includes('/login')) {
+      test.skip(true);
+      return;
+    }
+    await page.goto(`/ade/dashboard/repositories/${repositoryId}?tab=specs`);
+    await page.getByTestId('spec-row-select-openapi/orders-v3.yaml').click();
+    await page.getByTestId('spec-row-select-openapi/legacy.yaml').click();
+    await expect(page.getByTestId('spec-bulk-set-auto')).toBeDisabled();
+  });
+
+  test('REPO-9.7 — bulk disable import for an already-imported file asks for confirmation', async ({ page }) => {
+    await login(page);
+    if (page.url().includes('/login')) {
+      test.skip(true);
+      return;
+    }
+    await page.goto(`/ade/dashboard/repositories/${repositoryId}?tab=specs`);
+    await page.getByTestId('spec-row-select-openapi/orders-v3.yaml').click();
+    await page.getByTestId('spec-bulk-disable-import').click();
+    await expect(page.getByText('Disable import for selected files?')).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: 'Disable import' }).click();
+    await expect(page.getByTestId('spec-import-toggle-openapi/orders-v3.yaml')).not.toBeChecked();
   });
 
   test('Import Now overflow action surfaces a success notification', async ({ page }) => {
