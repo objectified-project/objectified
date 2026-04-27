@@ -1785,7 +1785,10 @@ def test_patch_specs_enforces_selection_invariant_and_writes_audit() -> None:
     new_selection_audits = [
         row for row in audit_rows[audit_baseline:] if row["eventType"] == "repository.spec.selection_changed"
     ]
-    assert len(new_selection_audits) == 3
+    # Two PATCHes that each toggle both fields produce four field-level audits:
+    # (False -> True) for import_enabled and auto_import_enabled, then (True -> False) for both
+    # when the atomic auto-import disable kicks in alongside importEnabled=False.
+    assert len(new_selection_audits) == 4
     assert {row["detail"]["field"] for row in new_selection_audits} == {"import_enabled", "auto_import_enabled"}
 
 
@@ -1853,3 +1856,93 @@ def test_bulk_update_specs_is_transactional_and_capped() -> None:
     assert after_valid["apis/a.yaml"]["autoImportEnabled"] is True
     assert after_valid["apis/b.yaml"]["importEnabled"] is True
     assert after_valid["apis/b.yaml"]["autoImportEnabled"] is True
+
+
+def test_list_specs_exposes_confidence_and_supports_min_confidence_filter() -> None:
+    """REPO-9.4: spec listings expose sniffer confidence/discriminator and
+    support a minimum-confidence filter so the ADE Specs tab can hide rows
+    the walker did not classify."""
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000064",
+                "provider": "github",
+                "owner": "acme",
+                "name": "spec-confidence",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="confidence-seed",
+            files=[
+                {
+                    "path": "apis/high.yaml",
+                    "blobSha": "1",
+                    "tracked": True,
+                    "format": "openapi_3_1",
+                    "confidence": 0.9,
+                    "discriminator": "openapi: 3.1.0",
+                },
+                {
+                    "path": "apis/medium.yaml",
+                    "blobSha": "2",
+                    "tracked": True,
+                    "format": "openapi_3_0",
+                    "confidence": 0.6,
+                    "discriminator": "openapi: 3.0",
+                },
+                {
+                    "path": "apis/low.yaml",
+                    "blobSha": "3",
+                    "tracked": False,
+                    "format": "json_schema",
+                    "confidence": 0.3,
+                },
+                {
+                    "path": "apis/missing.yaml",
+                    "blobSha": "4",
+                    "tracked": False,
+                },
+            ],
+        )
+
+        unfiltered = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs",
+            params={"branch": "main"},
+        )
+        importable_only = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs",
+            params={"branch": "main", "min_confidence": 0.5},
+        )
+        invalid_threshold = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs",
+            params={"branch": "main", "min_confidence": 1.5},
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert unfiltered.status_code == 200
+    unfiltered_paths = {row["path"] for row in unfiltered.json()["items"]}
+    assert unfiltered_paths == {
+        "apis/high.yaml",
+        "apis/medium.yaml",
+        "apis/low.yaml",
+        "apis/missing.yaml",
+    }
+    high_row = next(row for row in unfiltered.json()["items"] if row["path"] == "apis/high.yaml")
+    assert high_row["confidence"] == 0.9
+    assert high_row["discriminator"] == "openapi: 3.1.0"
+    assert high_row["lastImportedAt"] is None
+
+    assert importable_only.status_code == 200
+    importable_paths = sorted(row["path"] for row in importable_only.json()["items"])
+    assert importable_paths == ["apis/high.yaml", "apis/medium.yaml"]
+
+    assert invalid_threshold.status_code == 422

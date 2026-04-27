@@ -267,10 +267,13 @@ class RepositorySpecRecord(BaseModel):
     branch: str
     path: str
     format: str | None = None
+    confidence: float | None = None
+    discriminator: str | None = None
     status: RepositorySpecSelectionStatus
     importEnabled: bool
     autoImportEnabled: bool
     lastImportedVersionId: str | None = None
+    lastImportedAt: str | None = None
     createdAt: str
 
 
@@ -1233,9 +1236,11 @@ def _build_repository_spec_record(
     latest_import_job: RepositoryImportJobRecord | None,
 ) -> RepositorySpecRecord:
     status = _derive_repository_spec_status(file_row, latest_import_job)
-    last_imported_version_id = None
+    last_imported_version_id: str | None = None
+    last_imported_at: str | None = None
     if latest_import_job is not None and latest_import_job.state == "committed":
         last_imported_version_id = latest_import_job.targetVersionId
+        last_imported_at = latest_import_job.createdAt
     return RepositorySpecRecord(
         fileId=file_row.id,
         repositoryId=file_row.repositoryId,
@@ -1243,10 +1248,13 @@ def _build_repository_spec_record(
         branch=branch,
         path=file_row.path,
         format=file_row.format,
+        confidence=file_row.confidence,
+        discriminator=file_row.discriminator,
         status=status,
         importEnabled=file_row.importEnabled,
         autoImportEnabled=file_row.autoImportEnabled,
         lastImportedVersionId=last_imported_version_id,
+        lastImportedAt=last_imported_at,
         createdAt=file_row.createdAt,
     )
 
@@ -2411,6 +2419,7 @@ async def list_repository_specs(
     branch: str | None = Query(default=None),
     status: RepositorySpecSelectionStatus | None = Query(default=None),
     search: str | None = Query(default=None),
+    min_confidence: float | None = Query(default=None, ge=0.0, le=1.0),
     limit: int = Query(default=_DEFAULT_SCAN_PAGE_SIZE, ge=1, le=_MAX_SCAN_PAGE_SIZE),
     cursor: str | None = Query(default=None),
 ) -> RepositorySpecPage:
@@ -2453,6 +2462,10 @@ async def list_repository_specs(
             effective_branch,
             latest_jobs.get(file_row.path),
         )
+        if min_confidence is not None:
+            row_confidence = spec_row.confidence
+            if row_confidence is None or row_confidence < min_confidence:
+                continue
         if status is not None and spec_row.status != status:
             continue
         if normalized_search and normalized_search not in spec_row.path.lower():
@@ -2610,7 +2623,7 @@ async def bulk_update_repository_spec_selection(
                 latest_jobs = _latest_import_jobs_by_path(repository_id, branch_name)
                 latest_jobs_by_branch[branch_name] = latest_jobs
             if changes:
-                changed_file_ids.add(updated_row.file_id)
+                changed_file_ids.add(updated_row.id)
             response_items.append(
                 _build_repository_spec_record(updated_row, branch_name, latest_jobs.get(updated_row.path))
             )
