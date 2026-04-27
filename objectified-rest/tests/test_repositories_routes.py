@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,8 +7,10 @@ from fastapi.testclient import TestClient
 from app.auth import validate_authentication
 from app.main import app
 from app.repositories_routes import (
+    RepositoryFileRecord,
     _build_repository_sync_change_report_for_test_status,
     _complete_repository_scan_for_tests,
+    _dispatch_import_jobs_for_scan,
     _get_repository_audit_rows_for_tests,
     _get_repository_change_reports_for_tests,
     _get_repository_import_jobs_for_tests,
@@ -514,10 +517,22 @@ def test_complete_scan_classifies_files_and_writes_diff_summary():
     assert next_scan_response.status_code == 200
 
     assert first_completed.status == "complete"
-    assert first_completed.diffSummary == {"added": 2, "modified": 0, "removed": 0, "unchanged": 0}
+    assert first_completed.diffSummary == {
+        "added": 2,
+        "modified": 0,
+        "removed": 0,
+        "unchanged": 0,
+        "skipped_unchanged_by_checksum": 0,
+    }
 
     assert second_completed.status == "complete"
-    assert second_completed.diffSummary == {"added": 1, "modified": 1, "removed": 1, "unchanged": 0}
+    assert second_completed.diffSummary == {
+        "added": 1,
+        "modified": 1,
+        "removed": 1,
+        "unchanged": 0,
+        "skipped_unchanged_by_checksum": 0,
+    }
 
     assert files_response.status_code == 200
     by_path = {row["path"]: row for row in files_response.json()["items"]}
@@ -714,6 +729,133 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
         "repository.sync_failed",
         "repository.scanned",
     ]
+
+
+def test_checksum_matched_modified_file_skips_dispatch_and_updates_diff_summary() -> None:
+    file_row = RepositoryFileRecord(
+        id="11111111-1111-1111-1111-111111111111",
+        repositoryId="22222222-2222-2222-2222-222222222222",
+        scanId="33333333-3333-3333-3333-333333333333",
+        path="apis/orders.yaml",
+        blobSha="new-blob-sha",
+        contentAlgo="sha256",
+        contentChecksum="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        tracked=True,
+        projectSlug="payments",
+        versionStrategy="commit-sha",
+        status="modified",
+        createdAt="2026-04-26T00:00:00Z",
+    )
+    diff_summary = {
+        "added": 0,
+        "modified": 1,
+        "removed": 0,
+        "unchanged": 0,
+        "skipped_unchanged_by_checksum": 0,
+    }
+
+    with patch("app.repositories_routes.db") as mdb:
+        mdb.get_project_by_slug.return_value = {"id": "44444444-4444-4444-4444-444444444444"}
+        mdb.get_latest_repository_source_checksum_for_project.return_value = (
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        )
+        audit_rows = _dispatch_import_jobs_for_scan(
+            tenant_id=_MOCK_AUTH["tenant_id"],
+            repository_id=file_row.repositoryId,
+            scan_id=file_row.scanId,
+            branch="main",
+            commit_sha="commit-second",
+            scan_files=[file_row],
+            actor_id=_MOCK_AUTH["user_id"],
+            force=False,
+            diff_summary=diff_summary,
+        )
+
+    assert _get_repository_import_jobs_for_tests(file_row.repositoryId) == []
+    assert file_row.status == "unchanged_checksum"
+    assert file_row.lastImportJobId is None
+    assert diff_summary["modified"] == 0
+    assert diff_summary["skipped_unchanged_by_checksum"] == 1
+    assert len(audit_rows) == 1
+    assert audit_rows[0]["eventType"] == "repository.scan.skipped_checksum"
+    assert audit_rows[0]["detail"]["path"] == "apis/orders.yaml"
+    assert audit_rows[0]["detail"]["contentChecksumShort"] == "aaaaaaaaaaaa"
+
+
+def test_force_scan_ignores_checksum_skip_and_dispatches_modified_file() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000044",
+                "provider": "github",
+                "owner": "acme",
+                "name": "checksum-force-override",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        first_scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            first_scan_id,
+            commit_sha="commit-first",
+            files=[
+                {
+                    "path": "apis/orders.yaml",
+                    "blobSha": "111",
+                    "contentAlgo": "sha256",
+                    "contentChecksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "tracked": True,
+                    "projectSlug": "payments",
+                }
+            ],
+        )
+
+        next_scan_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans",
+            json={"branch": "main", "force": True},
+        )
+        second_scan_id = next_scan_response.json()["id"]
+        with patch("app.repositories_routes.db") as mdb:
+            mdb.get_project_by_slug.return_value = {"id": "55555555-5555-5555-5555-555555555555"}
+            mdb.get_latest_repository_source_checksum_for_project.return_value = (
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            )
+            second_completed = _complete_repository_scan_for_tests(
+                repository_id,
+                second_scan_id,
+                commit_sha="commit-second",
+                files=[
+                    {
+                        "path": "apis/orders.yaml",
+                        "blobSha": "999",
+                        "contentAlgo": "sha256",
+                        "contentChecksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                        "tracked": True,
+                        "projectSlug": "payments",
+                    }
+                ],
+            )
+        second_scan_files = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{second_scan_id}/files",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert next_scan_response.status_code == 200
+    assert second_scan_files.status_code == 200
+
+    second_scan_jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == second_scan_id]
+    assert len(second_scan_jobs) == 1
+    assert second_scan_jobs[0].diffSnapshot["path"] == "apis/orders.yaml"
+
+    only_file = second_scan_files.json()["items"][0]
+    assert only_file["status"] == "modified"
+    assert second_completed.diffSummary["modified"] == 1
+    assert second_completed.diffSummary["skipped_unchanged_by_checksum"] == 0
 
 
 def test_sync_history_routes_persist_conflict_resolution_on_import_job_event_log() -> None:
