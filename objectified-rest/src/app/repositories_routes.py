@@ -34,6 +34,13 @@ from .repositories.manifest import (
     parse_repo_manifest,
     resolve_repository_file_mapping,
 )
+from .repositories.spec_detail import (
+    MAX_INLINE_PREVIEW_BYTES,
+    derive_lint_summary,
+    empty_lint_summary,
+    provider_blob_url,
+    provider_raw_url,
+)
 
 router = APIRouter(prefix="/v1/repositories", tags=["repositories"])
 
@@ -315,6 +322,57 @@ class RepositorySpecImportNowResponse(BaseModel):
     importJobId: str
 
 
+class RepositorySpecLintSummary(BaseModel):
+    errors: int = 0
+    warnings: int = 0
+    info: int = 0
+    sourceImportJobId: str | None = None
+    derivedFrom: Literal["none", "import_job", "import_job_change_report"] = "none"
+
+
+class RepositorySpecImportSummary(BaseModel):
+    id: str
+    state: ImportJobStatus
+    sourceKind: RepositoryImportJobSourceKind
+    operation: ImportJobOperation
+    branch: str
+    createdAt: str
+    conflictCount: int
+    targetVersionId: str | None = None
+    targetProjectSlug: str | None = None
+    changeReportId: str | None = None
+    lintSummary: RepositorySpecLintSummary
+
+
+class RepositorySpecDetailResponse(BaseModel):
+    spec: RepositorySpecRecord
+    branch: str
+    path: str
+    fullName: str
+    provider: Literal["github"]
+    providerWebUrl: str | None = None
+    providerRawUrl: str | None = None
+    recentImports: List[RepositorySpecImportSummary]
+    lintSummary: RepositorySpecLintSummary
+
+
+class RepositorySpecContentResponse(BaseModel):
+    fileId: str
+    repositoryId: str
+    branch: str
+    path: str
+    format: str | None = None
+    encoding: Literal["utf-8", "base64"]
+    content: str | None = None
+    sizeBytes: int | None = None
+    truncated: bool = False
+    tooLargeForPreview: bool = False
+    maxInlineBytes: int = MAX_INLINE_PREVIEW_BYTES
+    contentChecksum: str | None = None
+    providerRawUrl: str | None = None
+    fetchedAt: str
+
+
 class RepositoryResolvedProjectRecord(BaseModel):
     id: str
     tenantId: str
@@ -348,6 +406,12 @@ _REPO_PROJECT_STORE: Dict[str, Dict[str, RepositoryResolvedProjectRecord]] = {}
 _REPO_VERSION_STORE: Dict[str, Dict[str, Dict[str, RepositoryResolvedVersionRecord]]] = {}
 # (repository_id, file_id, branch) -> (import_job_id, monotonic_timestamp) for 30s idempotency (REPO-9.5)
 _REPO_IMPORT_NOW_IDEMPOTENCY: Dict[Tuple[str, str, str], Tuple[str, float]] = {}
+# (repository_id, file_id) -> raw bytes used by the spec-detail content
+# endpoint (REPO-9.6). Tests seed entries here via
+# ``_seed_repository_file_content_for_tests`` so unit tests don't need to
+# stub the GitHub Contents API; production path falls back to the live
+# provider fetch when no entry is present.
+_REPO_FILE_CONTENT_STORE: Dict[Tuple[str, str], bytes] = {}
 _STORE_LOCK = Lock()
 _SYSTEM_ACTOR_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -1989,6 +2053,136 @@ def _find_import_job_for_repository(repository_id: str, import_job_id: str) -> R
     return None
 
 
+def _find_change_report_for_import_job(repository_id: str, import_job_id: str) -> RepositorySyncChangeReportRecord | None:
+    for report in _REPO_CHANGE_REPORT_STORE.get(repository_id, []):
+        if report.importJobId == import_job_id:
+            return report
+    return None
+
+
+def _find_repository_file_row(
+    repository_id: str,
+    file_id: str,
+) -> Tuple[RepositoryFileRecord, RepositoryScanRecord] | None:
+    """Find the ``RepositoryFileRecord`` for ``file_id`` and the scan that owns it.
+
+    Walks the per-repository scan history newest-first; spec detail lookups
+    almost always target the latest scan, so this short-circuits quickly.
+    """
+    scans = _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
+    for scan in scans:
+        for file_row in _REPO_SCAN_FILE_HISTORY_STORE.get(scan.id, []):
+            if file_row.id == file_id:
+                return file_row, scan
+    return None
+
+
+def _build_spec_import_summary(
+    *,
+    job: RepositoryImportJobRecord,
+    repository_id: str,
+) -> RepositorySpecImportSummary:
+    change_report = _find_change_report_for_import_job(repository_id, job.id)
+    change_model = change_report.changeModelJson if change_report is not None else None
+    summary = derive_lint_summary(job=job.model_dump(), change_model=change_model)
+    return RepositorySpecImportSummary(
+        id=job.id,
+        state=job.state,
+        sourceKind=job.sourceKind,
+        operation=job.operation,
+        branch=job.branch,
+        createdAt=job.createdAt,
+        conflictCount=len(job.conflictRecords or []),
+        targetVersionId=job.targetVersionId,
+        targetProjectSlug=job.targetProjectSlug,
+        changeReportId=job.changeReportId,
+        lintSummary=RepositorySpecLintSummary(**summary.to_payload()),
+    )
+
+
+def _list_recent_imports_for_path(
+    repository_id: str,
+    branch: str,
+    path: str,
+    *,
+    limit: int,
+) -> List[RepositoryImportJobRecord]:
+    matched: List[RepositoryImportJobRecord] = []
+    for job in _REPO_IMPORT_JOB_STORE.get(repository_id, []):
+        if job.branch != branch:
+            continue
+        snapshot_path = str(job.diffSnapshot.get("path") or "").strip()
+        if snapshot_path != path:
+            continue
+        matched.append(job)
+    matched.sort(key=lambda item: _to_sort_key(item.createdAt, item.id), reverse=True)
+    return matched[: max(1, limit)]
+
+
+def _fetch_file_content_bytes(
+    *,
+    repository: RepositoryRecord,
+    file_row: RepositoryFileRecord,
+    branch: str,
+) -> bytes:
+    """Return raw bytes for ``file_row``.
+
+    Test environments seed ``_REPO_FILE_CONTENT_STORE`` directly so unit
+    tests don't have to stub GitHub. In production we hit the GitHub
+    Contents API (the same URL we already use for scans) and decode the
+    base64 payload.
+    """
+    seeded = _REPO_FILE_CONTENT_STORE.get((repository.id, file_row.id))
+    if seeded is not None:
+        return seeded
+
+    access_token = _load_linked_account_access_token(repository.linkedAccountId)
+    owner = urllib_parse.quote(repository.owner, safe="")
+    name = urllib_parse.quote(repository.name, safe="")
+    branch_ref = urllib_parse.quote(branch, safe="")
+    encoded_path = "/".join(urllib_parse.quote(part, safe="") for part in file_row.path.strip("/").split("/") if part)
+    payload = _github_api_get_json(
+        f"https://api.github.com/repos/{owner}/{name}/contents/{encoded_path}?ref={branch_ref}",
+        access_token,
+    )
+    if not isinstance(payload, dict):
+        raise RuntimeError("GitHub Contents API returned malformed payload")
+    encoding = str(payload.get("encoding") or "").lower()
+    if encoding == "base64":
+        raw = str(payload.get("content") or "").replace("\n", "")
+        try:
+            return base64.b64decode(raw)
+        except (binascii.Error, ValueError) as exc:
+            raise RuntimeError("GitHub Contents API returned invalid base64") from exc
+    if encoding == "":
+        # Some shapes return raw text on the `content` field directly.
+        return str(payload.get("content") or "").encode("utf-8")
+    raise RuntimeError(f"Unsupported GitHub content encoding: {encoding!r}")
+
+
+def _seed_repository_file_content_for_tests(
+    repository_id: str,
+    file_id: str,
+    content: bytes,
+) -> None:
+    """Seed in-memory file bytes so REPO-9.6 tests don't need GitHub stubs."""
+    with _STORE_LOCK:
+        _REPO_FILE_CONTENT_STORE[(repository_id, file_id)] = content
+
+
+def _looks_like_text_bytes(payload: bytes) -> bool:
+    """Heuristic: declare the bytes safe for an inline UTF-8 preview."""
+    if not payload:
+        return True
+    if b"\x00" in payload[:8192]:
+        return False
+    try:
+        payload.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
 @router.post("/{tenant_slug}", status_code=201, response_model=RegisterRepositoryResponse)
 async def register_repository(
     tenant_slug: str,
@@ -2812,6 +3006,202 @@ async def import_repository_spec_now(
     )
 
 
+@router.get(
+    "/{tenant_slug}/{repository_id}/specs/{file_id}/detail",
+    response_model=RepositorySpecDetailResponse,
+)
+async def get_repository_spec_detail(
+    tenant_slug: str,
+    repository_id: str,
+    file_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    limit: int = Query(default=5, ge=1, le=20),
+) -> RepositorySpecDetailResponse:
+    """Return aggregated spec-detail metadata for the drawer (REPO-9.6).
+
+    The endpoint joins the latest scan record, the last N import jobs for
+    ``(branch, path)``, and a derived lint summary. Lazy-load contract: the
+    drawer only calls this when it opens, so closed-drawer rendering does
+    not pay a fan-out cost.
+    """
+    tenant_id = auth_data["tenant_id"]
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    _validate_uuid(file_id, "fileId")
+
+    with _STORE_LOCK:
+        repository = _find_repository_for_tenant(tenant_id, repository_id)
+        located = _find_repository_file_row(repository_id, file_id)
+        if located is None:
+            raise HTTPException(status_code=404, detail=f"Repository file not found: {file_id}")
+        file_row, scan = located
+        recent_jobs = _list_recent_imports_for_path(repository_id, scan.branch, file_row.path, limit=limit)
+        latest_job_for_path = _latest_import_jobs_by_path(repository_id, scan.branch).get(file_row.path)
+        spec_record = _build_repository_spec_record(file_row, scan.branch, latest_job_for_path)
+        recent_summaries = [
+            _build_spec_import_summary(job=job, repository_id=repository_id) for job in recent_jobs
+        ]
+
+    latest_non_failed = next(
+        (
+            job
+            for job in recent_jobs
+            if job.state in ("committed", "pending_review")
+        ),
+        None,
+    )
+    if latest_non_failed is not None:
+        change_report = _find_change_report_for_import_job(repository_id, latest_non_failed.id)
+        change_model = change_report.changeModelJson if change_report is not None else None
+        lint = derive_lint_summary(job=latest_non_failed.model_dump(), change_model=change_model)
+    elif recent_jobs:
+        lint = derive_lint_summary(job=recent_jobs[0].model_dump(), change_model=None)
+    else:
+        lint = empty_lint_summary()
+
+    web_url = provider_blob_url(
+        provider=repository.provider,
+        owner=repository.owner,
+        name=repository.name,
+        branch=scan.branch,
+        path=file_row.path,
+    )
+    raw_url = provider_raw_url(
+        provider=repository.provider,
+        owner=repository.owner,
+        name=repository.name,
+        branch=scan.branch,
+        path=file_row.path,
+    )
+
+    return RepositorySpecDetailResponse(
+        spec=spec_record,
+        branch=scan.branch,
+        path=file_row.path,
+        fullName=repository.fullName,
+        provider=repository.provider,
+        providerWebUrl=web_url,
+        providerRawUrl=raw_url,
+        recentImports=recent_summaries,
+        lintSummary=RepositorySpecLintSummary(**lint.to_payload()),
+    )
+
+
+@router.get(
+    "/{tenant_slug}/{repository_id}/specs/{file_id}/content",
+    response_model=RepositorySpecContentResponse,
+)
+async def get_repository_spec_content(
+    tenant_slug: str,
+    repository_id: str,
+    file_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositorySpecContentResponse:
+    """Return inline file bytes for the drawer's Monaco preview (REPO-9.6).
+
+    Files larger than ``MAX_INLINE_PREVIEW_BYTES`` (2 MB) are not inlined;
+    instead the response sets ``tooLargeForPreview = true`` and exposes
+    a ``providerRawUrl`` the user can download. Binary payloads return
+    ``encoding='base64'`` so the UI can show a "binary file — download"
+    affordance without misrendering.
+    """
+    tenant_id = auth_data["tenant_id"]
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    _validate_uuid(file_id, "fileId")
+
+    with _STORE_LOCK:
+        repository = _find_repository_for_tenant(tenant_id, repository_id)
+        located = _find_repository_file_row(repository_id, file_id)
+        if located is None:
+            raise HTTPException(status_code=404, detail=f"Repository file not found: {file_id}")
+        file_row, scan = located
+
+    raw_url = provider_raw_url(
+        provider=repository.provider,
+        owner=repository.owner,
+        name=repository.name,
+        branch=scan.branch,
+        path=file_row.path,
+    )
+
+    declared_size = file_row.sizeBytes if isinstance(file_row.sizeBytes, int) else None
+    if declared_size is not None and declared_size > MAX_INLINE_PREVIEW_BYTES:
+        return RepositorySpecContentResponse(
+            fileId=file_row.id,
+            repositoryId=repository_id,
+            branch=scan.branch,
+            path=file_row.path,
+            format=file_row.format,
+            encoding="utf-8",
+            content=None,
+            sizeBytes=declared_size,
+            truncated=False,
+            tooLargeForPreview=True,
+            contentChecksum=file_row.contentChecksum,
+            providerRawUrl=raw_url,
+            fetchedAt=_utc_now_iso(),
+        )
+
+    try:
+        payload = _fetch_file_content_bytes(repository=repository, file_row=file_row, branch=scan.branch)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "PROVIDER_FETCH_FAILED", "message": str(exc)},
+        ) from exc
+
+    actual_size = len(payload)
+    if actual_size > MAX_INLINE_PREVIEW_BYTES:
+        return RepositorySpecContentResponse(
+            fileId=file_row.id,
+            repositoryId=repository_id,
+            branch=scan.branch,
+            path=file_row.path,
+            format=file_row.format,
+            encoding="utf-8",
+            content=None,
+            sizeBytes=actual_size,
+            truncated=False,
+            tooLargeForPreview=True,
+            contentChecksum=file_row.contentChecksum,
+            providerRawUrl=raw_url,
+            fetchedAt=_utc_now_iso(),
+        )
+
+    if _looks_like_text_bytes(payload):
+        text = payload.decode("utf-8")
+        return RepositorySpecContentResponse(
+            fileId=file_row.id,
+            repositoryId=repository_id,
+            branch=scan.branch,
+            path=file_row.path,
+            format=file_row.format,
+            encoding="utf-8",
+            content=text,
+            sizeBytes=actual_size,
+            truncated=False,
+            tooLargeForPreview=False,
+            contentChecksum=file_row.contentChecksum,
+            providerRawUrl=raw_url,
+            fetchedAt=_utc_now_iso(),
+        )
+
+    return RepositorySpecContentResponse(
+        fileId=file_row.id,
+        repositoryId=repository_id,
+        branch=scan.branch,
+        path=file_row.path,
+        format=file_row.format,
+        encoding="base64",
+        content=base64.b64encode(payload).decode("ascii"),
+        sizeBytes=actual_size,
+        truncated=False,
+        tooLargeForPreview=False,
+        contentChecksum=file_row.contentChecksum,
+        providerRawUrl=raw_url,
+        fetchedAt=_utc_now_iso(),
+    )
+
+
 @router.post(
     "/{tenant_slug}/{repository_id}/specs:bulkUpdate",
     response_model=RepositorySpecBulkUpdateResponse,
@@ -3190,6 +3580,7 @@ def _reset_repository_state_for_tests() -> None:
         _REPO_PROJECT_STORE.clear()
         _REPO_VERSION_STORE.clear()
         _REPO_IMPORT_NOW_IDEMPOTENCY.clear()
+        _REPO_FILE_CONTENT_STORE.clear()
 
 
 def _complete_repository_scan_for_tests(

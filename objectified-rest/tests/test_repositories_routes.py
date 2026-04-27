@@ -18,8 +18,10 @@ from app.repositories_routes import (
     _get_repository_resolved_versions_for_tests,
     _list_poll_targets_for_tests,
     _reset_repository_state_for_tests,
+    _seed_repository_file_content_for_tests,
     _seed_repository_relations_for_tests,
 )
+from app.repositories.spec_detail import MAX_INLINE_PREVIEW_BYTES
 
 client = TestClient(app)
 
@@ -2088,3 +2090,260 @@ def test_import_now_rejects_disabled_import_and_unchanged_checksum() -> None:
     assert patch_response.status_code == 200
     assert conflict.status_code == 409
     assert conflict.json()["detail"]["code"] == "IMPORT_UNCHANGED_CHECKSUM"
+
+
+# ----------------------------------------------------------------------
+# REPO-9.6 — spec detail drawer endpoints
+# ----------------------------------------------------------------------
+
+
+def _setup_repo_for_spec_drawer(
+    *,
+    linked_account_id: str,
+    repo_name: str,
+    file_path: str = "openapi/orders-v3.yaml",
+    file_size: int | None = None,
+    import_enabled: bool = True,
+    auto_import_enabled: bool = False,
+) -> tuple[str, str, str]:
+    """Helper that registers a repo, completes a scan with one file, and
+    returns ``(repository_id, scan_id, file_id)`` for spec-drawer tests."""
+    create_response = client.post(
+        f"/v1/repositories/{_TENANT_SLUG}",
+        json={
+            "linkedAccountId": linked_account_id,
+            "provider": "github",
+            "owner": "acme",
+            "name": repo_name,
+            "branches": [{"branch": "main"}],
+            "manifest": (
+                "version: 1\n"
+                "specs:\n"
+                f"  - path: {file_path}\n"
+                "    project: payments\n"
+                "    promote: auto\n"
+                "    importEnabled: true\n"
+            ),
+        },
+    )
+    repository_id = create_response.json()["repository"]["id"]
+    scan_id = create_response.json()["initialScanJobId"]
+    seed_file: dict = {
+        "path": file_path,
+        "blobSha": "sha-1",
+        "contentAlgo": "sha256",
+        "contentChecksum": "f" * 64,
+        "tracked": True,
+        "importEnabled": import_enabled,
+        "autoImportEnabled": auto_import_enabled,
+        "projectSlug": "payments",
+    }
+    if file_size is not None:
+        seed_file["sizeBytes"] = file_size
+    _complete_repository_scan_for_tests(
+        repository_id,
+        scan_id,
+        commit_sha="drawer-seed",
+        files=[seed_file],
+    )
+    file_id = client.get(
+        f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{scan_id}/files",
+    ).json()["items"][0]["id"]
+    return repository_id, scan_id, file_id
+
+
+def test_spec_detail_returns_provider_links_imports_and_lint_summary() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    detail = None
+    try:
+        repository_id, _scan_id, file_id = _setup_repo_for_spec_drawer(
+            linked_account_id="aaaaaaaa-bbbb-cccc-dddd-000000000080",
+            repo_name="drawer-detail",
+        )
+        with patch("app.repositories_routes.db") as mdb:
+            mdb.get_project_by_slug.return_value = {"id": "99999999-9999-9999-9999-999999999999"}
+            mdb.get_latest_repository_source_checksum_for_project.return_value = None
+            client.post(
+                f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}:importNow",
+                json={"branch": "main", "force": True},
+            )
+        detail = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}/detail",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert detail is not None
+    assert detail.status_code == 200
+    body = detail.json()
+    assert body["fullName"] == "acme/drawer-detail"
+    assert body["provider"] == "github"
+    assert body["providerWebUrl"] == "https://github.com/acme/drawer-detail/blob/main/openapi/orders-v3.yaml"
+    assert body["providerRawUrl"] == "https://raw.githubusercontent.com/acme/drawer-detail/main/openapi/orders-v3.yaml"
+    assert body["spec"]["fileId"] == file_id
+    assert body["branch"] == "main"
+    assert body["path"] == "openapi/orders-v3.yaml"
+    assert len(body["recentImports"]) == 1
+    job = body["recentImports"][0]
+    assert job["sourceKind"] == "repository_manual_import"
+    assert job["state"] in {"pending_review", "committed"}
+    assert job["lintSummary"]["sourceImportJobId"] == job["id"]
+    assert isinstance(body["lintSummary"]["errors"], int)
+    assert body["lintSummary"]["sourceImportJobId"] == job["id"]
+
+
+def test_spec_detail_requires_repository_read_scope() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    response = None
+    try:
+        repository_id, _scan_id, file_id = _setup_repo_for_spec_drawer(
+            linked_account_id="aaaaaaaa-bbbb-cccc-dddd-000000000081",
+            repo_name="drawer-scope",
+        )
+        response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}/detail",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert response is not None
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "REPOSITORY_SCOPE_REQUIRED"
+
+
+def test_spec_detail_404_for_missing_file() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    response = None
+    try:
+        repository_id, _scan_id, _file_id = _setup_repo_for_spec_drawer(
+            linked_account_id="aaaaaaaa-bbbb-cccc-dddd-000000000082",
+            repo_name="drawer-missing",
+        )
+        response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/00000000-0000-4000-8000-000000000000/detail",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert response is not None and response.status_code == 404
+
+
+def test_spec_content_returns_inline_text_when_under_limit() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    response = None
+    expected_text = "openapi: 3.1.0\ninfo:\n  title: Orders\n  version: 3.4.0\n"
+    try:
+        repository_id, _scan_id, file_id = _setup_repo_for_spec_drawer(
+            linked_account_id="aaaaaaaa-bbbb-cccc-dddd-000000000083",
+            repo_name="drawer-content",
+        )
+        _seed_repository_file_content_for_tests(repository_id, file_id, expected_text.encode("utf-8"))
+        response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}/content",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert response is not None
+    assert response.status_code == 200
+    body = response.json()
+    assert body["encoding"] == "utf-8"
+    assert body["content"] == expected_text
+    assert body["sizeBytes"] == len(expected_text.encode("utf-8"))
+    assert body["tooLargeForPreview"] is False
+    assert body["truncated"] is False
+    assert body["maxInlineBytes"] == MAX_INLINE_PREVIEW_BYTES
+    assert body["providerRawUrl"].startswith("https://raw.githubusercontent.com/")
+
+
+def test_spec_content_returns_download_prompt_when_size_metadata_exceeds_2mb() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    response = None
+    try:
+        oversized = MAX_INLINE_PREVIEW_BYTES + 1024
+        repository_id, _scan_id, file_id = _setup_repo_for_spec_drawer(
+            linked_account_id="aaaaaaaa-bbbb-cccc-dddd-000000000084",
+            repo_name="drawer-oversized",
+            file_size=oversized,
+        )
+        response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}/content",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert response is not None
+    assert response.status_code == 200
+    body = response.json()
+    assert body["tooLargeForPreview"] is True
+    assert body["content"] is None
+    assert body["sizeBytes"] == oversized
+    assert body["providerRawUrl"].endswith("openapi/orders-v3.yaml")
+
+
+def test_spec_content_returns_download_prompt_when_actual_payload_exceeds_2mb() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    response = None
+    try:
+        repository_id, _scan_id, file_id = _setup_repo_for_spec_drawer(
+            linked_account_id="aaaaaaaa-bbbb-cccc-dddd-000000000085",
+            repo_name="drawer-actual-oversized",
+        )
+        big_payload = b"x" * (MAX_INLINE_PREVIEW_BYTES + 32)
+        _seed_repository_file_content_for_tests(repository_id, file_id, big_payload)
+        response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}/content",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert response is not None
+    assert response.status_code == 200
+    body = response.json()
+    assert body["tooLargeForPreview"] is True
+    assert body["content"] is None
+    assert body["sizeBytes"] == len(big_payload)
+
+
+def test_spec_content_returns_base64_for_binary_payload() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    response = None
+    binary_payload = b"\x00\x01\x02PNGSTUB\x00\xff"
+    try:
+        repository_id, _scan_id, file_id = _setup_repo_for_spec_drawer(
+            linked_account_id="aaaaaaaa-bbbb-cccc-dddd-000000000086",
+            repo_name="drawer-binary",
+            file_path="schemas/binary.bin",
+        )
+        _seed_repository_file_content_for_tests(repository_id, file_id, binary_payload)
+        response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}/content",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert response is not None
+    assert response.status_code == 200
+    body = response.json()
+    assert body["encoding"] == "base64"
+    import base64 as _b64
+    assert _b64.b64decode(body["content"]) == binary_payload
+
+
+def test_spec_content_requires_repository_read_scope() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    response = None
+    try:
+        repository_id, _scan_id, file_id = _setup_repo_for_spec_drawer(
+            linked_account_id="aaaaaaaa-bbbb-cccc-dddd-000000000087",
+            repo_name="drawer-content-scope",
+        )
+        response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}/content",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert response is not None
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "REPOSITORY_SCOPE_REQUIRED"

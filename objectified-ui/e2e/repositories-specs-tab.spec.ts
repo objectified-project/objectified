@@ -167,6 +167,106 @@ test.describe('REPO-9.4 — Specs tab', () => {
       },
     );
 
+    await page.route(
+      new RegExp(`/api/repositories/${repositoryId}/specs/[0-9a-f-]{36}/detail$`),
+      async (route: Route) => {
+        const url = new URL(route.request().url());
+        const segments = url.pathname.split('/');
+        const fileId = segments[segments.length - 2];
+        const current = state.get(fileId);
+        if (!current) {
+          await route.fulfill({
+            status: 404,
+            contentType: 'application/json',
+            body: JSON.stringify({ success: false, error: 'not found' }),
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            spec: buildSpecPayload([current])[0],
+            branch: 'main',
+            path: current.path,
+            fullName: 'acme/orders-service',
+            provider: 'github',
+            providerWebUrl: `https://github.com/acme/orders-service/blob/main/${current.path}`,
+            providerRawUrl: `https://raw.githubusercontent.com/acme/orders-service/main/${current.path}`,
+            recentImports: [
+              {
+                id: '99999999-0000-0000-0000-000000000001',
+                state: 'committed',
+                sourceKind: 'repository_manual_import',
+                operation: 'upsert_data',
+                branch: 'main',
+                createdAt: new Date('2026-04-21T08:00:00Z').toISOString(),
+                conflictCount: 0,
+                targetVersionId: current.lastImportedVersionId,
+                targetProjectSlug: 'orders',
+                changeReportId: '99999999-1111-1111-1111-000000000001',
+                lintSummary: {
+                  errors: 0,
+                  warnings: 1,
+                  info: 2,
+                  sourceImportJobId: '99999999-0000-0000-0000-000000000001',
+                  derivedFrom: 'import_job_change_report',
+                },
+              },
+            ],
+            lintSummary: {
+              errors: 0,
+              warnings: 1,
+              info: 2,
+              sourceImportJobId: '99999999-0000-0000-0000-000000000001',
+              derivedFrom: 'import_job_change_report',
+            },
+          }),
+        });
+      },
+    );
+
+    await page.route(
+      new RegExp(`/api/repositories/${repositoryId}/specs/[0-9a-f-]{36}/content$`),
+      async (route: Route) => {
+        const url = new URL(route.request().url());
+        const segments = url.pathname.split('/');
+        const fileId = segments[segments.length - 2];
+        const current = state.get(fileId);
+        if (!current) {
+          await route.fulfill({
+            status: 404,
+            contentType: 'application/json',
+            body: JSON.stringify({ success: false, error: 'not found' }),
+          });
+          return;
+        }
+        const text = `openapi: 3.1.0\ninfo:\n  title: ${current.path}\n  version: 3.4.0\n`;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            fileId,
+            repositoryId,
+            branch: 'main',
+            path: current.path,
+            format: current.format,
+            encoding: 'utf-8',
+            content: text,
+            sizeBytes: text.length,
+            truncated: false,
+            tooLargeForPreview: false,
+            maxInlineBytes: 2 * 1024 * 1024,
+            contentChecksum: 'mock-checksum',
+            providerRawUrl: `https://raw.githubusercontent.com/acme/orders-service/main/${current.path}`,
+            fetchedAt: new Date('2026-04-21T08:00:01Z').toISOString(),
+          }),
+        });
+      },
+    );
+
     await page.route(`**/api/repositories/${repositoryId}/specs/bulk-update`, async (route) => {
       const body = (await route.request().postDataJSON()) as {
         fileIds: string[];
@@ -282,5 +382,83 @@ test.describe('REPO-9.4 — Specs tab', () => {
     await page.getByTestId('spec-row-path-openapi/orders-v3.yaml').click();
     await expect(page.getByTestId('spec-drawer')).toBeVisible();
     await expect(page.getByTestId('spec-drawer')).toContainText('openapi/orders-v3.yaml');
+  });
+
+  test('REPO-9.6 — drawer shows lint summary, recent imports, and provider link', async ({ page }) => {
+    await login(page);
+    if (page.url().includes('/login')) {
+      test.skip(true);
+      return;
+    }
+    await page.goto(`/ade/dashboard/repositories/${repositoryId}?tab=specs`);
+    await page.getByTestId('spec-row-path-openapi/orders-v3.yaml').click();
+    const drawer = page.getByTestId('spec-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(page.getByTestId('spec-drawer-lint-warnings')).toContainText('1');
+    await expect(page.getByTestId('spec-drawer-lint-info')).toContainText('2');
+    await expect(page.getByTestId('spec-drawer-recent-imports')).toContainText('committed');
+    const provider = page.getByTestId('spec-drawer-open-provider');
+    await expect(provider).toHaveAttribute(
+      'href',
+      'https://github.com/acme/orders-service/blob/main/openapi/orders-v3.yaml',
+    );
+    await page.keyboard.press('Escape');
+    await expect(drawer).toBeHidden();
+  });
+
+  test('REPO-9.6 — too-large preview swaps to a download prompt', async ({ page }) => {
+    const oversizedFileId = seededSpecs[1].fileId;
+    await page.route(
+      new RegExp(`/api/repositories/${repositoryId}/specs/${oversizedFileId}/content$`),
+      async (route: Route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            fileId: oversizedFileId,
+            repositoryId,
+            branch: 'main',
+            path: 'openapi/legacy.yaml',
+            format: 'swagger_2_0',
+            encoding: 'utf-8',
+            content: null,
+            sizeBytes: 3 * 1024 * 1024,
+            truncated: false,
+            tooLargeForPreview: true,
+            maxInlineBytes: 2 * 1024 * 1024,
+            contentChecksum: null,
+            providerRawUrl: 'https://raw.githubusercontent.com/acme/orders-service/main/openapi/legacy.yaml',
+            fetchedAt: new Date('2026-04-21T08:00:01Z').toISOString(),
+          }),
+        });
+      },
+    );
+    await login(page);
+    if (page.url().includes('/login')) {
+      test.skip(true);
+      return;
+    }
+    await page.goto(`/ade/dashboard/repositories/${repositoryId}?tab=specs`);
+    await page.getByTestId('spec-row-path-openapi/legacy.yaml').click();
+    await expect(page.getByTestId('spec-drawer-too-large')).toBeVisible();
+    const download = page.getByTestId('spec-drawer-download');
+    await expect(download).toHaveAttribute(
+      'href',
+      'https://raw.githubusercontent.com/acme/orders-service/main/openapi/legacy.yaml',
+    );
+  });
+
+  test('REPO-9.6 — deep-link via ?fileId= opens the drawer on load', async ({ page }) => {
+    await login(page);
+    if (page.url().includes('/login')) {
+      test.skip(true);
+      return;
+    }
+    await page.goto(
+      `/ade/dashboard/repositories/${repositoryId}?tab=specs&fileId=${seededSpecs[0].fileId}`,
+    );
+    await expect(page.getByTestId('spec-drawer')).toBeVisible();
+    await expect(page.getByTestId('spec-drawer-path')).toContainText('openapi/orders-v3.yaml');
   });
 });
