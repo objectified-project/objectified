@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added REPO-8.3 checksum-keyed idempotent re-import dispatch gating so modified tracked files with unchanged repository-source checksums are marked `unchanged_checksum`, emit `repository.scan.skipped_checksum` audit rows, and increment `diffSummary.skipped_unchanged_by_checksum` unless scans run with `force=true`.
 - Added REPO-8.2 version provenance tuple support by adding validated/indexed `versions.repository_source` storage, surfacing `GET /v1/versions/{tenant_slug}/by-repo-source?repository_id&path` for fast tenant-scoped lookup, and expanding repository model coverage to assert constraint and planner-index behavior.
 - Added REPO-8.1 provider-agnostic repository file checksums with `content_checksum`/`content_algo` persistence, streaming SHA-256 walker hashing utilities with memory-budget coverage, and per-file `repository.scan.hashed` scan audit entries while reusing checksums for unchanged blob SHAs.
 - Added REPO-7.4 token health monitoring so linked-account credentials are probed and classified (`healthy` / `scope_missing` / `revoked` / `network_error`), revoked credentials auto-pause connected repositories, and the Linked Accounts view now shows usage count, last verification age, health state, plus a reconnect action for non-healthy accounts.

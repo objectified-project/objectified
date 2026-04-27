@@ -1461,6 +1461,36 @@ class Database:
             return None
         return self.get_version_by_id(str(rows[0]["id"]), tenant_id)
 
+    def get_latest_repository_source_checksum_for_project(
+        self,
+        tenant_id: str,
+        repository_id: str,
+        path: str,
+        project_id: str,
+    ) -> Optional[str]:
+        """Get latest repository_source.contentChecksum for a specific project/path tuple."""
+        query = """
+            SELECT v.repository_source->>'contentChecksum' AS content_checksum
+            FROM odb.versions v
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE p.tenant_id = %s
+              AND p.deleted_at IS NULL
+              AND v.deleted_at IS NULL
+              AND v.project_id = %s
+              AND (v.repository_source->>'repositoryId') = %s
+              AND (v.repository_source->>'path') = %s
+            ORDER BY v.created_at DESC
+            LIMIT 1
+        """
+        rows = self.execute_query(query, (tenant_id, project_id, repository_id, path))
+        if not rows:
+            return None
+        raw_checksum = rows[0].get("content_checksum")
+        if not isinstance(raw_checksum, str):
+            return None
+        normalized = raw_checksum.strip().lower()
+        return normalized or None
+
     def revision_has_protected_named_ref(
         self, version_row_id: str, project_id: str, tenant_id: str
     ) -> bool:

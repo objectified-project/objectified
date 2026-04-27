@@ -71,6 +71,7 @@ RepositoryScanStatus = Literal[
 RepositoryFileStatus = Literal[
     "new",
     "unchanged",
+    "unchanged_checksum",
     "modified",
     "removed",
     "parse_error",
@@ -369,7 +370,16 @@ def _to_sort_key(created_at: str, row_id: str) -> Tuple[datetime, str]:
 
 
 def _empty_scan_diff_summary() -> Dict[str, int]:
-    return {"added": 0, "modified": 0, "removed": 0, "unchanged": 0}
+    return {"added": 0, "modified": 0, "removed": 0, "unchanged": 0, "skipped_unchanged_by_checksum": 0}
+
+
+def _scan_force_enabled(scan: RepositoryScanRecord) -> bool:
+    for event in scan.eventLog:
+        if not isinstance(event, dict):
+            continue
+        if event.get("force") is True:
+            return True
+    return False
 
 
 def _normalize_content_checksum(raw: Any) -> str | None:
@@ -801,6 +811,8 @@ def _process_single_pending_repository_scan(
             commit_sha=commit_sha,
             scan_files=classified_files,
             actor_id=_SYSTEM_ACTOR_ID,
+            force=_scan_force_enabled(history[scan_index]),
+            diff_summary=diff_summary,
         )
 
         completed_scan = history[scan_index].model_copy(
@@ -1377,6 +1389,33 @@ def _resolve_target_project_slug_for_dry_run(
     return None
 
 
+def _latest_repository_source_checksum_for_file(
+    *,
+    tenant_id: str,
+    repository_id: str,
+    file_row: RepositoryFileRecord,
+) -> str | None:
+    project_slug = _normalize_slug(file_row.projectSlug)
+    if project_slug is None:
+        return None
+    try:
+        project = db.get_project_by_slug(project_slug, tenant_id)
+        if not project:
+            return None
+        project_id = project.get("id")
+        if not isinstance(project_id, str) or not project_id.strip():
+            return None
+        return db.get_latest_repository_source_checksum_for_project(
+            tenant_id,
+            repository_id,
+            file_row.path,
+            project_id,
+        )
+    except Exception:
+        # Best-effort optimization; scan completion should not fail on lookup issues.
+        return None
+
+
 def _dispatch_import_jobs_for_scan(
     *,
     tenant_id: str,
@@ -1386,6 +1425,8 @@ def _dispatch_import_jobs_for_scan(
     commit_sha: str,
     scan_files: List[RepositoryFileRecord],
     actor_id: str,
+    force: bool,
+    diff_summary: Dict[str, int],
 ) -> List[Dict[str, Any]]:
     repository_jobs = _REPO_IMPORT_JOB_STORE.setdefault(repository_id, [])
     manifest_project_slug_by_path = _manifest_project_slug_by_path(repository_id)
@@ -1395,6 +1436,34 @@ def _dispatch_import_jobs_for_scan(
             continue
         if not file_row.tracked:
             continue
+        if file_row.status == "modified" and not force:
+            current_checksum = _normalize_content_checksum(file_row.contentChecksum)
+            if current_checksum is not None:
+                latest_checksum = _latest_repository_source_checksum_for_file(
+                    tenant_id=tenant_id,
+                    repository_id=repository_id,
+                    file_row=file_row,
+                )
+                if latest_checksum == current_checksum:
+                    file_row.status = "unchanged_checksum"
+                    diff_summary["modified"] = max(0, int(diff_summary.get("modified", 0)) - 1)
+                    diff_summary["skipped_unchanged_by_checksum"] = int(
+                        diff_summary.get("skipped_unchanged_by_checksum", 0)
+                    ) + 1
+                    pending_audit_rows.append(
+                        _append_audit_row(
+                            tenant_id,
+                            repository_id,
+                            "repository.scan.skipped_checksum",
+                            actor_id=actor_id,
+                            detail={
+                                "scanId": scan_id,
+                                "path": file_row.path,
+                                "contentChecksumShort": _short_checksum(current_checksum),
+                            },
+                        )
+                    )
+                    continue
 
         operation: ImportJobOperation = "import"
         promote: ImportJobPromotion = file_row.promote if file_row.promote in {"auto", "manual"} else "manual"
@@ -2356,6 +2425,8 @@ def _complete_repository_scan_for_tests(
             commit_sha=commit_sha,
             scan_files=classified_files,
             actor_id=_SYSTEM_ACTOR_ID,
+            force=_scan_force_enabled(target_scan),
+            diff_summary=diff_summary,
         )
         _REPO_SCAN_FILE_HISTORY_STORE[scan_id] = classified_files
 
