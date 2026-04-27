@@ -27,6 +27,7 @@ from .database import db
 from .openapi_change_report import build_change_report
 from .repositories.manifest import (
     RepoManifest,
+    initial_auto_import_enabled_for_path,
     initial_import_enabled_for_path,
     parse_repo_manifest,
     resolve_repository_file_mapping,
@@ -166,6 +167,7 @@ class RepositoryFileRecord(BaseModel):
     discriminator: str | None = None
     tracked: bool
     importEnabled: bool = False
+    autoImportEnabled: bool = False
     projectSlug: str | None = None
     versionStrategy: str | None = None
     settingsJson: Dict[str, Any] | None = None
@@ -241,6 +243,11 @@ class RepositorySyncConflictResolutionRequest(BaseModel):
 
 class RepositoryFileImportEnabledRequest(BaseModel):
     importEnabled: bool
+    source: Literal["ui", "api", "manifest"] = "api"
+
+
+class RepositoryFileAutoImportEnabledRequest(BaseModel):
+    autoImportEnabled: bool
     source: Literal["ui", "api", "manifest"] = "api"
 
 
@@ -503,7 +510,12 @@ def _classify_scan_files_against_previous(
         current = current_by_path[path]
         previous = previous_by_path.get(path)
         if previous is not None:
-            current = current.model_copy(update={"importEnabled": previous.importEnabled})
+            current = current.model_copy(
+                update={
+                    "importEnabled": previous.importEnabled,
+                    "autoImportEnabled": previous.autoImportEnabled if previous.importEnabled else False,
+                }
+            )
         if previous is None:
             next_status: RepositoryFileStatus = "new"
             summary["added"] += 1
@@ -686,6 +698,10 @@ def _build_scan_file_rows(
             manifest=manifest_outcome.manifest,
             spec=manifest_spec,
         )
+        auto_import_enabled = initial_auto_import_enabled_for_path(
+            manifest=manifest_outcome.manifest,
+            spec=manifest_spec,
+        )
         settings_json = dict(mapping.settings_json or {})
         content_checksum = _normalize_content_checksum(item.get("contentChecksum"))
         content_algo = _normalize_content_algo(item.get("contentAlgo"), has_checksum=content_checksum is not None)
@@ -706,6 +722,7 @@ def _build_scan_file_rows(
                 discriminator=None,
                 tracked=mapping.tracked,
                 importEnabled=import_enabled,
+                autoImportEnabled=auto_import_enabled,
                 projectSlug=mapping.project_slug if mapping.tracked else None,
                 versionStrategy=mapping.version_strategy,
                 settingsJson=settings_json or None,
@@ -1531,6 +1548,8 @@ def _dispatch_import_jobs_for_scan(
             continue
         if not file_row.importEnabled:
             continue
+        if not file_row.autoImportEnabled:
+            continue
         if file_row.status == "modified" and not force:
             current_checksum = _normalize_content_checksum(file_row.contentChecksum)
             if current_checksum is not None:
@@ -2228,7 +2247,12 @@ async def update_repository_file_import_enabled(
                     after = request.importEnabled
                     if before == after:
                         return file_row
-                    updated = file_row.model_copy(update={"importEnabled": after})
+                    updated = file_row.model_copy(
+                        update={
+                            "importEnabled": after,
+                            "autoImportEnabled": file_row.autoImportEnabled if after else False,
+                        }
+                    )
                     file_list[idx] = updated
                     out_row = updated
                     audit_to_persist = _append_audit_row(
@@ -2241,6 +2265,67 @@ async def update_repository_file_import_enabled(
                             "before": before,
                             "after": after,
                             "actorId": actor_id,
+                            "field": "import_enabled",
+                            "source": request.source,
+                        },
+                    )
+                    break
+            if out_row is not None:
+                break
+        if out_row is None:
+            raise HTTPException(status_code=404, detail=f"Repository file not found: {file_id}")
+    if audit_to_persist is not None:
+        _persist_audit_row(audit_to_persist)
+    return out_row
+
+
+@router.patch(
+    "/{tenant_slug}/{repository_id}/files/{file_id}/auto-import-enabled",
+    response_model=RepositoryFileRecord,
+)
+async def update_repository_file_auto_import_enabled(
+    tenant_slug: str,
+    repository_id: str,
+    file_id: str,
+    request: RepositoryFileAutoImportEnabledRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositoryFileRecord:
+    """Toggle whether a spec path is eligible for automatic import dispatch (REPO-9.2)."""
+    tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
+    _validate_uuid(file_id, "fileId")
+
+    audit_to_persist: Dict[str, Any] | None = None
+    with _STORE_LOCK:
+        _find_repository_for_tenant(tenant_id, repository_id)
+        out_row: RepositoryFileRecord | None = None
+        for _scan in _REPO_SCAN_HISTORY_STORE.get(repository_id, []):
+            file_list = _REPO_SCAN_FILE_HISTORY_STORE.get(_scan.id, [])
+            for idx, file_row in enumerate(file_list):
+                if file_row.id == file_id:
+                    if request.autoImportEnabled and not file_row.importEnabled:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="autoImportEnabled cannot be true when importEnabled is false",
+                        )
+                    before = file_row.autoImportEnabled
+                    after = request.autoImportEnabled
+                    if before == after:
+                        return file_row
+                    updated = file_row.model_copy(update={"autoImportEnabled": after})
+                    file_list[idx] = updated
+                    out_row = updated
+                    audit_to_persist = _append_audit_row(
+                        tenant_id,
+                        repository_id,
+                        "repository.spec.selection_changed",
+                        actor_id=actor_id,
+                        detail={
+                            "path": file_row.path,
+                            "before": before,
+                            "after": after,
+                            "actorId": actor_id,
+                            "field": "auto_import_enabled",
                             "source": request.source,
                         },
                     )
@@ -2528,6 +2613,17 @@ def _complete_repository_scan_for_tests(
                     manifest=manifest_parsed,
                     spec=manifest_spec,
                 )
+            if "autoImportEnabled" in item and item.get("autoImportEnabled") is not None:
+                if not isinstance(item.get("autoImportEnabled"), bool):
+                    raise ValueError("autoImportEnabled must be a boolean when provided")
+                auto_import_enabled_value = item["autoImportEnabled"]
+            else:
+                auto_import_enabled_value = initial_auto_import_enabled_for_path(
+                    manifest=manifest_parsed,
+                    spec=manifest_spec,
+                )
+            if not import_enabled_value:
+                auto_import_enabled_value = False
             current_files.append(
                 RepositoryFileRecord(
                     id=str(uuid4()),
@@ -2543,6 +2639,7 @@ def _complete_repository_scan_for_tests(
                     discriminator=item.get("discriminator"),
                     tracked=tracked_value,
                     importEnabled=import_enabled_value,
+                    autoImportEnabled=auto_import_enabled_value,
                     projectSlug=project_slug_value,
                     versionStrategy=version_strategy_value,
                     settingsJson=settings_json_value,

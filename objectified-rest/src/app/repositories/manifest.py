@@ -62,6 +62,7 @@ class RepositoryFileRow:
     version_strategy: str | None
     poll_interval_sec: int | None
     import_enabled: bool
+    auto_import_enabled: bool
     status: str
     promote: Literal["auto", "manual"] | None = None
     metadata: dict[str, Any] | None = None
@@ -109,6 +110,17 @@ def initial_import_enabled_for_path(
     if manifest is None or spec is None:
         return False
     return spec.import_enabled
+
+
+def initial_auto_import_enabled_for_path(
+    *,
+    manifest: RepoManifest | None,
+    spec: RepoManifestSpec | None,
+) -> bool:
+    # REPO-9.2: auto import is always explicit opt-in outside of manifest parsing.
+    _ = manifest
+    _ = spec
+    return False
 
 
 def parse_repo_manifest(raw_manifest: str | None) -> RepoManifestParseOutcome:
@@ -204,6 +216,7 @@ def build_repository_file_rows(
         manifest_spec_poll = spec.poll_interval_sec if spec is not None else None
         mapping = resolve_repository_file_mapping(discovery.path, spec)
         i_enabled = initial_import_enabled_for_path(manifest=manifest, spec=spec)
+        ai_enabled = initial_auto_import_enabled_for_path(manifest=manifest, spec=spec)
         rows.append(
             RepositoryFileRow(
                 path=discovery.path,
@@ -216,6 +229,7 @@ def build_repository_file_rows(
                 if manifest_spec_poll is not None
                 else effective_branch_poll_interval,
                 import_enabled=i_enabled,
+                auto_import_enabled=ai_enabled,
                 status="discovered",
                 settings_json=mapping.settings_json,
             )
@@ -267,6 +281,7 @@ def _manifest_error_row(message: str) -> RepositoryFileRow:
         promote=None,
         poll_interval_sec=None,
         import_enabled=False,
+        auto_import_enabled=False,
         status="manifest_error",
         metadata={"error": message},
     )

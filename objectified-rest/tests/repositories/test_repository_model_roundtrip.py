@@ -326,13 +326,13 @@ def repository_file_row(repository_schema, repository_row, repository_scan_row):
                 INSERT INTO {} (
                     id, repository_id, scan_id, path, blob_sha, size_bytes, format, confidence,
                     discriminator, tracked, project_slug, version_strategy, status, quality_score,
-                    content_algo, content_checksum, import_enabled
+                    content_algo, content_checksum, import_enabled, auto_import_enabled
                 )
                 VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, 'modified', %s, %s, %s, %s
+                    %s, %s, %s, %s, 'modified', %s, %s, %s, %s, %s
                 )
-                RETURNING id, repository_id, scan_id, path, status, tracked, quality_score, content_algo, content_checksum, import_enabled;
+                RETURNING id, repository_id, scan_id, path, status, tracked, quality_score, content_algo, content_checksum, import_enabled, auto_import_enabled;
                 """
             ).format(sql.Identifier(schema, "repository_file")),
             (
@@ -352,13 +352,14 @@ def repository_file_row(repository_schema, repository_row, repository_scan_row):
                 "sha256",
                 "031edd7d41651593c5fe5c006fa5752b37fddff7bc4e843aa6af0c950f4b9406",
                 True,
+                True,
             ),
         )
         inserted = cur.fetchone()
         cur.execute(
             sql.SQL(
                 """
-                SELECT id, repository_id, scan_id, path, status, tracked, quality_score, content_algo, content_checksum, import_enabled
+                SELECT id, repository_id, scan_id, path, status, tracked, quality_score, content_algo, content_checksum, import_enabled, auto_import_enabled
                 FROM {}
                 WHERE id = %s;
                 """
@@ -398,6 +399,7 @@ def test_repository_file_round_trip(repository_file_row):
     assert repository_file_row["status"] == "modified"
     assert repository_file_row["tracked"] is True
     assert repository_file_row["import_enabled"] is True
+    assert repository_file_row["auto_import_enabled"] is True
 
 
 def test_provider_enum_is_github_only(repository_schema):

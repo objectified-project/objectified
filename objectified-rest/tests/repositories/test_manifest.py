@@ -93,8 +93,10 @@ specs:
 
     # Listed in manifest: import_enabled defaults to True when importEnabled is omitted in YAML.
     assert by_path["apis/openapi.yaml"].import_enabled is True
+    assert by_path["apis/openapi.yaml"].auto_import_enabled is False
     # Not listed: import not offered until an explicit list + opt-in in manifest or UI.
     assert by_path["apis/unlisted.yaml"].import_enabled is False
+    assert by_path["apis/unlisted.yaml"].auto_import_enabled is False
     # Per-spec format override wins over scanner phase-B detection.
     assert by_path["apis/openapi.yaml"].format == "asyncapi_3"
     # Per-spec pollIntervalSec wins over branch-level interval.
@@ -134,6 +136,7 @@ specs:
     )
     assert len(rows) == 1
     assert rows[0].import_enabled is False
+    assert rows[0].auto_import_enabled is False
 
 
 def test_unmapped_root_file_gets_mapping_affordance() -> None:
@@ -144,6 +147,7 @@ def test_unmapped_root_file_gets_mapping_affordance() -> None:
     )
     assert len(rows) == 1
     assert rows[0].import_enabled is False
+    assert rows[0].auto_import_enabled is False
     assert rows[0].tracked is False
     assert rows[0].project_slug is None
     assert rows[0].version_strategy == "commit-sha"
