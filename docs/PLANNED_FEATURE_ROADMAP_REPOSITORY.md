@@ -501,7 +501,7 @@ entries.
 | REPO-9.3   | REST: list / toggle / bulk-update spec selection | `GET /v1/repositories/{id}/specs`, `PATCH /v1/repositories/{id}/specs/{file_id}`, bulk variant              | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `rest` | Yes | No  | Done (#2934) |
 | REPO-9.4   | ADE Repository Detail "Specs" tab               | Replace existing Files tab spec list with switches (Import / Auto-Import) + status pill + last-imported-version link | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `ui`   | Yes | Yes | Done (#2938) |
 | REPO-9.5   | "Import Now" one-shot action                    | Trigger a manual import for any discovered spec regardless of `auto_import_enabled`                         | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `import`, `ui` | Yes | Yes | Done (#2939) |
-| REPO-9.6   | Spec detail drawer                              | Read-only Monaco preview, lint summary, last 5 import attempts, current selection state                     | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `ui`   | Yes | Yes | #2940 |
+| REPO-9.6   | Spec detail drawer                              | Read-only Monaco preview, lint summary, last 5 import attempts, current selection state                     | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `ui`   | Yes | Yes | Done (#2940) |
 | REPO-9.7   | Bulk select + apply across discovered files     | Multi-select with sticky toolbar; "Enable import for selected", "Disable", "Set auto-import"                 | `enhancement`, `repository`, `roadmap-repository`, `repository-selection`, `ui`          | No  | Yes | #2948 |
 
 ### Detailed issues
@@ -1186,7 +1186,6 @@ blocking.
 | 7     | REPO-12.1  | #2935 | auto-import worker + dispatch                       | Yes | E    |
 | 8     | REPO-12.3  | #2936 | version creation with provenance                    | Yes | E    |
 | 9     | REPO-12.4  | #2937 | repository_scan_report artifact                     | Yes | E    |
-| 12    | REPO-9.6   | #2940 | spec detail drawer                                  | Yes | B    |
 | 13    | REPO-11.1  | #2941 | repository_attention rollup table + computer        | Yes | D    |
 | 14    | REPO-11.2  | #2942 | dashboard widget: Repositories Needing Attention    | Yes | D    |
 | 15    | REPO-11.3  | #2943 | dashboard widget: Recent Imports Needing Attention  | Yes | D    |

@@ -17,6 +17,7 @@ import {
 import { Button } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
 import { Switch } from '@/app/components/ui/Switch';
+import { RepositorySpecDetailDrawer } from './RepositorySpecDetailDrawer';
 
 export type RepositorySpecStatus =
   | 'importing'
@@ -165,6 +166,12 @@ interface RepositorySpecsTabProps {
   initialSearch?: string;
   onFilterChange?: (filter: SpecFilter) => void;
   onBranchChange?: (branch: string) => void;
+  /** When the parent has a `?fileId=` query string, the drawer opens for that
+   * spec on mount (deep linking, REPO-9.6). */
+  initialFileId?: string | null;
+  /** Notifies the parent every time the selected spec changes so it can keep
+   * the URL in sync (or null to clear `?fileId=`). */
+  onSelectedFileIdChange?: (fileId: string | null) => void;
 }
 
 const minImportableConfidence = 0.5;
@@ -177,6 +184,8 @@ export function RepositorySpecsTab({
   initialSearch = '',
   onFilterChange,
   onBranchChange,
+  initialFileId = null,
+  onSelectedFileIdChange,
 }: RepositorySpecsTabProps) {
   const [filter, setFilter] = useState<SpecFilter>(initialFilter);
   const [branch, setBranch] = useState<string>(initialBranch || branches[0] || '');
@@ -191,7 +200,6 @@ export function RepositorySpecsTab({
   const [pendingPatchIds, setPendingPatchIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkPending, setIsBulkPending] = useState(false);
-  const drawerRef = useRef<HTMLElement | null>(null);
   const importNowEarlyRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const importNowLateRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -207,11 +215,20 @@ export function RepositorySpecsTab({
     }
   }, [initialFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Sync the parent's `?fileId=` query param when the drawer opens or closes.
   useEffect(() => {
-    if (selectedSpec) {
-      drawerRef.current?.focus();
-    }
-  }, [selectedSpec]);
+    if (!onSelectedFileIdChange) return;
+    onSelectedFileIdChange(selectedSpec?.fileId ?? null);
+  }, [selectedSpec, onSelectedFileIdChange]);
+
+  // Deep-link: when the spec list (re)loads and the URL/parent points at a
+  // specific fileId, surface that spec in the drawer once it's available.
+  useEffect(() => {
+    if (!initialFileId) return;
+    if (selectedSpec && selectedSpec.fileId === initialFileId) return;
+    const candidate = specs.find((row) => row.fileId === initialFileId);
+    if (candidate) setSelectedSpec(candidate);
+  }, [initialFileId, specs, selectedSpec]);
 
   useEffect(() => {
     return () => {
@@ -771,115 +788,31 @@ export function RepositorySpecsTab({
       </div>
 
       {selectedSpec ? (
-        <div
-          className="fixed top-12 right-0 bottom-0 left-0 z-40 bg-black/30"
-          role="presentation"
-          onClick={() => setSelectedSpec(null)}
-          data-testid="spec-drawer-overlay"
-        >
-          <aside
-            ref={drawerRef}
-            className="absolute right-0 top-0 h-full w-full max-w-xl bg-white dark:bg-gray-900 shadow-xl overflow-auto"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Spec detail drawer"
-            tabIndex={-1}
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => { if (event.key === 'Escape') setSelectedSpec(null); }}
-            data-testid="spec-drawer"
-          >
-            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">
-                  Spec detail
-                </p>
-                <p className="text-sm font-medium font-mono mt-1 truncate" title={selectedSpec.path}>
-                  {selectedSpec.path}
-                </p>
-              </div>
-              <button
-                type="button"
-                aria-label="Close spec drawer"
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                onClick={() => setSelectedSpec(null)}
-              >
-                <X className="w-4 h-4 text-gray-500" />
-              </button>
-            </div>
-            <div className="p-5 space-y-3 text-xs">
-              <div className="rounded-md border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700/60">
-                <DrawerRow label="Format">
-                  <span className="font-mono">{selectedSpec.format || 'unknown'}</span>
-                </DrawerRow>
-                <DrawerRow label="Confidence">
-                  <span className="font-mono">
-                    {selectedSpec.confidence != null
-                      ? `${Math.round(selectedSpec.confidence * 100)}%`
-                      : '—'}
-                  </span>
-                </DrawerRow>
-                <DrawerRow label="Discriminator">
-                  <span className="font-mono truncate max-w-[260px]" title={selectedSpec.discriminator || 'n/a'}>
-                    {selectedSpec.discriminator || 'n/a'}
-                  </span>
-                </DrawerRow>
-                <DrawerRow label="Status">
-                  <StatusPill status={selectedSpec.status} />
-                </DrawerRow>
-                <DrawerRow label="Branch">
-                  <span className="font-mono">{selectedSpec.branch}</span>
-                </DrawerRow>
-                <DrawerRow label="Import">
-                  <span className="font-mono">{selectedSpec.importEnabled ? 'enabled' : 'disabled'}</span>
-                </DrawerRow>
-                <DrawerRow label="Auto-Import">
-                  <span className="font-mono">{selectedSpec.autoImportEnabled ? 'enabled' : 'disabled'}</span>
-                </DrawerRow>
-                <DrawerRow label="Last imported">
-                  <span className="font-mono">{formatTimestamp(selectedSpec.lastImportedAt)}</span>
-                </DrawerRow>
-                <DrawerRow label="Last version">
-                  {selectedSpec.lastImportedVersionId ? (
-                    <a
-                      href={`/ade/dashboard/versions/${selectedSpec.lastImportedVersionId}`}
-                      className="font-mono text-indigo-600 hover:text-indigo-700"
-                    >
-                      {selectedSpec.lastImportedVersionId.slice(0, 8)}
-                    </a>
-                  ) : (
-                    <span className="font-mono text-gray-400">—</span>
-                  )}
-                </DrawerRow>
-              </div>
-              <div className="pt-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => { void handleImportNow(selectedSpec); }}
-                  data-testid="spec-drawer-import-now"
-                >
-                  <Download className="w-3.5 h-3.5 mr-1.5" />
-                  Import now
-                </Button>
-              </div>
-              <p className="text-[11px] text-gray-500">
-                Full spec detail UI ships with REPO-9.6. The drawer above shows the values
-                already available from the scan record.
-              </p>
-            </div>
-          </aside>
-        </div>
+        <RepositorySpecDetailDrawer
+          spec={selectedSpec}
+          repositoryId={repositoryId}
+          isPatchPending={pendingPatchIds.has(selectedSpec.fileId)}
+          onSelectionToggle={async (fileId, payload) => {
+            const target = specs.find((row) => row.fileId === fileId);
+            if (!target) return;
+            if (payload.importEnabled !== undefined) {
+              handleImportToggle(target, payload.importEnabled);
+            }
+            if (payload.autoImportEnabled !== undefined) {
+              handleAutoImportToggle(target, payload.autoImportEnabled);
+            }
+          }}
+          onSpecRefresh={(refreshed) => {
+            setSpecs((current) =>
+              current.map((row) => (row.fileId === refreshed.fileId ? refreshed : row)),
+            );
+            setSelectedSpec((prev) =>
+              prev && prev.fileId === refreshed.fileId ? refreshed : prev,
+            );
+          }}
+          onClose={() => setSelectedSpec(null)}
+        />
       ) : null}
-    </div>
-  );
-}
-
-function DrawerRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="px-3 py-2 flex justify-between gap-3 items-center">
-      <span className="text-gray-500">{label}</span>
-      <div>{children}</div>
     </div>
   );
 }

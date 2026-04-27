@@ -504,6 +504,26 @@ export default function RepositoryDetailPage() {
     router.replace(`/ade/dashboard/repositories/${repositoryId}?${nextQuery.toString()}`);
   }, [repositoryId, router, searchParams]);
 
+  const initialSpecFileId = searchParams.get('fileId');
+
+  /**
+   * Round-trips the spec drawer's open/closed state through the URL
+   * (`?fileId=`) so the drawer is deep-linkable per REPO-9.6. We only call
+   * `router.replace` when the value actually changes to keep history clean.
+   */
+  const setSpecFileIdQuery = useCallback((nextFileId: string | null) => {
+    const current = searchParams.get('fileId') ?? null;
+    if (current === nextFileId) return;
+    const nextQuery = new URLSearchParams(searchParams.toString());
+    if (nextFileId) {
+      nextQuery.set('fileId', nextFileId);
+      nextQuery.set('tab', 'specs');
+    } else {
+      nextQuery.delete('fileId');
+    }
+    router.replace(`/ade/dashboard/repositories/${repositoryId}?${nextQuery.toString()}`);
+  }, [repositoryId, router, searchParams]);
+
   const loadRepository = useCallback(async () => {
     if (!repositoryId) return;
     setIsLoadingRepository(true);
@@ -1386,6 +1406,8 @@ export default function RepositoryDetailPage() {
                     initialBranch={branchRows[0]?.branch || ''}
                     initialFilter={queryStatusFilter}
                     onFilterChange={setSpecFilterQuery}
+                    initialFileId={initialSpecFileId}
+                    onSelectedFileIdChange={setSpecFileIdQuery}
                   />
                 </TabsContent>
 
