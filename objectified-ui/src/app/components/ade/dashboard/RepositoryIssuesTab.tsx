@@ -243,16 +243,22 @@ export function RepositoryIssuesTab({ repositoryId, detail, loading, loadError, 
                     ) : (
                       <button
                         type="button"
+                        aria-expanded={exp}
+                        aria-controls={`paths-${item.reason}`}
                         onClick={() => setExpanded((prev) => ({ ...prev, [item.reason]: !exp }))}
                         className="inline-flex items-center gap-1 font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
                       >
                         {pathCount} affected file{pathCount === 1 ? '' : 's'}
-                        {exp ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                        {exp ? (
+                          <ChevronDown className="h-3.5 w-3.5" aria-hidden={true} />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5" aria-hidden={true} />
+                        )}
                       </button>
                     )}
                   </div>
                   {pathCount > 0 && exp ? (
-                    <ul className="mt-2 max-h-40 overflow-y-auto rounded-md border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 divide-y divide-gray-100 dark:divide-gray-800 text-xs font-mono">
+                    <ul id={`paths-${item.reason}`} className="mt-2 max-h-40 overflow-y-auto rounded-md border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 divide-y divide-gray-100 dark:divide-gray-800 text-xs font-mono">
                       {item.paths.map((p) => (
                         <li key={p} className="px-2 py-1.5 truncate" title={p}>
                           {p}

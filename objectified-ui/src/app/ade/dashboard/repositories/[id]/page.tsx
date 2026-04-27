@@ -487,25 +487,32 @@ export default function RepositoryDetailPage() {
 
   const activeTab = useMemo<RepositoryTab>(() => {
     if (pathname?.endsWith('/issues')) {
+      // Treat the /issues path as explicit user intent — keep Issues tab active
+      // until attention has finished loading; only fall back to branches once we
+      // know the repo genuinely has no active reasons.
+      if (attentionLoading) return 'issues';
       return showIssuesTab ? 'issues' : 'branches';
     }
     const queryTab = searchParams.get('tab');
     const allowed = new Set<RepositoryTab>([...repositoryTabsWithoutIssues, 'issues']);
     if (queryTab && allowed.has(queryTab as RepositoryTab)) {
       const qt = queryTab as RepositoryTab;
-      if (qt === 'issues' && !showIssuesTab) {
+      if (qt === 'issues' && !attentionLoading && !showIssuesTab) {
         return 'branches';
       }
       return qt;
     }
     return 'branches';
-  }, [pathname, searchParams, showIssuesTab]);
+  }, [pathname, searchParams, attentionLoading, showIssuesTab]);
 
   useEffect(() => {
-    if (pathname?.endsWith('/issues') && !showIssuesTab) {
+    // Only redirect away from /issues once the attention fetch has completed and
+    // we have confirmed there are no active reasons — prevents a premature redirect
+    // while data is still loading.
+    if (pathname?.endsWith('/issues') && !attentionLoading && !showIssuesTab) {
       router.replace(`/ade/dashboard/repositories/${repositoryId}?tab=branches`);
     }
-  }, [pathname, showIssuesTab, repositoryId, router]);
+  }, [pathname, attentionLoading, showIssuesTab, repositoryId, router]);
 
   const [repository, setRepository] = useState<RepositoryDetail | null>(null);
   const [branchRows, setBranchRows] = useState<BranchRow[]>([]);
