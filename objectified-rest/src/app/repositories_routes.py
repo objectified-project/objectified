@@ -403,6 +403,8 @@ def _short_checksum(checksum: str | None, length: int = _CONTENT_CHECKSUM_SHORT_
 def _build_hashed_event_log_entries(files: Sequence[RepositoryFileRecord], *, at: str) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for file_row in files:
+        if file_row.status == "removed":
+            continue
         short_checksum = _short_checksum(file_row.contentChecksum)
         if short_checksum is None:
             continue
@@ -480,7 +482,7 @@ def _classify_scan_files_against_previous(
         if previous is None:
             next_status: RepositoryFileStatus = "new"
             summary["added"] += 1
-        elif current.blobSha == previous.blobSha:
+        elif current.blobSha and current.blobSha == previous.blobSha:
             next_status = "unchanged"
             summary["unchanged"] += 1
             current = _reuse_checksum_from_previous_scan(current, previous)
@@ -1196,8 +1198,8 @@ def _build_diff_snapshot(file_row: RepositoryFileRecord) -> Dict[str, Any]:
         "path": file_row.path,
         "status": file_row.status,
         "blobSha": file_row.blobSha,
-                    "contentAlgo": file_row.contentAlgo,
-                    "contentChecksum": file_row.contentChecksum,
+        "contentAlgo": file_row.contentAlgo,
+        "contentChecksum": file_row.contentChecksum,
         "format": file_row.format,
         "tracked": file_row.tracked,
     }
