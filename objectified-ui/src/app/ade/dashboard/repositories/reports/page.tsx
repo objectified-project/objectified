@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft, Download, FileBarChart2, Search, Timer } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Download, FileBarChart2, Loader2, RotateCcw, Search, Timer, X } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { toast } from 'sonner';
 import { Button, buttonVariants } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
 import { Alert } from '@/app/components/ui/Alert';
@@ -81,6 +83,38 @@ function providerBarClass(provider: string): string {
   return 'bg-gray-700 dark:bg-gray-300';
 }
 
+type ScanReportExportListItem = {
+  id: string;
+  format: string;
+  status: string;
+  createdAt: string;
+  completedAt: string | null;
+  rowCount: number | null;
+  expectedRows: number | null;
+  progress: number;
+  error: string | null;
+};
+
+type ScanReportExportJobDetail = ScanReportExportListItem & {
+  downloadUrl?: string;
+};
+
+function buildClientExportDownloadUrl(exportId: string, downloadUrl: string | undefined): string | null {
+  if (!downloadUrl) return null;
+  const q = downloadUrl.split('?')[1];
+  if (!q) return null;
+  const p = new URLSearchParams(q);
+  const token = p.get('token');
+  if (!token) return null;
+  return `/api/repositories/scan-reports/exports/${encodeURIComponent(exportId)}/content?${new URLSearchParams({ token })}`;
+}
+
+function formatExportStatus(status: string): string {
+  if (status === 'cancelling') return 'Cancelling…';
+  if (status === 'pending' || status === 'running') return 'In progress';
+  return status;
+}
+
 function attentionCell(
   item: Pick<ScanReportRow, 'stale' | 'totals' | 'attentionScore'>,
 ): { label: string; title: string } {
@@ -116,6 +150,13 @@ export default function ScanReportsPage() {
   const [corpusStats, setCorpusStats] = useState<RepositoryCorpusStats | null>(null);
   const [corpusLoading, setCorpusLoading] = useState(true);
   const [corpusError, setCorpusError] = useState('');
+  const [exportJobs, setExportJobs] = useState<ScanReportExportListItem[]>([]);
+  const [exportsLoading, setExportsLoading] = useState(false);
+  const [exportBusyId, setExportBusyId] = useState<string | null>(null);
+  const [exportStartFormat, setExportStartFormat] = useState<null | 'csv' | 'json'>(null);
+  const [pollingJobId, setPollingJobId] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollGenRef = useRef(0);
 
   const urlProvider = searchParams.get('provider') || 'all';
   const urlStatus = searchParams.get('status') || 'all';
@@ -223,6 +264,196 @@ export default function ScanReportsPage() {
     };
   }, []);
 
+  const loadExportList = useCallback(async () => {
+    setExportsLoading(true);
+    try {
+      const res = await fetch('/api/repositories/scan-reports/exports', { cache: 'no-store' });
+      const body = (await res.json().catch(() => ({}))) as { success?: boolean; data?: { items?: unknown[] } };
+      if (!res.ok || !body.success || !body.data?.items) {
+        return;
+      }
+      setExportJobs(
+        (body.data.items as ScanReportExportListItem[]).map((j) => ({
+          ...j,
+        })),
+      );
+    } finally {
+      setExportsLoading(false);
+    }
+  }, []);
+
+  const startExport = useCallback(
+    async (format: 'csv' | 'json') => {
+      setExportStartFormat(format);
+      try {
+        const res = await fetch('/api/repositories/scan-reports/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            format,
+            filter: {
+              provider: urlProvider,
+              status: urlStatus,
+              search: urlQ.trim(),
+            },
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { success?: boolean; error?: unknown; data?: { exportJobId?: string } };
+        if (res.status === 400) {
+          const e = body.error;
+          if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'EXPORT_ROW_CAP_EXCEEDED') {
+            const msg = (e as { message?: string }).message || 'Result set too large. Narrow the filters.';
+            toast.error('Export limit exceeded', { description: msg });
+            return;
+          }
+          if (e && typeof e === 'object' && 'message' in e) {
+            toast.error(String((e as { message: unknown }).message));
+            return;
+          }
+        }
+        if (!res.ok || !body.success) {
+          const e = body.error;
+          toast.error(
+            typeof e === 'string' ? e : res.statusText || 'Failed to start export',
+          );
+          return;
+        }
+        const eid = body.data?.exportJobId;
+        if (!eid) {
+          toast.error('Invalid export response');
+          return;
+        }
+        void loadExportList();
+        toast.message('Export started', { description: 'We will notify you when the file is ready.' });
+        setPollingJobId(eid);
+      } finally {
+        setExportStartFormat(null);
+      }
+    },
+    [loadExportList, urlProvider, urlQ, urlStatus],
+  );
+
+  const cancelExport = useCallback(
+    async (exportId: string) => {
+      setExportBusyId(exportId);
+      try {
+        const res = await fetch(
+          `/api/repositories/scan-reports/exports/${encodeURIComponent(exportId)}/cancel`,
+          { method: 'POST' },
+        );
+        const body = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string };
+        if (!res.ok || !body.success) {
+          toast.error(body.error || 'Could not cancel export');
+          return;
+        }
+        toast.message('Cancelling export…');
+        void loadExportList();
+      } finally {
+        setExportBusyId(null);
+      }
+    },
+    [loadExportList],
+  );
+
+  const retryExport = useCallback(
+    async (exportId: string) => {
+      setExportBusyId(exportId);
+      try {
+        const res = await fetch(
+          `/api/repositories/scan-reports/exports/${encodeURIComponent(exportId)}/retry`,
+          { method: 'POST' },
+        );
+        const body = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string; data?: { exportJobId?: string } };
+        if (!res.ok || !body.success) {
+          toast.error(body.error || 'Retry failed');
+          return;
+        }
+        const e2 = body.data?.exportJobId;
+        if (e2) {
+          setPollingJobId(e2);
+        }
+        toast.message('Export restarted');
+        void loadExportList();
+      } finally {
+        setExportBusyId(null);
+      }
+    },
+    [loadExportList],
+  );
+
+  useEffect(() => {
+    if (!pollingJobId) return;
+    const gen = ++pollGenRef.current;
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
+    let attempts = 0;
+    const maxAttempts = 120;
+    const tick = async () => {
+      if (gen !== pollGenRef.current) return;
+      if (attempts++ > maxAttempts) {
+        setPollingJobId(null);
+        toast.error('Export timed out', { description: 'Refresh the page and check recent exports below.' });
+        return;
+      }
+      try {
+        const res = await fetch(`/api/repositories/scan-reports/exports/${encodeURIComponent(pollingJobId)}`, {
+          cache: 'no-store',
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          success?: boolean;
+          data?: ScanReportExportJobDetail;
+        };
+        if (!res.ok || !body.success || !body.data) {
+          pollRef.current = setTimeout(tick, 600);
+          return;
+        }
+        const j = body.data;
+        if (j.status === 'failed') {
+          setPollingJobId(null);
+          void loadExportList();
+          toast.error('Export failed', { description: j.error || 'See recent exports for details.' });
+          return;
+        }
+        if (j.status === 'cancelled' || j.status === 'cancelling') {
+          setPollingJobId(null);
+          void loadExportList();
+          return;
+        }
+        if (j.status === 'completed') {
+          setPollingJobId(null);
+          void loadExportList();
+          const link = buildClientExportDownloadUrl(j.id, j.downloadUrl);
+          if (link) {
+            toast.success('Export ready', {
+              action: { label: 'Download', onClick: () => window.open(link, '_blank', 'noopener') },
+              description: j.rowCount != null ? `${j.rowCount.toLocaleString()} row(s).` : undefined,
+            });
+          } else {
+            toast.success('Export complete');
+          }
+          return;
+        }
+      } catch {
+        // network blip: keep polling
+      }
+      pollRef.current = setTimeout(tick, 600);
+    };
+    void tick();
+    return () => {
+      pollGenRef.current += 1;
+      if (pollRef.current) {
+        clearTimeout(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [loadExportList, pollingJobId]);
+
+  useEffect(() => {
+    void loadExportList();
+  }, [loadExportList]);
+
   const liveMessage = useMemo(() => {
     if (isLoading) return 'Loading scan reports';
     if (error) return error;
@@ -260,18 +491,50 @@ export default function ScanReportsPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled
-                className="gap-1.5"
-                title="Planned in REPO-10.4"
-                aria-label="Export report; coming soon"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </Button>
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={exportStartFormat !== null}
+                    aria-label="Export report"
+                  >
+                    {exportStartFormat ? (
+                      <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4 shrink-0" />
+                    )}
+                    Export
+                    <ChevronDown className="w-4 h-4 shrink-0 opacity-70" />
+                  </Button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    className="z-50 min-w-[12rem] rounded-md border border-gray-200/90 bg-white p-1.5 text-sm shadow-md dark:border-slate-600 dark:bg-slate-900"
+                    align="end"
+                    sideOffset={4}
+                  >
+                    <DropdownMenu.Item
+                      className="flex cursor-default select-none items-center rounded-sm px-2.5 py-1.5 outline-none hover:bg-indigo-50 data-[highlighted]:bg-indigo-50 dark:hover:bg-slate-800 data-[highlighted]:dark:bg-slate-800"
+                      onSelect={() => {
+                        void startExport('csv');
+                      }}
+                    >
+                      CSV
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      className="flex cursor-default select-none items-center rounded-sm px-2.5 py-1.5 outline-none hover:bg-indigo-50 data-[highlighted]:bg-indigo-50 dark:hover:bg-slate-800 data-[highlighted]:dark:bg-slate-800"
+                      onSelect={() => {
+                        void startExport('json');
+                      }}
+                    >
+                      NDJSON (one object per line)
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
             </div>
           </div>
         </div>
@@ -293,6 +556,116 @@ export default function ScanReportsPage() {
               {corpusError}
             </Alert>
           )}
+
+          <section
+            className="rounded-lg border border-gray-200/80 dark:border-slate-600/50 bg-white/40 dark:bg-slate-900/20 p-3"
+            aria-label="Recent scan report exports"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Recent exports</h2>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                {exportsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
+                <button
+                  type="button"
+                  className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                  onClick={() => void loadExportList()}
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+            {exportJobs.length < 1 && !exportsLoading ? (
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">No exports yet. Use Export to start one.</p>
+            ) : (
+              <ul className="mt-2 divide-y divide-gray-200/60 dark:divide-slate-600/40 text-sm">
+                {exportJobs.map((job) => {
+                  const canCancel = job.status === 'pending' || job.status === 'running' || job.status === 'cancelling';
+                  const canRetry = job.status === 'failed' || job.status === 'cancelled';
+                  const fmt = job.format === 'json' ? 'NDJSON' : 'CSV';
+                  return (
+                    <li key={job.id} className="flex flex-col gap-1.5 py-2.5 first:pt-0 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <span className="font-mono text-xs text-gray-500 dark:text-gray-400">{job.id}</span>
+                        <span className="mx-2 text-gray-300">·</span>
+                        <span className="text-gray-800 dark:text-gray-100">{fmt}</span>
+                        <span className="mx-2 text-gray-300">·</span>
+                        <span className="capitalize text-gray-600 dark:text-gray-300">
+                          {formatExportStatus(job.status)}
+                        </span>
+                        {job.status === 'completed' && job.rowCount != null ? (
+                          <span className="ml-2 text-gray-500">({job.rowCount.toLocaleString()} rows)</span>
+                        ) : null}
+                        {job.error ? (
+                          <span className="ml-2 text-amber-600 dark:text-amber-400" title={job.error}>
+                            {job.error}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {job.status === 'completed' ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={async () => {
+                              const r = await fetch(
+                                `/api/repositories/scan-reports/exports/${encodeURIComponent(job.id)}`,
+                                { cache: 'no-store' },
+                              );
+                              const b = (await r.json().catch(() => ({}))) as {
+                                success?: boolean;
+                                data?: ScanReportExportJobDetail;
+                              };
+                              if (!r.ok || !b.success || !b.data) {
+                                toast.error('Could not get download link');
+                                return;
+                              }
+                              const link = buildClientExportDownloadUrl(job.id, b.data.downloadUrl);
+                              if (link) {
+                                window.open(link, '_blank', 'noopener');
+                              } else {
+                                toast.error('Download not available');
+                              }
+                            }}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download
+                          </Button>
+                        ) : null}
+                        {canCancel ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={exportBusyId === job.id}
+                            onClick={() => void cancelExport(job.id)}
+                            className="gap-1"
+                          >
+                            {exportBusyId === job.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                            Cancel
+                          </Button>
+                        ) : null}
+                        {canRetry ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={exportBusyId === job.id}
+                            onClick={() => void retryExport(job.id)}
+                            className="gap-1"
+                          >
+                            {exportBusyId === job.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                            Retry
+                          </Button>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
 
           <section
             className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5"

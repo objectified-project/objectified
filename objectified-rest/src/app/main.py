@@ -43,7 +43,7 @@ from .dashboard_routes import router as dashboard_router
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.45"
+    version="1.0.79"
 )
 
 
@@ -112,6 +112,9 @@ app.include_router(push_webhook_subscriptions_router)
 app.include_router(change_report_router)
 app.include_router(version_change_report_router)
 app.include_router(change_report_template_router)
+from .repositories.scan_report_export import register_routes as _register_scan_report_export
+
+_register_scan_report_export(repositories_router)
 app.include_router(repositories_router)
 app.include_router(dashboard_router)
 
