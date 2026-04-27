@@ -874,7 +874,7 @@ with REPO-10.3, REPO-10.4, REPO-10.5.
 | REPO-11.1  | `repository_attention` rollup table + computer | (Shipped) Materialized rollup; events + hourly reconcile, `pg_notify`                                | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `attention`, `database`, `rest` | Yes | No  | #2941 |
 | REPO-11.2  | Dashboard widget: "Repositories Needing Attention" | (Shipped) Top-N panel on `/ade/dashboard` from `GET /v1/dashboard/{tenant}/repository_attention?limit=5` + `odb.repository_attention` roll-up. | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `attention`, `dashboard`, `ui` | Yes | Yes | #2942 |
 | REPO-11.3  | Dashboard widget: "Recent Imports Needing Attention" | (Shipped) Panel under REPO-11.2 on `/ade/dashboard` from `GET /v1/dashboard/{tenant}/recent_imports_attention?limit=5`, `POST …/dismiss`, `odb.user_settings`; same import-job store as sync-history. | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `attention`, `dashboard`, `ui`, `import` | Yes | Yes | #2943 |
-| REPO-11.4  | Per-repo "Issues" tab                           | Repository detail tab listing actionable problems with "Fix" links (reconnect, edit manifest, retry import) | `enhancement`, `repository`, `roadmap-repository`, `attention`, `ui`             | No  | Yes | #2952 |
+| REPO-11.4  | Per-repo "Issues" tab                           | (Shipped) Tab between Scans and Sync; cards per rollup reason + paths; `GET /v1/repositories/{tenant}/{id}/attention`; Fix links; `/repositories/{id}/issues` rewrite + fade-out | `enhancement`, `repository`, `roadmap-repository`, `attention`, `ui`             | No  | Yes | #2952 |
 
 ### Detailed issues
 
@@ -1195,7 +1195,7 @@ blocking.
 | 21    | REPO-10.3  | #2949 | cross-repo aggregate stats card                    | Yes | C    |
 | 22    | REPO-10.4  | #2950 | report export (CSV + JSON) (shipped)               | No  | C    |
 | 23    | REPO-10.5  | #2951 | saved filters per user                             | No  | C    |
-| 24    | REPO-11.4  | #2952 | per-repo "Issues" tab                              | No  | D    |
+| 24    | REPO-11.4  | #2952 | per-repo "Issues" tab (shipped)                   | No  | D    |
 | 25    | REPO-12.2  | #2953 | project auto-creation policy & conflict handling   | No  | E    |
 | 26    | REPO-12.5  | #2954 | notifications on auto-import failure / warnings    | No  | E    |
 

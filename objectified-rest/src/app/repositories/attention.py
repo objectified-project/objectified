@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Sequence, Set, Tuple
+from typing import Dict, List, Sequence, Set, Tuple
 
 # Sum-based score; each reason at most once. Capped at 100 in compute_attention_score.
 REASON_WEIGHTS: dict[str, int] = {
@@ -82,25 +82,32 @@ def _stale_ready_to_promote(f: AttentionFileInput, now: datetime) -> bool:
     return (now - t0) >= STALE_CHECKSUM_AGE
 
 
-def compute_attention_row(inp: AttentionComputeInput) -> Tuple[Set[str], int, int]:
-    """Return (reasons set, open_count, attention_score)."""
+def compute_attention_detail(
+    inp: AttentionComputeInput,
+) -> Tuple[Set[str], int, int, Dict[str, List[str]]]:
+    """
+    Return (reasons set, open_count, attention_score, paths per active reason).
+    Repository-scoped reasons (e.g. token_revoked) map to an empty path list.
+    """
     reasons: Set[str] = set()
     open_paths: Set[str] = set()
+    reason_paths: Dict[str, Set[str]] = {}
+
+    def _add_path(reason: str, path: str | None) -> None:
+        reasons.add(reason)
+        if path:
+            reason_paths.setdefault(reason, set()).add(path)
+            open_paths.add(path)
+
     for f in inp.last_scan_files:
         if f.status == "parse_error":
-            reasons.add("parse_error")
-            if f.path:
-                open_paths.add(f.path)
+            _add_path("parse_error", f.path)
         if f.status == "manifest_error":
-            reasons.add("manifest_error")
-            if f.path:
-                open_paths.add(f.path)
+            _add_path("manifest_error", f.path)
         if f.last_import_job_state == "failed" and f.path:
-            reasons.add("import_failed")
-            open_paths.add(f.path)
+            _add_path("import_failed", f.path)
         if _stale_ready_to_promote(f, inp.now) and f.path:
-            reasons.add("stale_checksum")
-            open_paths.add(f.path)
+            _add_path("stale_checksum", f.path)
 
     if inp.any_credential_revoked:
         reasons.add("token_revoked")
@@ -112,7 +119,14 @@ def compute_attention_row(inp: AttentionComputeInput) -> Tuple[Set[str], int, in
     ordered = sorted(r for r in reasons if r in _VALID_REASONS)
     open_count = len(open_paths)
     score = compute_attention_score(ordered)
-    return set(ordered), open_count, score
+    paths_by_reason = {r: sorted(reason_paths.get(r, set())) for r in ordered}
+    return set(ordered), open_count, score, paths_by_reason
+
+
+def compute_attention_row(inp: AttentionComputeInput) -> Tuple[Set[str], int, int]:
+    """Return (reasons set, open_count, attention_score)."""
+    rsn, ocnt, score, _ = compute_attention_detail(inp)
+    return rsn, ocnt, score
 
 
 def top_reason_for_chips(valid_reasons: Sequence[str]) -> str:
@@ -132,14 +146,8 @@ def top_reason_for_chips(valid_reasons: Sequence[str]) -> str:
 
 
 def attention_detail_query_tab(valid_reasons: Sequence[str]) -> str:
-    """`tab` query value for repository deep links (REPO-11.2 / #2942; Issues tab is REPO-11.4)."""
+    """`tab` query for repository deep links (REPO-11.4: prefer Issues for any active reason)."""
     r = {x for x in valid_reasons if x in _VALID_REASONS}
-    if "stale_checksum" in r:
-        return "specs"
-    if r & {"parse_error", "manifest_error", "import_failed"}:
-        return "files"
-    if "token_revoked" in r or "scheduler_paused" in r:
-        return "settings"
-    if "repeated_failures" in r:
-        return "scans"
+    if r:
+        return "issues"
     return "files"

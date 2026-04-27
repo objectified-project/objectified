@@ -47,7 +47,7 @@ from .repositories.spec_detail import (
 from .repositories.attention import (
     AttentionComputeInput,
     AttentionFileInput,
-    compute_attention_row,
+    compute_attention_detail,
 )
 
 router = APIRouter(prefix="/v1/repositories", tags=["repositories"])
@@ -81,6 +81,20 @@ class RepositoryEditRequest(BaseModel):
 
 class RepositoryDeleteRequest(BaseModel):
     confirmFullName: str = Field(min_length=1)
+
+
+class RepositoryAttentionReasonDetail(BaseModel):
+    reason: str
+    paths: List[str] = Field(default_factory=list)
+
+
+class RepositoryAttentionDetailResponse(BaseModel):
+    reasons: List[str] = Field(default_factory=list)
+    items: List[RepositoryAttentionReasonDetail] = Field(default_factory=list)
+    openCount: int = 0
+    attentionScore: int = 0
+    lastChangeAt: str = ""
+    refreshedAt: str = ""
 
 
 RepositoryScanTrigger = Literal["manual", "scheduled", "webhook", "register"]
@@ -1320,14 +1334,19 @@ def _sync_stale_mismatch_markers(now_iso: str, files: Sequence[RepositoryFileRec
             f.staleMismatchAt = now_iso
 
 
-def _recompute_repository_attention(tenant_id: str, repository_id: str) -> None:
-    """REPO-11.1 / #2941: recompute in-memory and optional PostgreSQL row, then NOTIFY."""
+def _attention_compute_input_for_repository(
+    tenant_id: str, repository_id: str,
+) -> Optional[Tuple[datetime, str, AttentionComputeInput, Optional[Dict[str, Any]]]]:
+    """
+    Build AttentionComputeInput plus timestamps / prior rollup row.
+    Returns None when the repository is not registered for this tenant.
+    """
     now_iso = _utc_now_iso()
     now_dt = datetime.now(timezone.utc)
     with _STORE_LOCK:
         repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
         if repository is None:
-            return
+            return None
         repo_status = repository.status
         is_auto = repository_id in _REPO_AUTO_PAUSED
         last = _get_last_complete_scan_in_memory(repository_id)
@@ -1367,16 +1386,24 @@ def _recompute_repository_attention(tenant_id: str, repository_id: str) -> None:
             _any_rev = bool(db.any_repository_credential_revoked(repository_id))
         except Exception:
             _any_rev = False
-    rsn, ocnt, score = compute_attention_row(
-        AttentionComputeInput(
-            now=now_dt,
-            repository_status=repo_status,
-            is_auto_paused=is_auto,
-            last_scan_files=vfiles,
-            max_consecutive_failures=_max_cf,
-            any_credential_revoked=_any_rev,
-        )
+    inp = AttentionComputeInput(
+        now=now_dt,
+        repository_status=repo_status,
+        is_auto_paused=is_auto,
+        last_scan_files=vfiles,
+        max_consecutive_failures=_max_cf,
+        any_credential_revoked=_any_rev,
     )
+    return now_dt, now_iso, inp, prev
+
+
+def _recompute_repository_attention(tenant_id: str, repository_id: str) -> None:
+    """REPO-11.1 / #2941: recompute in-memory and optional PostgreSQL row, then NOTIFY."""
+    ctx = _attention_compute_input_for_repository(tenant_id, repository_id)
+    if ctx is None:
+        return
+    _now_dt, now_iso, inp, prev = ctx
+    rsn, ocnt, score, _ = compute_attention_detail(inp)
     reasons_list = sorted(rsn)
     p_reasons: Optional[List[str]] = None
     p_oc: Optional[int] = None
@@ -3646,6 +3673,40 @@ async def get_repository(
     if repository is None:
         raise HTTPException(status_code=404, detail=f"Repository not found: {repository_id}")
     return repository
+
+
+@router.get(
+    "/{tenant_slug}/{repository_id}/attention",
+    response_model=RepositoryAttentionDetailResponse,
+    summary="Per-repository attention detail with file paths (REPO-11.4 / #2952).",
+)
+async def get_repository_attention_detail(
+    tenant_slug: str,
+    repository_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositoryAttentionDetailResponse:
+    def _now_iso() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    _ = tenant_slug
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    tenant_id = str(auth_data["tenant_id"])
+    ctx = _attention_compute_input_for_repository(tenant_id, repository_id)
+    if ctx is None:
+        raise HTTPException(status_code=404, detail=f"Repository not found: {repository_id}")
+    _now_dt, now_iso, inp, prev = ctx
+    rsn, ocnt, score, reason_paths = compute_attention_detail(inp)
+    reasons_list = sorted(rsn)
+    items = [RepositoryAttentionReasonDetail(reason=r, paths=reason_paths.get(r, [])) for r in reasons_list]
+    last_change = str(prev.get("lastChangeAt") or now_iso) if prev else now_iso
+    return RepositoryAttentionDetailResponse(
+        reasons=reasons_list,
+        items=items,
+        openCount=ocnt,
+        attentionScore=score,
+        lastChangeAt=last_change,
+        refreshedAt=_now_iso(),
+    )
 
 
 @router.patch("/{tenant_slug}/{repository_id}/branches", response_model=RepositoryRecord)

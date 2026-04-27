@@ -2,10 +2,11 @@
 
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Activity,
   AlertOctagon,
+  AlertTriangle,
   ArrowDown,
   ArrowLeft,
   ArrowUp,
@@ -49,7 +50,12 @@ import {
   repositoryPanelHeaderClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
 import { RepositoryStatusChip } from '@/app/components/ade/dashboard/RepositoryStatusChip';
+import {
+  RepositoryIssuesTab,
+  type RepositoryAttentionDetailPayload,
+} from '@/app/components/ade/dashboard/RepositoryIssuesTab';
 import { RepositorySpecsTab } from '@/app/components/ade/dashboard/RepositorySpecsTab';
+import { subscribeRepositoryDashboardWidgetRefresh } from '@/app/utils/repository-dashboard-broadcast';
 import { repositoryManifestSchema } from '@/lib/repositoryManifestSchema';
 import { getRepositoriesI18nBundle } from '../i18n';
 
@@ -62,8 +68,17 @@ const fileViewportMinHeightPx = 420;
 const fileViewportBottomReservePx = 64;
 const repo63IssueUrl = 'https://github.com/KenSuenobu/objectified-commercial/issues/2796';
 
-type RepositoryTab = 'branches' | 'files' | 'specs' | 'scans' | 'sync' | 'manifest' | 'settings';
-const repositoryTabs: RepositoryTab[] = ['branches', 'files', 'specs', 'scans', 'sync', 'manifest', 'settings'];
+type RepositoryTab = 'branches' | 'files' | 'specs' | 'scans' | 'issues' | 'sync' | 'manifest' | 'settings';
+
+const repositoryTabsWithoutIssues: RepositoryTab[] = [
+  'branches',
+  'files',
+  'specs',
+  'scans',
+  'sync',
+  'manifest',
+  'settings',
+];
 
 type SpecFilter = 'all' | 'importable' | 'imported' | 'failing' | 'awaiting_selection';
 const specFilterValues: SpecFilter[] = ['all', 'importable', 'imported', 'failing', 'awaiting_selection'];
@@ -353,6 +368,7 @@ const tabIcons: Record<RepositoryTab, React.ComponentType<{ className?: string }
   files: FileSearch,
   specs: FileCode2,
   scans: Activity,
+  issues: AlertTriangle,
   sync: GitPullRequestArrow,
   manifest: FileCode2,
   settings: Settings2,
@@ -363,6 +379,7 @@ const tabLabel: Record<RepositoryTab, string> = {
   files: 'Files',
   specs: 'Specs',
   scans: 'Scans',
+  issues: 'Issues',
   sync: 'Sync history',
   manifest: 'Manifest',
   settings: 'Settings',
@@ -389,17 +406,113 @@ const tabListClass = [
 export default function RepositoryDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const copy = getRepositoriesI18nBundle('en');
   const repositoryId = params?.id || '';
 
+  const [attentionDetail, setAttentionDetail] = useState<RepositoryAttentionDetailPayload | null>(null);
+  const [attentionLoading, setAttentionLoading] = useState(true);
+  const [attentionError, setAttentionError] = useState<string | null>(null);
+  const [fadingAttentionReasons, setFadingAttentionReasons] = useState<Set<string>>(new Set());
+  const prevAttentionReasonsRef = useRef<string[]>([]);
+  const attentionFadeTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const issuesHref = `/ade/dashboard/repositories/${repositoryId}/issues`;
+
+  const loadAttentionDetail = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!repositoryId) return;
+      setAttentionError(null);
+      try {
+        const res = await fetch(`/api/repositories/${encodeURIComponent(repositoryId)}/attention`, {
+          signal,
+          cache: 'no-store',
+        });
+        const j = (await res.json().catch(() => ({}))) as {
+          success?: boolean;
+          data?: RepositoryAttentionDetailPayload;
+          error?: string;
+        };
+        if (signal?.aborted) return;
+        if (!res.ok || j.success === false) {
+          setAttentionDetail(null);
+          setAttentionError(j.error || 'Failed to load attention');
+          return;
+        }
+        if (j.data) {
+          const nextReasons = j.data.reasons ?? [];
+          const prev = prevAttentionReasonsRef.current;
+          if (prev.length > 0 || nextReasons.length > 0) {
+            const dropped = prev.filter((r) => !nextReasons.includes(r));
+            for (const r of dropped) {
+              const existing = attentionFadeTimersRef.current.get(r);
+              if (existing) clearTimeout(existing);
+              setFadingAttentionReasons((s) => new Set(s).add(r));
+              const tid = setTimeout(() => {
+                setFadingAttentionReasons((s) => {
+                  const n = new Set(s);
+                  n.delete(r);
+                  return n;
+                });
+                attentionFadeTimersRef.current.delete(r);
+              }, 5000);
+              attentionFadeTimersRef.current.set(r, tid);
+            }
+          }
+          prevAttentionReasonsRef.current = nextReasons;
+          setAttentionDetail(j.data);
+        }
+      } catch (e) {
+        if (signal?.aborted) return;
+        setAttentionDetail(null);
+        setAttentionError(e instanceof Error ? e.message : 'Failed to load attention');
+      } finally {
+        if (!signal?.aborted) setAttentionLoading(false);
+      }
+    },
+    [repositoryId],
+  );
+
+  const showIssuesTab =
+    (attentionDetail?.reasons?.length ?? 0) > 0 || fadingAttentionReasons.size > 0;
+
+  const repositoryTabs = useMemo((): RepositoryTab[] => {
+    if (!showIssuesTab) return repositoryTabsWithoutIssues;
+    const base = repositoryTabsWithoutIssues;
+    const i = base.indexOf('scans');
+    if (i === -1) return base;
+    return [...base.slice(0, i + 1), 'issues', ...base.slice(i + 1)];
+  }, [showIssuesTab]);
+
   const activeTab = useMemo<RepositoryTab>(() => {
+    if (pathname?.endsWith('/issues')) {
+      // Treat the /issues path as explicit user intent — keep Issues tab active
+      // until attention has finished loading; only fall back to branches once we
+      // know the repo genuinely has no active reasons.
+      if (attentionLoading) return 'issues';
+      return showIssuesTab ? 'issues' : 'branches';
+    }
     const queryTab = searchParams.get('tab');
-    if (queryTab && repositoryTabs.includes(queryTab as RepositoryTab)) {
-      return queryTab as RepositoryTab;
+    const allowed = new Set<RepositoryTab>([...repositoryTabsWithoutIssues, 'issues']);
+    if (queryTab && allowed.has(queryTab as RepositoryTab)) {
+      const qt = queryTab as RepositoryTab;
+      if (qt === 'issues' && !attentionLoading && !showIssuesTab) {
+        return 'branches';
+      }
+      return qt;
     }
     return 'branches';
-  }, [searchParams]);
+  }, [pathname, searchParams, attentionLoading, showIssuesTab]);
+
+  useEffect(() => {
+    // Only redirect away from /issues once the attention fetch has completed and
+    // we have confirmed there are no active reasons — prevents a premature redirect
+    // while data is still loading.
+    if (pathname?.endsWith('/issues') && !attentionLoading && !showIssuesTab) {
+      router.replace(`/ade/dashboard/repositories/${repositoryId}?tab=branches`);
+    }
+  }, [pathname, attentionLoading, showIssuesTab, repositoryId, router]);
 
   const [repository, setRepository] = useState<RepositoryDetail | null>(null);
   const [branchRows, setBranchRows] = useState<BranchRow[]>([]);
@@ -475,11 +588,21 @@ export default function RepositoryDetailPage() {
     return () => { cancelled = true; };
   }, [manifestDraft]);
 
-  const setTab = useCallback((nextTab: RepositoryTab) => {
-    const nextQuery = new URLSearchParams(searchParams.toString());
-    nextQuery.set('tab', nextTab);
-    router.replace(`/ade/dashboard/repositories/${repositoryId}?${nextQuery.toString()}`);
-  }, [repositoryId, router, searchParams]);
+  const setTab = useCallback(
+    (nextTab: RepositoryTab) => {
+      const base = `/ade/dashboard/repositories/${repositoryId}`;
+      if (nextTab === 'issues') {
+        if (showIssuesTab) {
+          router.replace(issuesHref);
+        }
+        return;
+      }
+      const nextQuery = new URLSearchParams(searchParams.toString());
+      nextQuery.set('tab', nextTab);
+      router.replace(`${base}?${nextQuery.toString()}`);
+    },
+    [issuesHref, repositoryId, router, searchParams, showIssuesTab],
+  );
 
   const queryStatusFilter: SpecFilter = useMemo(() => {
     const queryStatus = searchParams.get('status');
@@ -523,6 +646,49 @@ export default function RepositoryDetailPage() {
     }
     router.replace(`/ade/dashboard/repositories/${repositoryId}?${nextQuery.toString()}`);
   }, [repositoryId, router, searchParams]);
+
+  useEffect(() => {
+    const fs = searchParams.get('fileStatus');
+    if (!fs) return;
+    if (fs !== 'all') {
+      setFileStatusFilter(fs);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!repositoryId) return;
+    setFadingAttentionReasons(new Set());
+    prevAttentionReasonsRef.current = [];
+    setAttentionDetail(null);
+    setAttentionLoading(true);
+    setAttentionError(null);
+    const c = new AbortController();
+    void loadAttentionDetail(c.signal);
+    return () => c.abort();
+  }, [repositoryId, loadAttentionDetail]);
+
+  useEffect(() => {
+    if (!repository) return;
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
+      void loadAttentionDetail();
+    };
+    const id = window.setInterval(tick, 5000);
+    return () => window.clearInterval(id);
+  }, [repository, loadAttentionDetail]);
+
+  useEffect(() => {
+    return subscribeRepositoryDashboardWidgetRefresh(() => {
+      void loadAttentionDetail();
+    });
+  }, [loadAttentionDetail]);
+
+  useEffect(() => {
+    return () => {
+      attentionFadeTimersRef.current.forEach((t) => clearTimeout(t));
+      attentionFadeTimersRef.current.clear();
+    };
+  }, [repositoryId]);
 
   const loadRepository = useCallback(async () => {
     if (!repositoryId) return;
@@ -755,9 +921,10 @@ export default function RepositoryDetailPage() {
       branches: branchRows.length || undefined,
       files: scanFiles.length || undefined,
       scans: scans.length || undefined,
+      issues: attentionDetail?.reasons?.length || undefined,
       sync: syncHistory.length || undefined,
     }),
-    [branchRows.length, scanFiles.length, scans.length, syncHistory.length],
+    [attentionDetail?.reasons?.length, branchRows.length, scanFiles.length, scans.length, syncHistory.length],
   );
 
   const saveBranches = async () => {
@@ -1571,6 +1738,17 @@ export default function RepositoryDetailPage() {
                       ) : null}
                     </ol>
                   </div>
+                </TabsContent>
+
+                {/* ============ ISSUES (attention) ============ */}
+                <TabsContent value="issues" className={repositoryPanelClass}>
+                  <RepositoryIssuesTab
+                    repositoryId={repositoryId}
+                    detail={attentionDetail}
+                    loading={attentionLoading}
+                    loadError={attentionError}
+                    fadingReasons={fadingAttentionReasons}
+                  />
                 </TabsContent>
 
                 {/* ============ SYNC HISTORY ============ */}

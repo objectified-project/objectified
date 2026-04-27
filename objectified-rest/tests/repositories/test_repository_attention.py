@@ -9,6 +9,7 @@ from app.repositories.attention import (
     REASON_WEIGHTS,
     STALE_CHECKSUM_AGE,
     attention_detail_query_tab,
+    compute_attention_detail,
     compute_attention_row,
     compute_attention_score,
     top_reason_for_chips,
@@ -104,7 +105,46 @@ def test_top_reason_for_chips_prefers_highest_weight() -> None:
 
 
 def test_attention_detail_query_tab() -> None:
-    assert attention_detail_query_tab(["stale_checksum", "parse_error"]) == "specs"
-    assert attention_detail_query_tab(["parse_error"]) == "files"
-    assert attention_detail_query_tab(["token_revoked"]) == "settings"
-    assert attention_detail_query_tab(["repeated_failures"]) == "scans"
+    assert attention_detail_query_tab(["stale_checksum", "parse_error"]) == "issues"
+    assert attention_detail_query_tab(["parse_error"]) == "issues"
+    assert attention_detail_query_tab(["token_revoked"]) == "issues"
+    assert attention_detail_query_tab(["repeated_failures"]) == "issues"
+
+
+def test_compute_attention_detail_paths_by_reason() -> None:
+    t = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    f1 = AttentionFileInput(
+        path="a.yaml",
+        status="parse_error",
+        import_enabled=True,
+        auto_import_enabled=True,
+        content_checksum="a" * 64,
+        last_imported_checksum="b" * 64,
+        stale_mismatch_at="2020-01-01T00:00:00+00:00",
+        last_import_job_state=None,
+    )
+    f2 = AttentionFileInput(
+        path="b.yaml",
+        status="new",
+        import_enabled=True,
+        auto_import_enabled=True,
+        content_checksum="a" * 64,
+        last_imported_checksum="b" * 64,
+        stale_mismatch_at="2020-01-01T00:00:00+00:00",
+        last_import_job_state="failed",
+    )
+    rsn, ocnt, _score, paths = compute_attention_detail(
+        AttentionComputeInput(
+            now=t,
+            repository_status="healthy",
+            is_auto_paused=False,
+            last_scan_files=(f1, f2),
+            max_consecutive_failures=0,
+            any_credential_revoked=False,
+        )
+    )
+    assert "parse_error" in rsn
+    assert "import_failed" in rsn
+    assert ocnt == 2
+    assert paths["parse_error"] == ["a.yaml"]
+    assert paths["import_failed"] == ["b.yaml"]
