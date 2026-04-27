@@ -516,7 +516,7 @@ export function RepositorySpecsTab({
         </div>
       ) : filteredSpecs.length === 0 ? (
         <div className="px-5 py-6 text-sm text-gray-500" data-testid="spec-empty">
-          No specs match the current filter. Try lowering the confidence threshold or running another scan.
+          No specs match the current filter. Try changing the filter or running another scan.
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -683,7 +683,7 @@ export function RepositorySpecsTab({
                             onClick={() => setOpenMenuFileId(null)}
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            View raw file
+                            Open scan record
                           </a>
                         </div>
                       ) : null}

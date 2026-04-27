@@ -124,7 +124,7 @@ test.describe('REPO-9.4 — Specs tab', () => {
     });
 
     await page.route(
-      new RegExp(`/api/repositories/${repositoryId}/specs/[^/]+$`),
+      new RegExp(`/api/repositories/${repositoryId}/specs/[0-9a-f-]{36}$`),
       async (route: Route) => {
         const url = new URL(route.request().url());
         const segments = url.pathname.split('/');
