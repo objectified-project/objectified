@@ -1061,7 +1061,7 @@ shared widget shell. **Parallel = Yes**.
 
 | Roadmap ID | Title                                            | Description                                                                                                  | Labels                                                                          | MVP | Parallel | Issue |
 |------------|--------------------------------------------------|--------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|-----|----------|-------|
-| REPO-12.1  | Auto-import worker + dispatch                    | Consume scan-completion events; for `(import_enabled, auto_import_enabled, checksum_changed)` triplets, dispatch dry-run import jobs | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `scan`, `import` | Yes | No  | #2935 |
+| REPO-12.1  | Auto-import worker + dispatch                    | Consume scan-completion events; for `(import_enabled, auto_import_enabled, checksum_changed)` triplets, dispatch dry-run import jobs | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `scan`, `import` | Yes | No  | Done (#2935) |
 | REPO-12.2  | Project auto-creation policy & conflict handling | Reuse REPO-5.3 policy; expose conflict resolution surface ("project slug taken", "version-strategy mismatch") | `enhancement`, `repository`, `roadmap-repository`, `scan`, `import`   | No  | Yes | #2953 |
 | REPO-12.3  | Version creation with provenance                 | Bind `repository_source` (Epic A) on every auto-imported version; emit `repository.auto_imported` audit     | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-provenance`, `import` | Yes | No  | #2936 |
 | REPO-12.4  | `repository_scan_report` artifact persisted per tick | Per scheduler tick (or scan), emit a single report row with totals + per-file payload; retained 90 days   | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `scan`, `database` | Yes | Yes | #2937 |
@@ -1185,7 +1185,7 @@ blocking.
 | Order | ID         | Issue | Title                                               | MVP | Epic |
 |-------|------------|-------|-----------------------------------------------------|-----|------|
 | 3     | REPO-9.1   | #2931 | import_enabled flag                                 | Yes | B    |
-| 7     | REPO-12.1  | #2935 | auto-import worker + dispatch                       | Yes | E    |
+| 7     | REPO-12.1  | Done (#2935) | auto-import worker + dispatch                       | Yes | E    |
 | 8     | REPO-12.3  | #2936 | version creation with provenance                    | Yes | E    |
 | 9     | REPO-12.4  | #2937 | repository_scan_report artifact                     | Yes | E    |
 | 16    | REPO-12.6  | #2944 | audit + change-report linking for auto-imports      | Yes | E    |
