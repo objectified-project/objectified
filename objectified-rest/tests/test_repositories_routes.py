@@ -1946,3 +1946,145 @@ def test_list_specs_exposes_confidence_and_supports_min_confidence_filter() -> N
     assert importable_paths == ["apis/high.yaml", "apis/medium.yaml"]
 
     assert invalid_threshold.status_code == 422
+
+
+def test_import_now_dispatches_manual_job_idempotency_and_audit() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    r1 = None
+    r2 = None
+    by_path: dict = {}
+    import_audits: list = []
+    file_id = ""
+    create_response = None
+    repository_id = ""
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000070",
+                "provider": "github",
+                "owner": "acme",
+                "name": "import-now",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="import-now-seed",
+            files=[
+                {
+                    "path": "apis/manual.yaml",
+                    "blobSha": "1",
+                    "contentAlgo": "sha256",
+                    "contentChecksum": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                    "tracked": True,
+                    "importEnabled": True,
+                    "autoImportEnabled": False,
+                    "projectSlug": "payments",
+                }
+            ],
+        )
+        file_id = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{scan_id}/files",
+        ).json()["items"][0]["id"]
+        with patch("app.repositories_routes.db") as mdb:
+            mdb.get_project_by_slug.return_value = {"id": "99999999-9999-9999-9999-999999999999"}
+            mdb.get_latest_repository_source_checksum_for_project.return_value = None
+            r1 = client.post(
+                f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}:importNow",
+                json={"branch": "main", "force": True},
+            )
+            r2 = client.post(
+                f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}:importNow",
+                json={"branch": "main", "force": True},
+            )
+        spec_row = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs",
+            params={"branch": "main"},
+        ).json()["items"]
+        by_path = {r["path"]: r for r in spec_row}
+        audit_rows = _get_repository_audit_rows_for_tests(repository_id)
+        import_audits = [a for a in audit_rows if a["eventType"] == "repository.spec.import_now_triggered"]
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response is not None and create_response.status_code == 201
+    assert r1 is not None and r1.status_code == 202
+    assert r2 is not None and r2.status_code == 202
+    job_id_1 = r1.json()["importJobId"]
+    assert r2.json()["importJobId"] == job_id_1
+    assert by_path["apis/manual.yaml"]["status"] == "importing"
+    assert len(import_audits) == 1
+    assert import_audits[0]["detail"]["fileId"] == file_id
+    assert import_audits[0]["detail"]["branch"] == "main"
+    assert import_audits[0]["detail"]["force"] is True
+    jobs = [j for j in _get_repository_import_jobs_for_tests(repository_id) if j.id == job_id_1]
+    assert len(jobs) == 1
+    assert jobs[0].sourceKind == "repository_manual_import"
+
+
+def test_import_now_rejects_disabled_import_and_unchanged_checksum() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000071",
+                "provider": "github",
+                "owner": "acme",
+                "name": "import-now-gate",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="gate-seed",
+            files=[
+                {
+                    "path": "apis/locked.yaml",
+                    "blobSha": "1",
+                    "contentAlgo": "sha256",
+                    "contentChecksum": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                    "tracked": True,
+                    "importEnabled": False,
+                    "autoImportEnabled": False,
+                    "projectSlug": "pay",
+                },
+            ],
+        )
+        file_id = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{scan_id}/files",
+        ).json()["items"][0]["id"]
+        disabled = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}:importNow",
+            json={"force": False},
+        )
+        patch_response = client.patch(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}",
+            json={"importEnabled": True},
+        )
+        opened_id = patch_response.json()["fileId"]
+        with patch("app.repositories_routes.db") as mdb:
+            mdb.get_project_by_slug.return_value = {"id": "88888888-8888-8888-8888-888888888888"}
+            mdb.get_latest_repository_source_checksum_for_project.return_value = (
+                "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            )
+            conflict = client.post(
+                f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{opened_id}:importNow",
+                json={"force": False},
+            )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert disabled.status_code == 400
+    assert disabled.json()["detail"]["code"] == "IMPORT_NOT_ENABLED"
+    assert patch_response.status_code == 200
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["code"] == "IMPORT_UNCHANGED_CHECKSUM"
