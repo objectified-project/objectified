@@ -2401,3 +2401,112 @@ def test_scan_reports_list_includes_materialized_row_after_scan() -> None:
     assert item["totals"] is not None
     assert int(item["totals"]["importable"]) >= 1
     assert item["lastScanId"] == scan_id
+    assert item.get("lastReportId")
+
+
+def test_per_repository_scan_reports_list_detail_latest_and_diff() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000099",
+                "provider": "github",
+                "owner": "acme",
+                "name": "per-repo-reports",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        assert create_response.status_code == 201, create_response.text
+        repository_id = create_response.json()["repository"]["id"]
+        first_scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            first_scan_id,
+            commit_sha="c1",
+            files=[
+                {
+                    "path": "specs/api.yaml",
+                    "format": "openapi_3.1",
+                    "confidence": 0.9,
+                    "tracked": True,
+                },
+            ],
+        )
+        tlist = client.get(f"/v1/repositories/{_TENANT_SLUG}/scan-reports")
+        assert tlist.status_code == 200
+        t_item = next(
+            (row for row in tlist.json()["items"] if row["repositoryId"] == repository_id), None
+        )
+        assert t_item is not None
+        assert t_item.get("lastReportId")
+        report_a = str(t_item["lastReportId"])
+        rlist = client.get(f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scan-reports")
+        assert rlist.status_code == 200
+        rj = rlist.json()
+        assert rj["total"] == 1
+        assert rj["items"][0]["id"] == report_a
+        latest = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scan-reports/latest",
+            follow_redirects=False,
+        )
+        assert latest.status_code == 302
+        assert report_a in (latest.headers.get("location") or "")
+
+        detail = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scan-reports/{report_a}"
+        )
+        assert detail.status_code == 200
+        dj = detail.json()
+        assert dj["id"] == report_a
+        assert dj["compareToPrevious"] is None
+        assert isinstance(dj["payload"], list) and len(dj["payload"]) >= 1
+        assert dj["scan"] is not None
+
+        next_scan = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans",
+            json={"branch": "main", "force": True},
+        )
+        assert next_scan.status_code == 200, next_scan.text
+        second_scan_id = next_scan.json()["id"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            second_scan_id,
+            commit_sha="c2",
+            files=[
+                {
+                    "path": "specs/api.yaml",
+                    "format": "openapi_3.1",
+                    "confidence": 0.9,
+                    "tracked": True,
+                },
+            ],
+        )
+        rlist2 = client.get(f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scan-reports")
+        assert rlist2.json()["total"] == 2
+        report_b = rlist2.json()["items"][0]["id"]
+        det_b = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scan-reports/{report_b}"
+        )
+        body_b = det_b.json()
+        assert body_b["compareToPrevious"] is not None
+        assert body_b["compareToPrevious"]["otherReportId"] == report_a
+        diff = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scan-reports/{report_b}/diff/{report_a}"
+        )
+        assert diff.status_code == 200
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_per_repo_scan_report_endpoints_require_repository_read_scope() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        r = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/"
+            "aaaaaaaa-bbbb-cccc-dddd-00000000aaaa/scan-reports",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "REPOSITORY_SCOPE_REQUIRED"

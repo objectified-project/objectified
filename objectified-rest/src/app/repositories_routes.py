@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from .auth import validate_authentication
@@ -382,6 +382,7 @@ class RepositoryScanReportListItem(BaseModel):
     branchCount: int
     lastScanAt: str | None
     lastScanId: str | None
+    lastReportId: str | None
     totals: Dict[str, Any] | None
     attentionScore: int
     stale: bool
@@ -392,6 +393,67 @@ class RepositoryScanReportListResponse(BaseModel):
     total: int
     page: int
     pageSize: int
+
+
+class RepositoryPerRepoScanReportListItem(BaseModel):
+    id: str
+    scanId: str
+    generatedAt: str
+    attentionScore: int
+    totals: Dict[str, Any]
+
+
+class RepositoryPerRepoScanReportListResponse(BaseModel):
+    items: List[RepositoryPerRepoScanReportListItem]
+    total: int
+
+
+class RepositoryScanReportMetadata(BaseModel):
+    """Snapshot metadata for the underlying repository_scan row."""
+
+    commitSha: str
+    trigger: str
+    startedAt: str
+    finishedAt: str | None
+    status: str
+
+
+class RepositoryScanReportCompareToPrevious(BaseModel):
+    otherReportId: str
+    totalsDelta: Dict[str, int]
+    filePathsAdded: int
+    filePathsRemoved: int
+    filePathsInBoth: int
+
+
+class RepositoryScanReportDetailResponse(BaseModel):
+    id: str
+    scanId: str
+    repositoryId: str
+    generatedAt: str
+    attentionScore: int
+    totals: Dict[str, Any]
+    payload: List[Dict[str, Any]]
+    errors: List[Dict[str, Any]]
+    scan: RepositoryScanReportMetadata | None
+    previousReportId: str | None
+    compareToPrevious: RepositoryScanReportCompareToPrevious | None
+
+
+class RepositoryScanReportPairTotals(BaseModel):
+    id: str
+    generatedAt: str
+    scanId: str
+    totals: Dict[str, Any]
+
+
+class RepositoryScanReportDiffResponse(BaseModel):
+    left: RepositoryScanReportPairTotals
+    right: RepositoryScanReportPairTotals
+    totalsDelta: Dict[str, int]
+    filePathsOnlyInLeft: List[str]
+    filePathsOnlyInRight: List[str]
+    filePathsInBoth: int
 
 
 class RepositoryResolvedProjectRecord(BaseModel):
@@ -965,6 +1027,7 @@ def _process_single_pending_repository_scan(
                 generated_at=now,
                 classified_files=None,
                 scan_failed=True,
+                scan=failed_scan,
             )
         return True, [audit]
 
@@ -1094,6 +1157,7 @@ def _process_single_pending_repository_scan(
             generated_at=now,
             classified_files=classified_files,
             scan_failed=False,
+            scan=completed_scan,
         )
     return True, pending_audit_rows
 
@@ -1302,6 +1366,80 @@ def _scan_report_attention_score(
     return int(score)
 
 
+def _file_record_to_report_payload(file_row: RepositoryFileRecord) -> Dict[str, Any]:
+    return {
+        "fileId": file_row.id,
+        "path": file_row.path,
+        "status": file_row.status,
+        "format": file_row.format,
+        "confidence": file_row.confidence,
+        "importEnabled": file_row.importEnabled,
+        "autoImportEnabled": file_row.autoImportEnabled,
+        "tracked": file_row.tracked,
+        "projectSlug": file_row.projectSlug,
+        "versionStrategy": file_row.versionStrategy,
+        "qualityScore": file_row.qualityScore,
+        "discriminator": file_row.discriminator,
+    }
+
+
+def _build_report_errors(
+    *,
+    scan: RepositoryScanRecord | None,
+    classified_files: Sequence[RepositoryFileRecord] | None,
+    scan_failed: bool,
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    if scan_failed and scan is not None:
+        out.append(
+            {
+                "kind": "scan",
+                "path": None,
+                "code": scan.errorCode,
+                "message": "Scan failed",
+                "errorDetail": scan.errorDetail,
+            }
+        )
+    elif scan_failed and scan is None:
+        out.append(
+            {
+                "kind": "scan",
+                "path": None,
+                "code": "scan_failed",
+                "message": "Scan failed",
+                "errorDetail": None,
+            }
+        )
+    for f in sorted(classified_files or [], key=lambda r: (r.path or "").lower()):
+        if f.status not in {"parse_error", "manifest_error"}:
+            continue
+        detail = (f.discriminator or "").strip() or None
+        if f.status == "parse_error":
+            title = "Parse error"
+        else:
+            title = "Manifest error"
+        out.append(
+            {
+                "kind": "file",
+                "path": f.path,
+                "code": f.status,
+                "message": detail or title,
+                "errorDetail": detail,
+            }
+        )
+    return out
+
+
+def _build_payload_json(
+    classified_files: Sequence[RepositoryFileRecord] | None,
+) -> List[Dict[str, Any]]:
+    if not classified_files:
+        return []
+    rows = list(classified_files)
+    rows.sort(key=lambda r: (r.path or "").lower())
+    return [_file_record_to_report_payload(f) for f in rows]
+
+
 def _append_scan_report_row(
     repository_id: str,
     scan_id: str,
@@ -1309,12 +1447,18 @@ def _append_scan_report_row(
     generated_at: str,
     classified_files: Sequence[RepositoryFileRecord] | None,
     scan_failed: bool,
+    scan: RepositoryScanRecord | None = None,
 ) -> None:
     raw_totals = _build_scan_report_totals_json(
         repository_id, scan_id, classified_files or [], scan_failed=scan_failed
     )
     t_int: Dict[str, int] = {k: int(v) for k, v in raw_totals.items()}
     attention = _scan_report_attention_score(t_int, last_scan_at=generated_at)
+    errors_json = _build_report_errors(
+        scan=scan,
+        classified_files=classified_files,
+        scan_failed=scan_failed,
+    )
     row = {
         "id": str(uuid4()),
         "scanId": scan_id,
@@ -1331,12 +1475,138 @@ def _append_scan_report_row(
             "scanFailed": bool(int(raw_totals.get("scanFailed", 0))),
         },
         "attentionScore": attention,
-        "payloadJson": [],
+        "payloadJson": _build_payload_json(classified_files),
+        "errorsJson": errors_json,
     }
     bucket = _REPO_SCAN_REPORT_STORE.setdefault(repository_id, [])
     bucket.append(row)
     if len(bucket) > 200:
         bucket[:] = bucket[-200:]
+
+
+def _reports_for_repository_newest_first(repository_id: str) -> List[Dict[str, Any]]:
+    with _STORE_LOCK:
+        rlist = [r for r in _REPO_SCAN_REPORT_STORE.get(repository_id, []) if isinstance(r, dict)]
+    return sorted(
+        rlist,
+        key=lambda r: (r.get("generatedAt", ""), r.get("id", "")),
+        reverse=True,
+    )
+
+
+def _get_report_row_by_id(repository_id: str, report_id: str) -> Dict[str, Any] | None:
+    with _STORE_LOCK:
+        for row in _REPO_SCAN_REPORT_STORE.get(repository_id, []):
+            if isinstance(row, dict) and str(row.get("id")) == report_id:
+                return row
+    return None
+
+
+def _coerce_report_totals_for_delta(t: Dict[str, Any]) -> Dict[str, int]:
+    if not t:
+        return {
+            "discovered": 0,
+            "importable": 0,
+            "imported": 0,
+            "failing": 0,
+            "parseError": 0,
+            "manifestError": 0,
+            "awaitingSelection": 0,
+            "scanFailed": 0,
+        }
+    sf = 1 if bool(t.get("scanFailed")) else 0
+    return {
+        "discovered": int(t.get("discovered", 0) or 0),
+        "importable": int(t.get("importable", 0) or 0),
+        "imported": int(t.get("imported", 0) or 0),
+        "failing": int(t.get("failing", 0) or 0),
+        "parseError": int(t.get("parseError", 0) or 0),
+        "manifestError": int(t.get("manifestError", 0) or 0),
+        "awaitingSelection": int(t.get("awaitingSelection", 0) or 0),
+        "scanFailed": sf,
+    }
+
+
+def _totals_delta_map(left: Dict[str, int], right: Dict[str, int]) -> Dict[str, int]:
+    all_keys = sorted(set(left) | set(right))
+    return {k: int(left.get(k, 0)) - int(right.get(k, 0)) for k in all_keys}
+
+
+def _file_paths_in_payload_row(row: Dict[str, Any]) -> set[str]:
+    pl = row.get("payloadJson")
+    if not isinstance(pl, list):
+        return set()
+    return {str(x.get("path", "")) for x in pl if isinstance(x, dict) and x.get("path")}
+
+
+def _scan_metadata_for_report(repository_id: str, scan_id: str) -> RepositoryScanReportMetadata | None:
+    with _STORE_LOCK:
+        history = _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
+    for s in history:
+        if s.id == scan_id:
+            return RepositoryScanReportMetadata(
+                commitSha=s.commitSha,
+                trigger=s.trigger,
+                startedAt=s.startedAt,
+                finishedAt=s.finishedAt,
+                status=s.status,
+            )
+    return None
+
+
+def _build_compare_to_previous(
+    repository_id: str, current: Dict[str, Any], ordered_newest_first: List[Dict[str, Any]]
+) -> RepositoryScanReportCompareToPrevious | None:
+    cur_id = str(current.get("id", ""))
+    for idx, row in enumerate(ordered_newest_first):
+        if str(row.get("id")) == cur_id and idx + 1 < len(ordered_newest_first):
+            other = ordered_newest_first[idx + 1]
+            t0 = _coerce_report_totals_for_delta(
+                other.get("totalsJson") if isinstance(other.get("totalsJson"), dict) else {}
+            )
+            t1 = _coerce_report_totals_for_delta(
+                current.get("totalsJson") if isinstance(current.get("totalsJson"), dict) else {}
+            )
+            delta = _totals_delta_map(t1, t0)
+            p0 = _file_paths_in_payload_row(other)
+            p1 = _file_paths_in_payload_row(current)
+            return RepositoryScanReportCompareToPrevious(
+                otherReportId=str(other.get("id")),
+                totalsDelta=delta,
+                filePathsAdded=len(p1 - p0),
+                filePathsRemoved=len(p0 - p1),
+                filePathsInBoth=len(p0 & p1),
+            )
+    return None
+
+
+def _build_scan_report_detail(
+    repository_id: str, row: Dict[str, Any], *, ordered: List[Dict[str, Any]]
+) -> RepositoryScanReportDetailResponse:
+    totals = row.get("totalsJson")
+    if not isinstance(totals, dict):
+        totals = {}
+    pl = row.get("payloadJson")
+    payload: List[Dict[str, Any]] = pl if isinstance(pl, list) else []
+    er = row.get("errorsJson")
+    errors = [dict(x) for x in er if isinstance(x, dict)] if isinstance(er, list) else []
+    scan_id = str(row.get("scanId", ""))
+    meta = _scan_metadata_for_report(repository_id, scan_id) if scan_id else None
+    other = _build_compare_to_previous(repository_id, row, ordered)
+    prev_id: str | None = str(other.otherReportId) if other is not None else None
+    return RepositoryScanReportDetailResponse(
+        id=str(row.get("id", "")),
+        scanId=scan_id,
+        repositoryId=str(row.get("repositoryId", "")),
+        generatedAt=str(row.get("generatedAt", "")),
+        attentionScore=int(row.get("attentionScore", 0) or 0),
+        totals=dict(totals),
+        payload=payload,
+        errors=errors,
+        scan=meta,
+        previousReportId=prev_id,
+        compareToPrevious=other,
+    )
 
 
 def _append_audit_row(
@@ -2530,6 +2800,9 @@ async def list_repository_scan_reports(
         with _STORE_LOCK:
             rlist = list(_REPO_SCAN_REPORT_STORE.get(repo.id, []))
         latest: Dict[str, Any] | None = max(rlist, key=lambda r: r["generatedAt"]) if rlist else None
+        last_report_id: str | None = None
+        if isinstance(latest, dict) and latest.get("id"):
+            last_report_id = str(latest["id"])
         totals = None
         attention = 0
         if latest is not None:
@@ -2574,6 +2847,7 @@ async def list_repository_scan_reports(
                 branchCount=len(repo.branches),
                 lastScanAt=last_scan_at,
                 lastScanId=last_scan_id,
+                lastReportId=last_report_id,
                 totals=totals,
                 attentionScore=attention,
                 stale=stale,
@@ -2593,6 +2867,139 @@ async def list_repository_scan_reports(
         page=page,
         pageSize=pageSize,
     )
+
+
+@router.get(
+    "/{tenant_slug}/{repository_id}/scan-reports",
+    response_model=RepositoryPerRepoScanReportListResponse,
+)
+async def list_per_repository_scan_reports(
+    tenant_slug: str,
+    repository_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositoryPerRepoScanReportListResponse:
+    _ = tenant_slug
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    tenant_id = auth_data["tenant_id"]
+    _find_repository_for_tenant(tenant_id, repository_id)
+    rows = _reports_for_repository_newest_first(repository_id)
+    items: List[RepositoryPerRepoScanReportListItem] = []
+    for row in rows:
+        tj = row.get("totalsJson")
+        if not isinstance(tj, dict):
+            continue
+        items.append(
+            RepositoryPerRepoScanReportListItem(
+                id=str(row.get("id", "")),
+                scanId=str(row.get("scanId", "")),
+                generatedAt=str(row.get("generatedAt", "")),
+                attentionScore=int(row.get("attentionScore", 0) or 0),
+                totals=dict(tj),
+            )
+        )
+    return RepositoryPerRepoScanReportListResponse(
+        items=items,
+        total=len(items),
+    )
+
+
+@router.get("/{tenant_slug}/{repository_id}/scan-reports/latest")
+async def redirect_to_latest_per_repository_scan_report(
+    tenant_slug: str,
+    repository_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RedirectResponse:
+    _ = tenant_slug
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    tenant_id = auth_data["tenant_id"]
+    _find_repository_for_tenant(tenant_id, repository_id)
+    rows = _reports_for_repository_newest_first(repository_id)
+    if not rows:
+        raise HTTPException(
+            status_code=404, detail="No materialized scan reports for this repository yet"
+        )
+    first = rows[0]
+    rid = str(first.get("id", ""))
+    target = f"/v1/repositories/{tenant_slug}/{repository_id}/scan-reports/{rid}"
+    return RedirectResponse(url=target, status_code=302)
+
+
+@router.get(
+    "/{tenant_slug}/{repository_id}/scan-reports/{left_report_id}/diff/{right_report_id}",
+    response_model=RepositoryScanReportDiffResponse,
+)
+async def diff_per_repository_scan_reports(
+    tenant_slug: str,
+    repository_id: str,
+    left_report_id: str,
+    right_report_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositoryScanReportDiffResponse:
+    _ = tenant_slug
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    tenant_id = auth_data["tenant_id"]
+    _find_repository_for_tenant(tenant_id, repository_id)
+    _validate_uuid(left_report_id, "leftReportId")
+    _validate_uuid(right_report_id, "rightReportId")
+    l_row = _get_report_row_by_id(repository_id, left_report_id)
+    r_row = _get_report_row_by_id(repository_id, right_report_id)
+    if l_row is None or r_row is None:
+        raise HTTPException(
+            status_code=404, detail="One or both scan report rows were not found in this repository"
+        )
+    lt = l_row.get("totalsJson") if isinstance(l_row.get("totalsJson"), dict) else {}
+    rt = r_row.get("totalsJson") if isinstance(r_row.get("totalsJson"), dict) else {}
+    left_int = _coerce_report_totals_for_delta(lt)
+    right_int = _coerce_report_totals_for_delta(rt)
+    delta = _totals_delta_map(left_int, right_int)
+    p_l = _file_paths_in_payload_row(l_row)
+    p_r = _file_paths_in_payload_row(r_row)
+    return RepositoryScanReportDiffResponse(
+        left=RepositoryScanReportPairTotals(
+            id=str(l_row.get("id", "")),
+            generatedAt=str(l_row.get("generatedAt", "")),
+            scanId=str(l_row.get("scanId", "")),
+            totals=dict(lt),
+        ),
+        right=RepositoryScanReportPairTotals(
+            id=str(r_row.get("id", "")),
+            generatedAt=str(r_row.get("generatedAt", "")),
+            scanId=str(r_row.get("scanId", "")),
+            totals=dict(rt),
+        ),
+        totalsDelta=delta,
+        filePathsOnlyInLeft=sorted(p_l - p_r),
+        filePathsOnlyInRight=sorted(p_r - p_l),
+        filePathsInBoth=len(p_l & p_r),
+    )
+
+
+@router.get(
+    "/{tenant_slug}/{repository_id}/scan-reports/{scan_report_id}",
+    response_model=RepositoryScanReportDetailResponse,
+)
+async def get_per_repository_scan_report(
+    tenant_slug: str,
+    repository_id: str,
+    scan_report_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositoryScanReportDetailResponse:
+    _ = tenant_slug
+    if scan_report_id == "latest":
+        raise HTTPException(
+            status_code=400, detail="Use /scan-reports/latest for the latest snapshot redirect"
+        )
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    tenant_id = auth_data["tenant_id"]
+    _find_repository_for_tenant(tenant_id, repository_id)
+    _validate_uuid(scan_report_id, "scanReportId")
+    row = _get_report_row_by_id(repository_id, scan_report_id)
+    if row is None:
+        raise HTTPException(
+            status_code=404, detail=f"Scan report not found: {scan_report_id}"
+        )
+    ordered = _reports_for_repository_newest_first(repository_id)
+    return _build_scan_report_detail(repository_id, row, ordered=ordered)
 
 
 @router.get("/{tenant_slug}/{repository_id}", response_model=RepositoryRecord)
@@ -4071,6 +4478,7 @@ def _complete_repository_scan_for_tests(
             generated_at=now,
             classified_files=classified_files,
             scan_failed=False,
+            scan=completed_scan,
         )
 
     for _audit_row in pending_audit_rows:

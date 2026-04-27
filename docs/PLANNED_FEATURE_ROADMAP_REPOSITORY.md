@@ -45,6 +45,7 @@ filter only the tickets defined in this document._
 
 ## Completed (Repository Connector v1)
 
+- REPO-10.2 (#2946): Per-repository **Scanned repository report** drill-in at `/ade/dashboard/repositories/{id}/reports/{scan_report_id}` (and `…/latest` → stable redirect) with server materialized `totalsJson` / `payloadJson` / `errorsJson`, REST list/detail/diff, and “compare with previous” totals roll-up.
 - REPO-7.4 (#2802): Added linked-account token health monitoring by introducing per-credential probe persistence, classifying daily probe outcomes (`healthy` / `scope_missing` / `revoked` / `network_error`), auto-pausing repositories bound to revoked credentials, and surfacing usage + verification + reconnect states in Linked Accounts UI.
 - REPO-7.1 (#2799): Added repository workflow-audit coverage in the shared `workflow_audit` ledger, documenting and emitting repository action codes (`registered/scanned/sync/pause/poll/token/archive/remove`) with structured per-event detail payloads and actor identities.
 - REPO-6.3 (#2796): Added scan timeline upgrades in the repository detail view with trigger/status/branch filter chips, per-row trigger/SHA/duration/file-count summaries, and expandable failed-scan error consoles that render `repository_scan.event_log` plus `error_detail`.
@@ -118,8 +119,8 @@ The first release of this extension must:
   **Auto-Import** switches plus a one-shot **Import Now** action and a
   spec detail drawer — REPO-9.3, REPO-9.4, REPO-9.5, REPO-9.6
 - Publish a tenant-wide **Scanned Repository Report** page listing every
-  scanned repository, its discovered specs, and per-spec status —
-  REPO-10.1, REPO-10.2
+  scanned repository, its discovered specs, and per-spec status, with
+  per-repository report drill-in (REPO-10.1, REPO-10.2 — **done**)
 - Publish two ADE dashboard widgets — **Repositories Needing Attention**
   and **Recent Imports Needing Attention** — backed by a unified
   attention rollup — REPO-11.1, REPO-11.2, REPO-11.3
@@ -752,7 +753,6 @@ decision loop.
 | Roadmap ID | Title                                            | Description                                                                                                  | Labels                                                                              | MVP | Parallel | Issue |
 |------------|--------------------------------------------------|--------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|-----|----------|-------|
 | REPO-10.1  | "Scanned Repository Report" page (tenant-wide)  | New page at `/ade/dashboard/repositories/reports` listing every repository, last scan, importable counts    | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-report`, `ui`  | Yes | No       | #2945 |
-| REPO-10.2  | Per-repository report drill-in                  | Drill from REPO-10.1 row into per-repo report rendered from the latest `repository_scan_report` row         | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-report`, `ui`, `rest` | Yes | Yes | #2946 |
 | REPO-10.3  | Cross-repo aggregate stats card                 | Top-of-page stat cards: total repos, importable specs, parse errors, manifest errors, awaiting-selection    | `enhancement`, `repository`, `roadmap-repository`, `repository-report`, `ui`         | No  | Yes      | #2949 |
 | REPO-10.4  | Report export (CSV + JSON)                      | Stream-export the current filtered report; capped at 100k rows; reuses the existing audit-export pipeline   | `enhancement`, `repository`, `roadmap-repository`, `repository-report`, `rest`       | No  | Yes      | #2950 |
 | REPO-10.5  | Saved filters per user                          | Persist named filters ("All failing on prod", "Awaiting selection in core repos") in `user_settings`        | `enhancement`, `repository`, `roadmap-repository`, `repository-report`, `ui`         | No  | Yes      | #2951 |
@@ -1191,7 +1191,6 @@ blocking.
 | 15    | REPO-11.3  | #2943 | dashboard widget: Recent Imports Needing Attention  | Yes | D    |
 | 16    | REPO-12.6  | #2944 | audit + change-report linking for auto-imports      | Yes | E    |
 | 17    | REPO-10.1  | #2945 | Scanned Repository Report page                      | Yes | C    |
-| 18    | REPO-10.2  | #2946 | per-repository report drill-in                      | Yes | C    |
 | —     | _Repo-Scan v1 ships here. Items below are post-MVP._               |     |      |
 | 20    | REPO-9.7   | #2948 | bulk select + apply across discovered files        | No  | B    |
 | 21    | REPO-10.3  | #2949 | cross-repo aggregate stats card                    | No  | C    |
