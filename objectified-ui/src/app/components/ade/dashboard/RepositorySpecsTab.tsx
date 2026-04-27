@@ -185,7 +185,7 @@ export function RepositorySpecsTab({
   const [pendingPatchIds, setPendingPatchIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkPending, setIsBulkPending] = useState(false);
-  const drawerRef = useRef<HTMLDivElement | null>(null);
+  const drawerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (initialBranch && initialBranch !== branch) {
@@ -198,6 +198,12 @@ export function RepositorySpecsTab({
       setFilter(initialFilter);
     }
   }, [initialFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (selectedSpec) {
+      drawerRef.current?.focus();
+    }
+  }, [selectedSpec]);
 
   const loadSpecs = useCallback(async () => {
     if (!repositoryId) return;
@@ -648,6 +654,7 @@ export function RepositorySpecsTab({
                         >
                           <button
                             type="button"
+                            role="menuitem"
                             className="w-full px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
                             onClick={() => handleImportNow(spec)}
                             data-testid={`spec-import-now-${spec.path}`}
@@ -657,6 +664,7 @@ export function RepositorySpecsTab({
                           </button>
                           <button
                             type="button"
+                            role="menuitem"
                             className="w-full px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
                             onClick={() => {
                               setOpenMenuFileId(null);
@@ -667,6 +675,7 @@ export function RepositorySpecsTab({
                             Open spec detail
                           </button>
                           <a
+                            role="menuitem"
                             href={`/api/repositories/${repositoryId}/scans/${spec.scanId}`}
                             target="_blank"
                             rel="noreferrer"
@@ -707,6 +716,7 @@ export function RepositorySpecsTab({
             role="dialog"
             aria-modal="true"
             aria-label="Spec detail drawer"
+            tabIndex={-1}
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => { if (event.key === 'Escape') setSelectedSpec(null); }}
             data-testid="spec-drawer"
