@@ -383,6 +383,16 @@ export function RepositorySpecsTab({
     [specs, extraRowById],
   );
 
+  /** Stable ref: drawer `loadDetail` depends on this; an inline function would retrigger fetch on every parent render. */
+  const handleSpecDetailRefresh = useCallback((refreshed: RepositorySpecRecord) => {
+    setSpecs((current) =>
+      current.map((row) => (row.fileId === refreshed.fileId ? refreshed : row)),
+    );
+    setSelectedSpec((prev) =>
+      prev && prev.fileId === refreshed.fileId ? refreshed : prev,
+    );
+  }, []);
+
   const selectedCanSetAutoImport = useMemo(() => {
     if (selectedIds.size === 0) return false;
     for (const id of selectedIds) {
@@ -1067,14 +1077,7 @@ export function RepositorySpecsTab({
               handleAutoImportToggle(target, payload.autoImportEnabled);
             }
           }}
-          onSpecRefresh={(refreshed) => {
-            setSpecs((current) =>
-              current.map((row) => (row.fileId === refreshed.fileId ? refreshed : row)),
-            );
-            setSelectedSpec((prev) =>
-              prev && prev.fileId === refreshed.fileId ? refreshed : prev,
-            );
-          }}
+          onSpecRefresh={handleSpecDetailRefresh}
           onClose={() => setSelectedSpec(null)}
         />
       ) : null}
