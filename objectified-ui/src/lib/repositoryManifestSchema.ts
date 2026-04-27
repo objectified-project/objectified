@@ -77,6 +77,10 @@ export const repositoryManifestSchema = {
             minimum: 15,
             maximum: 86400,
           },
+          importEnabled: {
+            type: 'boolean',
+            description: 'When false, the file stays discovered but does not dispatch imports until enabled in the Specs tab or set to true here.',
+          },
         },
       },
     },

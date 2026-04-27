@@ -41,6 +41,8 @@ class RepoManifestSpec:
     promote: Literal["auto", "manual"] | None
     on_breaking_change: Literal["warn", "block", "autoCreateNewMajor"] | None
     poll_interval_sec: int | None
+    # True when the key is omitted (legacy listed specs). Explicit false for new spec entries.
+    import_enabled: bool
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,7 @@ class RepositoryFileRow:
     project_slug: str | None
     version_strategy: str | None
     poll_interval_sec: int | None
+    import_enabled: bool
     status: str
     promote: Literal["auto", "manual"] | None = None
     metadata: dict[str, Any] | None = None
@@ -89,6 +92,23 @@ class RepositoryMappingDecision:
 
 _DEFAULT_VERSION_STRATEGY = "commit-sha"
 _SLUG_SANITIZER = re.compile(r"[^a-z0-9]+")
+
+
+def spec_import_enabled_from_dict(spec: dict[str, Any]) -> bool:
+    """True when the key is absent (legacy / pre-rollout listed specs), else the explicit boolean."""
+    if "importEnabled" in spec:
+        return bool(spec["importEnabled"])
+    return True
+
+
+def initial_import_enabled_for_path(
+    *,
+    manifest: RepoManifest | None,
+    spec: RepoManifestSpec | None,
+) -> bool:
+    if manifest is None or spec is None:
+        return False
+    return spec.import_enabled
 
 
 def parse_repo_manifest(raw_manifest: str | None) -> RepoManifestParseOutcome:
@@ -183,6 +203,7 @@ def build_repository_file_rows(
         spec = spec_by_path.get(discovery.path)
         manifest_spec_poll = spec.poll_interval_sec if spec is not None else None
         mapping = resolve_repository_file_mapping(discovery.path, spec)
+        i_enabled = initial_import_enabled_for_path(manifest=manifest, spec=spec)
         rows.append(
             RepositoryFileRow(
                 path=discovery.path,
@@ -194,6 +215,7 @@ def build_repository_file_rows(
                 poll_interval_sec=manifest_spec_poll
                 if manifest_spec_poll is not None
                 else effective_branch_poll_interval,
+                import_enabled=i_enabled,
                 status="discovered",
                 settings_json=mapping.settings_json,
             )
@@ -227,6 +249,7 @@ def _to_repo_manifest(parsed: dict[str, Any]) -> RepoManifest:
                 promote=spec.get("promote"),
                 on_breaking_change=spec.get("onBreakingChange"),
                 poll_interval_sec=spec.get("pollIntervalSec"),
+                import_enabled=spec_import_enabled_from_dict(spec),
             )
             for spec in specs
         ),
@@ -243,6 +266,7 @@ def _manifest_error_row(message: str) -> RepositoryFileRow:
         version_strategy=None,
         promote=None,
         poll_interval_sec=None,
+        import_enabled=False,
         status="manifest_error",
         metadata={"error": message},
     )

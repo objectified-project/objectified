@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added REPO-9.1 per-spec `import_enabled` on `repository_file` (default off without manifest; manifest-listed specs use explicit `importEnabled` with legacy-safe omissions), selection preserved across re-scans, `PATCH /v1/repositories/{id}/files/{file_id}/import-enabled` plus `repository.spec.selection_changed` audit, and import-job dispatch only when the flag is true.
 - Added REPO-8.4 historical backfill tooling via `objectified-rest/scripts/backfill_repository_checksums.py` to stream-hash tracked repository files missing `content_checksum`, migrate valid legacy `metadata.repositorySource` payloads into typed `versions.repository_source`, and emit structured rejection/error reports with `repository.scan.backfilled` audit rows.
 - Added REPO-8.3 checksum-keyed idempotent re-import dispatch gating so modified tracked files with unchanged repository-source checksums are marked `unchanged_checksum`, emit `repository.scan.skipped_checksum` audit rows, and increment `diffSummary.skipped_unchanged_by_checksum` unless scans run with `force=true`.
 - Added REPO-8.2 version provenance tuple support by adding validated/indexed `versions.repository_source` storage, surfacing `GET /v1/versions/{tenant_slug}/by-repo-source?repository_id&path` for fast tenant-scoped lookup, and expanding repository model coverage to assert constraint and planner-index behavior.
