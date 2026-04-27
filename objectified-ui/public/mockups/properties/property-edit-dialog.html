@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Designer · Edit property</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .scrim {
+      background:
+        radial-gradient(1200px 600px at 8% 0%, rgba(139,92,246,.18), transparent 60%),
+        radial-gradient(900px 500px at 92% 100%, rgba(217,70,239,.15), transparent 60%),
+        linear-gradient(180deg, #0b1020 0%, #060814 100%);
+    }
+    .light .scrim {
+      background:
+        radial-gradient(1200px 600px at 8% 0%, rgba(139,92,246,.10), transparent 60%),
+        radial-gradient(900px 500px at 92% 100%, rgba(217,70,239,.08), transparent 60%),
+        linear-gradient(180deg, #f1f5fb 0%, #e8ecf6 100%);
+    }
+    .dialog-shadow {
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.04) inset,
+        0 30px 80px -20px rgba(2, 6, 23, .55),
+        0 12px 32px -12px rgba(99, 102, 241, .25);
+    }
+    .section-card { transition: border-color .15s ease, background-color .15s ease; }
+    .section-card[data-status="filled"] { box-shadow: 0 0 0 1px rgba(217,119,6,.18); }
+    .section-card[data-status="warn"]   { box-shadow: 0 0 0 1px rgba(245,158,11,.30); }
+    .section-card[data-status="error"]  { box-shadow: 0 0 0 1px rgba(225,29,72,.30); }
+    /* faux-syntax for JSON preview */
+    .tk-key  { color: #a78bfa; }
+    .tk-str  { color: #34d399; }
+    .tk-num  { color: #f59e0b; }
+    .tk-bool { color: #f472b6; }
+    .tk-pun  { color: #94a3b8; }
+    .light .tk-key  { color: #7c3aed; }
+    .light .tk-str  { color: #047857; }
+    .light .tk-num  { color: #b45309; }
+    .light .tk-bool { color: #be185d; }
+    .light .tk-pun  { color: #475569; }
+    .dot   { width: 8px; height: 8px; border-radius: 999px; display: inline-block; flex-shrink: 0; }
+    .dot-empty  { border: 2px solid rgb(148 163 184 / .55); background: transparent; }
+    .dot-filled { background: #f59e0b; }
+    .dot-warn   { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.20); }
+    .dot-error  { background: #f43f5e; box-shadow: 0 0 0 3px rgba(244,63,94,.20); }
+    .dot-ok     { background: #10b981; }
+    .chip-soft { background: rgba(139,92,246,.10); color: #6d28d9; }
+    .dark .chip-soft { background: rgba(139,92,246,.20); color: #c4b5fd; }
+    .kbd {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 10px; line-height: 1; padding: 3px 5px; border-radius: 4px;
+      border: 1px solid rgba(148,163,184,.35); color: rgb(100 116 139);
+      background: rgba(248,250,252,.6);
+    }
+    .dark .kbd { color: #cbd5e1; background: rgba(30,41,59,.6); border-color: rgba(71,85,105,.5); }
+    /* primitive tile selected state */
+    .primitive-tile.is-selected {
+      border-color: rgb(139 92 246);
+      background: rgba(139,92,246,.08);
+      box-shadow: 0 0 0 1px rgba(139,92,246,.6);
+    }
+    .dark .primitive-tile.is-selected { background: rgba(139,92,246,.18); }
+    /* command palette overlay */
+    .palette-shadow {
+      box-shadow:
+        0 0 0 1px rgba(139,92,246,.35),
+        0 24px 60px -12px rgba(2,6,23,.55),
+        0 8px 24px -8px rgba(99,102,241,.30);
+    }
+    /* view-mode driven layout */
+    [data-view="form"]  .rail-right,
+    [data-view="json"]  .rail-nav,
+    [data-view="json"]  .rail-main { display: none; }
+    [data-view="form"]  .body-grid { grid-template-columns: 232px minmax(0,1fr); }
+    [data-view="json"]  .body-grid { grid-template-columns: minmax(0,1fr); }
+    [data-view="json"]  .rail-right { border-left: 0; }
+  </style>
+</head>
+<body class="min-h-screen scrim text-gray-900 dark:text-gray-100">
+
+  <!-- Mockup hub strip -->
+  <div class="flex items-center justify-between px-4 py-2 text-xs text-slate-300 dark:text-slate-300">
+    <a href="../designer/index.html" class="hover:text-violet-300">← Mockup hub</a>
+    <div class="flex items-center gap-2">
+      <span class="text-slate-400">Designer · Property edit dialog</span>
+      <button id="themeBtn" class="w-7 h-7 rounded-md border border-slate-500/30 hover:bg-white/10 flex items-center justify-center"><i data-lucide="sun-moon" class="w-3.5 h-3.5"></i></button>
+    </div>
+  </div>
+
+  <!-- "Modal" container -->
+  <div class="px-4 pb-8 flex justify-center">
+    <div id="dialog" data-view="split" class="relative w-full max-w-[1320px] rounded-2xl bg-white dark:bg-slate-900 ring-1 ring-slate-900/10 dark:ring-white/10 dialog-shadow overflow-hidden flex flex-col" style="height: calc(100vh - 56px); min-height: 720px;">
+
+      <!-- ─────────── Dialog header ─────────── -->
+      <header class="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div class="px-5 pt-3.5 pb-3 flex items-start gap-4">
+          <!-- Left: identity -->
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+              <i data-lucide="square-pen" class="w-3.5 h-3.5"></i>
+              <span>Designer</span>
+              <span class="text-slate-300 dark:text-slate-600">·</span>
+              <span>Class</span>
+              <span class="mono text-violet-600 dark:text-violet-400">Subscription</span>
+              <span class="text-slate-300 dark:text-slate-600">·</span>
+              <span>Property</span>
+              <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Edit</span>
+            </div>
+
+            <div class="mt-1.5 flex flex-wrap items-center gap-2">
+              <h2 class="text-[18px] font-semibold tracking-tight flex items-center gap-2">
+                <span class="mono text-slate-900 dark:text-slate-100 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800">email_address</span>
+              </h2>
+              <span class="inline-flex items-center gap-1 text-[11px] mono px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"><i data-lucide="type" class="w-3 h-3"></i> string</span>
+              <span class="inline-flex items-center gap-1 text-[11px] mono px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">format · email</span>
+              <span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"><i data-lucide="asterisk" class="w-3 h-3"></i> required</span>
+              <span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"><i data-lucide="user" class="w-3 h-3"></i> @platform-team</span>
+              <span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded chip-soft"><i data-lucide="git-pull-request-arrow" class="w-3 h-3"></i> 2 unsaved</span>
+            </div>
+            <p class="mt-1 text-[12px] text-slate-500 dark:text-slate-400 leading-snug max-w-3xl">
+              Primary contact email for the customer attached to this subscription. Used for receipts, dunning notices, and account recovery flows.
+            </p>
+          </div>
+
+          <!-- Right: view switcher + close -->
+          <div class="flex items-center gap-2 shrink-0">
+            <div id="viewToggle" class="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-0.5 text-[11px]">
+              <button data-view-target="form"  class="vw-btn px-2.5 py-1 rounded-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700/60">Form</button>
+              <button data-view-target="split" class="vw-btn px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-300 font-semibold shadow-sm">Split</button>
+              <button data-view-target="json"  class="vw-btn px-2.5 py-1 rounded-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700/60">JSON</button>
+            </div>
+            <button class="px-2 py-1.5 rounded-md text-[11px] border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 inline-flex items-center gap-1.5"><i data-lucide="history" class="w-3.5 h-3.5"></i> History</button>
+            <button class="w-8 h-8 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500"><i data-lucide="x" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+      </header>
+
+      <!-- ─────────── Body: 3-column split ─────────── -->
+      <div class="flex-1 min-h-0 grid body-grid" style="grid-template-columns: 232px minmax(0,1fr) 360px;">
+
+        <!-- ─── Section nav ─── -->
+        <nav class="rail-nav border-r border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 overflow-y-auto">
+          <div class="px-4 pt-4 pb-2 flex items-center justify-between">
+            <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Sections</span>
+            <span class="mono text-[10px] text-slate-400">5 / 7</span>
+          </div>
+          <ul class="px-2 pb-4 space-y-0.5 text-[13px]">
+            <li><a href="#identity" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md bg-violet-500/10 border border-violet-200 dark:border-violet-700/50 text-violet-700 dark:text-violet-300 font-medium"><span class="dot dot-filled"></span><i data-lucide="badge-info" class="w-4 h-4"></i><span class="flex-1">Identity</span><span class="mono text-[10px] text-violet-500">3</span></a></li>
+            <li><a href="#type-format" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-slate-200/40 dark:hover:bg-slate-800/60"><span class="dot dot-filled"></span><i data-lucide="type" class="w-4 h-4 text-slate-500"></i><span class="flex-1">Type &amp; format</span></a></li>
+            <li><a href="#constraints" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-slate-200/40 dark:hover:bg-slate-800/60"><span class="dot dot-warn" title="1 lint warning"></span><i data-lucide="ruler" class="w-4 h-4 text-slate-500"></i><span class="flex-1">Constraints</span><span class="mono text-[10px] text-amber-500">1</span></a></li>
+            <li><a href="#flags" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-slate-200/40 dark:hover:bg-slate-800/60"><span class="dot dot-filled"></span><i data-lucide="toggle-right" class="w-4 h-4 text-slate-500"></i><span class="flex-1">Flags &amp; behavior</span></a></li>
+            <li><a href="#defaults" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-slate-200/40 dark:hover:bg-slate-800/60"><span class="dot dot-filled"></span><i data-lucide="puzzle" class="w-4 h-4 text-slate-500"></i><span class="flex-1">Defaults &amp; examples</span></a></li>
+            <li><a href="#docs" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-slate-200/40 dark:hover:bg-slate-800/60"><span class="dot dot-empty"></span><i data-lucide="book-open-text" class="w-4 h-4 text-slate-500"></i><span class="flex-1">Docs &amp; metadata</span></a></li>
+            <li><a href="#extensions" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-slate-200/40 dark:hover:bg-slate-800/60"><span class="dot dot-empty"></span><i data-lucide="braces" class="w-4 h-4 text-slate-500"></i><span class="flex-1">Ownership &amp; extensions</span></a></li>
+          </ul>
+
+          <div class="mx-3 mb-3 rounded-lg border border-violet-200/60 dark:border-violet-800/40 bg-violet-50 dark:bg-violet-900/20 p-3">
+            <div class="flex items-center gap-2 text-[11px] font-semibold text-violet-700 dark:text-violet-300"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Suggestion</div>
+            <p class="mt-1 text-[11px] leading-snug text-violet-700/90 dark:text-violet-200/90">Add at least one example so SDK / docs renderers have a sample value.</p>
+            <button class="mt-2 text-[11px] font-medium text-violet-700 dark:text-violet-200 hover:underline">Generate example →</button>
+          </div>
+        </nav>
+
+        <!-- ─── Main form ─── -->
+        <main class="rail-main overflow-y-auto bg-slate-50 dark:bg-slate-950">
+          <div class="max-w-3xl mx-auto px-6 py-6 space-y-5">
+
+            <!-- ─ Identity ─ -->
+            <section id="identity" class="section-card rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/70" data-status="filled">
+              <header class="flex items-start gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+                <span class="flex h-7 w-7 items-center justify-center rounded-md bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300"><i data-lucide="badge-info" class="w-4 h-4"></i></span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-violet-600 dark:text-violet-400">01 · Identity</p>
+                  <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">Name &amp; description <span class="dot dot-filled" title="Has values"></span></h3>
+                  <p class="text-[12px] text-slate-500 dark:text-slate-400">Identify and describe this property. Name and base type lock once it exists.</p>
+                </div>
+                <span class="text-[10px] mono text-slate-400">3 fields</span>
+              </header>
+              <div class="p-5 space-y-4">
+                <div class="grid grid-cols-12 gap-4">
+                  <div class="col-span-7">
+                    <label class="block text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Property name <span class="text-rose-500">*</span></label>
+                    <div class="relative">
+                      <input value="email_address" disabled class="w-full mono px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200" />
+                      <span class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] text-slate-400"><i data-lucide="lock" class="w-3 h-3"></i> immutable</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-1">Letters, numbers and underscores. <code class="mono text-[10px]">camelCase</code> or <code class="mono text-[10px]">snake_case</code> per project convention.</p>
+                  </div>
+                  <div class="col-span-5">
+                    <label class="block text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Title</label>
+                    <input value="Customer email" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" />
+                    <p class="text-[11px] text-slate-500 mt-1">Human label shown in generated docs.</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Description</label>
+                  <textarea rows="2" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">Primary contact email for the customer attached to this subscription. Used for receipts, dunning notices, and account recovery flows.</textarea>
+                  <div class="flex items-center justify-between mt-1">
+                    <p class="text-[11px] text-slate-500">Markdown supported. <a class="text-violet-500 hover:underline">Cheatsheet ↗</a></p>
+                    <p class="text-[11px] text-slate-400 mono">142 / 500</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ─ Type & format ─ -->
+            <section id="type-format" class="section-card rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/70" data-status="filled">
+              <header class="flex items-start gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+                <span class="flex h-7 w-7 items-center justify-center rounded-md bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300"><i data-lucide="type" class="w-4 h-4"></i></span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-600 dark:text-rose-400">02 · Type &amp; format</p>
+                  <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">Base type, shape, and format</h3>
+                  <p class="text-[12px] text-slate-500 dark:text-slate-400">JSON Schema 2020-12 / OpenAPI 3.1. Apply a primitive template to inherit format and constraints.</p>
+                </div>
+                <span class="text-[10px] mono text-slate-400">string · email</span>
+              </header>
+              <div class="p-5 space-y-5">
+
+                <!-- Type chooser row -->
+                <div class="grid grid-cols-12 gap-4">
+                  <div class="col-span-7">
+                    <label class="block text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Base type</label>
+                    <div class="grid grid-cols-6 gap-1.5 p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40">
+                      <button class="px-2 py-1.5 rounded-md bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-300 text-xs font-semibold shadow-sm">string</button>
+                      <button class="px-2 py-1.5 rounded-md text-xs text-slate-500 hover:bg-white/60 dark:hover:bg-slate-700/40">number</button>
+                      <button class="px-2 py-1.5 rounded-md text-xs text-slate-500 hover:bg-white/60 dark:hover:bg-slate-700/40">integer</button>
+                      <button class="px-2 py-1.5 rounded-md text-xs text-slate-500 hover:bg-white/60 dark:hover:bg-slate-700/40">boolean</button>
+                      <button class="px-2 py-1.5 rounded-md text-xs text-slate-500 hover:bg-white/60 dark:hover:bg-slate-700/40">object</button>
+                      <button class="px-2 py-1.5 rounded-md text-xs text-slate-500 hover:bg-white/60 dark:hover:bg-slate-700/40">$ref</button>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-1 inline-flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> Type cannot be changed after creation.</p>
+                  </div>
+                  <div class="col-span-5">
+                    <label class="block text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Shape</label>
+                    <div class="grid grid-cols-2 gap-2">
+                      <label class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                        <div>
+                          <p class="text-[12px] font-medium">Array</p>
+                          <p class="text-[10px] text-slate-500">List of items</p>
+                        </div>
+                        <input type="checkbox" class="accent-violet-500" />
+                      </label>
+                      <label class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-900/15 cursor-pointer">
+                        <div>
+                          <p class="text-[12px] font-medium">Nullable</p>
+                          <p class="text-[10px] text-slate-500">Allow <code class="mono text-[10px]">null</code></p>
+                        </div>
+                        <input type="checkbox" class="accent-amber-500" />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Apply primitive button (opens command palette) -->
+                <div class="rounded-xl border border-violet-200/70 dark:border-violet-800/50 bg-gradient-to-br from-violet-50 to-fuchsia-50 dark:from-violet-950/40 dark:to-fuchsia-950/30 p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="flex h-7 w-7 items-center justify-center rounded-md bg-violet-100 text-violet-600 dark:bg-violet-900/50 dark:text-violet-300"><i data-lucide="sparkles" class="w-4 h-4"></i></span>
+                      <div class="min-w-0">
+                        <p class="text-[12px] font-semibold text-slate-900 dark:text-slate-100">Apply from primitive</p>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Currently inheriting <code class="mono text-[11px] text-violet-600 dark:text-violet-300">email</code> · format · pattern · length</p>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button class="px-2 py-1 rounded-md text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 inline-flex items-center gap-1"><i data-lucide="link-2-off" class="w-3 h-3"></i> Detach</button>
+                      <button id="palette-trigger" class="px-3 py-1.5 rounded-md text-[12px] font-medium bg-white dark:bg-slate-900 border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/40 inline-flex items-center gap-1.5 shadow-sm">
+                        <i data-lucide="search" class="w-3.5 h-3.5"></i> Apply primitive…
+                        <span class="kbd ml-1">⌘ K</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Format & pattern -->
+                <div class="grid grid-cols-12 gap-4">
+                  <div class="col-span-6">
+                    <label class="block text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Format</label>
+                    <div class="relative">
+                      <select class="w-full mono px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 appearance-none">
+                        <option selected>email</option>
+                        <option>idn-email</option>
+                        <option>uri</option>
+                        <option>uuid</option>
+                        <option>date-time</option>
+                        <option>(custom)</option>
+                      </select>
+                      <i data-lucide="chevron-down" class="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
+                  </div>
+                  <div class="col-span-6">
+                    <label class="block text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Pattern (regex)</label>
+                    <div class="relative">
+                      <input value="^[\\w.+-]+@[\\w-]+\\.[\\w.-]+$" class="w-full mono text-[12px] px-3 py-2 pr-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" />
+                      <button class="absolute right-1 top-1/2 -translate-y-1/2 px-1.5 py-1 text-[10px] mono text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/30 rounded inline-flex items-center gap-1"><i data-lucide="flask-conical" class="w-3 h-3"></i> Test</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Inline regex tester -->
+                <div class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="flask-conical" class="w-3.5 h-3.5 text-violet-500"></i> Regex tester · 2 / 3 match</p>
+                    <button class="text-[11px] text-violet-500 hover:underline">Add sample</button>
+                  </div>
+                  <ul class="space-y-1 text-[12px] mono">
+                    <li class="flex items-center gap-2 px-2 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"><span class="dot dot-ok"></span><span class="flex-1">jane.doe@example.com</span><span class="text-emerald-600 dark:text-emerald-400 text-[10px]">match</span></li>
+                    <li class="flex items-center gap-2 px-2 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"><span class="dot dot-ok"></span><span class="flex-1">a+test@sub.acme.co.uk</span><span class="text-emerald-600 dark:text-emerald-400 text-[10px]">match</span></li>
+                    <li class="flex items-center gap-2 px-2 py-1 rounded bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800/50"><span class="dot dot-error"></span><span class="flex-1">no-at-symbol.example</span><span class="text-rose-600 dark:text-rose-300 text-[10px]">no match</span></li>
+                  </ul>
+                </div>
+
+                <!-- Enum / Const -->
+                <div>
+                  <label class="block text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-2">Enumerated values <span class="text-[10px] text-slate-400 normal-case tracking-normal">(mutually exclusive with const)</span></label>
+                  <div class="flex flex-wrap items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/40 min-h-[42px]">
+                    <span class="text-[11px] text-slate-400 italic">No enumerated values — any string matching the pattern is allowed.</span>
+                    <button class="ml-auto text-[11px] text-violet-500 hover:underline inline-flex items-center gap-0.5"><i data-lucide="plus" class="w-3 h-3"></i> Add value</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ─ Constraints ─ -->
+            <section id="constraints" class="section-card rounded-xl border border-amber-200/70 dark:border-amber-800/40 bg-amber-50/30 dark:bg-amber-900/10" data-status="warn">
+              <header class="flex items-start gap-3 px-5 py-4 border-b border-amber-100 dark:border-amber-800/40">
+                <span class="flex h-7 w-7 items-center justify-center rounded-md bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300"><i data-lucide="ruler" class="w-4 h-4"></i></span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-600 dark:text-amber-400">03 · Constraints</p>
+                  <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">Validation rules <span class="dot dot-warn" title="Lint warning"></span></h3>
+                  <p class="text-[12px] text-slate-500 dark:text-slate-400">Type-specific bounds and structural rules.</p>
+                </div>
+                <span class="text-[10px] mono text-amber-600">1 warning</span>
+              </header>
+              <div class="p-5 space-y-5 bg-white dark:bg-slate-900/70 rounded-b-xl">
+                <!-- string length card -->
+                <div class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+                  <p class="text-[12px] font-semibold mb-2 inline-flex items-center gap-1.5"><i data-lucide="case-sensitive" class="w-3.5 h-3.5 text-rose-500"></i> String length</p>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-[11px] uppercase tracking-wider text-slate-500 mb-1">minLength</label>
+                      <input value="3" type="number" class="w-full mono px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" />
+                    </div>
+                    <div>
+                      <label class="block text-[11px] uppercase tracking-wider text-slate-500 mb-1">maxLength</label>
+                      <input value="254" type="number" class="w-full mono px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" />
+                    </div>
+                  </div>
+                  <!-- visualizer -->
+                  <div class="mt-3 relative h-1.5 rounded-full bg-slate-200 dark:bg-slate-700">
+                    <span class="absolute left-[1%] right-[2%] top-0 bottom-0 rounded-full bg-gradient-to-r from-rose-400 to-amber-400"></span>
+                  </div>
+                  <div class="mt-1.5 flex items-center justify-between text-[10px] mono text-slate-400">
+                    <span>0</span><span>3 ≤ length ≤ 254</span><span>500</span>
+                  </div>
+                </div>
+
+                <!-- value range (collapsed/disabled because string) -->
+                <div class="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 px-4 py-3 flex items-center gap-3">
+                  <i data-lucide="hash" class="w-3.5 h-3.5 text-slate-400"></i>
+                  <p class="text-[12px] text-slate-500 dark:text-slate-400 flex-1">
+                    <span class="font-semibold text-slate-600 dark:text-slate-300">Numeric range</span>
+                    <span class="text-slate-400"> · not applicable to <code class="mono text-[10px]">string</code></span>
+                  </p>
+                  <span class="text-[11px] text-slate-400 italic">disabled</span>
+                </div>
+
+                <!-- array items / object props (stubs) -->
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 px-4 py-3">
+                    <p class="text-[12px] font-medium text-slate-600 dark:text-slate-300 inline-flex items-center gap-1.5"><i data-lucide="list-tree" class="w-3.5 h-3.5"></i> Array items</p>
+                    <p class="text-[11px] text-slate-500 mt-0.5">minItems · maxItems · uniqueItems · prefixItems · contains</p>
+                    <p class="text-[10px] text-slate-400 italic mt-1">Toggle <span class="mono">Array</span> shape to configure.</p>
+                  </div>
+                  <div class="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 px-4 py-3">
+                    <p class="text-[12px] font-medium text-slate-600 dark:text-slate-300 inline-flex items-center gap-1.5"><i data-lucide="braces" class="w-3.5 h-3.5"></i> Object properties</p>
+                    <p class="text-[11px] text-slate-500 mt-0.5">additionalProperties · min/maxProperties · propertyNames</p>
+                    <p class="text-[10px] text-slate-400 italic mt-1">Available when type is <code class="mono">object</code>.</p>
+                  </div>
+                </div>
+
+                <!-- composition / NOT -->
+                <div class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <p class="text-[12px] font-semibold inline-flex items-center gap-1.5"><i data-lucide="ban" class="w-3.5 h-3.5 text-purple-500"></i> Negation · <code class="mono">not</code></p>
+                    <button class="text-[11px] text-violet-500 hover:underline inline-flex items-center gap-0.5"><i data-lucide="plus" class="w-3 h-3"></i> Add subschema</button>
+                  </div>
+                  <p class="text-[11px] text-slate-500">A value that is valid against the subschema fails this property. Useful for blocklisting domains, e.g. <code class="mono">{ "pattern": "@example\\.test$" }</code>.</p>
+                </div>
+
+                <!-- Lint inline -->
+                <div class="rounded-lg border border-amber-300/70 dark:border-amber-800/50 bg-amber-50/70 dark:bg-amber-900/15 px-4 py-3 flex items-start gap-3">
+                  <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500 shrink-0 mt-0.5"></i>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[12px] font-semibold text-amber-800 dark:text-amber-200">Pattern is stricter than <code class="mono">format: email</code></p>
+                    <p class="text-[11px] text-amber-700 dark:text-amber-300/90 mt-0.5">Your regex disallows quoted local parts that the email format spec accepts. Tighten the format docs or relax the pattern.</p>
+                    <div class="mt-1.5 flex items-center gap-2">
+                      <button class="text-[11px] font-medium text-amber-800 dark:text-amber-200 hover:underline">Use generic email regex</button>
+                      <span class="text-amber-300">·</span>
+                      <button class="text-[11px] text-amber-700/80 dark:text-amber-300/80 hover:underline">Suppress</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ─ Flags ─ -->
+            <section id="flags" class="section-card rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/70" data-status="filled">
+              <header class="flex items-start gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+                <span class="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300"><i data-lucide="toggle-right" class="w-4 h-4"></i></span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-600 dark:text-emerald-400">04 · Flags &amp; behavior</p>
+                  <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Runtime behavior</h3>
+                  <p class="text-[12px] text-slate-500 dark:text-slate-400">How this property behaves in requests, responses, and lifecycle.</p>
+                </div>
+              </header>
+              <div class="p-5 space-y-4">
+                <div class="grid grid-cols-4 gap-2.5">
+                  <label class="flex flex-col gap-1 px-3 py-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-900/15 cursor-pointer">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[12px] font-semibold inline-flex items-center gap-1"><i data-lucide="asterisk" class="w-3 h-3 text-emerald-500"></i> Required</span>
+                      <input type="checkbox" checked class="accent-emerald-500" />
+                    </div>
+                    <span class="text-[10px] text-slate-500">Must be present</span>
+                  </label>
+                  <label class="flex flex-col gap-1 px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[12px] font-semibold inline-flex items-center gap-1"><i data-lucide="circle-slash" class="w-3 h-3 text-amber-500"></i> Nullable</span>
+                      <input type="checkbox" class="accent-amber-500" />
+                    </div>
+                    <span class="text-[10px] text-slate-500">Allow <code class="mono text-[10px]">null</code></span>
+                  </label>
+                  <label class="flex flex-col gap-1 px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[12px] font-semibold inline-flex items-center gap-1"><i data-lucide="eye" class="w-3 h-3 text-sky-500"></i> Read only</span>
+                      <input type="checkbox" class="accent-sky-500" />
+                    </div>
+                    <span class="text-[10px] text-slate-500">Responses only</span>
+                  </label>
+                  <label class="flex flex-col gap-1 px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[12px] font-semibold inline-flex items-center gap-1"><i data-lucide="pen-line" class="w-3 h-3 text-purple-500"></i> Write only</span>
+                      <input type="checkbox" class="accent-purple-500" />
+                    </div>
+                    <span class="text-[10px] text-slate-500">Requests only</span>
+                  </label>
+                </div>
+
+                <!-- deprecated -->
+                <div class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
+                  <label class="flex items-center justify-between cursor-pointer">
+                    <span class="text-[12px] font-semibold inline-flex items-center gap-2"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-500"></i> Deprecated <span class="text-[10px] font-normal text-slate-500">— signal consumers to migrate off</span></span>
+                    <input type="checkbox" class="accent-amber-500" />
+                  </label>
+                </div>
+
+                <!-- owner -->
+                <div class="grid grid-cols-12 gap-4">
+                  <div class="col-span-7">
+                    <label class="block text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Owner <span class="text-slate-400 normal-case tracking-normal">— stored as <code class="mono text-[10px]">x-owner</code></span></label>
+                    <div class="relative">
+                      <input value="@platform-team" class="w-full pl-7 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 mono text-[12px]" />
+                      <i data-lucide="users" class="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    </div>
+                  </div>
+                  <div class="col-span-5">
+                    <label class="block text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Stability</label>
+                    <select class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                      <option>stable</option>
+                      <option>beta</option>
+                      <option>experimental</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ─ Defaults & examples ─ -->
+            <section id="defaults" class="section-card rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/70" data-status="filled">
+              <header class="flex items-start gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+                <span class="flex h-7 w-7 items-center justify-center rounded-md bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300"><i data-lucide="puzzle" class="w-4 h-4"></i></span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-600 dark:text-sky-300">05 · Defaults &amp; examples</p>
+                  <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Default value, constants, and sample payloads</h3>
+                  <p class="text-[12px] text-slate-500 dark:text-slate-400">Examples are surfaced in generated SDK and "Try it" docs.</p>
+                </div>
+              </header>
+              <div class="p-5 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-[11px] uppercase tracking-wider text-slate-500 mb-1">Default value</label>
+                    <input placeholder='JSON value (e.g. "hello")' class="w-full mono text-[12px] px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" />
+                    <p class="text-[11px] text-slate-500 mt-1">Used when no value is provided.</p>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] uppercase tracking-wider text-slate-500 mb-1">Constant <span class="text-slate-400">(<code class="mono text-[10px]">const</code>)</span></label>
+                    <input placeholder="Fixed value · disables enum" class="w-full mono text-[12px] px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" />
+                    <p class="text-[11px] text-slate-500 mt-1">Mutually exclusive with enum.</p>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="block text-[11px] uppercase tracking-wider text-slate-500">Examples</label>
+                    <div class="flex items-center gap-1.5">
+                      <button class="text-[11px] text-slate-500 hover:text-violet-500 inline-flex items-center gap-0.5"><i data-lucide="sparkles" class="w-3 h-3"></i> Generate</button>
+                      <button class="text-[11px] text-violet-500 hover:underline inline-flex items-center gap-0.5"><i data-lucide="plus" class="w-3 h-3"></i> Add</button>
+                    </div>
+                  </div>
+                  <ul class="space-y-1.5">
+                    <li class="flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                      <i data-lucide="grip-vertical" class="w-3 h-3 text-slate-400"></i>
+                      <code class="mono text-[12px] flex-1 truncate">"jane.doe@example.com"</code>
+                      <span class="dot dot-ok" title="Matches schema"></span>
+                      <button class="text-slate-400 hover:text-slate-600"><i data-lucide="pencil" class="w-3 h-3"></i></button>
+                      <button class="text-slate-400 hover:text-rose-500"><i data-lucide="x" class="w-3 h-3"></i></button>
+                    </li>
+                    <li class="flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                      <i data-lucide="grip-vertical" class="w-3 h-3 text-slate-400"></i>
+                      <code class="mono text-[12px] flex-1 truncate">"a+test@sub.acme.co.uk"</code>
+                      <span class="dot dot-ok" title="Matches schema"></span>
+                      <button class="text-slate-400 hover:text-slate-600"><i data-lucide="pencil" class="w-3 h-3"></i></button>
+                      <button class="text-slate-400 hover:text-rose-500"><i data-lucide="x" class="w-3 h-3"></i></button>
+                    </li>
+                    <li class="flex items-center gap-2 px-3 py-1.5 rounded-md border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40">
+                      <input placeholder="Add example value (JSON)" class="flex-1 bg-transparent outline-none mono text-[12px] text-slate-500" />
+                      <button class="text-[11px] text-violet-500 hover:underline">Save</button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <!-- ─ Docs & metadata (collapsed stub) ─ -->
+            <section id="docs" class="section-card rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40" data-status="empty">
+              <button class="w-full flex items-center gap-3 px-5 py-3.5 text-left">
+                <span class="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"><i data-lucide="book-open-text" class="w-4 h-4"></i></span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">06 · Docs &amp; metadata</p>
+                  <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">External docs, comments, content shape <span class="dot dot-empty"></span></h3>
+                  <p class="text-[12px] text-slate-500 dark:text-slate-400">externalDocs · <code class="mono text-[11px]">$comment</code> · XML · contentMediaType · contentEncoding · contentSchema</p>
+                </div>
+                <span class="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-[11px] text-slate-500 hover:border-violet-300 hover:text-violet-600"><i data-lucide="plus" class="w-3 h-3"></i> Configure</span>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+              </button>
+            </section>
+
+            <!-- ─ Ownership & extensions (collapsed stub) ─ -->
+            <section id="extensions" class="section-card rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40" data-status="empty">
+              <button class="w-full flex items-center gap-3 px-5 py-3.5 text-left">
+                <span class="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"><i data-lucide="braces" class="w-4 h-4"></i></span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">07 · Ownership &amp; extensions</p>
+                  <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">Custom <code class="mono text-[11px]">x-*</code> keys <span class="dot dot-empty"></span></h3>
+                  <p class="text-[12px] text-slate-500 dark:text-slate-400">Vendor extensions surfaced in the OpenAPI document.</p>
+                </div>
+                <span class="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-[11px] text-slate-500 hover:border-violet-300 hover:text-violet-600"><i data-lucide="plus" class="w-3 h-3"></i> Configure</span>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+              </button>
+            </section>
+
+            <p class="text-center text-[11px] text-slate-400 pt-2 pb-4">End of property · 7 sections · <a class="text-violet-500 hover:underline">Back to top ↑</a></p>
+          </div>
+        </main>
+
+        <!-- ─── Right rail: live JSON + sample + lint ─── -->
+        <aside class="rail-right border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col min-h-0">
+          <div class="px-4 pt-3.5 pb-2 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
+            <div class="flex items-center gap-2">
+              <i data-lucide="braces" class="w-4 h-4 text-violet-500"></i>
+              <span class="text-[12px] font-semibold">Live preview</span>
+              <span class="dot dot-ok"></span><span class="text-[10px] text-emerald-600 dark:text-emerald-400">in sync</span>
+            </div>
+            <button class="text-[11px] text-slate-500 hover:text-violet-500 inline-flex items-center gap-1"><i data-lucide="copy" class="w-3 h-3"></i> Copy</button>
+          </div>
+
+          <!-- Tabs inside rail -->
+          <div class="px-4 pt-2 flex items-center gap-1 text-[11px]">
+            <button class="px-2.5 py-1 rounded-md bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 font-medium">Schema</button>
+            <button class="px-2.5 py-1 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">Sample</button>
+            <button class="px-2.5 py-1 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">Diff</button>
+            <span class="ml-auto text-[10px] mono text-slate-400">19 lines</span>
+          </div>
+
+          <div class="flex-1 min-h-0 overflow-auto px-4 py-3 mono text-[11.5px] leading-[1.55] bg-slate-50/50 dark:bg-slate-950/40">
+<pre class="whitespace-pre"><span class="tk-pun">{</span>
+  <span class="tk-key">"title"</span><span class="tk-pun">:</span> <span class="tk-str">"Customer email"</span><span class="tk-pun">,</span>
+  <span class="tk-key">"description"</span><span class="tk-pun">:</span> <span class="tk-str">"Primary contact email…"</span><span class="tk-pun">,</span>
+  <span class="tk-key">"type"</span><span class="tk-pun">:</span> <span class="tk-str">"string"</span><span class="tk-pun">,</span>
+  <span class="tk-key">"format"</span><span class="tk-pun">:</span> <span class="tk-str">"email"</span><span class="tk-pun">,</span>
+  <span class="tk-key">"pattern"</span><span class="tk-pun">:</span> <span class="tk-str">"^[\\w.+-]+@[\\w-]+\\.[\\w.-]+$"</span><span class="tk-pun">,</span>
+  <span class="tk-key">"minLength"</span><span class="tk-pun">:</span> <span class="tk-num">3</span><span class="tk-pun">,</span>
+  <span class="tk-key">"maxLength"</span><span class="tk-pun">:</span> <span class="tk-num">254</span><span class="tk-pun">,</span>
+  <span class="tk-key">"required"</span><span class="tk-pun">:</span> <span class="tk-bool">true</span><span class="tk-pun">,</span>
+  <span class="tk-key">"examples"</span><span class="tk-pun">: [</span>
+    <span class="tk-str">"jane.doe@example.com"</span><span class="tk-pun">,</span>
+    <span class="tk-str">"a+test@sub.acme.co.uk"</span>
+  <span class="tk-pun">],</span>
+  <span class="tk-key">"x-owner"</span><span class="tk-pun">:</span> <span class="tk-str">"@platform-team"</span><span class="tk-pun">,</span>
+  <span class="tk-key">"x-stability"</span><span class="tk-pun">:</span> <span class="tk-str">"stable"</span>
+<span class="tk-pun">}</span></pre>
+          </div>
+
+          <!-- Sample value -->
+          <div class="border-t border-slate-200 dark:border-slate-800 px-4 py-3">
+            <div class="flex items-center justify-between mb-1.5">
+              <p class="text-[11px] font-semibold inline-flex items-center gap-1.5"><i data-lucide="play" class="w-3 h-3 text-emerald-500"></i> Sample value</p>
+              <button class="text-[10px] text-slate-500 hover:text-violet-500 inline-flex items-center gap-1"><i data-lucide="rotate-ccw" class="w-3 h-3"></i> Re-roll</button>
+            </div>
+            <div class="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 mono text-[12px]">
+              <span class="text-slate-400">"email_address":</span> <span class="text-emerald-600 dark:text-emerald-400">"jane.doe@example.com"</span>
+            </div>
+          </div>
+
+          <!-- Lint summary -->
+          <div class="border-t border-slate-200 dark:border-slate-800 px-4 py-3">
+            <div class="flex items-center justify-between mb-1.5">
+              <p class="text-[11px] font-semibold inline-flex items-center gap-1.5"><i data-lucide="shield-check" class="w-3 h-3 text-amber-500"></i> Lint · 0 errors · 1 warn</p>
+              <button class="text-[10px] text-violet-500 hover:underline">Run all rules</button>
+            </div>
+            <ul class="space-y-1.5 text-[11px]">
+              <li class="flex items-start gap-2 px-2 py-1.5 rounded-md bg-amber-50/70 dark:bg-amber-900/15 border border-amber-200/70 dark:border-amber-800/40">
+                <i data-lucide="alert-triangle" class="w-3 h-3 text-amber-500 mt-0.5"></i>
+                <div class="flex-1 min-w-0">
+                  <p class="text-amber-800 dark:text-amber-200 font-medium">Pattern stricter than format</p>
+                  <p class="text-amber-700/80 dark:text-amber-300/80 leading-snug">Constraints · jump to fix →</p>
+                </div>
+              </li>
+              <li class="flex items-start gap-2 px-2 py-1.5 rounded-md bg-emerald-50/70 dark:bg-emerald-900/15 border border-emerald-200/70 dark:border-emerald-800/40">
+                <i data-lucide="check" class="w-3 h-3 text-emerald-500 mt-0.5"></i>
+                <div class="flex-1 min-w-0">
+                  <p class="text-emerald-700 dark:text-emerald-200 font-medium">Examples validate against schema</p>
+                  <p class="text-emerald-700/80 dark:text-emerald-300/80 leading-snug">2 / 2 examples passed</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+
+      <!-- ─────────── Footer ─────────── -->
+      <footer class="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-3 flex items-center gap-4">
+        <div class="flex items-center gap-3 text-[11px]">
+          <span class="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium"><span class="dot dot-filled"></span> 2 unsaved changes</span>
+          <span class="text-slate-300 dark:text-slate-600">·</span>
+          <span class="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400"><i data-lucide="check" class="w-3 h-3"></i> 0 errors</span>
+          <span class="text-slate-300 dark:text-slate-600">·</span>
+          <span class="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400"><i data-lucide="alert-triangle" class="w-3 h-3"></i> 1 warning</span>
+          <span class="text-slate-300 dark:text-slate-600">·</span>
+          <button class="text-slate-500 hover:text-violet-500 inline-flex items-center gap-1"><i data-lucide="undo-2" class="w-3 h-3"></i> Reset to saved</button>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <span class="kbd hidden md:inline">⌘ ⏎</span>
+          <button class="px-3 py-1.5 text-[12px] rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">Cancel</button>
+          <button class="px-4 py-1.5 text-[12px] rounded-md bg-violet-600 hover:bg-violet-700 text-white font-semibold inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i> Save property</button>
+        </div>
+      </footer>
+
+      <!-- ─────────── Command palette overlay (Apply primitive…) ─────────── -->
+      <div id="palette" class="absolute inset-0 z-30 flex items-start justify-center pt-24 px-4 pointer-events-none" style="display:none;">
+        <div id="palette-scrim" class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] pointer-events-none"></div>
+        <div class="relative w-full max-w-xl rounded-xl bg-white dark:bg-slate-900 ring-1 ring-violet-200/70 dark:ring-violet-700/40 palette-shadow overflow-hidden pointer-events-auto">
+          <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+            <i data-lucide="search" class="w-4 h-4 text-violet-500"></i>
+            <input value="em" placeholder="Search primitives — try 'email', 'uuid', 'date'…" class="flex-1 bg-transparent outline-none text-[13px] mono placeholder:text-slate-400" />
+            <span class="kbd">esc</span>
+            <button id="palette-close" class="ml-1 w-6 h-6 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+          </div>
+          <div class="max-h-[360px] overflow-y-auto py-1.5">
+            <p class="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Strings · 3 matches</p>
+            <ul class="px-1.5">
+              <li class="flex items-center gap-3 px-3 py-2 rounded-md bg-violet-500/10 border border-violet-200 dark:border-violet-700/50 text-violet-700 dark:text-violet-300">
+                <i data-lucide="at-sign" class="w-4 h-4"></i>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[13px] font-semibold mono">email</p>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">RFC 5322 — <code class="mono text-[10px]">format: email</code> · <code class="mono text-[10px]">pattern</code> · length 3–254</p>
+                </div>
+                <span class="text-[10px] mono text-violet-500">currently applied</span>
+                <span class="kbd">↵</span>
+              </li>
+              <li class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-100/70 dark:hover:bg-slate-800/60">
+                <i data-lucide="at-sign" class="w-4 h-4 text-slate-500"></i>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[13px] font-semibold mono">idn-email</p>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">Internationalized email — <code class="mono text-[10px]">format: idn-email</code></p>
+                </div>
+              </li>
+              <li class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-100/70 dark:hover:bg-slate-800/60">
+                <i data-lucide="mail-search" class="w-4 h-4 text-slate-500"></i>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[13px] font-semibold mono">email-list</p>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">Comma-separated emails — <code class="mono text-[10px]">pattern</code> only</p>
+                </div>
+              </li>
+            </ul>
+            <p class="px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Recently used</p>
+            <ul class="px-1.5">
+              <li class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-100/70 dark:hover:bg-slate-800/60">
+                <i data-lucide="fingerprint" class="w-4 h-4 text-amber-500"></i>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[13px] font-semibold mono">uuid</p>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">v4 / v7 — <code class="mono text-[10px]">format: uuid</code></p>
+                </div>
+                <span class="text-[10px] text-slate-400">used 12× this week</span>
+              </li>
+              <li class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-100/70 dark:hover:bg-slate-800/60">
+                <i data-lucide="calendar-clock" class="w-4 h-4 text-amber-500"></i>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[13px] font-semibold mono">date-time</p>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">ISO-8601 timestamp with timezone</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <div class="flex items-center gap-3 px-4 py-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-500">
+            <span class="inline-flex items-center gap-1"><span class="kbd">↑</span><span class="kbd">↓</span> navigate</span>
+            <span class="inline-flex items-center gap-1"><span class="kbd">↵</span> apply</span>
+            <span class="inline-flex items-center gap-1"><span class="kbd">⌘ ↵</span> apply &amp; preview</span>
+            <span class="ml-auto inline-flex items-center gap-1"><i data-lucide="library-big" class="w-3 h-3"></i> 24 primitives</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.add('light');
+    }
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      document.documentElement.classList.toggle('light');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+
+    // View-mode toggle (Form / Split / JSON). Form = rail hidden; Split = rail visible; JSON = JSON-only.
+    const dialog = document.getElementById('dialog');
+    document.querySelectorAll('.vw-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const target = btn.getAttribute('data-view-target');
+        dialog.setAttribute('data-view', target);
+        document.querySelectorAll('.vw-btn').forEach((b) => {
+          const isActive = b === btn;
+          b.classList.toggle('bg-white', isActive);
+          b.classList.toggle('dark:bg-slate-900', isActive);
+          b.classList.toggle('text-violet-600', isActive);
+          b.classList.toggle('dark:text-violet-300', isActive);
+          b.classList.toggle('font-semibold', isActive);
+          b.classList.toggle('shadow-sm', isActive);
+          b.classList.toggle('text-slate-500', !isActive);
+          b.classList.toggle('dark:text-slate-400', !isActive);
+        });
+      });
+    });
+
+    // Command palette show/hide (open by default to demonstrate the design).
+    const palette = document.getElementById('palette');
+    const showPalette = (show) => {
+      palette.style.display = show ? 'flex' : 'none';
+    };
+    document.getElementById('palette-trigger').addEventListener('click', () => showPalette(true));
+    document.getElementById('palette-close').addEventListener('click', () => showPalette(false));
+    document.getElementById('palette-scrim').addEventListener('click', () => showPalette(false));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') showPalette(false);
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); showPalette(true); }
+    });
+
+    lucide.createIcons();
+  </script>
+</body>
+</html>

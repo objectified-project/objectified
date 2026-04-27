@@ -26,6 +26,7 @@ import { RegexTester } from './RegexTester';
 import { PrefixItemsEditor } from './PrefixItemsEditor';
 import { ExtensionsEditor } from './ExtensionsEditor';
 import { PrimitiveSelector } from './PrimitiveSelector';
+import { validateExample } from './validateExample';
 import { Input } from '../../ui/Input';
 import { Label } from '../../ui/Label';
 import { Badge } from '../../ui/Badge';
@@ -274,6 +275,8 @@ export interface PropertyFormData {
   deprecationMessage?: string;
   /** Team or person responsible; persisted as OpenAPI extension `x-owner` on the property schema */
   owner?: string;
+  /** Name of the primitive currently applied to this property; persisted as `x-primitive` */
+  appliedPrimitive?: string;
   examples?: string[]; // Array of example values (JSON strings)
 
   // Object constraints
@@ -1082,51 +1085,85 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   {data.examples.length} example{data.examples.length !== 1 ? 's' : ''}
                 </Typography>
                 <List sx={{ p: 0 }}>
-                  {data.examples.map((example, index) => (
-                    <ListItem
-                      key={index}
-                      sx={{
-                        borderBottom: index < data.examples!.length - 1 ? '1px solid' : 'none',
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 1,
-                        px: 0,
-                        py: 1.5,
-                      }}
-                    >
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-                            fontSize: '0.75rem',
-                            color: isDark ? '#cbd5e1' : '#334155',
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                          }}
-                        >
-                          {example}
-                        </Typography>
-                      </Box>
-                      <IconButton
-                        edge="end"
-                        onClick={() => handleRemoveExample(index)}
-                        size="small"
+                  {data.examples.map((example, index) => {
+                    const validity = validateExample(example, data, baseType, isArray);
+                    const dotColor = validity.ok ? '#10b981' : '#ef4444';
+                    const dotTitle = validity.ok
+                      ? `Valid · ${validity.matchedConstraints.join(', ') || 'type only'}`
+                      : `Invalid · ${validity.reason}`;
+                    return (
+                      <ListItem
+                        key={index}
                         sx={{
-                          flex: 0,
-                          color: '#94a3b8',
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            color: '#ef4444',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                          },
+                          borderBottom: index < data.examples!.length - 1 ? '1px solid' : 'none',
+                          borderColor: isDark ? '#334155' : '#e2e8f0',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 1,
+                          px: 0,
+                          py: 1.5,
                         }}
                       >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </ListItem>
-                  ))}
+                        <Box
+                          component="span"
+                          aria-label={dotTitle}
+                          title={dotTitle}
+                          sx={{
+                            mt: 0.5,
+                            flex: 0,
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            bgcolor: dotColor,
+                            boxShadow: `0 0 0 2px ${dotColor}33`,
+                          }}
+                        />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                              fontSize: '0.75rem',
+                              color: isDark ? '#cbd5e1' : '#334155',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                            }}
+                          >
+                            {example}
+                          </Typography>
+                          {!validity.ok && (
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                display: 'block',
+                                mt: 0.5,
+                                color: '#dc2626',
+                                fontSize: '0.7rem',
+                              }}
+                            >
+                              {validity.reason}
+                            </Typography>
+                          )}
+                        </Box>
+                        <IconButton
+                          edge="end"
+                          onClick={() => handleRemoveExample(index)}
+                          size="small"
+                          sx={{
+                            flex: 0,
+                            color: '#94a3b8',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              color: '#ef4444',
+                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            },
+                          }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </ListItem>
+                    );
+                  })}
                 </List>
               </Box>
             )}

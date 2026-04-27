@@ -1,18 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
   Dialog,
   DialogPortal,
   DialogOverlay,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
 } from '../../ui/Dialog';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
-import { Checkbox } from '../../ui/Checkbox';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 import { PropertyFormData } from './PropertyFormFields';
 import { cn } from '../../../../../lib/utils';
@@ -24,6 +20,9 @@ import {
   Sparkles,
   Database,
   Loader2,
+  CornerDownLeft,
+  Link2Off,
+  History,
 } from 'lucide-react';
 
 export interface Primitive {
@@ -44,31 +43,69 @@ export interface Primitive {
 }
 
 export interface PrimitiveSelectorProps {
-  // Form data and update handler
   formData: PropertyFormData;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onChange: (field: keyof PropertyFormData, value: any) => void;
-
-  // Current property type (to filter primitives by category)
   propertyType: string;
-
-  // Optional: callback when a primitive is applied
   onPrimitiveApplied?: (primitive: Primitive) => void;
-
-  // Optional: callback when the selection dialog opens or closes (e.g. to dim parent form)
+  /** Notified when the palette opens or closes (e.g. to dim the parent form). */
   onOpenChange?: (open: boolean) => void;
-
-  // Size variant
+  /** Trigger button size. */
   size?: 'small' | 'medium';
+  /** When true, hides the trigger button (palette must be opened via the global ⌘K shortcut or a controlled open prop). */
+  hideTrigger?: boolean;
+  /** Controlled palette-open state. When provided, the component is fully controlled. */
+  open?: boolean;
+  /** Override the trigger button label. */
+  triggerLabel?: string;
 }
 
-// Category type mapping from property types to primitive categories
 const propertyTypeToPrimitiveCategory: Record<string, string> = {
-  'string': 'string',
-  'number': 'number',
-  'integer': 'integer',
-  'boolean': 'boolean',
-  'array': 'array',
-  'object': 'object',
+  string: 'string',
+  number: 'number',
+  integer: 'integer',
+  boolean: 'boolean',
+  array: 'array',
+  object: 'object',
+};
+
+const RECENT_STORAGE_KEY = 'property-dialog-recent-primitives';
+const MAX_RECENT = 6;
+
+const loadRecent = (): string[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(RECENT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as string[]).slice(0, MAX_RECENT) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveRecent = (ids: string[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(ids.slice(0, MAX_RECENT)));
+  } catch {
+    /* ignore */
+  }
+};
+
+const summarizeSchema = (schema: Record<string, unknown>): string => {
+  const parts: string[] = [];
+  if (schema.format) parts.push(`format=${schema.format}`);
+  if (schema.pattern) parts.push('pattern');
+  if (schema.minLength !== undefined || schema.maxLength !== undefined) {
+    parts.push(`len ${schema.minLength ?? '·'}–${schema.maxLength ?? '·'}`);
+  }
+  if (schema.minimum !== undefined || schema.maximum !== undefined) {
+    parts.push(`range ${schema.minimum ?? '·'}–${schema.maximum ?? '·'}`);
+  }
+  if (schema.enum && Array.isArray(schema.enum)) parts.push(`enum(${schema.enum.length})`);
+  if (schema.multipleOf !== undefined) parts.push(`×${schema.multipleOf}`);
+  return parts.join(' · ') || 'no constraints';
 };
 
 export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
@@ -78,37 +115,51 @@ export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
   onPrimitiveApplied,
   onOpenChange,
   size = 'small',
+  hideTrigger = false,
+  open: controlledOpen,
+  triggerLabel = 'Apply primitive…',
 }) => {
   const isDark = useDarkMode();
 
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (!isControlled) setInternalOpen(next);
+    },
+    [isControlled],
+  );
   const [loading, setLoading] = useState(false);
   const [primitives, setPrimitives] = useState<Primitive[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showSystemPrimitives, setShowSystemPrimitives] = useState(true);
-  const [showTenantPrimitives, setShowTenantPrimitives] = useState(true);
-  const [selectedPrimitive, setSelectedPrimitive] = useState<Primitive | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
 
-  // Fetch primitives when dialog opens
-  useEffect(() => {
-    if (dialogOpen) {
-      fetchPrimitives();
-    }
-  }, [dialogOpen]);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const fetchPrimitives = async () => {
+  const setOpenState = useCallback(
+    (next: boolean) => {
+      setOpen(next);
+      onOpenChange?.(next);
+      if (next) {
+        setSearchQuery('');
+        setActiveIndex(0);
+      }
+    },
+    [onOpenChange, setOpen],
+  );
+
+  const fetchPrimitives = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const category = propertyTypeToPrimitiveCategory[propertyType];
       const url = category ? `/api/primitives?category=${category}` : '/api/primitives';
       const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch primitives');
-      }
-
+      if (!response.ok) throw new Error('Failed to fetch primitives');
       const data = await response.json();
       if (data.success) {
         setPrimitives(data.primitives || []);
@@ -121,87 +172,117 @@ export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [propertyType]);
 
-  // Filter primitives based on search and visibility settings
-  const filteredPrimitives = useMemo(() => {
-    let filtered = primitives;
-
-    // Filter by system/tenant
-    if (!showSystemPrimitives) {
-      filtered = filtered.filter(p => !p.is_system);
+  useEffect(() => {
+    if (open) {
+      fetchPrimitives();
+      setRecentIds(loadRecent());
+      requestAnimationFrame(() => inputRef.current?.focus());
     }
-    if (!showTenantPrimitives) {
-      filtered = filtered.filter(p => p.is_system);
-    }
+  }, [open, fetchPrimitives]);
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(p =>
+  // Global ⌘K / Ctrl+K shortcut to open the palette.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setOpenState(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [setOpenState]);
+
+  // Filter + group results.
+  const { filtered, groups } = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const matches = primitives.filter((p) => {
+      if (!query) return true;
+      return (
         p.name.toLowerCase().includes(query) ||
         p.description?.toLowerCase().includes(query) ||
-        p.tags.some(tag => tag.toLowerCase().includes(query))
+        p.tags.some((tag) => tag.toLowerCase().includes(query))
       );
-    }
+    });
 
-    // Sort: tenant primitives first, then alphabetically
-    return filtered.sort((a, b) => {
-      if (a.is_system !== b.is_system) {
-        return a.is_system ? 1 : -1; // Tenant primitives first
-      }
+    const sorted = [...matches].sort((a, b) => {
+      if (a.is_system !== b.is_system) return a.is_system ? 1 : -1;
       return a.name.localeCompare(b.name);
     });
-  }, [primitives, searchQuery, showSystemPrimitives, showTenantPrimitives]);
 
-  // Apply primitive schema to form data
+    const recents = recentIds
+      .map((id) => sorted.find((p) => p.id === id))
+      .filter((p): p is Primitive => Boolean(p));
+
+    const recentSet = new Set(recents.map((p) => p.id));
+    const rest = sorted.filter((p) => !recentSet.has(p.id));
+
+    const ordered: Primitive[] = !query ? [...recents, ...rest] : sorted;
+
+    const grouped: Array<{ id: string; label: string; items: Primitive[] }> = [];
+    if (!query && recents.length > 0) {
+      grouped.push({ id: 'recent', label: 'Recently used', items: recents });
+    }
+    if (rest.length > 0 || query) {
+      const items = !query ? rest : sorted;
+      const byCategory = new Map<string, Primitive[]>();
+      for (const p of items) {
+        const key = p.category || 'other';
+        const arr = byCategory.get(key) ?? [];
+        arr.push(p);
+        byCategory.set(key, arr);
+      }
+      const categories = Array.from(byCategory.keys()).sort();
+      for (const cat of categories) {
+        grouped.push({
+          id: `cat-${cat}`,
+          label: cat.charAt(0).toUpperCase() + cat.slice(1),
+          items: byCategory.get(cat) ?? [],
+        });
+      }
+    }
+
+    return { filtered: ordered, groups: grouped };
+  }, [primitives, searchQuery, recentIds]);
+
+  useEffect(() => {
+    if (activeIndex >= filtered.length) {
+      setActiveIndex(filtered.length === 0 ? 0 : Math.max(0, filtered.length - 1));
+    }
+  }, [filtered.length, activeIndex]);
+
+  // Keep the active row in view.
+  useEffect(() => {
+    const node = listRef.current?.querySelector<HTMLElement>(
+      `[data-primitive-index="${activeIndex}"]`,
+    );
+    node?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex]);
+
   const applyPrimitive = (primitive: Primitive) => {
     const schema = primitive.schema;
 
-    // First, clear all constraint fields (preserve title, description which are identity fields)
-    // Clear string constraints
     onChange('format', '');
     onChange('pattern', '');
     onChange('minLength', '');
     onChange('maxLength', '');
-
-    // Clear number constraints
     onChange('minimum', '');
     onChange('maximum', '');
     onChange('minimumType', undefined);
     onChange('maximumType', undefined);
     onChange('multipleOf', '');
-
-    // Clear array constraints
     onChange('minItems', '');
     onChange('maxItems', '');
     onChange('uniqueItems', false);
-
-    // Clear enum and default
     onChange('enum', []);
     onChange('default', '');
     onChange('const', '');
 
-    // Now apply the primitive's constraints
-    // Apply format
-    if (schema.format !== undefined) {
-      onChange('format', schema.format as string);
-    }
-
-    // Apply pattern (regex)
-    if (schema.pattern !== undefined) {
-      onChange('pattern', schema.pattern as string);
-    }
-
-    // Apply string constraints
-    if (schema.minLength !== undefined) {
-      onChange('minLength', String(schema.minLength));
-    }
-    if (schema.maxLength !== undefined) {
-      onChange('maxLength', String(schema.maxLength));
-    }
-
-    // Apply number constraints
+    if (schema.format !== undefined) onChange('format', schema.format as string);
+    if (schema.pattern !== undefined) onChange('pattern', schema.pattern as string);
+    if (schema.minLength !== undefined) onChange('minLength', String(schema.minLength));
+    if (schema.maxLength !== undefined) onChange('maxLength', String(schema.maxLength));
     if (schema.minimum !== undefined) {
       onChange('minimum', String(schema.minimum));
       onChange('minimumType', 'inclusive');
@@ -218,302 +299,296 @@ export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
       onChange('maximum', String(schema.exclusiveMaximum));
       onChange('maximumType', 'exclusive');
     }
-    if (schema.multipleOf !== undefined) {
-      onChange('multipleOf', String(schema.multipleOf));
-    }
-
-    // Apply array constraints
-    if (schema.minItems !== undefined) {
-      onChange('minItems', String(schema.minItems));
-    }
-    if (schema.maxItems !== undefined) {
-      onChange('maxItems', String(schema.maxItems));
-    }
-    if (schema.uniqueItems !== undefined) {
-      onChange('uniqueItems', schema.uniqueItems);
-    }
-
-    // Apply enum values
+    if (schema.multipleOf !== undefined) onChange('multipleOf', String(schema.multipleOf));
+    if (schema.minItems !== undefined) onChange('minItems', String(schema.minItems));
+    if (schema.maxItems !== undefined) onChange('maxItems', String(schema.maxItems));
+    if (schema.uniqueItems !== undefined) onChange('uniqueItems', schema.uniqueItems);
     if (schema.enum !== undefined && Array.isArray(schema.enum)) {
       onChange('enum', schema.enum.map(String));
     }
-
-    // Apply default value
-    if (schema.default !== undefined) {
-      onChange('default', String(schema.default));
-    }
-
-    // Apply const value
+    if (schema.default !== undefined) onChange('default', String(schema.default));
     if (schema.const !== undefined) {
-      onChange('const', typeof schema.const === 'string' ? schema.const : JSON.stringify(schema.const));
+      onChange(
+        'const',
+        typeof schema.const === 'string' ? schema.const : JSON.stringify(schema.const),
+      );
     }
-
-    // Apply description only if the form doesn't have one (don't overwrite user's description)
     if (schema.description && !formData.description) {
       onChange('description', schema.description as string);
     }
 
-    // Notify callback
-    if (onPrimitiveApplied) {
-      onPrimitiveApplied(primitive);
-    }
+    onChange('appliedPrimitive', primitive.name);
 
-    setDialogOpen(false);
-    setSelectedPrimitive(null);
-    setSearchQuery('');
-    onOpenChange?.(false);
+    const nextRecent = [primitive.id, ...recentIds.filter((id) => id !== primitive.id)].slice(
+      0,
+      MAX_RECENT,
+    );
+    setRecentIds(nextRecent);
+    saveRecent(nextRecent);
+
+    onPrimitiveApplied?.(primitive);
+    setOpenState(false);
   };
 
-  // Render schema preview
-  const renderSchemaPreview = (schema: Record<string, unknown>) => {
-    const constraints: string[] = [];
-
-    if (schema.format) constraints.push(`format: ${schema.format}`);
-    if (schema.pattern) constraints.push(`pattern: ${schema.pattern}`);
-    if (schema.minLength !== undefined) constraints.push(`minLength: ${schema.minLength}`);
-    if (schema.maxLength !== undefined) constraints.push(`maxLength: ${schema.maxLength}`);
-    if (schema.minimum !== undefined) constraints.push(`minimum: ${schema.minimum}`);
-    if (schema.maximum !== undefined) constraints.push(`maximum: ${schema.maximum}`);
-    if (schema.exclusiveMinimum !== undefined) constraints.push(`exclusiveMinimum: ${schema.exclusiveMinimum}`);
-    if (schema.exclusiveMaximum !== undefined) constraints.push(`exclusiveMaximum: ${schema.exclusiveMaximum}`);
-    if (schema.multipleOf !== undefined) constraints.push(`multipleOf: ${schema.multipleOf}`);
-    if (schema.minItems !== undefined) constraints.push(`minItems: ${schema.minItems}`);
-    if (schema.maxItems !== undefined) constraints.push(`maxItems: ${schema.maxItems}`);
-    if (schema.uniqueItems) constraints.push('uniqueItems: true');
-    if (schema.enum && Array.isArray(schema.enum)) {
-      const enumStr = (schema.enum as string[]).slice(0, 3).join(', ');
-      constraints.push(`enum: [${enumStr}${(schema.enum as string[]).length > 3 ? '...' : ''}]`);
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, filtered.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const target = filtered[activeIndex];
+      if (target) applyPrimitive(target);
     }
+  };
 
-    return constraints.length > 0 ? constraints.join(', ') : 'No constraints defined';
+  const flatToIndex = (groupIdx: number, itemIdx: number) => {
+    let n = 0;
+    for (let i = 0; i < groupIdx; i += 1) {
+      n += groups[i].items.length;
+    }
+    return n + itemIdx;
   };
 
   return (
     <>
-      {/* Trigger Button */}
-      <div className="flex items-center gap-2">
+      {!hideTrigger && (
         <Button
           variant="outline"
           size={size === 'small' ? 'sm' : 'default'}
-          onClick={() => {
-            setDialogOpen(true);
-            onOpenChange?.(true);
-          }}
-          className="gap-2"
+          onClick={() => setOpenState(true)}
+          className="gap-1.5 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/40"
+          type="button"
         >
-          <Sparkles size={14} />
-          Select
+          <Search className="h-3.5 w-3.5" /> {triggerLabel}
+          <kbd className="ml-1 hidden sm:inline-flex items-center gap-0.5 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-1 py-0 text-[10px] font-mono text-slate-500 dark:text-slate-400">
+            ⌘K
+          </kbd>
         </Button>
-        <span
-          className="text-xs text-gray-500 dark:text-gray-400 cursor-help"
-          title="Apply a predefined primitive type to automatically set format, pattern, and constraints"
-        >
-          ⓘ
-        </span>
-      </div>
+      )}
 
-      {/* Selection Dialog — uses z-[10000]/[10001] to sit above any parent Dialog (z-9999) */}
-      <Dialog open={dialogOpen} onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          setDialogOpen(false);
-          setSelectedPrimitive(null);
-          setSearchQuery('');
-          onOpenChange?.(false);
-        }
-      }} modal={true}>
+      <Dialog
+        open={open}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setOpenState(false);
+        }}
+        modal={true}
+      >
         <DialogPortal>
-          <DialogOverlay className="z-[10000]" />
+          <DialogOverlay className="z-[10000] bg-slate-950/40 backdrop-blur-sm" />
           <DialogPrimitive.Content
             className={cn(
-              'fixed left-[50%] top-[50%] z-[10001] w-full translate-x-[-50%] translate-y-[-50%]',
-              'max-w-3xl h-[80vh] max-h-[700px] p-0 flex flex-col overflow-hidden',
-              'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl rounded-xl',
+              'fixed left-[50%] top-[15%] z-[10001] w-full translate-x-[-50%]',
+              'max-w-2xl p-0 flex flex-col overflow-hidden',
+              'border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl rounded-xl',
             )}
             aria-describedby={undefined}
           >
-          <DialogHeader className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Sparkles size={20} className="text-indigo-500" />
-                <DialogTitle className="text-lg font-semibold">Apply Primitive</DialogTitle>
-              </div>
-              <DialogPrimitive.Close className="rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:pointer-events-none dark:ring-offset-gray-800">
-                <X className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                <span className="sr-only">Close</span>
-              </DialogPrimitive.Close>
-            </div>
-          </DialogHeader>
+            <DialogPrimitive.Title className="sr-only">Apply primitive</DialogPrimitive.Title>
 
-          {/* Search and Filters */}
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 space-y-3">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            {/* Search input */}
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+              <Search className="h-4 w-4 text-slate-400 dark:text-slate-500 shrink-0" />
               <Input
-                placeholder="Search primitives by name, description, or tags..."
+                ref={inputRef}
+                placeholder="Search primitives by name, description, or tags…"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-9"
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setActiveIndex(0);
+                }}
+                onKeyDown={onKeyDown}
+                className="border-0 shadow-none focus-visible:ring-0 px-0 h-7 text-sm"
+                aria-label="Search primitives"
               />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <X size={14} />
-                </button>
+              <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-1 py-0 text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                ESC
+              </kbd>
+            </div>
+
+            {/* Results */}
+            <div ref={listRef} className="max-h-[420px] overflow-y-auto" onKeyDown={onKeyDown}>
+              {loading ? (
+                <div className="flex justify-center items-center py-12">
+                  <Loader2 className="h-5 w-5 animate-spin text-violet-500" />
+                </div>
+              ) : error ? (
+                <div className="px-6 py-10 text-center">
+                  <p className="text-sm text-rose-500 mb-3">{error}</p>
+                  <Button onClick={fetchPrimitives} variant="outline" size="sm">
+                    Retry
+                  </Button>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="px-6 py-10 text-center">
+                  <Database className="h-10 w-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    {searchQuery
+                      ? 'No primitives match your search.'
+                      : `No ${propertyType} primitives available.`}
+                  </p>
+                </div>
+              ) : (
+                <div className="py-1">
+                  {groups.map((group, gi) => (
+                    <div key={group.id} className="pb-1">
+                      <div
+                        className={cn(
+                          'flex items-center gap-1.5 px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                          group.id === 'recent'
+                            ? 'text-violet-500 dark:text-violet-400'
+                            : 'text-slate-400 dark:text-slate-500',
+                        )}
+                      >
+                        {group.id === 'recent' && <History className="h-3 w-3" />}
+                        {group.label}
+                      </div>
+                      {group.items.map((primitive, ii) => {
+                        const flatIdx = flatToIndex(gi, ii);
+                        const active = flatIdx === activeIndex;
+                        return (
+                          <button
+                            key={primitive.id}
+                            type="button"
+                            data-primitive-index={flatIdx}
+                            onMouseMove={() => setActiveIndex(flatIdx)}
+                            onClick={() => applyPrimitive(primitive)}
+                            className={cn(
+                              'w-full text-left px-4 py-2 flex items-start gap-3 transition-colors',
+                              active
+                                ? 'bg-violet-50 dark:bg-violet-900/30'
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/60',
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded',
+                                primitive.is_system
+                                  ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                  : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300',
+                              )}
+                              title={primitive.is_system ? 'System' : 'Tenant'}
+                            >
+                              {primitive.is_system ? (
+                                <Shield className="h-3 w-3" />
+                              ) : (
+                                <User className="h-3 w-3" />
+                              )}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[13px] text-slate-900 dark:text-slate-100 truncate">
+                                  {primitive.name}
+                                </span>
+                                <span
+                                  className={cn(
+                                    'shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded',
+                                    'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+                                  )}
+                                >
+                                  {primitive.category}
+                                </span>
+                                {primitive.usage_count > 0 && (
+                                  <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 ml-auto">
+                                    {primitive.usage_count}×
+                                  </span>
+                                )}
+                              </div>
+                              {primitive.description && (
+                                <p className="text-[12px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                  {primitive.description}
+                                </p>
+                              )}
+                              <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                                {summarizeSchema(primitive.schema)}
+                              </p>
+                            </div>
+                            {active && (
+                              <CornerDownLeft className="h-3.5 w-3.5 mt-1 text-violet-500 dark:text-violet-400 shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
-            <div className="flex items-center gap-4 flex-wrap">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={showSystemPrimitives}
-                  onCheckedChange={(checked) => setShowSystemPrimitives(!!checked)}
-                />
-                <Shield size={14} className="text-emerald-500" />
-                <span className="text-sm">System Primitives</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={showTenantPrimitives}
-                  onCheckedChange={(checked) => setShowTenantPrimitives(!!checked)}
-                />
-                <User size={14} className="text-indigo-500" />
-                <span className="text-sm">Tenant Primitives</span>
-              </label>
-              <span className="ml-auto text-xs text-gray-500 dark:text-gray-400 px-2 py-1 rounded border border-gray-200 dark:border-gray-700">
-                Showing {filteredPrimitives.length} primitive{filteredPrimitives.length !== 1 ? 's' : ''}
+            {/* Footer */}
+            <div
+              className={cn(
+                'px-4 py-2 border-t border-slate-200 dark:border-slate-800 flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400',
+                isDark ? 'bg-slate-900/60' : 'bg-slate-50/80',
+              )}
+            >
+              <span className="inline-flex items-center gap-1">
+                <kbd className="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1 font-mono text-[10px]">
+                  ↑↓
+                </kbd>
+                Navigate
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <kbd className="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1 font-mono text-[10px]">
+                  ↵
+                </kbd>
+                Apply
+              </span>
+              <span className="ml-auto inline-flex items-center gap-1">
+                <Sparkles className="h-3 w-3 text-violet-500" /> {filtered.length} primitive
+                {filtered.length === 1 ? '' : 's'}
               </span>
             </div>
-          </div>
-
-          {/* Primitives List */}
-          <div className="flex-1 overflow-y-auto min-h-0">
-            {loading ? (
-              <div className="flex justify-center items-center py-16">
-                <Loader2 size={32} className="animate-spin text-indigo-500" />
-              </div>
-            ) : error ? (
-              <div className="p-8 text-center">
-                <p className="text-red-500 mb-4">{error}</p>
-                <Button onClick={fetchPrimitives} variant="outline">Retry</Button>
-              </div>
-            ) : filteredPrimitives.length === 0 ? (
-              <div className="p-8 text-center">
-                <Database size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">
-                  {searchQuery ? 'No primitives match your search' : `No ${propertyType} primitives available`}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                  {searchQuery ? 'Try a different search term' : 'Create primitives in the Primitives Management section'}
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                {filteredPrimitives.map((primitive) => (
-                  <button
-                    key={primitive.id}
-                    onClick={() => setSelectedPrimitive(primitive)}
-                    onDoubleClick={() => applyPrimitive(primitive)}
-                    className={`w-full text-left px-4 py-3 transition-colors ${
-                      selectedPrimitive?.id === primitive.id
-                        ? 'bg-indigo-50 dark:bg-indigo-900/20'
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      {primitive.is_system ? (
-                        <span title="System Primitive">
-                          <Shield size={14} className="text-emerald-500" />
-                        </span>
-                      ) : (
-                        <span title="Tenant Primitive">
-                          <User size={14} className="text-indigo-500" />
-                        </span>
-                      )}
-                      <span className="font-semibold text-gray-900 dark:text-gray-100">
-                        {primitive.name}
-                      </span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
-                        {primitive.category}
-                      </span>
-                      {primitive.usage_count > 0 && (
-                        <span className="ml-auto text-xs text-gray-500">
-                          Used {primitive.usage_count}×
-                        </span>
-                      )}
-                    </div>
-
-                    {primitive.description && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 truncate mb-1">
-                        {primitive.description}
-                      </p>
-                    )}
-
-                    <p className="text-xs text-gray-500 dark:text-gray-500 font-mono truncate">
-                      {renderSchemaPreview(primitive.schema)}
-                    </p>
-
-                    {primitive.tags.length > 0 && (
-                      <div className="flex gap-1 mt-1.5 flex-wrap">
-                        {primitive.tags.slice(0, 5).map((tag) => (
-                          <span
-                            key={tag}
-                            className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {primitive.tags.length > 5 && (
-                          <span className="text-xs text-gray-500">
-                            +{primitive.tags.length - 5} more
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Selected Primitive Preview */}
-          {selectedPrimitive && (
-            <div className={`px-4 py-3 border-t border-gray-200 dark:border-gray-700 ${isDark ? 'bg-indigo-900/10' : 'bg-indigo-50/50'}`}>
-              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Schema Preview</p>
-              <pre className={`text-xs font-mono p-3 rounded-lg overflow-auto max-h-32 ${isDark ? 'bg-slate-900 text-gray-300' : 'bg-gray-100 text-gray-800'}`}>
-                {JSON.stringify(selectedPrimitive.schema, null, 2)}
-              </pre>
-            </div>
-          )}
-
-          {/* Footer */}
-          <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
-            <div className="flex justify-end gap-2 w-full">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setDialogOpen(false);
-                  setSelectedPrimitive(null);
-                  setSearchQuery('');
-                  onOpenChange?.(false);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                disabled={!selectedPrimitive}
-                onClick={() => selectedPrimitive && applyPrimitive(selectedPrimitive)}
-              >
-                Apply Primitive
-              </Button>
-            </div>
-          </DialogFooter>
           </DialogPrimitive.Content>
         </DialogPortal>
       </Dialog>
     </>
   );
 };
+
+export interface PrimitiveInheritanceBadgeProps {
+  primitiveName: string;
+  onDetach: () => void;
+  onChange?: () => void;
+}
+
+/**
+ * Compact badge displayed when a property is currently inheriting from a primitive.
+ * Offers a Change action (re-open palette) and a Detach action (cut the link).
+ */
+export const PrimitiveInheritanceBadge: React.FC<PrimitiveInheritanceBadgeProps> = ({
+  primitiveName,
+  onDetach,
+  onChange,
+}) => (
+  <div className="rounded-xl border border-violet-200 bg-violet-50/70 px-3 py-2 dark:border-violet-900/50 dark:bg-violet-950/30 flex items-center gap-3">
+    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300 shrink-0">
+      <Sparkles className="h-3.5 w-3.5" />
+    </span>
+    <div className="min-w-0 flex-1 text-[12px]">
+      <div className="text-slate-600 dark:text-slate-400">Inheriting from</div>
+      <div className="font-mono text-[13px] text-violet-700 dark:text-violet-300 truncate">
+        {primitiveName}
+      </div>
+    </div>
+    {onChange && (
+      <Button type="button" variant="ghost" size="sm" onClick={onChange} className="h-7 text-[11px]">
+        Change
+      </Button>
+    )}
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={onDetach}
+      className="h-7 text-[11px] text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+      title="Stop inheriting from this primitive (constraint values are kept as-is)"
+    >
+      <Link2Off className="h-3 w-3" /> Detach
+    </Button>
+  </div>
+);
 
 export default PrimitiveSelector;

@@ -99,6 +99,8 @@ export interface FormSectionNavProps {
   onSelect: (id: string) => void;
   className?: string;
   title?: string;
+  /** Optional content rendered at the bottom of the nav (e.g. suggestion card). */
+  footer?: React.ReactNode;
 }
 
 export const FormSectionNav: React.FC<FormSectionNavProps> = ({
@@ -107,6 +109,7 @@ export const FormSectionNav: React.FC<FormSectionNavProps> = ({
   onSelect,
   className,
   title = 'Sections',
+  footer,
 }) => {
   // Group items by their `group` field while preserving order.
   const groups: Array<{ group: string | undefined; items: FormSectionNavItem[] }> = [];
@@ -130,7 +133,7 @@ export const FormSectionNav: React.FC<FormSectionNavProps> = ({
       <div className="px-4 pt-5 pb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">
         {title}
       </div>
-      <ul className="flex flex-col gap-0.5 px-2 pb-6">
+      <ul className="flex flex-col gap-0.5 px-2 pb-3">
         {groups.map((group, gi) => (
           <React.Fragment key={gi}>
             {group.group && (
@@ -206,6 +209,11 @@ export const FormSectionNav: React.FC<FormSectionNavProps> = ({
           </React.Fragment>
         ))}
       </ul>
+      {footer && (
+        <div className="mt-auto px-3 pt-2 pb-4 border-t border-slate-200/70 dark:border-slate-800/70">
+          {footer}
+        </div>
+      )}
     </nav>
   );
 };

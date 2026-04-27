@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import dynamic from 'next/dynamic';
+import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,13 +12,16 @@ import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Textarea } from '../../ui/Textarea';
 import { Alert } from '../../ui/Alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/Tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/Select';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 import { PropertyFormFields, PropertyFormData } from './PropertyFormFields';
-import { PrimitiveSelector } from './PrimitiveSelector';
+import { PrimitiveSelector, PrimitiveInheritanceBadge } from './PrimitiveSelector';
+import { PropertyLivePreview } from './PropertyLivePreview';
+import { lintProperty, countDiagnostics, type PropertyLintDiagnostic } from './propertyLint';
+import { suggestNextAction } from './propertySuggestions';
+import { SectionLintBanner } from './SectionLintBanner';
+import { SuggestionCard } from './SuggestionCard';
 import {
-  FileText,
   Settings,
   Code,
   AlertTriangle,
@@ -27,32 +29,29 @@ import {
   Sparkles,
   ListChecks,
   BookOpenText,
+  SquarePen,
+  Sliders,
+  Columns2,
+  Braces,
+  Asterisk,
+  User as UserIcon,
+  X as XIcon,
+  Check,
+  BadgeInfo,
+  Type as TypeIcon,
+  Briefcase,
+  Plus,
 } from 'lucide-react';
 import {
   FormSection,
   FormFieldGroup,
   FormGrid,
   FormToggleCard,
-  FormViewModeToggle,
   FormSectionNav,
-  FormWizardStepper,
-  FormWizardControls,
   useFormScrollSpy,
   scrollToSection,
-  useFormViewMode,
   type FormSectionNavItem,
-  type FormWizardStep,
 } from './form';
-
-// Dynamically import Monaco Editor with SSR disabled
-const Editor = dynamic(() => import('@monaco-editor/react'), {
-  ssr: false,
-  loading: () => (
-    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#666' }}>Loading editor...</div>
-    </div>
-  ),
-});
 
 export interface PropertyItem {
   id: string;
@@ -83,6 +82,8 @@ export interface PropertyItem {
   deprecationMessage?: string;
   /** OpenAPI extension; prefer editing via the Owner field in the form */
   'x-owner'?: string;
+  /** OpenAPI extension; tracks the primitive currently applied to this property */
+  'x-primitive'?: string;
   examples?: any[];
   additionalProperties?: boolean | any;
   minProperties?: number;
@@ -115,45 +116,38 @@ interface PropertyDialogProps {
 // React subtrees on every render of the parent dialog.
 // ────────────────────────────────────────────────────────────────────────────
 
-interface BasicsSectionProps {
+interface IdentitySectionProps {
   mode: 'add' | 'edit';
   propertyName: string;
   setPropertyName: (next: string) => void;
-  propertyType: string;
-  setPropertyType: (next: string) => void;
-  propertyIsArray: boolean;
-  setPropertyIsArray: (next: boolean) => void;
   formData: PropertyFormData;
   setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
-  primitiveAvailable: boolean;
-  setPrimitiveDialogOpen: (next: boolean) => void;
   changed?: boolean;
   eyebrow?: string;
+  diagnostics: PropertyLintDiagnostic[];
+  onSelectDiagnostic?: (d: PropertyLintDiagnostic) => void;
 }
 
-const BasicsSection: React.FC<BasicsSectionProps> = ({
+const IdentitySection: React.FC<IdentitySectionProps> = ({
   mode,
   propertyName,
   setPropertyName,
-  propertyType,
-  setPropertyType,
-  propertyIsArray,
-  setPropertyIsArray,
   formData,
   setFormData,
-  primitiveAvailable,
-  setPrimitiveDialogOpen,
   changed,
-  eyebrow = 'Basics',
+  eyebrow = 'Identity',
+  diagnostics,
+  onSelectDiagnostic,
 }) => (
   <FormSection
-    id="basics"
-    icon={<FileText className="h-4 w-4" />}
+    id="identity"
+    icon={<BadgeInfo className="h-4 w-4" />}
     eyebrow={eyebrow}
-    title="Basics"
-    description="Identify and describe this property. Name and type are locked once the property exists."
+    title="Identity"
+    description="Name and describe this property. The name is locked once the property exists."
     changed={changed}
   >
+    <SectionLintBanner section="identity" diagnostics={diagnostics} onSelect={onSelectDiagnostic} />
     <FormFieldGroup
       label="Property Name"
       required
@@ -172,37 +166,6 @@ const BasicsSection: React.FC<BasicsSectionProps> = ({
         disabled={mode === 'edit'}
       />
     </FormFieldGroup>
-
-    <FormGrid cols={2} gap="md">
-      <FormToggleCard
-        id="isArray"
-        label="Array"
-        description="An array of the selected base type."
-        checked={propertyIsArray}
-        onCheckedChange={setPropertyIsArray}
-        disabled={mode === 'edit'}
-      />
-      <FormFieldGroup
-        label="Type"
-        required
-        htmlFor="propertyType"
-        helper={mode === 'edit' ? 'Type cannot be changed after creation.' : undefined}
-      >
-        <Select value={propertyType} onValueChange={setPropertyType} disabled={mode === 'edit'}>
-          <SelectTrigger id="propertyType" className="w-full">
-            <SelectValue placeholder="Select type..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="string">string</SelectItem>
-            <SelectItem value="number">number</SelectItem>
-            <SelectItem value="integer">integer</SelectItem>
-            <SelectItem value="boolean">boolean</SelectItem>
-            <SelectItem value="object">object</SelectItem>
-            <SelectItem value="null">null</SelectItem>
-          </SelectContent>
-        </Select>
-      </FormFieldGroup>
-    </FormGrid>
 
     <FormFieldGroup
       label="Title"
@@ -226,52 +189,167 @@ const BasicsSection: React.FC<BasicsSectionProps> = ({
         rows={3}
       />
     </FormFieldGroup>
-
-    {primitiveAvailable && (
-      <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/30">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-500 dark:bg-indigo-900/40 dark:text-indigo-300">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            <div className="min-w-0">
-              <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Apply from Primitive
-              </h4>
-              <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                Quickly apply format, pattern, and constraints from a predefined primitive type.
-              </p>
-            </div>
-          </div>
-          <PrimitiveSelector
-            formData={formData}
-            onChange={(field, value) => setFormData((prev) => ({ ...prev, [field]: value }))}
-            propertyType={propertyType}
-            size="small"
-            onOpenChange={setPrimitiveDialogOpen}
-          />
-        </div>
-      </div>
-    )}
   </FormSection>
 );
+
+interface TypeFormatSectionProps {
+  mode: 'add' | 'edit';
+  propertyType: string;
+  setPropertyType: (next: string) => void;
+  propertyIsArray: boolean;
+  setPropertyIsArray: (next: boolean) => void;
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  primitiveAvailable: boolean;
+  setPrimitiveDialogOpen: (next: boolean) => void;
+  changed?: boolean;
+  eyebrow?: string;
+  diagnostics: PropertyLintDiagnostic[];
+  onSelectDiagnostic?: (d: PropertyLintDiagnostic) => void;
+}
+
+const TypeFormatSection: React.FC<TypeFormatSectionProps> = ({
+  mode,
+  propertyType,
+  setPropertyType,
+  propertyIsArray,
+  setPropertyIsArray,
+  formData,
+  setFormData,
+  primitiveAvailable,
+  setPrimitiveDialogOpen,
+  changed,
+  eyebrow = 'Type & Format',
+  diagnostics,
+  onSelectDiagnostic,
+}) => {
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const inheriting = !!formData.appliedPrimitive?.trim();
+
+  const detachPrimitive = () => {
+    setFormData((prev) => ({ ...prev, appliedPrimitive: '' }));
+  };
+
+  return (
+    <FormSection
+      id="type-format"
+      icon={<TypeIcon className="h-4 w-4" />}
+      eyebrow={eyebrow}
+      title="Type & Format"
+      description="Pick the JSON Schema base type and optionally apply a primitive to seed format, pattern, and constraints."
+      changed={changed}
+    >
+      <SectionLintBanner
+        section="type-format"
+        diagnostics={diagnostics}
+        onSelect={onSelectDiagnostic}
+      />
+      <FormGrid cols={2} gap="md">
+        <FormFieldGroup
+          label="Type"
+          required
+          htmlFor="propertyType"
+          helper={mode === 'edit' ? 'Type cannot be changed after creation.' : undefined}
+        >
+          <Select value={propertyType} onValueChange={setPropertyType} disabled={mode === 'edit'}>
+            <SelectTrigger id="propertyType" className="w-full">
+              <SelectValue placeholder="Select type..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="string">string</SelectItem>
+              <SelectItem value="number">number</SelectItem>
+              <SelectItem value="integer">integer</SelectItem>
+              <SelectItem value="boolean">boolean</SelectItem>
+              <SelectItem value="object">object</SelectItem>
+              <SelectItem value="null">null</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormFieldGroup>
+        <FormToggleCard
+          id="isArray"
+          label="Array"
+          description="An array of the selected base type."
+          checked={propertyIsArray}
+          onCheckedChange={setPropertyIsArray}
+          disabled={mode === 'edit'}
+        />
+      </FormGrid>
+
+      {primitiveAvailable ? (
+        <div className="space-y-3">
+          {inheriting && (
+            <PrimitiveInheritanceBadge
+              primitiveName={formData.appliedPrimitive!.trim()}
+              onDetach={detachPrimitive}
+              onChange={() => setPaletteOpen(true)}
+            />
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 px-4 py-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300 shrink-0">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {inheriting ? 'Replace primitive' : 'Apply from Primitive'}
+                </h4>
+                <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  Quickly apply format, pattern, and constraints from a predefined primitive type.
+                </p>
+              </div>
+            </div>
+            <PrimitiveSelector
+              formData={formData}
+              onChange={(field, value) => setFormData((prev) => ({ ...prev, [field]: value }))}
+              propertyType={propertyType}
+              size="small"
+              open={paletteOpen}
+              onOpenChange={(o) => {
+                setPaletteOpen(o);
+                setPrimitiveDialogOpen(o);
+              }}
+              triggerLabel={inheriting ? 'Change primitive…' : 'Apply primitive…'}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+          Primitives are available for <code className="font-mono text-[11px]">string</code>,{' '}
+          <code className="font-mono text-[11px]">number</code>,{' '}
+          <code className="font-mono text-[11px]">integer</code>, and non-tuple{' '}
+          <code className="font-mono text-[11px]">array</code> types.
+        </div>
+      )}
+    </FormSection>
+  );
+};
 
 interface FlagsSectionProps {
   formData: PropertyFormData;
   setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
   changed?: boolean;
   eyebrow?: string;
+  diagnostics: PropertyLintDiagnostic[];
+  onSelectDiagnostic?: (d: PropertyLintDiagnostic) => void;
 }
 
-const FlagsSection: React.FC<FlagsSectionProps> = ({ formData, setFormData, changed, eyebrow = 'Flags & Ownership' }) => (
+const FlagsSection: React.FC<FlagsSectionProps> = ({
+  formData,
+  setFormData,
+  changed,
+  eyebrow = 'Flags & Behavior',
+  diagnostics,
+  onSelectDiagnostic,
+}) => (
   <FormSection
     id="flags"
     icon={<Settings className="h-4 w-4" />}
     eyebrow={eyebrow}
-    title="Flags & Ownership"
-    description="Declare runtime behavior and ownership metadata."
+    title="Flags & Behavior"
+    description="Declare runtime behavior: presence, nullability, read/write surfaces, and deprecation."
     changed={changed}
   >
+    <SectionLintBanner section="flags" diagnostics={diagnostics} onSelect={onSelectDiagnostic} />
     <FormGrid cols={4} gap="md">
       <FormToggleCard
         id="required"
@@ -327,7 +405,35 @@ const FlagsSection: React.FC<FlagsSectionProps> = ({ formData, setFormData, chan
         ) : undefined
       }
     />
+  </FormSection>
+);
 
+interface OwnershipSectionProps {
+  formData: PropertyFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
+  changed?: boolean;
+  eyebrow?: string;
+  diagnostics: PropertyLintDiagnostic[];
+  onSelectDiagnostic?: (d: PropertyLintDiagnostic) => void;
+}
+
+const OwnershipSection: React.FC<OwnershipSectionProps> = ({
+  formData,
+  setFormData,
+  changed,
+  eyebrow = 'Ownership & Extensions',
+  diagnostics,
+  onSelectDiagnostic,
+}) => (
+  <FormSection
+    id="ownership"
+    icon={<Briefcase className="h-4 w-4" />}
+    eyebrow={eyebrow}
+    title="Ownership & Extensions"
+    description="Attribute this property to a team or person and add custom x-* extensions for tooling."
+    changed={changed}
+  >
+    <SectionLintBanner section="ownership" diagnostics={diagnostics} onSelect={onSelectDiagnostic} />
     <FormFieldGroup
       label="Owner"
       htmlFor="owner"
@@ -345,6 +451,22 @@ const FlagsSection: React.FC<FlagsSectionProps> = ({ formData, setFormData, chan
         placeholder="e.g. platform-team or @handle"
       />
     </FormFieldGroup>
+
+    <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-4 py-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[12px] font-semibold text-slate-700 dark:text-slate-200">
+          Extensions (<code className="font-mono text-[11px]">x-*</code>)
+        </div>
+        <Button type="button" variant="ghost" size="sm" disabled className="h-7 text-[11px]">
+          <Plus className="h-3.5 w-3.5" /> Add extension
+        </Button>
+      </div>
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Custom keys for codegen and tooling (e.g.{' '}
+        <code className="font-mono text-[11px]">x-stability</code>,{' '}
+        <code className="font-mono text-[11px]">x-pii</code>). Editor coming soon.
+      </p>
+    </div>
   </FormSection>
 );
 
@@ -353,17 +475,27 @@ interface DefaultsSectionProps {
   setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
   changed?: boolean;
   eyebrow?: string;
+  diagnostics: PropertyLintDiagnostic[];
+  onSelectDiagnostic?: (d: PropertyLintDiagnostic) => void;
 }
 
-const DefaultsSection: React.FC<DefaultsSectionProps> = ({ formData, setFormData, changed, eyebrow = 'Defaults & Constants' }) => (
+const DefaultsSection: React.FC<DefaultsSectionProps> = ({
+  formData,
+  setFormData,
+  changed,
+  eyebrow = 'Defaults & Examples',
+  diagnostics,
+  onSelectDiagnostic,
+}) => (
   <FormSection
     id="defaults"
     icon={<Code className="h-4 w-4" />}
     eyebrow={eyebrow}
-    title="Defaults & Constants"
-    description="Optional default and constant values for this property. Constant is mutually exclusive with enum."
+    title="Defaults & Examples"
+    description="Default value, constant, and example payloads. Constant is mutually exclusive with enum."
     changed={changed}
   >
+    <SectionLintBanner section="defaults" diagnostics={diagnostics} onSelect={onSelectDiagnostic} />
     <FormGrid cols={2} gap="md">
       <FormFieldGroup
         label="Default Value"
@@ -402,6 +534,8 @@ interface ConstraintsSectionProps {
   setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
   availableClasses: string[];
   eyebrow?: string;
+  diagnostics: PropertyLintDiagnostic[];
+  onSelectDiagnostic?: (d: PropertyLintDiagnostic) => void;
 }
 
 const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
@@ -411,7 +545,11 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
   setFormData,
   availableClasses,
   eyebrow = 'Advanced Constraints',
-}) => (
+  diagnostics,
+  onSelectDiagnostic,
+}) => {
+  const hasConstraintsDiagnostic = diagnostics.some((d) => d.section === 'constraints');
+  return (
   <FormSection
     id="constraints"
     icon={<ListChecks className="h-4 w-4" />}
@@ -422,6 +560,15 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
     headerClassName="mx-8 mt-7 mb-0"
     bodyClassName="space-y-0"
   >
+    {hasConstraintsDiagnostic && (
+      <div className="mx-8 mt-3">
+        <SectionLintBanner
+          section="constraints"
+          diagnostics={diagnostics}
+          onSelect={onSelectDiagnostic}
+        />
+      </div>
+    )}
     <PropertyFormFields
       baseType={propertyType}
       isArray={propertyIsArray}
@@ -437,24 +584,35 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
       availableClasses={availableClasses}
     />
   </FormSection>
-);
+  );
+};
 
 interface DocsSectionProps {
   formData: PropertyFormData;
   setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
   changed?: boolean;
   eyebrow?: string;
+  diagnostics: PropertyLintDiagnostic[];
+  onSelectDiagnostic?: (d: PropertyLintDiagnostic) => void;
 }
 
-const DocsSection: React.FC<DocsSectionProps> = ({ formData, setFormData, changed, eyebrow = 'Documentation' }) => (
+const DocsSection: React.FC<DocsSectionProps> = ({
+  formData,
+  setFormData,
+  changed,
+  eyebrow = 'Docs & Metadata',
+  diagnostics,
+  onSelectDiagnostic,
+}) => (
   <FormSection
     id="docs"
     icon={<BookOpenText className="h-4 w-4" />}
     eyebrow={eyebrow}
-    title="Documentation"
-    description="External documentation links surfaced in generated specs."
+    title="Docs & Metadata"
+    description="External documentation, plus schema-level metadata (XML, content media type, $comment) — full metadata editor coming soon."
     changed={changed}
   >
+    <SectionLintBanner section="docs" diagnostics={diagnostics} onSelect={onSelectDiagnostic} />
     <FormGrid cols={1} gap="md">
       <FormFieldGroup label="URL" htmlFor="externalDocsUrl">
         <Input
@@ -488,6 +646,55 @@ const DocsSection: React.FC<DocsSectionProps> = ({ formData, setFormData, change
   </FormSection>
 );
 
+// ────────────────────────────────────────────────────────────────────────────
+// View mode: Form (form only) · Split (form + live JSON rail) · JSON (JSON only)
+// ────────────────────────────────────────────────────────────────────────────
+
+type PropertyViewMode = 'form' | 'split' | 'json';
+const VIEW_MODE_STORAGE_KEY = 'property-dialog-view-mode-v2';
+
+const VIEW_MODES: Array<{ mode: PropertyViewMode; label: string; icon: React.ReactNode; hint: string }> = [
+  { mode: 'form', label: 'Form', icon: <Sliders className="h-3.5 w-3.5" />, hint: 'Form only' },
+  { mode: 'split', label: 'Split', icon: <Columns2 className="h-3.5 w-3.5" />, hint: 'Form + live JSON' },
+  { mode: 'json', label: 'JSON', icon: <Braces className="h-3.5 w-3.5" />, hint: 'JSON only' },
+];
+
+interface PropertyViewModeToggleProps {
+  value: PropertyViewMode;
+  onChange: (next: PropertyViewMode) => void;
+}
+
+const PropertyViewModeToggle: React.FC<PropertyViewModeToggleProps> = ({ value, onChange }) => (
+  <div
+    role="tablist"
+    aria-label="View mode"
+    className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800/60"
+  >
+    {VIEW_MODES.map(({ mode, label, icon, hint }) => {
+      const active = value === mode;
+      return (
+        <button
+          key={mode}
+          type="button"
+          role="tab"
+          aria-selected={active}
+          title={hint}
+          onClick={() => onChange(mode)}
+          className={
+            'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ' +
+            (active
+              ? 'bg-white text-violet-600 shadow-sm dark:bg-slate-900 dark:text-violet-300 font-semibold'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200')
+          }
+        >
+          <span className="inline-flex h-3.5 w-3.5 items-center justify-center">{icon}</span>
+          {label}
+        </button>
+      );
+    })}
+  </div>
+);
+
 export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                                                                 open,
                                                                 onClose,
@@ -498,9 +705,17 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                                                               }) => {
   const isDark = useDarkMode();
 
-  const [tabMode, setTabMode] = useState<'form' | 'json'>('form');
-  const [viewMode, setViewMode] = useFormViewMode('property-dialog-view-mode');
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [viewMode, setViewMode] = useState<PropertyViewMode>(() => {
+    if (typeof window === 'undefined') return 'form';
+    const saved = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    return saved === 'form' || saved === 'split' || saved === 'json' ? saved : 'form';
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+    }
+  }, [viewMode]);
+
   const [propertyName, setPropertyName] = useState('');
   const [propertyType, setPropertyType] = useState('string');
   const [propertyIsArray, setPropertyIsArray] = useState(false);
@@ -614,10 +829,10 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         }
       }
 
-      // Extract extensions (x- prefixed properties); x-owner uses dedicated Owner field
+      // Extract extensions (x- prefixed properties); x-owner / x-primitive use dedicated fields
       const extensions: Record<string, any> = {};
       Object.keys(property as any).forEach(key => {
-        if (key.startsWith('x-') && key !== 'x-owner') {
+        if (key.startsWith('x-') && key !== 'x-owner' && key !== 'x-primitive') {
           extensions[key] = (property as any)[key];
         }
       });
@@ -670,6 +885,10 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         owner: (property as any)['x-owner'] != null && String((property as any)['x-owner']).trim() !== ''
           ? String((property as any)['x-owner'])
           : '',
+        appliedPrimitive: (() => {
+          const raw = (property as unknown as Record<string, unknown>)['x-primitive'];
+          return raw != null && String(raw).trim() !== '' ? String(raw) : '';
+        })(),
         examples: property.examples ? property.examples.map((ex: any) => JSON.stringify(ex)) : [],
         // Object constraints
         additionalProperties: additionalPropsValue,
@@ -709,8 +928,6 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       setPropertyError('');
     } else if (open && mode === 'add') {
       // Reset all fields for add mode
-      setTabMode('form');
-      setCurrentStepIndex(0);
       setPropertyName('');
       setPropertyType('string');
       setPropertyIsArray(false);
@@ -985,6 +1202,10 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
 
     if (formData.owner?.trim()) {
       schema['x-owner'] = formData.owner.trim();
+    }
+
+    if (formData.appliedPrimitive?.trim()) {
+      schema['x-primitive'] = formData.appliedPrimitive.trim();
     }
 
     return schema;
@@ -1481,6 +1702,12 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         delete dataObject['x-owner'];
       }
 
+      if (formData.appliedPrimitive?.trim()) {
+        dataObject['x-primitive'] = formData.appliedPrimitive.trim();
+      } else {
+        delete dataObject['x-primitive'];
+      }
+
       // Handle externalDocs
       if (formData.externalDocsUrl?.trim()) {
         dataObject.externalDocs = {
@@ -1515,284 +1742,429 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       propertyType === 'array') &&
     !formData.tupleMode;
 
-  const changedBasics =
-    Boolean(formData.description?.trim()) || Boolean(formData.title?.trim());
+  const changedIdentity =
+    Boolean(formData.title?.trim()) || Boolean(formData.description?.trim());
+  const changedTypeFormat = Boolean(formData.format?.trim());
   const changedFlags =
     Boolean(formData.required) ||
     Boolean(formData.nullable) ||
     Boolean(formData.readOnly) ||
     Boolean(formData.writeOnly) ||
     Boolean(formData.deprecated) ||
-    Boolean(formData.deprecationMessage?.trim()) ||
-    Boolean(formData.owner?.trim());
+    Boolean(formData.deprecationMessage?.trim());
   const changedDefaults =
     Boolean(formData.default?.trim()) || Boolean(formData.const?.trim());
   const changedDocs =
     Boolean(formData.externalDocsUrl?.trim()) ||
     Boolean(formData.externalDocsDescription?.trim());
+  const changedOwnership = Boolean(formData.owner?.trim());
 
   const sectionChanged: Record<string, boolean> = {
-    basics: changedBasics,
+    identity: changedIdentity,
+    'type-format': changedTypeFormat,
     flags: changedFlags,
     defaults: changedDefaults,
     constraints: false,
     docs: changedDocs,
+    ownership: changedOwnership,
   };
 
+  const diagnostics = useMemo(
+    () =>
+      lintProperty({
+        propertyName,
+        propertyType,
+        propertyIsArray,
+        formData,
+        mode,
+      }),
+    [propertyName, propertyType, propertyIsArray, formData, mode],
+  );
+  const { errors: errorCount, warnings: warningCount } = countDiagnostics(diagnostics);
+
+  const sectionDiagnosticState = useMemo(() => {
+    const state: Record<string, { error: boolean; warn: boolean }> = {};
+    diagnostics.forEach((d) => {
+      const entry = state[d.section] ?? { error: false, warn: false };
+      if (d.level === 'error') entry.error = true;
+      else if (d.level === 'warning') entry.warn = true;
+      state[d.section] = entry;
+    });
+    return state;
+  }, [diagnostics]);
+
   const navItems: FormSectionNavItem[] = [
-    { id: 'basics', label: 'Basics', icon: <FileText className="h-3.5 w-3.5" />, changed: sectionChanged.basics },
-    { id: 'flags', label: 'Flags & Ownership', icon: <Settings className="h-3.5 w-3.5" />, changed: sectionChanged.flags },
-    { id: 'defaults', label: 'Defaults & Constants', icon: <Code className="h-3.5 w-3.5" />, changed: sectionChanged.defaults },
-    { id: 'constraints', label: 'Advanced Constraints', icon: <ListChecks className="h-3.5 w-3.5" /> },
-    { id: 'docs', label: 'Documentation', icon: <BookOpenText className="h-3.5 w-3.5" />, changed: sectionChanged.docs },
+    {
+      id: 'identity',
+      label: 'Identity',
+      icon: <BadgeInfo className="h-3.5 w-3.5" />,
+      changed: sectionChanged.identity,
+      error: sectionDiagnosticState.identity?.error,
+      warn: sectionDiagnosticState.identity?.warn,
+    },
+    {
+      id: 'type-format',
+      label: 'Type & Format',
+      icon: <TypeIcon className="h-3.5 w-3.5" />,
+      changed: sectionChanged['type-format'],
+      error: sectionDiagnosticState['type-format']?.error,
+      warn: sectionDiagnosticState['type-format']?.warn,
+    },
+    {
+      id: 'flags',
+      label: 'Flags & Behavior',
+      icon: <Settings className="h-3.5 w-3.5" />,
+      changed: sectionChanged.flags,
+      error: sectionDiagnosticState.flags?.error,
+      warn: sectionDiagnosticState.flags?.warn,
+    },
+    {
+      id: 'defaults',
+      label: 'Defaults & Examples',
+      icon: <Code className="h-3.5 w-3.5" />,
+      changed: sectionChanged.defaults,
+      error: sectionDiagnosticState.defaults?.error,
+      warn: sectionDiagnosticState.defaults?.warn,
+    },
+    {
+      id: 'constraints',
+      label: 'Constraints',
+      icon: <ListChecks className="h-3.5 w-3.5" />,
+      error: sectionDiagnosticState.constraints?.error,
+      warn: sectionDiagnosticState.constraints?.warn,
+    },
+    {
+      id: 'docs',
+      label: 'Docs & Metadata',
+      icon: <BookOpenText className="h-3.5 w-3.5" />,
+      changed: sectionChanged.docs,
+      error: sectionDiagnosticState.docs?.error,
+      warn: sectionDiagnosticState.docs?.warn,
+    },
+    {
+      id: 'ownership',
+      label: 'Ownership & Extensions',
+      icon: <Briefcase className="h-3.5 w-3.5" />,
+      changed: sectionChanged.ownership,
+      error: sectionDiagnosticState.ownership?.error,
+      warn: sectionDiagnosticState.ownership?.warn,
+    },
   ];
 
-  const wizardSteps: FormWizardStep[] = useMemo(
-    () => [
-      { id: 'basics', label: 'Basics', icon: <FileText className="h-4 w-4" /> },
-      { id: 'flags', label: 'Flags', icon: <Settings className="h-4 w-4" /> },
-      { id: 'defaults', label: 'Defaults', icon: <Code className="h-4 w-4" /> },
-      { id: 'constraints', label: 'Constraints', icon: <ListChecks className="h-4 w-4" /> },
-      { id: 'docs', label: 'Docs', icon: <BookOpenText className="h-4 w-4" /> },
-    ],
-    [],
-  );
-  const currentWizardSection = wizardSteps[currentStepIndex]?.id ?? 'basics';
-
   const sectionOrder = useMemo(
-    () => ['basics', 'flags', 'defaults', 'constraints', 'docs'],
+    () => ['identity', 'type-format', 'flags', 'defaults', 'constraints', 'docs', 'ownership'],
     [],
   );
   const { activeId } = useFormScrollSpy({
     sectionIds: sectionOrder,
     containerRef: advancedScrollRef,
-    disabled: tabMode !== 'form' || viewMode !== 'advanced',
+    disabled: viewMode === 'json',
   });
 
-  const handleNextStep = () => {
-    setCurrentStepIndex((i) => Math.min(i + 1, wizardSteps.length - 1));
-  };
-  const handlePrevStep = () => {
-    setCurrentStepIndex((i) => Math.max(i - 1, 0));
-  };
+  const changeCount = Object.values(sectionChanged).filter(Boolean).length;
+
+  const liveSchema = buildPropertyJsonSchema();
+
+  const handleSelectDiagnostic = useCallback(
+    (d: { section: string }) => {
+      if (viewMode === 'json') setViewMode('split');
+      requestAnimationFrame(() => scrollToSection(advancedScrollRef.current, d.section, 16));
+    },
+    [viewMode, setViewMode],
+  );
+
+  const suggestion = useMemo(
+    () =>
+      suggestNextAction({
+        propertyName,
+        propertyType,
+        propertyIsArray,
+        formData,
+        diagnostics,
+      }),
+    [propertyName, propertyType, propertyIsArray, formData, diagnostics],
+  );
+
+  const handleSelectSuggestion = useCallback(
+    (sectionId: string) => {
+      if (viewMode === 'json') setViewMode('split');
+      requestAnimationFrame(() => scrollToSection(advancedScrollRef.current, sectionId, 16));
+    },
+    [viewMode, setViewMode],
+  );
+
+  const gridTemplateColumns =
+    viewMode === 'json'
+      ? 'minmax(0, 1fr)'
+      : viewMode === 'split'
+        ? '224px minmax(0, 1fr) 360px'
+        : '224px minmax(0, 1fr)';
+
+  const formatChip = formData.format;
+  const ownerChip = formData.owner?.trim();
+  const primitiveChip = formData.appliedPrimitive?.trim();
+
+  const renderForm = () => (
+    <div
+      ref={advancedScrollRef}
+      className={
+        'overflow-y-auto min-h-0 transition-opacity duration-200 ' +
+        (primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100')
+      }
+    >
+      <div className="mx-auto max-w-3xl divide-y divide-slate-200 dark:divide-slate-800">
+        <IdentitySection
+          mode={mode}
+          propertyName={propertyName}
+          setPropertyName={setPropertyName}
+          formData={formData}
+          setFormData={setFormData}
+          changed={changedIdentity}
+          diagnostics={diagnostics}
+          onSelectDiagnostic={handleSelectDiagnostic}
+        />
+        <TypeFormatSection
+          mode={mode}
+          propertyType={propertyType}
+          setPropertyType={setPropertyType}
+          propertyIsArray={propertyIsArray}
+          setPropertyIsArray={setPropertyIsArray}
+          formData={formData}
+          setFormData={setFormData}
+          primitiveAvailable={primitiveAvailable}
+          setPrimitiveDialogOpen={setPrimitiveDialogOpen}
+          changed={changedTypeFormat}
+          diagnostics={diagnostics}
+          onSelectDiagnostic={handleSelectDiagnostic}
+        />
+        <FlagsSection
+          formData={formData}
+          setFormData={setFormData}
+          changed={changedFlags}
+          diagnostics={diagnostics}
+          onSelectDiagnostic={handleSelectDiagnostic}
+        />
+        <DefaultsSection
+          formData={formData}
+          setFormData={setFormData}
+          changed={changedDefaults}
+          diagnostics={diagnostics}
+          onSelectDiagnostic={handleSelectDiagnostic}
+        />
+        <ConstraintsSection
+          propertyType={propertyType}
+          propertyIsArray={propertyIsArray}
+          formData={formData}
+          setFormData={setFormData}
+          availableClasses={availableClasses}
+          diagnostics={diagnostics}
+          onSelectDiagnostic={handleSelectDiagnostic}
+        />
+        <DocsSection
+          formData={formData}
+          setFormData={setFormData}
+          changed={changedDocs}
+          diagnostics={diagnostics}
+          onSelectDiagnostic={handleSelectDiagnostic}
+        />
+        <OwnershipSection
+          formData={formData}
+          setFormData={setFormData}
+          changed={changedOwnership}
+          diagnostics={diagnostics}
+          onSelectDiagnostic={handleSelectDiagnostic}
+        />
+      </div>
+    </div>
+  );
+
+  const renderRail = (fullWidth: boolean) => (
+    <PropertyLivePreview
+      schema={liveSchema}
+      formData={formData}
+      propertyType={propertyType}
+      propertyIsArray={propertyIsArray}
+      diagnostics={diagnostics}
+      isDark={isDark}
+      fullWidth={fullWidth}
+      onSelectDiagnostic={handleSelectDiagnostic}
+    />
+  );
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()} modal={true}>
       <DialogContent
-        className="max-w-6xl h-[90vh] max-h-[900px] p-0 flex flex-col overflow-hidden"
-        showCloseButton={true}
+        className="max-w-[1280px] w-[96vw] h-[92vh] max-h-[920px] p-0 flex flex-col overflow-hidden"
+        showCloseButton={false}
         aria-describedby={undefined}
       >
-        <DialogHeader className="pl-6 pr-10 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-          <div className="flex min-w-0 items-center gap-3">
-            <DialogTitle className="text-lg font-semibold">
-              {mode === 'add' ? 'Add Property' : 'Edit Property'}
-            </DialogTitle>
-            {propertyName && mode === 'edit' && (
-              <code className="truncate rounded bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                {propertyName}
-              </code>
-            )}
+        {/* Header: breadcrumb · property identity · view-mode toggle · close */}
+        <DialogHeader className="px-5 pt-3.5 pb-3 border-b border-slate-200 dark:border-slate-800 shrink-0 space-y-0">
+          <div className="flex items-start gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                <SquarePen className="h-3.5 w-3.5" />
+                <span>Designer</span>
+                <span className="text-slate-300 dark:text-slate-600">·</span>
+                <span>Class</span>
+                <span className="text-slate-300 dark:text-slate-600">·</span>
+                <span>Property</span>
+                <span
+                  className={
+                    'ml-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ' +
+                    (mode === 'add'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                      : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300')
+                  }
+                >
+                  {mode === 'add' ? 'Add' : 'Edit'}
+                </span>
+              </div>
+
+              <DialogTitle className="mt-1.5 text-[18px] font-semibold tracking-tight flex flex-wrap items-center gap-2">
+                {propertyName ? (
+                  <span className="font-mono text-slate-900 dark:text-slate-100 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800">
+                    {propertyName}
+                  </span>
+                ) : (
+                  <span className="text-slate-700 dark:text-slate-200">
+                    {mode === 'add' ? 'New property' : 'Edit property'}
+                  </span>
+                )}
+                <span className="inline-flex items-center text-[11px] font-mono px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                  {propertyIsArray ? `${propertyType}[]` : propertyType}
+                </span>
+                {formatChip && (
+                  <span className="inline-flex items-center text-[11px] font-mono px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    format · {formatChip}
+                  </span>
+                )}
+                {primitiveChip && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
+                    title={`Inheriting from primitive ${primitiveChip}`}
+                  >
+                    <Sparkles className="h-3 w-3" /> {primitiveChip}
+                  </span>
+                )}
+                {formData.required && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                    <Asterisk className="h-3 w-3" /> required
+                  </span>
+                )}
+                {formData.deprecated && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    <AlertTriangle className="h-3 w-3" /> deprecated
+                  </span>
+                )}
+                {ownerChip && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                    <UserIcon className="h-3 w-3" /> {ownerChip}
+                  </span>
+                )}
+              </DialogTitle>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 pt-0.5">
+              <PropertyViewModeToggle value={viewMode} onChange={setViewMode} />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="w-8 h-8"
+                aria-label="Close"
+              >
+                <XIcon className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
-        <Tabs value={tabMode} onValueChange={(v) => setTabMode(v as 'form' | 'json')} className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 shrink-0 gap-4">
-            <TabsList className="h-auto p-0 rounded-none bg-transparent justify-start gap-0 -ml-2">
-              <TabsTrigger
-                value="form"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
-              >
-                Form
-              </TabsTrigger>
-              <TabsTrigger
-                value="json"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
-              >
-                JSON
-              </TabsTrigger>
-            </TabsList>
-            {tabMode === 'form' && (
-              <FormViewModeToggle value={viewMode} onChange={setViewMode} />
-            )}
-          </div>
-
-          {/* Form Tab */}
-          <TabsContent value="form" className="flex-1 flex flex-col overflow-hidden mt-0 p-0">
-            {propertyError && <Alert variant="error" className="m-4 mb-0">{propertyError}</Alert>}
-
-            {viewMode === 'guided' ? (
-              <div className="flex flex-1 flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
-                <FormWizardStepper
-                  steps={wizardSteps}
-                  currentIndex={currentStepIndex}
-                  onStepSelect={setCurrentStepIndex}
-                />
-                <div
-                  className={`flex-1 overflow-y-auto min-h-0 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}
-                >
-                  <div className="mx-auto max-w-4xl">
-                    {currentWizardSection === 'basics' && (
-                      <BasicsSection
-                        mode={mode}
-                        propertyName={propertyName}
-                        setPropertyName={setPropertyName}
-                        propertyType={propertyType}
-                        setPropertyType={setPropertyType}
-                        propertyIsArray={propertyIsArray}
-                        setPropertyIsArray={setPropertyIsArray}
-                        formData={formData}
-                        setFormData={setFormData}
-                        primitiveAvailable={primitiveAvailable}
-                        setPrimitiveDialogOpen={setPrimitiveDialogOpen}
-                        changed={changedBasics}
-                        eyebrow="Step 1 of 5"
-                      />
-                    )}
-                    {currentWizardSection === 'flags' && (
-                      <FlagsSection
-                        formData={formData}
-                        setFormData={setFormData}
-                        changed={changedFlags}
-                        eyebrow="Step 2 of 5"
-                      />
-                    )}
-                    {currentWizardSection === 'defaults' && (
-                      <DefaultsSection
-                        formData={formData}
-                        setFormData={setFormData}
-                        changed={changedDefaults}
-                        eyebrow="Step 3 of 5"
-                      />
-                    )}
-                    {currentWizardSection === 'constraints' && (
-                      <ConstraintsSection
-                        propertyType={propertyType}
-                        propertyIsArray={propertyIsArray}
-                        formData={formData}
-                        setFormData={setFormData}
-                        availableClasses={availableClasses}
-                        eyebrow="Step 4 of 5"
-                      />
-                    )}
-                    {currentWizardSection === 'docs' && (
-                      <DocsSection
-                        formData={formData}
-                        setFormData={setFormData}
-                        changed={changedDocs}
-                        eyebrow="Step 5 of 5"
-                      />
-                    )}
-                  </div>
-                </div>
-                <div className="border-t border-slate-200 bg-white px-6 py-3 dark:border-slate-800 dark:bg-slate-900">
-                  <FormWizardControls
-                    currentIndex={currentStepIndex}
-                    stepCount={wizardSteps.length}
-                    onBack={handlePrevStep}
-                    onNext={handleNextStep}
-                    onCancel={onClose}
-                    onFinish={handleSubmit}
-                    finishLabel={mode === 'add' ? 'Add Property' : 'Save'}
-                    finishBusy={isSubmitting}
-                    finishDisabled={!propertyName.trim() || isSubmitting}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-1 overflow-hidden min-h-0 bg-slate-50 dark:bg-slate-950">
-                <FormSectionNav
-                  items={navItems}
-                  activeId={activeId}
-                  onSelect={(id) => scrollToSection(advancedScrollRef.current, id, 16)}
-                  title="Property"
-                />
-                <div
-                  ref={advancedScrollRef}
-                  className={`flex-1 overflow-y-auto min-h-0 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}
-                >
-                  <div className="mx-auto max-w-4xl divide-y divide-slate-200 dark:divide-slate-800">
-                    <BasicsSection
-                      mode={mode}
-                      propertyName={propertyName}
-                      setPropertyName={setPropertyName}
-                      propertyType={propertyType}
-                      setPropertyType={setPropertyType}
-                      propertyIsArray={propertyIsArray}
-                      setPropertyIsArray={setPropertyIsArray}
-                      formData={formData}
-                      setFormData={setFormData}
-                      primitiveAvailable={primitiveAvailable}
-                      setPrimitiveDialogOpen={setPrimitiveDialogOpen}
-                      changed={changedBasics}
-                    />
-                    <FlagsSection formData={formData} setFormData={setFormData} changed={changedFlags} />
-                    <DefaultsSection formData={formData} setFormData={setFormData} changed={changedDefaults} />
-                    <ConstraintsSection
-                      propertyType={propertyType}
-                      propertyIsArray={propertyIsArray}
-                      formData={formData}
-                      setFormData={setFormData}
-                      availableClasses={availableClasses}
-                    />
-                    <DocsSection formData={formData} setFormData={setFormData} changed={changedDocs} />
-                  </div>
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* JSON Tab */}
-          <TabsContent value="json" className="flex-1 flex flex-col overflow-hidden mt-0 p-6">
-            <div className="mb-2">
-              <p className="text-sm text-gray-500 dark:text-gray-400">JSON Schema 2020-12 Definition</p>
-            </div>
-            <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden min-h-[300px]">
-              <Editor
-                height="100%"
-                defaultLanguage="json"
-                value={JSON.stringify(buildPropertyJsonSchema(), null, 2)}
-                theme={isDark ? 'vs-dark' : 'vs-light'}
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  fontSize: 13,
-                  lineNumbers: 'on',
-                  renderWhitespace: 'none',
-                  automaticLayout: true,
-                  wordWrap: 'on',
-                  folding: true,
-                  contextmenu: false,
-                  selectOnLineNumbers: true,
-                  roundedSelection: false,
-                  cursorStyle: 'line',
-                  scrollbar: {
-                    vertical: 'auto',
-                    horizontal: 'auto',
-                  },
-                }}
-              />
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-              This is the JSON Schema representation of your property definition. Switch back to Form view to make changes.
-            </p>
-          </TabsContent>
-        </Tabs>
-
-        {/* Footer - hidden in guided-form mode because the wizard provides its own controls */}
-        {!(tabMode === 'form' && viewMode === 'guided') && (
-          <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
-            <div className="flex justify-end w-full gap-2">
-              <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button onClick={handleSubmit} disabled={isSubmitting || !propertyName.trim()}>
-                {isSubmitting ? 'Saving…' : mode === 'add' ? 'Add Property' : 'Save'}
-              </Button>
-            </div>
-          </DialogFooter>
+        {propertyError && (
+          <Alert variant="error" className="mx-5 mt-3 mb-0 shrink-0">
+            {propertyError}
+          </Alert>
         )}
+
+        {/* Body: nav · form · live preview rail (visibility driven by viewMode) */}
+        <div
+          className="flex-1 min-h-0 grid bg-slate-50 dark:bg-slate-950"
+          style={{ gridTemplateColumns }}
+        >
+          {viewMode !== 'json' && (
+            <FormSectionNav
+              items={navItems}
+              activeId={activeId}
+              onSelect={(id) => scrollToSection(advancedScrollRef.current, id, 16)}
+              title="Property"
+              footer={
+                suggestion ? (
+                  <SuggestionCard suggestion={suggestion} onSelect={handleSelectSuggestion} />
+                ) : null
+              }
+            />
+          )}
+          {viewMode !== 'json' && renderForm()}
+          {viewMode !== 'form' && renderRail(viewMode === 'json')}
+        </div>
+
+        {/* Footer: telemetry · primary actions */}
+        <DialogFooter className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 shrink-0 flex-row sm:justify-start items-center gap-4">
+          <div className="flex items-center gap-3 text-[11px]">
+            {changeCount > 0 ? (
+              <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
+                <span className="inline-flex h-2 w-2 rounded-full bg-amber-400" />
+                {changeCount} unsaved {changeCount === 1 ? 'change' : 'changes'}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                <Check className="h-3 w-3" />
+                {mode === 'add' ? 'Ready to add' : 'No changes'}
+              </span>
+            )}
+            <span className="text-slate-300 dark:text-slate-600">·</span>
+            <span
+              className={
+                'inline-flex items-center gap-1.5 ' +
+                (errorCount > 0
+                  ? 'text-rose-600 dark:text-rose-400 font-medium'
+                  : 'text-slate-500 dark:text-slate-400')
+              }
+            >
+              {errorCount > 0 ? (
+                <AlertTriangle className="h-3 w-3" />
+              ) : (
+                <Check className="h-3 w-3 text-emerald-500" />
+              )}
+              {errorCount} {errorCount === 1 ? 'error' : 'errors'}
+            </span>
+            <span className="text-slate-300 dark:text-slate-600">·</span>
+            <span
+              className={
+                'inline-flex items-center gap-1.5 ' +
+                (warningCount > 0
+                  ? 'text-amber-600 dark:text-amber-400 font-medium'
+                  : 'text-slate-500 dark:text-slate-400')
+              }
+            >
+              <Sparkles className="h-3 w-3" />
+              {warningCount} {warningCount === 1 ? 'warning' : 'warnings'}
+            </span>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || !propertyName.trim() || errorCount > 0}
+              title={errorCount > 0 ? 'Resolve lint errors before saving' : undefined}
+            >
+              {isSubmitting ? 'Saving…' : mode === 'add' ? 'Add Property' : 'Save'}
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
