@@ -10,14 +10,16 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import os
 import re
 import time
 from urllib import error as urllib_error
 from urllib import parse as urllib_parse
 from urllib import request as urllib_request
+import logging
 from datetime import datetime, timezone
 from threading import Lock
-from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Set, Tuple
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
@@ -41,8 +43,14 @@ from .repositories.spec_detail import (
     provider_blob_url,
     provider_raw_url,
 )
+from .repositories.attention import (
+    AttentionComputeInput,
+    AttentionFileInput,
+    compute_attention_row,
+)
 
 router = APIRouter(prefix="/v1/repositories", tags=["repositories"])
+_logger = logging.getLogger(__name__)
 
 
 class RepositoryBranchInput(BaseModel):
@@ -184,6 +192,8 @@ class RepositoryFileRecord(BaseModel):
     status: RepositoryFileStatus
     qualityScore: int | None = None
     lastImportJobId: str | None = None
+    lastImportedContentChecksum: str | None = None
+    staleMismatchAt: str | None = None
     createdAt: str
 
 
@@ -505,6 +515,9 @@ _REPO_CORPUS_ROLLUP: Dict[str, Dict[str, Any]] = {}
 # (under _STORE_LOCK). Used by _refresh_repository_corpus_rollup_unsafe to avoid
 # scanning the full scan-report list on every rollup, reducing lock hold time.
 _REPO_LATEST_REPORT_TOTALS: Dict[str, Dict[str, Any]] = {}
+# REPO-11.1 / #2941: last pause was from auto-failure (vs user pause); in-memory + DB rollup.
+_REPO_AUTO_PAUSED: Set[str] = set()
+_REPO_ATTENTION: Dict[str, Dict[str, Any]] = {}
 _STORE_LOCK = Lock()
 _SYSTEM_ACTOR_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -1195,6 +1208,7 @@ def process_pending_repository_scans(max_scans: int = 25) -> int:
         if handled:
             processed += 1
             pending_audit_rows.extend(rows)
+            _recompute_repository_attention(tenant_id, repository_id)
 
     for audit_row in pending_audit_rows:
         _persist_audit_row(audit_row)
@@ -1272,6 +1286,147 @@ def _get_repository_last_scan_at(repository_id: str) -> Optional[str]:
     if last_scan is None:
         return None
     return last_scan.createdAt or last_scan.startedAt or last_scan.finishedAt
+
+
+def _get_last_complete_scan_in_memory(repository_id: str) -> Optional[RepositoryScanRecord]:
+    with _STORE_LOCK:
+        history = list(_REPO_SCAN_HISTORY_STORE.get(repository_id, []))
+    if not history:
+        return None
+    complete = [s for s in history if s.status == "complete"]
+    if not complete:
+        return None
+    return max(complete, key=lambda s: (s.finishedAt or s.startedAt or s.createdAt or ""))
+
+
+def _sync_stale_mismatch_markers(now_iso: str, files: Sequence[RepositoryFileRecord]) -> None:
+    """Update stale_mismatch_at for the ready-to-promote (import on, auto-import off) bucket. Call under lock."""
+    for f in files:
+        if not f.importEnabled or f.autoImportEnabled:
+            f.staleMismatchAt = None
+            continue
+        c = _normalize_content_checksum(f.contentChecksum)
+        li = _normalize_content_checksum(f.lastImportedContentChecksum)
+        if c is None or li is None or c == li:
+            f.staleMismatchAt = None
+            continue
+        if f.staleMismatchAt is None:
+            f.staleMismatchAt = now_iso
+
+
+def _recompute_repository_attention(tenant_id: str, repository_id: str) -> None:
+    """REPO-11.1 / #2941: recompute in-memory and optional PostgreSQL row, then NOTIFY."""
+    now_iso = _utc_now_iso()
+    now_dt = datetime.now(timezone.utc)
+    with _STORE_LOCK:
+        repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
+        if repository is None:
+            return
+        repo_status = repository.status
+        is_auto = repository_id in _REPO_AUTO_PAUSED
+        last = _get_last_complete_scan_in_memory(repository_id)
+        files: List[RepositoryFileRecord] = list(_REPO_SCAN_FILE_HISTORY_STORE.get(last.id, [])) if last else []
+        if files:
+            _sync_stale_mismatch_markers(now_iso, files)
+        j_by: Dict[str, RepositoryImportJobRecord] = {}
+        if last is not None:
+            j_by = _latest_import_jobs_by_path(repository_id, last.branch)
+        vfiles: List[AttentionFileInput] = []
+        for f in files:
+            j = j_by.get(f.path)
+            jst = j.state if j is not None else None
+            csum = _normalize_content_checksum(f.contentChecksum)
+            lis = _normalize_content_checksum(f.lastImportedContentChecksum)
+            vfiles.append(
+                AttentionFileInput(
+                    path=f.path,
+                    status=f.status,
+                    import_enabled=bool(f.importEnabled),
+                    auto_import_enabled=bool(f.autoImportEnabled),
+                    content_checksum=csum,
+                    last_imported_checksum=lis,
+                    stale_mismatch_at=f.staleMismatchAt,
+                    last_import_job_state=jst,
+                )
+            )
+        prev = _REPO_ATTENTION.get(repository_id)
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        _max_cf, _any_rev = 0, False
+    else:
+        try:
+            _max_cf = int(db.max_consecutive_failures_for_repository(repository_id))
+        except Exception:
+            _max_cf = 0
+        try:
+            _any_rev = bool(db.any_repository_credential_revoked(repository_id))
+        except Exception:
+            _any_rev = False
+    rsn, ocnt, score = compute_attention_row(
+        AttentionComputeInput(
+            now=now_dt,
+            repository_status=repo_status,
+            is_auto_paused=is_auto,
+            last_scan_files=vfiles,
+            max_consecutive_failures=_max_cf,
+            any_credential_revoked=_any_rev,
+        )
+    )
+    reasons_list = sorted(rsn)
+    p_reasons: Optional[List[str]] = None
+    p_oc: Optional[int] = None
+    p_sc: Optional[int] = None
+    p_lca: Optional[str] = None
+    if prev and isinstance(prev.get("reasons"), list):
+        p_reasons = [str(x) for x in prev.get("reasons", [])]  # type: ignore[assignment]
+    if prev is not None and isinstance(prev.get("openCount"), (int, float, str)):
+        p_oc = int(prev.get("openCount", -1) or 0)  # type: ignore[assignment, arg-type]
+    if prev is not None and isinstance(prev.get("attentionScore"), (int, float, str)):
+        p_sc = int(prev.get("attentionScore", -1) or 0)  # type: ignore[assignment, arg-type]
+    p_lca = str(prev.get("lastChangeAt")) if prev and prev.get("lastChangeAt") else None  # type: ignore[union-attr]
+    unchanged = (
+        prev is not None
+        and p_reasons == reasons_list
+        and p_oc == ocnt
+        and p_sc == score
+    )
+    last_change_at = p_lca if (unchanged and p_lca) else now_iso
+    row: Dict[str, Any] = {
+        "repositoryId": repository_id,
+        "tenantId": tenant_id,
+        "computedAt": now_iso,
+        "reasons": reasons_list,
+        "openCount": ocnt,
+        "attentionScore": score,
+        "lastChangeAt": last_change_at,
+    }
+    with _STORE_LOCK:
+        _REPO_ATTENTION[repository_id] = row
+    if "PYTEST_CURRENT_TEST" not in os.environ and not unchanged:
+        try:
+            wrote = db.upsert_repository_attention(
+                repository_id=repository_id,
+                computed_at=now_iso,
+                reasons=reasons_list,
+                open_count=ocnt,
+                attention_score=score,
+                last_change_at=last_change_at,
+            )
+            if wrote:
+                db.notify_repository_attention(repository_id)
+        except Exception as e:
+            _logger.debug("repository attention persist skipped: %s", e)
+
+
+def recompute_all_repositories_attention() -> int:
+    """Hourly safety sweep: reconcile every in-memory repository (O(repos) total). Returns repo count."""
+    targets: List[Tuple[str, str]] = []
+    with _STORE_LOCK:
+        for tid, repos in _REPO_STORE.items():
+            for rid in repos:
+                targets.append((tid, rid))
+    for tid, rid in targets:
+        _recompute_repository_attention(tid, rid)
+    return len(targets)
 
 
 def _to_summary(repo: RepositoryRecord) -> Dict[str, Any]:
@@ -2388,6 +2543,10 @@ def _materialize_repository_dry_run_import_job(
     repository_jobs.insert(0, import_job)
     _REPO_CHANGE_REPORT_STORE.setdefault(repository_id, []).insert(0, change_report)
     file_row.lastImportJobId = import_job.id
+    if import_job.state == "committed" and not failure_message:
+        c0 = _normalize_content_checksum(file_row.contentChecksum)
+        file_row.lastImportedContentChecksum = c0
+        file_row.staleMismatchAt = None
 
     pending_audit_rows: List[Dict[str, Any]] = []
     if failure_message:
@@ -2782,6 +2941,7 @@ async def register_repository(
         _persist_audit_row(_audit_token_row)
     if _audit_registered_row is not None:
         _persist_audit_row(_audit_registered_row)
+    _recompute_repository_attention(tenant_id, repository_id)
     return RegisterRepositoryResponse(
         repository=repository,
         initialScanJobId=initial_scan_job_id,
@@ -3474,6 +3634,7 @@ async def pause_repository(
         now = _utc_now_iso()
         repository.status = "paused"
         repository.updatedAt = now
+        _REPO_AUTO_PAUSED.discard(repository_id)
         _audit_row = _append_audit_row(
             tenant_id,
             repository_id,
@@ -3483,6 +3644,7 @@ async def pause_repository(
         )
     if _audit_row is not None:
         _persist_audit_row(_audit_row)
+    _recompute_repository_attention(tenant_id, repository_id)
     return repository
 
 
@@ -3502,6 +3664,7 @@ async def auto_pause_repository(
         now = _utc_now_iso()
         repository.status = "paused"
         repository.updatedAt = now
+        _REPO_AUTO_PAUSED.add(repository_id)
         _audit_row = _append_audit_row(
             tenant_id,
             repository_id,
@@ -3511,6 +3674,7 @@ async def auto_pause_repository(
         )
     if _audit_row is not None:
         _persist_audit_row(_audit_row)
+    _recompute_repository_attention(tenant_id, repository_id)
     return repository
 
 
@@ -3542,6 +3706,8 @@ async def delete_repository(
         _REPO_CREDENTIAL_REF_STORE.pop(repository_id, None)
         _REPO_SCAN_REPORT_STORE.pop(repository_id, None)
         _REPO_LATEST_REPORT_TOTALS.pop(repository_id, None)
+        _REPO_ATTENTION.pop(repository_id, None)
+        _REPO_AUTO_PAUSED.discard(repository_id)
         _refresh_repository_corpus_rollup_unsafe(tenant_id)
         _audit_row = _append_audit_row(
             tenant_id,
@@ -3553,6 +3719,11 @@ async def delete_repository(
 
     if _audit_row is not None:
         _persist_audit_row(_audit_row)
+    if "PYTEST_CURRENT_TEST" not in os.environ:
+        try:
+            db.delete_repository_attention_row(repository_id)
+        except Exception:
+            pass
     return Response(status_code=204)
 
 
@@ -3813,6 +3984,7 @@ async def update_repository_spec_selection(
 
     for row in audits_to_persist:
         _persist_audit_row(row)
+    _recompute_repository_attention(tenant_id, repository_id)
     return out_spec
 
 
@@ -3999,6 +4171,7 @@ async def import_repository_spec_now(
 
     for row in all_audits:
         _persist_audit_row(row)
+    _recompute_repository_attention(tenant_id, repository_id)
     return JSONResponse(
         status_code=202,
         content=RepositorySpecImportNowResponse(importJobId=new_job.id).model_dump(),
@@ -4296,6 +4469,7 @@ async def bulk_update_repository_spec_selection(
 
     for row in audits_to_persist:
         _persist_audit_row(row)
+    _recompute_repository_attention(tenant_id, repository_id)
     updated_count = len(changed_file_ids)
     return RepositorySpecBulkUpdateResponse(updatedCount=updated_count, items=response_items)
 
@@ -4357,6 +4531,7 @@ async def update_repository_file_import_enabled(
             raise HTTPException(status_code=404, detail=f"Repository file not found: {file_id}")
     if audit_to_persist is not None:
         _persist_audit_row(audit_to_persist)
+    _recompute_repository_attention(tenant_id, repository_id)
     return out_row
 
 
@@ -4417,6 +4592,7 @@ async def update_repository_file_auto_import_enabled(
             raise HTTPException(status_code=404, detail=f"Repository file not found: {file_id}")
     if audit_to_persist is not None:
         _persist_audit_row(audit_to_persist)
+    _recompute_repository_attention(tenant_id, repository_id)
     return out_row
 
 
@@ -4600,6 +4776,8 @@ def _reset_repository_state_for_tests() -> None:
         _REPO_FILE_CONTENT_STORE.clear()
         _REPO_SCAN_REPORT_STORE.clear()
         _REPO_CORPUS_ROLLUP.clear()
+        _REPO_ATTENTION.clear()
+        _REPO_AUTO_PAUSED.clear()
     try:
         from .repositories.scan_report_export import reset_scan_report_export_state_for_tests
 
@@ -4818,6 +4996,7 @@ def _complete_repository_scan_for_tests(
 
     for _audit_row in pending_audit_rows:
         _persist_audit_row(_audit_row)
+    _recompute_repository_attention(tenant_id, repository_id)
     return completed_scan
 
 

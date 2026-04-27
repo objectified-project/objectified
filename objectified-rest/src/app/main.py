@@ -36,14 +36,14 @@ from .push_webhook_crypto import validate_webhook_signing_key
 from .change_report_routes import router as change_report_router
 from .version_change_report_routes import router as version_change_report_router
 from .change_report_template_routes import router as change_report_template_router
-from .repositories_routes import process_pending_repository_scans, router as repositories_router
+from .repositories_routes import process_pending_repository_scans, recompute_all_repositories_attention, router as repositories_router
 from .dashboard_routes import router as dashboard_router
 
 # Create FastAPI app
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.79"
+    version="1.0.80"
 )
 
 
@@ -121,6 +121,7 @@ app.include_router(dashboard_router)
 
 _webhook_delivery_task: asyncio.Task | None = None
 _repository_scan_worker_task: asyncio.Task | None = None
+_repository_attention_reconcile_task: asyncio.Task | None = None
 
 
 @app.on_event("startup")
@@ -194,12 +195,30 @@ async def startup_event():
         global _repository_scan_worker_task
         _repository_scan_worker_task = asyncio.create_task(_repository_scan_worker_loop())
 
+    async def _repository_attention_hourly_loop() -> None:
+        log = logging.getLogger(__name__)
+        while True:
+            await asyncio.sleep(3600)
+            try:
+                n = recompute_all_repositories_attention()
+                if n > 0:
+                    log.info("Repository attention hourly reconcile for %s repositories", n)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("repository attention hourly reconcile")
+
+    if "PYTEST_CURRENT_TEST" not in os.environ:
+        global _repository_attention_reconcile_task
+        _repository_attention_reconcile_task = asyncio.create_task(_repository_attention_hourly_loop())
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Close database connection on shutdown."""
     global _webhook_delivery_task
     global _repository_scan_worker_task
+    global _repository_attention_reconcile_task
     if _webhook_delivery_task is not None:
         _webhook_delivery_task.cancel()
         try:
@@ -214,6 +233,13 @@ async def shutdown_event():
         except asyncio.CancelledError:
             pass
         _repository_scan_worker_task = None
+    if _repository_attention_reconcile_task is not None:
+        _repository_attention_reconcile_task.cancel()
+        try:
+            await _repository_attention_reconcile_task
+        except asyncio.CancelledError:
+            pass
+        _repository_attention_reconcile_task = None
     db.close()
 
 
