@@ -17,6 +17,7 @@ def _migration_paths() -> list[Path]:
     return [
         scripts_dir / "20260423-230000.sql",
         scripts_dir / "20260424-120000.sql",
+        scripts_dir / "20260426-210000.sql",
     ]
 
 
@@ -322,13 +323,14 @@ def repository_file_row(repository_schema, repository_row, repository_scan_row):
                 """
                 INSERT INTO {} (
                     id, repository_id, scan_id, path, blob_sha, size_bytes, format, confidence,
-                    discriminator, tracked, project_slug, version_strategy, status, quality_score
+                    discriminator, tracked, project_slug, version_strategy, status, quality_score,
+                    content_algo, content_checksum
                 )
                 VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, 'modified', %s
+                    %s, %s, %s, %s, 'modified', %s, %s, %s
                 )
-                RETURNING id, repository_id, scan_id, path, status, tracked, quality_score;
+                RETURNING id, repository_id, scan_id, path, status, tracked, quality_score, content_algo, content_checksum;
                 """
             ).format(sql.Identifier(schema, "repository_file")),
             (
@@ -345,13 +347,15 @@ def repository_file_row(repository_schema, repository_row, repository_scan_row):
                 "orders",
                 "semver",
                 88,
+                "sha256",
+                "031edd7d41651593c5fe5c006fa5752b37fddff7bc4e843aa6af0c950f4b9406",
             ),
         )
         inserted = cur.fetchone()
         cur.execute(
             sql.SQL(
                 """
-                SELECT id, repository_id, scan_id, path, status, tracked, quality_score
+                SELECT id, repository_id, scan_id, path, status, tracked, quality_score, content_algo, content_checksum
                 FROM {}
                 WHERE id = %s;
                 """

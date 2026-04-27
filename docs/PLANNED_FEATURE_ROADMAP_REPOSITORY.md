@@ -302,7 +302,7 @@ content-keyed pipeline; after Epic E it becomes user-controlled.
 
 | Roadmap ID | Title                                                  | Description                                                                                                  | Labels                                                                                       | MVP | Parallel | Issue |
 |------------|--------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|-----|----------|-------|
-| REPO-8.1   | `repository_file.content_checksum` column + walker hash | Add `content_checksum` (SHA-256) + `content_algo` columns; populate in tree walker; index for lookups       | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-provenance`, `database` | Yes | No       | #2929 |
+| REPO-8.1   | `repository_file.content_checksum` column + walker hash ✅ | Add `content_checksum` (SHA-256) + `content_algo` columns; populate in tree walker; index for lookups       | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-provenance`, `database` | Yes | No       | Done |
 | REPO-8.2   | Version provenance tuple (`repository_source`)          | Persist `(repositoryId, branch, path, commitSha, contentChecksum, contentAlgo, importedAt)` on every version created from a repo import | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-provenance`, `database`, `import` | Yes | Yes      | #2930 |
 | REPO-8.3   | Checksum-keyed idempotent re-import                     | Skip dispatch when `(project, source_path, content_checksum)` already mapped to a non-deleted version       | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-provenance`, `import`   | Yes | No       | #2933 |
 | REPO-8.4   | Backfill checksum + provenance for historical scans     | One-shot job to compute checksums for current `tracked` files and stamp `repository_source` on existing versions | `enhancement`, `repository`, `roadmap-repository`, `repository-provenance`, `database`        | No  | Yes      | #2947 |
@@ -1182,7 +1182,6 @@ blocking.
 
 | Order | ID         | Issue | Title                                               | MVP | Epic |
 |-------|------------|-------|-----------------------------------------------------|-----|------|
-| 1     | REPO-8.1   | #2929 | content_checksum column + walker hash               | Yes | A    |
 | 2     | REPO-8.2   | #2930 | version provenance tuple                            | Yes | A    |
 | 3     | REPO-9.1   | #2931 | import_enabled flag                                 | Yes | B    |
 | 4     | REPO-9.2   | #2932 | auto_import_enabled flag                            | Yes | B    |

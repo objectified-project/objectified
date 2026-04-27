@@ -1,8 +1,18 @@
+import hashlib
+import tracemalloc
+
 import pytest
 
 from app.repositories.providers import RepoRef, RepositoryProviderError, RepositoryProviderErrorCode, TreeEntry
 from app.repositories.providers.base import ListReposOpts, ReadFileResult, RepoDetail
-from app.repositories.tree_walker import DEFAULT_SCAN_IGNORE_PATTERNS, ScanLimit, walk_repository_tree
+from app.repositories.tree_walker import (
+    CONTENT_CHECKSUM_ALGO_SHA256,
+    DEFAULT_SCAN_IGNORE_PATTERNS,
+    DEFAULT_SNIFF_BYTES,
+    ScanLimit,
+    hash_streamed_bytes,
+    walk_repository_tree,
+)
 
 
 class _StubProvider:
@@ -249,3 +259,40 @@ async def test_walk_repository_tree_explicit_specs_override_ignore_patterns() ->
     ]
 
     assert [entry.path for entry in result] == ["dist/openapi.yaml"]
+
+
+def test_hash_streamed_bytes_is_deterministic_across_chunking() -> None:
+    payload = (b"openapi: 3.1.0\n" * 8192) + b"components:\n  schemas:\n"
+    contiguous_result = hash_streamed_bytes([payload])
+    chunked_result = hash_streamed_bytes([payload[:2048], payload[2048:65536], payload[65536:]])
+
+    assert contiguous_result.algo == CONTENT_CHECKSUM_ALGO_SHA256
+    assert contiguous_result.checksum == hashlib.sha256(payload).hexdigest()
+    assert chunked_result.checksum == contiguous_result.checksum
+    assert contiguous_result.sniff_prefix == payload[:DEFAULT_SNIFF_BYTES]
+
+
+def test_hash_streamed_bytes_large_payload_peak_heap_delta_within_budget() -> None:
+    chunk = b"a" * (64 * 1024)
+    target_bytes = 25 * 1024 * 1024
+    chunk_count = target_bytes // len(chunk)
+    assert chunk_count > 0
+
+    expected_hasher = hashlib.sha256()
+    for _ in range(chunk_count):
+        expected_hasher.update(chunk)
+
+    tracemalloc.start()
+    try:
+        tracemalloc.reset_peak()
+        baseline_current, _ = tracemalloc.get_traced_memory()
+        hashed = hash_streamed_bytes((chunk for _ in range(chunk_count)))
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    peak_delta = peak - baseline_current
+    assert hashed.checksum == expected_hasher.hexdigest()
+    assert hashed.algo == CONTENT_CHECKSUM_ALGO_SHA256
+    assert len(hashed.sniff_prefix) == DEFAULT_SNIFF_BYTES
+    assert peak_delta <= 4 * 1024 * 1024

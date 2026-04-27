@@ -527,6 +527,79 @@ def test_complete_scan_classifies_files_and_writes_diff_summary():
     assert by_path["events/asyncapi.yaml"]["blobSha"] == "222"
 
 
+def test_complete_scan_records_hashed_events_and_reuses_checksum_for_unchanged_blob_sha() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000024",
+                "provider": "github",
+                "owner": "acme",
+                "name": "scan-checksum-reuse",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        first_scan_id = create_response.json()["initialScanJobId"]
+        first_completed = _complete_repository_scan_for_tests(
+            repository_id,
+            first_scan_id,
+            commit_sha="checksum-seed",
+            files=[
+                {
+                    "path": "apis/openapi.yaml",
+                    "blobSha": "abc123",
+                    "contentAlgo": "sha256",
+                    "contentChecksum": "031edd7d41651593c5fe5c006fa5752b37fddff7bc4e843aa6af0c950f4b9406",
+                    "tracked": True,
+                },
+            ],
+        )
+
+        next_scan_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans",
+            json={"branch": "main", "force": True},
+        )
+        second_scan_id = next_scan_response.json()["id"]
+        second_completed = _complete_repository_scan_for_tests(
+            repository_id,
+            second_scan_id,
+            commit_sha="checksum-rescan",
+            files=[
+                {
+                    "path": "apis/openapi.yaml",
+                    "blobSha": "abc123",
+                    "tracked": True,
+                },
+            ],
+        )
+        files_response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{second_scan_id}/files",
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert next_scan_response.status_code == 200
+    assert first_completed.status == "complete"
+    assert second_completed.status == "complete"
+    assert files_response.status_code == 200
+
+    first_hashed_events = [event for event in first_completed.eventLog if event.get("type") == "repository.scan.hashed"]
+    second_hashed_events = [event for event in second_completed.eventLog if event.get("type") == "repository.scan.hashed"]
+    assert len(first_hashed_events) == 1
+    assert len(second_hashed_events) == 1
+    assert first_hashed_events[0]["content_algo"] == "sha256"
+    assert first_hashed_events[0]["content_checksum_short"] == "031edd7d4165"
+    assert second_hashed_events[0]["content_checksum_short"] == "031edd7d4165"
+
+    only_file = files_response.json()["items"][0]
+    assert only_file["status"] == "unchanged"
+    assert only_file["contentAlgo"] == "sha256"
+    assert only_file["contentChecksum"] == "031edd7d41651593c5fe5c006fa5752b37fddff7bc4e843aa6af0c950f4b9406"
+
+
 def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
