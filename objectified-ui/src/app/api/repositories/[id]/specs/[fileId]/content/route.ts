@@ -48,9 +48,16 @@ export async function GET(
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const detail = typeof data.detail === 'string' ? data.detail : 'Failed to load spec content';
+      const detail = data.detail;
+      if (typeof detail === 'object' && detail !== null && 'message' in detail) {
+        return NextResponse.json(
+          { success: false, error: (detail as { message?: string }).message, detail },
+          { status: response.status },
+        );
+      }
+      const errText = typeof data.detail === 'string' ? data.detail : 'Failed to load spec content';
       return NextResponse.json(
-        { success: false, error: detail, detail: data.detail ?? null },
+        { success: false, error: errText, detail: data.detail ?? null },
         { status: response.status },
       );
     }

@@ -116,7 +116,7 @@ def derive_lint_summary(
         warnings=breaking,
         info=additive,
         sourceImportJobId=job_id,
-        derivedFrom="import_job_change_report" if change_model else "import_job",
+        derivedFrom="import_job_change_report" if change_model is not None else "import_job",
     )
 
 

@@ -214,6 +214,7 @@ export function RepositorySpecDetailDrawer({
 }: RepositorySpecDetailDrawerProps) {
   const drawerRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const copyStateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [detail, setDetail] = useState<SpecDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
@@ -230,64 +231,111 @@ export function RepositorySpecDetailDrawer({
     closeButtonRef.current?.focus();
   }, []);
 
-  const loadDetail = useCallback(async () => {
-    setDetailLoading(true);
-    setDetailError('');
-    try {
-      const response = await fetch(
-        `/api/repositories/${repositoryId}/specs/${spec.fileId}/detail`,
-      );
-      const data = (await response.json()) as SpecDetailResponse;
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to load spec detail');
+  const loadDetail = useCallback(
+    async (signal: AbortSignal) => {
+      setDetailLoading(true);
+      setDetailError('');
+      try {
+        const response = await fetch(
+          `/api/repositories/${repositoryId}/specs/${spec.fileId}/detail`,
+          { signal },
+        );
+        const data = (await response.json()) as SpecDetailResponse;
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Failed to load spec detail');
+        }
+        if (signal.aborted) return;
+        setDetail(data);
+        if (data.spec) onSpecRefresh(data.spec);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        if (signal.aborted) return;
+        const message = error instanceof Error ? error.message : 'Failed to load spec detail';
+        setDetailError(message);
+      } finally {
+        if (!signal.aborted) {
+          setDetailLoading(false);
+        }
       }
-      setDetail(data);
-      if (data.spec) onSpecRefresh(data.spec);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load spec detail';
-      setDetailError(message);
-    } finally {
-      setDetailLoading(false);
-    }
-  }, [repositoryId, spec.fileId, onSpecRefresh]);
+    },
+    [repositoryId, spec.fileId, onSpecRefresh],
+  );
 
-  const loadContent = useCallback(async () => {
-    setContentLoading(true);
-    setContentError('');
-    try {
-      const response = await fetch(
-        `/api/repositories/${repositoryId}/specs/${spec.fileId}/content`,
-      );
-      const data = (await response.json()) as SpecContentResponse;
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to load spec content');
+  const loadContent = useCallback(
+    async (signal: AbortSignal) => {
+      setContentLoading(true);
+      setContentError('');
+      try {
+        const response = await fetch(
+          `/api/repositories/${repositoryId}/specs/${spec.fileId}/content`,
+          { signal },
+        );
+        const data = (await response.json()) as SpecContentResponse;
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Failed to load spec content');
+        }
+        if (signal.aborted) return;
+        setContent(data);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        if (signal.aborted) return;
+        const message = error instanceof Error ? error.message : 'Failed to load spec content';
+        setContentError(message);
+      } finally {
+        if (!signal.aborted) {
+          setContentLoading(false);
+        }
       }
-      setContent(data);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load spec content';
-      setContentError(message);
-    } finally {
-      setContentLoading(false);
-    }
-  }, [repositoryId, spec.fileId]);
+    },
+    [repositoryId, spec.fileId],
+  );
 
   useEffect(() => {
-    void loadDetail();
-    void loadContent();
+    const detailController = new AbortController();
+    const contentController = new AbortController();
+    void loadDetail(detailController.signal);
+    void loadContent(contentController.signal);
+    return () => {
+      detailController.abort();
+      contentController.abort();
+    };
   }, [loadDetail, loadContent]);
+
+  useEffect(() => {
+    return () => {
+      if (copyStateTimeoutRef.current) {
+        clearTimeout(copyStateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const onCopyLink = useCallback(async () => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
     url.searchParams.set('tab', 'specs');
     url.searchParams.set('fileId', spec.fileId);
+
+    const scheduleCopyStateReset = () => {
+      if (copyStateTimeoutRef.current) {
+        clearTimeout(copyStateTimeoutRef.current);
+      }
+      copyStateTimeoutRef.current = setTimeout(() => {
+        setCopyState('idle');
+        copyStateTimeoutRef.current = null;
+      }, 2000);
+    };
+
     try {
       await navigator.clipboard.writeText(url.toString());
       setCopyState('copied');
-      setTimeout(() => setCopyState('idle'), 2000);
+      scheduleCopyStateReset();
     } catch {
       setCopyState('error');
-      setTimeout(() => setCopyState('idle'), 2000);
+      scheduleCopyStateReset();
     }
   }, [spec.fileId]);
 
@@ -426,7 +474,10 @@ export function RepositorySpecDetailDrawer({
               size="sm"
               variant="outline"
               type="button"
-              onClick={() => { void loadDetail(); void loadContent(); }}
+              onClick={() => {
+                void loadDetail(new AbortController().signal);
+                void loadContent(new AbortController().signal);
+              }}
               className="ml-auto"
               data-testid="spec-drawer-refresh"
               title="Re-fetch detail + content"
@@ -617,7 +668,7 @@ export function RepositorySpecDetailDrawer({
                     {job.changeReportId ? (
                       <a
                         className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 inline-flex items-center text-[11px]"
-                        href={`/ade/dashboard/repositories/${repositoryId}?tab=sync&importJobId=${encodeURIComponent(job.id)}`}
+                        href={`/ade/dashboard/repositories/${repositoryId}?tab=sync&changeReportId=${encodeURIComponent(job.changeReportId ?? '')}`}
                       >
                         Change report
                         <ExternalLink className="w-3 h-3 ml-0.5" />

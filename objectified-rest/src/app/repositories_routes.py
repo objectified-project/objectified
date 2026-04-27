@@ -2132,7 +2132,8 @@ def _fetch_file_content_bytes(
     Contents API (the same URL we already use for scans) and decode the
     base64 payload.
     """
-    seeded = _REPO_FILE_CONTENT_STORE.get((repository.id, file_row.id))
+    with _STORE_LOCK:
+        seeded = _REPO_FILE_CONTENT_STORE.get((repository.id, file_row.id))
     if seeded is not None:
         return seeded
 
@@ -3041,22 +3042,22 @@ async def get_repository_spec_detail(
             _build_spec_import_summary(job=job, repository_id=repository_id) for job in recent_jobs
         ]
 
-    latest_non_failed = next(
-        (
-            job
-            for job in recent_jobs
-            if job.state in ("committed", "pending_review")
-        ),
-        None,
-    )
-    if latest_non_failed is not None:
-        change_report = _find_change_report_for_import_job(repository_id, latest_non_failed.id)
-        change_model = change_report.changeModelJson if change_report is not None else None
-        lint = derive_lint_summary(job=latest_non_failed.model_dump(), change_model=change_model)
-    elif recent_jobs:
-        lint = derive_lint_summary(job=recent_jobs[0].model_dump(), change_model=None)
-    else:
-        lint = empty_lint_summary()
+        latest_non_failed = next(
+            (
+                job
+                for job in recent_jobs
+                if job.state in ("committed", "pending_review")
+            ),
+            None,
+        )
+        if latest_non_failed is not None:
+            change_report = _find_change_report_for_import_job(repository_id, latest_non_failed.id)
+            change_model = change_report.changeModelJson if change_report is not None else None
+            lint = derive_lint_summary(job=latest_non_failed.model_dump(), change_model=change_model)
+        elif recent_jobs:
+            lint = derive_lint_summary(job=recent_jobs[0].model_dump(), change_model=None)
+        else:
+            lint = empty_lint_summary()
 
     web_url = provider_blob_url(
         provider=repository.provider,
@@ -3185,6 +3186,24 @@ async def get_repository_spec_content(
             fetchedAt=_utc_now_iso(),
         )
 
+    encoded = base64.b64encode(payload).decode("ascii")
+    if len(encoded) > MAX_INLINE_PREVIEW_BYTES:
+        return RepositorySpecContentResponse(
+            fileId=file_row.id,
+            repositoryId=repository_id,
+            branch=scan.branch,
+            path=file_row.path,
+            format=file_row.format,
+            encoding="utf-8",
+            content=None,
+            sizeBytes=actual_size,
+            truncated=False,
+            tooLargeForPreview=True,
+            contentChecksum=file_row.contentChecksum,
+            providerRawUrl=raw_url,
+            fetchedAt=_utc_now_iso(),
+        )
+
     return RepositorySpecContentResponse(
         fileId=file_row.id,
         repositoryId=repository_id,
@@ -3192,7 +3211,7 @@ async def get_repository_spec_content(
         path=file_row.path,
         format=file_row.format,
         encoding="base64",
-        content=base64.b64encode(payload).decode("ascii"),
+        content=encoded,
         sizeBytes=actual_size,
         truncated=False,
         tooLargeForPreview=False,
