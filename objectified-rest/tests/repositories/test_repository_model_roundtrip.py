@@ -5,7 +5,7 @@ import uuid
 
 import psycopg2
 from psycopg2 import sql
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import Json, RealDictCursor
 import pytest
 
 from app.config import settings
@@ -18,6 +18,7 @@ def _migration_paths() -> list[Path]:
         scripts_dir / "20260423-230000.sql",
         scripts_dir / "20260424-120000.sql",
         scripts_dir / "20260426-210000.sql",
+        scripts_dir / "20260426-220000.sql",
     ]
 
 
@@ -413,4 +414,139 @@ def test_provider_enum_is_github_only(repository_schema):
         )
         labels = [row[0] for row in cur.fetchall()]
     assert labels == ["github"]
+
+
+def test_versions_repository_source_round_trip(repository_schema, base_refs):
+    conn, schema = repository_schema
+    version_id = "00000000-0000-0000-0000-000000000881"
+    repository_source = {
+        "repositoryId": "00000000-0000-0000-0000-000000000555",
+        "branch": "main",
+        "path": "apis/openapi.yaml",
+        "commitSha": "a" * 40,
+        "contentChecksum": "b" * 64,
+        "contentAlgo": "sha256",
+        "importedAt": "2026-04-26T21:30:00Z",
+    }
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            sql.SQL(
+                """
+                INSERT INTO {} (
+                    id, project_id, creator_id, version_id, repository_source
+                )
+                VALUES (%s, %s, %s, %s, %s::jsonb)
+                RETURNING id, version_id, repository_source;
+                """
+            ).format(sql.Identifier(schema, "versions")),
+            (
+                version_id,
+                base_refs["project_id"],
+                base_refs["user_id"],
+                "1.2.3",
+                Json(repository_source),
+            ),
+        )
+        inserted = cur.fetchone()
+        cur.execute(
+            sql.SQL(
+                """
+                SELECT id, version_id, repository_source
+                FROM {}
+                WHERE id = %s;
+                """
+            ).format(sql.Identifier(schema, "versions")),
+            (version_id,),
+        )
+        selected = cur.fetchone()
+    conn.commit()
+    assert inserted == selected
+    assert selected["repository_source"]["contentAlgo"] == "sha256"
+
+
+def test_versions_repository_source_check_rejects_malformed_payload(repository_schema, base_refs):
+    conn, schema = repository_schema
+    with conn.cursor() as cur:
+        with pytest.raises(psycopg2.errors.CheckViolation):
+            cur.execute(
+                sql.SQL(
+                    """
+                    INSERT INTO {} (
+                        id, project_id, creator_id, version_id, repository_source
+                    )
+                    VALUES (%s, %s, %s, %s, %s::jsonb);
+                    """
+                ).format(sql.Identifier(schema, "versions")),
+                (
+                    "00000000-0000-0000-0000-000000000882",
+                    base_refs["project_id"],
+                    base_refs["user_id"],
+                    "1.2.4",
+                    # Missing required keys and invalid commit/content formats.
+                    '{"repositoryId":"not-a-uuid","commitSha":"abc","contentChecksum":"123"}',
+                ),
+            )
+        conn.rollback()
+
+
+def test_versions_repository_source_indexes_are_used_by_planner(repository_schema, base_refs):
+    conn, schema = repository_schema
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        repository_source = {
+            "repositoryId": "00000000-0000-0000-0000-000000000555",
+            "branch": "main",
+            "path": "apis/openapi.yaml",
+            "commitSha": "c" * 40,
+            "contentChecksum": "d" * 64,
+            "contentAlgo": "sha256",
+            "importedAt": "2026-04-26T21:40:00Z",
+        }
+        cur.execute(
+            sql.SQL(
+                """
+                INSERT INTO {} (
+                    id, project_id, creator_id, version_id, repository_source
+                )
+                VALUES (%s, %s, %s, %s, %s::jsonb);
+                """
+            ).format(sql.Identifier(schema, "versions")),
+            (
+                "00000000-0000-0000-0000-000000000883",
+                base_refs["project_id"],
+                base_refs["user_id"],
+                "1.2.5",
+                Json(repository_source),
+            ),
+        )
+        cur.execute(sql.SQL("SET LOCAL enable_seqscan TO off;"))
+        cur.execute(
+            sql.SQL(
+                """
+                EXPLAIN
+                SELECT id
+                FROM {}
+                WHERE (repository_source->>'repositoryId') = %s
+                  AND (repository_source->>'path') = %s;
+                """
+            ).format(sql.Identifier(schema, "versions")),
+            (repository_source["repositoryId"], repository_source["path"]),
+        )
+        lookup_plan = "\n".join(row["QUERY PLAN"] for row in cur.fetchall())
+
+        cur.execute(
+            sql.SQL(
+                """
+                EXPLAIN
+                SELECT id
+                FROM {}
+                WHERE (repository_source->>'contentChecksum') = %s;
+                """
+            ).format(sql.Identifier(schema, "versions")),
+            (repository_source["contentChecksum"],),
+        )
+        checksum_plan = "\n".join(row["QUERY PLAN"] for row in cur.fetchall())
+    conn.commit()
+
+    assert "idx_version_repo_source_lookup" in lookup_plan
+    assert "idx_version_content_checksum" in checksum_plan
 

@@ -1437,6 +1437,30 @@ class Database:
         results = self.execute_query(query, (project_id, version_id_str, tenant_id))
         return results[0] if results else None
 
+    def get_latest_version_by_repository_source(
+        self,
+        tenant_id: str,
+        repository_id: str,
+        path: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Get newest revision for a repository-source tuple."""
+        query = """
+            SELECT v.id
+            FROM odb.versions v
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE p.tenant_id = %s
+              AND v.deleted_at IS NULL
+              AND p.deleted_at IS NULL
+              AND (v.repository_source->>'repositoryId') = %s
+              AND (v.repository_source->>'path') = %s
+            ORDER BY v.created_at DESC
+            LIMIT 1
+        """
+        rows = self.execute_query(query, (tenant_id, repository_id, path))
+        if not rows:
+            return None
+        return self.get_version_by_id(str(rows[0]["id"]), tenant_id)
+
     def revision_has_protected_named_ref(
         self, version_row_id: str, project_id: str, tenant_id: str
     ) -> bool:
