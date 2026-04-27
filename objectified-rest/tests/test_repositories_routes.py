@@ -2372,8 +2372,10 @@ def test_scan_reports_list_includes_materialized_row_after_scan() -> None:
                 "branches": [{"branch": "main"}],
             },
         )
-        repository_id = create_response.json()["repository"]["id"]
-        scan_id = create_response.json()["initialScanJobId"]
+        assert create_response.status_code == 201, f"Repository creation failed: {create_response.text}"
+        create_body = create_response.json()
+        repository_id = create_body["repository"]["id"]
+        scan_id = create_body["initialScanJobId"]
         _complete_repository_scan_for_tests(
             repository_id,
             scan_id,
@@ -2391,7 +2393,6 @@ def test_scan_reports_list_includes_materialized_row_after_scan() -> None:
     finally:
         app.dependency_overrides.pop(validate_authentication, None)
 
-    assert create_response.status_code == 201
     assert list_response.status_code == 200
     body = list_response.json()
     assert body["total"] >= 1

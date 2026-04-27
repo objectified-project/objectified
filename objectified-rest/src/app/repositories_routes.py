@@ -2527,7 +2527,8 @@ async def list_repository_scan_reports(
         if last_scan is not None:
             last_scan_at = (last_scan.finishedAt or last_scan.startedAt or last_scan.createdAt) or None
         last_scan_id = last_scan.id if last_scan is not None else None
-        rlist = _REPO_SCAN_REPORT_STORE.get(repo.id, [])
+        with _STORE_LOCK:
+            rlist = list(_REPO_SCAN_REPORT_STORE.get(repo.id, []))
         latest: Dict[str, Any] | None = max(rlist, key=lambda r: r["generatedAt"]) if rlist else None
         totals = None
         attention = 0

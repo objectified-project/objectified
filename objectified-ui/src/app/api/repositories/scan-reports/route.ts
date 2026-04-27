@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       if (v != null && v.length > 0) q.set(key, v);
     }
     const qs = q.toString();
-    const url = `${REST_API_BASE_URL}/repositories/${auth.tenantSlug}/scan-reports${qs ? `?${qs}` : ''}`;
+    const url = `${REST_API_BASE_URL}/repositories/${encodeURIComponent(auth.tenantSlug)}/scan-reports${qs ? `?${qs}` : ''}`;
 
     const response = await fetch(url, { method: 'GET', headers: createRestAuthHeaders(auth.sessionUser) });
     const data = await response.json().catch(() => ({}));

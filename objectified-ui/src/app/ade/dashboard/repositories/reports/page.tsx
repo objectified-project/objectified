@@ -125,7 +125,7 @@ export default function ScanReportsPage() {
     [router, pathname, searchParams],
   );
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     setError('');
     try {
@@ -135,7 +135,7 @@ export default function ScanReportsPage() {
       if (urlQ.trim()) p.set('q', urlQ.trim());
       p.set('page', String(urlPage));
       p.set('pageSize', String(pageSize));
-      const res = await fetch(`/api/repositories/scan-reports?${p.toString()}`);
+      const res = await fetch(`/api/repositories/scan-reports?${p.toString()}`, { signal });
       const body = await res.json();
       if (!res.ok || !body.success) {
         throw new Error(typeof body.error === 'string' ? body.error : 'Failed to load scan reports');
@@ -145,6 +145,7 @@ export default function ScanReportsPage() {
       setTotal(d.total ?? 0);
       setPage(d.page ?? 1);
     } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return;
       setError(e instanceof Error ? e.message : 'Failed to load');
       setRows([]);
       setTotal(0);
@@ -154,8 +155,16 @@ export default function ScanReportsPage() {
   }, [pageSize, urlPage, urlProvider, urlQ, urlStatus]);
 
   useEffect(() => {
-    void load();
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
   }, [load]);
+
+  useEffect(() => {
+    return () => {
+      if (qDebounce.current) clearTimeout(qDebounce.current);
+    };
+  }, []);
 
   const liveMessage = useMemo(() => {
     if (isLoading) return 'Loading scan reports';
@@ -240,6 +249,7 @@ export default function ScanReportsPage() {
                         type="button"
                         key={p.id}
                         onClick={() => setQuery({ provider: p.id, page: 1 })}
+                        aria-pressed={active}
                         className={cn(
                           'px-3 py-1.5 text-sm rounded-md border transition-colors',
                           active
@@ -265,6 +275,7 @@ export default function ScanReportsPage() {
                         type="button"
                         key={p.id}
                         onClick={() => setQuery({ status: p.id, page: 1 })}
+                        aria-pressed={active}
                         className={cn(
                           'px-3 py-1.5 text-sm rounded-md border transition-colors',
                           active
@@ -293,6 +304,7 @@ export default function ScanReportsPage() {
                       setQDraft(v);
                       if (qDebounce.current) clearTimeout(qDebounce.current);
                       qDebounce.current = setTimeout(() => {
+                        qDebounce.current = null;
                         setQuery({ q: v || null, page: 1 });
                       }, 400);
                     }}
@@ -327,7 +339,6 @@ export default function ScanReportsPage() {
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase text-gray-500"
-                      aria-sort="descending"
                     >
                       Specs (I / A / F / S)
                     </th>
