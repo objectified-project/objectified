@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added REPO-9.3 repository specs REST endpoints for cursor-paginated listing (`GET /v1/repositories/{tenant_slug}/{repository_id}/specs`), single-spec selection updates, and transactional bulk selection updates with typed invariant errors and `repository.spec.selection_changed` audit rows.
 - Added REPO-9.2 per-spec `auto_import_enabled` on `repository_file` (default false), including `PATCH /v1/repositories/{tenant_slug}/{repository_id}/files/{file_id}/auto-import-enabled`, independent `repository.spec.selection_changed` audit discrimination by `field`, scan dispatch gating that requires both import and auto-import enabled, and automatic clearing of auto-import whenever import is disabled.
 - Added REPO-9.1 per-spec `import_enabled` on `repository_file` (default off without manifest; manifest-listed specs use explicit `importEnabled` with legacy-safe omissions), selection preserved across re-scans, `PATCH /v1/repositories/{tenant_slug}/{repository_id}/files/{file_id}/import-enabled` plus `repository.spec.selection_changed` audit, and import-job dispatch only when the flag is true.
 - Added REPO-8.4 historical backfill tooling via `objectified-rest/scripts/backfill_repository_checksums.py` to stream-hash tracked repository files missing `content_checksum`, migrate valid legacy `metadata.repositorySource` payloads into typed `versions.repository_source`, and emit structured rejection/error reports with `repository.scan.backfilled` audit rows.

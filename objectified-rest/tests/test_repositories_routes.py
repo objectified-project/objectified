@@ -45,6 +45,13 @@ def _override_auth_tenant_admin_with_repo_project_autocreate():
     }
 
 
+def _override_auth_with_repository_scopes():
+    return {
+        **_MOCK_AUTH,
+        "scopes": ["repository.read", "repository.write"],
+    }
+
+
 @pytest.fixture(autouse=True)
 def _clear_repository_state():
     _reset_repository_state_for_tests()
@@ -1586,3 +1593,263 @@ def test_patch_file_auto_import_enabled_writes_audit_and_requires_import_enabled
     assert selection_audits[1]["detail"]["field"] == "import_enabled"
     assert selection_audits[1]["detail"]["before"] is True
     assert selection_audits[1]["detail"]["after"] is False
+
+
+def test_specs_routes_require_repository_scopes() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000060",
+                "provider": "github",
+                "owner": "acme",
+                "name": "scope-required",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="scope-seed",
+            files=[{"path": "apis/spec.yaml", "blobSha": "1", "tracked": True}],
+        )
+        file_id = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{scan_id}/files"
+        ).json()["items"][0]["id"]
+
+        list_response = client.get(f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs")
+        patch_response = client.patch(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}",
+            json={"importEnabled": True},
+        )
+        bulk_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs:bulkUpdate",
+            json={"file_ids": [file_id], "importEnabled": True},
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert list_response.status_code == 403
+    assert list_response.json()["detail"]["code"] == "REPOSITORY_SCOPE_REQUIRED"
+    assert patch_response.status_code == 403
+    assert patch_response.json()["detail"]["code"] == "REPOSITORY_SCOPE_REQUIRED"
+    assert bulk_response.status_code == 403
+    assert bulk_response.json()["detail"]["code"] == "REPOSITORY_SCOPE_REQUIRED"
+
+
+def test_list_specs_supports_status_search_and_cursor() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000061",
+                "provider": "github",
+                "owner": "acme",
+                "name": "spec-listing",
+                "branches": [{"branch": "main"}],
+                "manifest": (
+                    "version: 1\n"
+                    "specs:\n"
+                    "  - path: apis/imported.yaml\n"
+                    "    project: payments\n"
+                    "    promote: auto\n"
+                ),
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="spec-listing-seed",
+            files=[
+                {"path": "apis/imported.yaml", "blobSha": "1", "tracked": True, "autoImportEnabled": True},
+                {
+                    "path": "apis/parse-error.yaml",
+                    "blobSha": "2",
+                    "tracked": True,
+                    "importEnabled": True,
+                    "autoImportEnabled": True,
+                    "settingsJson": {"forceImportFailure": "bad parser"},
+                },
+                {"path": "apis/not-imported.yaml", "blobSha": "3", "tracked": True, "importEnabled": False},
+            ],
+        )
+
+        first_page = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs",
+            params={"branch": "main", "limit": 1},
+        )
+        next_cursor = first_page.json()["nextCursor"]
+        second_page = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs",
+            params={"branch": "main", "limit": 2, "cursor": next_cursor},
+        )
+        parse_errors = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs",
+            params={"branch": "main", "status": "parse_error"},
+        )
+        search_imported = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs",
+            params={"branch": "main", "search": "imported.yaml"},
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert first_page.status_code == 200
+    assert len(first_page.json()["items"]) == 1
+    assert next_cursor is not None
+    assert second_page.status_code == 200
+    assert len(second_page.json()["items"]) >= 1
+    by_path = {
+        item["path"]: item
+        for item in (first_page.json()["items"] + second_page.json()["items"])
+    }
+    assert by_path["apis/imported.yaml"]["status"] == "imported"
+    assert by_path["apis/parse-error.yaml"]["status"] == "parse_error"
+    assert by_path["apis/not-imported.yaml"]["status"] == "not_imported"
+    assert parse_errors.status_code == 200
+    assert [row["path"] for row in parse_errors.json()["items"]] == ["apis/parse-error.yaml"]
+    assert search_imported.status_code == 200
+    assert sorted(row["path"] for row in search_imported.json()["items"]) == [
+        "apis/imported.yaml",
+        "apis/not-imported.yaml",
+    ]
+
+
+def test_patch_specs_enforces_selection_invariant_and_writes_audit() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000062",
+                "provider": "github",
+                "owner": "acme",
+                "name": "spec-patch",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="patch-seed",
+            files=[
+                {
+                    "path": "apis/patchable.yaml",
+                    "blobSha": "1",
+                    "tracked": True,
+                    "importEnabled": False,
+                    "autoImportEnabled": False,
+                }
+            ],
+        )
+        file_id = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{scan_id}/files"
+        ).json()["items"][0]["id"]
+        audit_baseline = len(_get_repository_audit_rows_for_tests(repository_id))
+
+        invalid_response = client.patch(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}",
+            json={"autoImportEnabled": True},
+        )
+        valid_response = client.patch(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}",
+            json={"importEnabled": True, "autoImportEnabled": True},
+        )
+        disable_response = client.patch(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs/{file_id}",
+            json={"importEnabled": False},
+        )
+        audit_rows = _get_repository_audit_rows_for_tests(repository_id)
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert invalid_response.status_code == 400
+    assert invalid_response.json()["detail"]["code"] == "SELECTION_INVARIANT_VIOLATION"
+    assert valid_response.status_code == 200
+    assert valid_response.json()["importEnabled"] is True
+    assert valid_response.json()["autoImportEnabled"] is True
+    assert disable_response.status_code == 200
+    assert disable_response.json()["importEnabled"] is False
+    assert disable_response.json()["autoImportEnabled"] is False
+    new_selection_audits = [
+        row for row in audit_rows[audit_baseline:] if row["eventType"] == "repository.spec.selection_changed"
+    ]
+    assert len(new_selection_audits) == 3
+    assert {row["detail"]["field"] for row in new_selection_audits} == {"import_enabled", "auto_import_enabled"}
+
+
+def test_bulk_update_specs_is_transactional_and_capped() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    try:
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000063",
+                "provider": "github",
+                "owner": "acme",
+                "name": "spec-bulk",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="bulk-seed",
+            files=[
+                {"path": "apis/a.yaml", "blobSha": "1", "tracked": True, "importEnabled": True, "autoImportEnabled": False},
+                {"path": "apis/b.yaml", "blobSha": "2", "tracked": True, "importEnabled": False, "autoImportEnabled": False},
+            ],
+        )
+        file_rows = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{scan_id}/files"
+        ).json()["items"]
+        file_ids = [row["id"] for row in file_rows]
+
+        oversized_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs:bulkUpdate",
+            json={"file_ids": file_ids + ["11111111-1111-1111-1111-111111111111"] * 499, "importEnabled": True},
+        )
+        invalid_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs:bulkUpdate",
+            json={"file_ids": file_ids, "autoImportEnabled": True},
+        )
+        after_invalid = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs",
+            params={"branch": "main"},
+        )
+        valid_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/specs:bulkUpdate",
+            json={"file_ids": file_ids, "importEnabled": True, "autoImportEnabled": True},
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+    assert create_response.status_code == 201
+    assert oversized_response.status_code == 422
+    assert invalid_response.status_code == 400
+    assert invalid_response.json()["detail"]["code"] == "SELECTION_INVARIANT_VIOLATION"
+    assert after_invalid.status_code == 200
+    before_valid = {row["path"]: row for row in after_invalid.json()["items"]}
+    assert before_valid["apis/a.yaml"]["autoImportEnabled"] is False
+    assert before_valid["apis/b.yaml"]["importEnabled"] is False
+
+    assert valid_response.status_code == 200
+    assert valid_response.json()["updatedCount"] == 2
+    after_valid = {row["path"]: row for row in valid_response.json()["items"]}
+    assert after_valid["apis/a.yaml"]["importEnabled"] is True
+    assert after_valid["apis/a.yaml"]["autoImportEnabled"] is True
+    assert after_valid["apis/b.yaml"]["importEnabled"] is True
+    assert after_valid["apis/b.yaml"]["autoImportEnabled"] is True

@@ -251,6 +251,51 @@ class RepositoryFileAutoImportEnabledRequest(BaseModel):
     source: Literal["ui", "api", "manifest"] = "api"
 
 
+RepositorySpecSelectionStatus = Literal[
+    "imported",
+    "parse_error",
+    "manifest_error",
+    "not_imported",
+    "unchanged_checksum",
+]
+
+
+class RepositorySpecRecord(BaseModel):
+    fileId: str
+    repositoryId: str
+    scanId: str
+    branch: str
+    path: str
+    format: str | None = None
+    status: RepositorySpecSelectionStatus
+    importEnabled: bool
+    autoImportEnabled: bool
+    lastImportedVersionId: str | None = None
+    createdAt: str
+
+
+class RepositorySpecPage(BaseModel):
+    items: List[RepositorySpecRecord]
+    limit: int
+    nextCursor: str | None = None
+
+
+class RepositorySpecUpdateRequest(BaseModel):
+    importEnabled: bool | None = None
+    autoImportEnabled: bool | None = None
+
+
+class RepositorySpecBulkUpdateRequest(BaseModel):
+    fileIds: List[str] = Field(min_length=1, max_length=500, validation_alias="file_ids")
+    importEnabled: bool | None = None
+    autoImportEnabled: bool | None = None
+
+
+class RepositorySpecBulkUpdateResponse(BaseModel):
+    updatedCount: int
+    items: List[RepositorySpecRecord]
+
+
 class RepositoryResolvedProjectRecord(BaseModel):
     id: str
     tenantId: str
@@ -308,6 +353,9 @@ _CONTENT_CHECKSUM_ALGO = "sha256"
 _CONTENT_CHECKSUM_SHORT_LEN = 12
 _SLUG_SANITIZER = re.compile(r"[^a-z0-9]+")
 _VERSION_SHA_SANITIZER = re.compile(r"[^a-z0-9]+")
+_REPOSITORY_SCOPE_READ = "repository.read"
+_REPOSITORY_SCOPE_WRITE = "repository.write"
+_REPOSITORY_SELECTION_ERROR_CODE = "SELECTION_INVARIANT_VIOLATION"
 _MANIFEST_PROJECT_AUTO_CREATE_FLAG_KEYS = (
     "repoManifestProjectAutoCreate",
     "repo_manifest_project_auto_create",
@@ -1125,6 +1173,142 @@ def _resolve_actor_id(auth_data: Dict[str, Any] | None) -> str:
             except ValueError:
                 pass
     return _SYSTEM_ACTOR_ID
+
+
+def _extract_auth_scopes(auth_data: Dict[str, Any]) -> set[str]:
+    raw_scopes = auth_data.get("scopes")
+    if isinstance(raw_scopes, str):
+        return {token for token in raw_scopes.split() if token}
+    if isinstance(raw_scopes, list):
+        return {str(scope).strip() for scope in raw_scopes if str(scope).strip()}
+    raw_scope = auth_data.get("scope")
+    if isinstance(raw_scope, str):
+        return {token for token in raw_scope.split() if token}
+    return set()
+
+
+def _require_repository_scope(auth_data: Dict[str, Any], required_scope: str) -> None:
+    scopes = _extract_auth_scopes(auth_data)
+    if required_scope not in scopes:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "REPOSITORY_SCOPE_REQUIRED",
+                "message": f"Missing required scope: {required_scope}",
+            },
+        )
+
+
+def _derive_repository_spec_status(
+    file_row: RepositoryFileRecord,
+    latest_import_job: RepositoryImportJobRecord | None,
+) -> RepositorySpecSelectionStatus:
+    if latest_import_job is not None and latest_import_job.state == "committed":
+        return "imported"
+    if file_row.status == "parse_error":
+        return "parse_error"
+    if file_row.status == "manifest_error":
+        return "manifest_error"
+    if file_row.status == "unchanged_checksum":
+        return "unchanged_checksum"
+    return "not_imported"
+
+
+def _latest_import_jobs_by_path(repository_id: str, branch: str) -> Dict[str, RepositoryImportJobRecord]:
+    jobs = [job for job in _REPO_IMPORT_JOB_STORE.get(repository_id, []) if job.branch == branch]
+    jobs.sort(key=lambda item: _to_sort_key(item.createdAt, item.id), reverse=True)
+    by_path: Dict[str, RepositoryImportJobRecord] = {}
+    for job in jobs:
+        path = str(job.diffSnapshot.get("path") or "").strip()
+        if not path:
+            continue
+        if path not in by_path:
+            by_path[path] = job
+    return by_path
+
+
+def _build_repository_spec_record(
+    file_row: RepositoryFileRecord,
+    branch: str,
+    latest_import_job: RepositoryImportJobRecord | None,
+) -> RepositorySpecRecord:
+    status = _derive_repository_spec_status(file_row, latest_import_job)
+    last_imported_version_id = None
+    if latest_import_job is not None and latest_import_job.state == "committed":
+        last_imported_version_id = latest_import_job.targetVersionId
+    return RepositorySpecRecord(
+        fileId=file_row.id,
+        repositoryId=file_row.repositoryId,
+        scanId=file_row.scanId,
+        branch=branch,
+        path=file_row.path,
+        format=file_row.format,
+        status=status,
+        importEnabled=file_row.importEnabled,
+        autoImportEnabled=file_row.autoImportEnabled,
+        lastImportedVersionId=last_imported_version_id,
+        createdAt=file_row.createdAt,
+    )
+
+
+def _selection_invariant_violation(message: str) -> None:
+    raise HTTPException(
+        status_code=400,
+        detail={"code": _REPOSITORY_SELECTION_ERROR_CODE, "message": message},
+    )
+
+
+def _apply_selection_update(
+    file_row: RepositoryFileRecord,
+    *,
+    import_enabled: bool | None,
+    auto_import_enabled: bool | None,
+) -> Tuple[RepositoryFileRecord, List[Dict[str, Any]]]:
+    if import_enabled is None and auto_import_enabled is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_INPUT", "message": "Provide importEnabled and/or autoImportEnabled"},
+        )
+    if import_enabled is False and auto_import_enabled is True:
+        _selection_invariant_violation(
+            "autoImportEnabled cannot be true when importEnabled is false"
+        )
+
+    next_import_enabled = file_row.importEnabled if import_enabled is None else import_enabled
+    next_auto_import_enabled = file_row.autoImportEnabled if auto_import_enabled is None else auto_import_enabled
+
+    if import_enabled is False:
+        next_auto_import_enabled = False
+    if next_auto_import_enabled and not next_import_enabled:
+        _selection_invariant_violation(
+            "autoImportEnabled cannot be true when importEnabled is false"
+        )
+
+    changes: List[Dict[str, Any]] = []
+    if file_row.importEnabled != next_import_enabled:
+        changes.append(
+            {
+                "field": "import_enabled",
+                "before": file_row.importEnabled,
+                "after": next_import_enabled,
+            }
+        )
+    if file_row.autoImportEnabled != next_auto_import_enabled:
+        changes.append(
+            {
+                "field": "auto_import_enabled",
+                "before": file_row.autoImportEnabled,
+                "after": next_auto_import_enabled,
+            }
+        )
+    if not changes:
+        return file_row, changes
+    return file_row.model_copy(
+        update={
+            "importEnabled": next_import_enabled,
+            "autoImportEnabled": next_auto_import_enabled,
+        }
+    ), changes
 
 
 def _build_repository_source_uri(repository_id: str, path: str, branch: str, commit_sha: str) -> str:
@@ -2217,6 +2401,222 @@ async def list_repository_scan_files(
         tail = page_items[-1]
         next_cursor = _encode_cursor(tail.createdAt, tail.id)
     return RepositoryScanFilePage(items=page_items, limit=limit, nextCursor=next_cursor)
+
+
+@router.get("/{tenant_slug}/{repository_id}/specs", response_model=RepositorySpecPage)
+async def list_repository_specs(
+    tenant_slug: str,
+    repository_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    branch: str | None = Query(default=None),
+    status: RepositorySpecSelectionStatus | None = Query(default=None),
+    search: str | None = Query(default=None),
+    limit: int = Query(default=_DEFAULT_SCAN_PAGE_SIZE, ge=1, le=_MAX_SCAN_PAGE_SIZE),
+    cursor: str | None = Query(default=None),
+) -> RepositorySpecPage:
+    tenant_id = auth_data["tenant_id"]
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    cursor_key: Tuple[datetime, str] | None = None
+    if cursor:
+        cursor_dt, cursor_id = _decode_cursor(cursor)
+        cursor_key = (cursor_dt, cursor_id)
+
+    normalized_branch = (branch or "").strip()
+    normalized_search = (search or "").strip().lower()
+
+    with _STORE_LOCK:
+        repository = _find_repository_for_tenant(tenant_id, repository_id)
+        effective_branch = normalized_branch
+        if not effective_branch:
+            if not repository.branches:
+                raise HTTPException(status_code=400, detail="Repository has no branch configuration")
+            effective_branch = repository.branches[0].branch
+
+        scans = _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
+        latest_scan = next((scan for scan in scans if scan.branch == effective_branch), None)
+        if latest_scan is None:
+            raise HTTPException(status_code=404, detail=f"No scan found for branch: {effective_branch}")
+
+        files = list(_REPO_SCAN_FILE_HISTORY_STORE.get(latest_scan.id, []))
+        latest_jobs = _latest_import_jobs_by_path(repository_id, effective_branch)
+
+    filtered: List[RepositorySpecRecord] = []
+    for file_row in files:
+        if file_row.status == "removed":
+            continue
+        spec_row = _build_repository_spec_record(
+            file_row,
+            effective_branch,
+            latest_jobs.get(file_row.path),
+        )
+        if status is not None and spec_row.status != status:
+            continue
+        if normalized_search and normalized_search not in spec_row.path.lower():
+            continue
+        row_dt = _parse_iso8601(spec_row.createdAt, "createdAt")
+        if row_dt is None:
+            continue
+        if cursor_key is not None and (row_dt, spec_row.fileId) >= cursor_key:
+            continue
+        filtered.append(spec_row)
+
+    filtered.sort(key=lambda item: _to_sort_key(item.createdAt, item.fileId), reverse=True)
+    page_rows = filtered[: limit + 1]
+    has_more = len(page_rows) > limit
+    page_items = page_rows[:limit]
+    next_cursor = None
+    if has_more and page_items:
+        tail = page_items[-1]
+        next_cursor = _encode_cursor(tail.createdAt, tail.fileId)
+
+    return RepositorySpecPage(items=page_items, limit=limit, nextCursor=next_cursor)
+
+
+@router.patch(
+    "/{tenant_slug}/{repository_id}/specs/{file_id}",
+    response_model=RepositorySpecRecord,
+)
+async def update_repository_spec_selection(
+    tenant_slug: str,
+    repository_id: str,
+    file_id: str,
+    request: RepositorySpecUpdateRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositorySpecRecord:
+    tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_WRITE)
+    _validate_uuid(file_id, "fileId")
+
+    audits_to_persist: List[Dict[str, Any]] = []
+    with _STORE_LOCK:
+        _find_repository_for_tenant(tenant_id, repository_id)
+        out_row: RepositoryFileRecord | None = None
+        out_branch: str | None = None
+        for scan in _REPO_SCAN_HISTORY_STORE.get(repository_id, []):
+            file_list = _REPO_SCAN_FILE_HISTORY_STORE.get(scan.id, [])
+            for idx, file_row in enumerate(file_list):
+                if file_row.id != file_id:
+                    continue
+                updated, changes = _apply_selection_update(
+                    file_row,
+                    import_enabled=request.importEnabled,
+                    auto_import_enabled=request.autoImportEnabled,
+                )
+                file_list[idx] = updated
+                out_row = updated
+                out_branch = scan.branch
+                for change in changes:
+                    audits_to_persist.append(
+                        _append_audit_row(
+                            tenant_id,
+                            repository_id,
+                            "repository.spec.selection_changed",
+                            actor_id=actor_id,
+                            detail={
+                                "path": file_row.path,
+                                "before": change["before"],
+                                "after": change["after"],
+                                "actorId": actor_id,
+                                "field": change["field"],
+                                "source": "api",
+                            },
+                        )
+                    )
+                break
+            if out_row is not None:
+                break
+        if out_row is None or out_branch is None:
+            raise HTTPException(status_code=404, detail=f"Repository file not found: {file_id}")
+        latest_job = _latest_import_jobs_by_path(repository_id, out_branch).get(out_row.path)
+        out_spec = _build_repository_spec_record(out_row, out_branch, latest_job)
+
+    for row in audits_to_persist:
+        _persist_audit_row(row)
+    return out_spec
+
+
+@router.post(
+    "/{tenant_slug}/{repository_id}/specs:bulkUpdate",
+    response_model=RepositorySpecBulkUpdateResponse,
+)
+async def bulk_update_repository_spec_selection(
+    tenant_slug: str,
+    repository_id: str,
+    request: RepositorySpecBulkUpdateRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositorySpecBulkUpdateResponse:
+    tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_WRITE)
+
+    for file_id in request.fileIds:
+        _validate_uuid(file_id, "fileId")
+
+    audits_to_persist: List[Dict[str, Any]] = []
+    with _STORE_LOCK:
+        _find_repository_for_tenant(tenant_id, repository_id)
+        indexed_rows: Dict[str, Tuple[str, int, RepositoryFileRecord, str]] = {}
+        for scan in _REPO_SCAN_HISTORY_STORE.get(repository_id, []):
+            file_list = _REPO_SCAN_FILE_HISTORY_STORE.get(scan.id, [])
+            for idx, file_row in enumerate(file_list):
+                indexed_rows[file_row.id] = (scan.id, idx, file_row, scan.branch)
+
+        missing_ids = [file_id for file_id in request.fileIds if file_id not in indexed_rows]
+        if missing_ids:
+            raise HTTPException(status_code=404, detail=f"Repository file not found: {missing_ids[0]}")
+
+        updates: List[Tuple[str, str, int, RepositoryFileRecord, RepositoryFileRecord, List[Dict[str, Any]], str]] = []
+        for file_id in request.fileIds:
+            scan_id, idx, existing_row, branch_name = indexed_rows[file_id]
+            updated_row, changes = _apply_selection_update(
+                existing_row,
+                import_enabled=request.importEnabled,
+                auto_import_enabled=request.autoImportEnabled,
+            )
+            updates.append((file_id, scan_id, idx, existing_row, updated_row, changes, branch_name))
+
+        for _file_id, scan_id, idx, existing_row, updated_row, changes, _branch_name in updates:
+            file_list = _REPO_SCAN_FILE_HISTORY_STORE.get(scan_id, [])
+            file_list[idx] = updated_row
+            for change in changes:
+                audits_to_persist.append(
+                    _append_audit_row(
+                        tenant_id,
+                        repository_id,
+                        "repository.spec.selection_changed",
+                        actor_id=actor_id,
+                        detail={
+                            "path": existing_row.path,
+                            "before": change["before"],
+                            "after": change["after"],
+                            "actorId": actor_id,
+                            "field": change["field"],
+                            "source": "api",
+                        },
+                    )
+                )
+
+        latest_jobs_by_branch: Dict[str, Dict[str, RepositoryImportJobRecord]] = {}
+        response_items: List[RepositorySpecRecord] = []
+        for _file_id, _scan_id, _idx, _existing_row, updated_row, _changes, branch_name in updates:
+            latest_jobs = latest_jobs_by_branch.get(branch_name)
+            if latest_jobs is None:
+                latest_jobs = _latest_import_jobs_by_path(repository_id, branch_name)
+                latest_jobs_by_branch[branch_name] = latest_jobs
+            response_items.append(
+                _build_repository_spec_record(updated_row, branch_name, latest_jobs.get(updated_row.path))
+            )
+
+    for row in audits_to_persist:
+        _persist_audit_row(row)
+    updated_count = len(
+        {
+            item.fileId
+            for item in response_items
+        }
+    )
+    return RepositorySpecBulkUpdateResponse(updatedCount=updated_count, items=response_items)
 
 
 @router.patch(
