@@ -49,6 +49,7 @@ import {
   repositoryPanelHeaderClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
 import { RepositoryStatusChip } from '@/app/components/ade/dashboard/RepositoryStatusChip';
+import { RepositorySpecsTab } from '@/app/components/ade/dashboard/RepositorySpecsTab';
 import { repositoryManifestSchema } from '@/lib/repositoryManifestSchema';
 import { getRepositoriesI18nBundle } from '../i18n';
 
@@ -61,8 +62,11 @@ const fileViewportMinHeightPx = 420;
 const fileViewportBottomReservePx = 64;
 const repo63IssueUrl = 'https://github.com/KenSuenobu/objectified-commercial/issues/2796';
 
-type RepositoryTab = 'branches' | 'files' | 'scans' | 'sync' | 'manifest' | 'settings';
-const repositoryTabs: RepositoryTab[] = ['branches', 'files', 'scans', 'sync', 'manifest', 'settings'];
+type RepositoryTab = 'branches' | 'files' | 'specs' | 'scans' | 'sync' | 'manifest' | 'settings';
+const repositoryTabs: RepositoryTab[] = ['branches', 'files', 'specs', 'scans', 'sync', 'manifest', 'settings'];
+
+type SpecFilter = 'all' | 'importable' | 'imported' | 'failing' | 'awaiting_selection';
+const specFilterValues: SpecFilter[] = ['all', 'importable', 'imported', 'failing', 'awaiting_selection'];
 
 interface RepositoryTimelineItem {
   id: string;
@@ -347,6 +351,7 @@ function getQualityTone(score: number | null | undefined): { text: string; bar: 
 const tabIcons: Record<RepositoryTab, React.ComponentType<{ className?: string }>> = {
   branches: GitBranch,
   files: FileSearch,
+  specs: FileCode2,
   scans: Activity,
   sync: GitPullRequestArrow,
   manifest: FileCode2,
@@ -356,6 +361,7 @@ const tabIcons: Record<RepositoryTab, React.ComponentType<{ className?: string }
 const tabLabel: Record<RepositoryTab, string> = {
   branches: 'Branches',
   files: 'Files',
+  specs: 'Specs',
   scans: 'Scans',
   sync: 'Sync history',
   manifest: 'Manifest',
@@ -472,6 +478,29 @@ export default function RepositoryDetailPage() {
   const setTab = useCallback((nextTab: RepositoryTab) => {
     const nextQuery = new URLSearchParams(searchParams.toString());
     nextQuery.set('tab', nextTab);
+    router.replace(`/ade/dashboard/repositories/${repositoryId}?${nextQuery.toString()}`);
+  }, [repositoryId, router, searchParams]);
+
+  const queryStatusFilter: SpecFilter = useMemo(() => {
+    const queryStatus = searchParams.get('status');
+    if (queryStatus === 'parse_error' || queryStatus === 'manifest_error') return 'failing';
+    if (queryStatus === 'imported') return 'imported';
+    if (queryStatus === 'not_imported') return 'awaiting_selection';
+    if (queryStatus === 'importable') return 'importable';
+    if (queryStatus && specFilterValues.includes(queryStatus as SpecFilter)) {
+      return queryStatus as SpecFilter;
+    }
+    return 'all';
+  }, [searchParams]);
+
+  const setSpecFilterQuery = useCallback((nextFilter: SpecFilter) => {
+    const nextQuery = new URLSearchParams(searchParams.toString());
+    if (nextFilter === 'all') {
+      nextQuery.delete('status');
+    } else {
+      nextQuery.set('status', nextFilter);
+    }
+    nextQuery.set('tab', 'specs');
     router.replace(`/ade/dashboard/repositories/${repositoryId}?${nextQuery.toString()}`);
   }, [repositoryId, router, searchParams]);
 
@@ -1336,6 +1365,28 @@ export default function RepositoryDetailPage() {
                     </span>
                     <span>click row · open drawer</span>
                   </div>
+                </TabsContent>
+
+                {/* ============ SPECS ============ */}
+                <TabsContent value="specs" className={repositoryPanelClass}>
+                  <div className={`${repositoryPanelHeaderClass} flex flex-wrap items-center justify-between gap-3`}>
+                    <div className="flex items-center gap-3">
+                      <FileCode2 className="w-5 h-5 text-indigo-500" />
+                      <div>
+                        <h3 className="text-base font-semibold">Importable specs</h3>
+                        <p className={repositoryPanelEyebrowClass}>
+                          Files the walker classified with confidence ≥ 50% · toggle import / auto-import per spec
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <RepositorySpecsTab
+                    repositoryId={repository.id}
+                    branches={branchRows.map((row) => row.branch).filter((value, index, self) => self.indexOf(value) === index)}
+                    initialBranch={branchRows[0]?.branch || ''}
+                    initialFilter={queryStatusFilter}
+                    onFilterChange={setSpecFilterQuery}
+                  />
                 </TabsContent>
 
                 {/* ============ SCANS ============ */}
