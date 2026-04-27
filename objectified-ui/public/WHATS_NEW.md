@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## Repositories
+- Added REPO-8.2 version provenance tuple support by adding validated/indexed `versions.repository_source` storage, surfacing `GET /v1/versions/by-repo-source?repository_id&path` for fast lookup, and expanding repository model coverage to assert constraint and planner-index behavior.
 - Added REPO-8.1 provider-agnostic repository file checksums with `content_checksum`/`content_algo` persistence, streaming SHA-256 walker hashing utilities with memory-budget coverage, and per-file `repository.scan.hashed` scan audit entries while reusing checksums for unchanged blob SHAs.
 - Added REPO-7.4 token health monitoring so linked-account credentials are probed and classified (`healthy` / `scope_missing` / `revoked` / `network_error`), revoked credentials auto-pause connected repositories, and the Linked Accounts view now shows usage count, last verification age, health state, plus a reconnect action for non-healthy accounts.
 - Added REPO-7.1 workflow-audit repository events in the shared ledger so repository register/scan/sync/pause/poll/token/archive/remove actions now emit filterable `workflow_audit` rows with actor identity and structured detail payloads.

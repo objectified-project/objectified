@@ -1164,6 +1164,9 @@ def _ensure_commit_sha_version(
     repository_id: str,
     branch: str,
     path: str,
+    content_checksum: str,
+    content_algo: str,
+    imported_at: str,
 ) -> RepositoryResolvedVersionRecord:
     normalized_sha = commit_sha.strip().lower()
     tenant_versions = _REPO_VERSION_STORE.setdefault(tenant_id, {})
@@ -1173,6 +1176,9 @@ def _ensure_commit_sha_version(
         return existing
 
     now_dt = datetime.now(timezone.utc)
+    effective_checksum = content_checksum.strip().lower()
+    effective_algo = content_algo.strip().lower()
+    effective_imported_at = imported_at.strip()
     record = RepositoryResolvedVersionRecord(
         id=str(uuid4()),
         tenantId=tenant_id,
@@ -1185,6 +1191,9 @@ def _ensure_commit_sha_version(
                 "branch": branch,
                 "commitSha": commit_sha,
                 "path": path,
+                "contentChecksum": effective_checksum,
+                "contentAlgo": effective_algo,
+                "importedAt": effective_imported_at,
             }
         },
         createdAt=now_dt.isoformat(),

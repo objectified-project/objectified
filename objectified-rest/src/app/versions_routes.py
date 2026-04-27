@@ -11,6 +11,7 @@ from datetime import date as date_cls
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -524,6 +525,32 @@ async def get_sunset_timeline(
         )
 
     return SunsetTimelineResponse(entries=entries)
+
+
+@router.get("/by-repo-source", response_model=VersionSchema)
+async def get_version_by_repo_source(
+    repository_id: str = Query(..., alias="repository_id"),
+    path: str = Query(..., min_length=1),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> VersionSchema:
+    """Resolve latest revision by repository source tuple (REPO-8.2)."""
+    repository_id_value = repository_id.strip()
+    path_value = path.strip()
+    if not path_value:
+        raise HTTPException(status_code=400, detail="path is required")
+    try:
+        UUID(repository_id_value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="repository_id must be a valid UUID") from exc
+
+    version = db.get_latest_version_by_repository_source(
+        auth_data["tenant_id"],
+        repository_id_value,
+        path_value,
+    )
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found for repository source")
+    return VersionSchema(**version)
 
 
 @router.get("/{tenant_slug}/{project_id}")
