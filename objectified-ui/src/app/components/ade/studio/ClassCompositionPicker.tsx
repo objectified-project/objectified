@@ -210,12 +210,31 @@ const ChipPicker: React.FC<ChipPickerProps> = ({
         )}
       </div>
       <div ref={ref} className="relative">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setOpen((v) => !v)}
+        {/* Trigger is rendered as a div (not a button) because it contains
+            per-chip remove buttons. Nested <button>s are invalid HTML and
+            cause a hydration warning. We restore button semantics with
+            role/tabIndex/keydown so it's still keyboard-accessible. */}
+        <div
+          role="button"
+          tabIndex={disabled ? -1 : 0}
+          aria-disabled={disabled || undefined}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          onClick={() => {
+            if (disabled) return;
+            setOpen((v) => !v);
+          }}
+          onKeyDown={(e) => {
+            if (disabled) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setOpen((v) => !v);
+            } else if (e.key === 'Escape' && open) {
+              setOpen(false);
+            }
+          }}
           className={cn(
-            'w-full min-h-[40px] rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-left flex flex-wrap gap-1 items-center text-sm',
+            'w-full min-h-[40px] rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-left flex flex-wrap gap-1 items-center text-sm cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60',
             disabled && 'opacity-60 cursor-not-allowed',
           )}
         >
@@ -248,7 +267,7 @@ const ChipPicker: React.FC<ChipPickerProps> = ({
             ))
           )}
           <ChevronDown className="h-4 w-4 ml-auto text-slate-400 shrink-0" />
-        </button>
+        </div>
         {open && remaining.length > 0 && (
           <div className="absolute z-50 mt-1 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg max-h-48 overflow-auto">
             {remaining.map((opt) => (

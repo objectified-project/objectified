@@ -424,6 +424,67 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   }, [changedSections, sectionLintMap]);
 
   /**
+   * At-a-glance summary string rendered on the right of each section's
+   * header band. Mirrors the mockup's `2 of 4 fields` / `2 base · 0 alt`
+   * stat treatment. Returns undefined when a section has nothing
+   * meaningful to summarise.
+   */
+  const sectionStat = useMemo<Partial<Record<ClassSectionId, string>>>(() => {
+    const d = formData;
+    const apOn = d.additionalPropertiesType !== 'default';
+    const upOn = d.unevaluatedPropertiesType !== 'default';
+    const xmlFilled =
+      [d.xmlName, d.xmlNamespace, d.xmlPrefix].filter((v) => v.trim() !== '').length;
+    const metaFilled =
+      [d.schemaId, d.schemaAnchor, d.schemaComment].filter((v) => v.trim() !== '').length;
+    const basicsFilled =
+      (d.name.trim() ? 1 : 0) +
+      (d.description.trim() ? 1 : 0) +
+      (d.selectedTags.length > 0 ? 1 : 0) +
+      (d.deprecated ? 1 : 0);
+    const constraintsFilled =
+      (d.minProperties.trim() ? 1 : 0) + (d.maxProperties.trim() ? 1 : 0);
+    return {
+      basics: `${basicsFilled} of 4 fields`,
+      'object-constraints': `${constraintsFilled} of 2 fields`,
+      'additional-props': apOn ? d.additionalPropertiesType : 'unset',
+      'unevaluated-props': upOn ? d.unevaluatedPropertiesType : 'unset',
+      composition:
+        d.allOf.length || d.anyOf.length || d.oneOf.length
+          ? `${d.allOf.length} base · ${d.anyOf.length} alt · ${d.oneOf.length} exclusive`
+          : 'standalone',
+      'pattern-props':
+        d.patternProperties.length === 0
+          ? 'none'
+          : `${d.patternProperties.length} pattern${d.patternProperties.length === 1 ? '' : 's'}`,
+      'dependent-schemas': (() => {
+        const n = Object.keys(d.dependentSchemas).length;
+        return n === 0 ? 'none' : `${n} schema${n === 1 ? '' : 's'}`;
+      })(),
+      'dependent-required':
+        d.dependentRequired.length === 0
+          ? 'none'
+          : `${d.dependentRequired.length} rule${d.dependentRequired.length === 1 ? '' : 's'}`,
+      conditional:
+        d.conditionalRules.length === 0
+          ? 'none'
+          : `${d.conditionalRules.length} rule${d.conditionalRules.length === 1 ? '' : 's'}`,
+      examples:
+        d.examples.length === 0
+          ? '0 examples'
+          : `${d.examples.length} example${d.examples.length === 1 ? '' : 's'}`,
+      xml: xmlFilled === 0 ? 'unset' : `${xmlFilled} of 3 fields`,
+      'schema-metadata': metaFilled === 0 ? 'unset' : `${metaFilled} of 3 fields`,
+      'external-docs':
+        d.externalDocsUrl.trim() || d.externalDocsDescription.trim() ? 'set' : 'none',
+      extensions: (() => {
+        const n = Object.keys(d.extensions).length;
+        return n === 0 ? 'none' : `${n} field${n === 1 ? '' : 's'}`;
+      })(),
+    };
+  }, [formData]);
+
+  /**
    * Sections the user has explicitly opened in Advanced view. Empty
    * optional sections start collapsed; touching the section (via the
    * sidebar nav or a programmatic scroll) auto-expands it. Required
@@ -1624,20 +1685,20 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 <FormSectionNav
                   title="Sections"
                   items={[
-                    { id: 'basics', label: 'Basic Information', icon: <FileText className="h-3.5 w-3.5" />, group: 'Basics', status: sectionStatus.basics },
-                    { id: 'object-constraints', label: 'Object Constraints', icon: <Settings className="h-3.5 w-3.5" />, group: 'Validation', status: sectionStatus['object-constraints'] },
-                    { id: 'additional-props', label: 'Additional Properties', icon: <Layers className="h-3.5 w-3.5" />, group: 'Validation', status: sectionStatus['additional-props'] },
-                    { id: 'unevaluated-props', label: 'Unevaluated Properties', icon: <Layers className="h-3.5 w-3.5" />, group: 'Validation', status: sectionStatus['unevaluated-props'] },
-                    { id: 'composition', label: 'Composition', icon: <GitBranch className="h-3.5 w-3.5" />, group: 'Composition', status: sectionStatus.composition },
-                    { id: 'pattern-props', label: 'Pattern Properties', icon: <Regex className="h-3.5 w-3.5" />, group: 'Dynamic Properties', status: sectionStatus['pattern-props'] },
-                    { id: 'dependent-schemas', label: 'Dependent Schemas', icon: <Link className="h-3.5 w-3.5" />, group: 'Dynamic Properties', status: sectionStatus['dependent-schemas'] },
-                    { id: 'dependent-required', label: 'Dependent Required', icon: <ListChecks className="h-3.5 w-3.5" />, group: 'Dynamic Properties', status: sectionStatus['dependent-required'] },
-                    { id: 'conditional', label: 'Conditional Schema', icon: <GitBranch className="h-3.5 w-3.5" />, group: 'Dynamic Properties', status: sectionStatus.conditional },
+                    { id: 'basics', label: 'Basics', icon: <FileText className="h-3.5 w-3.5" />, group: 'Identity', status: sectionStatus.basics },
+                    { id: 'object-constraints', label: 'Object constraints', icon: <Settings className="h-3.5 w-3.5" />, group: 'Validation', status: sectionStatus['object-constraints'] },
+                    { id: 'additional-props', label: 'Additional props', icon: <Layers className="h-3.5 w-3.5" />, group: 'Validation', status: sectionStatus['additional-props'] },
+                    { id: 'unevaluated-props', label: 'Unevaluated props', icon: <Layers className="h-3.5 w-3.5" />, group: 'Validation', status: sectionStatus['unevaluated-props'] },
+                    { id: 'composition', label: 'Inheritance', icon: <GitBranch className="h-3.5 w-3.5" />, group: 'Composition', status: sectionStatus.composition },
+                    { id: 'pattern-props', label: 'Pattern properties', icon: <Regex className="h-3.5 w-3.5" />, group: 'Conditional & Dynamic', status: sectionStatus['pattern-props'] },
+                    { id: 'dependent-schemas', label: 'Dependent schemas', icon: <Link className="h-3.5 w-3.5" />, group: 'Conditional & Dynamic', status: sectionStatus['dependent-schemas'] },
+                    { id: 'dependent-required', label: 'Dependent required', icon: <ListChecks className="h-3.5 w-3.5" />, group: 'Conditional & Dynamic', status: sectionStatus['dependent-required'] },
+                    { id: 'conditional', label: 'If / then / else', icon: <GitBranch className="h-3.5 w-3.5" />, group: 'Conditional & Dynamic', status: sectionStatus.conditional },
                     { id: 'examples', label: 'Examples', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus.examples },
-                    { id: 'xml', label: 'XML Representation', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus.xml },
-                    { id: 'schema-metadata', label: 'Schema Metadata', icon: <FileText className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus['schema-metadata'] },
-                    { id: 'external-docs', label: 'External Docs', icon: <ExternalLink className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus['external-docs'] },
-                    { id: 'extensions', label: 'Extensions', icon: <Code className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus.extensions },
+                    { id: 'external-docs', label: 'External docs', icon: <ExternalLink className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus['external-docs'] },
+                    { id: 'schema-metadata', label: 'Schema metadata', icon: <FileText className="h-3.5 w-3.5" />, group: 'Documentation', status: sectionStatus['schema-metadata'] },
+                    { id: 'xml', label: 'XML representation', icon: <Code className="h-3.5 w-3.5" />, group: 'Advanced', status: sectionStatus.xml },
+                    { id: 'extensions', label: 'Extensions', icon: <Code className="h-3.5 w-3.5" />, group: 'Advanced', status: sectionStatus.extensions },
                   ]}
                   activeId={activeSectionId}
                   onSelect={(id) => {
@@ -1656,16 +1717,22 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 ref={advancedScrollRef}
                 className="flex-1 overflow-y-auto min-h-0"
               >
+              {/* Inner content wrapper — gives every section card consistent
+                  padding and a centered max-width so the form column doesn't
+                  sprawl when the dialog is wide. Sections render as bordered
+                  cards inside this wrapper (see FormSection). */}
+              <div className="mx-auto max-w-3xl px-6 py-5 space-y-5">
 
               {/* SECTION: Basic Information */}
               {(viewMode === 'advanced' || CLASS_WIZARD_STEPS[currentStepIndex].sections.includes('basics')) && (
               <FormSection
                 id="basics"
                 icon={<FileText size={16} />}
-                eyebrow="Identity"
-                title="Basic Information"
-                description="Name, description, tags, and deprecation metadata."
+                accent="indigo"
+                title="Basics"
+                description="Identity, description, tags, deprecation."
                 status={sectionStatus.basics}
+                stat={sectionStat.basics}
               >
                 <FormGrid cols={3} gap="md">
                   <FormFieldGroup label="Class Name" htmlFor="className" required helper="PascalCase recommended">
@@ -1765,11 +1832,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="object-constraints"
                 icon={<Settings size={16} />}
-                eyebrow="Validation"
-                title="Object Constraints"
-                description="Limits on the number of properties an instance of this class may contain."
+                accent="emerald"
+                title="Object constraints"
+                description="Min / max number of properties an instance may have."
                 badge={<Badge variant="secondary" className="text-xs">OpenAPI 3.1</Badge>}
                 status={sectionStatus['object-constraints']}
+                stat={sectionStat['object-constraints']}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('object-constraints')}
                 onExpandedChange={(next) => setSectionExpanded('object-constraints', next)}
@@ -1804,10 +1872,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="additional-props"
                 icon={<Layers size={16} />}
-                eyebrow="Validation"
-                title="Additional Properties"
-                description="Controls validation for properties not defined in the schema."
+                accent="emerald"
+                title="Additional properties"
+                description="How to handle keys not declared in this schema."
                 status={sectionStatus['additional-props']}
+                stat={sectionStat['additional-props']}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('additional-props')}
                 onExpandedChange={(next) => setSectionExpanded('additional-props', next)}
@@ -1891,10 +1960,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="unevaluated-props"
                 icon={<Layers size={16} />}
-                eyebrow="Validation"
-                title="Unevaluated Properties"
+                accent="emerald"
+                title="Unevaluated properties"
                 description="For properties not matched by allOf / oneOf / anyOf subschemas."
                 status={sectionStatus['unevaluated-props']}
+                stat={sectionStat['unevaluated-props']}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('unevaluated-props')}
                 onExpandedChange={(next) => setSectionExpanded('unevaluated-props', next)}
@@ -1978,10 +2048,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="composition"
                 icon={<GitBranch size={16} />}
-                eyebrow="Composition"
+                accent="violet"
                 title="Composition & Inheritance"
-                description="Define relationships with other classes using OpenAPI composition keywords."
+                description="Combine with other classes via allOf / anyOf / oneOf."
                 status={sectionStatus.composition}
+                stat={sectionStat.composition}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('composition')}
                 onExpandedChange={(next) => setSectionExpanded('composition', next)}
@@ -2134,10 +2205,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="pattern-props"
                 icon={<Regex size={16} />}
-                eyebrow="Dynamic Properties"
-                title="Pattern Properties"
+                accent="sky"
+                title="Pattern properties"
                 description="Define regex patterns that map dynamic property names to schemas."
                 status={sectionStatus['pattern-props']}
+                stat={sectionStat['pattern-props']}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('pattern-props')}
                 onExpandedChange={(next) => setSectionExpanded('pattern-props', next)}
@@ -2254,10 +2326,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="dependent-schemas"
                 icon={<Link size={16} />}
-                eyebrow="Dynamic Properties"
-                title="Dependent Schemas"
+                accent="sky"
+                title="Dependent schemas"
                 description="Apply additional constraints conditionally when a property has a specific value."
                 status={sectionStatus['dependent-schemas']}
+                stat={sectionStat['dependent-schemas']}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('dependent-schemas')}
                 onExpandedChange={(next) => setSectionExpanded('dependent-schemas', next)}
@@ -2554,10 +2627,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="dependent-required"
                 icon={<ListChecks size={16} />}
-                eyebrow="Dynamic Properties"
-                title="Dependent Required"
+                accent="sky"
+                title="Dependent required"
                 description="When a trigger property is present, other properties become required."
                 status={sectionStatus['dependent-required']}
+                stat={sectionStat['dependent-required']}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('dependent-required')}
                 onExpandedChange={(next) => setSectionExpanded('dependent-required', next)}
@@ -2638,10 +2712,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="conditional"
                 icon={<GitBranch size={16} />}
-                eyebrow="Dynamic Properties"
-                title="Conditional Schema"
-                description="Apply branching validation rules using if / then / else."
+                accent="sky"
+                title="If / then / else rules"
+                description="Branch validation depending on property values."
                 status={sectionStatus.conditional}
+                stat={sectionStat.conditional}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('conditional')}
                 onExpandedChange={(next) => setSectionExpanded('conditional', next)}
@@ -2667,11 +2742,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="examples"
                 icon={<Code size={16} />}
-                eyebrow="Documentation"
+                accent="amber"
                 title="Examples"
-                description="Add example instances of this class schema (JSON format)."
+                description="Example instances of this class. Improves SDKs and docs."
                 badge={<Badge variant="secondary" className="text-xs">JSON Schema</Badge>}
                 status={sectionStatus.examples}
+                stat={sectionStat.examples}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('examples')}
                 onExpandedChange={(next) => setSectionExpanded('examples', next)}
@@ -2720,12 +2796,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="xml"
                 icon={<Code size={16} />}
-                eyebrow="Documentation"
-                title="XML Representation"
+                accent="orange"
+                title="XML representation"
                 description="Configure how this class is serialized to XML."
                 badge={<Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">OpenAPI 3.1</Badge>}
-                accent="orange"
                 status={sectionStatus.xml}
+                stat={sectionStat.xml}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('xml')}
                 onExpandedChange={(next) => setSectionExpanded('xml', next)}
@@ -2764,11 +2840,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="schema-metadata"
                 icon={<FileText size={16} />}
-                eyebrow="Documentation"
-                title="Schema Metadata"
+                accent="slate"
+                title="Schema metadata"
                 description="Advanced schema identification and authoring metadata."
                 badge={<Badge variant="secondary" className="text-xs">JSON Schema 2020-12</Badge>}
                 status={sectionStatus['schema-metadata']}
+                stat={sectionStat['schema-metadata']}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('schema-metadata')}
                 onExpandedChange={(next) => setSectionExpanded('schema-metadata', next)}
@@ -2806,10 +2883,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="external-docs"
                 icon={<ExternalLink size={16} />}
-                eyebrow="Documentation"
-                title="External Documentation"
+                accent="amber"
+                title="External documentation"
                 description="Link out to human-readable docs, tutorials, or spec references."
                 status={sectionStatus['external-docs']}
+                stat={sectionStat['external-docs']}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('external-docs')}
                 onExpandedChange={(next) => setSectionExpanded('external-docs', next)}
@@ -2840,10 +2918,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <FormSection
                 id="extensions"
                 icon={<Code size={16} />}
-                eyebrow="Documentation"
-                title="Custom Extensions"
+                accent="purple"
+                title="Custom extensions"
                 description="Add x- prefixed vendor extensions for tooling and codegen."
                 status={sectionStatus.extensions}
+                stat={sectionStat.extensions}
                 collapsible={viewMode === 'advanced'}
                 expanded={isSectionExpanded('extensions')}
                 onExpandedChange={(next) => setSectionExpanded('extensions', next)}
@@ -2855,6 +2934,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 />
               </FormSection>
               )}
+
+              </div>{/* /inner form content wrapper */}
 
               {/* Guided-mode wizard controls, rendered inside the scroll pane */}
               {viewMode === 'guided' && (

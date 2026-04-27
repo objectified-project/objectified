@@ -23,7 +23,10 @@ const ACCENT_ICON: Record<AccentColor, string> = {
   amber: 'text-amber-500 dark:text-amber-400',
   orange: 'text-orange-500 dark:text-orange-400',
   purple: 'text-purple-500 dark:text-purple-400',
+  violet: 'text-violet-500 dark:text-violet-400',
   emerald: 'text-emerald-500 dark:text-emerald-400',
+  sky: 'text-sky-500 dark:text-sky-400',
+  rose: 'text-rose-500 dark:text-rose-400',
   slate: 'text-slate-500 dark:text-slate-400',
 };
 
@@ -32,11 +35,40 @@ const ACCENT_EYEBROW: Record<AccentColor, string> = {
   amber: 'text-amber-600 dark:text-amber-400',
   orange: 'text-orange-600 dark:text-orange-400',
   purple: 'text-purple-600 dark:text-purple-400',
+  violet: 'text-violet-600 dark:text-violet-300',
   emerald: 'text-emerald-600 dark:text-emerald-400',
+  sky: 'text-sky-600 dark:text-sky-300',
+  rose: 'text-rose-600 dark:text-rose-400',
   slate: 'text-slate-500 dark:text-slate-400',
 };
 
-export type AccentColor = 'indigo' | 'amber' | 'orange' | 'purple' | 'emerald' | 'slate';
+/**
+ * Background + text classes for the small icon swatch tile that sits at
+ * the start of every section header. Tints are intentionally muted so a
+ * dialog full of swatches doesn't read as "every section is a callout".
+ */
+const ACCENT_SWATCH: Record<AccentColor, string> = {
+  indigo: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300',
+  amber: 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300',
+  orange: 'bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-300',
+  purple: 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300',
+  violet: 'bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300',
+  emerald: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300',
+  sky: 'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300',
+  rose: 'bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300',
+  slate: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+};
+
+export type AccentColor =
+  | 'indigo'
+  | 'amber'
+  | 'orange'
+  | 'purple'
+  | 'violet'
+  | 'emerald'
+  | 'sky'
+  | 'rose'
+  | 'slate';
 
 /**
  * Per-section status used by the dot-state nav and the collapsed-stub
@@ -61,6 +93,12 @@ export interface FormSectionProps {
   badge?: React.ReactNode;
   /** Right-aligned header slot, typically an "Add" button. */
   action?: React.ReactNode;
+  /**
+   * Tiny right-aligned summary rendered next to (or instead of) `action`.
+   * Use for at-a-glance counts like `2 of 4 fields` or `2 base · 0 alt`.
+   * Rendered in mono so it matches the mockup's "stat" treatment.
+   */
+  stat?: React.ReactNode;
   /** Subtle amber ring and dot signalling this section contains non-default values. */
   changed?: boolean;
   /**
@@ -116,6 +154,7 @@ export const FormSection = React.forwardRef<HTMLElement, FormSectionProps>(
       description,
       badge,
       action,
+      stat,
       changed,
       status,
       accent = 'indigo',
@@ -161,13 +200,87 @@ export const FormSection = React.forwardRef<HTMLElement, FormSectionProps>(
         />
       ) : null;
 
-    const showEdgeStripe = effectiveStatus !== 'empty';
-    const stripeClass =
-      effectiveStatus === 'error'
-        ? 'before:bg-rose-400/80'
+    // Card chrome varies with status so warn/error sections read as
+    // callouts (matching the amber Examples card in the mockup) and empty
+    // collapsed stubs read as dashed placeholders.
+    const isCollapsedStub = collapsible && !expanded;
+    const cardChrome = isCollapsedStub
+      ? 'border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/30 hover:border-indigo-300 dark:hover:border-indigo-700/60'
+      : effectiveStatus === 'error'
+        ? 'border-rose-200 dark:border-rose-800/50 bg-rose-50/40 dark:bg-rose-900/10'
         : effectiveStatus === 'warn'
-          ? 'before:bg-amber-500/80'
-          : 'before:bg-amber-400/80';
+          ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50/40 dark:bg-amber-900/10'
+          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60';
+
+    const headerBandPadding = dense ? 'px-4 py-3' : 'px-5 py-3.5';
+    const stubHeaderPadding = dense ? 'px-4 py-2.5' : 'px-5 py-3';
+    const bodyPadding = dense ? 'p-4' : 'p-5';
+
+    const swatchTone = isCollapsedStub
+      ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+      : ACCENT_SWATCH[accent];
+
+    const renderSwatch = () =>
+      icon ? (
+        <span
+          className={cn(
+            'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
+            swatchTone,
+          )}
+          aria-hidden
+        >
+          <span className="flex h-4 w-4 items-center justify-center">{icon}</span>
+        </span>
+      ) : null;
+
+    const titleBlock = (
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        {renderSwatch()}
+        <div className="min-w-0 flex-1">
+          {eyebrow && (
+            <span
+              className={cn(
+                'block text-[10px] font-semibold uppercase tracking-[0.12em] leading-none mb-0.5',
+                ACCENT_EYEBROW[accent],
+              )}
+            >
+              {eyebrow}
+            </span>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <h3
+              className={cn(
+                'text-sm font-semibold leading-5 tracking-[-0.005em]',
+                isCollapsedStub
+                  ? 'text-slate-700 dark:text-slate-300'
+                  : 'text-slate-900 dark:text-slate-100',
+              )}
+            >
+              {title}
+            </h3>
+            {renderDot()}
+            {badge && <span className="ml-0.5 flex items-center">{badge}</span>}
+          </div>
+          {description && !isCollapsedStub && (
+            <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              {description}
+            </p>
+          )}
+          {description && isCollapsedStub && (
+            <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400 line-clamp-1">
+              {description}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+
+    const renderStat = () =>
+      stat ? (
+        <span className="hidden sm:inline-flex shrink-0 items-center text-[10px] font-mono text-slate-400 dark:text-slate-500">
+          {stat}
+        </span>
+      ) : null;
 
     return (
       <section
@@ -175,145 +288,98 @@ export const FormSection = React.forwardRef<HTMLElement, FormSectionProps>(
         id={id}
         data-section-id={id}
         data-section-status={effectiveStatus}
-        data-section-collapsed={collapsible && !expanded ? 'true' : undefined}
+        data-section-collapsed={isCollapsedStub ? 'true' : undefined}
         className={cn(
-          'relative scroll-mt-24 border-b border-slate-200 dark:border-slate-800 last:border-b-0',
-          collapsible && !expanded
-            ? dense
-              ? 'px-6 py-3'
-              : 'px-8 py-4'
-            : dense
-              ? 'px-6 py-5'
-              : 'px-8 py-7',
-          showEdgeStripe &&
-            cn(
-              'before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full',
-              stripeClass,
-            ),
+          'relative scroll-mt-24 rounded-xl border transition-colors',
+          cardChrome,
           className,
         )}
       >
-        {collapsible ? (
+        {isCollapsedStub ? (
           <button
             type="button"
             onClick={toggle}
-            aria-expanded={expanded}
+            aria-expanded={false}
             className={cn(
-              'group flex w-full items-start justify-between gap-x-6 gap-y-2 text-left rounded-md',
-              expanded ? 'mb-5' : 'mb-0',
-              'hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors',
+              'group flex w-full items-center justify-between gap-3 text-left rounded-xl',
+              stubHeaderPadding,
+              'hover:bg-white/60 dark:hover:bg-slate-800/40 transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60',
-              '-mx-2 px-2 py-1',
               headerClassName,
             )}
           >
-            <span className="flex min-w-0 flex-1 flex-col gap-1">
-              {eyebrow && (
-                <span
-                  className={cn(
-                    'text-[11px] font-semibold uppercase tracking-[0.1em]',
-                    ACCENT_EYEBROW[accent],
-                  )}
-                >
-                  {eyebrow}
-                </span>
-              )}
-              <span className="flex flex-wrap items-center gap-2">
-                <span
-                  className={cn(
-                    'inline-flex h-4 w-4 shrink-0 items-center justify-center text-slate-400',
-                    expanded ? 'rotate-0' : 'group-hover:translate-x-0.5 transition-transform',
-                  )}
-                  aria-hidden
-                >
-                  {expanded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </span>
-                {icon && (
-                  <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center', ACCENT_ICON[accent])}>
-                    {icon}
-                  </span>
-                )}
-                <h3 className="text-base font-semibold leading-6 tracking-[-0.01em] text-slate-900 dark:text-slate-100">
-                  {title}
-                </h3>
-                {renderDot()}
-                {badge && <span className="ml-1 flex items-center">{badge}</span>}
-              </span>
-              {description && expanded && (
-                <span className="mt-1 max-w-3xl block text-sm leading-5 text-slate-500 dark:text-slate-400">
-                  {description}
-                </span>
-              )}
-              {!expanded && (
-                <span className="text-[12px] leading-5 text-slate-500 dark:text-slate-400 inline-flex items-center gap-1">
-                  {effectiveStatus === 'empty' ? (
-                    <>
-                      <Plus className="h-3 w-3" />
-                      Configure
-                    </>
-                  ) : effectiveStatus === 'error' ? (
-                    'Has a validation error — click to fix'
-                  ) : effectiveStatus === 'warn' ? (
-                    'Has a recommendation — click to review'
-                  ) : (
-                    'Configured · click to edit'
-                  )}
-                </span>
-              )}
-            </span>
-            {action && expanded && (
+            {titleBlock}
+            <span className="flex shrink-0 items-center gap-2">
+              {renderStat()}
               <span
-                className="flex shrink-0 items-center gap-2"
-                onClick={(e) => e.stopPropagation()}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors',
+                  effectiveStatus === 'empty'
+                    ? 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 group-hover:border-indigo-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-300'
+                    : effectiveStatus === 'error'
+                      ? 'border-rose-300 dark:border-rose-700/60 text-rose-600 dark:text-rose-300'
+                      : effectiveStatus === 'warn'
+                        ? 'border-amber-300 dark:border-amber-700/60 text-amber-700 dark:text-amber-300'
+                        : 'border-indigo-200 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-300',
+                )}
               >
-                {action}
+                {effectiveStatus === 'empty' ? (
+                  <>
+                    <Plus className="h-3 w-3" />
+                    Configure
+                  </>
+                ) : effectiveStatus === 'error' ? (
+                  'Fix'
+                ) : effectiveStatus === 'warn' ? (
+                  'Review'
+                ) : (
+                  'Edit'
+                )}
               </span>
-            )}
+              <ChevronRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5" />
+            </span>
           </button>
         ) : (
-          <header
-            className={cn(
-              'mb-5 flex flex-wrap items-start justify-between gap-x-6 gap-y-2',
-              headerClassName,
-            )}
-          >
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              {eyebrow && (
-                <span
-                  className={cn(
-                    'text-[11px] font-semibold uppercase tracking-[0.1em]',
-                    ACCENT_EYEBROW[accent],
-                  )}
-                >
-                  {eyebrow}
-                </span>
+          <>
+            <header
+              className={cn(
+                'flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b',
+                effectiveStatus === 'error'
+                  ? 'border-rose-100 dark:border-rose-800/40'
+                  : effectiveStatus === 'warn'
+                    ? 'border-amber-100 dark:border-amber-800/40'
+                    : 'border-slate-100 dark:border-slate-700/60',
+                headerBandPadding,
+                collapsible &&
+                  'cursor-pointer hover:bg-slate-50/40 dark:hover:bg-slate-800/30 transition-colors rounded-t-xl',
+                headerClassName,
               )}
-              <div className="flex flex-wrap items-center gap-2">
-                {icon && (
-                  <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center', ACCENT_ICON[accent])}>
-                    {icon}
-                  </span>
+              onClick={collapsible ? toggle : undefined}
+              role={collapsible ? 'button' : undefined}
+              aria-expanded={collapsible ? expanded : undefined}
+            >
+              {titleBlock}
+              <div
+                className="flex shrink-0 items-center gap-3"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {renderStat()}
+                {action && <div className="flex items-center gap-2">{action}</div>}
+                {collapsible && (
+                  <button
+                    type="button"
+                    onClick={toggle}
+                    className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                    aria-label="Collapse section"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
                 )}
-                <h3 className="text-base font-semibold leading-6 tracking-[-0.01em] text-slate-900 dark:text-slate-100">
-                  {title}
-                </h3>
-                {renderDot()}
-                {badge && <span className="ml-1 flex items-center">{badge}</span>}
               </div>
-              {description && (
-                <p className="mt-1 max-w-3xl text-sm leading-5 text-slate-500 dark:text-slate-400">
-                  {description}
-                </p>
-              )}
-            </div>
-            {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
-          </header>
+            </header>
+            <div className={cn(bodyPadding, 'space-y-4', bodyClassName)}>{children}</div>
+          </>
         )}
-        {expanded && <div className={cn('space-y-5', bodyClassName)}>{children}</div>}
       </section>
     );
   },
