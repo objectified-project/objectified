@@ -2442,6 +2442,62 @@ def test_repository_attention_full_name_uses_rid_when_owner_or_name_missing() ->
     assert items["repo-only-name"] == "myrepo"
 
 
+def test_repository_attention_detail_requires_repository_read_scope() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        response = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/00000000-0000-0000-0000-000000000001/attention"
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "REPOSITORY_SCOPE_REQUIRED"
+
+
+def test_repository_attention_detail_404() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    try:
+        r = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/00000000-0000-0000-0000-000000000099/attention"
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+    assert r.status_code == 404
+
+
+def test_repository_attention_detail_shape() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        reg = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000001",
+                "provider": "github",
+                "owner": "acme",
+                "name": "attention-ui",
+                "branches": [{"branch": "main", "subpathGlob": "specs/**"}],
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+    assert reg.status_code == 201, reg.text
+    repository_id = reg.json()["repository"]["id"]
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    try:
+        r = client.get(f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/attention")
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["reasons"] == []
+    assert body["items"] == []
+    assert "openCount" in body
+    assert "attentionScore" in body
+    assert "lastChangeAt" in body
+    assert "refreshedAt" in body
+    assert body["attentionScore"] == 0
+
+
 def test_recent_imports_attention_requires_repository_read_scope() -> None:
     app.dependency_overrides[validate_authentication] = _override_auth
     try:
