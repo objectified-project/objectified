@@ -6609,12 +6609,6 @@ class Database:
         v = rows[0].get("change_report_template_version_id")
         return str(v) if v is not None else None
 
-    def _sql_text_array_literal(self, values: List[str]) -> str:
-        """Build ARRAY['a','b']::text[] for trusted enum reason strings (REPO-11.1 / #2941)."""
-        parts = ["'" + (v or "").replace("'", "''") + "'" for v in values]
-        if not parts:
-            return "ARRAY[]::text[]"
-        return "ARRAY[" + ",".join(parts) + "]::text[]"
 
     def max_consecutive_failures_for_repository(self, repository_id: str) -> int:
         """Largest odb.repository_branch.consecutive_failures for a repository (0 if N/A / schema missing)."""
@@ -6681,12 +6675,11 @@ class Database:
             "import_failed",
         }
         rsort = sorted({r for r in reasons if r in _ok_reasons})
-        ar_sql = self._sql_text_array_literal(rsort)
-        full_q = f"""
+        full_q = """
             INSERT INTO odb.repository_attention (
                 repository_id, computed_at, reasons, open_count, attention_score, last_change_at
             ) VALUES (
-                %s::uuid, %s::timestamptz, {ar_sql}, %s, %s, %s::timestamptz
+                %s::uuid, %s::timestamptz, %s::text[], %s, %s, %s::timestamptz
             )
             ON CONFLICT (repository_id) DO UPDATE SET
                 computed_at = EXCLUDED.computed_at,
@@ -6708,6 +6701,7 @@ class Database:
                         (
                             repository_id,
                             computed_at,
+                            rsort,
                             open_count,
                             int(attention_score),
                             last_change_at,

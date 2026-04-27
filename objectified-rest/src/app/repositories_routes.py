@@ -1401,7 +1401,7 @@ def _recompute_repository_attention(tenant_id: str, repository_id: str) -> None:
     }
     with _STORE_LOCK:
         _REPO_ATTENTION[repository_id] = row
-    if "PYTEST_CURRENT_TEST" not in os.environ:
+    if "PYTEST_CURRENT_TEST" not in os.environ and not unchanged:
         try:
             wrote = db.upsert_repository_attention(
                 repository_id=repository_id,
@@ -2544,9 +2544,8 @@ def _materialize_repository_dry_run_import_job(
     _REPO_CHANGE_REPORT_STORE.setdefault(repository_id, []).insert(0, change_report)
     file_row.lastImportJobId = import_job.id
     if import_job.state == "committed" and not failure_message:
-        c0 = _normalize_content_checksum(file_row.contentChecksum) or file_row.contentChecksum
-        if c0:
-            file_row.lastImportedContentChecksum = c0
+        c0 = _normalize_content_checksum(file_row.contentChecksum)
+        file_row.lastImportedContentChecksum = c0
         file_row.staleMismatchAt = None
 
     pending_audit_rows: List[Dict[str, Any]] = []
