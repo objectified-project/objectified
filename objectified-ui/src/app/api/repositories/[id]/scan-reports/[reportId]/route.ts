@@ -31,13 +31,13 @@ async function resolveAuthContext() {
 
 export async function GET(
   _request: NextRequest,
-  context: { params: Promise<{ repositoryId: string }> },
+  context: { params: Promise<{ id: string; reportId: string }> },
 ) {
   try {
     const auth = await resolveAuthContext();
     if ('error' in auth) return auth.error;
-    const { repositoryId } = await context.params;
-    const url = `${REST_API_BASE_URL}/repositories/${encodeURIComponent(auth.tenantSlug)}/${encodeURIComponent(repositoryId)}/scan-reports`;
+    const { id, reportId } = await context.params;
+    const url = `${REST_API_BASE_URL}/repositories/${encodeURIComponent(auth.tenantSlug)}/${encodeURIComponent(id)}/scan-reports/${encodeURIComponent(reportId)}`;
     const response = await fetch(url, { method: 'GET', headers: createRestAuthHeaders(auth.sessionUser) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -50,7 +50,7 @@ export async function GET(
             ? String((asObj as { message?: string }).message ?? 'Request failed')
             : typeof data.detail === 'string'
               ? data.detail
-              : 'Failed to load scan reports';
+              : 'Failed to load scan report';
       return NextResponse.json(
         { success: false, error: detailMessage },
         { status: response.status },
