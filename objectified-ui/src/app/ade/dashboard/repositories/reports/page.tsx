@@ -51,6 +51,7 @@ type ScanReportRow = {
   branchCount: number;
   lastScanAt: string | null;
   lastScanId: string | null;
+  lastReportId: string | null;
   totals: ScanReportTotals | null;
   attentionScore: number;
   stale: boolean;
@@ -369,13 +370,14 @@ export default function ScanReportsPage() {
                       const f0 = t?.failing ?? (t?.parseError ?? 0) + (t?.manifestError ?? 0);
                       const s0 = t?.awaitingSelection ?? 0;
                       const att = attentionCell(item);
+                      const reportSegment = item.lastReportId || item.lastScanId;
                       return (
                         <tr key={item.repositoryId} className="border-t border-gray-200/60 dark:border-slate-600/30">
                           <td className="px-3 py-2.5">
-                            {item.lastScanId ? (
+                            {reportSegment ? (
                               <Link
                                 className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-                                href={`/ade/dashboard/repositories/${item.repositoryId}/reports/${item.lastScanId}`}
+                                href={`/ade/dashboard/repositories/${item.repositoryId}/reports/${reportSegment}`}
                               >
                                 {item.fullName}
                               </Link>
@@ -413,10 +415,10 @@ export default function ScanReportsPage() {
                           </td>
                           <td className="px-3 py-2.5">
                             <div className="flex gap-2">
-                              {item.lastScanId ? (
+                              {reportSegment ? (
                                 <Link
                                   className={buttonVariants({ size: 'sm', variant: 'ghost' })}
-                                  href={`/ade/dashboard/repositories/${item.repositoryId}/reports/${item.lastScanId}`}
+                                  href={`/ade/dashboard/repositories/${item.repositoryId}/reports/${reportSegment}`}
                                 >
                                   Open report
                                 </Link>
