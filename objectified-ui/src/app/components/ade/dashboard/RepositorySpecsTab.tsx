@@ -14,7 +14,9 @@ import {
   MoreHorizontal,
   X,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/app/components/ui/Button';
+import ConfirmDialog from '@/app/components/dialogs/ConfirmDialog';
 import { Input } from '@/app/components/ui/Input';
 import { Switch } from '@/app/components/ui/Switch';
 import { RepositorySpecDetailDrawer } from './RepositorySpecDetailDrawer';
@@ -96,6 +98,74 @@ const filterToServerStatus: Record<SpecFilter, RepositorySpecStatus[] | null> = 
   failing: ['parse_error', 'manifest_error'],
   awaiting_selection: ['not_imported'],
 };
+
+/** REPO-9.7: client-only filters (must match `filteredSpecs` in the list). */
+export function matchesListFilter(
+  row: Pick<RepositorySpecRecord, 'status' | 'confidence' | 'importEnabled'>,
+  filter: SpecFilter,
+  minConf: number,
+): boolean {
+  if (filter === 'importable') {
+    return (row.confidence ?? 0) >= minConf;
+  }
+  if (filter === 'failing') {
+    return row.status === 'parse_error' || row.status === 'manifest_error';
+  }
+  return true;
+}
+
+const BULK_MAX = 500;
+
+function mergeBulkResponseIntoList(
+  current: RepositorySpecRecord[],
+  updated: RepositorySpecRecord[],
+): RepositorySpecRecord[] {
+  const fromResponse = new Map(updated.map((u) => [u.fileId, u]));
+  const had = new Set(current.map((c) => c.fileId));
+  const next: RepositorySpecRecord[] = current.map(
+    (c) => fromResponse.get(c.fileId) ?? c,
+  );
+  for (const u of updated) {
+    if (!had.has(u.fileId)) {
+      next.push(u);
+    }
+  }
+  return next;
+}
+
+function applyOptimisticBulk(
+  rows: RepositorySpecRecord[],
+  ids: Set<string>,
+  payload: { importEnabled?: boolean; autoImportEnabled?: boolean },
+): RepositorySpecRecord[] {
+  return rows.map((row) => {
+    if (!ids.has(row.fileId)) return row;
+    let { importEnabled, autoImportEnabled } = row;
+    if (payload.importEnabled === true) {
+      importEnabled = true;
+    }
+    if (payload.importEnabled === false) {
+      importEnabled = false;
+      autoImportEnabled = false;
+    }
+    if (payload.autoImportEnabled === true) {
+      autoImportEnabled = true;
+    }
+    if (payload.autoImportEnabled === false) {
+      autoImportEnabled = false;
+    }
+    return { ...row, importEnabled, autoImportEnabled };
+  });
+}
+
+function chunkIds(ids: string[], size: number): string[][] {
+  if (ids.length === 0) return [];
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) {
+    out.push(ids.slice(i, i + size));
+  }
+  return out;
+}
 
 const formatPillClass: Record<string, string> = {
   openapi_3_0: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
@@ -199,9 +269,14 @@ export function RepositorySpecsTab({
   const [selectedSpec, setSelectedSpec] = useState<RepositorySpecRecord | null>(null);
   const [pendingPatchIds, setPendingPatchIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  /** REPO-9.7: rows from "Select all matching filter" (and other off-canvas IDs) for import/imported state. */
+  const [extraRowById, setExtraRowById] = useState<Record<string, RepositorySpecRecord>>({});
+  const [confirmDisableImportOpen, setConfirmDisableImportOpen] = useState(false);
   const [isBulkPending, setIsBulkPending] = useState(false);
+  const [isSelectAllMatchingPending, setIsSelectAllMatchingPending] = useState(false);
   const importNowEarlyRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const importNowLateRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectionScopeKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (initialBranch && initialBranch !== branch) {
@@ -214,6 +289,19 @@ export function RepositorySpecsTab({
       setFilter(initialFilter);
     }
   }, [initialFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const k = `${branch}||${filter}`;
+    if (selectionScopeKeyRef.current === null) {
+      selectionScopeKeyRef.current = k;
+      return;
+    }
+    if (selectionScopeKeyRef.current !== k) {
+      setSelectedIds(new Set());
+      setExtraRowById({});
+      selectionScopeKeyRef.current = k;
+    }
+  }, [branch, filter]);
 
   // Sync the parent's `?fileId=` query param when the drawer opens or closes.
   useEffect(() => {
@@ -261,14 +349,6 @@ export function RepositorySpecsTab({
         rows = rows.filter((row) => row.status === 'parse_error' || row.status === 'manifest_error');
       }
       setSpecs(rows);
-      setSelectedIds((prev) => {
-        const validIds = new Set(rows.map((row) => row.fileId));
-        const next = new Set<string>();
-        prev.forEach((id) => {
-          if (validIds.has(id)) next.add(id);
-        });
-        return next;
-      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load specs';
       setErrorMessage(message);
@@ -280,6 +360,112 @@ export function RepositorySpecsTab({
   useEffect(() => {
     void loadSpecs();
   }, [loadSpecs]);
+
+  useEffect(() => {
+    if (specs.length === 0) return;
+    setExtraRowById((prev) => {
+      if (Object.keys(prev).length === 0) return prev;
+      const inSpec = new Set(specs.map((r) => r.fileId));
+      const n = { ...prev };
+      let changed = false;
+      for (const k of Object.keys(n)) {
+        if (inSpec.has(k)) {
+          delete n[k];
+          changed = true;
+        }
+      }
+      return changed ? n : prev;
+    });
+  }, [specs]);
+
+  const rowForSelection = useCallback(
+    (fileId: string) => specs.find((r) => r.fileId === fileId) ?? extraRowById[fileId] ?? null,
+    [specs, extraRowById],
+  );
+
+  const selectedCanSetAutoImport = useMemo(() => {
+    if (selectedIds.size === 0) return false;
+    for (const id of selectedIds) {
+      const row = rowForSelection(id);
+      if (!row?.importEnabled) return false;
+    }
+    return true;
+  }, [rowForSelection, selectedIds]);
+
+  const disableImportAffectsImported = useMemo(() => {
+    for (const id of selectedIds) {
+      const row = rowForSelection(id);
+      if (row && (row.status === 'imported' || row.lastImportedVersionId)) {
+        return true;
+      }
+    }
+    return false;
+  }, [rowForSelection, selectedIds]);
+
+  const fetchFileIdsMatchingCurrentFilter = useCallback(async () => {
+    const collected: RepositorySpecRecord[] = [];
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    for (;;) {
+      const params = new URLSearchParams();
+      params.set('limit', '200');
+      params.set('min_confidence', String(minImportableConfidence));
+      if (branch) params.set('branch', branch);
+      if (search.trim()) params.set('search', search.trim());
+      const serverStatuses = filterToServerStatus[filter];
+      if (serverStatuses && serverStatuses.length === 1) {
+        params.set('status', serverStatuses[0]);
+      }
+      if (cursor) params.set('cursor', cursor);
+      const response = await fetch(`/api/repositories/${repositoryId}/specs?${params.toString()}`);
+      const data = (await response.json()) as SpecsResponse;
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to list specs for selection');
+      }
+      const items = Array.isArray(data.items) ? data.items : [];
+      for (const row of items) {
+        if (!matchesListFilter(row, filter, minImportableConfidence)) continue;
+        if (seen.has(row.fileId)) continue;
+        seen.add(row.fileId);
+        collected.push(row);
+        if (collected.length >= BULK_MAX) {
+          return { records: collected, hitCap: true };
+        }
+      }
+      const next = data.nextCursor;
+      if (!next) {
+        return { records: collected, hitCap: false };
+      }
+      cursor = next;
+    }
+  }, [branch, filter, repositoryId, search]);
+
+  const handleSelectAllMatchingFilter = useCallback(async () => {
+    setIsSelectAllMatchingPending(true);
+    setErrorMessage('');
+    try {
+      const { records, hitCap } = await fetchFileIdsMatchingCurrentFilter();
+      setSelectedIds(new Set(records.map((r) => r.fileId)));
+      setExtraRowById(Object.fromEntries(records.map((r) => [r.fileId, r])));
+      if (records.length === 0) {
+        toast.info('No specs match the current filter on this branch.');
+        return;
+      }
+      if (hitCap) {
+        toast.info(
+          `Selected first ${BULK_MAX} file(s) (bulk update limit). Narrow the filter to target fewer rows.`,
+        );
+      } else {
+        toast.success(`Selected ${records.length} file(s) matching the current filter.`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to list specs';
+      setErrorMessage(message);
+      toast.error(message);
+    } finally {
+      setIsSelectAllMatchingPending(false);
+    }
+  }, [fetchFileIdsMatchingCurrentFilter]);
 
   /**
    * Optimistically PATCH a single spec selection. Rolls back on REST 4xx by
@@ -354,37 +540,72 @@ export function RepositorySpecsTab({
     [patchSpec],
   );
 
-  const handleBulkUpdate = useCallback(
+  const bulkOptSnapshotRef = useRef<RepositorySpecRecord[] | null>(null);
+
+  const runBulkUpdate = useCallback(
     async (payload: { importEnabled?: boolean; autoImportEnabled?: boolean }) => {
-      const ids = Array.from(selectedIds);
-      if (ids.length === 0) return;
+      const allIds = Array.from(selectedIds);
+      if (allIds.length === 0) return;
+      const idChunks = chunkIds(allIds, BULK_MAX);
       setIsBulkPending(true);
       setErrorMessage('');
       setSuccessMessage('');
       setImportNowJobId(null);
+      setSpecs((c) => {
+        bulkOptSnapshotRef.current = c.map((r) => ({ ...r }));
+        return applyOptimisticBulk(c, selectedIds, payload);
+      });
       try {
-        const response = await fetch(`/api/repositories/${repositoryId}/specs/bulk-update`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileIds: ids, ...payload }),
-        });
-        const data = (await response.json()) as SpecBulkResponse;
-        if (!response.ok || !data.success) {
-          throw new Error(data.error || data.detail?.message || 'Failed to bulk update specs');
+        for (const chunk of idChunks) {
+          const response = await fetch(`/api/repositories/${repositoryId}/specs/bulk-update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileIds: chunk, ...payload }),
+          });
+          const data = (await response.json()) as SpecBulkResponse;
+          if (!response.ok || !data.success) {
+            const d = data.detail as { message?: string; code?: string } | null | string | undefined;
+            const fromDetail =
+              typeof d === 'object' && d && 'message' in d && typeof d.message === 'string'
+                ? d.message
+                : null;
+            throw new Error(
+              (typeof d === 'string' ? d : fromDetail) ||
+                (typeof data.error === 'string' ? data.error : null) ||
+                'Failed to bulk update specs',
+            );
+          }
+          const updated = Array.isArray(data.items) ? data.items : [];
+          setSpecs((c) => mergeBulkResponseIntoList(c, updated));
         }
-        const updated = Array.isArray(data.items) ? data.items : [];
-        const updatedById = new Map(updated.map((row) => [row.fileId, row]));
-        setSpecs((current) => current.map((row) => updatedById.get(row.fileId) ?? row));
-        setSuccessMessage(`Updated ${data.updatedCount ?? updated.length} spec(s).`);
+        toast.success(`Updated ${allIds.length} spec(s).`);
+        setSelectedIds(new Set());
+        setExtraRowById({});
+        bulkOptSnapshotRef.current = null;
       } catch (error) {
+        const snap = bulkOptSnapshotRef.current;
+        if (snap) {
+          setSpecs(snap);
+          bulkOptSnapshotRef.current = null;
+        }
         const message = error instanceof Error ? error.message : 'Failed to bulk update specs';
         setErrorMessage(message);
+        toast.error(message, { id: 'spec-bulk-error' });
       } finally {
         setIsBulkPending(false);
       }
     },
     [repositoryId, selectedIds],
   );
+
+  const requestBulkDisableImport = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    if (disableImportAffectsImported) {
+      setConfirmDisableImportOpen(true);
+      return;
+    }
+    void runBulkUpdate({ importEnabled: false });
+  }, [disableImportAffectsImported, runBulkUpdate, selectedIds]);
 
   const handleImportNow = useCallback(
     async (spec: RepositorySpecRecord) => {
@@ -551,42 +772,74 @@ export function RepositorySpecsTab({
 
       {selectedIds.size > 0 ? (
         <div
-          className="mx-5 rounded-md border border-indigo-200 dark:border-indigo-700/40 bg-indigo-50/70 dark:bg-indigo-900/20 px-3 py-2 text-xs flex flex-wrap items-center gap-2"
+          className="sticky top-0 z-30 mx-3 sm:mx-5 rounded-md border border-indigo-200 dark:border-indigo-700/40 bg-indigo-50/90 dark:bg-indigo-900/30 supports-[backdrop-filter]:backdrop-blur-sm px-3 py-2 text-xs flex flex-wrap items-center gap-2 shadow-sm"
           data-testid="spec-bulk-bar"
         >
           <span className="font-mono">{selectedIds.size} selected</span>
           <span className="text-gray-500">·</span>
           <Button
+            type="button"
             size="sm"
             variant="outline"
             disabled={isBulkPending}
-            onClick={() => void handleBulkUpdate({ importEnabled: true })}
+            onClick={() => void runBulkUpdate({ importEnabled: true })}
             data-testid="spec-bulk-enable-import"
           >
             Enable import
           </Button>
           <Button
+            type="button"
             size="sm"
             variant="outline"
             disabled={isBulkPending}
-            onClick={() => void handleBulkUpdate({ importEnabled: false })}
+            onClick={requestBulkDisableImport}
             data-testid="spec-bulk-disable-import"
           >
             Disable import
           </Button>
           <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isBulkPending || !selectedCanSetAutoImport}
+            title={
+              !selectedCanSetAutoImport
+                ? 'Set auto-import only when import is already enabled for every selected row.'
+                : 'Turn on auto-import for the selected file(s) without changing import opt-in state.'
+            }
+            onClick={() => void runBulkUpdate({ autoImportEnabled: true })}
+            data-testid="spec-bulk-set-auto"
+          >
+            Set auto-import
+          </Button>
+          <Button
+            type="button"
             size="sm"
             variant="outline"
             disabled={isBulkPending}
-            onClick={() => void handleBulkUpdate({ importEnabled: true, autoImportEnabled: true })}
-            data-testid="spec-bulk-enable-auto"
+            onClick={() => void runBulkUpdate({ autoImportEnabled: false })}
+            data-testid="spec-bulk-clear-auto"
           >
-            Enable auto-import
+            Clear auto-import
+          </Button>
+          <span className="w-px h-4 bg-gray-300 dark:bg-gray-600 hidden sm:block" aria-hidden />
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={isLoading || isBulkPending || isSelectAllMatchingPending}
+            onClick={() => void handleSelectAllMatchingFilter()}
+            data-testid="spec-bulk-select-all-matching"
+          >
+            {isSelectAllMatchingPending ? 'Selecting…' : 'Select all matching filter'}
           </Button>
           <button
             type="button"
-            className="ml-auto text-indigo-600 hover:text-indigo-700 underline"
-            onClick={() => setSelectedIds(new Set())}
+            className="ml-auto text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 underline"
+            onClick={() => {
+              setSelectedIds(new Set());
+              setExtraRowById({});
+            }}
           >
             Clear selection
           </button>
@@ -813,8 +1066,31 @@ export function RepositorySpecsTab({
           onClose={() => setSelectedSpec(null)}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={confirmDisableImportOpen}
+        title="Disable import for selected files?"
+        message="This will leave the existing version in place but stop further imports. Proceed?"
+        variant="warning"
+        confirmLabel="Disable import"
+        onCancel={() => {
+          setConfirmDisableImportOpen(false);
+        }}
+        onConfirm={() => {
+          setConfirmDisableImportOpen(false);
+          void runBulkUpdate({ importEnabled: false });
+        }}
+      />
     </div>
   );
 }
 
-export const _internal = { filterToServerStatus, minImportableConfidence };
+export const _internal = {
+  filterToServerStatus,
+  minImportableConfidence,
+  matchesListFilter,
+  BULK_MAX,
+  mergeBulkResponseIntoList,
+  applyOptimisticBulk,
+  chunkIds,
+};

@@ -502,7 +502,7 @@ entries.
 | REPO-9.4   | ADE Repository Detail "Specs" tab               | Replace existing Files tab spec list with switches (Import / Auto-Import) + status pill + last-imported-version link | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `ui`   | Yes | Yes | Done (#2938) |
 | REPO-9.5   | "Import Now" one-shot action                    | Trigger a manual import for any discovered spec regardless of `auto_import_enabled`                         | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `import`, `ui` | Yes | Yes | Done (#2939) |
 | REPO-9.6   | Spec detail drawer                              | Read-only Monaco preview, lint summary, last 5 import attempts, current selection state                     | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `ui`   | Yes | Yes | Done (#2940) |
-| REPO-9.7   | Bulk select + apply across discovered files     | Multi-select with sticky toolbar; "Enable import for selected", "Disable", "Set auto-import"                 | `enhancement`, `repository`, `roadmap-repository`, `repository-selection`, `ui`          | No  | Yes | #2948 |
+| REPO-9.7   | Bulk select + apply across discovered files     | Multi-select with sticky toolbar; "Enable import for selected", "Disable", "Set auto-import"                 | `enhancement`, `repository`, `roadmap-repository`, `repository-selection`, `ui`          | No  | Yes | Done (#2948) |
 
 ### Detailed issues
 
