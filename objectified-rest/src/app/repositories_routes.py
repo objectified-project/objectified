@@ -1489,7 +1489,7 @@ def _append_scan_report_row(
     bucket.append(row)
     if len(bucket) > 200:
         bucket[:] = bucket[-200:]
-    _REPO_LATEST_REPORT_TOTALS[repository_id] = row["totalsJson"]
+    _REPO_LATEST_REPORT_TOTALS[repository_id] = row.get("totalsJson") or {}
     try:
         _rollup_tid = _find_tenant_id_for_repository(repository_id)
     except ValueError:
