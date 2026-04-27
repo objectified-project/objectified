@@ -79,7 +79,8 @@ export const repositoryManifestSchema = {
           },
           importEnabled: {
             type: 'boolean',
-            description: 'When false, the file stays discovered but does not dispatch imports until enabled in the Specs tab or set to true here.',
+            default: true,
+            description: 'When false, the file remains discovered but is not offered for import until enabled in the Specs tab or re-listed with importEnabled: true in the manifest.',
           },
         },
       },
