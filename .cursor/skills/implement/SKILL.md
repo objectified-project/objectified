@@ -40,6 +40,7 @@ git checkout -b ticket-<number>
 
 ## Phase 3 - Implementation
 
+- If work can safely be done in parallel, create subagents to do the work.  However, do not perform parallel work on the same file.  Only use subagents where it makes sense to do so.
 - Use the Context7 MCP service to fetch the latest support documentation for the task to be implemented.
 - Apply **CLAUDE.md** / **copilot-instructions.md** and other workspace rules (tests, version bumps, no edits to reference-only trees, etc.).
 - Implement the behavior **as specified in the issue**.
