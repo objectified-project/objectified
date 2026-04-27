@@ -17,7 +17,7 @@ from urllib import parse as urllib_parse
 from urllib import request as urllib_request
 from datetime import datetime, timezone
 from threading import Lock
-from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Tuple
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
@@ -2918,6 +2918,282 @@ async def list_repository_scan_reports(
     )
 
 
+def _repositories_for_scan_report_export(
+    tenant_id: str, *, provider: str, status: str, q: str
+) -> list[RepositoryRecord]:
+    """Repositories matching the tenant scan-report list (same as ``list_repository_scan_reports``)."""
+    now_ms = time.time() * 1000.0
+    qn = (q or "").strip().lower()
+    with _STORE_LOCK:
+        tenant_repos = list(_REPO_STORE.get(tenant_id, {}).values())
+    out: list[tuple[RepositoryRecord, int, str]] = []
+    for repo in tenant_repos:
+        if provider != "all" and repo.provider != provider:
+            continue
+        if qn:
+            blob = f"{repo.fullName} {repo.name} {repo.owner} {repo.id}".lower()
+            if qn not in blob:
+                continue
+        last_scan = _get_repository_last_scan(repo.id)
+        last_scan_at: str | None = None
+        if last_scan is not None:
+            last_scan_at = (last_scan.finishedAt or last_scan.startedAt or last_scan.createdAt) or None
+        with _STORE_LOCK:
+            rlist = list(_REPO_SCAN_REPORT_STORE.get(repo.id, []))
+        latest: Dict[str, Any] | None = max(rlist, key=lambda r: r["generatedAt"]) if rlist else None
+        totals: Dict[str, Any] | None = None
+        attention = 0
+        if latest is not None:
+            tj = latest.get("totalsJson")
+            if isinstance(tj, dict):
+                totals = dict(tj)
+            attention = int(latest.get("attentionScore", 0) or 0)
+        elif last_scan_at:
+            attention = _scan_report_attention_score(
+                {"failing": 0, "awaiting_selection": 0, "scanFailed": 0},
+                last_scan_at=last_scan_at,
+                now_ms=now_ms,
+            )
+        stale = _is_scan_timestamp_stale(last_scan_at, now_ms=now_ms)
+        if status == "importable":
+            if not totals or int(totals.get("importable", 0) or 0) < 1:
+                continue
+        elif status == "imported":
+            if not totals or int(totals.get("imported", 0) or 0) < 1:
+                continue
+        elif status == "failing":
+            if not totals:
+                continue
+            perr = int(totals.get("parseError", 0) or 0)
+            merr = int(totals.get("manifestError", 0) or 0)
+            fail = int(totals.get("failing", 0) or 0) or perr + merr
+            if fail < 1 and not bool(totals.get("scanFailed")):
+                continue
+        elif status == "awaiting":
+            if not totals or int(totals.get("awaitingSelection", 0) or 0) < 1:
+                continue
+        elif status == "stale":
+            if not stale:
+                continue
+        out.append((repo, attention, last_scan_at or ""))
+    out.sort(
+        key=lambda t: (t[1], _last_scan_effective_time(t[2] or "")),
+        reverse=True,
+    )
+    return [t[0] for t in out]
+
+
+def _export_scan_window_epoch_bounds(
+    w_from: str | None, w_to: str | None
+) -> tuple[float | None, float | None, bool]:
+    if not w_from and not w_to:
+        return None, None, False
+    a = _parse_iso8601(w_from, "scan_window.from") if w_from and str(w_from).strip() else None
+    b = _parse_iso8601(w_to, "scan_window.to") if w_to and str(w_to).strip() else None
+    if w_from and str(w_from).strip() and a is None:
+        raise ValueError("invalid scan window from")
+    if w_to and str(w_to).strip() and b is None:
+        raise ValueError("invalid scan window to")
+    from_ms = a.timestamp() * 1000.0 if a is not None else None
+    to_ms = b.timestamp() * 1000.0 if b is not None else None
+    return from_ms, to_ms, True
+
+
+def _export_reports_to_include(
+    repository_id: str, *, from_ms: float | None, to_ms: float | None, has_window: bool
+) -> list[Dict[str, Any]]:
+    rows = _reports_for_repository_newest_first(repository_id)
+    if not has_window:
+        return [rows[0]] if rows else []
+    picked: list[Dict[str, Any]] = []
+    for row in rows:
+        ga = row.get("generatedAt")
+        p = _parse_iso8601(str(ga), "generatedAt") if ga else None
+        if p is None:
+            continue
+        t = p.timestamp() * 1000.0
+        if from_ms is not None and t < from_ms:
+            continue
+        if to_ms is not None and t > to_ms:
+            continue
+        picked.append(row)
+    return picked
+
+
+def _get_scan_by_id_for_repository(
+    repository_id: str, scan_id: str
+) -> Optional[RepositoryScanRecord]:
+    with _STORE_LOCK:
+        history = list(_REPO_SCAN_HISTORY_STORE.get(repository_id, []))
+    for s in history:
+        if s.id == scan_id:
+            return s
+    return None
+
+
+def _get_file_in_scan_by_id(
+    repository_id: str, scan_id: str, file_id: str
+) -> Optional[RepositoryFileRecord]:
+    with _STORE_LOCK:
+        f_list = list(_REPO_SCAN_FILE_HISTORY_STORE.get(scan_id, []))
+    for f in f_list:
+        if f.id == file_id:
+            return f
+    return None
+
+
+def _export_attention_reasons(
+    file_row: RepositoryFileRecord | None, spec: RepositorySpecRecord, *, report_repo_stale: bool
+) -> str:
+    parts: list[str] = []
+    if report_repo_stale:
+        parts.append("repository_stale")
+    parts.append(f"spec:{spec.status}")
+    if (
+        file_row is not None
+        and not file_row.importEnabled
+        and (file_row.confidence or 0) >= 0.5
+        and file_row.tracked
+        and file_row.status not in ("parse_error", "manifest_error", "removed")
+    ):
+        parts.append("awaiting_selection")
+    seen: set[str] = set()
+    out: list[str] = []
+    for r in parts:
+        r2 = (r or "").strip()
+        if r2 and r2 not in seen:
+            seen.add(r2)
+            out.append(r2)
+    return ";".join(out)
+
+
+def count_scan_report_export_row_candidates(
+    tenant_id: str,
+    *,
+    provider: str = "all",
+    status: str = "all",
+    search: str = "",
+    scan_from: str | None = None,
+    scan_to: str | None = None,
+) -> int:
+    try:
+        f_ms, t_ms, has_w = _export_scan_window_epoch_bounds(scan_from, scan_to)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    repos = _repositories_for_scan_report_export(
+        tenant_id, provider=provider, status=status, q=search
+    )
+    n = 0
+    for repo in repos:
+        for report in _export_reports_to_include(
+            repo.id, from_ms=f_ms, to_ms=t_ms, has_window=has_w
+        ):
+            pl = report.get("payloadJson")
+            if not isinstance(pl, list):
+                continue
+            n += sum(1 for p in pl if isinstance(p, dict))
+    return n
+
+
+def iter_scan_report_export_rows(
+    tenant_id: str,
+    *,
+    provider: str = "all",
+    status: str = "all",
+    search: str = "",
+    scan_from: str | None = None,
+    scan_to: str | None = None,
+) -> Iterator[dict[str, Any]]:
+    try:
+        f_ms, t_ms, has_w = _export_scan_window_epoch_bounds(scan_from, scan_to)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    now_ms = time.time() * 1000.0
+    repos = _repositories_for_scan_report_export(
+        tenant_id, provider=provider, status=status, q=search
+    )
+    for repo in repos:
+        ls0 = _get_repository_last_scan(repo.id)
+        lsa0: str | None = (
+            (ls0.finishedAt or ls0.startedAt or ls0.createdAt) if ls0 is not None else None
+        ) or None
+        report_repo_stale = _is_scan_timestamp_stale(lsa0, now_ms=now_ms) if lsa0 else False
+        for report in _export_reports_to_include(
+            repo.id, from_ms=f_ms, to_ms=t_ms, has_window=has_w
+        ):
+            report_id = str(report.get("id", ""))
+            scan_id = str(report.get("scanId", ""))
+            scan = _get_scan_by_id_for_repository(repo.id, scan_id) if scan_id else None
+            branch = (scan.branch if scan is not None else None) or (
+                repo.branches[0].branch if repo.branches else ""
+            )
+            scanned_at = (scan.finishedAt or scan.startedAt or str(report.get("generatedAt", "")) or "") if scan is not None else str(report.get("generatedAt", ""))
+            if not branch:
+                continue
+            j_by = _latest_import_jobs_by_path(repo.id, branch)
+            pl2 = report.get("payloadJson")
+            if not isinstance(pl2, list):
+                continue
+            for pitem in pl2:
+                if not isinstance(pitem, dict):
+                    continue
+                fid = str(pitem.get("fileId", ""))
+                frow = _get_file_in_scan_by_id(repo.id, scan_id, fid) if fid and scan_id else None
+                if frow is not None:
+                    job = j_by.get(frow.path)
+                    spec = _build_repository_spec_record(frow, branch, job)
+                else:
+                    _VALID_SPEC_STATUSES = {
+                        "importing", "imported", "parse_error", "manifest_error",
+                        "not_imported", "unchanged_checksum",
+                    }
+                    raw_status = pitem.get("status")
+                    spec_status: RepositorySpecSelectionStatus = (
+                        raw_status if raw_status in _VALID_SPEC_STATUSES else "not_imported"
+                    )
+                    spec = RepositorySpecRecord(
+                        fileId=fid,
+                        repositoryId=repo.id,
+                        scanId=scan_id,
+                        branch=branch,
+                        path=str(pitem.get("path", "")),
+                        format=str(pitem.get("format", "")) or None
+                        if pitem.get("format")
+                        else None,
+                        confidence=float(pitem.get("confidence"))
+                        if pitem.get("confidence") is not None
+                        else None,
+                        discriminator=None,
+                        status=spec_status,
+                        importEnabled=bool(pitem.get("importEnabled")),
+                        autoImportEnabled=bool(pitem.get("autoImportEnabled")),
+                        lastImportedVersionId=None,
+                        lastImportedAt=None,
+                        createdAt=report.get("generatedAt", "") or "",
+                    )
+                att_s = _export_attention_reasons(frow, spec, report_repo_stale=report_repo_stale)
+                chk = frow.contentChecksum if frow is not None else None
+                vers = spec.lastImportedVersionId or ""
+                yield {
+                    "repository": repo.fullName,
+                    "provider": repo.provider,
+                    "branch": branch,
+                    "scan_id": scan_id,
+                    "scanned_at": str(scanned_at or ""),
+                    "path": str(pitem.get("path", "")) if frow is None else frow.path,
+                    "format": (frow.format or "") if frow is not None else (str(pitem.get("format") or "") or ""),
+                    "confidence": frow.confidence
+                    if frow is not None and frow.confidence is not None
+                    else pitem.get("confidence"),
+                    "status": spec.status,
+                    "content_checksum": (chk or "") if frow is not None else str(pitem.get("contentChecksum") or ""),
+                    "last_imported_version": vers,
+                    "attention_reasons": att_s,
+                    "reportId": report_id,
+                    "payload": dict(pitem),
+                }
+
+
 @router.get(
     "/{tenant_slug}/{repository_id}/scan-reports",
     response_model=RepositoryPerRepoScanReportListResponse,
@@ -4324,6 +4600,12 @@ def _reset_repository_state_for_tests() -> None:
         _REPO_FILE_CONTENT_STORE.clear()
         _REPO_SCAN_REPORT_STORE.clear()
         _REPO_CORPUS_ROLLUP.clear()
+    try:
+        from .repositories.scan_report_export import reset_scan_report_export_state_for_tests
+
+        reset_scan_report_export_state_for_tests()
+    except Exception:
+        pass
 
 
 def _complete_repository_scan_for_tests(
@@ -4629,3 +4911,5 @@ def _get_repository_resolved_versions_for_tests(tenant_id: str) -> List[Reposito
 def _list_poll_targets_for_tests(tenant_id: str) -> List[Dict[str, str]]:
     with _STORE_LOCK:
         return _list_poll_targets_for_tenant(tenant_id)
+
+

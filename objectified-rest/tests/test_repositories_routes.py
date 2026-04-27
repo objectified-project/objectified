@@ -2586,3 +2586,52 @@ def test_per_repo_scan_report_endpoints_require_repository_read_scope() -> None:
         app.dependency_overrides.pop(validate_authentication, None)
     assert r.status_code == 403
     assert r.json()["detail"]["code"] == "REPOSITORY_SCOPE_REQUIRED"
+
+
+def test_scan_report_export_202_and_empty_csv() -> None:
+    """0 matching repositories → 202, completed job with header-only CSV."""
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    try:
+        p = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}/scan-reports:export",
+            json={"format": "csv", "filter": {"provider": "all", "status": "all", "search": ""}},
+        )
+        assert p.status_code == 202, p.text
+        eid = p.json()["exportJobId"]
+        g = client.get(f"/v1/repositories/{_TENANT_SLUG}/scan-reports/exports/{eid}")
+        assert g.status_code == 200
+        gj = g.json()
+        assert gj.get("status") == "completed"
+        assert gj.get("rowCount") == 0
+        token = (gj.get("downloadUrl") or "").split("token=")[-1]
+        d = client.get(
+            f"/v1/repositories/{_TENANT_SLUG}/scan-reports/exports/{eid}/content?token={token}"
+        )
+        assert d.status_code == 200
+        assert b"scan_id" in d.content
+        l = client.get(f"/v1/repositories/{_TENANT_SLUG}/scan-reports/exports")
+        assert l.status_code == 200
+        assert len(l.json()["items"]) >= 1
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+
+
+def test_scan_report_export_row_cap_400() -> None:
+    from app import repositories_routes as rr
+
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    try:
+        with patch.object(
+            rr,
+            "count_scan_report_export_row_candidates",
+            return_value=100_001,
+        ):
+            p = client.post(
+                f"/v1/repositories/{_TENANT_SLUG}/scan-reports:export",
+                json={"format": "csv", "filter": {}},
+            )
+        assert p.status_code == 400
+        det = p.json()["detail"]
+        assert isinstance(det, dict) and det.get("code") == "EXPORT_ROW_CAP_EXCEEDED"
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
