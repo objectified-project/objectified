@@ -291,7 +291,7 @@ export function RepositorySpecsTab({
   }, [initialFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const k = `${branch}||${filter}`;
+    const k = `${branch}||${filter}||${search}`;
     if (selectionScopeKeyRef.current === null) {
       selectionScopeKeyRef.current = k;
       return;
@@ -301,7 +301,7 @@ export function RepositorySpecsTab({
       setExtraRowById({});
       selectionScopeKeyRef.current = k;
     }
-  }, [branch, filter]);
+  }, [branch, filter, search]);
 
   // Sync the parent's `?fileId=` query param when the drawer opens or closes.
   useEffect(() => {
@@ -555,6 +555,7 @@ export function RepositorySpecsTab({
         bulkOptSnapshotRef.current = c.map((r) => ({ ...r }));
         return applyOptimisticBulk(c, selectedIds, payload);
       });
+      let succeededChunks = 0;
       try {
         for (const chunk of idChunks) {
           const response = await fetch(`/api/repositories/${repositoryId}/specs/bulk-update`, {
@@ -577,25 +578,36 @@ export function RepositorySpecsTab({
           }
           const updated = Array.isArray(data.items) ? data.items : [];
           setSpecs((c) => mergeBulkResponseIntoList(c, updated));
+          succeededChunks++;
         }
         toast.success(`Updated ${allIds.length} spec(s).`);
         setSelectedIds(new Set());
         setExtraRowById({});
         bulkOptSnapshotRef.current = null;
       } catch (error) {
-        const snap = bulkOptSnapshotRef.current;
-        if (snap) {
-          setSpecs(snap);
-          bulkOptSnapshotRef.current = null;
-        }
         const message = error instanceof Error ? error.message : 'Failed to bulk update specs';
+        if (succeededChunks > 0) {
+          // Earlier chunks already applied on the server — refetch to get the
+          // true server state instead of rolling back to a stale snapshot.
+          bulkOptSnapshotRef.current = null;
+          void loadSpecs();
+          toast.error(`Partial update: ${succeededChunks} of ${idChunks.length} chunk(s) applied. ${message}`, {
+            id: 'spec-bulk-error',
+          });
+        } else {
+          const snap = bulkOptSnapshotRef.current;
+          if (snap) {
+            setSpecs(snap);
+            bulkOptSnapshotRef.current = null;
+          }
+          toast.error(message, { id: 'spec-bulk-error' });
+        }
         setErrorMessage(message);
-        toast.error(message, { id: 'spec-bulk-error' });
       } finally {
         setIsBulkPending(false);
       }
     },
-    [repositoryId, selectedIds],
+    [loadSpecs, repositoryId, selectedIds],
   );
 
   const requestBulkDisableImport = useCallback(() => {
