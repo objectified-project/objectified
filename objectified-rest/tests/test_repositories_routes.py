@@ -641,6 +641,7 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
                     "tracked": True,
                     "promote": "auto",
                     "importEnabled": True,
+                    "autoImportEnabled": True,
                 },
                 {
                     "path": "apis/error.yaml",
@@ -648,6 +649,7 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
                     "tracked": True,
                     "promote": "auto",
                     "importEnabled": True,
+                    "autoImportEnabled": True,
                 },
                 {
                     "path": "apis/removed.yaml",
@@ -655,6 +657,7 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
                     "tracked": True,
                     "promote": "manual",
                     "importEnabled": True,
+                    "autoImportEnabled": True,
                 },
             ],
         )
@@ -671,13 +674,20 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
             second_scan_id,
             commit_sha="commit-second",
             files=[
-                {"path": "apis/stable.yaml", "blobSha": "111", "tracked": True, "importEnabled": True},
+                {
+                    "path": "apis/stable.yaml",
+                    "blobSha": "111",
+                    "tracked": True,
+                    "importEnabled": True,
+                    "autoImportEnabled": True,
+                },
                 {
                     "path": "apis/error.yaml",
                     "blobSha": "999",
                     "tracked": True,
                     "promote": "auto",
                     "importEnabled": True,
+                    "autoImportEnabled": True,
                     "settingsJson": {"forceImportFailure": "parser exploded"},
                 },
             ],
@@ -761,6 +771,7 @@ def test_checksum_matched_modified_file_skips_dispatch_and_updates_diff_summary(
         contentChecksum="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         tracked=True,
         importEnabled=True,
+        autoImportEnabled=True,
         projectSlug="payments",
         versionStrategy="commit-sha",
         status="modified",
@@ -829,6 +840,7 @@ def test_force_scan_ignores_checksum_skip_and_dispatches_modified_file() -> None
                     "contentChecksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                     "tracked": True,
                     "importEnabled": True,
+                    "autoImportEnabled": True,
                     "projectSlug": "payments",
                 }
             ],
@@ -856,6 +868,7 @@ def test_force_scan_ignores_checksum_skip_and_dispatches_modified_file() -> None
                         "contentChecksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                         "tracked": True,
                         "importEnabled": True,
+                        "autoImportEnabled": True,
                         "projectSlug": "payments",
                     }
                 ],
@@ -899,7 +912,15 @@ def test_sync_history_routes_persist_conflict_resolution_on_import_job_event_log
             repository_id,
             first_scan_id,
             commit_sha="commit-primer",
-            files=[{"path": "apis/orders.yaml", "blobSha": "111", "tracked": True, "importEnabled": True}],
+            files=[
+                {
+                    "path": "apis/orders.yaml",
+                    "blobSha": "111",
+                    "tracked": True,
+                    "importEnabled": True,
+                    "autoImportEnabled": True,
+                }
+            ],
         )
         second_scan_response = client.post(
             f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans",
@@ -916,6 +937,7 @@ def test_sync_history_routes_persist_conflict_resolution_on_import_job_event_log
                     "blobSha": "999",
                     "tracked": True,
                     "importEnabled": True,
+                    "autoImportEnabled": True,
                     "settingsJson": {
                         "simulatedConflicts": [
                             {
@@ -1041,8 +1063,11 @@ def test_complete_scan_applies_manifest_first_mapping_and_auto_fallback_rules():
         "mappingReason": "project_slug_not_resolved",
     }
     assert by_path["services/orders/openapi.yaml"]["importEnabled"] is True
+    assert by_path["services/orders/openapi.yaml"]["autoImportEnabled"] is False
     assert by_path["billing/openapi.yaml"]["importEnabled"] is False
+    assert by_path["billing/openapi.yaml"]["autoImportEnabled"] is False
     assert by_path["root-openapi.yaml"]["importEnabled"] is False
+    assert by_path["root-openapi.yaml"]["autoImportEnabled"] is False
 
 
 def test_commit_sha_jobs_bind_to_idempotent_auto_created_versions() -> None:
@@ -1076,6 +1101,7 @@ def test_commit_sha_jobs_bind_to_idempotent_auto_created_versions() -> None:
                 {
                     "path": "services/orders/openapi.yaml",
                     "blobSha": "111",
+                    "autoImportEnabled": True,
                 }
             ],
         )
@@ -1095,6 +1121,7 @@ def test_commit_sha_jobs_bind_to_idempotent_auto_created_versions() -> None:
                 {
                     "path": "services/orders/openapi.yaml",
                     "blobSha": "222",
+                    "autoImportEnabled": True,
                 }
             ],
         )
@@ -1143,7 +1170,7 @@ def test_manifest_project_does_not_autocreate_without_flag_or_tenant_admin() -> 
             repository_id,
             scan_id,
             commit_sha="abc123def4567890",
-            files=[{"path": "services/orders/openapi.yaml", "blobSha": "111"}],
+            files=[{"path": "services/orders/openapi.yaml", "blobSha": "111", "autoImportEnabled": True}],
         )
         jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == scan_id]
         versions = _get_repository_resolved_versions_for_tests(_MOCK_AUTH["tenant_id"])
@@ -1177,7 +1204,13 @@ def test_noop_dry_run_change_report_is_zero_diff_for_unchanged_file() -> None:
             first_scan_id,
             commit_sha="unchanged-seed",
             files=[
-                {"path": "apis/stable.yaml", "blobSha": "same", "tracked": True, "importEnabled": True},
+                {
+                    "path": "apis/stable.yaml",
+                    "blobSha": "same",
+                    "tracked": True,
+                    "importEnabled": True,
+                    "autoImportEnabled": True,
+                },
             ],
         )
 
@@ -1191,7 +1224,13 @@ def test_noop_dry_run_change_report_is_zero_diff_for_unchanged_file() -> None:
             second_scan_id,
             commit_sha="unchanged-seed",
             files=[
-                {"path": "apis/stable.yaml", "blobSha": "same", "tracked": True, "importEnabled": True},
+                {
+                    "path": "apis/stable.yaml",
+                    "blobSha": "same",
+                    "tracked": True,
+                    "importEnabled": True,
+                    "autoImportEnabled": True,
+                },
             ],
         )
         second_scan_jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == second_scan_id]
@@ -1227,7 +1266,15 @@ def test_default_promotion_mode_is_manual_for_new_repositories() -> None:
             repository_id,
             scan_id,
             commit_sha="default-manual-sha",
-            files=[{"path": "apis/default.yaml", "blobSha": "111", "tracked": True, "importEnabled": True}],
+            files=[
+                {
+                    "path": "apis/default.yaml",
+                    "blobSha": "111",
+                    "tracked": True,
+                    "importEnabled": True,
+                    "autoImportEnabled": True,
+                }
+            ],
         )
         files_response = client.get(f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{scan_id}/files")
         jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == scan_id]
@@ -1268,7 +1315,7 @@ def test_auto_promotion_records_change_report_and_sync_committed_audit() -> None
             repository_id,
             scan_id,
             commit_sha="auto-commit-sha",
-            files=[{"path": "apis/auto.yaml", "blobSha": "111"}],
+            files=[{"path": "apis/auto.yaml", "blobSha": "111", "autoImportEnabled": True}],
         )
         jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == scan_id]
         change_reports = _get_repository_change_reports_for_tests(repository_id)
@@ -1316,7 +1363,7 @@ def test_on_breaking_change_block_forces_manual_even_when_promote_is_auto() -> N
             repository_id,
             scan_id,
             commit_sha="blocked-commit-sha",
-            files=[{"path": "apis/blocked.yaml", "blobSha": "111"}],
+            files=[{"path": "apis/blocked.yaml", "blobSha": "111", "autoImportEnabled": True}],
         )
         jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == scan_id]
         audit_rows = _get_repository_audit_rows_for_tests(repository_id)
@@ -1425,7 +1472,13 @@ def test_patch_file_import_enabled_writes_audit() -> None:
             scan_id,
             commit_sha="c1",
             files=[
-                {"path": "apis/patchable.yaml", "blobSha": "1", "tracked": True, "importEnabled": True},
+                {
+                    "path": "apis/patchable.yaml",
+                    "blobSha": "1",
+                    "tracked": True,
+                    "importEnabled": True,
+                    "autoImportEnabled": True,
+                },
             ],
         )
         file_id = (
@@ -1449,6 +1502,7 @@ def test_patch_file_import_enabled_writes_audit() -> None:
     assert create_response.status_code == 201
     assert patch1.status_code == 200
     assert patch1.json()["importEnabled"] is False
+    assert patch1.json()["autoImportEnabled"] is False
     assert no_op.status_code == 200
     new_audits = _audit_after_first[_audit_baseline:]
     assert any(row["eventType"] == "repository.spec.selection_changed" for row in new_audits)
@@ -1456,5 +1510,79 @@ def test_patch_file_import_enabled_writes_audit() -> None:
     assert last_sel["detail"]["path"] == "apis/patchable.yaml"
     assert last_sel["detail"]["before"] is True
     assert last_sel["detail"]["after"] is False
+    assert last_sel["detail"]["field"] == "import_enabled"
     assert last_sel["detail"]["source"] == "ui"
     assert len(_audit_after_noop) == len(_audit_after_first)
+
+
+def test_patch_file_auto_import_enabled_writes_audit_and_requires_import_enabled() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        _reset_repository_state_for_tests()
+        create_response = client.post(
+            f"/v1/repositories/{_TENANT_SLUG}",
+            json={
+                "linkedAccountId": "aaaaaaaa-bbbb-cccc-dddd-000000000053",
+                "provider": "github",
+                "owner": "acme",
+                "name": "auto-import-toggle",
+                "branches": [{"branch": "main"}],
+            },
+        )
+        repository_id = create_response.json()["repository"]["id"]
+        scan_id = create_response.json()["initialScanJobId"]
+        _complete_repository_scan_for_tests(
+            repository_id,
+            scan_id,
+            commit_sha="c1",
+            files=[
+                {
+                    "path": "apis/auto-toggle.yaml",
+                    "blobSha": "1",
+                    "tracked": True,
+                    "importEnabled": True,
+                    "autoImportEnabled": False,
+                },
+            ],
+        )
+        file_id = (
+            client.get(f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/scans/{scan_id}/files").json()["items"][0]["id"]
+        )
+        audit_baseline = len(_get_repository_audit_rows_for_tests(repository_id))
+
+        patch_auto = client.patch(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/files/{file_id}/auto-import-enabled",
+            json={"autoImportEnabled": True, "source": "ui"},
+        )
+        patch_import_off = client.patch(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/files/{file_id}/import-enabled",
+            json={"importEnabled": False, "source": "ui"},
+        )
+        invalid_patch = client.patch(
+            f"/v1/repositories/{_TENANT_SLUG}/{repository_id}/files/{file_id}/auto-import-enabled",
+            json={"autoImportEnabled": True, "source": "ui"},
+        )
+        audit_rows = _get_repository_audit_rows_for_tests(repository_id)
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+        _reset_repository_state_for_tests()
+
+    assert create_response.status_code == 201
+    assert patch_auto.status_code == 200
+    assert patch_auto.json()["importEnabled"] is True
+    assert patch_auto.json()["autoImportEnabled"] is True
+    assert patch_import_off.status_code == 200
+    assert patch_import_off.json()["importEnabled"] is False
+    assert patch_import_off.json()["autoImportEnabled"] is False
+    assert invalid_patch.status_code == 400
+
+    selection_audits = [
+        row for row in audit_rows[audit_baseline:] if row["eventType"] == "repository.spec.selection_changed"
+    ]
+    assert len(selection_audits) == 2
+    assert selection_audits[0]["detail"]["field"] == "auto_import_enabled"
+    assert selection_audits[0]["detail"]["before"] is False
+    assert selection_audits[0]["detail"]["after"] is True
+    assert selection_audits[1]["detail"]["field"] == "import_enabled"
+    assert selection_audits[1]["detail"]["before"] is True
+    assert selection_audits[1]["detail"]["after"] is False
