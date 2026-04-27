@@ -174,13 +174,17 @@ def validate_authentication(
                     detail=f"User does not have access to tenant: {tenant_slug}"
                 )
 
+            # Collect scope claim(s) from JWT – honour scope, scp, and scopes conventions
+            jwt_scope = jwt_payload.get('scope') or jwt_payload.get('scp') or jwt_payload.get('scopes')
+
             # Return tenant data with user information
             return {
                 **tenant_data,
                 'auth_method': 'jwt',
                 'user_id': user_id,
                 'user_email': jwt_payload.get('email'),
-                'user_name': jwt_payload.get('name')
+                'user_name': jwt_payload.get('name'),
+                **({'scope': jwt_scope} if jwt_scope is not None else {}),
             }
 
     # Try API key authentication
@@ -201,9 +205,12 @@ def validate_authentication(
                 detail="API key does not have access to this tenant"
             )
 
+        # API keys are tenant-level credentials; grant full repository access by default.
+        # When a per-key scope column is added to odb.api_keys, substitute it here.
         return {
             **api_key_data,
-            'auth_method': 'api_key'
+            'auth_method': 'api_key',
+            'scopes': ['repository.read', 'repository.write'],
         }
 
     # No authentication provided

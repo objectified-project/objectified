@@ -2433,7 +2433,11 @@ async def list_repository_specs(
             effective_branch = repository.branches[0].branch
 
         scans = _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
-        latest_scan = next((scan for scan in scans if scan.branch == effective_branch), None)
+        _TERMINAL_SCAN_STATUSES = {"complete", "skipped_unchanged"}
+        latest_scan = next(
+            (scan for scan in scans if scan.branch == effective_branch and scan.status in _TERMINAL_SCAN_STATUSES),
+            None,
+        )
         if latest_scan is None:
             raise HTTPException(status_code=404, detail=f"No scan found for branch: {effective_branch}")
 
@@ -2599,23 +2603,21 @@ async def bulk_update_repository_spec_selection(
 
         latest_jobs_by_branch: Dict[str, Dict[str, RepositoryImportJobRecord]] = {}
         response_items: List[RepositorySpecRecord] = []
-        for _file_id, _scan_id, _idx, _existing_row, updated_row, _changes, branch_name in updates:
+        changed_file_ids: set[str] = set()
+        for _file_id, _scan_id, _idx, _existing_row, updated_row, changes, branch_name in updates:
             latest_jobs = latest_jobs_by_branch.get(branch_name)
             if latest_jobs is None:
                 latest_jobs = _latest_import_jobs_by_path(repository_id, branch_name)
                 latest_jobs_by_branch[branch_name] = latest_jobs
+            if changes:
+                changed_file_ids.add(updated_row.file_id)
             response_items.append(
                 _build_repository_spec_record(updated_row, branch_name, latest_jobs.get(updated_row.path))
             )
 
     for row in audits_to_persist:
         _persist_audit_row(row)
-    updated_count = len(
-        {
-            item.fileId
-            for item in response_items
-        }
-    )
+    updated_count = len(changed_file_ids)
     return RepositorySpecBulkUpdateResponse(updatedCount=updated_count, items=response_items)
 
 
