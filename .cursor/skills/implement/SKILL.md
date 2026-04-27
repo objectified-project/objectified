@@ -47,6 +47,7 @@ git checkout -b ticket-<number>
 - Split code into separate modules, helper functions, or utility classes if context becomes too large or unmanageable.
 - Keep the implementation **simple** - the simpler the better, making the code easy to read and understand.
 - Create **comprehensive test cases** for all new and changed functionality.
+- SQL files must be in the format of YYYYMMDD-HHMMSS.sql - they should not be any other filename.  Use the `date` command to get an accurate date, don't estimate.
 - Don't Repeat Yourself.
 
 ## Phase 4 - Internal Audit
