@@ -498,7 +498,7 @@ entries.
 |------------|--------------------------------------------------|--------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|-----|----------|-------|
 | REPO-9.1   | `import_enabled` flag on `repository_file`     | New boolean defaulting `false`; new audit code `repository.spec.selection_changed`                          | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `database` | Yes | No  | Done (#2931) |
 | REPO-9.2   | `auto_import_enabled` flag on `repository_file` | New boolean defaulting `false`; toggling triggers REPO-12.1 worker eligibility                              | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `database` | Yes | Yes | Done (#2932) |
-| REPO-9.3   | REST: list / toggle / bulk-update spec selection | `GET /v1/repositories/{id}/specs`, `PATCH /v1/repositories/{id}/specs/{file_id}`, bulk variant              | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `rest` | Yes | No  | #2934 |
+| REPO-9.3   | REST: list / toggle / bulk-update spec selection | `GET /v1/repositories/{id}/specs`, `PATCH /v1/repositories/{id}/specs/{file_id}`, bulk variant              | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `rest` | Yes | No  | Done (#2934) |
 | REPO-9.4   | ADE Repository Detail "Specs" tab               | Replace existing Files tab spec list with switches (Import / Auto-Import) + status pill + last-imported-version link | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `ui`   | Yes | Yes | #2938 |
 | REPO-9.5   | "Import Now" one-shot action                    | Trigger a manual import for any discovered spec regardless of `auto_import_enabled`                         | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `import`, `ui` | Yes | Yes | #2939 |
 | REPO-9.6   | Spec detail drawer                              | Read-only Monaco preview, lint summary, last 5 import attempts, current selection state                     | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-selection`, `ui`   | Yes | Yes | #2940 |
@@ -1183,7 +1183,6 @@ blocking.
 | Order | ID         | Issue | Title                                               | MVP | Epic |
 |-------|------------|-------|-----------------------------------------------------|-----|------|
 | 3     | REPO-9.1   | #2931 | import_enabled flag                                 | Yes | B    |
-| 6     | REPO-9.3   | #2934 | REST: list/toggle/bulk spec selection               | Yes | B    |
 | 7     | REPO-12.1  | #2935 | auto-import worker + dispatch                       | Yes | E    |
 | 8     | REPO-12.3  | #2936 | version creation with provenance                    | Yes | E    |
 | 9     | REPO-12.4  | #2937 | repository_scan_report artifact                     | Yes | E    |
