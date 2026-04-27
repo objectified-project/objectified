@@ -1,4 +1,5 @@
 import psycopg2
+import psycopg2.errors
 import json
 import logging
 import hashlib
@@ -80,7 +81,8 @@ class Database:
         if not self.connection or self.connection.closed:
             self.connection = psycopg2.connect(
                 settings.effective_database_url,
-                cursor_factory=RealDictCursor
+                cursor_factory=RealDictCursor,
+                connect_timeout=5,
             )
         return self.connection
 
@@ -6606,6 +6608,163 @@ class Database:
             return None
         v = rows[0].get("change_report_template_version_id")
         return str(v) if v is not None else None
+
+    def _sql_text_array_literal(self, values: List[str]) -> str:
+        """Build ARRAY['a','b']::text[] for trusted enum reason strings (REPO-11.1 / #2941)."""
+        parts = ["'" + (v or "").replace("'", "''") + "'" for v in values]
+        if not parts:
+            return "ARRAY[]::text[]"
+        return "ARRAY[" + ",".join(parts) + "]::text[]"
+
+    def max_consecutive_failures_for_repository(self, repository_id: str) -> int:
+        """Largest odb.repository_branch.consecutive_failures for a repository (0 if N/A / schema missing)."""
+        try:
+            rows = self.execute_query(
+                """
+                SELECT COALESCE(MAX(consecutive_failures), 0)::int AS m
+                FROM odb.repository_branch
+                WHERE repository_id = %s::uuid
+                """,
+                (repository_id,),
+            )
+        except Exception as e:
+            _s = str(e).lower()
+            if "42p01" in _s or "does not exist" in _s or "undefinedtable" in _s:
+                return 0
+            _logger.debug("max_consecutive_failures_for_repository failed: %s", e)
+            return 0
+        if not rows:
+            return 0
+        return int(rows[0].get("m", 0) or 0)
+
+    def any_repository_credential_revoked(self, repository_id: str) -> bool:
+        """True if a linked account health probe for this repo is revoked (REPO-7.4 / #2941)."""
+        try:
+            rows = self.execute_query(
+                """
+                SELECT 1
+                FROM odb.repository_credential_ref r
+                JOIN odb.repository_credential_health h
+                  ON h.linked_account_id = r.linked_account_id
+                WHERE r.repository_id = %s::uuid
+                  AND h.status = 'revoked'
+                LIMIT 1
+                """,
+                (repository_id,),
+            )
+        except Exception as e:
+            _s = str(e).lower()
+            if "42p01" in _s or "does not exist" in _s or "undefinedtable" in _s:
+                return False
+            _logger.debug("any_repository_credential_revoked failed: %s", e)
+            return False
+        return bool(rows)
+
+    def upsert_repository_attention(
+        self,
+        *,
+        repository_id: str,
+        computed_at: str,
+        reasons: List[str],
+        open_count: int,
+        attention_score: int,
+        last_change_at: str,
+    ) -> bool:
+        """Persist rollup. Returns True when a row was written to PostgreSQL."""
+        _ok_reasons = {
+            "parse_error",
+            "manifest_error",
+            "token_revoked",
+            "scheduler_paused",
+            "repeated_failures",
+            "stale_checksum",
+            "import_failed",
+        }
+        rsort = sorted({r for r in reasons if r in _ok_reasons})
+        ar_sql = self._sql_text_array_literal(rsort)
+        full_q = f"""
+            INSERT INTO odb.repository_attention (
+                repository_id, computed_at, reasons, open_count, attention_score, last_change_at
+            ) VALUES (
+                %s::uuid, %s::timestamptz, {ar_sql}, %s, %s, %s::timestamptz
+            )
+            ON CONFLICT (repository_id) DO UPDATE SET
+                computed_at = EXCLUDED.computed_at,
+                reasons = EXCLUDED.reasons,
+                open_count = EXCLUDED.open_count,
+                attention_score = EXCLUDED.attention_score,
+                last_change_at = EXCLUDED.last_change_at
+            """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT 1 FROM odb.repository WHERE id = %s::uuid LIMIT 1", (repository_id,))
+                if not cursor.fetchone():
+                    conn.rollback()
+                    return False
+                try:
+                    cursor.execute(
+                        full_q,
+                        (
+                            repository_id,
+                            computed_at,
+                            open_count,
+                            int(attention_score),
+                            last_change_at,
+                        ),
+                    )
+                except psycopg2.errors.InFailedSqlTransaction:
+                    conn.rollback()
+                    return False
+            conn.commit()
+            return True
+        except (psycopg2.errors.ForeignKeyViolation, psycopg2.errors.UndefinedTable) as e:
+            if conn and not conn.closed:
+                conn.rollback()
+            if isinstance(e, psycopg2.errors.ForeignKeyViolation):
+                return False
+            return False
+        except Exception as e:
+            if conn and not conn.closed:
+                conn.rollback()
+            _s = str(e).lower()
+            if "42p01" in _s or "does not exist" in _s or "undefinedtable" in _s:
+                return False
+            if "foreign" in _s and "key" in _s:
+                return False
+            raise
+
+    def delete_repository_attention_row(self, repository_id: str) -> None:
+        try:
+            conn = self.connect()
+            with conn.cursor() as c:
+                c.execute("DELETE FROM odb.repository_attention WHERE repository_id = %s::uuid", (repository_id,))
+            conn.commit()
+        except Exception as e:
+            cnx = self.connection
+            if cnx and not cnx.closed:
+                cnx.rollback()
+            if "42p01" in str(e).lower() or "undefinedtable" in str(e).lower() or "does not exist" in str(e).lower():
+                return
+            raise
+
+    def notify_repository_attention(self, repository_id: str) -> None:
+        """pg_notify for channel dashboard.attention (REPO-11.1 / #2941)."""
+        try:
+            conn = self.connect()
+            payload = json.dumps({"repositoryId": str(repository_id)})
+            with conn.cursor() as c:
+                c.execute("SELECT pg_notify(%s, %s::text)", ("dashboard.attention", payload))
+            conn.commit()
+        except Exception as e:
+            cnx = self.connection
+            if cnx and not cnx.closed:
+                cnx.rollback()
+            _s = str(e).lower()
+            if "function pg_notify" in _s or "undefinedfunction" in _s or "42p01" in _s:
+                _logger.debug("notify_repository_attention skipped: %s", e)
+                return
+            _logger.debug("notify_repository_attention: %s", e)
 
 
 # Global database instance

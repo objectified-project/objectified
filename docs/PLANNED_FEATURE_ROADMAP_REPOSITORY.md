@@ -46,6 +46,7 @@ filter only the tickets defined in this document._
 ## Completed (Repository Connector v1)
 
 - REPO-10.2 (#2946): Per-repository **Scanned repository report** drill-in at `/ade/dashboard/repositories/{id}/reports/{scan_report_id}` (and `…/latest` → stable redirect) with server materialized `totalsJson` / `payloadJson` / `errorsJson`, REST list/detail/diff, and “compare with previous” totals roll-up.
+- REPO-11.1 (#2941): **repository_attention rollup** — `odb.repository_attention` plus per-repo recompute (reasons, open count, attention score) on scan/import/selection/credential/scheduler events, `pg_notify('dashboard.attention')` after PostgreSQL upsert, in-memory store for the REST process, and hourly safety reconcile.
 - REPO-10.4 (#2950): **Scan report export** — `POST /v1/repositories/{tenant}/scan-reports:export` (async job, CSV or NDJSON per-line JSON with `file` + report metadata) with 100k row cap and `GET …/exports` + tokenized `GET …/content`; `repository.scan_report.export_*` workflow audits; ADE export menu, **Recent exports** list, cancel/retry, and a session-scoped Next download proxy.
 - REPO-7.4 (#2802): Added linked-account token health monitoring by introducing per-credential probe persistence, classifying daily probe outcomes (`healthy` / `scope_missing` / `revoked` / `network_error`), auto-pausing repositories bound to revoked credentials, and surfacing usage + verification + reconnect states in Linked Accounts UI.
 - REPO-7.1 (#2799): Added repository workflow-audit coverage in the shared `workflow_audit` ledger, documenting and emitting repository action codes (`registered/scanned/sync/pause/poll/token/archive/remove`) with structured per-event detail payloads and actor identities.
@@ -870,7 +871,7 @@ with REPO-10.3, REPO-10.4, REPO-10.5.
 
 | Roadmap ID | Title                                            | Description                                                                                                  | Labels                                                                          | MVP | Parallel | Issue |
 |------------|--------------------------------------------------|--------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|-----|----------|-------|
-| REPO-11.1  | `repository_attention` rollup table + computer | Materialized rollup table; recomputed at scan completion and at scheduler tick                              | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `attention`, `database`, `rest` | Yes | No  | #2941 |
+| REPO-11.1  | `repository_attention` rollup table + computer | (Shipped) Materialized rollup; events + hourly reconcile, `pg_notify`                                | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `attention`, `database`, `rest` | Yes | No  | #2941 |
 | REPO-11.2  | Dashboard widget: "Repositories Needing Attention" | Top-N panel on `/ade/dashboard` rendering `repository_attention` ordered by score                          | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `attention`, `dashboard`, `ui` | Yes | Yes | #2942 |
 | REPO-11.3  | Dashboard widget: "Recent Imports Needing Attention" | Last N failed/warning import jobs sourced from repositories                                              | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `attention`, `dashboard`, `ui`, `import` | Yes | Yes | #2943 |
 | REPO-11.4  | Per-repo "Issues" tab                           | Repository detail tab listing actionable problems with "Fix" links (reconnect, edit manifest, retry import) | `enhancement`, `repository`, `roadmap-repository`, `attention`, `ui`             | No  | Yes | #2952 |
@@ -1187,7 +1188,6 @@ blocking.
 | 7     | REPO-12.1  | #2935 | auto-import worker + dispatch                       | Yes | E    |
 | 8     | REPO-12.3  | #2936 | version creation with provenance                    | Yes | E    |
 | 9     | REPO-12.4  | #2937 | repository_scan_report artifact                     | Yes | E    |
-| 13    | REPO-11.1  | #2941 | repository_attention rollup table + computer        | Yes | D    |
 | 14    | REPO-11.2  | #2942 | dashboard widget: Repositories Needing Attention    | Yes | D    |
 | 15    | REPO-11.3  | #2943 | dashboard widget: Recent Imports Needing Attention  | Yes | D    |
 | 16    | REPO-12.6  | #2944 | audit + change-report linking for auto-imports      | Yes | E    |
