@@ -2240,6 +2240,7 @@ async def update_repository_file_import_enabled(
                             "path": file_row.path,
                             "before": before,
                             "after": after,
+                            "actorId": actor_id,
                             "source": request.source,
                         },
                     )
