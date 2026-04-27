@@ -28,7 +28,7 @@ BEGIN
             'importedAt'
           ]
           AND jsonb_typeof(repository_source->'repositoryId') = 'string'
-          AND (repository_source->>'repositoryId') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+          AND (repository_source->>'repositoryId') ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
           AND jsonb_typeof(repository_source->'branch') = 'string'
           AND char_length(repository_source->>'branch') <= 256
           AND jsonb_typeof(repository_source->'path') = 'string'

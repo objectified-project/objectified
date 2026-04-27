@@ -527,8 +527,9 @@ async def get_sunset_timeline(
     return SunsetTimelineResponse(entries=entries)
 
 
-@router.get("/by-repo-source", response_model=VersionSchema)
+@router.get("/{tenant_slug}/by-repo-source", response_model=VersionSchema)
 async def get_version_by_repo_source(
+    tenant_slug: str,
     repository_id: str = Query(..., alias="repository_id"),
     path: str = Query(..., min_length=1),
     auth_data: Dict[str, Any] = Depends(validate_authentication),
