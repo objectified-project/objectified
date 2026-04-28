@@ -479,7 +479,7 @@ async def create_repository_scan_report_saved_filter(
         "id": new_id,
         "name": body.name.strip(),
         "filter": fp.model_dump(),
-        "isDefault": bool(body.is_default),
+        "isDefault": False,
         "createdAt": now,
         "updatedAt": now,
     }
@@ -556,9 +556,7 @@ async def delete_repository_scan_report_saved_filter(
     deleted_was_default = bool(deleted.get("isDefault"))
     items = [it for it in items if str(it.get("id")) != fid]
     if deleted_was_default and items:
-        replacement = dict(items[0])
-        replacement["isDefault"] = True
-        replacement["updatedAt"] = _scan_ts_iso()
-        items[0] = replacement
+        items[0]["isDefault"] = True
+        items[0]["updatedAt"] = _scan_ts_iso()
     db.replace_repository_scan_report_saved_filters(str(uid), tenant_id, items)
     return {"ok": True}
