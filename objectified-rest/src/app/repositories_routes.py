@@ -112,6 +112,8 @@ RepositoryFileStatus = Literal[
     "unchanged_checksum",
     "modified",
     "removed",
+    "discovered",
+    "ready_to_promote",
     "parse_error",
     "manifest_error",
 ]
@@ -540,6 +542,50 @@ _REPO_AUTO_PAUSED: Set[str] = set()
 _REPO_ATTENTION: Dict[str, Dict[str, Any]] = {}
 _STORE_LOCK = Lock()
 _SYSTEM_ACTOR_ID = "00000000-0000-0000-0000-000000000000"
+# Per-repository serialization for scan dispatch (REPO-12.1); parallels PG advisory
+# lock on repository.id within a single Python process only. Keep a bounded registry
+# so long-running processes do not accumulate one Lock per historical repository_id.
+_MAX_REPO_DISPATCH_ADVISORY_LOCKS = 1024
+_REPO_DISPATCH_ADVISORY_LOCKS: Dict[str, Tuple[Lock, float]] = {}
+_DISPATCH_ADVISORY_REGISTRY_LOCK = Lock()
+
+
+def _prune_repository_dispatch_advisory_locks_locked(
+    active_repository_id: Optional[str] = None,
+) -> None:
+    """Remove oldest unlocked entries when registry exceeds the cap.
+
+    Must be called with *_DISPATCH_ADVISORY_REGISTRY_LOCK* already held.
+    *active_repository_id* is never evicted even if it is the oldest entry.
+    """
+    if len(_REPO_DISPATCH_ADVISORY_LOCKS) <= _MAX_REPO_DISPATCH_ADVISORY_LOCKS:
+        return
+
+    for candidate_repository_id, (candidate_lock, _) in sorted(
+        _REPO_DISPATCH_ADVISORY_LOCKS.items(),
+        key=lambda item: item[1][1],
+    ):
+        if len(_REPO_DISPATCH_ADVISORY_LOCKS) <= _MAX_REPO_DISPATCH_ADVISORY_LOCKS:
+            break
+        if candidate_repository_id == active_repository_id:
+            continue
+        if candidate_lock.locked():
+            continue
+        _REPO_DISPATCH_ADVISORY_LOCKS.pop(candidate_repository_id, None)
+
+
+def _repository_dispatch_advisory_lock(repository_id: str) -> Lock:
+    with _DISPATCH_ADVISORY_REGISTRY_LOCK:
+        now = time.monotonic()
+        existing_entry = _REPO_DISPATCH_ADVISORY_LOCKS.get(repository_id)
+        if existing_entry is None:
+            existing = Lock()
+        else:
+            existing, _ = existing_entry
+        _REPO_DISPATCH_ADVISORY_LOCKS[repository_id] = (existing, now)
+        _prune_repository_dispatch_advisory_locks_locked(repository_id)
+        return existing
+
 
 RepositoryAuditEvent = Literal[
     "repository.registered",
@@ -557,6 +603,7 @@ RepositoryAuditEvent = Literal[
     "repository.token_resolved",
     "repository.polled",
     "repository.spec.import_now_triggered",
+    "repository.auto_imported",
 ]
 
 _DEFAULT_SCAN_PAGE_SIZE = 50
@@ -2645,52 +2692,77 @@ def _dispatch_import_jobs_for_scan(
 ) -> List[Dict[str, Any]]:
     pending_audit_rows: List[Dict[str, Any]] = []
     checksums = precomputed_checksums or {}
-    for file_row in scan_files:
-        if file_row.status not in {"new", "modified", "removed"}:
-            continue
-        if not file_row.tracked:
-            continue
-        if not file_row.importEnabled:
-            continue
-        if not file_row.autoImportEnabled:
-            continue
-        if file_row.status == "modified" and not force:
-            current_checksum = _normalize_content_checksum(file_row.contentChecksum)
-            if current_checksum is not None:
-                latest_checksum = checksums.get(file_row.path)
-                if latest_checksum == current_checksum:
-                    file_row.status = "unchanged_checksum"
-                    diff_summary["modified"] = max(0, int(diff_summary.get("modified", 0)) - 1)
-                    diff_summary["skipped_unchanged_by_checksum"] = int(
-                        diff_summary.get("skipped_unchanged_by_checksum", 0)
-                    ) + 1
-                    pending_audit_rows.append(
-                        _append_audit_row(
-                            tenant_id,
-                            repository_id,
-                            "repository.scan.skipped_checksum",
-                            actor_id=actor_id,
-                            detail={
-                                "scanId": scan_id,
-                                "path": file_row.path,
-                                "contentChecksumShort": _short_checksum(current_checksum),
-                            },
-                        )
-                    )
-                    continue
+    with _repository_dispatch_advisory_lock(repository_id):
+        for file_row in scan_files:
+            if file_row.status not in {"new", "modified", "removed"}:
+                continue
+            if not file_row.tracked:
+                continue
 
-        _created_job, materialize_audits = _materialize_repository_dry_run_import_job(
-            tenant_id=tenant_id,
-            repository_id=repository_id,
-            scan_id=scan_id,
-            branch=branch,
-            commit_sha=commit_sha,
-            file_row=file_row,
-            actor_id=actor_id,
-            source_kind="repository_auto_import",
-        )
-        pending_audit_rows.extend(materialize_audits)
-        _ = _created_job
+            if not file_row.importEnabled:
+                if file_row.status != "removed":
+                    file_row.status = "discovered"
+                continue
+
+            if not file_row.autoImportEnabled:
+                if file_row.status != "removed":
+                    file_row.status = "ready_to_promote"
+                continue
+
+            if file_row.status == "modified" and not force:
+                current_checksum = _normalize_content_checksum(file_row.contentChecksum)
+                if current_checksum is not None:
+                    latest_checksum = checksums.get(file_row.path)
+                    if latest_checksum == current_checksum:
+                        file_row.status = "unchanged_checksum"
+                        diff_summary["modified"] = max(0, int(diff_summary.get("modified", 0)) - 1)
+                        diff_summary["skipped_unchanged_by_checksum"] = int(
+                            diff_summary.get("skipped_unchanged_by_checksum", 0)
+                        ) + 1
+                        pending_audit_rows.append(
+                            _append_audit_row(
+                                tenant_id,
+                                repository_id,
+                                "repository.scan.skipped_checksum",
+                                actor_id=actor_id,
+                                detail={
+                                    "scanId": scan_id,
+                                    "path": file_row.path,
+                                    "contentChecksumShort": _short_checksum(current_checksum),
+                                },
+                            )
+                        )
+                        continue
+
+            _created_job, materialize_audits = _materialize_repository_dry_run_import_job(
+                tenant_id=tenant_id,
+                repository_id=repository_id,
+                scan_id=scan_id,
+                branch=branch,
+                commit_sha=commit_sha,
+                file_row=file_row,
+                actor_id=actor_id,
+                source_kind="repository_auto_import",
+            )
+            pending_audit_rows.extend(materialize_audits)
+            pending_audit_rows.append(
+                _append_audit_row(
+                    tenant_id,
+                    repository_id,
+                    "repository.auto_imported",
+                    actor_id=actor_id,
+                    detail={
+                        "scanId": scan_id,
+                        "fileId": file_row.id,
+                        "contentChecksumShort": _short_checksum(
+                            _normalize_content_checksum(file_row.contentChecksum)
+                        ),
+                        "projectSlug": file_row.projectSlug,
+                        "versionStrategy": file_row.versionStrategy,
+                        "importJobId": _created_job.id,
+                    },
+                )
+            )
     return pending_audit_rows
 
 
@@ -4986,6 +5058,8 @@ def _reset_repository_state_for_tests() -> None:
         _REPO_CORPUS_ROLLUP.clear()
         _REPO_ATTENTION.clear()
         _REPO_AUTO_PAUSED.clear()
+    with _DISPATCH_ADVISORY_REGISTRY_LOCK:
+        _REPO_DISPATCH_ADVISORY_LOCKS.clear()
     try:
         from .repositories.scan_report_export import reset_scan_report_export_state_for_tests
 

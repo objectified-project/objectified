@@ -8,6 +8,8 @@ from app.auth import validate_authentication
 from app.main import app
 from app.repositories_routes import (
     RepositoryFileRecord,
+    _REPO_SCAN_FILE_HISTORY_STORE,
+    _STORE_LOCK,
     _build_repository_sync_change_report_for_test_status,
     _complete_repository_scan_for_tests,
     _dispatch_import_jobs_for_scan,
@@ -764,7 +766,9 @@ def test_complete_scan_dispatches_import_jobs_and_records_parse_errors():
     assert [row["eventType"] for row in new_audit_rows] == [
         "repository.polled",
         "repository.sync_pending_review",
+        "repository.auto_imported",
         "repository.sync_failed",
+        "repository.auto_imported",
         "repository.scanned",
     ]
 
@@ -809,6 +813,9 @@ def test_checksum_matched_modified_file_skips_dispatch_and_updates_diff_summary(
             actor_id=_MOCK_AUTH["user_id"],
             force=False,
             diff_summary=diff_summary,
+            precomputed_checksums={
+                file_row.path: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            },
         )
 
     assert _get_repository_import_jobs_for_tests(file_row.repositoryId) == []
@@ -820,6 +827,139 @@ def test_checksum_matched_modified_file_skips_dispatch_and_updates_diff_summary(
     assert audit_rows[0]["eventType"] == "repository.scan.skipped_checksum"
     assert audit_rows[0]["detail"]["path"] == "apis/orders.yaml"
     assert audit_rows[0]["detail"]["contentChecksumShort"] == "aaaaaaaaaaaa"
+
+
+def test_dispatch_chain_selection_mode_checksum_and_auto_import_audit() -> None:
+    """REPO-12.1: discovered → ready_to_promote → unchanged_checksum → dispatch + repository.auto_imported."""
+    tenant_id = _MOCK_AUTH["tenant_id"]
+    actor_id = _MOCK_AUTH["user_id"]
+    repository_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    scan_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+
+    f_selection = RepositoryFileRecord(
+        id="e1111111-1111-1111-1111-111111111111",
+        repositoryId=repository_id,
+        scanId=scan_id,
+        path="sel.yaml",
+        blobSha="b1",
+        contentAlgo="sha256",
+        contentChecksum="c" * 64,
+        tracked=True,
+        importEnabled=False,
+        autoImportEnabled=False,
+        projectSlug="svc",
+        versionStrategy="commit-sha",
+        status="new",
+        createdAt="2026-04-26T00:00:00Z",
+    )
+    f_mode = RepositoryFileRecord(
+        id="e2222222-2222-2222-2222-222222222222",
+        repositoryId=repository_id,
+        scanId=scan_id,
+        path="mode.yaml",
+        blobSha="b2",
+        contentAlgo="sha256",
+        contentChecksum="d" * 64,
+        tracked=True,
+        importEnabled=True,
+        autoImportEnabled=False,
+        projectSlug="svc",
+        versionStrategy="semver",
+        status="modified",
+        createdAt="2026-04-26T00:00:00Z",
+    )
+    f_checksum = RepositoryFileRecord(
+        id="e3333333-3333-3333-3333-333333333333",
+        repositoryId=repository_id,
+        scanId=scan_id,
+        path="ck.yaml",
+        blobSha="b3",
+        contentAlgo="sha256",
+        contentChecksum="e" * 64,
+        tracked=True,
+        importEnabled=True,
+        autoImportEnabled=True,
+        projectSlug="svc",
+        versionStrategy="commit-sha",
+        status="modified",
+        createdAt="2026-04-26T00:00:00Z",
+    )
+    f_dispatch = RepositoryFileRecord(
+        id="e4444444-4444-4444-4444-444444444444",
+        repositoryId=repository_id,
+        scanId=scan_id,
+        path="go.yaml",
+        blobSha="b4",
+        contentAlgo="sha256",
+        contentChecksum="f" * 64,
+        tracked=True,
+        importEnabled=True,
+        autoImportEnabled=True,
+        projectSlug="svc",
+        versionStrategy="commit-sha",
+        status="modified",
+        createdAt="2026-04-26T00:00:00Z",
+    )
+
+    diff_summary = {
+        "added": 1,
+        "modified": 3,
+        "removed": 0,
+        "unchanged": 0,
+        "skipped_unchanged_by_checksum": 0,
+    }
+    precomputed_checksums = {"ck.yaml": "e" * 64, "go.yaml": "1" * 64}
+
+    with (
+        patch("app.repositories_routes.db") as mdb,
+        patch(
+            "app.repositories_routes._find_tenant_id_for_repository",
+            return_value=tenant_id,
+        ),
+    ):
+        mdb.get_project_by_slug.return_value = {"id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}
+
+        def _latest_checksum(_tid: str, _rid: str, path: str, _pid: str) -> str | None:
+            return precomputed_checksums.get(path)
+
+        mdb.get_latest_repository_source_checksum_for_project.side_effect = _latest_checksum
+
+        audit_rows = _dispatch_import_jobs_for_scan(
+            tenant_id=tenant_id,
+            repository_id=repository_id,
+            scan_id=scan_id,
+            branch="main",
+            commit_sha="commit-dispatch",
+            scan_files=[f_selection, f_mode, f_checksum, f_dispatch],
+            actor_id=actor_id,
+            force=False,
+            diff_summary=diff_summary,
+            precomputed_checksums=precomputed_checksums,
+        )
+
+    assert f_selection.status == "discovered"
+    assert f_mode.status == "ready_to_promote"
+    assert f_checksum.status == "unchanged_checksum"
+    assert f_dispatch.status == "modified"
+    assert diff_summary["modified"] == 2
+    assert diff_summary["skipped_unchanged_by_checksum"] == 1
+
+    jobs = _get_repository_import_jobs_for_tests(repository_id)
+    assert len(jobs) == 1
+    assert jobs[0].diffSnapshot["path"] == "go.yaml"
+    assert jobs[0].sourceKind == "repository_auto_import"
+    assert f_dispatch.lastImportJobId == jobs[0].id
+
+    types = [row["eventType"] for row in audit_rows]
+    assert types.count("repository.scan.skipped_checksum") == 1
+    assert types.count("repository.sync_pending_review") == 1
+    assert types.count("repository.auto_imported") == 1
+    auto_rows = [row for row in audit_rows if row["eventType"] == "repository.auto_imported"]
+    assert auto_rows[0]["detail"]["fileId"] == f_dispatch.id
+    assert auto_rows[0]["detail"]["projectSlug"] == "svc"
+    assert auto_rows[0]["detail"]["versionStrategy"] == "commit-sha"
+    assert auto_rows[0]["detail"]["importJobId"] == jobs[0].id
+    assert auto_rows[0]["detail"]["contentChecksumShort"] == ("f" * 64)[:12]
 
 
 def test_force_scan_ignores_checksum_skip_and_dispatches_modified_file() -> None:
@@ -1388,6 +1528,7 @@ def test_on_breaking_change_block_forces_manual_even_when_promote_is_auto() -> N
         "repository.token_resolved",
         "repository.registered",
         "repository.sync_pending_review",
+        "repository.auto_imported",
         "repository.scanned",
     ]
 
@@ -1416,11 +1557,15 @@ def test_no_manifest_import_enabled_false_does_not_dispatch() -> None:
             ],
         )
         jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == scan_id]
+        with _STORE_LOCK:
+            scan_rows = list(_REPO_SCAN_FILE_HISTORY_STORE.get(scan_id, []))
     finally:
         app.dependency_overrides.pop(validate_authentication, None)
 
     assert create_response.status_code == 201
     assert jobs == []
+    assert len(scan_rows) == 1
+    assert scan_rows[0].status == "discovered"
 
 
 def test_manifest_import_enabled_false_does_not_dispatch() -> None:
@@ -1453,11 +1598,15 @@ def test_manifest_import_enabled_false_does_not_dispatch() -> None:
             files=[{"path": "apis/held.yaml", "blobSha": "x"}],
         )
         jobs = [job for job in _get_repository_import_jobs_for_tests(repository_id) if job.scanId == scan_id]
+        with _STORE_LOCK:
+            scan_rows = list(_REPO_SCAN_FILE_HISTORY_STORE.get(scan_id, []))
     finally:
         app.dependency_overrides.pop(validate_authentication, None)
 
     assert create_response.status_code == 201
     assert jobs == []
+    assert len(scan_rows) == 1
+    assert scan_rows[0].status == "discovered"
 
 
 def test_patch_file_import_enabled_writes_audit() -> None:
