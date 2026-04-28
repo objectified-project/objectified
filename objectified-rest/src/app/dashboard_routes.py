@@ -483,7 +483,8 @@ async def create_repository_scan_report_saved_filter(
         "createdAt": now,
         "updatedAt": now,
     }
-    if body.is_default:
+    if body.is_default or not items:
+        row["isDefault"] = True
         for it in items:
             it["isDefault"] = False
     items.append(row)
@@ -549,9 +550,15 @@ async def delete_repository_scan_report_saved_filter(
         raise HTTPException(status_code=401, detail="User id required")
     fid = filter_id.strip()
     items = db.list_repository_scan_report_saved_filters(str(uid), tenant_id)
-    n_before = len(items)
-    items = [it for it in items if str(it.get("id")) != fid]
-    if len(items) == n_before:
+    deleted = next((it for it in items if str(it.get("id")) == fid), None)
+    if deleted is None:
         raise HTTPException(status_code=404, detail="Saved filter not found")
+    deleted_was_default = bool(deleted.get("isDefault"))
+    items = [it for it in items if str(it.get("id")) != fid]
+    if deleted_was_default and items:
+        replacement = dict(items[0])
+        replacement["isDefault"] = True
+        replacement["updatedAt"] = _scan_ts_iso()
+        items[0] = replacement
     db.replace_repository_scan_report_saved_filters(str(uid), tenant_id, items)
     return {"ok": True}

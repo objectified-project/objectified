@@ -193,6 +193,7 @@ export default function ScanReportsPage() {
   const pollGenRef = useRef(0);
   const [savedFilters, setSavedFilters] = useState<SavedScanReportFilter[]>([]);
   const [savedFiltersLoading, setSavedFiltersLoading] = useState(false);
+  const [savedFiltersInitialized, setSavedFiltersInitialized] = useState(false);
   const emptyQueryLandingHandledRef = useRef(false);
   const [presetDialogOpen, setPresetDialogOpen] = useState(false);
   const [presetDialogMode, setPresetDialogMode] = useState<'save' | 'rename'>('save');
@@ -242,6 +243,7 @@ export default function ScanReportsPage() {
       setSavedFilters([]);
     } finally {
       setSavedFiltersLoading(false);
+      setSavedFiltersInitialized(true);
     }
   }, []);
 
@@ -475,37 +477,19 @@ export default function ScanReportsPage() {
       emptyQueryLandingHandledRef.current = true;
       return;
     }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch('/api/dashboard/repository-scan-report-saved-filters', { cache: 'no-store' });
-        const body = (await res.json()) as { success?: boolean; data?: { items?: SavedScanReportFilter[] } };
-        if (cancelled || !res.ok || !body.success || !body.data?.items) {
-          emptyQueryLandingHandledRef.current = true;
-          return;
-        }
-        const def = body.data.items.find((x) => x.isDefault);
-        if (!def) {
-          emptyQueryLandingHandledRef.current = true;
-          return;
-        }
-        emptyQueryLandingHandledRef.current = true;
-        const f = def.filter;
-        const p = new URLSearchParams();
-        p.set('provider', f.provider);
-        p.set('status', f.status);
-        if (f.subtype) p.set('subtype', f.subtype);
-        if (f.search) p.set('q', f.search);
-        p.set('page', '1');
-        router.replace(`${pathname}?${p.toString()}`);
-      } catch {
-        emptyQueryLandingHandledRef.current = true;
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname, router, searchParams]);
+    if (!savedFiltersInitialized) return;
+    emptyQueryLandingHandledRef.current = true;
+    const def = savedFilters.find((x) => x.isDefault);
+    if (!def) return;
+    const f = def.filter;
+    const p = new URLSearchParams();
+    p.set('provider', f.provider);
+    p.set('status', f.status);
+    if (f.subtype) p.set('subtype', f.subtype);
+    if (f.search) p.set('q', f.search);
+    p.set('page', '1');
+    router.replace(`${pathname}?${p.toString()}`);
+  }, [pathname, router, searchParams, savedFilters, savedFiltersInitialized]);
 
   const loadExportList = useCallback(async () => {
     setExportsLoading(true);
