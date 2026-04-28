@@ -6972,8 +6972,7 @@ class Database:
         """
         own_conn = _connection is None
         conn = _connection or self.connect()
-        prev_ac = conn.autocommit
-        conn.autocommit = False
+        prev_ac = self._begin_tx(conn) if own_conn else None
         report_id: Optional[str] = None
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -7010,9 +7009,14 @@ class Database:
                     ),
                 )
                 if cursor.rowcount != 1:
-                    conn.rollback()
-                    conn.autocommit = prev_ac
-                    return None
+                    if own_conn:
+                        conn.rollback()
+                        conn.autocommit = prev_ac
+                        return None
+                    raise RuntimeError(
+                        "repository scan update affected an unexpected number of rows; "
+                        "caller-managed transaction left unchanged"
+                    )
                 cursor.execute(
                     """
                     INSERT INTO odb.repository_scan_report (
@@ -7057,16 +7061,19 @@ class Database:
             if own_conn:
                 conn.commit()
         except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn) as e:
-            conn.rollback()
-            conn.autocommit = prev_ac
+            if own_conn:
+                conn.rollback()
+                conn.autocommit = prev_ac
             _logger.debug("finalize_repository_scan_with_report skipped: %s", e)
             return None
         except Exception:
-            conn.rollback()
-            conn.autocommit = prev_ac
+            if own_conn:
+                conn.rollback()
+                conn.autocommit = prev_ac
             raise
         else:
-            conn.autocommit = prev_ac
+            if own_conn:
+                conn.autocommit = prev_ac
         return report_id or None
 
     def purge_expired_repository_scan_reports(self) -> List[Dict[str, Any]]:
@@ -7076,8 +7083,7 @@ class Database:
         """
         default_days = int(settings.repository_scan_report_retention_days_default)
         conn = self.connect()
-        prev_ac = conn.autocommit
-        conn.autocommit = False
+        prev_ac = self._begin_tx(conn)
         deleted: List[Dict[str, Any]] = []
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -7086,7 +7092,7 @@ class Database:
                     WITH latest AS (
                       SELECT DISTINCT ON (repository_id) id
                       FROM odb.repository_scan_report
-                      ORDER BY repository_id, generated_at DESC
+                      ORDER BY repository_id, generated_at DESC, id DESC
                     )
                     DELETE FROM odb.repository_scan_report r
                     USING odb.repository repo, odb.tenants t

@@ -213,12 +213,19 @@ async def startup_event():
         global _repository_attention_reconcile_task
         _repository_attention_reconcile_task = asyncio.create_task(_repository_attention_hourly_loop())
 
+    def _purge_expired_repository_scan_reports_isolated() -> int:
+        retention_db = Database()
+        try:
+            return len(retention_db.purge_expired_repository_scan_reports())
+        finally:
+            retention_db.close()
+
     async def _repository_scan_report_retention_daily_loop() -> None:
         log = logging.getLogger(__name__)
         while True:
             await asyncio.sleep(86400)
             try:
-                n = len(db.purge_expired_repository_scan_reports())
+                n = await asyncio.to_thread(_purge_expired_repository_scan_reports_isolated)
                 if n > 0:
                     log.info("Purged %s expired repository_scan_report row(s)", n)
             except asyncio.CancelledError:
