@@ -972,10 +972,10 @@ def test_dispatch_chain_selection_mode_checksum_and_auto_import_audit() -> None:
 
 def test_repo_12_3_committed_auto_import_calls_push_with_repository_source() -> None:
     tenant_id = _MOCK_AUTH["tenant_id"]
-    repository_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-    scan_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    repository_id = "b0b0b0b0-b0b0-4b0b-8b0b-b0b0b0b0b0b0"
+    scan_id = "c0c0c0c0-c0c0-4c0c-8c0c-c0c0c0c0c0c0"
     _REPO_PROJECT_STORE.setdefault(tenant_id, {})["svc"] = RepositoryResolvedProjectRecord(
-        id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        id="a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0",
         tenantId=tenant_id,
         slug="svc",
         name="Svc",
@@ -1005,11 +1005,12 @@ def test_repo_12_3_committed_auto_import_calls_push_with_repository_source() -> 
 
     def _fake_push(**kwargs):
         captured.update(kwargs)
-        return ({"id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "version_id": "0.1.0"}, 0)
+        return ({"id": "d0d0d0d0-d0d0-4d0d-8d0d-d0d0d0d0d0d0", "version_id": "0.1.0"}, 0)
 
     try:
         with (
-            patch("app.repositories_routes.db.get_project_by_slug", return_value={"id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}),
+            patch("app.repositories_routes._find_tenant_id_for_repository", return_value=tenant_id),
+            patch("app.repositories_routes.db.get_project_by_slug", return_value={"id": "a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0"}),
             patch(
                 "app.repositories_routes.db.resolve_push_head_for_repository_import",
                 return_value=(None, None),
@@ -1044,8 +1045,8 @@ def test_repo_12_3_committed_auto_import_calls_push_with_repository_source() -> 
     assert auto["detail"]["repositoryId"] == repository_id
     assert auto["detail"]["branch"] == "main"
     assert auto["detail"]["commitSha"] == "a" * 40
-    assert auto["detail"]["versionId"] == "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-    assert auto["detail"]["projectId"] == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    assert auto["detail"]["versionId"] == "d0d0d0d0-d0d0-4d0d-8d0d-d0d0d0d0d0d0"
+    assert auto["detail"]["projectId"] == "a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0"
 
 
 def test_force_scan_ignores_checksum_skip_and_dispatches_modified_file() -> None:
