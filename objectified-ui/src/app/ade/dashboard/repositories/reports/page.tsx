@@ -3,7 +3,19 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronDown, ChevronLeft, Download, FileBarChart2, Loader2, RotateCcw, Search, Timer, X } from 'lucide-react';
+import {
+  BookmarkPlus,
+  ChevronDown,
+  ChevronLeft,
+  Download,
+  FileBarChart2,
+  Loader2,
+  RotateCcw,
+  Search,
+  Star,
+  Timer,
+  X,
+} from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { toast } from 'sonner';
 import { Button, buttonVariants } from '@/app/components/ui/Button';
@@ -11,6 +23,14 @@ import { Input } from '@/app/components/ui/Input';
 import { Alert } from '@/app/components/ui/Alert';
 import { Skeleton } from '@/app/components/ui/Skeleton';
 import { cn } from '@lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/app/components/ui/Dialog';
 import {
   dashboardContentStackClass,
   dashboardMainClass,
@@ -99,6 +119,20 @@ type ScanReportExportJobDetail = ScanReportExportListItem & {
   downloadUrl?: string;
 };
 
+type SavedScanReportFilter = {
+  id: string;
+  name: string;
+  filter: {
+    provider: string;
+    status: string;
+    subtype?: string;
+    search?: string;
+  };
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 function buildClientExportDownloadUrl(exportId: string, downloadUrl: string | undefined): string | null {
   if (!downloadUrl) return null;
   const q = downloadUrl.split('?')[1];
@@ -157,6 +191,15 @@ export default function ScanReportsPage() {
   const [pollingJobId, setPollingJobId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollGenRef = useRef(0);
+  const [savedFilters, setSavedFilters] = useState<SavedScanReportFilter[]>([]);
+  const [savedFiltersLoading, setSavedFiltersLoading] = useState(false);
+  const emptyQueryLandingHandledRef = useRef(false);
+  const [presetDialogOpen, setPresetDialogOpen] = useState(false);
+  const [presetDialogMode, setPresetDialogMode] = useState<'save' | 'rename'>('save');
+  const [presetEditingId, setPresetEditingId] = useState<string | null>(null);
+  const [presetNameDraft, setPresetNameDraft] = useState('');
+  const [presetSaving, setPresetSaving] = useState(false);
+  const [manageFiltersOpen, setManageFiltersOpen] = useState(false);
 
   const urlProvider = searchParams.get('provider') || 'all';
   const urlStatus = searchParams.get('status') || 'all';
@@ -180,6 +223,164 @@ export default function ScanReportsPage() {
       router.push(`${pathname}?${p.toString()}`);
     },
     [router, pathname, searchParams],
+  );
+
+  const loadSavedFilters = useCallback(async () => {
+    setSavedFiltersLoading(true);
+    try {
+      const res = await fetch('/api/dashboard/repository-scan-report-saved-filters', { cache: 'no-store' });
+      const body = (await res.json()) as {
+        success?: boolean;
+        data?: { items?: SavedScanReportFilter[] };
+      };
+      if (!res.ok || !body.success || !body.data?.items) {
+        setSavedFilters([]);
+        return;
+      }
+      setSavedFilters(body.data.items);
+    } catch {
+      setSavedFilters([]);
+    } finally {
+      setSavedFiltersLoading(false);
+    }
+  }, []);
+
+  const applySavedFilter = useCallback(
+    (sf: SavedScanReportFilter) => {
+      setQuery({
+        provider: sf.filter.provider,
+        status: sf.filter.status,
+        subtype: sf.filter.subtype || null,
+        q: sf.filter.search || null,
+        page: 1,
+      });
+    },
+    [setQuery],
+  );
+
+  const openSavePresetDialog = useCallback(() => {
+    setPresetDialogMode('save');
+    setPresetEditingId(null);
+    setPresetNameDraft('');
+    setPresetDialogOpen(true);
+  }, []);
+
+  const openRenamePresetDialog = useCallback((sf: SavedScanReportFilter) => {
+    setPresetDialogMode('rename');
+    setPresetEditingId(sf.id);
+    setPresetNameDraft(sf.name);
+    setPresetDialogOpen(true);
+    setManageFiltersOpen(false);
+  }, []);
+
+  const submitPresetDialog = useCallback(async () => {
+    const name = presetNameDraft.trim();
+    if (!name) {
+      toast.error('Enter a name');
+      return;
+    }
+    setPresetSaving(true);
+    try {
+      if (presetDialogMode === 'rename' && presetEditingId) {
+        const res = await fetch(
+          `/api/dashboard/repository-scan-report-saved-filters/${encodeURIComponent(presetEditingId)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name }),
+          },
+        );
+        const body = (await res.json()) as { success?: boolean; error?: string };
+        if (!res.ok || !body.success) {
+          toast.error(body.error || 'Could not rename');
+          return;
+        }
+        toast.success('Saved filter renamed');
+      } else {
+        const res = await fetch('/api/dashboard/repository-scan-report-saved-filters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            isDefault: false,
+            filter: {
+              provider: urlProvider,
+              status: urlStatus,
+              subtype: urlSubtype || '',
+              search: urlQ.trim(),
+            },
+          }),
+        });
+        const body = (await res.json()) as { success?: boolean; error?: string; code?: string };
+        if (res.status === 400 && body.code === 'SAVED_FILTER_LIMIT_REACHED') {
+          toast.error('Saved filter limit reached', {
+            description: body.error || 'Delete an existing filter first.',
+          });
+          return;
+        }
+        if (!res.ok || !body.success) {
+          toast.error(body.error || 'Could not save filter');
+          return;
+        }
+        toast.success('Filter saved');
+      }
+      setPresetDialogOpen(false);
+      void loadSavedFilters();
+    } finally {
+      setPresetSaving(false);
+    }
+  }, [
+    presetDialogMode,
+    presetEditingId,
+    presetNameDraft,
+    urlProvider,
+    urlStatus,
+    urlSubtype,
+    urlQ,
+    loadSavedFilters,
+  ]);
+
+  const setSavedAsDefault = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/dashboard/repository-scan-report-saved-filters/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isDefault: true }),
+        });
+        const body = (await res.json()) as { success?: boolean; error?: string };
+        if (!res.ok || !body.success) {
+          toast.error(body.error || 'Could not update default');
+          return;
+        }
+        toast.success('Default filter updated');
+        void loadSavedFilters();
+      } catch {
+        toast.error('Could not update default');
+      }
+    },
+    [loadSavedFilters],
+  );
+
+  const deleteSavedFilter = useCallback(
+    async (id: string) => {
+      if (!globalThis.window.confirm('Delete this saved filter?')) return;
+      try {
+        const res = await fetch(`/api/dashboard/repository-scan-report-saved-filters/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        });
+        const body = (await res.json()) as { success?: boolean; error?: string };
+        if (!res.ok || !body.success) {
+          toast.error(body.error || 'Could not delete');
+          return;
+        }
+        toast.message('Saved filter deleted');
+        void loadSavedFilters();
+      } catch {
+        toast.error('Could not delete');
+      }
+    },
+    [loadSavedFilters],
   );
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -263,6 +464,48 @@ export default function ScanReportsPage() {
       if (qDebounce.current) clearTimeout(qDebounce.current);
     };
   }, []);
+
+  useEffect(() => {
+    void loadSavedFilters();
+  }, [loadSavedFilters]);
+
+  useEffect(() => {
+    if (emptyQueryLandingHandledRef.current) return;
+    if (searchParams.toString() !== '') {
+      emptyQueryLandingHandledRef.current = true;
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/dashboard/repository-scan-report-saved-filters', { cache: 'no-store' });
+        const body = (await res.json()) as { success?: boolean; data?: { items?: SavedScanReportFilter[] } };
+        if (cancelled || !res.ok || !body.success || !body.data?.items) {
+          emptyQueryLandingHandledRef.current = true;
+          return;
+        }
+        const def = body.data.items.find((x) => x.isDefault);
+        if (!def) {
+          emptyQueryLandingHandledRef.current = true;
+          return;
+        }
+        emptyQueryLandingHandledRef.current = true;
+        const f = def.filter;
+        const p = new URLSearchParams();
+        p.set('provider', f.provider);
+        p.set('status', f.status);
+        if (f.subtype) p.set('subtype', f.subtype);
+        if (f.search) p.set('q', f.search);
+        p.set('page', '1');
+        router.replace(`${pathname}?${p.toString()}`);
+      } catch {
+        emptyQueryLandingHandledRef.current = true;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, router, searchParams]);
 
   const loadExportList = useCallback(async () => {
     setExportsLoading(true);
@@ -757,6 +1000,79 @@ export default function ScanReportsPage() {
             aria-label="Scan report filters"
           >
             <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        disabled={savedFiltersLoading}
+                        aria-label="Saved scan report filters"
+                      >
+                        {savedFiltersLoading ? (
+                          <Loader2 className="w-4 h-4 shrink-0 animate-spin" aria-hidden />
+                        ) : (
+                          <BookmarkPlus className="w-4 h-4 shrink-0" aria-hidden />
+                        )}
+                        Saved filters
+                        <ChevronDown className="w-4 h-4 shrink-0 opacity-70" aria-hidden />
+                      </Button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content
+                        className="z-50 min-w-[14rem] rounded-md border border-gray-200/90 bg-white p-1.5 text-sm shadow-md dark:border-slate-600 dark:bg-slate-900"
+                        align="start"
+                        sideOffset={4}
+                      >
+                        {savedFilters.length < 1 ? (
+                          <div className="px-2 py-2 text-xs text-gray-500 dark:text-gray-400">
+                            No saved filters yet. Use &quot;Save current filter&quot; below.
+                          </div>
+                        ) : (
+                          savedFilters.map((sf) => (
+                            <DropdownMenu.Item
+                              key={sf.id}
+                              className="flex cursor-default select-none items-center gap-2 rounded-sm px-2.5 py-2 outline-none hover:bg-indigo-50 data-[highlighted]:bg-indigo-50 dark:hover:bg-slate-800 data-[highlighted]:dark:bg-slate-800"
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                applySavedFilter(sf);
+                              }}
+                            >
+                              {sf.isDefault ? (
+                                <Star
+                                  className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                                  aria-hidden
+                                  fill="currentColor"
+                                />
+                              ) : (
+                                <span className="inline-block w-3.5 shrink-0" aria-hidden />
+                              )}
+                              <span className="truncate">{sf.name}</span>
+                            </DropdownMenu.Item>
+                          ))
+                        )}
+                        <DropdownMenu.Separator className="my-1 h-px bg-gray-200 dark:bg-slate-600" />
+                        <DropdownMenu.Item
+                          className="flex cursor-default select-none items-center rounded-sm px-2.5 py-2 text-xs outline-none hover:bg-indigo-50 data-[highlighted]:bg-indigo-50 dark:hover:bg-slate-800 data-[highlighted]:dark:bg-slate-800"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setManageFiltersOpen(true);
+                          }}
+                        >
+                          Manage saved filters…
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
+                  <Button type="button" variant="secondary" size="sm" className="gap-1.5" onClick={openSavePresetDialog}>
+                    <BookmarkPlus className="w-4 h-4 shrink-0" aria-hidden />
+                    Save current filter
+                  </Button>
+                </div>
+              </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
                   Provider
@@ -990,6 +1306,109 @@ export default function ScanReportsPage() {
           </section>
         </div>
       </main>
+
+      <Dialog open={presetDialogOpen} onOpenChange={setPresetDialogOpen}>
+        <DialogContent showCloseButton={!presetSaving}>
+          <DialogHeader>
+            <DialogTitle>{presetDialogMode === 'rename' ? 'Rename saved filter' : 'Save current filter'}</DialogTitle>
+            <DialogDescription>
+              {presetDialogMode === 'rename'
+                ? 'Update the display name for this preset.'
+                : 'Name this combination of provider, status, subtype, and search.'}
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={presetNameDraft}
+            onChange={(e) => setPresetNameDraft(e.target.value)}
+            placeholder="e.g. Failing on prod"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void submitPresetDialog();
+              }
+            }}
+          />
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPresetDialogOpen(false)}
+              disabled={presetSaving}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void submitPresetDialog()} disabled={presetSaving}>
+              {presetSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin inline" aria-hidden /> : null}
+              {presetDialogMode === 'rename' ? 'Save' : 'Save preset'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={manageFiltersOpen} onOpenChange={setManageFiltersOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Saved filters</DialogTitle>
+            <DialogDescription>Apply, rename, set your default landing filter, or delete a preset.</DialogDescription>
+          </DialogHeader>
+          {savedFilters.length < 1 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">No saved filters yet.</p>
+          ) : (
+            <ul className="divide-y divide-gray-200 dark:divide-slate-600">
+              {savedFilters.map((sf) => (
+                <li
+                  key={sf.id}
+                  className="flex flex-col gap-2 py-3 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {sf.isDefault ? (
+                      <Star className="w-4 h-4 text-amber-500 shrink-0" aria-hidden fill="currentColor" />
+                    ) : (
+                      <span className="inline-block w-4 shrink-0" aria-hidden />
+                    )}
+                    <span className="font-medium text-gray-900 dark:text-gray-100 truncate">{sf.name}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        applySavedFilter(sf);
+                        setManageFiltersOpen(false);
+                      }}
+                    >
+                      Apply
+                    </Button>
+                    {!sf.isDefault ? (
+                      <Button type="button" size="sm" variant="outline" onClick={() => void setSavedAsDefault(sf.id)}>
+                        Set default
+                      </Button>
+                    ) : null}
+                    <Button type="button" size="sm" variant="outline" onClick={() => openRenamePresetDialog(sf)}>
+                      Rename
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-600 dark:text-red-400"
+                      onClick={() => void deleteSavedFilter(sf.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setManageFiltersOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

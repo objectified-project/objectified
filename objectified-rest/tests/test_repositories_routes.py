@@ -3227,3 +3227,70 @@ def test_repo_12_2_dispatch_parks_rbac_emits_mapping_audit() -> None:
     ]
     assert detail_kinds == ["RBAC_NO_PROJECT_CREATE"]
     assert _get_repository_import_jobs_for_tests(repository_id) == []
+
+
+def test_repository_scan_report_saved_filters_require_scope() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth
+    try:
+        r = client.get(f"/v1/dashboard/{_TENANT_SLUG}/repository_scan_report_saved_filters")
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)
+    assert r.status_code == 403
+
+
+def test_repository_scan_report_saved_filters_limit_and_default() -> None:
+    app.dependency_overrides[validate_authentication] = _override_auth_with_repository_scopes
+    storage: dict = {"filters": []}
+
+    def _list_sf(_uid, _tid):
+        return list(storage["filters"])
+
+    def _replace_sf(_uid, _tid, items):
+        storage["filters"] = list(items)
+
+    try:
+        with (
+            patch("app.dashboard_routes.db.list_repository_scan_report_saved_filters", side_effect=_list_sf),
+            patch("app.dashboard_routes.db.replace_repository_scan_report_saved_filters", side_effect=_replace_sf),
+        ):
+            base = f"/v1/dashboard/{_TENANT_SLUG}/repository_scan_report_saved_filters"
+            for i in range(20):
+                res = client.post(
+                    base,
+                    json={
+                        "name": f"preset-{i}",
+                        "isDefault": i == 0,
+                        "filter": {
+                            "provider": "github",
+                            "status": "failing",
+                            "subtype": "",
+                            "search": f"s{i}",
+                        },
+                    },
+                )
+                assert res.status_code == 200, res.text
+            over = client.post(
+                base,
+                json={
+                    "name": "overflow",
+                    "isDefault": False,
+                    "filter": {"provider": "all", "status": "all", "subtype": "", "search": ""},
+                },
+            )
+            assert over.status_code == 400
+            assert over.json()["detail"]["code"] == "SAVED_FILTER_LIMIT_REACHED"
+            assert len(storage["filters"]) == 20
+            assert sum(1 for x in storage["filters"] if x.get("isDefault")) == 1
+            second_id = storage["filters"][1]["id"]
+            pr = client.patch(
+                f"{base}/{second_id}",
+                json={"isDefault": True},
+            )
+            assert pr.status_code == 200
+            assert sum(1 for x in storage["filters"] if x.get("isDefault")) == 1
+            assert next(x for x in storage["filters"] if x.get("isDefault"))["id"] == second_id
+            de = client.delete(f"{base}/{second_id}")
+            assert de.status_code == 200
+            assert all(x.get("id") != second_id for x in storage["filters"])
+    finally:
+        app.dependency_overrides.pop(validate_authentication, None)

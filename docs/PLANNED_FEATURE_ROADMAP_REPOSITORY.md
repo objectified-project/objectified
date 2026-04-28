@@ -758,7 +758,7 @@ decision loop.
 | REPO-10.1  | "Scanned Repository Report" page (tenant-wide)  | New page at `/ade/dashboard/repositories/reports` listing every repository, last scan, importable counts    | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-report`, `ui`  | Yes | No       | #2945 |
 | REPO-10.3  | Cross-repo aggregate stats card (shipped)        | Top-of-page stat cards: total repos, importable specs, parse errors, manifest errors, awaiting-selection; `GET /v1/dashboard/{tenant}/repository_corpus_stats` + `odb.repository_corpus_stats_rollup`    | `enhancement`, `repository`, `roadmap-repository`, `repository-report`, `ui`         | No  | Yes      | #2949 |
 | REPO-10.4  | Report export (CSV + JSON) (shipped)             | `POST …:export` + async jobs, CSV/NDJSON, 100k cap, list/cancel/retry, tokenized download, workflow-audit events | `enhancement`, `repository`, `roadmap-repository`, `repository-report`, `rest`       | No  | Yes      | #2950 |
-| REPO-10.5  | Saved filters per user                          | Persist named filters ("All failing on prod", "Awaiting selection in core repos") in `user_settings`        | `enhancement`, `repository`, `roadmap-repository`, `repository-report`, `ui`         | No  | Yes      | #2951 |
+| REPO-10.5  | Saved filters per user                          | Persist named filters ("All failing on prod", "Awaiting selection in core repos") in `user_settings`        | `enhancement`, `repository`, `roadmap-repository`, `repository-report`, `ui`         | No  | Yes      | Done (#2951) |
 
 ### Detailed issues
 
@@ -1194,7 +1194,7 @@ blocking.
 | 20    | REPO-9.7   | #2948 | bulk select + apply across discovered files        | No  | B    |
 | 21    | REPO-10.3  | #2949 | cross-repo aggregate stats card                    | Yes | C    |
 | 22    | REPO-10.4  | #2950 | report export (CSV + JSON) (shipped)               | No  | C    |
-| 23    | REPO-10.5  | #2951 | saved filters per user                             | No  | C    |
+| 23    | REPO-10.5  | Done (#2951) | saved filters per user                             | No  | C    |
 | 24    | REPO-11.4  | #2952 | per-repo "Issues" tab (shipped)                   | No  | D    |
 | 25    | REPO-12.2  | Done (#2953) | project auto-creation policy & conflict handling   | No  | E    |
 | 26    | REPO-12.5  | Done (#2954) | notifications on auto-import failure / warnings    | No  | E    |

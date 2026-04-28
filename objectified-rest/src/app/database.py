@@ -6941,6 +6941,42 @@ class Database:
         cur["dashboard"] = dash
         self.upsert_user_settings(user_id, tenant_id, cur)
 
+    def list_repository_scan_report_saved_filters(
+        self, user_id: str, tenant_id: str
+    ) -> List[Dict[str, Any]]:
+        """Return persisted scan-report filter presets (REPO-10.5 / #2951)."""
+        cur = self.get_user_settings(user_id, tenant_id)
+        repo = cur.get("repository")
+        if not isinstance(repo, dict):
+            return []
+        sr = repo.get("scan_report")
+        if not isinstance(sr, dict):
+            return []
+        raw = sr.get("saved_filters")
+        if not isinstance(raw, list):
+            return []
+        out: List[Dict[str, Any]] = []
+        for item in raw:
+            if isinstance(item, dict) and item.get("id"):
+                out.append(dict(item))
+        return out
+
+    def replace_repository_scan_report_saved_filters(
+        self, user_id: str, tenant_id: str, items: List[Dict[str, Any]]
+    ) -> None:
+        """Replace the full saved-filter list under ``repository.scan_report.saved_filters``."""
+        cur = self.get_user_settings(user_id, tenant_id)
+        repo = cur.setdefault("repository", {})
+        if not isinstance(repo, dict):
+            cur["repository"] = {}
+            repo = cur["repository"]
+        sr = repo.setdefault("scan_report", {})
+        if not isinstance(sr, dict):
+            repo["scan_report"] = {}
+            sr = repo["scan_report"]
+        sr["saved_filters"] = list(items)
+        self.upsert_user_settings(user_id, tenant_id, cur)
+
     def insert_repository_import_notification_if_absent(
         self,
         *,

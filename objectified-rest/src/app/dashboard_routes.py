@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import uuid as uuid_module
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .auth import get_authenticated_user_id, validate_authentication
 from .database import db
@@ -19,6 +20,143 @@ from .repositories_routes import (
 )
 
 router = APIRouter(prefix="/v1/dashboard", tags=["dashboard"])
+
+_SCAN_REPORT_SAVED_FILTERS_MAX = 20
+_PROVIDER_SLUGS = frozenset({"all", "github", "gitlab", "bitbucket"})
+_STATUS_SLUGS = frozenset({"all", "importable", "imported", "failing", "awaiting", "stale"})
+_SUBTYPE_SLUGS = frozenset({"", "parse", "manifest"})
+
+
+def _scan_ts_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _coerce_provider_slug(raw: Any) -> str:
+    if isinstance(raw, list):
+        raw = raw[0] if raw else "all"
+    if raw is None:
+        return "all"
+    s = str(raw).strip().lower()
+    if s in _PROVIDER_SLUGS:
+        return s
+    if "bucket" in s:
+        return "bitbucket"
+    if "lab" in s:
+        return "gitlab"
+    if "hub" in s:
+        return "github"
+    return "all"
+
+
+def _coerce_status_slug(raw: Any) -> str:
+    if isinstance(raw, list):
+        raw = raw[0] if raw else "all"
+    if raw is None:
+        return "all"
+    s = str(raw).strip().lower()
+    mapping = {
+        "failing": "failing",
+        "fail": "failing",
+        "importable": "importable",
+        "imported": "imported",
+        "awaiting": "awaiting",
+        "awaiting selection": "awaiting",
+        "stale": "stale",
+        "all": "all",
+    }
+    if s in mapping:
+        return mapping[s]
+    if s in _STATUS_SLUGS:
+        return s
+    return "all"
+
+
+def _normalize_scan_report_saved_filter_dict(blob: Dict[str, Any]) -> Dict[str, str]:
+    f = blob.get("filter") if isinstance(blob.get("filter"), dict) else {}
+    prov = _coerce_provider_slug(f.get("provider"))
+    stat = _coerce_status_slug(f.get("status"))
+    subtype_raw = f.get("subtype")
+    subtype = ""
+    if isinstance(subtype_raw, str):
+        subtype = subtype_raw.strip().lower()
+        if subtype not in _SUBTYPE_SLUGS:
+            subtype = ""
+    elif subtype_raw is not None:
+        subtype = str(subtype_raw).strip().lower()
+        if subtype not in _SUBTYPE_SLUGS:
+            subtype = ""
+    search_raw = f.get("search")
+    search = ""
+    if isinstance(search_raw, str):
+        search = search_raw.strip()
+        if len(search) > 500:
+            search = search[:500]
+    elif search_raw is not None:
+        search = str(search_raw).strip()[:500]
+    return {
+        "provider": prov,
+        "status": stat,
+        "subtype": subtype,
+        "search": search,
+    }
+
+
+class ScanReportFilterPayload(BaseModel):
+    """Shape mirrored by the scan-report list/export query parameters."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    provider: str = Field(default="all")
+    status: str = Field(default="all")
+    subtype: str = Field(default="")
+    search: str = Field(default="")
+
+
+class ScanReportSavedFilterOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    name: str
+    filter: ScanReportFilterPayload
+    is_default: bool = Field(serialization_alias="isDefault")
+    created_at: str = Field(serialization_alias="createdAt")
+    updated_at: str = Field(serialization_alias="updatedAt")
+
+
+class ScanReportSavedFilterListResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    items: List[ScanReportSavedFilterOut]
+
+
+class ScanReportSavedFilterCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(min_length=1, max_length=160)
+    filter: ScanReportFilterPayload
+    is_default: bool = Field(default=False, validation_alias="isDefault", serialization_alias="isDefault")
+
+
+class ScanReportSavedFilterPatch(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(default=None, min_length=1, max_length=160)
+    filter: Optional[ScanReportFilterPayload] = None
+    is_default: Optional[bool] = Field(default=None, validation_alias="isDefault", serialization_alias="isDefault")
+
+
+def _row_to_saved_filter_out(row: Dict[str, Any]) -> ScanReportSavedFilterOut:
+    merged_filter = _normalize_scan_report_saved_filter_dict(row)
+    fp = ScanReportFilterPayload(**merged_filter)
+    return ScanReportSavedFilterOut(
+        id=str(row.get("id", "")),
+        name=str(row.get("name", "") or ""),
+        filter=fp,
+        is_default=bool(row.get("isDefault") or row.get("is_default")),
+        created_at=str(row.get("createdAt") or row.get("created_at") or _scan_ts_iso()),
+        updated_at=str(row.get("updatedAt") or row.get("updated_at") or _scan_ts_iso()),
+    )
+
 
 
 class RepositoryCorpusStatsResponse(BaseModel):
@@ -287,3 +425,133 @@ async def repository_import_notifications_unread_count(
         raise HTTPException(status_code=401, detail="User id required")
     n = db.count_unread_repository_import_notifications(str(uid), tenant_id)
     return {"unreadCount": n}
+
+
+@router.get(
+    "/{tenant_slug}/repository_scan_report_saved_filters",
+    response_model=ScanReportSavedFilterListResponse,
+    summary="Named scan-report filter presets for the current user (REPO-10.5).",
+)
+async def list_repository_scan_report_saved_filters(
+    tenant_slug: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> ScanReportSavedFilterListResponse:
+    _ = tenant_slug
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    tenant_id = str(auth_data["tenant_id"])
+    uid = get_authenticated_user_id(auth_data)
+    if not uid:
+        raise HTTPException(status_code=401, detail="User id required")
+    rows = db.list_repository_scan_report_saved_filters(str(uid), tenant_id)
+    return ScanReportSavedFilterListResponse(items=[_row_to_saved_filter_out(r) for r in rows])
+
+
+@router.post(
+    "/{tenant_slug}/repository_scan_report_saved_filters",
+    response_model=ScanReportSavedFilterOut,
+    summary="Save a new scan-report filter preset.",
+)
+async def create_repository_scan_report_saved_filter(
+    tenant_slug: str,
+    body: ScanReportSavedFilterCreate,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> ScanReportSavedFilterOut:
+    _ = tenant_slug
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    tenant_id = str(auth_data["tenant_id"])
+    uid = get_authenticated_user_id(auth_data)
+    if not uid:
+        raise HTTPException(status_code=401, detail="User id required")
+    items = db.list_repository_scan_report_saved_filters(str(uid), tenant_id)
+    if len(items) >= _SCAN_REPORT_SAVED_FILTERS_MAX:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "SAVED_FILTER_LIMIT_REACHED",
+                "message": "Maximum of 20 saved scan-report filters.",
+            },
+        )
+    merged = _normalize_scan_report_saved_filter_dict({"filter": body.filter.model_dump()})
+    fp = ScanReportFilterPayload(**merged)
+    now = _scan_ts_iso()
+    new_id = str(uuid_module.uuid4())
+    row: Dict[str, Any] = {
+        "id": new_id,
+        "name": body.name.strip(),
+        "filter": fp.model_dump(),
+        "isDefault": bool(body.is_default),
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    if body.is_default:
+        for it in items:
+            it["isDefault"] = False
+    items.append(row)
+    db.replace_repository_scan_report_saved_filters(str(uid), tenant_id, items)
+    return _row_to_saved_filter_out(row)
+
+
+@router.patch(
+    "/{tenant_slug}/repository_scan_report_saved_filters/{filter_id}",
+    response_model=ScanReportSavedFilterOut,
+    summary="Rename, update, or set default among scan-report filter presets.",
+)
+async def patch_repository_scan_report_saved_filter(
+    tenant_slug: str,
+    filter_id: str,
+    body: ScanReportSavedFilterPatch,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> ScanReportSavedFilterOut:
+    _ = tenant_slug
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    tenant_id = str(auth_data["tenant_id"])
+    uid = get_authenticated_user_id(auth_data)
+    if not uid:
+        raise HTTPException(status_code=401, detail="User id required")
+    fid = filter_id.strip()
+    items = db.list_repository_scan_report_saved_filters(str(uid), tenant_id)
+    idx = next((i for i, it in enumerate(items) if str(it.get("id")) == fid), -1)
+    if idx < 0:
+        raise HTTPException(status_code=404, detail="Saved filter not found")
+    row = dict(items[idx])
+    if body.name is not None:
+        row["name"] = body.name.strip()
+    if body.filter is not None:
+        merged = _normalize_scan_report_saved_filter_dict({"filter": body.filter.model_dump()})
+        fp = ScanReportFilterPayload(**merged)
+        row["filter"] = fp.model_dump()
+    if body.is_default is True:
+        for it in items:
+            it["isDefault"] = False
+        row["isDefault"] = True
+    elif body.is_default is False:
+        row["isDefault"] = False
+    row["updatedAt"] = _scan_ts_iso()
+    items[idx] = row
+    db.replace_repository_scan_report_saved_filters(str(uid), tenant_id, items)
+    return _row_to_saved_filter_out(row)
+
+
+@router.delete(
+    "/{tenant_slug}/repository_scan_report_saved_filters/{filter_id}",
+    summary="Delete one scan-report filter preset.",
+)
+async def delete_repository_scan_report_saved_filter(
+    tenant_slug: str,
+    filter_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> Dict[str, bool]:
+    _ = tenant_slug
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_READ)
+    tenant_id = str(auth_data["tenant_id"])
+    uid = get_authenticated_user_id(auth_data)
+    if not uid:
+        raise HTTPException(status_code=401, detail="User id required")
+    fid = filter_id.strip()
+    items = db.list_repository_scan_report_saved_filters(str(uid), tenant_id)
+    n_before = len(items)
+    items = [it for it in items if str(it.get("id")) != fid]
+    if len(items) == n_before:
+        raise HTTPException(status_code=404, detail="Saved filter not found")
+    db.replace_repository_scan_report_saved_filters(str(uid), tenant_id, items)
+    return {"ok": True}
