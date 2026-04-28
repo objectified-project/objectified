@@ -1652,6 +1652,16 @@ class DataSnapshotModel(BaseModel):
 # ==================== Workflow audit (git-like ledger, #2578) ====================
 
 
+class WorkflowAuditChangeReportJoinOut(BaseModel):
+    """Synthetic join projection for ``repository.auto_imported`` rows (#2944)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    summary_kind: Literal["breaking", "additive", "none"] = Field(serialization_alias="summaryKind")
+    breaking_change_count: int = Field(serialization_alias="breakingChangeCount")
+
+
 class WorkflowAuditEntryOut(BaseModel):
     """One row from odb.workflow_audit (newest-first list endpoint)."""
 
@@ -1666,6 +1676,11 @@ class WorkflowAuditEntryOut(BaseModel):
     actor_id: Optional[str] = Field(None, serialization_alias="actorId")
     detail: Optional[Dict[str, Any]] = None
     created_at: str = Field(serialization_alias="createdAt")
+    change_report: Optional[WorkflowAuditChangeReportJoinOut] = Field(
+        None,
+        serialization_alias="changeReport",
+        description="Present when action is repository.auto_imported and detail links a change report.",
+    )
 
 
 class WorkflowAuditPaginationOut(BaseModel):

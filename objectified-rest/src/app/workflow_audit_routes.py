@@ -18,10 +18,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from .auth import validate_authentication
 from .database import db
 from .models import (
+    WorkflowAuditChangeReportJoinOut,
     WorkflowAuditEntryOut,
     WorkflowAuditPageResponse,
     WorkflowAuditPaginationOut,
 )
+from .repositories.spec_detail import derive_change_report_summary_kind
 
 router = APIRouter(prefix="/v1/versions", tags=["workflow-audit"])
 
@@ -119,6 +121,38 @@ def _decode_cursor(token: str) -> Tuple[datetime, str]:
     return dt, rid
 
 
+def _auto_import_change_report_projection(detail: Dict[str, Any]) -> WorkflowAuditChangeReportJoinOut | None:
+    cr_id = detail.get("changeReportId") or detail.get("change_report_id")
+    if not cr_id:
+        return None
+    sk = detail.get("changeReportSummaryKind") or detail.get("change_report_summary_kind")
+    bc_raw = detail.get("changeReportBreakingChangeCount")
+    if bc_raw is None:
+        bc_raw = detail.get("breaking_change_count")
+    ad_raw = detail.get("changeReportAdditiveChangeCount")
+    if ad_raw is None:
+        ad_raw = detail.get("additive_change_count")
+    bc_i: int
+    ad_i: int
+    try:
+        bc_i = int(bc_raw) if bc_raw is not None else 0
+    except (TypeError, ValueError):
+        bc_i = 0
+    try:
+        ad_i = int(ad_raw) if ad_raw is not None else 0
+    except (TypeError, ValueError):
+        ad_i = 0
+    if not isinstance(sk, str) or not sk.strip():
+        sk = derive_change_report_summary_kind(bc_i, ad_i)
+    else:
+        sk = sk.strip()
+    return WorkflowAuditChangeReportJoinOut(
+        id=str(cr_id),
+        summary_kind=sk,
+        breaking_change_count=bc_i,
+    )
+
+
 def _row_to_entry(row: Dict[str, Any]) -> WorkflowAuditEntryOut:
     ca = row.get("created_at")
     if hasattr(ca, "isoformat"):
@@ -130,6 +164,9 @@ def _row_to_entry(row: Dict[str, Any]) -> WorkflowAuditEntryOut:
     detail = row.get("detail")
     if detail is not None and not isinstance(detail, dict):
         detail = None
+    change_report: WorkflowAuditChangeReportJoinOut | None = None
+    if str(row.get("action")) == "repository.auto_imported" and isinstance(detail, dict):
+        change_report = _auto_import_change_report_projection(detail)
     return WorkflowAuditEntryOut(
         id=str(row["id"]),
         tenant_id=str(row["tenant_id"]),
@@ -140,6 +177,7 @@ def _row_to_entry(row: Dict[str, Any]) -> WorkflowAuditEntryOut:
         actor_id=str(row["actor_id"]) if row.get("actor_id") is not None else None,
         detail=detail,
         created_at=ca_s,
+        change_report=change_report,
     )
 
 

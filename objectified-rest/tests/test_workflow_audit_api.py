@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.auth import validate_authentication
 from app.main import app
+from app.repositories.spec_detail import derive_change_report_summary_kind
 
 client = TestClient(app)
 
@@ -117,4 +118,42 @@ def test_workflow_audit_cursor_mode_next_cursor():
     ca = mdb.search_workflow_audit.call_args[1]["cursor_created_at"]
     assert ca is not None
     assert mdb.search_workflow_audit.call_args[1]["cursor_id"] == row["id"]
+
+
+def test_workflow_audit_repository_auto_imported_change_report_projection():
+    rid = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    row = {
+        "id": "aaaaaaaa-bbbb-cccc-dddd-000000000099",
+        "tenant_id": _MOCK_AUTH["tenant_id"],
+        "project_id": None,
+        "version_id": None,
+        "action": "repository.auto_imported",
+        "outcome": "success",
+        "actor_id": _MOCK_AUTH["user_id"],
+        "detail": {
+            "repositoryId": rid,
+            "importJobId": "aaaaaaaa-bbbb-cccc-dddd-000000000088",
+            "changeReportId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "changeReportSummaryKind": "breaking",
+            "changeReportBreakingChangeCount": 3,
+            "changeReportAdditiveChangeCount": 1,
+        },
+        "created_at": datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc),
+    }
+    with patch("app.workflow_audit_routes.db") as mdb:
+        mdb.count_workflow_audit_filtered.return_value = 1
+        mdb.search_workflow_audit.return_value = [row]
+        r = client.get("/v1/versions/t/workflow-audit?action=repository.auto_imported")
+    assert r.status_code == 200
+    item = r.json()["items"][0]
+    assert item["action"] == "repository.auto_imported"
+    assert item["changeReport"]["id"] == "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    assert item["changeReport"]["summaryKind"] == "breaking"
+    assert item["changeReport"]["breakingChangeCount"] == 3
+
+
+def test_derive_change_report_summary_kind() -> None:
+    assert derive_change_report_summary_kind(1, 99) == "breaking"
+    assert derive_change_report_summary_kind(0, 4) == "additive"
+    assert derive_change_report_summary_kind(0, 0) == "none"
 

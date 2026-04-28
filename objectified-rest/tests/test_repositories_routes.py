@@ -967,6 +967,10 @@ def test_dispatch_chain_selection_mode_checksum_and_auto_import_audit() -> None:
     assert auto_rows[0]["detail"]["projectSlug"] == "svc"
     assert auto_rows[0]["detail"]["versionStrategy"] == "commit-sha"
     assert auto_rows[0]["detail"]["importJobId"] == jobs[0].id
+    assert auto_rows[0]["detail"]["changeReportId"] == jobs[0].changeReportId
+    assert auto_rows[0]["detail"]["changeReportSummaryKind"] in ("breaking", "additive", "none")
+    assert isinstance(auto_rows[0]["detail"]["changeReportBreakingChangeCount"], int)
+    assert isinstance(auto_rows[0]["detail"]["changeReportAdditiveChangeCount"], int)
     assert auto_rows[0]["detail"]["contentChecksumShort"] == ("f" * 64)[:12]
 
 
@@ -1047,6 +1051,8 @@ def test_repo_12_3_committed_auto_import_calls_push_with_repository_source() -> 
     assert auto["detail"]["commitSha"] == "a" * 40
     assert auto["detail"]["versionId"] == "d0d0d0d0-d0d0-4d0d-8d0d-d0d0d0d0d0d0"
     assert auto["detail"]["projectId"] == "a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0"
+    assert auto["detail"]["changeReportId"] == job.changeReportId
+    assert auto["detail"]["changeReportSummaryKind"] in ("breaking", "additive", "none")
 
 
 def test_force_scan_ignores_checksum_skip_and_dispatches_modified_file() -> None:
