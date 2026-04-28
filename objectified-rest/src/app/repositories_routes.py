@@ -553,6 +553,11 @@ _DISPATCH_ADVISORY_REGISTRY_LOCK = Lock()
 def _prune_repository_dispatch_advisory_locks_locked(
     active_repository_id: Optional[str] = None,
 ) -> None:
+    """Remove oldest unlocked entries when registry exceeds the cap.
+
+    Must be called with *_DISPATCH_ADVISORY_REGISTRY_LOCK* already held.
+    *active_repository_id* is never evicted even if it is the oldest entry.
+    """
     if len(_REPO_DISPATCH_ADVISORY_LOCKS) <= _MAX_REPO_DISPATCH_ADVISORY_LOCKS:
         return
 
