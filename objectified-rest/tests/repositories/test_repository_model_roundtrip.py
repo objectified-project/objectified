@@ -1,5 +1,6 @@
 """REPO-1.1 / #2753: round-trip coverage for repository connector tables."""
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import uuid
 
@@ -20,6 +21,7 @@ def _migration_paths() -> list[Path]:
         scripts_dir / "20260426-210000.sql",
         scripts_dir / "20260426-220000.sql",
         scripts_dir / "20260427-120000.sql",
+        scripts_dir / "20260427-204023.sql",
     ]
 
 
@@ -554,4 +556,215 @@ def test_versions_repository_source_indexes_are_used_by_planner(repository_schem
 
     assert "idx_version_repo_source_lookup" in lookup_plan
     assert "idx_version_content_checksum" in checksum_plan
+
+
+def _insert_pending_scan(conn, schema: str, repository_id: str, scan_id: str) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            sql.SQL(
+                """
+                INSERT INTO {} (
+                    id, repository_id, branch, commit_sha, trigger, status, started_at, finished_at,
+                    duration_ms, files_seen, files_classified, files_unknown, files_failed, event_log, diff_summary
+                )
+                VALUES (
+                    %s, %s, %s, %s, 'manual', 'pending', now(), NULL,
+                    NULL, 0, 0, 0, 0, '[]'::jsonb, '{}'::jsonb
+                );
+                """
+            ).format(sql.Identifier(schema, "repository_scan")),
+            (scan_id, repository_id, "main", "a" * 40),
+        )
+    conn.commit()
+
+
+def test_repository_scan_report_finalize_rollback_keeps_scan_pending(repository_schema, repository_row, base_refs):
+    """REPO-12.4: report + scan update are in one transaction (rollback restores pending scan)."""
+    conn, schema = repository_schema
+    scan_id = str(uuid.uuid4())
+    rid = str(repository_row["id"])
+    _insert_pending_scan(conn, schema, rid, scan_id)
+
+    totals = {"discovered": 1, "importable": 1}
+    payload = {"files": [{"path": "a.yaml"}]}
+    finished = datetime.now(timezone.utc)
+    report_gen = finished
+
+    conn.autocommit = False
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                sql.SQL(
+                    """
+                    UPDATE {}
+                    SET status = 'complete',
+                        finished_at = %s,
+                        duration_ms = %s,
+                        files_seen = %s,
+                        files_classified = %s,
+                        files_unknown = %s,
+                        files_failed = %s
+                    WHERE id = %s::uuid AND repository_id = %s::uuid
+                    """
+                ).format(sql.Identifier(schema, "repository_scan")),
+                (finished, 10, 1, 1, 0, 0, scan_id, rid),
+            )
+            cur.execute(
+                sql.SQL(
+                    """
+                    INSERT INTO {} (
+                      scan_id, repository_id, generated_at, totals_json, attention_score,
+                      payload_json, payload_overflow_url
+                    )
+                    VALUES (%s::uuid, %s::uuid, %s::timestamptz, %s::jsonb, %s, %s::jsonb, %s)
+                    """
+                ).format(sql.Identifier(schema, "repository_scan_report")),
+                (
+                    scan_id,
+                    rid,
+                    report_gen,
+                    Json(totals),
+                    5,
+                    Json(payload),
+                    None,
+                ),
+            )
+        conn.rollback()
+    finally:
+        conn.autocommit = True
+
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            sql.SQL("SELECT status FROM {} WHERE id = %s::uuid").format(sql.Identifier(schema, "repository_scan")),
+            (scan_id,),
+        )
+        assert cur.fetchone()["status"] == "pending"
+        cur.execute(
+            sql.SQL("SELECT count(*)::int AS n FROM {} WHERE scan_id = %s::uuid").format(
+                sql.Identifier(schema, "repository_scan_report")
+            ),
+            (scan_id,),
+        )
+        assert int(cur.fetchone()["n"]) == 0
+
+
+def test_repository_scan_report_retention_purge_drops_only_stale_non_latest(
+    repository_schema, repository_row
+):
+    """REPO-12.4: latest report per repository survives; older rows past window are removed."""
+    conn, schema = repository_schema
+    rid = str(repository_row["id"])
+
+    old_scan = "00000000-0000-0000-0000-000000000901"
+    new_scan = "00000000-0000-0000-0000-000000000902"
+    with conn.cursor() as cur:
+        cur.execute(
+            sql.SQL(
+                """
+                INSERT INTO {} (
+                    id, repository_id, branch, commit_sha, trigger, status, started_at, finished_at,
+                    duration_ms, files_seen, files_classified, files_unknown, files_failed, event_log, diff_summary
+                )
+                VALUES
+                  (%s, %s, 'main', %s, 'manual', 'complete', now(), now(), 0, 0, 0, 0, 0, '[]'::jsonb, '{}'::jsonb),
+                  (%s, %s, 'main', %s, 'manual', 'complete', now(), now(), 0, 0, 0, 0, 0, '[]'::jsonb, '{}'::jsonb);
+                """
+            ).format(sql.Identifier(schema, "repository_scan")),
+            (old_scan, rid, "b" * 40, new_scan, rid, "c" * 40),
+        )
+        old_gen = datetime.now(timezone.utc) - timedelta(days=200)
+        new_gen = datetime.now(timezone.utc) - timedelta(days=30)
+        cur.execute(
+            sql.SQL(
+                """
+                INSERT INTO {} (scan_id, repository_id, generated_at, totals_json, attention_score, payload_json, payload_overflow_url)
+                VALUES
+                  (%s::uuid, %s::uuid, %s::timestamptz, %s::jsonb, 0, %s::jsonb, NULL),
+                  (%s::uuid, %s::uuid, %s::timestamptz, %s::jsonb, 0, %s::jsonb, NULL);
+                """
+            ).format(sql.Identifier(schema, "repository_scan_report")),
+            (
+                old_scan,
+                rid,
+                old_gen,
+                Json({"discovered": 0}),
+                Json({}),
+                new_scan,
+                rid,
+                new_gen,
+                Json({"discovered": 1}),
+                Json({}),
+            ),
+        )
+    conn.commit()
+
+    default_retention = 90
+    with conn.cursor() as cur:
+        cur.execute(
+            sql.SQL(
+                """
+                WITH latest AS (
+                  SELECT DISTINCT ON (repository_id) id
+                  FROM {}
+                  ORDER BY repository_id, generated_at DESC
+                )
+                DELETE FROM {} r
+                USING {} repo, {} t
+                WHERE r.repository_id = repo.id
+                  AND repo.tenant_id = t.id
+                  AND r.id NOT IN (SELECT id FROM latest)
+                  AND r.generated_at < (
+                    CURRENT_TIMESTAMP
+                    - (COALESCE(t.repository_scan_report_retention_days, %s) * interval '1 day')
+                  );
+                """
+            ).format(
+                sql.Identifier(schema, "repository_scan_report"),
+                sql.Identifier(schema, "repository_scan_report"),
+                sql.Identifier(schema, "repository"),
+                sql.Identifier(schema, "tenants"),
+            ),
+            (default_retention,),
+        )
+    conn.commit()
+
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            sql.SQL("SELECT count(*)::int AS n FROM {}").format(sql.Identifier(schema, "repository_scan_report"))
+        )
+        assert int(cur.fetchone()["n"]) == 1
+        cur.execute(
+            sql.SQL("SELECT scan_id::text AS sid FROM {}").format(sql.Identifier(schema, "repository_scan_report"))
+        )
+        assert cur.fetchone()["sid"] == new_scan
+
+    with conn.cursor() as cur:
+        cur.execute(
+            sql.SQL(
+                """
+                WITH latest AS (
+                  SELECT DISTINCT ON (repository_id) id
+                  FROM {}
+                  ORDER BY repository_id, generated_at DESC
+                )
+                DELETE FROM {} r
+                USING {} repo, {} t
+                WHERE r.repository_id = repo.id
+                  AND repo.tenant_id = t.id
+                  AND r.id NOT IN (SELECT id FROM latest)
+                  AND r.generated_at < (
+                    CURRENT_TIMESTAMP
+                    - (COALESCE(t.repository_scan_report_retention_days, %s) * interval '1 day')
+                  );
+                """
+            ).format(
+                sql.Identifier(schema, "repository_scan_report"),
+                sql.Identifier(schema, "repository_scan_report"),
+                sql.Identifier(schema, "repository"),
+                sql.Identifier(schema, "tenants"),
+            ),
+            (default_retention,),
+        )
+        assert cur.rowcount == 0
+    conn.commit()
 

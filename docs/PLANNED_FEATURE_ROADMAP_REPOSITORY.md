@@ -45,6 +45,7 @@ filter only the tickets defined in this document._
 
 ## Completed (Repository Connector v1)
 
+- REPO-12.4 (#2937): **`repository_scan_report` PostgreSQL artifact** — table plus transactional finalize with `repository_scan`, bounded payload (≤5k rows) with on-disk overflow + synthetic signed URL, `attention_score`, tenant retention override, daily purge preserving latest-per-repo, and `repository.scan_report.purged` workflow audits.
 - REPO-10.2 (#2946): Per-repository **Scanned repository report** drill-in at `/ade/dashboard/repositories/{id}/reports/{scan_report_id}` (and `…/latest` → stable redirect) with server materialized `totalsJson` / `payloadJson` / `errorsJson`, REST list/detail/diff, and “compare with previous” totals roll-up.
 - REPO-11.1 (#2941): **repository_attention rollup** — `odb.repository_attention` plus per-repo recompute (reasons, open count, attention score) on scan/import/selection/credential/scheduler events, `pg_notify('dashboard.attention')` after PostgreSQL upsert, in-memory store for the REST process, and hourly safety reconcile.
 - REPO-10.4 (#2950): **Scan report export** — `POST /v1/repositories/{tenant}/scan-reports:export` (async job, CSV or NDJSON per-line JSON with `file` + report metadata) with 100k row cap and `GET …/exports` + tokenized `GET …/content`; `repository.scan_report.export_*` workflow audits; ADE export menu, **Recent exports** list, cancel/retry, and a session-scoped Next download proxy.
@@ -1064,7 +1065,6 @@ shared widget shell. **Parallel = Yes**.
 | REPO-12.1  | Auto-import worker + dispatch                    | Consume scan-completion events; for `(import_enabled, auto_import_enabled, checksum_changed)` triplets, dispatch dry-run import jobs | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `scan`, `import` | Yes | No  | Done (#2935) |
 | REPO-12.2  | Project auto-creation policy & conflict handling | Reuse REPO-5.3 policy; expose conflict resolution surface ("project slug taken", "version-strategy mismatch") | `enhancement`, `repository`, `roadmap-repository`, `scan`, `import`   | No  | Yes | Done (#2953) |
 | REPO-12.3  | Version creation with provenance                 | Bind `repository_source` (Epic A) on every auto-imported version; emit `repository.auto_imported` audit     | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-provenance`, `import` | Yes | No  | Done (#2936) |
-| REPO-12.4  | `repository_scan_report` artifact persisted per tick | Per scheduler tick (or scan), emit a single report row with totals + per-file payload; retained 90 days   | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `scan`, `database` | Yes | Yes | #2937 |
 | REPO-12.5  | Notifications on auto-import failure / warnings  | Re-use the existing notification system to ping the spec's selection actor on terminal-state changes        | `enhancement`, `repository`, `roadmap-repository`, `attention`, `import`         | No  | Yes | #2954 |
 | REPO-12.6  | Audit + change-report linking for auto-imports   | Every auto-import emits a `repository.auto_imported` row pointing at the change report                      | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `governance`, `import` | Yes | Yes | #2944 |
 
@@ -1187,7 +1187,7 @@ blocking.
 | 3     | REPO-9.1   | #2931 | import_enabled flag                                 | Yes | B    |
 | 7     | REPO-12.1  | Done (#2935) | auto-import worker + dispatch                       | Yes | E    |
 | 8     | REPO-12.3  | Done (#2936) | version creation with provenance                    | Yes | E    |
-| 9     | REPO-12.4  | #2937 | repository_scan_report artifact                     | Yes | E    |
+| 9     | REPO-12.4  | Done (#2937) | repository_scan_report artifact                     | Yes | E    |
 | 16    | REPO-12.6  | #2944 | audit + change-report linking for auto-imports      | Yes | E    |
 | 17    | REPO-10.1  | #2945 | Scanned Repository Report page                      | Yes | C    |
 | —     | _Repo-Scan v1 ships here. Items below are post-MVP._               |     |      |

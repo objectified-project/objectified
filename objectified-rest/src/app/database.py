@@ -6941,6 +6941,204 @@ class Database:
         cur["dashboard"] = dash
         self.upsert_user_settings(user_id, tenant_id, cur)
 
+    def finalize_repository_scan_with_report(
+        self,
+        *,
+        scan_id: str,
+        repository_id: str,
+        tenant_id: str,
+        terminal_status: str,
+        finished_at: datetime,
+        duration_ms: Optional[int],
+        files_seen: int,
+        files_classified: int,
+        files_unknown: int,
+        files_failed: int,
+        event_log: Any,
+        diff_summary: Any,
+        error_code: Optional[str],
+        error_detail: Optional[str],
+        report_generated_at: datetime,
+        totals_json: Dict[str, Any],
+        attention_score: int,
+        payload_json: Dict[str, Any],
+        payload_overflow_url: Optional[str],
+        update_repository_last_scan: bool = True,
+        _connection: Any = None,
+    ) -> Optional[str]:
+        """
+        REPO-12.4 / #2937: terminal ``repository_scan`` update plus ``repository_scan_report`` upsert
+        in one transaction.
+        """
+        own_conn = _connection is None
+        conn = _connection or self.connect()
+        prev_ac = self._begin_tx(conn) if own_conn else None
+        report_id: Optional[str] = None
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    UPDATE odb.repository_scan SET
+                      status = %s::odb.repository_scan_status,
+                      finished_at = %s::timestamptz,
+                      duration_ms = %s,
+                      files_seen = %s,
+                      files_classified = %s,
+                      files_unknown = %s,
+                      files_failed = %s,
+                      event_log = %s::jsonb,
+                      diff_summary = %s::jsonb,
+                      error_code = %s,
+                      error_detail = %s
+                    WHERE id = %s::uuid AND repository_id = %s::uuid
+                    """,
+                    (
+                        terminal_status,
+                        finished_at,
+                        duration_ms,
+                        files_seen,
+                        files_classified,
+                        files_unknown,
+                        files_failed,
+                        json.dumps(event_log) if event_log is not None else "[]",
+                        json.dumps(diff_summary) if diff_summary is not None else "{}",
+                        error_code,
+                        error_detail,
+                        scan_id,
+                        repository_id,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    if own_conn:
+                        conn.rollback()
+                        conn.autocommit = prev_ac
+                        return None
+                    raise RuntimeError(
+                        "repository scan update affected an unexpected number of rows; "
+                        "caller-managed transaction left unchanged"
+                    )
+                cursor.execute(
+                    """
+                    INSERT INTO odb.repository_scan_report (
+                      scan_id, repository_id, generated_at, totals_json, attention_score,
+                      payload_json, payload_overflow_url
+                    ) VALUES (
+                      %s::uuid, %s::uuid, %s::timestamptz, %s::jsonb, %s,
+                      %s::jsonb, %s
+                    )
+                    ON CONFLICT (repository_id, scan_id) DO UPDATE SET
+                      generated_at = EXCLUDED.generated_at,
+                      totals_json = EXCLUDED.totals_json,
+                      attention_score = EXCLUDED.attention_score,
+                      payload_json = EXCLUDED.payload_json,
+                      payload_overflow_url = EXCLUDED.payload_overflow_url
+                    RETURNING id::text
+                    """,
+                    (
+                        scan_id,
+                        repository_id,
+                        report_generated_at,
+                        Json(totals_json),
+                        int(attention_score),
+                        Json(payload_json),
+                        payload_overflow_url,
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is not None:
+                    report_id = str(row.get("id") or "")
+                if update_repository_last_scan:
+                    cursor.execute(
+                        """
+                        UPDATE odb.repository SET
+                          last_scan_id = %s::uuid,
+                          last_scan_at = %s::timestamptz,
+                          updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s::uuid AND tenant_id = %s::uuid
+                        """,
+                        (scan_id, finished_at, repository_id, tenant_id),
+                    )
+            if own_conn:
+                conn.commit()
+        except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn) as e:
+            if own_conn:
+                conn.rollback()
+                conn.autocommit = prev_ac
+            _logger.debug("finalize_repository_scan_with_report skipped: %s", e)
+            return None
+        except Exception:
+            if own_conn:
+                conn.rollback()
+                conn.autocommit = prev_ac
+            raise
+        else:
+            if own_conn:
+                conn.autocommit = prev_ac
+        return report_id or None
+
+    def purge_expired_repository_scan_reports(self) -> List[Dict[str, Any]]:
+        """
+        Delete aged ``repository_scan_report`` rows (never the latest per repository).
+        Emits ``repository.scan_report.purged`` workflow audits. Idempotent.
+        """
+        default_days = int(settings.repository_scan_report_retention_days_default)
+        conn = self.connect()
+        prev_ac = self._begin_tx(conn)
+        deleted: List[Dict[str, Any]] = []
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    WITH latest AS (
+                      SELECT DISTINCT ON (repository_id) id
+                      FROM odb.repository_scan_report
+                      ORDER BY repository_id, generated_at DESC, id DESC
+                    )
+                    DELETE FROM odb.repository_scan_report r
+                    USING odb.repository repo, odb.tenants t
+                    WHERE r.repository_id = repo.id
+                      AND repo.tenant_id = t.id
+                      AND r.id NOT IN (SELECT id FROM latest)
+                      AND r.generated_at < (
+                        CURRENT_TIMESTAMP
+                        - (COALESCE(t.repository_scan_report_retention_days, %s) * interval '1 day')
+                      )
+                    RETURNING r.id::text AS id, r.repository_id::text AS repository_id,
+                              r.scan_id::text AS scan_id, repo.tenant_id::text AS tenant_id
+                    """,
+                    (default_days,),
+                )
+                for row in cursor.fetchall() or []:
+                    deleted.append(dict(row))
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            _s = str(e).lower()
+            if "42p01" in _s or "does not exist" in _s or "undefinedtable" in _s:
+                return []
+            raise
+        finally:
+            conn.autocommit = prev_ac
+
+        for item in deleted:
+            try:
+                self.insert_workflow_audit(
+                    tenant_id=item["tenant_id"],
+                    project_id=None,
+                    version_id=None,
+                    action="repository.scan_report.purged",
+                    outcome="success",
+                    actor_id=None,
+                    detail={
+                        "repositoryId": item["repository_id"],
+                        "scanReportId": item["id"],
+                        "scanId": item["scan_id"],
+                    },
+                )
+            except Exception as audit_exc:
+                _logger.warning("purge scan_report audit failed: %s", audit_exc)
+        return deleted
+
 
 # Global database instance
 db = Database()
