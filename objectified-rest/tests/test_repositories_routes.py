@@ -11,6 +11,8 @@ from app.repositories_routes import (
     RepositoryFileRecord,
     RepositoryResolvedProjectRecord,
     _evaluate_project_mapping_conflict,
+    _REPO_CHANGE_REPORT_STORE,
+    _REPO_IMPORT_JOB_STORE,
     _REPO_IMPORT_POLICY_STORE,
     _REPO_PROJECT_STORE,
     _REPO_SCAN_FILE_HISTORY_STORE,
@@ -966,6 +968,84 @@ def test_dispatch_chain_selection_mode_checksum_and_auto_import_audit() -> None:
     assert auto_rows[0]["detail"]["versionStrategy"] == "commit-sha"
     assert auto_rows[0]["detail"]["importJobId"] == jobs[0].id
     assert auto_rows[0]["detail"]["contentChecksumShort"] == ("f" * 64)[:12]
+
+
+def test_repo_12_3_committed_auto_import_calls_push_with_repository_source() -> None:
+    tenant_id = _MOCK_AUTH["tenant_id"]
+    repository_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    scan_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    _REPO_PROJECT_STORE.setdefault(tenant_id, {})["svc"] = RepositoryResolvedProjectRecord(
+        id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        tenantId=tenant_id,
+        slug="svc",
+        name="Svc",
+        createdAt="2026-04-26T00:00:00Z",
+        origin="manifest_auto",
+        createdFromRepositoryId=repository_id,
+        defaultVersionStrategy="commit-sha",
+    )
+    file_row = RepositoryFileRecord(
+        id="e4444444-4444-4444-4444-444444444444",
+        repositoryId=repository_id,
+        scanId=scan_id,
+        path="go.yaml",
+        blobSha="b4",
+        contentAlgo="sha256",
+        contentChecksum="f" * 64,
+        tracked=True,
+        importEnabled=True,
+        autoImportEnabled=True,
+        projectSlug="svc",
+        versionStrategy="commit-sha",
+        promote="auto",
+        status="modified",
+        createdAt="2026-04-26T00:00:00Z",
+    )
+    captured: dict = {}
+
+    def _fake_push(**kwargs):
+        captured.update(kwargs)
+        return ({"id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "version_id": "0.1.0"}, 0)
+
+    try:
+        with (
+            patch("app.repositories_routes.db.get_project_by_slug", return_value={"id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}),
+            patch(
+                "app.repositories_routes.db.resolve_push_head_for_repository_import",
+                return_value=(None, None),
+            ),
+            patch(
+                "app.repositories_routes.db.create_version_push_transaction",
+                side_effect=_fake_push,
+            ),
+        ):
+            job, audits = _materialize_repository_dry_run_import_job(
+                tenant_id=tenant_id,
+                repository_id=repository_id,
+                scan_id=scan_id,
+                branch="main",
+                commit_sha="a" * 40,
+                file_row=file_row,
+                actor_id=_MOCK_AUTH["user_id"],
+                source_kind="repository_auto_import",
+            )
+    finally:
+        _REPO_PROJECT_STORE.get(tenant_id, {}).pop("svc", None)
+        _REPO_IMPORT_JOB_STORE.pop(repository_id, None)
+        _REPO_CHANGE_REPORT_STORE.pop(repository_id, None)
+
+    assert job.state == "committed"
+    assert captured.get("repository_source", {}).get("repositoryId") == repository_id
+    assert captured.get("repository_source", {}).get("path") == "go.yaml"
+    assert captured.get("repository_file_import") == (file_row.id, "f" * 64, repository_id)
+    types = [a["eventType"] for a in audits]
+    assert "repository.auto_imported" in types
+    auto = next(a for a in audits if a["eventType"] == "repository.auto_imported")
+    assert auto["detail"]["repositoryId"] == repository_id
+    assert auto["detail"]["branch"] == "main"
+    assert auto["detail"]["commitSha"] == "a" * 40
+    assert auto["detail"]["versionId"] == "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    assert auto["detail"]["projectId"] == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 
 
 def test_force_scan_ignores_checksum_skip_and_dispatches_modified_file() -> None:
