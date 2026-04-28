@@ -1066,7 +1066,7 @@ shared widget shell. **Parallel = Yes**.
 | REPO-12.2  | Project auto-creation policy & conflict handling | Reuse REPO-5.3 policy; expose conflict resolution surface ("project slug taken", "version-strategy mismatch") | `enhancement`, `repository`, `roadmap-repository`, `scan`, `import`   | No  | Yes | Done (#2953) |
 | REPO-12.3  | Version creation with provenance                 | Bind `repository_source` (Epic A) on every auto-imported version; emit `repository.auto_imported` audit     | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `repository-provenance`, `import` | Yes | No  | Done (#2936) |
 | REPO-12.5  | Notifications on auto-import failure / warnings  | Re-use the existing notification system to ping the spec's selection actor on terminal-state changes        | `enhancement`, `repository`, `roadmap-repository`, `attention`, `import`         | No  | Yes | Done (#2954) |
-| REPO-12.6  | Audit + change-report linking for auto-imports   | Every auto-import emits a `repository.auto_imported` row pointing at the change report                      | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `governance`, `import` | Yes | Yes | #2944 |
+| REPO-12.6  | Audit + change-report linking for auto-imports   | Every auto-import emits a `repository.auto_imported` row pointing at the change report                      | `enhancement`, `mvp`, `repository`, `roadmap-repository`, `governance`, `import` | Yes | Yes | Done (#2944) |
 
 ### Detailed issues
 
@@ -1188,7 +1188,7 @@ blocking.
 | 7     | REPO-12.1  | Done (#2935) | auto-import worker + dispatch                       | Yes | E    |
 | 8     | REPO-12.3  | Done (#2936) | version creation with provenance                    | Yes | E    |
 | 9     | REPO-12.4  | Done (#2937) | repository_scan_report artifact                     | Yes | E    |
-| 16    | REPO-12.6  | #2944 | audit + change-report linking for auto-imports      | Yes | E    |
+| 16    | REPO-12.6  | Done (#2944) | audit + change-report linking for auto-imports      | Yes | E    |
 | 17    | REPO-10.1  | #2945 | Scanned Repository Report page                      | Yes | C    |
 | —     | _Repo-Scan v1 ships here. Items below are post-MVP._               |     |      |
 | 20    | REPO-9.7   | #2948 | bulk select + apply across discovered files        | No  | B    |

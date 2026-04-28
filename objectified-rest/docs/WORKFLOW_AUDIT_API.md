@@ -46,6 +46,7 @@ Stable envelope (bump **`schemaVersion`** only on incompatible changes):
       "outcome": "success | failure",
       "actorId": "uuid or null",
       "detail": {},
+      "changeReport": null,
       "createdAt": "ISO 8601 string"
     }
   ],
@@ -72,6 +73,16 @@ Stable envelope (bump **`schemaVersion`** only on incompatible changes):
 - **`pagination.offset`** / **`nextOffset`** are null.
 - **`total`** is still the count of all rows matching the filters (excluding pagination).
 
+Optional **`changeReport`** on each item mirrors a join against the linked semantic change-report row (**REPO-12.6**, `#2944`): when **`action`** is **`repository.auto_imported`** and **`detail`** carries **`changeReportId`**, the API adds:
+
+| Field | Meaning |
+|-------|---------|
+| **`changeReport.id`** | Same id as **`detail.changeReportId`** (repository-sync diff artifact). |
+| **`changeReport.summaryKind`** | **`breaking`** \| **`additive`** \| **`none`** — rollup from change-report category counts at import time. |
+| **`changeReport.breakingChangeCount`** | Integer breaking-change count stored on the audit row for governance queries. |
+
+Counts and summary kind are also present on **`detail`** as **`changeReportBreakingChangeCount`**, **`changeReportAdditiveChangeCount`**, **`changeReportSummaryKind`** (camelCase JSON). Legacy rows without **`changeReportId`** omit **`changeReport`**.
+
 ## `version.rollback` detail shape (`#2582`)
 
 For **`action`** = **`version.rollback`**, **`detail`** is a JSON object that may include:
@@ -86,9 +97,11 @@ For **`action`** = **`version.rollback`**, **`detail`** is a JSON object that ma
 
 **`actorId`** and **`createdAt`** on the audit row identify **who** and **when**; they are not duplicated inside **`detail`**.
 
-## Repository action codes (`#2799`)
+## Repository action codes (`#2799`, Epic E scan/import)
 
 Repository connector events use the same ledger and filter surface through `action`:
+
+**Lifecycle / connector**
 
 - `repository.registered`
 - `repository.scanned`
@@ -102,6 +115,23 @@ Repository connector events use the same ledger and filter surface through `acti
 - `repository.auto_paused`
 - `repository.token_resolved`
 - `repository.polled`
+
+**Scan / checksum / spec selection (Epic E)**
+
+- `repository.scan.skipped_checksum` — modified file skipped for dispatch because content checksum matched the last imported revision.
+- `repository.scan_report.purged` — retention purge removed older materialized scan reports (PostgreSQL path).
+
+The code **`repository.scan.hashed`** labels checksum completion for a tracked file on scan **`eventLog`** timelines (REPO-8.1); correlate with **`workflow_audit`** when both streams are exported together.
+
+**Spec selection / manual import**
+
+- `repository.spec.selection_changed` — import / auto-import toggles or mapping updates on a spec row.
+- `repository.spec.import_now_triggered` — manual **Import now** queued a dry-run job.
+- `repository.spec.mapping_required` / `repository.spec.mapping_resolved` — project slug conflicts surfaced or cleared.
+
+**Auto-import**
+
+- `repository.auto_imported` — a repository auto-import job was dispatched or completed on the gated path; **`detail`** includes repository context, **`importJobId`**, **`changeReportId`**, optional **`projectId`** / **`versionId`** when a revision was written, checksum short form, and **`changeReportSummaryKind`** / **`changeReportBreakingChangeCount`** (see optional **`changeReport`** projection above).
 
 Each repository row includes tenant scope (`tenantId`, underlying DB column `tenant_id`), repository context in `detail.repositoryId`,
 an `actorId` (underlying DB column `actor_id`, user or system identity), and a structured `detail` JSON payload with no secrets.

@@ -43,6 +43,7 @@ from .repositories.repository_source import validate_repository_source_payload
 from .repositories.spec_detail import (
     MAX_INLINE_PREVIEW_BYTES,
     _count_change_report_categories,
+    derive_change_report_summary_kind,
     derive_lint_summary,
     empty_lint_summary,
     provider_blob_url,
@@ -2899,6 +2900,11 @@ def _materialize_repository_dry_run_import_job(
             auto_detail["projectId"] = persist_meta["projectId"]
         if persist_meta.get("versionId"):
             auto_detail["versionId"] = persist_meta["versionId"]
+        br_cnt, ad_cnt = _count_change_report_categories(change_report.changeModelJson)
+        auto_detail["changeReportId"] = change_report.id
+        auto_detail["changeReportSummaryKind"] = derive_change_report_summary_kind(br_cnt, ad_cnt)
+        auto_detail["changeReportBreakingChangeCount"] = br_cnt
+        auto_detail["changeReportAdditiveChangeCount"] = ad_cnt
         pending_audit_rows.append(
             _append_audit_row(
                 tenant_id,

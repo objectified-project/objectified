@@ -18,7 +18,7 @@ Pure helpers for the spec-detail drawer endpoints:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Mapping
+from typing import Any, Dict, Iterable, Literal, Mapping
 from urllib.parse import quote
 
 
@@ -84,6 +84,15 @@ def _count_change_report_categories(change_model: Mapping[str, Any] | None) -> t
         if isinstance(counts.get("additive"), int):
             additive = max(additive, int(counts["additive"]))
     return breaking, additive
+
+
+def derive_change_report_summary_kind(breaking: int, additive: int) -> Literal["breaking", "additive", "none"]:
+    """Roll up change-report category counts for governance / audit surfaces (#2944)."""
+    if breaking > 0:
+        return "breaking"
+    if additive > 0:
+        return "additive"
+    return "none"
 
 
 def derive_lint_summary(
