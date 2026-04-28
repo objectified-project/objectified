@@ -33,6 +33,8 @@ from .repositories.manifest import (
     RepoManifest,
     initial_auto_import_enabled_for_path,
     initial_import_enabled_for_path,
+    manifest_duplicate_spec_paths,
+    manifest_project_slug_map_from_manifest,
     parse_repo_manifest,
     resolve_repository_file_mapping,
 )
@@ -116,6 +118,7 @@ RepositoryFileStatus = Literal[
     "ready_to_promote",
     "parse_error",
     "manifest_error",
+    "mapping_required",
 ]
 ImportJobPromotion = Literal["auto", "manual"]
 ImportJobOperation = Literal["import", "removal"]
@@ -303,6 +306,7 @@ RepositorySpecSelectionStatus = Literal[
     "manifest_error",
     "not_imported",
     "unchanged_checksum",
+    "mapping_required",
 ]
 
 
@@ -318,6 +322,9 @@ class RepositorySpecRecord(BaseModel):
     status: RepositorySpecSelectionStatus
     importEnabled: bool
     autoImportEnabled: bool
+    projectSlug: str | None = None
+    versionStrategy: str | None = None
+    mappingConflictKind: str | None = None
     lastImportedVersionId: str | None = None
     lastImportedAt: str | None = None
     createdAt: str
@@ -352,6 +359,13 @@ class RepositorySpecImportNowRequest(BaseModel):
 
 class RepositorySpecImportNowResponse(BaseModel):
     importJobId: str
+
+
+class RepositorySpecMappingResolveRequest(BaseModel):
+    decision: Literal["map_existing", "create_new", "defer"]
+    projectSlug: str | None = None
+    versionStrategy: str | None = None
+    branch: str | None = None
 
 
 class RepositorySpecLintSummary(BaseModel):
@@ -494,6 +508,9 @@ class RepositoryResolvedProjectRecord(BaseModel):
     slug: str
     name: str
     createdAt: str
+    origin: Literal["manifest_auto", "manual", "mapped"] = "manual"
+    createdFromRepositoryId: str | None = None
+    defaultVersionStrategy: str | None = None
 
 
 class RepositoryResolvedVersionRecord(BaseModel):
@@ -604,6 +621,8 @@ RepositoryAuditEvent = Literal[
     "repository.polled",
     "repository.spec.import_now_triggered",
     "repository.auto_imported",
+    "repository.spec.mapping_required",
+    "repository.spec.mapping_resolved",
 ]
 
 _DEFAULT_SCAN_PAGE_SIZE = 50
@@ -1991,6 +2010,8 @@ def _derive_repository_spec_status(
     file_row: RepositoryFileRecord,
     latest_import_job: RepositoryImportJobRecord | None,
 ) -> RepositorySpecSelectionStatus:
+    if file_row.status == "mapping_required":
+        return "mapping_required"
     if latest_import_job is not None and latest_import_job.state == "pending_review":
         return "importing"
     if latest_import_job is not None and latest_import_job.state == "committed":
@@ -2028,6 +2049,8 @@ def _build_repository_spec_record(
     if latest_import_job is not None and latest_import_job.state == "committed":
         last_imported_version_id = latest_import_job.targetVersionId
         last_imported_at = latest_import_job.createdAt
+    sj = file_row.settingsJson or {}
+    mapping_kind = sj.get("mappingConflictKind") if isinstance(sj.get("mappingConflictKind"), str) else None
     return RepositorySpecRecord(
         fileId=file_row.id,
         repositoryId=file_row.repositoryId,
@@ -2040,6 +2063,9 @@ def _build_repository_spec_record(
         status=status,
         importEnabled=file_row.importEnabled,
         autoImportEnabled=file_row.autoImportEnabled,
+        projectSlug=file_row.projectSlug,
+        versionStrategy=file_row.versionStrategy,
+        mappingConflictKind=mapping_kind,
         lastImportedVersionId=last_imported_version_id,
         lastImportedAt=last_imported_at,
         createdAt=file_row.createdAt,
@@ -2162,15 +2188,98 @@ def _manifest_project_slug_by_path(repository_id: str) -> Dict[str, str]:
     if repository is None:
         return {}
     manifest_outcome = parse_repo_manifest(repository.manifest)
-    if manifest_outcome.manifest is None:
-        return {}
-    manifest_map: Dict[str, str] = {}
-    for spec in manifest_outcome.manifest.specs:
-        normalized_slug = _normalize_slug(spec.project)
-        if normalized_slug is None:
-            continue
-        manifest_map[spec.path] = normalized_slug
-    return manifest_map
+    return manifest_project_slug_map_from_manifest(manifest_outcome.manifest)
+
+
+ProjectMappingConflictKind = Literal[
+    "PROJECT_SLUG_TAKEN",
+    "VERSION_STRATEGY_MISMATCH",
+    "MANIFEST_PROJECT_AMBIGUOUS",
+    "RBAC_NO_PROJECT_CREATE",
+]
+
+
+def _evaluate_project_mapping_conflict(
+    *,
+    tenant_id: str,
+    repository_id: str,
+    file_row: RepositoryFileRecord,
+    manifest_project_slug_by_path: Dict[str, str],
+    manifest_duplicate_paths: bool,
+) -> ProjectMappingConflictKind | None:
+    """Return a typed conflict when auto-import cannot safely bind project/version (REPO-12.2)."""
+    if manifest_duplicate_paths:
+        return "MANIFEST_PROJECT_AMBIGUOUS"
+
+    normalized_slug = _normalize_slug(file_row.projectSlug)
+    if normalized_slug is None:
+        return None
+
+    tenant_projects = _REPO_PROJECT_STORE.setdefault(tenant_id, {})
+    existing = tenant_projects.get(normalized_slug)
+
+    policy = _REPO_IMPORT_POLICY_STORE.get(repository_id, {})
+    allow_auto_create = bool(policy.get("allowManifestProjectAutoCreate"))
+
+    manifest_slug = manifest_project_slug_by_path.get(file_row.path)
+
+    if manifest_slug is not None and manifest_slug == normalized_slug:
+        if existing is None and not allow_auto_create:
+            return "RBAC_NO_PROJECT_CREATE"
+
+    if existing is not None:
+        evs = existing.defaultVersionStrategy
+        fvs = file_row.versionStrategy
+        if (
+            isinstance(evs, str)
+            and evs.strip()
+            and isinstance(fvs, str)
+            and fvs.strip()
+            and evs.strip().lower() != fvs.strip().lower()
+        ):
+            return "VERSION_STRATEGY_MISMATCH"
+
+        if allow_auto_create and manifest_slug == normalized_slug:
+            if existing.origin == "manual":
+                return "PROJECT_SLUG_TAKEN"
+            if existing.origin == "manifest_auto" and (
+                existing.createdFromRepositoryId is None
+                or existing.createdFromRepositoryId != repository_id
+            ):
+                return "PROJECT_SLUG_TAKEN"
+
+    return None
+
+
+def _park_file_mapping_required(
+    file_row: RepositoryFileRecord,
+    *,
+    kind: ProjectMappingConflictKind,
+) -> RepositoryFileRecord:
+    sj = dict(file_row.settingsJson or {})
+    sj["mappingConflictKind"] = kind
+    sj["preMappingScanStatus"] = file_row.status
+    return file_row.model_copy(
+        update={
+            "status": "mapping_required",
+            "settingsJson": sj,
+            "discriminator": kind,
+        }
+    )
+
+
+def _tenant_project_slug_exists(tenant_id: str, slug: str) -> bool:
+    if slug in _REPO_PROJECT_STORE.get(tenant_id, {}):
+        return True
+    try:
+        hit = db.get_project_by_slug(slug, tenant_id)
+        return bool(hit)
+    except Exception:
+        _logger.exception(
+            "Failed to check whether project slug exists; failing closed",
+            extra={"tenant_id": tenant_id, "project_slug": slug},
+        )
+        return True
 
 
 def _ensure_project_for_scan_file(
@@ -2195,12 +2304,17 @@ def _ensure_project_for_scan_file(
         return None
 
     now = _utc_now_iso()
+    vs_raw = file_row.versionStrategy
+    vs_norm = vs_raw.strip().lower() if isinstance(vs_raw, str) and vs_raw.strip() else None
     created = RepositoryResolvedProjectRecord(
         id=str(uuid4()),
         tenantId=tenant_id,
         slug=normalized_project_slug,
         name=normalized_project_slug.replace("-", " ").title(),
         createdAt=now,
+        origin="manifest_auto",
+        createdFromRepositoryId=repository_id,
+        defaultVersionStrategy=vs_norm,
     )
     tenant_projects[normalized_project_slug] = created
     return created
@@ -2693,7 +2807,12 @@ def _dispatch_import_jobs_for_scan(
     pending_audit_rows: List[Dict[str, Any]] = []
     checksums = precomputed_checksums or {}
     with _repository_dispatch_advisory_lock(repository_id):
-        for file_row in scan_files:
+        repository = _REPO_STORE.get(tenant_id, {}).get(repository_id)
+        manifest_obj = parse_repo_manifest(repository.manifest).manifest if repository else None
+        manifest_duplicate_paths = manifest_duplicate_spec_paths(manifest_obj)
+        manifest_slug_map = manifest_project_slug_map_from_manifest(manifest_obj)
+
+        for idx, file_row in enumerate(scan_files):
             if file_row.status not in {"new", "modified", "removed"}:
                 continue
             if not file_row.tracked:
@@ -2733,6 +2852,32 @@ def _dispatch_import_jobs_for_scan(
                             )
                         )
                         continue
+
+            if file_row.status != "removed":
+                conflict = _evaluate_project_mapping_conflict(
+                    tenant_id=tenant_id,
+                    repository_id=repository_id,
+                    file_row=file_row,
+                    manifest_project_slug_by_path=manifest_slug_map,
+                    manifest_duplicate_paths=manifest_duplicate_paths,
+                )
+                if conflict is not None:
+                    scan_files[idx] = _park_file_mapping_required(file_row, kind=conflict)
+                    pending_audit_rows.append(
+                        _append_audit_row(
+                            tenant_id,
+                            repository_id,
+                            "repository.spec.mapping_required",
+                            actor_id=actor_id,
+                            detail={
+                                "scanId": scan_id,
+                                "fileId": file_row.id,
+                                "path": file_row.path,
+                                "conflictKind": conflict,
+                            },
+                        )
+                    )
+                    continue
 
             _created_job, materialize_audits = _materialize_repository_dry_run_import_job(
                 tenant_id=tenant_id,
@@ -3551,7 +3696,7 @@ def iter_scan_report_export_rows(
                 else:
                     _VALID_SPEC_STATUSES = {
                         "importing", "imported", "parse_error", "manifest_error",
-                        "not_imported", "unchanged_checksum",
+                        "not_imported", "unchanged_checksum", "mapping_required",
                     }
                     raw_status = pitem.get("status")
                     spec_status: RepositorySpecSelectionStatus = (
@@ -3573,6 +3718,9 @@ def iter_scan_report_export_rows(
                         status=spec_status,
                         importEnabled=bool(pitem.get("importEnabled")),
                         autoImportEnabled=bool(pitem.get("autoImportEnabled")),
+                        projectSlug=None,
+                        versionStrategy=None,
+                        mappingConflictKind=None,
                         lastImportedVersionId=None,
                         lastImportedAt=None,
                         createdAt=report.get("generatedAt", "") or "",
@@ -4261,6 +4409,244 @@ async def update_repository_spec_selection(
             raise HTTPException(status_code=404, detail=f"Repository file not found: {file_id}")
         latest_job = _latest_import_jobs_by_path(repository_id, out_branch).get(out_row.path)
         out_spec = _build_repository_spec_record(out_row, out_branch, latest_job)
+
+    for row in audits_to_persist:
+        _persist_audit_row(row)
+    _recompute_repository_attention(tenant_id, repository_id)
+    return out_spec
+
+
+@router.patch(
+    "/{tenant_slug}/{repository_id}/specs/{file_id}/mapping",
+    response_model=RepositorySpecRecord,
+)
+async def resolve_repository_spec_mapping(
+    tenant_slug: str,
+    repository_id: str,
+    file_id: str,
+    request: RepositorySpecMappingResolveRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositorySpecRecord:
+    """Resolve REPO-12.2 project-mapping conflicts and retry auto-import."""
+    tenant_id = auth_data["tenant_id"]
+    actor_id = _resolve_actor_id(auth_data)
+    _require_repository_scope(auth_data, _REPOSITORY_SCOPE_WRITE)
+    _validate_uuid(file_id, "fileId")
+
+    audits_to_persist: List[Dict[str, Any]] = []
+    out_spec: RepositorySpecRecord | None = None
+
+    with _STORE_LOCK:
+        repository = _find_repository_for_tenant(tenant_id, repository_id)
+        if not repository.branches:
+            raise HTTPException(status_code=400, detail="Repository has no branch configuration")
+
+        requested_branch = (request.branch or "").strip()
+        if not requested_branch:
+            effective_branch = repository.branches[0].branch
+        else:
+            if not any(branch.branch == requested_branch for branch in repository.branches):
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Branch {requested_branch!r} is not configured for this repository",
+                )
+            effective_branch = requested_branch
+
+        _TERMINAL = {"complete", "skipped_unchanged"}
+        scans = _REPO_SCAN_HISTORY_STORE.get(repository_id, [])
+        latest_scan: RepositoryScanRecord | None = next(
+            (scan for scan in scans if scan.branch == effective_branch and scan.status in _TERMINAL),
+            None,
+        )
+        if latest_scan is None:
+            raise HTTPException(status_code=404, detail=f"No completed scan for branch: {effective_branch}")
+
+        file_list = _REPO_SCAN_FILE_HISTORY_STORE.get(latest_scan.id, [])
+        file_idx: int | None = None
+        working_row: RepositoryFileRecord | None = None
+        for idx, row in enumerate(file_list):
+            if row.id == file_id:
+                file_idx = idx
+                working_row = row
+                break
+        if working_row is None or file_idx is None:
+            raise HTTPException(status_code=404, detail=f"Repository file not found: {file_id}")
+
+        if working_row.status != "mapping_required":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "SPEC_NOT_MAPPING_REQUIRED",
+                    "message": "This spec is not awaiting project mapping.",
+                },
+            )
+
+        if request.decision == "defer":
+            audits_to_persist.append(
+                _append_audit_row(
+                    tenant_id,
+                    repository_id,
+                    "repository.spec.mapping_resolved",
+                    actor_id=actor_id,
+                    detail={
+                        "path": working_row.path,
+                        "fileId": file_id,
+                        "decision": "defer",
+                        "actorId": actor_id,
+                    },
+                )
+            )
+            latest_job = _latest_import_jobs_by_path(repository_id, effective_branch).get(working_row.path)
+            out_spec = _build_repository_spec_record(working_row, effective_branch, latest_job)
+        else:
+            next_row: RepositoryFileRecord
+            if request.decision == "map_existing":
+                slug_norm = _normalize_slug(request.projectSlug)
+                if slug_norm is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"code": "INVALID_SLUG", "message": "projectSlug is required for map_existing"},
+                    )
+                if not _tenant_project_slug_exists(tenant_id, slug_norm):
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"code": "PROJECT_NOT_FOUND", "message": "Unknown project slug for this tenant"},
+                    )
+                vs_choice = request.versionStrategy
+                raw_row_vs = working_row.versionStrategy
+                vs_norm = (
+                    vs_choice.strip().lower()
+                    if isinstance(vs_choice, str) and vs_choice.strip()
+                    else (
+                        raw_row_vs.strip().lower()
+                        if isinstance(raw_row_vs, str) and raw_row_vs.strip()
+                        else "commit-sha"
+                    )
+                )
+                next_row = working_row.model_copy(
+                    update={
+                        "projectSlug": slug_norm,
+                        "versionStrategy": vs_norm,
+                    }
+                )
+            elif request.decision == "create_new":
+                slug_norm = _normalize_slug(request.projectSlug)
+                if slug_norm is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"code": "INVALID_SLUG", "message": "projectSlug is required for create_new"},
+                    )
+                vs_choice = request.versionStrategy
+                if not isinstance(vs_choice, str) or not vs_choice.strip():
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "code": "VERSION_STRATEGY_REQUIRED",
+                            "message": "versionStrategy is required for create_new",
+                        },
+                    )
+                vs_norm = vs_choice.strip().lower()
+                if _tenant_project_slug_exists(tenant_id, slug_norm):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={"code": "SLUG_TAKEN", "message": "A project with this slug already exists"},
+                    )
+                now_iso = _utc_now_iso()
+                created_proj = RepositoryResolvedProjectRecord(
+                    id=str(uuid4()),
+                    tenantId=tenant_id,
+                    slug=slug_norm,
+                    name=slug_norm.replace("-", " ").title(),
+                    createdAt=now_iso,
+                    origin="mapped",
+                    createdFromRepositoryId=repository_id,
+                    defaultVersionStrategy=vs_norm,
+                )
+                _REPO_PROJECT_STORE.setdefault(tenant_id, {})[slug_norm] = created_proj
+                next_row = working_row.model_copy(
+                    update={
+                        "projectSlug": slug_norm,
+                        "versionStrategy": vs_norm,
+                    }
+                )
+            else:
+                raise HTTPException(status_code=400, detail="Invalid mapping decision")
+
+            sj = dict(next_row.settingsJson or {})
+            pre_st = sj.pop("preMappingScanStatus", None)
+            sj.pop("mappingConflictKind", None)
+            restored_status: RepositoryFileStatus
+            if isinstance(pre_st, str) and pre_st in {
+                "new",
+                "modified",
+                "unchanged",
+                "unchanged_checksum",
+                "discovered",
+                "ready_to_promote",
+            }:
+                restored_status = pre_st  # type: ignore[assignment]
+            else:
+                restored_status = "modified"
+            next_row = next_row.model_copy(
+                update={"status": restored_status, "settingsJson": sj or None, "discriminator": None}
+            )
+
+            commit_sha = latest_scan.commitSha
+            if not (isinstance(commit_sha, str) and commit_sha.strip()):
+                raise HTTPException(status_code=500, detail="Repository scan is missing a commit reference for import dispatch.")
+
+            new_job, job_audits = _materialize_repository_dry_run_import_job(
+                tenant_id=tenant_id,
+                repository_id=repository_id,
+                scan_id=latest_scan.id,
+                branch=effective_branch,
+                commit_sha=commit_sha.strip(),
+                file_row=next_row,
+                actor_id=actor_id,
+                source_kind="repository_auto_import",
+            )
+            file_list[file_idx] = next_row
+            audits_to_persist.extend(job_audits)
+            audits_to_persist.append(
+                _append_audit_row(
+                    tenant_id,
+                    repository_id,
+                    "repository.auto_imported",
+                    actor_id=actor_id,
+                    detail={
+                        "scanId": latest_scan.id,
+                        "fileId": file_id,
+                        "contentChecksumShort": _short_checksum(
+                            _normalize_content_checksum(next_row.contentChecksum)
+                        ),
+                        "projectSlug": next_row.projectSlug,
+                        "versionStrategy": next_row.versionStrategy,
+                        "importJobId": new_job.id,
+                    },
+                )
+            )
+            audits_to_persist.append(
+                _append_audit_row(
+                    tenant_id,
+                    repository_id,
+                    "repository.spec.mapping_resolved",
+                    actor_id=actor_id,
+                    detail={
+                        "path": next_row.path,
+                        "fileId": file_id,
+                        "decision": request.decision,
+                        "projectSlug": next_row.projectSlug,
+                        "versionStrategy": next_row.versionStrategy,
+                        "importJobId": new_job.id,
+                        "actorId": actor_id,
+                    },
+                )
+            )
+            latest_job = _latest_import_jobs_by_path(repository_id, effective_branch).get(next_row.path)
+            out_spec = _build_repository_spec_record(next_row, effective_branch, latest_job)
+
+    if out_spec is None:
+        raise HTTPException(status_code=500, detail="Mapping resolution failed")
 
     for row in audits_to_persist:
         _persist_audit_row(row)

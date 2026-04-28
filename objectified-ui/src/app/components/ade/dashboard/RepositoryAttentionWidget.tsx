@@ -207,7 +207,10 @@ export function RepositoryAttentionWidget() {
             {data.items.map((row) => {
               const rel = formatRelativeTime(row.lastChangeAt);
               const fileLabel = row.openCount === 1 ? '1 file' : `${row.openCount} files`;
-              const href = `/ade/dashboard/repositories/${row.repositoryId}/issues`;
+              const href =
+                row.detailTab === 'specs'
+                  ? `/ade/dashboard/repositories/${row.repositoryId}?tab=specs`
+                  : `/ade/dashboard/repositories/${row.repositoryId}/issues`;
               return (
                 <li key={row.repositoryId} className={cn(repositoryActivityRowClass, 'items-center gap-2')}>
                   <Link

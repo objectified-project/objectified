@@ -38,6 +38,7 @@ const REASON_ORDER = [
   'manifest_error',
   'parse_error',
   'import_failed',
+  'mapping_required',
   'stale_checksum',
   'scheduler_paused',
   'repeated_failures',
@@ -63,6 +64,8 @@ function reasonPillClass(reason: string) {
       return 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200';
     case 'stale_checksum':
       return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200';
+    case 'mapping_required':
+      return 'bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-100';
     case 'scheduler_paused':
       return 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100';
     case 'repeated_failures':
@@ -97,6 +100,8 @@ function reasonExplanation(reason: string): string {
       return 'A recent import job failed for one or more specs — review the sync history.';
     case 'stale_checksum':
       return 'Auto-import is off but content changed — import or adjust promotion settings.';
+    case 'mapping_required':
+      return 'A manifest project mapping conflict blocked auto-import — map this spec to a project on the Specs tab.';
     case 'scheduler_paused':
       return 'Scheduled polling is paused for this repository.';
     case 'repeated_failures':
@@ -110,6 +115,8 @@ function fixLabel(reason: string): string {
   switch (reason) {
     case 'stale_checksum':
       return 'Import';
+    case 'mapping_required':
+      return 'Map';
     default:
       return 'Fix';
   }
@@ -145,6 +152,9 @@ export function RepositoryIssuesTab({ repositoryId, detail, loading, loadError, 
           return;
         case 'stale_checksum':
           router.push(`${baseHref}?tab=specs&status=importable`);
+          return;
+        case 'mapping_required':
+          router.push(`${baseHref}?tab=specs&status=needs_mapping`);
           return;
         default:
           router.push(`${baseHref}?tab=files`);

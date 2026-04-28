@@ -4,7 +4,7 @@ import importlib.resources as pkg_resources
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Literal, Sequence
+from typing import Any, Dict, Literal, Sequence
 
 import yaml
 from jsonschema import Draft202012Validator, ValidationError
@@ -121,6 +121,27 @@ def initial_auto_import_enabled_for_path(
     _ = manifest
     _ = spec
     return False
+
+
+def manifest_duplicate_spec_paths(manifest: RepoManifest | None) -> bool:
+    """True when the manifest lists the same ``specs[].path`` more than once (ambiguous)."""
+    if manifest is None:
+        return False
+    paths = [spec.path for spec in manifest.specs]
+    return len(paths) != len(set(paths))
+
+
+def manifest_project_slug_map_from_manifest(manifest: RepoManifest | None) -> Dict[str, str]:
+    """``path`` → normalized manifest ``project`` slug for REPO-12.2 conflict evaluation."""
+    if manifest is None:
+        return {}
+    manifest_map: Dict[str, str] = {}
+    for spec in manifest.specs:
+        normalized_slug = _normalize_project_slug(spec.project)
+        if normalized_slug is None:
+            continue
+        manifest_map[spec.path] = normalized_slug
+    return manifest_map
 
 
 def parse_repo_manifest(raw_manifest: str | None) -> RepoManifestParseOutcome:

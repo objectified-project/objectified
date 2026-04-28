@@ -20,6 +20,7 @@ import ConfirmDialog from '@/app/components/dialogs/ConfirmDialog';
 import { Input } from '@/app/components/ui/Input';
 import { Switch } from '@/app/components/ui/Switch';
 import { RepositorySpecDetailDrawer } from './RepositorySpecDetailDrawer';
+import { RepositorySpecMappingDialog } from './RepositorySpecMappingDialog';
 
 export type RepositorySpecStatus =
   | 'importing'
@@ -27,7 +28,8 @@ export type RepositorySpecStatus =
   | 'parse_error'
   | 'manifest_error'
   | 'not_imported'
-  | 'unchanged_checksum';
+  | 'unchanged_checksum'
+  | 'mapping_required';
 
 export interface RepositorySpecRecord {
   fileId: string;
@@ -41,6 +43,9 @@ export interface RepositorySpecRecord {
   status: RepositorySpecStatus;
   importEnabled: boolean;
   autoImportEnabled: boolean;
+  projectSlug?: string | null;
+  versionStrategy?: string | null;
+  mappingConflictKind?: string | null;
   lastImportedVersionId: string | null;
   lastImportedAt: string | null;
   createdAt: string;
@@ -75,6 +80,7 @@ const filterStatusValues = [
   'imported',
   'failing',
   'awaiting_selection',
+  'needs_mapping',
 ] as const;
 type SpecFilter = (typeof filterStatusValues)[number];
 
@@ -84,6 +90,7 @@ const filterLabel: Record<SpecFilter, string> = {
   imported: 'Imported',
   failing: 'Failing',
   awaiting_selection: 'Awaiting selection',
+  needs_mapping: 'Needs mapping',
 };
 
 /**
@@ -97,6 +104,7 @@ const filterToServerStatus: Record<SpecFilter, RepositorySpecStatus[] | null> = 
   imported: ['imported'],
   failing: ['parse_error', 'manifest_error'],
   awaiting_selection: ['not_imported'],
+  needs_mapping: ['mapping_required'],
 };
 
 /** REPO-9.7: client-only filters (must match `filteredSpecs` in the list). */
@@ -110,6 +118,9 @@ export function matchesListFilter(
   }
   if (filter === 'failing') {
     return row.status === 'parse_error' || row.status === 'manifest_error';
+  }
+  if (filter === 'needs_mapping') {
+    return row.status === 'mapping_required';
   }
   return true;
 }
@@ -189,6 +200,7 @@ const statusPillClass: Record<RepositorySpecStatus, string> = {
   manifest_error: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
   not_imported: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
   unchanged_checksum: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  mapping_required: 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100',
 };
 
 const statusLabel: Record<RepositorySpecStatus, string> = {
@@ -198,6 +210,7 @@ const statusLabel: Record<RepositorySpecStatus, string> = {
   manifest_error: 'Manifest error',
   not_imported: 'Not imported',
   unchanged_checksum: 'Unchanged',
+  mapping_required: 'Needs mapping',
 };
 
 function StatusPill({ status }: { status: RepositorySpecStatus }) {
@@ -205,11 +218,13 @@ function StatusPill({ status }: { status: RepositorySpecStatus }) {
     ? CheckCircle2
     : status === 'importing'
       ? Loader2
-    : status === 'parse_error' || status === 'manifest_error'
-      ? AlertCircle
-      : status === 'unchanged_checksum'
-        ? CircleDot
-        : CircleDashed;
+      : status === 'parse_error' || status === 'manifest_error'
+        ? AlertCircle
+        : status === 'mapping_required'
+          ? AlertCircle
+          : status === 'unchanged_checksum'
+            ? CircleDot
+            : CircleDashed;
   return (
     <span
       className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${statusPillClass[status]}`}
@@ -272,6 +287,7 @@ export function RepositorySpecsTab({
   /** REPO-9.7: rows from "Select all matching filter" (and other off-canvas IDs) for import/imported state. */
   const [extraRowById, setExtraRowById] = useState<Record<string, RepositorySpecRecord>>({});
   const [confirmDisableImportOpen, setConfirmDisableImportOpen] = useState(false);
+  const [mappingDialogSpec, setMappingDialogSpec] = useState<RepositorySpecRecord | null>(null);
   const [isBulkPending, setIsBulkPending] = useState(false);
   const [isSelectAllMatchingPending, setIsSelectAllMatchingPending] = useState(false);
   const importNowEarlyRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -957,7 +973,19 @@ export function RepositorySpecsTab({
                       </span>
                     </td>
                     <td className="px-3 py-2.5 align-middle">
-                      <StatusPill status={spec.status} />
+                      <div className="flex flex-col gap-1.5 items-start">
+                        <StatusPill status={spec.status} />
+                        {spec.status === 'mapping_required' ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="bg-amber-100 text-amber-950 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-100 dark:hover:bg-amber-900/70"
+                            onClick={() => setMappingDialogSpec(spec)}
+                          >
+                            Map to project
+                          </Button>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-3 py-2.5 align-middle">
                       {spec.lastImportedVersionId ? (
@@ -1079,6 +1107,27 @@ export function RepositorySpecsTab({
           }}
           onSpecRefresh={handleSpecDetailRefresh}
           onClose={() => setSelectedSpec(null)}
+          onMappingApplied={() => {
+            void loadSpecs();
+          }}
+        />
+      ) : null}
+
+      {mappingDialogSpec ? (
+        <RepositorySpecMappingDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) setMappingDialogSpec(null);
+          }}
+          repositoryId={repositoryId}
+          fileId={mappingDialogSpec.fileId}
+          branch={branch}
+          conflictKind={mappingDialogSpec.mappingConflictKind}
+          initialProjectSlug={mappingDialogSpec.projectSlug}
+          initialVersionStrategy={mappingDialogSpec.versionStrategy}
+          onMapped={async () => {
+            await loadSpecs();
+          }}
         />
       ) : null}
 

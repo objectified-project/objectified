@@ -80,8 +80,8 @@ const repositoryTabsWithoutIssues: RepositoryTab[] = [
   'settings',
 ];
 
-type SpecFilter = 'all' | 'importable' | 'imported' | 'failing' | 'awaiting_selection';
-const specFilterValues: SpecFilter[] = ['all', 'importable', 'imported', 'failing', 'awaiting_selection'];
+type SpecFilter = 'all' | 'importable' | 'imported' | 'failing' | 'awaiting_selection' | 'needs_mapping';
+const specFilterValues: SpecFilter[] = ['all', 'importable', 'imported', 'failing', 'awaiting_selection', 'needs_mapping'];
 
 interface RepositoryTimelineItem {
   id: string;
