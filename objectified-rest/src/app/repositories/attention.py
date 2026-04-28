@@ -149,7 +149,7 @@ def top_reason_for_chips(valid_reasons: Sequence[str]) -> str:
 
 
 def attention_detail_query_tab(valid_reasons: Sequence[str]) -> str:
-    """`tab` query for repository deep links (REPO-11.4: prefer Issues for any active reason)."""
+    """`tab` query for repository deep links. Returns `"specs"` when `mapping_required` is present; `"issues"` for any other active reason; `"files"` otherwise."""
     r = {x for x in valid_reasons if x in _VALID_REASONS}
     if "mapping_required" in r:
         return "specs"

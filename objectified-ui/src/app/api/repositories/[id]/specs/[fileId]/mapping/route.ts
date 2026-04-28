@@ -43,15 +43,25 @@ export async function PATCH(
       `${REST_API_BASE_URL}/repositories/${encodeURIComponent(auth.tenantSlug)}/${encodeURIComponent(params.id)}/specs/${encodeURIComponent(params.fileId)}/mapping`,
       {
         method: 'PATCH',
-        headers: createRestAuthHeaders(auth.sessionUser),
+        headers: {
+          ...createRestAuthHeaders(auth.sessionUser),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(body),
       }
     );
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const detail = typeof data.detail === 'string' ? data.detail : 'Failed to resolve project mapping';
+      const detail = data.detail;
+      if (typeof detail === 'object' && detail !== null && 'message' in detail) {
+        return NextResponse.json(
+          { success: false, error: (detail as { message?: string }).message, detail },
+          { status: response.status },
+        );
+      }
+      const errText = typeof data.detail === 'string' ? data.detail : 'Failed to resolve project mapping';
       return NextResponse.json(
-        { success: false, error: detail, detail: data.detail ?? null },
+        { success: false, error: errText, detail: data.detail ?? null },
         { status: response.status },
       );
     }

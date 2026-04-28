@@ -2275,7 +2275,11 @@ def _tenant_project_slug_exists(tenant_id: str, slug: str) -> bool:
         hit = db.get_project_by_slug(slug, tenant_id)
         return bool(hit)
     except Exception:
-        return False
+        _logger.exception(
+            "Failed to check whether project slug exists; failing closed",
+            extra={"tenant_id": tenant_id, "project_slug": slug},
+        )
+        return True
 
 
 def _ensure_project_for_scan_file(

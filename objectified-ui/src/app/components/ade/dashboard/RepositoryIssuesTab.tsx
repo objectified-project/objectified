@@ -154,7 +154,7 @@ export function RepositoryIssuesTab({ repositoryId, detail, loading, loadError, 
           router.push(`${baseHref}?tab=specs&status=importable`);
           return;
         case 'mapping_required':
-          router.push(`${baseHref}?tab=specs`);
+          router.push(`${baseHref}?tab=specs&status=needs_mapping`);
           return;
         default:
           router.push(`${baseHref}?tab=files`);
