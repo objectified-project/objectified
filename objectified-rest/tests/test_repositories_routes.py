@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,6 +9,10 @@ from app.auth import validate_authentication
 from app.main import app
 from app.repositories_routes import (
     RepositoryFileRecord,
+    RepositoryResolvedProjectRecord,
+    _evaluate_project_mapping_conflict,
+    _REPO_IMPORT_POLICY_STORE,
+    _REPO_PROJECT_STORE,
     _REPO_SCAN_FILE_HISTORY_STORE,
     _STORE_LOCK,
     _build_repository_sync_change_report_for_test_status,
@@ -19,6 +24,7 @@ from app.repositories_routes import (
     _get_repository_relations_exist_for_tests,
     _get_repository_resolved_versions_for_tests,
     _list_poll_targets_for_tests,
+    _materialize_repository_dry_run_import_job,
     _reset_repository_state_for_tests,
     _seed_repository_file_content_for_tests,
     _seed_repository_relations_for_tests,
@@ -2950,3 +2956,186 @@ def test_scan_report_export_row_cap_400() -> None:
         assert isinstance(det, dict) and det.get("code") == "EXPORT_ROW_CAP_EXCEEDED"
     finally:
         app.dependency_overrides.pop(validate_authentication, None)
+
+
+def _repo_12_2_base_file_row(
+    *,
+    repository_id: str,
+    path: str = "apis/svc.yaml",
+    project_slug: str = "svc",
+    version_strategy: str = "commit-sha",
+    status: str = "modified",
+) -> RepositoryFileRecord:
+    return RepositoryFileRecord(
+        id=str(uuid4()),
+        repositoryId=repository_id,
+        scanId="cccccccc-cccc-cccc-cccc-cccccccccccc",
+        path=path,
+        blobSha="b1",
+        contentAlgo="sha256",
+        contentChecksum="f" * 64,
+        tracked=True,
+        importEnabled=True,
+        autoImportEnabled=True,
+        projectSlug=project_slug,
+        versionStrategy=version_strategy,
+        status=status,
+        createdAt="2026-04-26T00:00:00Z",
+    )
+
+
+def test_repo_12_2_evaluate_manifest_ambiguous() -> None:
+    fr = _repo_12_2_base_file_row(repository_id="rid")
+    assert (
+        _evaluate_project_mapping_conflict(
+            tenant_id=_MOCK_AUTH["tenant_id"],
+            repository_id="rid",
+            file_row=fr,
+            manifest_project_slug_by_path={"apis/svc.yaml": "svc"},
+            manifest_duplicate_paths=True,
+        )
+        == "MANIFEST_PROJECT_AMBIGUOUS"
+    )
+
+
+def test_repo_12_2_evaluate_rbac_no_project_create() -> None:
+    rid = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    with _STORE_LOCK:
+        _REPO_IMPORT_POLICY_STORE[rid] = {"allowManifestProjectAutoCreate": False}
+    fr = _repo_12_2_base_file_row(repository_id=rid)
+    assert (
+        _evaluate_project_mapping_conflict(
+            tenant_id=_MOCK_AUTH["tenant_id"],
+            repository_id=rid,
+            file_row=fr,
+            manifest_project_slug_by_path={"apis/svc.yaml": "svc"},
+            manifest_duplicate_paths=False,
+        )
+        == "RBAC_NO_PROJECT_CREATE"
+    )
+
+
+def test_repo_12_2_evaluate_project_slug_taken() -> None:
+    tid = _MOCK_AUTH["tenant_id"]
+    rid = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    with _STORE_LOCK:
+        _REPO_IMPORT_POLICY_STORE[rid] = {"allowManifestProjectAutoCreate": True}
+        _REPO_PROJECT_STORE.setdefault(tid, {})["svc"] = RepositoryResolvedProjectRecord(
+            id=str(uuid4()),
+            tenantId=tid,
+            slug="svc",
+            name="Svc",
+            createdAt="2026-01-01T00:00:00Z",
+            origin="manual",
+        )
+    fr = _repo_12_2_base_file_row(repository_id=rid)
+    assert (
+        _evaluate_project_mapping_conflict(
+            tenant_id=tid,
+            repository_id=rid,
+            file_row=fr,
+            manifest_project_slug_by_path={"apis/svc.yaml": "svc"},
+            manifest_duplicate_paths=False,
+        )
+        == "PROJECT_SLUG_TAKEN"
+    )
+
+
+def test_repo_12_2_evaluate_version_strategy_mismatch() -> None:
+    tid = _MOCK_AUTH["tenant_id"]
+    rid = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    with _STORE_LOCK:
+        _REPO_IMPORT_POLICY_STORE[rid] = {"allowManifestProjectAutoCreate": True}
+        _REPO_PROJECT_STORE.setdefault(tid, {})["svc"] = RepositoryResolvedProjectRecord(
+            id=str(uuid4()),
+            tenantId=tid,
+            slug="svc",
+            name="Svc",
+            createdAt="2026-01-01T00:00:00Z",
+            origin="manifest_auto",
+            createdFromRepositoryId=rid,
+            defaultVersionStrategy="commit-sha",
+        )
+    fr = _repo_12_2_base_file_row(repository_id=rid, version_strategy="semver")
+    assert (
+        _evaluate_project_mapping_conflict(
+            tenant_id=tid,
+            repository_id=rid,
+            file_row=fr,
+            manifest_project_slug_by_path={"apis/svc.yaml": "svc"},
+            manifest_duplicate_paths=False,
+        )
+        == "VERSION_STRATEGY_MISMATCH"
+    )
+
+
+def test_repo_12_2_mapping_resolve_retry_materializes_auto_import_job() -> None:
+    """After conflict metadata is cleared and project slug maps to an existing tenant project, materialize succeeds."""
+    tenant_id = _MOCK_AUTH["tenant_id"]
+    repository_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    scan_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    with _STORE_LOCK:
+        _REPO_PROJECT_STORE.setdefault(tenant_id, {})["existing-proj"] = RepositoryResolvedProjectRecord(
+            id=str(uuid4()),
+            tenantId=tenant_id,
+            slug="existing-proj",
+            name="Existing Proj",
+            createdAt="2026-01-01T00:00:00Z",
+            origin="manual",
+            defaultVersionStrategy="commit-sha",
+        )
+
+    cleared = _repo_12_2_base_file_row(
+        repository_id=repository_id,
+        project_slug="existing-proj",
+    ).model_copy(update={"status": "modified", "settingsJson": None, "discriminator": None})
+    job, _audits = _materialize_repository_dry_run_import_job(
+        tenant_id=tenant_id,
+        repository_id=repository_id,
+        scan_id=scan_id,
+        branch="main",
+        commit_sha="deadbeefcafe",
+        file_row=cleared,
+        actor_id=_MOCK_AUTH["user_id"],
+        source_kind="repository_auto_import",
+    )
+    assert job.targetProjectSlug == "existing-proj"
+    assert job.targetVersionId is not None
+
+
+def test_repo_12_2_dispatch_parks_rbac_emits_mapping_audit() -> None:
+    """Auto-import dispatcher parks conflicting specs instead of dispatching a failing job."""
+    tenant_id = _MOCK_AUTH["tenant_id"]
+    repository_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    scan_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    with _STORE_LOCK:
+        _REPO_IMPORT_POLICY_STORE[repository_id] = {"allowManifestProjectAutoCreate": False}
+
+    fr = _repo_12_2_base_file_row(repository_id=repository_id)
+    diff_summary = {
+        "added": 0,
+        "modified": 1,
+        "removed": 0,
+        "unchanged": 0,
+        "skipped_unchanged_by_checksum": 0,
+    }
+    audit_rows = _dispatch_import_jobs_for_scan(
+        tenant_id=tenant_id,
+        repository_id=repository_id,
+        scan_id=scan_id,
+        branch="main",
+        commit_sha="commit-a",
+        scan_files=[fr],
+        actor_id=_MOCK_AUTH["user_id"],
+        force=False,
+        diff_summary=diff_summary,
+        precomputed_checksums=None,
+    )
+    assert fr.status == "mapping_required"
+    detail_kinds = [
+        row["detail"].get("conflictKind")
+        for row in audit_rows
+        if row["eventType"] == "repository.spec.mapping_required"
+    ]
+    assert detail_kinds == ["RBAC_NO_PROJECT_CREATE"]
+    assert _get_repository_import_jobs_for_tests(repository_id) == []

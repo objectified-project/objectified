@@ -20,6 +20,7 @@ import {
 import { Button } from '@/app/components/ui/Button';
 import { Switch } from '@/app/components/ui/Switch';
 import type { RepositorySpecRecord, RepositorySpecStatus } from './RepositorySpecsTab';
+import { RepositorySpecMappingDialog } from './RepositorySpecMappingDialog';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
@@ -30,6 +31,7 @@ const statusPillClass: Record<RepositorySpecStatus, string> = {
   manifest_error: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
   not_imported: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
   unchanged_checksum: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  mapping_required: 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100',
 };
 
 const statusLabel: Record<RepositorySpecStatus, string> = {
@@ -39,6 +41,7 @@ const statusLabel: Record<RepositorySpecStatus, string> = {
   manifest_error: 'Manifest error',
   not_imported: 'Not imported',
   unchanged_checksum: 'Unchanged',
+  mapping_required: 'Needs mapping',
 };
 
 function StatusPill({ status }: { status: RepositorySpecStatus }) {
@@ -48,9 +51,11 @@ function StatusPill({ status }: { status: RepositorySpecStatus }) {
       ? Loader2
       : status === 'parse_error' || status === 'manifest_error'
         ? AlertCircle
-        : status === 'unchanged_checksum'
-          ? CircleDot
-          : CircleDashed;
+        : status === 'mapping_required'
+          ? AlertCircle
+          : status === 'unchanged_checksum'
+            ? CircleDot
+            : CircleDashed;
   return (
     <span
       className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${statusPillClass[status]}`}
@@ -187,6 +192,8 @@ interface RepositorySpecDetailDrawerProps {
   ) => Promise<void> | void;
   isPatchPending: boolean;
   onClose: () => void;
+  /** Called after project mapping succeeds so the parent list can refresh. */
+  onMappingApplied?: () => void;
 }
 
 /**
@@ -211,6 +218,7 @@ export function RepositorySpecDetailDrawer({
   onSelectionToggle,
   isPatchPending,
   onClose,
+  onMappingApplied,
 }: RepositorySpecDetailDrawerProps) {
   const drawerRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -226,6 +234,7 @@ export function RepositorySpecDetailDrawer({
 
   const [showRaw, setShowRaw] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [mappingDialogOpen, setMappingDialogOpen] = useState(false);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -401,6 +410,18 @@ export function RepositorySpecDetailDrawer({
               </span>
               <StatusPill status={spec.status} />
             </div>
+            {spec.status === 'mapping_required' ? (
+              <div className="mt-3">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-amber-100 text-amber-950 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-100 dark:hover:bg-amber-900/70"
+                  onClick={() => setMappingDialogOpen(true)}
+                >
+                  Map to project
+                </Button>
+              </div>
+            ) : null}
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <Button
@@ -683,6 +704,22 @@ export function RepositorySpecDetailDrawer({
           </section>
         </div>
       </aside>
+
+      <RepositorySpecMappingDialog
+        open={mappingDialogOpen}
+        onOpenChange={setMappingDialogOpen}
+        repositoryId={repositoryId}
+        fileId={spec.fileId}
+        branch={spec.branch}
+        conflictKind={spec.mappingConflictKind}
+        initialProjectSlug={spec.projectSlug}
+        initialVersionStrategy={spec.versionStrategy}
+        onMapped={async () => {
+          const ac = new AbortController();
+          await loadDetail(ac.signal);
+          onMappingApplied?.();
+        }}
+      />
     </div>
   );
 }

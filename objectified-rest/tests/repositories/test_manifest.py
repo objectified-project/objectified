@@ -1,8 +1,36 @@
 from app.repositories.manifest import (
     RepositoryDiscoveryCandidate,
     build_repository_file_rows,
+    manifest_duplicate_spec_paths,
     parse_repo_manifest,
 )
+
+
+def test_manifest_duplicate_spec_paths() -> None:
+    m = parse_repo_manifest(
+        """
+version: 1
+specs:
+  - path: a.yaml
+    project: one
+  - path: a.yaml
+    project: two
+"""
+    ).manifest
+    assert m is not None
+    assert manifest_duplicate_spec_paths(m) is True
+    m2 = parse_repo_manifest(
+        """
+version: 1
+specs:
+  - path: a.yaml
+    project: svc
+  - path: b.yaml
+    project: svc
+"""
+    ).manifest
+    assert m2 is not None
+    assert manifest_duplicate_spec_paths(m2) is False
 
 
 def test_parse_repo_manifest_validates_against_schema() -> None:

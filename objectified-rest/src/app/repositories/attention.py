@@ -15,6 +15,7 @@ REASON_WEIGHTS: dict[str, int] = {
     "repeated_failures": 25,
     "stale_checksum": 10,
     "import_failed": 30,
+    "mapping_required": 25,
 }
 
 STALE_CHECKSUM_AGE = timedelta(hours=24)
@@ -106,6 +107,8 @@ def compute_attention_detail(
             _add_path("manifest_error", f.path)
         if f.last_import_job_state == "failed" and f.path:
             _add_path("import_failed", f.path)
+        if f.status == "mapping_required" and f.path:
+            _add_path("mapping_required", f.path)
         if _stale_ready_to_promote(f, inp.now) and f.path:
             _add_path("stale_checksum", f.path)
 
@@ -148,6 +151,8 @@ def top_reason_for_chips(valid_reasons: Sequence[str]) -> str:
 def attention_detail_query_tab(valid_reasons: Sequence[str]) -> str:
     """`tab` query for repository deep links (REPO-11.4: prefer Issues for any active reason)."""
     r = {x for x in valid_reasons if x in _VALID_REASONS}
+    if "mapping_required" in r:
+        return "specs"
     if r:
         return "issues"
     return "files"

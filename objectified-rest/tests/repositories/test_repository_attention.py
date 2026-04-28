@@ -109,6 +109,8 @@ def test_attention_detail_query_tab() -> None:
     assert attention_detail_query_tab(["parse_error"]) == "issues"
     assert attention_detail_query_tab(["token_revoked"]) == "issues"
     assert attention_detail_query_tab(["repeated_failures"]) == "issues"
+    assert attention_detail_query_tab(["mapping_required", "parse_error"]) == "specs"
+    assert attention_detail_query_tab(["mapping_required"]) == "specs"
 
 
 def test_compute_attention_detail_paths_by_reason() -> None:
