@@ -38,6 +38,7 @@ from .repositories.manifest import (
     parse_repo_manifest,
     resolve_repository_file_mapping,
 )
+from .repositories.repository_source import validate_repository_source_payload
 from .repositories.spec_detail import (
     MAX_INLINE_PREVIEW_BYTES,
     _count_change_report_categories,
@@ -638,6 +639,8 @@ _MANIFEST_PROJECT_AUTO_CREATE_FLAG_KEYS = (
     "repoManifestProjectAutoCreate",
     "repo_manifest_project_auto_create",
 )
+
+_IMPORT_WITH_PROVENANCE_KINDS: frozenset[str] = frozenset({"repository_auto_import", "repository_sync"})
 
 
 def _utc_now_iso() -> str:
@@ -2541,6 +2544,74 @@ def _resolve_target_project_slug_for_dry_run(
     return None
 
 
+def _persist_repository_import_revision_db(
+    *,
+    tenant_id: str,
+    repository_id: str,
+    scan_branch: str,
+    commit_sha: str,
+    file_row: RepositoryFileRecord,
+    target_semantic_version_id: str,
+    target_project_slug: str,
+) -> Dict[str, str]:
+    """Insert ODB revision + repository_file tracking for a committed repository import (#2936)."""
+    out: Dict[str, str] = {}
+    checksum = _normalize_content_checksum(file_row.contentChecksum)
+    if not checksum:
+        return out
+    slug = _normalize_slug(target_project_slug)
+    if not slug:
+        return out
+    try:
+        project = db.get_project_by_slug(slug, tenant_id)
+        if not project:
+            return out
+        project_id = str(project.get("id", "")).strip()
+        if not project_id:
+            return out
+        imported_at = _utc_now_iso()
+        cs_norm = commit_sha.strip().lower()
+        payload = {
+            "repositoryId": repository_id,
+            "branch": scan_branch,
+            "path": file_row.path,
+            "commitSha": cs_norm,
+            "contentChecksum": checksum,
+            "contentAlgo": "sha256",
+            "importedAt": imported_at,
+        }
+        normalized, err = validate_repository_source_payload(payload)
+        if err or not normalized:
+            return out
+        tip, branch_row = db.resolve_push_head_for_repository_import(project_id, tenant_id)
+        base = tip or ""
+        parent_version_id = tip if tip else None
+        version_row, _ = db.create_version_push_transaction(
+            project_id=project_id,
+            tenant_id=tenant_id,
+            creator_id=None,
+            version_id=target_semantic_version_id,
+            description="Repository import",
+            change_log=None,
+            commit_author=None,
+            commit_message=f"Auto-import {file_row.path}",
+            external_ref=None,
+            parent_version_id=parent_version_id,
+            source_version_id=None,
+            branch_row=branch_row,
+            client_base_revision_id=base,
+            repository_source=normalized,
+            repository_file_import=(file_row.id, checksum, repository_id),
+        )
+        rid = str(version_row.get("id", "")).strip()
+        if rid:
+            out["versionId"] = rid
+            out["projectId"] = project_id
+        return out
+    except Exception:
+        return out
+
+
 def _latest_repository_source_checksum_for_file(
     *,
     tenant_id: str,
@@ -2737,10 +2808,26 @@ def _materialize_repository_dry_run_import_job(
     repository_jobs.insert(0, import_job)
     _REPO_CHANGE_REPORT_STORE.setdefault(repository_id, []).insert(0, change_report)
     file_row.lastImportJobId = import_job.id
+    persist_meta: Dict[str, str] = {}
     if import_job.state == "committed" and not failure_message:
         c0 = _normalize_content_checksum(file_row.contentChecksum)
         file_row.lastImportedContentChecksum = c0
         file_row.staleMismatchAt = None
+        if (
+            source_kind in _IMPORT_WITH_PROVENANCE_KINDS
+            and (file_row.versionStrategy or "").strip().lower() == "commit-sha"
+            and target_project_slug
+            and target_version_id
+        ):
+            persist_meta = _persist_repository_import_revision_db(
+                tenant_id=tenant_id,
+                repository_id=repository_id,
+                scan_branch=branch,
+                commit_sha=commit_sha,
+                file_row=file_row,
+                target_semantic_version_id=target_version_id,
+                target_project_slug=target_project_slug,
+            )
 
     pending_audit_rows: List[Dict[str, Any]] = []
     if failure_message:
@@ -2788,6 +2875,35 @@ def _materialize_repository_dry_run_import_job(
                 "promotion": promote,
             },
         ))
+    if source_kind in _IMPORT_WITH_PROVENANCE_KINDS:
+        auto_detail: Dict[str, Any] = {
+            "scanId": scan_id,
+            "repositoryId": repository_id,
+            "branch": branch,
+            "path": file_row.path,
+            "commitSha": commit_sha,
+            "fileId": file_row.id,
+            "projectSlug": file_row.projectSlug,
+            "versionStrategy": file_row.versionStrategy,
+            "importJobId": import_job.id,
+            "actorId": actor_id,
+        }
+        cs = _normalize_content_checksum(file_row.contentChecksum)
+        if cs:
+            auto_detail["contentChecksumShort"] = _short_checksum(cs)
+        if persist_meta.get("projectId"):
+            auto_detail["projectId"] = persist_meta["projectId"]
+        if persist_meta.get("versionId"):
+            auto_detail["versionId"] = persist_meta["versionId"]
+        pending_audit_rows.append(
+            _append_audit_row(
+                tenant_id,
+                repository_id,
+                "repository.auto_imported",
+                actor_id=actor_id,
+                detail=auto_detail,
+            )
+        )
     return import_job, pending_audit_rows
 
 
@@ -2890,24 +3006,6 @@ def _dispatch_import_jobs_for_scan(
                 source_kind="repository_auto_import",
             )
             pending_audit_rows.extend(materialize_audits)
-            pending_audit_rows.append(
-                _append_audit_row(
-                    tenant_id,
-                    repository_id,
-                    "repository.auto_imported",
-                    actor_id=actor_id,
-                    detail={
-                        "scanId": scan_id,
-                        "fileId": file_row.id,
-                        "contentChecksumShort": _short_checksum(
-                            _normalize_content_checksum(file_row.contentChecksum)
-                        ),
-                        "projectSlug": file_row.projectSlug,
-                        "versionStrategy": file_row.versionStrategy,
-                        "importJobId": _created_job.id,
-                    },
-                )
-            )
     return pending_audit_rows
 
 
@@ -4607,24 +4705,6 @@ async def resolve_repository_spec_mapping(
             )
             file_list[file_idx] = next_row
             audits_to_persist.extend(job_audits)
-            audits_to_persist.append(
-                _append_audit_row(
-                    tenant_id,
-                    repository_id,
-                    "repository.auto_imported",
-                    actor_id=actor_id,
-                    detail={
-                        "scanId": latest_scan.id,
-                        "fileId": file_id,
-                        "contentChecksumShort": _short_checksum(
-                            _normalize_content_checksum(next_row.contentChecksum)
-                        ),
-                        "projectSlug": next_row.projectSlug,
-                        "versionStrategy": next_row.versionStrategy,
-                        "importJobId": new_job.id,
-                    },
-                )
-            )
             audits_to_persist.append(
                 _append_audit_row(
                     tenant_id,

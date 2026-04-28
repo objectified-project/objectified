@@ -4939,6 +4939,24 @@ class Database:
         """
         return self.execute_query(q, (project_id, tenant_id))
 
+    def resolve_push_head_for_repository_import(
+        self, project_id: str, tenant_id: str
+    ) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
+        """
+        Resolve expected tip revision id and branch row for an automated repository import push,
+        mirroring ``_resolve_expected_push_head`` without HTTP exceptions (#2936).
+        """
+        branches = self.list_version_branches_for_project(project_id, tenant_id)
+        n = len(branches)
+        if n == 0:
+            tip = self.get_latest_revision_id_for_project(project_id, tenant_id)
+            return (tip, None)
+        if n == 1:
+            b = branches[0]
+            return (str(b["tip_version_id"]), b)
+        default = next((b for b in branches if b.get("is_default")), branches[0])
+        return (str(default["tip_version_id"]), default)
+
     def compute_branch_divergence(
         self,
         *,
@@ -5173,9 +5191,14 @@ class Database:
         source_version_id: Optional[str],
         branch_row: Optional[Dict[str, Any]],
         client_base_revision_id: str,
+        repository_source: Optional[Dict[str, Any]] = None,
+        repository_file_import: Optional[Tuple[str, str, str]] = None,
     ) -> Tuple[Dict[str, Any], int]:
         """
         Insert version (optional parent), copy classes from source, advance branch tip under lock.
+        Optional ``repository_source`` populates REPO-8.2 provenance (#2936).
+        Optional ``repository_file_import`` is ``(repository_file_id, content_checksum_hex, repository_id)`` for
+        transactional ``repository_file`` tracking columns.
         Returns (full version row from get_version_by_id, copied_class_count).
         """
         base = (client_base_revision_id or "").strip()
@@ -5239,8 +5262,8 @@ class Database:
                     """
                     INSERT INTO odb.versions
                     (project_id, creator_id, version_id, description, change_log,
-                     commit_author, commit_message, external_ref, parent_version_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     commit_author, commit_message, external_ref, parent_version_id, repository_source)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
                     (
@@ -5253,12 +5276,25 @@ class Database:
                         commit_message,
                         external_ref,
                         parent_version_id,
+                        Json(repository_source) if repository_source is not None else None,
                     ),
                 )
                 row = cursor.fetchone()
                 if not row or row.get("id") is None:
                     raise ValueError("Failed to insert version")
                 new_id = str(row["id"])
+
+                if repository_file_import is not None:
+                    rf_id, rf_checksum, rf_repo_id = repository_file_import
+                    cursor.execute(
+                        """
+                        UPDATE odb.repository_file
+                        SET last_imported_checksum = %s,
+                            last_imported_version_id = %s::uuid
+                        WHERE id = %s::uuid AND repository_id = %s::uuid
+                        """,
+                        (rf_checksum, new_id, rf_id, rf_repo_id),
+                    )
 
                 if src:
                     copied_count = self.copy_classes_from_version_for_merge(cursor, src, new_id)
