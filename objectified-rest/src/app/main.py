@@ -43,7 +43,7 @@ from .dashboard_routes import router as dashboard_router
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.80"
+    version="1.0.87"
 )
 
 
@@ -122,6 +122,7 @@ app.include_router(dashboard_router)
 _webhook_delivery_task: asyncio.Task | None = None
 _repository_scan_worker_task: asyncio.Task | None = None
 _repository_attention_reconcile_task: asyncio.Task | None = None
+_repository_scan_report_retention_task: asyncio.Task | None = None
 
 
 @app.on_event("startup")
@@ -212,6 +213,23 @@ async def startup_event():
         global _repository_attention_reconcile_task
         _repository_attention_reconcile_task = asyncio.create_task(_repository_attention_hourly_loop())
 
+    async def _repository_scan_report_retention_daily_loop() -> None:
+        log = logging.getLogger(__name__)
+        while True:
+            await asyncio.sleep(86400)
+            try:
+                n = len(db.purge_expired_repository_scan_reports())
+                if n > 0:
+                    log.info("Purged %s expired repository_scan_report row(s)", n)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("repository_scan_report retention purge")
+
+    if "PYTEST_CURRENT_TEST" not in os.environ:
+        global _repository_scan_report_retention_task
+        _repository_scan_report_retention_task = asyncio.create_task(_repository_scan_report_retention_daily_loop())
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -219,6 +237,7 @@ async def shutdown_event():
     global _webhook_delivery_task
     global _repository_scan_worker_task
     global _repository_attention_reconcile_task
+    global _repository_scan_report_retention_task
     if _webhook_delivery_task is not None:
         _webhook_delivery_task.cancel()
         try:
@@ -240,6 +259,13 @@ async def shutdown_event():
         except asyncio.CancelledError:
             pass
         _repository_attention_reconcile_task = None
+    if _repository_scan_report_retention_task is not None:
+        _repository_scan_report_retention_task.cancel()
+        try:
+            await _repository_scan_report_retention_task
+        except asyncio.CancelledError:
+            pass
+        _repository_scan_report_retention_task = None
     db.close()
 
 

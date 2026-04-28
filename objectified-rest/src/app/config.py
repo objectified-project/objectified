@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # Pre-commit policy default when project metadata omits maxCommitPayloadBytes (#2565)
     commit_policy_max_payload_bytes_default: int = 5_242_880
 
+    # REPO-12.4 / #2937: overflow blobs for large scan reports; synthetic URL prefix for exports.
+    repository_scan_report_overflow_dir: Optional[str] = None
+    repository_scan_report_overflow_public_base: str = "https://storage.objectified.invalid/scan-report-overflow"
+    repository_scan_report_retention_days_default: int = 90
+
     # Fernet key (url-safe base64) from `Fernet.generate_key()` — encrypts webhook signing secrets at rest (#2588)
     webhook_signing_secret_encryption_key: Optional[str] = Field(
         default=None,
