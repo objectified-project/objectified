@@ -46,6 +46,15 @@ function cloneUrlFromHtml(htmlUrl: string | undefined): string | undefined {
   return base.endsWith('.git') ? base : `${base}.git`;
 }
 
+/** GitHub `owner/repo` shown as "group / repository" for users in many orgs. */
+function formatGroupAndRepoName(fullName: string | undefined): string {
+  const raw = (fullName || '').trim();
+  if (!raw) return '';
+  const slash = raw.indexOf('/');
+  if (slash <= 0 || slash === raw.length - 1) return raw;
+  return `${raw.slice(0, slash)} / ${raw.slice(slash + 1)}`;
+}
+
 export default function AddRepositoryPage() {
   const { data: session } = useSession();
   const currentTenantId = (session?.user as { current_tenant_id?: string })?.current_tenant_id;
@@ -142,7 +151,7 @@ export default function AddRepositoryPage() {
         const list = Array.isArray(data.repositories) ? data.repositories : [];
         setRemoteRepos(
           [...list].sort((a, b) =>
-            (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase())
+            (a.full_name || '').toLowerCase().localeCompare((b.full_name || '').toLowerCase())
           )
         );
       } catch {
@@ -409,8 +418,9 @@ export default function AddRepositoryPage() {
             ) : (
               <>
                 <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                  Pick a repository below. The subtitle is the GitHub description when present; otherwise it shows the{' '}
-                  <span className="font-mono">owner/repo</span> path.
+                  Each row lists <span className="font-medium text-gray-600 dark:text-gray-300">group / repository</span>{' '}
+                  (organization or user, then repo name). When GitHub provides a description, it appears on the second
+                  line.
                 </p>
                 <div className="relative mb-3">
                   <Search
@@ -449,8 +459,9 @@ export default function AddRepositoryPage() {
                       <ul className="divide-y divide-gray-100 dark:divide-gray-700">
                         {filteredRemoteRepos.map((repo) => {
                           const active = selectedRemoteRepo?.id === repo.id;
-                          const subtitle =
-                            (typeof repo.description === 'string' && repo.description.trim()) || repo.full_name;
+                          const primary = formatGroupAndRepoName(repo.full_name);
+                          const desc =
+                            typeof repo.description === 'string' ? repo.description.trim() : '';
                           return (
                             <li key={repo.id}>
                               <button
@@ -466,11 +477,11 @@ export default function AddRepositoryPage() {
                                 <div className="flex min-w-0 items-center gap-2">
                                   <span
                                     className={cn(
-                                      'truncate text-sm font-medium',
+                                      'min-w-0 flex-1 truncate text-sm font-medium font-mono tracking-tight',
                                       active ? 'text-indigo-950 dark:text-indigo-50' : 'text-gray-900 dark:text-gray-100'
                                     )}
                                   >
-                                    {repo.name}
+                                    {primary || repo.name}
                                   </span>
                                   {repo.private ? (
                                     <Lock
@@ -482,14 +493,18 @@ export default function AddRepositoryPage() {
                                     />
                                   ) : null}
                                 </div>
-                                <span
-                                  className={cn(
-                                    'truncate text-xs',
-                                    active ? 'text-indigo-800/90 dark:text-indigo-200/90' : 'text-gray-500 dark:text-gray-400'
-                                  )}
-                                >
-                                  {subtitle}
-                                </span>
+                                {desc ? (
+                                  <span
+                                    className={cn(
+                                      'truncate text-xs',
+                                      active
+                                        ? 'text-indigo-800/90 dark:text-indigo-200/90'
+                                        : 'text-gray-500 dark:text-gray-400'
+                                    )}
+                                  >
+                                    {desc}
+                                  </span>
+                                ) : null}
                               </button>
                             </li>
                           );
