@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered, Search, GitCompareArrows, FileText, ChevronRight } from 'lucide-react';
+import { Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered, GitCompareArrows, FileText, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -2899,33 +2899,14 @@ const Versions = () => {
         </div>
       )}
 
-      {/* Versions List */}
+      {/* Versions List — lifecycle (and related) filters stay visible when filters yield zero rows */}
       {(!showChangeReportTab || versionsMainTab === 'timeline') ? (
-      versions.length === 0 ? (
+      versions.length === 0 && !lifecycleFilter ? (
         <EmptyState
           icon={<Package className="h-10 w-10" />}
           title="No Versions Yet"
           description="Get started by creating your first version"
           iconContainerClassName="from-emerald-500 to-teal-600 shadow-emerald-500/30"
-        />
-      ) : tagFilteredVersions.length === 0 ? (
-        <EmptyState
-          icon={<Tag className="h-10 w-10" />}
-          title="No version matches this tag"
-          description="Clear the tag filter above the table or choose a different tag."
-          iconContainerClassName="from-amber-500 to-orange-600 shadow-amber-500/30"
-        />
-      ) : displayVersions.length === 0 ? (
-        <EmptyState
-          icon={<Search className="h-10 w-10" />}
-          title="No revisions match your filters"
-          description="Adjust search, author, or the date range, or reset timeline filters to see the full history again."
-          iconContainerClassName="from-slate-500 to-gray-600 shadow-slate-500/30"
-          action={
-            <Button type="button" variant="secondary" onClick={resetHistoryTimelineFilters}>
-              Reset timeline filters
-            </Button>
-          }
         />
       ) : (
         <>
@@ -3085,7 +3066,45 @@ const Versions = () => {
               </tr>
             </thead>
             <tbody className={dashboardTbodyClass}>
-              {displayVersions.map((version) => (
+              {versions.length === 0 && lifecycleFilter ? (
+                <tr key="versions-empty-lifecycle">
+                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-600 dark:text-gray-300">
+                    <p className="mx-auto max-w-md">
+                      No revisions match this lifecycle filter. Choose a different lifecycle or select{' '}
+                      <span className="font-medium">All lifecycles</span> to load every revision again.
+                    </p>
+                    <Button type="button" variant="secondary" className="mt-4" onClick={() => setLifecycleFilter('')}>
+                      Clear lifecycle filter
+                    </Button>
+                  </td>
+                </tr>
+              ) : versions.length > 0 && tagFilteredVersions.length === 0 ? (
+                <tr key="versions-empty-tag">
+                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-600 dark:text-gray-300">
+                    <p className="mx-auto max-w-md">
+                      No revision matches the selected history tag. Clear the tag filter above or pick another tag.
+                    </p>
+                    <Button type="button" variant="secondary" className="mt-4" onClick={() => setHistoryTagFilter('')}>
+                      Clear tag filter
+                    </Button>
+                  </td>
+                </tr>
+              ) : displayVersions.length === 0 ? (
+                <tr key="versions-empty-timeline">
+                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-600 dark:text-gray-300">
+                    <p className="mx-auto max-w-md">
+                      No revisions match your timeline filters (search, author, or date range). Adjust the filters or
+                      reset them to see the full history again.
+                    </p>
+                    {historyTimelineFiltersActive ? (
+                      <Button type="button" variant="secondary" className="mt-4" onClick={resetHistoryTimelineFilters}>
+                        Reset timeline filters
+                      </Button>
+                    ) : null}
+                  </td>
+                </tr>
+              ) : (
+                displayVersions.map((version) => (
                 <tr key={version.id} className={dashboardTrHoverClass}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -3392,7 +3411,8 @@ const Versions = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>

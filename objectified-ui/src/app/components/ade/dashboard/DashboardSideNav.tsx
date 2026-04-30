@@ -13,6 +13,8 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   disabled?: boolean;
+  /** Small label next to the nav text (e.g. feature maturity). */
+  pill?: string;
 }
 
 interface NavSection {
@@ -53,7 +55,13 @@ const DashboardSideNav: React.FC = () => {
       header: 'Specifications',
       items: [
         { label: 'Projects', href: '/ade/dashboard/projects', icon: Folders, disabled: !hasTenant },
-        { label: 'Repositories', href: '/ade/dashboard/repositories', icon: FolderGit2, disabled: !hasTenant },
+        {
+          label: 'Repositories',
+          href: '/ade/dashboard/repositories',
+          icon: FolderGit2,
+          disabled: !hasTenant,
+          pill: 'Preview',
+        },
         { label: 'Sunset timeline', href: '/ade/dashboard/versions/sunset-timeline', icon: Sun, disabled: !hasTenant },
         { label: 'Published', href: '/ade/dashboard/published', icon: Eye, disabled: !hasTenant },
       ],
@@ -109,6 +117,16 @@ const DashboardSideNav: React.FC = () => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
 
+                const pillEl =
+                  item.pill != null && item.pill !== '' ? (
+                    <span
+                      className="inline-flex shrink-0 items-center rounded-md border border-amber-200/90 bg-amber-50 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-amber-900 dark:border-amber-700/80 dark:bg-amber-950/60 dark:text-amber-100"
+                      title="Feature in preview"
+                    >
+                      {item.pill}
+                    </span>
+                  ) : null;
+
                 return (
                   <li key={item.href} className="mb-1">
                     {item.disabled ? (
@@ -119,7 +137,10 @@ const DashboardSideNav: React.FC = () => {
                         }}
                       >
                         <Icon size={20} className="flex-shrink-0 text-slate-500 dark:text-slate-400" />
-                        <span className="text-sm font-medium">{item.label}</span>
+                        <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                          <span className="min-w-0 flex-1 truncate pr-1 text-sm font-medium">{item.label}</span>
+                          {pillEl}
+                        </span>
                       </div>
                     ) : (
                       <Link
@@ -135,13 +156,14 @@ const DashboardSideNav: React.FC = () => {
                           className={`flex-shrink-0 transition-colors ${active ? 'text-indigo-500' : 'text-slate-500 dark:text-slate-400'}`}
                         />
                         <span
-                          className="text-sm flex-1"
+                          className="flex min-w-0 flex-1 items-center justify-between gap-2"
                           style={{
                             fontWeight: active ? 600 : 500,
                             color: active ? '#6366f1' : isDark ? '#e2e8f0' : '#334155',
                           }}
                         >
-                          {item.label}
+                          <span className="min-w-0 flex-1 truncate pr-1 text-sm">{item.label}</span>
+                          {pillEl}
                         </span>
                         {active && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500" />}
                       </Link>
