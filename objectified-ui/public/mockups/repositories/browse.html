@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Repository Store · Browse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center"><i data-lucide="folder-git-2" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Repository Store</span>
+      <span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">Browse</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark" style="width: 280px;">
+      <div class="overflow-auto p-4 h-full">
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Registry</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="repositories.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="library" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">All Repositories</span><span class="text-[10px] text-gray-400 mono">12</span></a></li>
+            <li><a href="add-repository.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-pull-request-create" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Add Repository</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Browse &amp; inspect</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="browse.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 border border-indigo-200 dark:border-indigo-700/70 bg-indigo-500/10"><i data-lucide="folder-tree" class="w-5 h-5 text-indigo-500"></i><span class="text-sm font-semibold flex-1 text-indigo-600 dark:text-indigo-400">Browse Files</span><span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span></a></li>
+            <li><a href="file-detail.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="file-search" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">File Detail</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div class="mb-5">
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Import flow</div>
+          <ul class="m-0 mt-1 list-none space-y-1 p-0">
+            <li><a href="import-mapping.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="git-merge" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Map &amp; Import</span></a></li>
+            <li><a href="imports.html" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-indigo-500/10 transition-colors"><i data-lucide="history" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i><span class="text-sm font-medium flex-1 text-slate-700 dark:text-slate-200">Import History</span><span class="text-[10px] text-gray-400 mono">23</span></a></li>
+          </ul>
+        </div>
+        <hr class="my-3 border-indigo-500/10" />
+        <div>
+          <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400"><span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span> Context</div>
+          <div class="px-3 py-2 rounded-lg bg-indigo-500/5 border border-indigo-500/10">
+            <p class="text-[10px] uppercase tracking-wider text-gray-400">Active repository</p>
+            <p class="text-sm font-semibold mt-0.5">acme-corp / payments-api</p>
+            <p class="text-[10px] mono text-gray-500 mt-0.5">main · 4f2c9a8</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0">
+      <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div class="px-6 py-4 flex items-end justify-between">
+          <div>
+            <h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="folder-tree" class="w-6 h-6 text-indigo-500"></i> Browse Files</h2>
+            <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">Filter the catalogued file list with globs, regex, or a preset · classify by filename + on-demand sniff</p>
+          </div>
+          <div class="flex items-center gap-2"><button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Export list</button><button class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"><i data-lucide="zap" class="w-4 h-4"></i> Sniff selected</button></div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-6 space-y-6">
+
+<!-- Repo header card -->
+<section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 flex items-start justify-between">
+  <div>
+    <div class="flex items-center gap-2 text-xs text-gray-500 mb-1"><i data-lucide="github" class="w-3.5 h-3.5"></i> github.com/acme-corp/payments-api · public · Linked as <span class="mono">@ksuenobu</span></div>
+    <h3 class="text-xl font-bold mono">acme-corp / payments-api</h3>
+    <p class="text-sm text-gray-500 mt-1">Payment gateway service · OpenAPI 3.1 + Arazzo flows · TypeScript</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <select class="px-2 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono">
+      <option>main · 4f2c9a8</option><option>release/2025-04 · 8d2e1b3</option><option>dev · 71c4ab9</option>
+    </select>
+    <button class="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"><i data-lucide="refresh-cw" class="w-4 h-4"></i> Re-scan</button>
+  </div>
+</section>
+
+<!-- Filter bar -->
+<section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+  <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+    <div class="md:col-span-3">
+      <label class="block text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">Importable file type</label>
+      <select class="w-full px-2 py-2 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+        <option>All importable</option>
+        <option selected>OpenAPI</option>
+        <option>Arazzo</option>
+        <option>AsyncAPI</option>
+        <option>JSON Schema</option>
+        <option>GraphQL</option>
+        <option>Protobuf</option>
+        <option>Avro</option>
+        <option>Postman</option>
+        <option>SQL DDL</option>
+        <option>Custom…</option>
+      </select>
+    </div>
+    <div class="md:col-span-6">
+      <label class="block text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">File glob (comma-separated)</label>
+      <div class="relative">
+        <i data-lucide="filter" class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+        <input type="text" value="**/openapi*.yaml, **/openapi*.yml, **/openapi*.json, **/swagger*.{yaml,yml,json}" class="pl-8 pr-3 py-2 w-full text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono" />
+      </div>
+    </div>
+    <div class="md:col-span-3">
+      <label class="block text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">Regex (overrides glob)</label>
+      <div class="relative">
+        <i data-lucide="regex" class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+        <input type="text" placeholder="^api/v[0-9]+/.+\.ya?ml$" class="pl-8 pr-3 py-2 w-full text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 mono" />
+      </div>
+    </div>
+  </div>
+  <div class="flex items-center justify-between pt-1">
+    <div class="flex items-center gap-2 text-xs">
+      <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-semibold">42 matches</span>
+      <span class="text-gray-500">of 1 284 files in <span class="mono">main · 4f2c9a8</span></span>
+      <button class="text-gray-400 hover:text-rose-500 ml-2 inline-flex items-center gap-1"><i data-lucide="x" class="w-3 h-3"></i>Clear</button>
+    </div>
+    <div class="flex items-center gap-2 text-xs text-gray-500">
+      <label class="inline-flex items-center gap-1.5"><input type="checkbox" checked /> Show only candidates</label>
+      <label class="inline-flex items-center gap-1.5"><input type="checkbox" /> Hide already imported</label>
+    </div>
+  </div>
+</section>
+
+<!-- File table -->
+<section class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+  <div class="px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+    <div class="flex items-center gap-2 text-xs text-gray-500">
+      <i data-lucide="folder" class="w-4 h-4"></i><span class="mono">/</span>
+    </div>
+    <div class="text-xs text-gray-500">Sorted by detected kind · then by path</div>
+  </div>
+  <table class="w-full text-sm">
+    <thead class="text-xs text-gray-500 uppercase tracking-wider bg-gray-50 dark:bg-gray-900/40">
+      <tr>
+        <th class="text-left px-6 py-3 font-medium">Path</th>
+        <th class="text-left px-4 py-3 font-medium">Detected kind</th>
+        <th class="text-left px-4 py-3 font-medium">Confidence</th>
+        <th class="text-right px-4 py-3 font-medium">Size</th>
+        <th class="text-left px-4 py-3 font-medium">Last commit</th>
+        <th class="text-left px-4 py-3 font-medium">Importable</th>
+        <th class="text-right px-6 py-3 font-medium">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100 dark:divide-gray-700/60">
+      <tr class="hover:bg-indigo-500/5">
+        <td class="px-6 py-3"><a href="file-detail.html" class="mono text-sm hover:text-indigo-600">api/openapi.yaml</a></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> OpenAPI 3.1</span></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Content sniffed</span></td>
+        <td class="px-4 py-3 text-right mono">42.1 KB</td>
+        <td class="px-4 py-3 text-xs text-gray-500"><span class="mono">4f2c9a8</span> · 3 d ago</td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"><i data-lucide="check" class="w-3 h-3"></i> Importable</span></td>
+        <td class="px-6 py-3 text-right"><a href="file-detail.html" class="text-xs text-indigo-600 hover:underline">Inspect →</a></td>
+      </tr>
+      <tr class="hover:bg-indigo-500/5">
+        <td class="px-6 py-3"><a href="file-detail.html" class="mono text-sm hover:text-indigo-600">api/v2/openapi.yml</a></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> OpenAPI 3.0</span></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 ring-1 ring-dashed ring-gray-300">Filename only</span></td>
+        <td class="px-4 py-3 text-right mono">28.7 KB</td>
+        <td class="px-4 py-3 text-xs text-gray-500"><span class="mono">e3d7c9a</span> · 1 w ago</td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Needs review</span></td>
+        <td class="px-6 py-3 text-right"><a href="file-detail.html" class="text-xs text-indigo-600 hover:underline">Inspect →</a></td>
+      </tr>
+      <tr class="hover:bg-indigo-500/5">
+        <td class="px-6 py-3"><a href="file-detail.html" class="mono text-sm hover:text-indigo-600">flows/checkout.arazzo.yaml</a></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span> Arazzo 1.0</span></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Content sniffed</span></td>
+        <td class="px-4 py-3 text-right mono">8.3 KB</td>
+        <td class="px-4 py-3 text-xs text-gray-500"><span class="mono">b2a1f47</span> · 2 d ago</td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"><i data-lucide="check" class="w-3 h-3"></i> Importable</span></td>
+        <td class="px-6 py-3 text-right"><a href="file-detail.html" class="text-xs text-indigo-600 hover:underline">Inspect →</a></td>
+      </tr>
+      <tr class="hover:bg-indigo-500/5">
+        <td class="px-6 py-3"><a href="file-detail.html" class="mono text-sm hover:text-indigo-600">schemas/payment.schema.json</a></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300"><span class="w-1.5 h-1.5 rounded-full bg-teal-500"></span> JSON Schema</span></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 ring-1 ring-dashed ring-gray-300">Filename only</span></td>
+        <td class="px-4 py-3 text-right mono">4.2 KB</td>
+        <td class="px-4 py-3 text-xs text-gray-500"><span class="mono">9c1e88d</span> · 5 d ago</td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Needs review</span></td>
+        <td class="px-6 py-3 text-right"><a href="file-detail.html" class="text-xs text-indigo-600 hover:underline">Inspect →</a></td>
+      </tr>
+      <tr class="hover:bg-indigo-500/5">
+        <td class="px-6 py-3"><a href="file-detail.html" class="mono text-sm hover:text-indigo-600">api/asyncapi.yaml</a></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300"><span class="w-1.5 h-1.5 rounded-full bg-pink-500"></span> AsyncAPI 2.6</span></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Content sniffed</span></td>
+        <td class="px-4 py-3 text-right mono">12.0 KB</td>
+        <td class="px-4 py-3 text-xs text-gray-500"><span class="mono">f7c2810</span> · 6 d ago</td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"><i data-lucide="check" class="w-3 h-3"></i> Importable</span></td>
+        <td class="px-6 py-3 text-right"><a href="file-detail.html" class="text-xs text-indigo-600 hover:underline">Inspect →</a></td>
+      </tr>
+      <tr class="hover:bg-indigo-500/5">
+        <td class="px-6 py-3"><a href="file-detail.html" class="mono text-sm hover:text-indigo-600">internal/config/server.yml</a></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span> YAML candidate</span></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Content sniffed</span></td>
+        <td class="px-4 py-3 text-right mono">1.1 KB</td>
+        <td class="px-4 py-3 text-xs text-gray-500"><span class="mono">22ac0e5</span> · 2 w ago</td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300">Not importable</span></td>
+        <td class="px-6 py-3 text-right text-xs text-gray-400">—</td>
+      </tr>
+      <tr class="hover:bg-indigo-500/5">
+        <td class="px-6 py-3"><a href="file-detail.html" class="mono text-sm hover:text-indigo-600">proto/payments.proto</a></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"><span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> Protobuf</span></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 ring-1 ring-dashed ring-gray-300">Filename only</span></td>
+        <td class="px-4 py-3 text-right mono">6.8 KB</td>
+        <td class="px-4 py-3 text-xs text-gray-500"><span class="mono">5d8e102</span> · 3 w ago</td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Needs review</span></td>
+        <td class="px-6 py-3 text-right"><a href="file-detail.html" class="text-xs text-indigo-600 hover:underline">Inspect →</a></td>
+      </tr>
+      <tr class="hover:bg-indigo-500/5 opacity-60">
+        <td class="px-6 py-3"><a href="file-detail.html" class="mono text-sm hover:text-indigo-600">api/legacy/swagger.json</a></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Swagger 2.0</span></td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Content sniffed</span></td>
+        <td class="px-4 py-3 text-right mono">68.4 KB</td>
+        <td class="px-4 py-3 text-xs text-gray-500"><span class="mono">aa30f1d</span> · 4 mo ago</td>
+        <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300"><i data-lucide="check-check" class="w-3 h-3"></i> Imported</span></td>
+        <td class="px-6 py-3 text-right text-xs text-gray-400">→ payments-legacy v1.4.0</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 flex items-center justify-between text-xs text-gray-500">
+    <span>Showing 8 of 42 matches</span>
+    <div class="flex items-center gap-1">
+      <button class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">←</button>
+      <button class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">→</button>
+    </div>
+  </div>
+</section>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const themeKey = 'repositories-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>
