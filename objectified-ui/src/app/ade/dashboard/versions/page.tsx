@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered, Search, GitCompareArrows, FileText } from 'lucide-react';
+import { Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake, GitBranch, GitMerge, Tag, GitFork, Shield, Sun, LayoutGrid, Undo2, ScrollText, ListOrdered, Search, GitCompareArrows, FileText, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -265,6 +266,8 @@ interface VersionTagRow {
 }
 
 const Versions = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const { conflict, setPushConflictFrom409, clearPushConflict } = usePushConflictBanner();
   const [versionsPullBannerLoading, setVersionsPullBannerLoading] = useState(false);
@@ -273,7 +276,6 @@ const Versions = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [versions, setVersions] = useState<Version[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [createDialogMode, setCreateDialogMode] = useState<'commit' | 'new-version'>('commit');
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showSunsetScheduleDialog, setShowSunsetScheduleDialog] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
@@ -479,6 +481,21 @@ const Versions = () => {
     [projects, selectedProjectId]
   );
 
+  const selectedProject = useMemo(
+    () => projects.find((p) => p.id === selectedProjectId),
+    [projects, selectedProjectId]
+  );
+
+  const handleSelectedProjectChange = useCallback(
+    (id: string) => {
+      setSelectedProjectId(id);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('projectId', id);
+      router.replace(`/ade/dashboard/versions?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams]
+  );
+
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const isSyncingScroll = useRef(false);
@@ -553,6 +570,21 @@ const Versions = () => {
   ]);
 
   useEffect(() => { if (currentTenantId) loadProjects(); }, [currentTenantId]);
+
+  /** Prefer `projectId` from the URL (e.g. drill-down from Projects); otherwise first project. */
+  useEffect(() => {
+    if (projects.length === 0) return;
+    const pid = searchParams.get('projectId');
+    if (pid && projects.some((p) => p.id === pid)) {
+      setSelectedProjectId(pid);
+      return;
+    }
+    setSelectedProjectId((prev) => {
+      if (prev && projects.some((p) => p.id === prev)) return prev;
+      return projects[0].id;
+    });
+  }, [projects, searchParams]);
+
   useEffect(() => { if (selectedProjectId) loadVersions(); else setVersions([]); }, [selectedProjectId, lifecycleFilter]);
 
   useEffect(() => {
@@ -671,7 +703,6 @@ const Versions = () => {
       const data = await response.json();
       if (data.success && data.projects) {
         setProjects(data.projects);
-        if (data.projects.length > 0 && !selectedProjectId) setSelectedProjectId(data.projects[0].id);
       } else {
         throw new Error(data.error || 'Failed to load projects');
       }
@@ -759,19 +790,7 @@ const Versions = () => {
     return strategy === 'minor' ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
   };
 
-  const handleCreateClick = () => {
-    setCreateDialogMode('commit');
-    setVersionId(''); setAutoGenerate(true); setBumpStrategy('patch');
-    setNextAutoVersion(calculateNextVersion('patch')); setDescription('');
-    setChangeLog(''); setCommitExternalRef(''); setEnabled(true); setSourceVersionId('');
-    setCopySourceBranchKey('blank');
-    setErrorMessage(''); setBranchListError(null);
-    void loadBranches();
-    setShowCreateDialog(true);
-  };
-
   const handleNewVersionClick = () => {
-    setCreateDialogMode('new-version');
     setVersionId(''); setAutoGenerate(true); setBumpStrategy('minor');
     setNextAutoVersion(calculateNextVersion('minor')); setDescription('');
     setChangeLog(''); setCommitExternalRef(''); setEnabled(true); setSourceVersionId('');
@@ -810,7 +829,7 @@ const Versions = () => {
         return;
       }
       if (!copySourceBranchKey.startsWith('branch:')) {
-        const msg = 'Select a valid branch for this commit.';
+        const msg = 'Select a valid branch.';
         setErrorMessage(msg);
         toast.error(msg);
         return;
@@ -913,7 +932,7 @@ const Versions = () => {
             });
           }
         }
-        const err = typeof json.error === 'string' ? json.error : 'Failed to commit revision';
+        const err = typeof json.error === 'string' ? json.error : 'Failed to create version';
         setErrorMessage(err);
         toast.error(err);
         return;
@@ -922,7 +941,7 @@ const Versions = () => {
       clearPushConflict();
       await loadVersions();
       const v = json.version;
-      const successNoun = createDialogMode === 'new-version' ? 'Version created' : 'Revision committed';
+      const successNoun = 'Version created';
       if (v && typeof v.copied_classes === 'number' && v.copied_classes > 0) {
         toast.success(`${successNoun}. Copied ${v.copied_classes} class(es).`);
       } else if (v?.copy_warning) {
@@ -2097,7 +2116,7 @@ const Versions = () => {
       if (d.success) {
         toast.success(`Fork created in ${projects.find((p) => p.id === forkTargetProjectId)?.name ?? 'target project'}`);
         setShowForkDialog(false);
-        setSelectedProjectId(forkTargetProjectId);
+        handleSelectedProjectChange(forkTargetProjectId);
       } else {
         toast.error(typeof d.error === 'string' ? d.error : 'Could not create fork');
       }
@@ -2618,12 +2637,27 @@ const Versions = () => {
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
+              <nav
+                className="flex flex-wrap items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mb-1"
+                aria-label="Breadcrumb"
+              >
+                <Link
+                  href="/ade/dashboard/projects"
+                  className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                >
+                  Projects
+                </Link>
+                <ChevronRight className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+                <span className="text-gray-900 dark:text-white font-medium truncate max-w-[min(100%,14rem)]">
+                  {selectedProject?.name ?? '…'}
+                </span>
+              </nav>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <Package className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                 Versions
               </h2>
               <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-                Manage versions with semantic versioning
+                Revisions and releases for this project
               </p>
               <Link
                 href="/ade/dashboard/versions/sunset-timeline"
@@ -2634,7 +2668,7 @@ const Versions = () => {
               </Link>
             </div>
             <div className="flex items-center gap-3">
-              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+              <Select value={selectedProjectId} onValueChange={handleSelectedProjectChange}>
                 <SelectTrigger className="w-56"><SelectValue placeholder="Select Project" /></SelectTrigger>
                 <SelectContent>{projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
               </Select>
@@ -2659,23 +2693,15 @@ const Versions = () => {
                   Merge branches
                 </Button>
               )}
-              {FEATURE_GITLIKE && (
-                <Button
-                  variant="secondary"
-                  onClick={handleNewVersionClick}
-                  disabled={!selectedProjectId}
-                  title="Start a new version (fresh release line, defaults to a minor bump)"
-                >
-                  <GitFork className="h-4 w-4 mr-2" />
-                  New Version
-                </Button>
-              )}
-              {FEATURE_GITLIKE && (
-                <Button onClick={handleCreateClick} disabled={!selectedProjectId || versions.length === 0} title={versions.length === 0 ? 'No versions yet — use New Version to create the first one' : 'Create a new schema revision (commit)'}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Commit
-                </Button>
-              )}
+              <Button
+                variant="secondary"
+                onClick={handleNewVersionClick}
+                disabled={!selectedProjectId}
+                title="Start a new version (fresh release line, defaults to a minor bump)"
+              >
+                <GitFork className="h-4 w-4 mr-2" />
+                New Version
+              </Button>
             </div>
           </div>
         </div>
@@ -3376,18 +3402,16 @@ const Versions = () => {
         </div>
       </main>
 
-      {/* Commit new revision (Radix dialog + validation #2564) — gated off with the rest of git-like. */}
-      <Dialog open={FEATURE_GITLIKE && showCreateDialog} onOpenChange={(open) => !isLoading && setShowCreateDialog(open)}>
+      {/* New Version dialog — core version workflow; not gated by FEATURE_GITLIKE (merge/tags/etc. still are). */}
+      <Dialog open={showCreateDialog} onOpenChange={(open) => !isLoading && setShowCreateDialog(open)}>
         <DialogContent
           className="flex max-h-[min(90vh,56rem)] max-w-xl flex-col gap-4 overflow-hidden"
-          aria-describedby="commit-dialog-desc"
+          aria-describedby="new-version-dialog-desc"
         >
           <DialogHeader className="shrink-0">
-            <DialogTitle>{createDialogMode === 'new-version' ? 'New Version' : 'Commit'}</DialogTitle>
-            <DialogDescription id="commit-dialog-desc">
-              {createDialogMode === 'new-version'
-                ? 'Start a new schema version for this project. Pick a bump strategy (defaults to minor), then describe the release.'
-                : 'Create a new schema revision for this project. Message is required; add an external reference when linking to a ticket or issue.'}
+            <DialogTitle>New Version</DialogTitle>
+            <DialogDescription id="new-version-dialog-desc">
+              Start a new schema version for this project. Pick a bump strategy (defaults to minor), then describe the release.
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain py-1 pr-1 [-webkit-overflow-scrolling:touch]">
@@ -3478,7 +3502,7 @@ const Versions = () => {
                 <Alert variant="default" role="note">
                   <span className="font-medium text-sm">Compatibility</span>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
-                    After a successful commit, the service records a parent→head compatibility check in the workflow audit
+                    After you create a new version, the service records a parent→head compatibility check in the workflow audit
                     log. Use <strong>Merge branches</strong> on this page or <strong>Compare versions</strong> to review a
                     full grouped report between two existing revisions before you integrate.
                   </p>
@@ -3562,9 +3586,7 @@ const Versions = () => {
           <DialogFooter className="shrink-0 border-t border-gray-100 pt-4 dark:border-gray-700">
             <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={isLoading}>Cancel</Button>
             <Button onClick={handleCreateSubmit} disabled={isLoading || !createCommitFormValid}>
-              {isLoading
-                ? (createDialogMode === 'new-version' ? 'Creating…' : 'Committing…')
-                : (createDialogMode === 'new-version' ? 'Create Version' : 'Commit')}
+              {isLoading ? 'Creating…' : 'Create Version'}
             </Button>
           </DialogFooter>
         </DialogContent>

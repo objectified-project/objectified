@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import React from 'react';
 import { useSession } from 'next-auth/react';
-import { User, Building2, Folders, FileDigit, Key, Eye, Link as LinkIcon, Database, Sun } from 'lucide-react';
+import { User, Building2, Folders, Key, Eye, Link as LinkIcon, Database, Sun } from 'lucide-react';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 
 interface NavItem {
@@ -53,14 +53,22 @@ const DashboardSideNav: React.FC = () => {
       header: 'Specifications',
       items: [
         { label: 'Projects', href: '/ade/dashboard/projects', icon: Folders, disabled: !hasTenant },
-        { label: 'Versions', href: '/ade/dashboard/versions', icon: FileDigit, disabled: !hasTenant },
         { label: 'Sunset timeline', href: '/ade/dashboard/versions/sunset-timeline', icon: Sun, disabled: !hasTenant },
         { label: 'Published', href: '/ade/dashboard/published', icon: Eye, disabled: !hasTenant },
       ],
     },
   ];
 
-  const isActive = (href: string) => pathname === href;
+  const isActive = (href: string) => {
+    if (href === '/ade/dashboard/projects') {
+      return (
+        pathname === '/ade/dashboard/projects' ||
+        pathname === '/ade/dashboard/versions' ||
+        pathname.startsWith('/ade/dashboard/versions/')
+      );
+    }
+    return pathname === href;
+  };
 
   const sidebarBg = isDark
     ? 'linear-gradient(180deg, #172033 0%, #0f172a 100%)'

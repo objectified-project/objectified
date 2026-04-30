@@ -1,6 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit, Layers, TrendingUp } from 'lucide-react';
 import {
@@ -72,6 +73,7 @@ interface Project {
 }
 
 const Projects = () => {
+  const router = useRouter();
   const { data: session } = useSession();
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -414,7 +416,7 @@ const Projects = () => {
                 Projects
               </h2>
               <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-                Manage projects for the current tenant
+                Manage projects for the current tenant. Click a project to open its versions.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -494,7 +496,16 @@ const Projects = () => {
                 {projects.map((project) => {
                   const domainCategoryLabel = getProjectDomainCategoryLabel(project.metadata?.domainCategory);
                   return (
-                  <tr key={project.id} className={dashboardTrHoverClass}>
+                  <tr
+                    key={project.id}
+                    className={`${dashboardTrHoverClass} cursor-pointer`}
+                    onClick={() =>
+                      router.push(
+                        `/ade/dashboard/versions?projectId=${encodeURIComponent(project.id)}`
+                      )
+                    }
+                    title="View versions for this project"
+                  >
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
                         <div className="text-sm font-semibold text-gray-900 dark:text-white truncate max-w-xs" title={project.name}>
@@ -538,7 +549,10 @@ const Projects = () => {
                         return (
                           <button
                             type="button"
-                            onClick={() => setQualityTrendProject(project)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setQualityTrendProject(project);
+                            }}
                             className="inline-flex max-w-full items-center gap-2 rounded-lg border border-transparent px-1 py-0.5 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-800 dark:hover:bg-indigo-950/40"
                             title="Open quality score history"
                           >
