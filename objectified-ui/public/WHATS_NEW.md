@@ -17,6 +17,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Added the ability to decide whether or not to save the layout image on a layout persist.
 - Corrects schema metrics display when the schema list is empty.
 - Corrects opacity of overlay buttons in canvas.
+- Combined Projects and Versions page for better design and navigation.
 
 ---
 
