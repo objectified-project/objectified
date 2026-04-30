@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Globe, Link2, Lock, PlusCircle, Search } from 'lucide-react';
 import { Button, buttonVariants } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
+import { Spinner } from '@/app/components/ui/Spinner';
 import { Label } from '@/app/components/ui/Label';
 import { LoadingState } from '@/app/components/ui/LoadingState';
 import { toast } from 'sonner';
@@ -249,6 +250,7 @@ export default function AddRepositoryPage() {
       }
       return;
     }
+    if (submitting) return;
     setSubmitting(true);
     try {
       const body =
@@ -595,10 +597,20 @@ export default function AddRepositoryPage() {
               size="sm"
               className="gap-1.5 bg-indigo-600 hover:bg-indigo-700"
               disabled={!canContinue || submitting}
+              aria-busy={submitting}
               onClick={() => void handleContinue()}
             >
-              Continue
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+              {submitting ? (
+                <>
+                  <Spinner size="sm" tone="light" className="shrink-0" aria-hidden />
+                  Adding…
+                </>
+              ) : (
+                <>
+                  Continue
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                </>
+              )}
             </Button>
           </div>
         </div>
