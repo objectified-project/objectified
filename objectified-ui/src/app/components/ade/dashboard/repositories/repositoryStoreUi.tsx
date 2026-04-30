@@ -2,9 +2,10 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { GitBranch, Github, Gitlab, Globe, FileCode2 } from 'lucide-react';
+import { FileCode2, GitBranch, Github, Gitlab, Globe, Loader2 } from 'lucide-react';
 import { SiBitbucket } from 'react-icons/si';
 import { cn } from '@lib/utils';
+import { RepositoryRowMenu } from './RepositoryRowMenu';
 
 export type RepositoryProvider = 'github' | 'gitlab' | 'bitbucket' | 'public_url';
 export type RepositoryStatus = 'pending' | 'scanning' | 'ready' | 'error' | 'archived';
@@ -214,10 +215,13 @@ export function RepositoryCard({
   repo,
   index,
   detailHref,
+  onRemoved,
 }: {
   repo: DashboardRepository;
   index: number;
   detailHref?: string;
+  /** When set with `detailHref`, shows an actions menu (e.g. remove from tenant list). */
+  onRemoved?: () => void;
 }) {
   const files = repo.total_files ?? 0;
   const importable = repo.importable_count;
@@ -225,14 +229,14 @@ export function RepositoryCard({
   const grad = gradientForIndex(index);
 
   const shellClass = cn(
-    'block rounded-xl border border-gray-200 bg-white p-5 transition-all duration-200 dark:border-gray-700 dark:bg-gray-800',
-    'hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/15'
+    'relative isolate rounded-xl border border-gray-200 bg-white p-5 transition-all duration-200 dark:border-gray-700 dark:bg-gray-800',
+    detailHref && 'hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/15'
   );
 
   const inner = (
     <>
-      <div className="mb-3 flex items-start justify-between">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <span
             className={cn(
               'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br font-mono text-xs font-bold text-white',
@@ -246,14 +250,29 @@ export function RepositoryCard({
             <p className="truncate font-mono text-[11px] text-gray-500 dark:text-gray-400">{repo.full_name}</p>
           </div>
         </div>
-        <span
-          className={cn(
-            'flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
-            repositoryStatusClass(repo.status)
-          )}
-        >
-          {repositoryStatusLabel(repo.status)}
-        </span>
+        <div className="flex shrink-0 items-center gap-1">
+          <span
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+              repositoryStatusClass(repo.status)
+            )}
+          >
+            {repo.status === 'scanning' ? (
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-hidden />
+            ) : null}
+            {repositoryStatusLabel(repo.status)}
+          </span>
+          {detailHref && onRemoved ? (
+            <div className="pointer-events-auto" onPointerDown={(e) => e.stopPropagation()}>
+              <RepositoryRowMenu
+                repositoryId={repo.id}
+                label={repo.name}
+                onRemoved={onRemoved}
+                triggerClassName="-mr-1"
+              />
+            </div>
+          ) : null}
+        </div>
       </div>
       {repo.description ? (
         <p className="mb-3 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{repo.description}</p>
@@ -286,9 +305,14 @@ export function RepositoryCard({
 
   if (detailHref) {
     return (
-      <Link href={detailHref} className={shellClass}>
-        {inner}
-      </Link>
+      <div className={shellClass}>
+        <Link
+          href={detailHref}
+          className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 ring-offset-white dark:ring-offset-gray-900"
+          aria-label={`Open repository ${repo.full_name || repo.name}`}
+        />
+        <div className="relative z-10 pointer-events-none">{inner}</div>
+      </div>
     );
   }
 

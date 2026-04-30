@@ -38,9 +38,13 @@ _LIST_ROW = {
     "description": "Hi",
     "default_branch": "main",
     "visibility": "public",
-    "status": "pending",
+    "status": "scanning",
     "created_at": None,
     "updated_at": None,
+    "linked_account_id": None,
+    "last_scanned_at": None,
+    "total_files": None,
+    "importable_count": None,
 }
 
 
@@ -104,7 +108,14 @@ def test_create_public_url_ok():
         body = r.json()
         assert body["success"] is True
         assert body["repository"]["provider"] == "github"
+        assert body["repository"]["status"] == "scanning"
         mdb.insert_tenant_repository.assert_called_once()
+        assert mdb.insert_tenant_repository.call_args.kwargs.get("status") == "scanning"
+        mdb.enqueue_repository_file_scan_job.assert_called_once_with(
+            _TENANT_ID,
+            _LIST_ROW["id"],
+            "main",
+        )
 
 
 def test_create_public_url_validation_error():
@@ -151,6 +162,9 @@ def test_create_linked_github_ok():
         )
     assert r.status_code == 200
     mdb.get_external_auth_provider_for_user.assert_called_once()
+    assert mdb.insert_tenant_repository.call_args.kwargs.get("status") == "scanning"
+    assert mdb.insert_tenant_repository.call_args.kwargs.get("linked_account_id") == _LINKED_ACCOUNT_ID
+    mdb.enqueue_repository_file_scan_job.assert_called_once()
 
 
 def test_create_duplicate_conflict():
@@ -184,3 +198,20 @@ def test_create_requires_jwt():
     finally:
         app.dependency_overrides[validate_authentication] = lambda: _JWT
     assert r.status_code == 403
+
+
+def test_delete_repository_ok():
+    rid = _LIST_ROW["id"]
+    with patch("app.tenant_repositories_routes.db") as mdb:
+        mdb.delete_tenant_repository.return_value = True
+        r = client.delete(f"/v1/tenants/acme/repositories/{rid}")
+    assert r.status_code == 200
+    assert r.json() == {"success": True}
+    mdb.delete_tenant_repository.assert_called_once_with(_TENANT_ID, rid)
+
+
+def test_delete_repository_not_found():
+    with patch("app.tenant_repositories_routes.db") as mdb:
+        mdb.delete_tenant_repository.return_value = False
+        r = client.delete("/v1/tenants/acme/repositories/880e8400-e29b-41d4-a716-446655440099")
+    assert r.status_code == 404

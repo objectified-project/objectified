@@ -25,6 +25,8 @@ We continue to improve the platform based on your feedback with improvements and
 ## Repositories
 - Added repositories section to the Dashboard.
 - Allows for addition of remote repositories both registered using Linked Accounts and entered manually.
+- Repositories list is available as a card and list format.
+- Clicking on repositories in the list will show a details screen.
 
 ---
 

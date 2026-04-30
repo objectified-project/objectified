@@ -6,8 +6,11 @@ POST requires JWT so we can verify linked GitHub accounts via ``external_auth_pr
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any, Dict, Optional
+
+_logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException
 from psycopg2 import errors as pg_errors
@@ -56,9 +59,9 @@ def _row_to_record(row: Dict[str, Any]) -> TenantRepositoryRecord:
         status=str(row.get("status") or "pending"),
         clone_url=str(row["clone_url"]) if row.get("clone_url") else None,
         source=str(row["source"]) if row.get("source") else None,
-        last_scanned_at=None,
-        total_files=None,
-        importable_count=None,
+        last_scanned_at=_ts(row.get("last_scanned_at")) if row.get("last_scanned_at") is not None else None,
+        total_files=row.get("total_files") if isinstance(row.get("total_files"), int) else None,
+        importable_count=row.get("importable_count") if isinstance(row.get("importable_count"), int) else None,
         created_at=_ts(row.get("created_at")),
         updated_at=_ts(row.get("updated_at")),
     )
@@ -115,6 +118,8 @@ async def create_tenant_repository(
     tenant_id = str(auth_data["tenant_id"])
     user_id = _require_jwt_user(auth_data)
 
+    linked_account_id: Optional[str] = None
+
     if body.source == "public_url":
         requested_clone = str(body.clone_url).strip()
         try:
@@ -124,6 +129,7 @@ async def create_tenant_repository(
         canonical_clone = str(meta.get("canonical_clone_url") or requested_clone).strip()
     else:
         linked_id = str(body.linked_account_id).strip()
+        linked_account_id = linked_id
         full_name_raw = str(body.repository_full_name).strip()
         parts = parse_owner_repo_slash(full_name_raw)
         if not parts:
@@ -185,6 +191,8 @@ async def create_tenant_repository(
     visibility = meta.get("visibility")
     vis_str = str(visibility) if visibility is not None else None
 
+    default_branch = str(meta.get("default_branch") or "main")
+
     try:
         inserted = db.insert_tenant_repository(
             tenant_id=tenant_id,
@@ -194,10 +202,11 @@ async def create_tenant_repository(
             clone_url_normalized=normalized,
             repository_full_name=meta.get("repository_full_name"),
             description=desc_str,
-            default_branch=str(meta.get("default_branch") or "main"),
+            default_branch=default_branch,
             visibility=vis_str,
-            status="pending",
+            status="scanning",
             created_by=user_id,
+            linked_account_id=linked_account_id,
         )
     except pg_errors.UniqueViolation as exc:
         raise HTTPException(
@@ -205,5 +214,26 @@ async def create_tenant_repository(
             detail="this repository is already registered for this tenant",
         ) from exc
 
+    try:
+        db.enqueue_repository_file_scan_job(tenant_id, str(inserted["id"]), default_branch)
+    except Exception as exc:
+        _logger.warning(
+            "repository registered but file scan job was not enqueued (check migration 20260501-120000): %s",
+            exc,
+        )
+
     record = _row_to_record(inserted)
     return TenantRepositoryCreateResponse(success=True, repository=record)
+
+
+@router.delete("/{tenant_slug}/repositories/{repository_id}")
+async def delete_tenant_repository(
+    tenant_slug: str,
+    repository_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> Dict[str, bool]:
+    _ = tenant_slug
+    tenant_id = str(auth_data["tenant_id"])
+    if not db.delete_tenant_repository(tenant_id, str(repository_id)):
+        raise HTTPException(status_code=404, detail="repository not found")
+    return {"success": True}

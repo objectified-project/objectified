@@ -4,13 +4,14 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ArrowRight,
   FolderGit2,
   LayoutGrid,
   List,
+  Loader2,
   Plus,
   RefreshCw,
   Search,
-  ArrowRight,
 } from 'lucide-react';
 import { Button, buttonVariants } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
@@ -47,6 +48,7 @@ import {
   repositoryStatusClass,
   repositoryStatusLabel,
 } from '@/app/components/ade/dashboard/repositories/repositoryStoreUi';
+import { RepositoryRowMenu } from '@/app/components/ade/dashboard/repositories/RepositoryRowMenu';
 
 const VIEW_STORAGE = 'objectified-dashboard-repositories-view';
 
@@ -357,7 +359,8 @@ export default function RepositoriesPage() {
                 key={repo.id}
                 repo={repo}
                 index={i}
-                detailHref={`/ade/dashboard/repositories/${repo.id}`}
+                detailHref={`/ade/dashboard/repositories/${repo.id}/preview`}
+                onRemoved={() => void load()}
               />
             ))}
           </div>
@@ -374,7 +377,7 @@ export default function RepositoriesPage() {
                   <th className={dashboardThClass}>Status</th>
                   <th className={dashboardThClass}>Last scan</th>
                   <th className={dashboardThClass}>Activity</th>
-                  <th className={cn(dashboardThRightClass, 'pr-6')} />
+                  <th className={cn(dashboardThRightClass, 'pr-6')}>Actions</th>
                 </tr>
               </thead>
               <tbody className={dashboardTbodyClass}>
@@ -382,7 +385,7 @@ export default function RepositoriesPage() {
                   <tr key={repo.id} className={dashboardTrHoverClass}>
                     <td className="px-6 py-3">
                       <Link
-                        href={`/ade/dashboard/repositories/${repo.id}`}
+                        href={`/ade/dashboard/repositories/${repo.id}/preview`}
                         className="flex min-w-0 items-center gap-2 rounded-md text-left outline-none ring-indigo-500/40 focus-visible:ring-2"
                       >
                         <span
@@ -430,10 +433,13 @@ export default function RepositoriesPage() {
                     <td className="py-3">
                       <span
                         className={cn(
-                          'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+                          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
                           repositoryStatusClass(repo.status)
                         )}
                       >
+                        {repo.status === 'scanning' ? (
+                          <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-hidden />
+                        ) : null}
                         {repositoryStatusLabel(repo.status)}
                       </span>
                     </td>
@@ -444,12 +450,19 @@ export default function RepositoriesPage() {
                       <RepositorySparkline seed={repo.id} errorTint={repo.status === 'error'} />
                     </td>
                     <td className="pr-6 text-right">
-                      <Link
-                        href={`/ade/dashboard/repositories/${repo.id}`}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-                      >
-                        Detail <ArrowRight className="h-3 w-3" aria-hidden />
-                      </Link>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link
+                          href={`/ade/dashboard/repositories/${repo.id}/preview`}
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+                        >
+                          Detail <ArrowRight className="h-3 w-3" aria-hidden />
+                        </Link>
+                        <RepositoryRowMenu
+                          repositoryId={repo.id}
+                          label={repo.name}
+                          onRemoved={() => void load()}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -109,6 +109,7 @@ app.include_router(tenant_repositories_router)
 
 
 _webhook_delivery_task: asyncio.Task | None = None
+_repository_file_scan_task: asyncio.Task | None = None
 
 
 @app.on_event("startup")
@@ -161,8 +162,31 @@ async def startup_event():
             except Exception:
                 log.exception("push webhook delivery sweep")
 
+    async def _repository_file_scan_sweep() -> None:
+        log = logging.getLogger(__name__)
+        while True:
+            await asyncio.sleep(5)
+            try:
+
+                def _run_scan() -> int:
+                    thread_db = Database()
+                    try:
+                        from .repository_file_scan import process_next_repository_file_scan_job
+
+                        return process_next_repository_file_scan_job(thread_db)
+                    finally:
+                        thread_db.close()
+
+                await asyncio.to_thread(_run_scan)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("repository file scan sweep")
+
     global _webhook_delivery_task
     _webhook_delivery_task = asyncio.create_task(_webhook_delivery_sweep())
+    global _repository_file_scan_task
+    _repository_file_scan_task = asyncio.create_task(_repository_file_scan_sweep())
 
 
 @app.on_event("shutdown")
@@ -176,6 +200,14 @@ async def shutdown_event():
         except asyncio.CancelledError:
             pass
         _webhook_delivery_task = None
+    global _repository_file_scan_task
+    if _repository_file_scan_task is not None:
+        _repository_file_scan_task.cancel()
+        try:
+            await _repository_file_scan_task
+        except asyncio.CancelledError:
+            pass
+        _repository_file_scan_task = None
     db.close()
 
 

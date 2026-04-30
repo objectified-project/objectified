@@ -288,7 +288,7 @@ export default function AddRepositoryPage() {
       const created = data as { repository?: { id?: unknown } };
       const newId = created.repository?.id != null ? String(created.repository.id) : '';
       if (newId) {
-        router.push(`/ade/dashboard/repositories/${newId}`);
+        router.push(`/ade/dashboard/repositories/${newId}/preview`);
       }
     } catch (e) {
       console.error(e);

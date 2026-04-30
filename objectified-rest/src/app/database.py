@@ -6232,7 +6232,8 @@ class Database:
     def list_tenant_repositories(self, tenant_id: str) -> List[Dict[str, Any]]:
         q = """
             SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
-                   description, default_branch, visibility, status, created_at, updated_at
+                   description, default_branch, visibility, status, created_at, updated_at,
+                   linked_account_id, last_scanned_at, total_files, importable_count
             FROM odb.tenant_repositories
             WHERE tenant_id = %s::uuid AND deleted_at IS NULL
             ORDER BY created_at DESC
@@ -6242,7 +6243,8 @@ class Database:
     def get_tenant_repository(self, tenant_id: str, repository_id: str) -> Optional[Dict[str, Any]]:
         q = """
             SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
-                   description, default_branch, visibility, status, created_at, updated_at
+                   description, default_branch, visibility, status, created_at, updated_at,
+                   linked_account_id, last_scanned_at, total_files, importable_count, created_by
             FROM odb.tenant_repositories
             WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
             LIMIT 1
@@ -6263,16 +6265,19 @@ class Database:
         visibility: Optional[str],
         status: str,
         created_by: Optional[str],
+        linked_account_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         q = """
             INSERT INTO odb.tenant_repositories (
                 tenant_id, source, provider, clone_url, clone_url_normalized,
-                repository_full_name, description, default_branch, visibility, status, created_by
+                repository_full_name, description, default_branch, visibility, status, created_by,
+                linked_account_id
             ) VALUES (
-                %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::uuid
+                %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s::uuid
             )
             RETURNING id, tenant_id, source, provider, clone_url, repository_full_name,
-                      description, default_branch, visibility, status, created_at
+                      description, default_branch, visibility, status, created_at, updated_at,
+                      linked_account_id, last_scanned_at, total_files, importable_count
         """
         conn = self.connect()
         try:
@@ -6291,11 +6296,182 @@ class Database:
                         visibility,
                         status,
                         created_by if created_by else None,
+                        linked_account_id if linked_account_id else None,
                     ),
                 )
                 row = cursor.fetchone()
                 conn.commit()
                 return dict(row)
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def enqueue_repository_file_scan_job(self, tenant_id: str, repository_id: str, branch: str) -> str:
+        q = """
+            INSERT INTO odb.tenant_repository_file_scan_jobs (tenant_id, repository_id, branch, status)
+            VALUES (%s::uuid, %s::uuid, %s, 'queued')
+            RETURNING id
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, (tenant_id, repository_id, branch))
+                row = cursor.fetchone()
+                conn.commit()
+                return str(row["id"]) if row else ""
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def claim_next_repository_file_scan_job(self) -> Optional[Dict[str, Any]]:
+        q = """
+            UPDATE odb.tenant_repository_file_scan_jobs j
+            SET status = 'running', started_at = CURRENT_TIMESTAMP
+            FROM (
+                SELECT id FROM odb.tenant_repository_file_scan_jobs
+                WHERE status = 'queued'
+                ORDER BY created_at ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            ) AS sub
+            WHERE j.id = sub.id
+            RETURNING j.id, j.tenant_id, j.repository_id, j.branch, j.status
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q)
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row) if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def replace_tenant_repository_files(
+        self, repository_id: str, branch: str, files: List[Dict[str, Any]]
+    ) -> None:
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    DELETE FROM odb.tenant_repository_files
+                    WHERE repository_id = %s::uuid AND branch = %s
+                    """,
+                    (repository_id, branch),
+                )
+                if files:
+                    cursor.executemany(
+                        """
+                        INSERT INTO odb.tenant_repository_files (
+                            repository_id, branch, path, name, ext, size_bytes, blob_sha, detected_kind
+                        ) VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        [
+                            (
+                                repository_id,
+                                branch,
+                                f["path"],
+                                f["name"],
+                                f.get("ext"),
+                                f.get("size_bytes"),
+                                f.get("blob_sha"),
+                                f.get("detected_kind"),
+                            )
+                            for f in files
+                        ],
+                    )
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_tenant_repository_after_file_scan(
+        self,
+        tenant_id: str,
+        repository_id: str,
+        total_files: int,
+        importable_count: int,
+        status: str,
+        touch_last_scanned_at: bool,
+    ) -> None:
+        if touch_last_scanned_at:
+            q = """
+                UPDATE odb.tenant_repositories
+                SET total_files = %s,
+                    importable_count = %s,
+                    status = %s,
+                    last_scanned_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
+            """
+            params = (total_files, importable_count, status, repository_id, tenant_id)
+        else:
+            q = """
+                UPDATE odb.tenant_repositories
+                SET total_files = %s,
+                    importable_count = %s,
+                    status = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
+            """
+            params = (total_files, importable_count, status, repository_id, tenant_id)
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, params)
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def mark_repository_file_scan_job_succeeded(self, job_id: str) -> None:
+        q = """
+            UPDATE odb.tenant_repository_file_scan_jobs
+            SET status = 'succeeded', finished_at = CURRENT_TIMESTAMP, error_message = NULL
+            WHERE id = %s::uuid
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, (job_id,))
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def mark_repository_file_scan_job_failed(self, job_id: str, error_message: str) -> None:
+        q = """
+            UPDATE odb.tenant_repository_file_scan_jobs
+            SET status = 'failed', finished_at = CURRENT_TIMESTAMP, error_message = %s
+            WHERE id = %s::uuid
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, (error_message[:8000], job_id))
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_tenant_repository(self, tenant_id: str, repository_id: str) -> bool:
+        """Soft-delete a tenant repository (sets ``deleted_at``). Returns True if a row was updated."""
+        q = """
+            UPDATE odb.tenant_repositories
+            SET deleted_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
+            RETURNING id
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, (repository_id, tenant_id))
+                row = cursor.fetchone()
+                conn.commit()
+                return bool(row)
         except Exception as e:
             conn.rollback()
             raise e
