@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = (session.user as any).user_id;
+    const userId = (session.user as { user_id?: string }).user_id;
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID not found in session' }, { status: 401 });
@@ -38,53 +38,68 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No access token found for this account' }, { status: 401 });
     }
 
-    // Call GitHub API to get user repositories
-    const githubResponse = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100', {
-      headers: {
-        'Authorization': `Bearer ${account.access_token}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28'
-      }
-    });
+    const perPage = 100;
+    const maxPages = 50;
+    const rawRepos: unknown[] = [];
 
-    if (!githubResponse.ok) {
-      const errorText = await githubResponse.text();
-      console.error('GitHub API error:', githubResponse.status, errorText);
+    for (let page = 1; page <= maxPages; page += 1) {
+      const githubResponse = await fetch(
+        `https://api.github.com/user/repos?sort=updated&per_page=${perPage}&page=${page}`,
+        {
+          headers: {
+            Authorization: `Bearer ${account.access_token}`,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+        }
+      );
 
-      if (githubResponse.status === 401) {
+      if (!githubResponse.ok) {
+        const errorText = await githubResponse.text();
+        console.error('GitHub API error:', githubResponse.status, errorText);
+
+        if (githubResponse.status === 401) {
+          return NextResponse.json(
+            { error: 'GitHub access token is invalid or expired. Please re-link your account.' },
+            { status: 401 }
+          );
+        }
+
         return NextResponse.json(
-          { error: 'GitHub access token is invalid or expired. Please re-link your account.' },
-          { status: 401 }
+          { error: `GitHub API error: ${githubResponse.statusText}` },
+          { status: githubResponse.status }
         );
       }
 
-      return NextResponse.json(
-        { error: `GitHub API error: ${githubResponse.statusText}` },
-        { status: githubResponse.status }
-      );
+      const batch = (await githubResponse.json()) as unknown[];
+      if (!Array.isArray(batch) || batch.length === 0) {
+        break;
+      }
+      rawRepos.push(...batch);
+      if (batch.length < perPage) {
+        break;
+      }
     }
 
-    const repositories = await githubResponse.json();
-
-    // Transform GitHub API response to our format
-    const formattedRepos = repositories.map((repo: any) => ({
-      id: repo.id,
-      name: repo.name,
-      full_name: repo.full_name,
-      description: repo.description,
-      private: repo.private,
-      default_branch: repo.default_branch || 'main',
-      html_url: repo.html_url,
-      updated_at: repo.updated_at,
-    }));
+    const formattedRepos = rawRepos.map((repo) => {
+      const r = repo && typeof repo === 'object' ? (repo as Record<string, unknown>) : {};
+      return {
+        id: r.id,
+        name: r.name,
+        full_name: r.full_name,
+        description: r.description,
+        private: r.private,
+        default_branch: r.default_branch || 'main',
+        html_url: r.html_url,
+        updated_at: r.updated_at,
+      };
+    });
 
     return NextResponse.json({ repositories: formattedRepos });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching GitHub repositories:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch repositories' },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Failed to fetch repositories';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

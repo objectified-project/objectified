@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Globe, Link2, PlusCircle, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Globe, Link2, Lock, PlusCircle, Search } from 'lucide-react';
 import { Button, buttonVariants } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
 import { Label } from '@/app/components/ui/Label';
@@ -30,6 +30,22 @@ interface LinkedAccount {
   provider_username: string | null;
 }
 
+interface RemoteRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  description?: string | null;
+  private?: boolean;
+  default_branch?: string;
+  html_url?: string;
+}
+
+function cloneUrlFromHtml(htmlUrl: string | undefined): string | undefined {
+  if (!htmlUrl?.trim()) return undefined;
+  const base = htmlUrl.trim().replace(/\/$/, '');
+  return base.endsWith('.git') ? base : `${base}.git`;
+}
+
 export default function AddRepositoryPage() {
   const { data: session } = useSession();
   const currentTenantId = (session?.user as { current_tenant_id?: string })?.current_tenant_id;
@@ -40,6 +56,10 @@ export default function AddRepositoryPage() {
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [repoSearch, setRepoSearch] = useState('');
+  const [remoteRepos, setRemoteRepos] = useState<RemoteRepo[]>([]);
+  const [loadingRepos, setLoadingRepos] = useState(false);
+  const [reposError, setReposError] = useState<string | null>(null);
+  const [selectedRemoteRepo, setSelectedRemoteRepo] = useState<RemoteRepo | null>(null);
   const [publicCloneUrl, setPublicCloneUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [urlTestLoading, setUrlTestLoading] = useState(false);
@@ -79,16 +99,88 @@ export default function AddRepositoryPage() {
     [linkedAccounts, selectedAccountId]
   );
 
+  useEffect(() => {
+    if (source !== 'linked' || !selectedAccount) {
+      setRemoteRepos([]);
+      setSelectedRemoteRepo(null);
+      setReposError(null);
+      setLoadingRepos(false);
+      return;
+    }
+
+    const provider = selectedAccount.provider?.toLowerCase() ?? '';
+    if (provider !== 'github') {
+      setRemoteRepos([]);
+      setSelectedRemoteRepo(null);
+      setReposError(null);
+      setLoadingRepos(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingRepos(true);
+    setReposError(null);
+    setSelectedRemoteRepo(null);
+    setRepoSearch('');
+
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/sso/github/repos?accountId=${encodeURIComponent(selectedAccount.id)}`,
+          { credentials: 'include' }
+        );
+        const data = (await res.json().catch(() => ({}))) as {
+          repositories?: RemoteRepo[];
+          error?: string;
+        };
+        if (cancelled) return;
+        if (!res.ok) {
+          setRemoteRepos([]);
+          setReposError(typeof data.error === 'string' ? data.error : res.statusText);
+          return;
+        }
+        const list = Array.isArray(data.repositories) ? data.repositories : [];
+        setRemoteRepos(
+          [...list].sort((a, b) =>
+            (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase())
+          )
+        );
+      } catch {
+        if (!cancelled) {
+          setRemoteRepos([]);
+          setReposError('Could not load repositories. Check your connection and try again.');
+        }
+      } finally {
+        if (!cancelled) setLoadingRepos(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [source, selectedAccount]);
+
   const accountLabel = (a: LinkedAccount) => {
     const u = a.provider_username?.trim();
     if (u) return u;
     return a.provider_email;
   };
 
+  const filteredRemoteRepos = useMemo(() => {
+    const q = repoSearch.trim().toLowerCase();
+    if (!q) return remoteRepos;
+    return remoteRepos.filter((r) => {
+      const name = (r.name || '').toLowerCase();
+      const full = (r.full_name || '').toLowerCase();
+      const desc = (r.description || '').toLowerCase();
+      return name.includes(q) || full.includes(q) || desc.includes(q);
+    });
+  }, [remoteRepos, repoSearch]);
+
   const canContinue =
     source === 'public_url'
       ? /^https:\/\/.+\..+/.test(publicCloneUrl.trim())
-      : Boolean(selectedAccountId);
+      : Boolean(selectedAccountId && selectedRemoteRepo);
 
   const handleTestPublicUrl = async () => {
     const u = publicCloneUrl.trim();
@@ -133,7 +225,13 @@ export default function AddRepositoryPage() {
       return;
     }
     if (!canContinue) {
-      toast.error(source === 'public_url' ? 'Enter an HTTPS clone URL.' : 'Pick a linked account.');
+      if (source === 'public_url') {
+        toast.error('Enter an HTTPS clone URL.');
+      } else if (!selectedAccountId) {
+        toast.error('Pick a linked account.');
+      } else {
+        toast.error('Pick a repository from the list.');
+      }
       return;
     }
     setSubmitting(true);
@@ -141,7 +239,12 @@ export default function AddRepositoryPage() {
       const body =
         source === 'public_url'
           ? { source: 'public_url', clone_url: publicCloneUrl.trim() }
-          : { source: 'linked_account', linked_account_id: selectedAccountId };
+          : {
+              source: 'linked_account',
+              linked_account_id: selectedAccountId,
+              repository_full_name: selectedRemoteRepo?.full_name,
+              clone_url: cloneUrlFromHtml(selectedRemoteRepo?.html_url),
+            };
       const res = await fetch('/api/repositories', {
         method: 'POST',
         credentials: 'include',
@@ -297,22 +400,106 @@ export default function AddRepositoryPage() {
         {source === 'linked' && selectedAccount && (
           <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
             <h3 className="mb-3 text-sm font-semibold">Choose a repository</h3>
-            <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-              Remote repository listing will appear here once the provider API is connected. Search is ready for when
-              results load.
-            </p>
-            <div className="relative mb-3">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden />
-              <Input
-                value={repoSearch}
-                onChange={(e) => setRepoSearch(e.target.value)}
-                placeholder={`Search repos in ${accountLabel(selectedAccount)}…`}
-                className="bg-gray-50 pl-9 dark:bg-gray-900/50"
-              />
-            </div>
-            <div className="rounded-md border border-dashed border-gray-200 py-10 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
-              No repositories loaded yet.
-            </div>
+            {selectedAccount.provider?.toLowerCase() !== 'github' ? (
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Browsing repositories from the dashboard is available for <strong className="font-medium">GitHub</strong>{' '}
+                linked accounts. For {selectedAccount.provider ? `${selectedAccount.provider}` : 'this provider'}, use{' '}
+                <strong className="font-medium">Public Git URL</strong> above, or link a GitHub account.
+              </p>
+            ) : (
+              <>
+                <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                  Pick a repository below. The subtitle is the GitHub description when present; otherwise it shows the{' '}
+                  <span className="font-mono">owner/repo</span> path.
+                </p>
+                <div className="relative mb-3">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                    aria-hidden
+                  />
+                  <Input
+                    value={repoSearch}
+                    onChange={(e) => setRepoSearch(e.target.value)}
+                    placeholder={`Search repositories for ${accountLabel(selectedAccount)}…`}
+                    disabled={loadingRepos}
+                    className="bg-gray-50 pl-9 dark:bg-gray-900/50"
+                    aria-busy={loadingRepos}
+                  />
+                </div>
+                {loadingRepos && remoteRepos.length === 0 ? (
+                  <LoadingState message="Loading repositories…" />
+                ) : null}
+                {reposError ? (
+                  <p className="text-sm text-rose-600 dark:text-rose-400" role="alert">
+                    {reposError}
+                  </p>
+                ) : null}
+                {!loadingRepos && !reposError && remoteRepos.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                    No repositories returned for this account.
+                  </p>
+                ) : null}
+                {!loadingRepos && !reposError && remoteRepos.length > 0 ? (
+                  <div className="max-h-[22rem] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-600">
+                    {filteredRemoteRepos.length === 0 ? (
+                      <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                        No repositories match &quot;{repoSearch.trim()}&quot;.
+                      </p>
+                    ) : (
+                      <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+                        {filteredRemoteRepos.map((repo) => {
+                          const active = selectedRemoteRepo?.id === repo.id;
+                          const subtitle =
+                            (typeof repo.description === 'string' && repo.description.trim()) || repo.full_name;
+                          return (
+                            <li key={repo.id}>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedRemoteRepo(repo)}
+                                className={cn(
+                                  'flex w-full flex-col gap-0.5 px-3 py-2.5 text-left transition-colors',
+                                  active
+                                    ? 'bg-indigo-50 text-indigo-950 dark:bg-indigo-900/25 dark:text-indigo-50'
+                                    : 'hover:bg-gray-50 dark:hover:bg-gray-700/40'
+                                )}
+                              >
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span
+                                    className={cn(
+                                      'truncate text-sm font-medium',
+                                      active ? 'text-indigo-950 dark:text-indigo-50' : 'text-gray-900 dark:text-gray-100'
+                                    )}
+                                  >
+                                    {repo.name}
+                                  </span>
+                                  {repo.private ? (
+                                    <Lock
+                                      className={cn(
+                                        'h-3.5 w-3.5 shrink-0',
+                                        active ? 'text-indigo-400 dark:text-indigo-300' : 'text-gray-400'
+                                      )}
+                                      aria-label="Private repository"
+                                    />
+                                  ) : null}
+                                </div>
+                                <span
+                                  className={cn(
+                                    'truncate text-xs',
+                                    active ? 'text-indigo-800/90 dark:text-indigo-200/90' : 'text-gray-500 dark:text-gray-400'
+                                  )}
+                                >
+                                  {subtitle}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
         )}
 
