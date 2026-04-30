@@ -21,6 +21,83 @@ export interface DashboardRepository {
   last_scanned_at?: string | null;
   total_files?: number | null;
   importable_count?: number | null;
+  clone_url?: string | null;
+  source?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+function normalizeProvider(p: unknown): RepositoryProvider {
+  const s = String(p ?? '').toLowerCase();
+  if (s === 'gitlab') return 'gitlab';
+  if (s === 'bitbucket') return 'bitbucket';
+  if (s === 'public_url' || s === 'publicurl') return 'public_url';
+  return 'github';
+}
+
+function normalizeStatus(s: unknown): RepositoryStatus {
+  const v = String(s ?? '').toLowerCase();
+  if (v === 'pending') return 'pending';
+  if (v === 'scanning') return 'scanning';
+  if (v === 'error') return 'error';
+  if (v === 'archived') return 'archived';
+  return 'ready';
+}
+
+/** Parse a repository object from the REST / Next API (list or detail). */
+export function dashboardRepositoryFromApi(x: unknown): DashboardRepository | null {
+  if (!x || typeof x !== 'object') return null;
+  const o = x as Record<string, unknown>;
+  const id = String(o.id ?? '');
+  if (!id) return null;
+  const vis = o.visibility;
+  const visibility =
+    vis === 'private' ? 'private' : vis === 'public' ? 'public' : undefined;
+  return {
+    id,
+    name: String(o.name ?? o.full_name ?? 'Repository'),
+    full_name: String(o.full_name ?? o.clone_url ?? o.name ?? ''),
+    description: o.description != null ? String(o.description) : null,
+    provider: normalizeProvider(o.provider),
+    default_branch: String(o.default_branch ?? 'main'),
+    visibility,
+    status: normalizeStatus(o.status),
+    last_scanned_at: o.last_scanned_at != null ? String(o.last_scanned_at) : null,
+    total_files: typeof o.total_files === 'number' ? o.total_files : null,
+    importable_count: typeof o.importable_count === 'number' ? o.importable_count : null,
+    clone_url: o.clone_url != null ? String(o.clone_url) : null,
+    source: o.source != null ? String(o.source) : null,
+    created_at: o.created_at != null ? String(o.created_at) : null,
+    updated_at: o.updated_at != null ? String(o.updated_at) : null,
+  };
+}
+
+export function dashboardRepositoriesFromListPayload(data: unknown): DashboardRepository[] {
+  if (!data || typeof data !== 'object') return [];
+  const raw = (data as { repositories?: unknown }).repositories;
+  if (!Array.isArray(raw)) return [];
+  return raw.map(dashboardRepositoryFromApi).filter((r): r is DashboardRepository => r != null);
+}
+
+/** Summary metric card — aligned with `public/mockups/data-transform/compatibility-report.html` KPI strip. */
+export function RepositoryKpiCard({
+  label,
+  value,
+  subtitle,
+  valueClassName,
+}: {
+  label: string;
+  value: ReactNode;
+  subtitle: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+      <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</p>
+      <div className={cn('mt-1 font-mono text-2xl font-bold tabular-nums tracking-tight', valueClassName)}>{value}</div>
+      <p className="mt-1 text-xs leading-snug text-gray-500 dark:text-gray-400">{subtitle}</p>
+    </div>
+  );
 }
 
 export function repoInitials(name: string): string {
@@ -133,19 +210,27 @@ const gradientForIndex = (i: number) => {
   return g[i % g.length];
 };
 
-export function RepositoryCard({ repo, index }: { repo: DashboardRepository; index: number }) {
+export function RepositoryCard({
+  repo,
+  index,
+  detailHref,
+}: {
+  repo: DashboardRepository;
+  index: number;
+  detailHref?: string;
+}) {
   const files = repo.total_files ?? 0;
   const importable = repo.importable_count;
   const scanLabel = formatLastScan(repo.last_scanned_at, repo.status === 'error');
   const grad = gradientForIndex(index);
 
-  return (
-    <div
-      className={cn(
-        'block rounded-xl border border-gray-200 bg-white p-5 transition-all duration-200 dark:border-gray-700 dark:bg-gray-800',
-        'hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/15'
-      )}
-    >
+  const shellClass = cn(
+    'block rounded-xl border border-gray-200 bg-white p-5 transition-all duration-200 dark:border-gray-700 dark:bg-gray-800',
+    'hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/15'
+  );
+
+  const inner = (
+    <>
       <div className="mb-3 flex items-start justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <span
@@ -196,8 +281,18 @@ export function RepositoryCard({ repo, index }: { repo: DashboardRepository; ind
         </div>
         <RepositorySparkline seed={repo.id} errorTint={repo.status === 'error'} />
       </div>
-    </div>
+    </>
   );
+
+  if (detailHref) {
+    return (
+      <Link href={detailHref} className={shellClass}>
+        {inner}
+      </Link>
+    );
+  }
+
+  return <div className={shellClass}>{inner}</div>;
 }
 
 export function formatLastScan(iso: string | null | undefined, failed: boolean): string {

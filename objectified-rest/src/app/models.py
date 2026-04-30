@@ -1780,3 +1780,78 @@ class ChangeReportTemplateDefaultPut(BaseModel):
         validation_alias=AliasChoices("templateVersionId", "template_version_id"),
     )
 
+
+class TenantRepositoryCreate(BaseModel):
+    """Dashboard: register a Git repository under a tenant."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    source: Literal["public_url", "linked_account"]
+    clone_url: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("cloneUrl", "clone_url"),
+    )
+    linked_account_id: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("linkedAccountId", "linked_account_id"),
+    )
+    repository_full_name: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("repositoryFullName", "repository_full_name"),
+    )
+
+    @model_validator(mode="after")
+    def _require_fields_for_source(self) -> "TenantRepositoryCreate":
+        if self.source == "public_url":
+            if self.clone_url is None or not str(self.clone_url).strip():
+                raise ValueError("clone_url is required when source is public_url")
+        elif self.source == "linked_account":
+            if self.linked_account_id is None or not str(self.linked_account_id).strip():
+                raise ValueError("linked_account_id is required when source is linked_account")
+            if self.repository_full_name is None or not str(self.repository_full_name).strip():
+                raise ValueError("repository_full_name is required when source is linked_account")
+        return self
+
+
+class TenantRepositoryRecord(BaseModel):
+    """Single repository row returned to the UI (snake_case keys for the dashboard)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    name: str
+    full_name: str
+    description: Optional[str] = None
+    provider: str
+    default_branch: str
+    visibility: Optional[str] = None
+    status: str
+    clone_url: Optional[str] = None
+    source: Optional[str] = None
+    last_scanned_at: Optional[str] = None
+    total_files: Optional[int] = None
+    importable_count: Optional[int] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class TenantRepositoriesListResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    repositories: List[TenantRepositoryRecord]
+
+
+class TenantRepositoryCreateResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    repository: TenantRepositoryRecord
+
+
+class TenantRepositoryGetResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    repository: TenantRepositoryRecord
+

@@ -6219,6 +6219,87 @@ class Database:
         v = rows[0].get("change_report_template_version_id")
         return str(v) if v is not None else None
 
+    def get_external_auth_provider_for_user(self, linked_account_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        q = """
+            SELECT id, user_id, provider, access_token
+            FROM odb.external_auth_providers
+            WHERE id = %s::uuid AND user_id = %s::uuid
+            LIMIT 1
+        """
+        rows = self.execute_query(q, (linked_account_id, user_id))
+        return dict(rows[0]) if rows else None
+
+    def list_tenant_repositories(self, tenant_id: str) -> List[Dict[str, Any]]:
+        q = """
+            SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
+                   description, default_branch, visibility, status, created_at, updated_at
+            FROM odb.tenant_repositories
+            WHERE tenant_id = %s::uuid AND deleted_at IS NULL
+            ORDER BY created_at DESC
+        """
+        return self.execute_query(q, (tenant_id,))
+
+    def get_tenant_repository(self, tenant_id: str, repository_id: str) -> Optional[Dict[str, Any]]:
+        q = """
+            SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
+                   description, default_branch, visibility, status, created_at, updated_at
+            FROM odb.tenant_repositories
+            WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
+            LIMIT 1
+        """
+        rows = self.execute_query(q, (repository_id, tenant_id))
+        return dict(rows[0]) if rows else None
+
+    def insert_tenant_repository(
+        self,
+        tenant_id: str,
+        source: str,
+        provider: str,
+        clone_url: str,
+        clone_url_normalized: str,
+        repository_full_name: Optional[str],
+        description: Optional[str],
+        default_branch: str,
+        visibility: Optional[str],
+        status: str,
+        created_by: Optional[str],
+    ) -> Dict[str, Any]:
+        q = """
+            INSERT INTO odb.tenant_repositories (
+                tenant_id, source, provider, clone_url, clone_url_normalized,
+                repository_full_name, description, default_branch, visibility, status, created_by
+            ) VALUES (
+                %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::uuid
+            )
+            RETURNING id, tenant_id, source, provider, clone_url, repository_full_name,
+                      description, default_branch, visibility, status, created_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    q,
+                    (
+                        tenant_id,
+                        source,
+                        provider,
+                        clone_url,
+                        clone_url_normalized,
+                        repository_full_name,
+                        description,
+                        default_branch,
+                        visibility,
+                        status,
+                        created_by if created_by else None,
+                    ),
+                )
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row)
+        except Exception as e:
+            conn.rollback()
+            raise e
+
 
 # Global database instance
 db = Database()

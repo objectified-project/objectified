@@ -1,6 +1,6 @@
 /**
- * Tenant repositories — proxies to objectified-rest when available.
- * Until the REST resource exists, GET returns an empty list and POST returns 501.
+ * Tenant repositories — proxies to objectified-rest GET/POST /v1/tenants/{slug}/repositories.
+ * When the REST service is unreachable or returns 404 for this path, GET falls back to [] and POST returns 501.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     {
       success: false,
       error:
-        'Repository registration is not enabled on the API yet. The control panel form is ready; wire this route when objectified-rest exposes POST /v1/tenants/{slug}/repositories.',
+        'Repository API unavailable (objectified-rest not reachable or POST /v1/tenants/{slug}/repositories returned 404). Ensure the API is running and migration 20260430-210000.sql has been applied.',
     },
     { status: 501 }
   );

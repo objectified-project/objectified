@@ -2,6 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Globe, Link2, Lock, PlusCircle, Search } from 'lucide-react';
 import { Button, buttonVariants } from '@/app/components/ui/Button';
@@ -56,6 +57,7 @@ function formatGroupAndRepoName(fullName: string | undefined): string {
 }
 
 export default function AddRepositoryPage() {
+  const router = useRouter();
   const { data: session } = useSession();
   const currentTenantId = (session?.user as { current_tenant_id?: string })?.current_tenant_id;
   const userId = (session?.user as { user_id?: string })?.user_id;
@@ -188,7 +190,7 @@ export default function AddRepositoryPage() {
 
   const canContinue =
     source === 'public_url'
-      ? /^https:\/\/.+\..+/.test(publicCloneUrl.trim())
+      ? /^https:\/\/.+\..+/.test(publicCloneUrl.trim()) && urlTestResult?.ok === true
       : Boolean(selectedAccountId && selectedRemoteRepo);
 
   const handleTestPublicUrl = async () => {
@@ -235,7 +237,11 @@ export default function AddRepositoryPage() {
     }
     if (!canContinue) {
       if (source === 'public_url') {
-        toast.error('Enter an HTTPS clone URL.');
+        if (!/^https:\/\/.+\..+/.test(publicCloneUrl.trim())) {
+          toast.error('Enter an HTTPS clone URL.');
+        } else {
+          toast.error('Use Test and confirm the URL succeeds before continuing.');
+        }
       } else if (!selectedAccountId) {
         toast.error('Pick a linked account.');
       } else {
@@ -266,9 +272,22 @@ export default function AddRepositoryPage() {
         return;
       }
       if (!res.ok) {
-        throw new Error(typeof data.error === 'string' ? data.error : res.statusText);
+        const detail = data as { error?: unknown; detail?: unknown };
+        let message = res.statusText;
+        if (typeof detail.error === 'string') message = detail.error;
+        else if (typeof detail.detail === 'string') message = detail.detail;
+        else if (Array.isArray(detail.detail) && detail.detail[0] && typeof detail.detail[0] === 'object') {
+          const row = detail.detail[0] as { msg?: unknown };
+          if (typeof row.msg === 'string') message = row.msg;
+        }
+        throw new Error(message);
       }
       toast.success('Repository registered.');
+      const created = data as { repository?: { id?: unknown } };
+      const newId = created.repository?.id != null ? String(created.repository.id) : '';
+      if (newId) {
+        router.push(`/ade/dashboard/repositories/${newId}`);
+      }
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : 'Request failed.');

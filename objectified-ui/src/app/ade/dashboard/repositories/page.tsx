@@ -37,11 +37,11 @@ import {
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
 import {
   type DashboardRepository,
-  type RepositoryProvider,
-  type RepositoryStatus,
   ProviderBadge,
   RepositoryCard,
+  RepositoryKpiCard,
   RepositorySparkline,
+  dashboardRepositoriesFromListPayload,
   formatLastScan,
   repoInitials,
   repositoryStatusClass,
@@ -49,50 +49,6 @@ import {
 } from '@/app/components/ade/dashboard/repositories/repositoryStoreUi';
 
 const VIEW_STORAGE = 'objectified-dashboard-repositories-view';
-
-function normalizeProvider(p: unknown): RepositoryProvider {
-  const s = String(p ?? '').toLowerCase();
-  if (s === 'gitlab') return 'gitlab';
-  if (s === 'bitbucket') return 'bitbucket';
-  if (s === 'public_url' || s === 'publicurl') return 'public_url';
-  return 'github';
-}
-
-function normalizeStatus(s: unknown): RepositoryStatus {
-  const v = String(s ?? '').toLowerCase();
-  if (v === 'pending') return 'pending';
-  if (v === 'scanning') return 'scanning';
-  if (v === 'error') return 'error';
-  if (v === 'archived') return 'archived';
-  return 'ready';
-}
-
-function normalizeRepo(x: unknown): DashboardRepository | null {
-  if (!x || typeof x !== 'object') return null;
-  const o = x as Record<string, unknown>;
-  const id = String(o.id ?? '');
-  if (!id) return null;
-  return {
-    id,
-    name: String(o.name ?? o.full_name ?? 'Repository'),
-    full_name: String(o.full_name ?? o.clone_url ?? o.name ?? ''),
-    description: o.description != null ? String(o.description) : null,
-    provider: normalizeProvider(o.provider),
-    default_branch: String(o.default_branch ?? 'main'),
-    visibility: o.visibility === 'private' ? 'private' : o.visibility === 'public' ? 'public' : undefined,
-    status: normalizeStatus(o.status),
-    last_scanned_at: o.last_scanned_at != null ? String(o.last_scanned_at) : null,
-    total_files: typeof o.total_files === 'number' ? o.total_files : null,
-    importable_count: typeof o.importable_count === 'number' ? o.importable_count : null,
-  };
-}
-
-function parseList(data: unknown): DashboardRepository[] {
-  if (!data || typeof data !== 'object') return [];
-  const raw = (data as { repositories?: unknown }).repositories;
-  if (!Array.isArray(raw)) return [];
-  return raw.map(normalizeRepo).filter((r): r is DashboardRepository => r != null);
-}
 
 export default function RepositoriesPage() {
   const { data: session } = useSession();
@@ -131,7 +87,7 @@ export default function RepositoriesPage() {
       if (!res.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : res.statusText);
       }
-      setRepos(parseList(data));
+      setRepos(dashboardRepositoriesFromListPayload(data));
     } catch (e) {
       console.error(e);
       setRepos([]);
@@ -267,32 +223,34 @@ export default function RepositoriesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Repositories</p>
-            <p className="mt-1 text-2xl font-bold">{kpis.count.toLocaleString()}</p>
-            <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">{kpis.providerSubtitle}</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Files indexed</p>
-            <p className="mt-1 text-2xl font-bold">{kpis.files.toLocaleString()}</p>
-            <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">Across tracked branches</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Importable</p>
-            <p className="mt-1 text-2xl font-bold text-indigo-600 dark:text-indigo-400">{kpis.importable.toLocaleString()}</p>
-            <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">OpenAPI · Arazzo · JSON Schema · …</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Imports (30d)</p>
-            <p className="mt-1 text-2xl font-bold">—</p>
-            <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">When import history is connected</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Last scan</p>
-            <p className="mt-1 text-2xl font-bold">{kpis.lastScanTitle}</p>
-            <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">{kpis.lastScanSub}</p>
-          </div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+          <RepositoryKpiCard
+            label="Repositories"
+            value={kpis.count.toLocaleString()}
+            subtitle={kpis.providerSubtitle}
+          />
+          <RepositoryKpiCard
+            label="Files indexed"
+            value={kpis.files.toLocaleString()}
+            subtitle="Sum of `total_files` from scan results across repos (0 until indexing runs)."
+          />
+          <RepositoryKpiCard
+            label="Importable"
+            value={kpis.importable.toLocaleString()}
+            subtitle="Sum of detected importable spec files (OpenAPI, Arazzo, JSON Schema, …) once scans classify paths."
+            valueClassName="text-indigo-600 dark:text-indigo-400"
+          />
+          <RepositoryKpiCard
+            label="Imports (30d)"
+            value="—"
+            subtitle="Needs import-event aggregation per tenant + repo (API not wired yet)."
+          />
+          <RepositoryKpiCard
+            label="Last scan"
+            value={kpis.lastScanTitle}
+            subtitle={kpis.lastScanSub}
+            valueClassName={kpis.lastScanTitle === '—' ? 'text-gray-400 dark:text-gray-500' : undefined}
+          />
         </div>
       </div>
 
@@ -395,7 +353,12 @@ export default function RepositoriesPage() {
         ) : view === 'grid' ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((repo, i) => (
-              <RepositoryCard key={repo.id} repo={repo} index={i} />
+              <RepositoryCard
+                key={repo.id}
+                repo={repo}
+                index={i}
+                detailHref={`/ade/dashboard/repositories/${repo.id}`}
+              />
             ))}
           </div>
         ) : (
@@ -418,7 +381,10 @@ export default function RepositoriesPage() {
                 {filtered.map((repo, i) => (
                   <tr key={repo.id} className={dashboardTrHoverClass}>
                     <td className="px-6 py-3">
-                      <div className="flex min-w-0 items-center gap-2">
+                      <Link
+                        href={`/ade/dashboard/repositories/${repo.id}`}
+                        className="flex min-w-0 items-center gap-2 rounded-md text-left outline-none ring-indigo-500/40 focus-visible:ring-2"
+                      >
                         <span
                           className={cn(
                             'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-gradient-to-br font-mono text-[10px] font-bold text-white',
@@ -438,12 +404,14 @@ export default function RepositoriesPage() {
                           {repoInitials(repo.name)}
                         </span>
                         <span className="min-w-0">
-                          <span className="block truncate font-semibold">{repo.name}</span>
+                          <span className="block truncate font-semibold text-gray-900 hover:text-indigo-600 dark:text-gray-100 dark:hover:text-indigo-300">
+                            {repo.name}
+                          </span>
                           <span className="block truncate font-mono text-[10px] text-gray-500 dark:text-gray-400">
                             {repo.full_name}
                           </span>
                         </span>
-                      </div>
+                      </Link>
                     </td>
                     <td className="py-3">
                       <ProviderBadge provider={repo.provider} />
@@ -476,9 +444,12 @@ export default function RepositoriesPage() {
                       <RepositorySparkline seed={repo.id} errorTint={repo.status === 'error'} />
                     </td>
                     <td className="pr-6 text-right">
-                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-400">
+                      <Link
+                        href={`/ade/dashboard/repositories/${repo.id}`}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+                      >
                         Detail <ArrowRight className="h-3 w-3" aria-hidden />
-                      </span>
+                      </Link>
                     </td>
                   </tr>
                 ))}
