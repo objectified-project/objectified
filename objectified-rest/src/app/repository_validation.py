@@ -146,7 +146,7 @@ def validate_public_clone_url(clone_url: str) -> dict:
             private = bool(j.get("private"))
             if private:
                 raise ValueError("repository is private; use a linked GitHub account instead")
-            return {
+            out = {
                 "provider": "github",
                 "repository_full_name": full_name,
                 "description": j.get("description"),
@@ -154,6 +154,10 @@ def validate_public_clone_url(clone_url: str) -> dict:
                 "visibility": "private" if private else "public",
                 "canonical_clone_url": str(j.get("clone_url") or f"https://github.com/{full_name}.git"),
             }
+            bc = count_github_repository_branches(owner, repo, access_token=None)
+            if bc is not None:
+                out["branch_count"] = bc
+            return out
         if r.status_code == 404:
             raise ValueError(
                 "GitHub returned 404 — repository may not exist, may be private, or may require authentication."
@@ -230,6 +234,57 @@ def validate_public_clone_url(clone_url: str) -> dict:
     }
 
 
+def count_github_repository_branches(
+    owner: str,
+    repo: str,
+    *,
+    access_token: str | None = None,
+) -> int | None:
+    """
+    Paginate GitHub ``/repos/{owner}/{repo}/branches`` and return the total count.
+
+    Returns ``None`` if the API does not return 200 (caller may still register the repo).
+    """
+    headers: dict[str, str] = {
+        "User-Agent": UA,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+    total = 0
+    page = 1
+    per_page = 100
+    max_pages = 100
+    try:
+        with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
+            while page <= max_pages:
+                url = (
+                    f"https://api.github.com/repos/{quote(owner, safe='')}/{quote(repo, safe='')}/branches"
+                    f"?per_page={per_page}&page={page}"
+                )
+                r = client.get(url, headers=headers)
+                if r.status_code != 200:
+                    _logger.debug(
+                        "github branch count failed owner=%s repo=%s status=%s",
+                        owner,
+                        repo,
+                        r.status_code,
+                    )
+                    return None
+                batch = r.json()
+                if not isinstance(batch, list):
+                    return None
+                total += len(batch)
+                if len(batch) < per_page:
+                    break
+                page += 1
+        return total
+    except Exception as exc:
+        _logger.debug("github branch count error: %s", exc)
+        return None
+
+
 def fetch_github_repo_with_token(access_token: str, owner: str, repo: str) -> dict:
     """Load repo metadata using the user's GitHub OAuth token (linked account)."""
     with httpx.Client(timeout=_HTTP_TIMEOUT, headers={"User-Agent": UA}) as client:
@@ -247,7 +302,7 @@ def fetch_github_repo_with_token(access_token: str, owner: str, repo: str) -> di
         full_name = str(j.get("full_name") or f"{owner}/{repo}")
         private = bool(j.get("private"))
         clone = str(j.get("clone_url") or f"https://github.com/{full_name}.git")
-        return {
+        out = {
             "provider": "github",
             "repository_full_name": full_name,
             "description": j.get("description"),
@@ -255,6 +310,10 @@ def fetch_github_repo_with_token(access_token: str, owner: str, repo: str) -> di
             "visibility": "private" if private else "public",
             "canonical_clone_url": clone,
         }
+        bc = count_github_repository_branches(owner, repo, access_token=access_token)
+        if bc is not None:
+            out["branch_count"] = bc
+        return out
     if r.status_code == 401:
         raise ValueError("GitHub access token is invalid or expired. Re-link your account.")
     if r.status_code == 404:

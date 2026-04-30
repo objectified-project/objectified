@@ -175,6 +175,68 @@ def fetch_github_tree_blobs(owner: str, repo: str, branch: str, access_token: Op
         return out
 
 
+def fetch_github_repository_file_text(
+    owner: str,
+    repo: str,
+    path: str,
+    ref: str,
+    access_token: Optional[str],
+    *,
+    max_bytes: int = 900_000,
+) -> Tuple[str, bool]:
+    """
+    Download file bytes from GitHub (raw contents API).
+
+    Returns ``(text, truncated)`` where ``text`` is UTF-8 with replacement for invalid bytes.
+    ``truncated`` is True when the file exceeded ``max_bytes``.
+    """
+    headers: Dict[str, str] = {
+        "User-Agent": UA,
+        "Accept": "application/vnd.github.raw",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+
+    owner_q = quote(owner, safe="")
+    repo_q = quote(repo, safe="")
+    ref_q = quote(ref, safe="")
+    norm_path = path.strip().replace("\\", "/").lstrip("/")
+    path_q = quote(norm_path, safe="/")
+
+    url = f"https://api.github.com/repos/{owner_q}/{repo_q}/contents/{path_q}?ref={ref_q}"
+
+    with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
+        with client.stream("GET", url, headers=headers) as resp:
+            if resp.status_code == 404:
+                raise ValueError("GitHub file not found (path or ref may be stale)")
+            if resp.status_code == 403:
+                raise ValueError("GitHub returned 403 (private repo needs a linked account token or rate limit)")
+            if resp.status_code != 200:
+                raise ValueError(f"GitHub contents API error: HTTP {resp.status_code}")
+
+            chunks: List[bytes] = []
+            total = 0
+            truncated = False
+            for chunk in resp.iter_bytes():
+                if not chunk:
+                    continue
+                if total >= max_bytes:
+                    truncated = True
+                    break
+                take = chunk[: max(0, max_bytes - total)]
+                if take:
+                    chunks.append(take)
+                    total += len(take)
+                if total >= max_bytes and len(chunk) > len(take):
+                    truncated = True
+                    break
+
+    raw = b"".join(chunks)
+    text = raw.decode("utf-8", errors="replace")
+    return text, truncated
+
+
 def _fail_job_and_repo(db: Database, tenant_id: str, repository_id: str, job_id: str, message: str) -> None:
     db.mark_repository_file_scan_job_failed(job_id, message)
     db.update_tenant_repository_after_file_scan(

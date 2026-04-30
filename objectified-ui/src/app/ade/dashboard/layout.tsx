@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "../../globals.css";
 import * as React from 'react';
 import DashboardSideNav from '@/app/components/ade/dashboard/DashboardSideNav';
+import { DashboardTooltipProvider } from '@/app/components/ade/dashboard/DashboardTooltipProvider';
 
 export const metadata: Metadata = {
   title: "Objectified: Dashboard",
@@ -20,10 +21,8 @@ export default function RootLayout({
     >
       <DashboardSideNav/>
 
-      <main
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent"
-      >
-        {children}
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
+        <DashboardTooltipProvider>{children}</DashboardTooltipProvider>
       </main>
     </div>
   );

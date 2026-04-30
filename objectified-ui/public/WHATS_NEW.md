@@ -27,6 +27,15 @@ We continue to improve the platform based on your feedback with improvements and
 - Allows for addition of remote repositories both registered using Linked Accounts and entered manually.
 - Repositories list is available as a card and list format.
 - Clicking on repositories in the list will show a details screen.
+- Workflow introduced for repositories:
+  - Upon a new repository being added to the system, the workflow changes to "SCANNING", indicating realtime indexing.
+  - Once scanning is complete, the repository screen is refreshed and its metrics are updated.
+  - Clicking "Rescan" will trigger a repository refresh and re-scan.
+  - Clicking "Files" in the repository after loading will present a file browser
+  - Clicking a file in the file browser will present the file details browser
+    - File details automatically fetches the file from the repository when clicking to load metadata.
+    - Metadata scraped from the file is presented in the detail screen.
+    - File contents can be viewed using a formatted editor in the detail screen.
 
 ---
 

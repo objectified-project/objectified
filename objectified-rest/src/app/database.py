@@ -6233,7 +6233,7 @@ class Database:
         q = """
             SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
                    description, default_branch, visibility, status, created_at, updated_at,
-                   linked_account_id, last_scanned_at, total_files, importable_count
+                   linked_account_id, last_scanned_at, total_files, importable_count, branch_count
             FROM odb.tenant_repositories
             WHERE tenant_id = %s::uuid AND deleted_at IS NULL
             ORDER BY created_at DESC
@@ -6244,13 +6244,163 @@ class Database:
         q = """
             SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
                    description, default_branch, visibility, status, created_at, updated_at,
-                   linked_account_id, last_scanned_at, total_files, importable_count, created_by
+                   linked_account_id, last_scanned_at, total_files, importable_count, branch_count, created_by
             FROM odb.tenant_repositories
             WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
             LIMIT 1
         """
         rows = self.execute_query(q, (repository_id, tenant_id))
         return dict(rows[0]) if rows else None
+
+    def list_tenant_repository_file_branches(self, tenant_id: str, repository_id: str) -> List[str]:
+        """Distinct branch names that have indexed file rows for this repository."""
+        q = """
+            SELECT DISTINCT f.branch
+            FROM odb.tenant_repository_files f
+            INNER JOIN odb.tenant_repositories r ON r.id = f.repository_id
+            WHERE r.tenant_id = %s::uuid AND r.id = %s::uuid AND r.deleted_at IS NULL
+            ORDER BY f.branch ASC
+        """
+        rows = self.execute_query(q, (tenant_id, repository_id))
+        return [str(r["branch"]) for r in rows if r.get("branch")]
+
+    def get_tenant_repository_file_row(
+        self, tenant_id: str, repository_id: str, file_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """One indexed file joined to its repository row (tenant-scoped)."""
+        q = """
+            SELECT f.id, f.repository_id, f.branch, f.path, f.name, f.ext, f.size_bytes, f.blob_sha,
+                   f.detected_kind,
+                   r.provider, r.clone_url, r.repository_full_name, r.linked_account_id, r.created_by,
+                   r.visibility
+            FROM odb.tenant_repository_files f
+            INNER JOIN odb.tenant_repositories r ON r.id = f.repository_id
+            WHERE f.id = %s::uuid AND r.tenant_id = %s::uuid AND r.id = %s::uuid AND r.deleted_at IS NULL
+            LIMIT 1
+        """
+        rows = self.execute_query(q, (file_id, tenant_id, repository_id))
+        return dict(rows[0]) if rows else None
+
+    def tenant_repository_files_stats_and_page(
+        self,
+        tenant_id: str,
+        repository_id: str,
+        branch: str,
+        *,
+        path_regex: Optional[str],
+        like_patterns: Optional[List[str]],
+        hide_non_importable: bool,
+        skip_vendor: bool,
+        include_hidden: bool,
+        path_prefix: Optional[str],
+        limit: int,
+        offset: int,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Return indexed totals for the branch, filtered counts, and one page of file rows.
+        ``like_patterns`` entries are passed to ``path ILIKE ... ESCAPE '\\'`` (OR together).
+        If ``path_regex`` is set, it replaces all LIKE path matching (POSIX ``~*``).
+        """
+        if not self.get_tenant_repository(tenant_id, repository_id):
+            return None
+
+        importable_sql = """(
+          f.detected_kind IS NOT NULL AND (
+            f.detected_kind ILIKE 'openapi%%' OR f.detected_kind ILIKE 'arazzo%%' OR
+            f.detected_kind ILIKE 'asyncapi%%' OR f.detected_kind ILIKE 'graphql%%' OR
+            f.detected_kind ILIKE 'protobuf%%' OR f.detected_kind ILIKE 'postman%%' OR
+            f.detected_kind ILIKE 'prisma%%' OR f.detected_kind ILIKE 'sql-ddl%%' OR
+            f.detected_kind ILIKE 'avro%%' OR f.detected_kind ILIKE 'dbml%%'
+          )
+        )"""
+
+        from_sql = """
+            FROM odb.tenant_repository_files f
+            INNER JOIN odb.tenant_repositories r ON r.id = f.repository_id
+            WHERE """
+
+        base_parts = [
+            "r.tenant_id = %s::uuid",
+            "r.id = %s::uuid",
+            "r.deleted_at IS NULL",
+            "f.repository_id = r.id",
+            "f.branch = %s",
+        ]
+        base_params: List[Any] = [tenant_id, repository_id, branch]
+
+        extra_parts: List[str] = []
+        extra_params: List[Any] = []
+        if path_prefix:
+            pp = path_prefix.strip().strip("/")
+            if pp:
+                extra_parts.append("(f.path = %s OR f.path LIKE %s)")
+                extra_params.extend([pp, pp + "/%"])
+        if skip_vendor:
+            extra_parts.append(
+                """(
+          f.path NOT ILIKE '%%/node_modules/%%' AND f.path NOT ILIKE 'node_modules/%%' AND
+          f.path NOT ILIKE '%%/vendor/%%' AND f.path NOT ILIKE 'vendor/%%' AND
+          f.path NOT ILIKE '%%/.git/%%' AND f.path NOT ILIKE '.git/%%'
+        )"""
+            )
+        if not include_hidden:
+            extra_parts.append("f.path !~ '(^|/)\\.[^/]+(/|$)'")
+
+        path_parts: List[str] = []
+        path_params: List[Any] = []
+        rx = (path_regex or "").strip()
+        if rx:
+            path_parts.append("f.path ~* %s")
+            path_params.append(rx)
+        else:
+            pats = [p for p in (like_patterns or []) if p and str(p).strip()]
+            if pats:
+                ors = " OR ".join(["f.path ILIKE %s ESCAPE E'\\\\'"] * len(pats))
+                path_parts.append("(" + ors + ")")
+                path_params.extend(pats)
+
+        idx_parts = base_parts + extra_parts
+        idx_params = base_params + extra_params
+        q_indexed = "SELECT COUNT(*) AS c " + from_sql + " AND ".join(idx_parts)
+        indexed_rows = self.execute_query(q_indexed, tuple(idx_params))
+        indexed_total = int(indexed_rows[0]["c"]) if indexed_rows else 0
+
+        filt_parts = base_parts + extra_parts + path_parts
+        filt_params = base_params + extra_params + path_params
+        if hide_non_importable:
+            filt_parts.append(importable_sql)
+
+        where_f = " AND ".join(filt_parts)
+        q_match = (
+            "SELECT COUNT(*) AS c, COUNT(*) FILTER (WHERE "
+            + importable_sql
+            + ") AS ic "
+            + from_sql
+            + where_f
+        )
+        match_rows = self.execute_query(q_match, tuple(filt_params))
+        match_count = int(match_rows[0]["c"]) if match_rows else 0
+        importable_match = int(match_rows[0]["ic"]) if match_rows else 0
+
+        lim = max(1, min(int(limit), 500))
+        off = max(0, min(int(offset), 500_000))
+        q_page = (
+            "SELECT f.id, f.path, f.name, f.ext, f.size_bytes, f.blob_sha, f.detected_kind "
+            + from_sql
+            + where_f
+            + " ORDER BY f.path ASC LIMIT %s OFFSET %s"
+        )
+        page_params = tuple(filt_params + [lim, off])
+        rows = self.execute_query(q_page, page_params)
+
+        return {
+            "indexed_total": indexed_total,
+            "match_count": match_count,
+            "importable_match_count": importable_match,
+            "limit": lim,
+            "offset": off,
+            "rows": rows,
+        }
 
     def insert_tenant_repository(
         self,
@@ -6266,18 +6416,19 @@ class Database:
         status: str,
         created_by: Optional[str],
         linked_account_id: Optional[str] = None,
+        branch_count: Optional[int] = None,
     ) -> Dict[str, Any]:
         q = """
             INSERT INTO odb.tenant_repositories (
                 tenant_id, source, provider, clone_url, clone_url_normalized,
                 repository_full_name, description, default_branch, visibility, status, created_by,
-                linked_account_id
+                linked_account_id, branch_count
             ) VALUES (
-                %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s::uuid
+                %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s::uuid, %s
             )
             RETURNING id, tenant_id, source, provider, clone_url, repository_full_name,
                       description, default_branch, visibility, status, created_at, updated_at,
-                      linked_account_id, last_scanned_at, total_files, importable_count
+                      linked_account_id, last_scanned_at, total_files, importable_count, branch_count
         """
         conn = self.connect()
         try:
@@ -6297,6 +6448,7 @@ class Database:
                         status,
                         created_by if created_by else None,
                         linked_account_id if linked_account_id else None,
+                        branch_count,
                     ),
                 )
                 row = cursor.fetchone()

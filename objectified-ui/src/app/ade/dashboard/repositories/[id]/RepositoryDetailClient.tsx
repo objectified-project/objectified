@@ -6,13 +6,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Download,
-  FileCode2,
   GitBranch,
   Github,
   Globe,
   Loader2,
   RefreshCw,
-  GitCommitHorizontal,
   Plus,
 } from 'lucide-react';
 import {
@@ -44,6 +42,7 @@ import {
   formatLastScan,
   repoInitials,
 } from '@/app/components/ade/dashboard/repositories/repositoryStoreUi';
+import { RepositoryFilesBrowser } from '@/app/components/ade/dashboard/repositories/RepositoryFilesBrowser';
 
 type RepoTab = 'preview' | 'files' | 'imports' | 'settings';
 
@@ -285,17 +284,6 @@ export function RepositoryDetailClient() {
           >
             ← Repositories
           </Link>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="ml-auto gap-1.5"
-            onClick={() => void load()}
-            disabled={loading || !id}
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden />
-            Refresh data
-          </Button>
         </div>
 
         {loading ? (
@@ -371,11 +359,12 @@ export function RepositoryDetailClient() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 border-t border-gray-100 py-4 md:grid-cols-4 dark:border-gray-700">
+            <div className="grid grid-cols-2 gap-4 border-t border-gray-100 py-4 md:grid-cols-3 xl:grid-cols-5 dark:border-gray-700">
               <RepositoryKpiCard
                 label="Files indexed"
                 value={filesTotal.toLocaleString()}
                 subtitle="From `total_files` after tree indexing; directory counts need scan metadata (not stored yet)."
+                valuePending={repo.status === 'scanning'}
               />
               <RepositoryKpiCard
                 label="Importable"
@@ -388,11 +377,26 @@ export function RepositoryDetailClient() {
                 valueClassName={
                   importable != null ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500'
                 }
+                valuePending={repo.status === 'scanning'}
+              />
+              <RepositoryKpiCard
+                label="Branches"
+                value={repo.branch_count != null ? repo.branch_count.toLocaleString() : '—'}
+                subtitle={
+                  repo.provider === 'github'
+                    ? '`branch_count` from GitHub at registration (paginated list-branches). Non-GitHub providers are not counted yet.'
+                    : 'Branch totals are only filled for GitHub registrations today; other providers return no count.'
+                }
+                valueClassName={
+                  repo.branch_count != null ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500'
+                }
+                valuePending={repo.status === 'scanning'}
               />
               <RepositoryKpiCard
                 label="Imports (30d)"
                 value="—"
                 subtitle="Requires import events keyed by repository UUID + rolling window (API pending)."
+                valuePending={repo.status === 'scanning'}
               />
               <RepositoryKpiCard
                 label="Last scan"
@@ -403,6 +407,7 @@ export function RepositoryDetailClient() {
                     ? 'text-gray-400 dark:text-gray-500'
                     : undefined
                 }
+                valuePending={repo.status === 'scanning'}
               />
             </div>
 
@@ -548,94 +553,13 @@ export function RepositoryDetailClient() {
       )}
 
       {!loading && repo && tab === 'files' && (
-        <div className="space-y-4 px-6 py-6">
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-            <span className="inline-flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm dark:border-gray-700">
-              <GitBranch className="h-3.5 w-3.5 text-indigo-500" aria-hidden />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Branch</span>
-              <span className="font-mono font-medium">{repo.default_branch}</span>
-            </span>
-            <span className="hidden h-6 border-l border-gray-200 sm:inline-block dark:border-gray-700" />
-            <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-              <GitCommitHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Tip commit / age will display after git tip resolution per branch (not implemented).
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-              <FileCode2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span className="font-mono">{filesTotal.toLocaleString()}</span> files (
-              <span className="font-mono">total_files</span>)
-            </span>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 bg-white p-4 opacity-75 dark:border-gray-700 dark:bg-gray-800">
-            <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-              Filters below mirror the intended UX; they stay disabled until the files API accepts preset + glob +
-              regex parameters on list queries.
-            </p>
-            <fieldset disabled className="space-y-3">
-              <div className="grid grid-cols-12 gap-3">
-                <div className="col-span-12 md:col-span-4">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Importable preset
-                  </label>
-                  <select className="mt-1 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-100">
-                    <option>All importable types</option>
-                  </select>
-                </div>
-                <div className="col-span-12 md:col-span-5">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Glob filter (comma-separated)
-                  </label>
-                  <Input placeholder="**/*.yaml" className="mt-1 font-mono text-sm" />
-                </div>
-                <div className="col-span-12 md:col-span-3">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Regex (optional)
-                  </label>
-                  <Input placeholder="e.g. v\\d+\\.yaml$" className="mt-1 font-mono text-sm" />
-                </div>
-              </div>
-            </fieldset>
-          </div>
-
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                <span className="font-semibold text-gray-700 dark:text-gray-200">{filesTotal.toLocaleString()}</span>{' '}
-                indexed paths · importable subset uses{' '}
-                <span className="font-semibold text-indigo-500 dark:text-indigo-400">
-                  {importable != null ? importable.toLocaleString() : '—'}
-                </span>
-              </p>
-              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                <span>Browse path:</span>
-                <span className="rounded bg-gray-100 px-2 py-0.5 font-mono dark:bg-gray-700">/</span>
-              </div>
-            </div>
-            <table className="w-full text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-400">
-                <tr>
-                  <th className="w-10 px-4 py-2 text-left font-semibold">
-                    <input type="checkbox" disabled className="rounded border-gray-300 dark:border-gray-600" aria-label="Select all" />
-                  </th>
-                  <th className="py-2 text-left font-semibold">Path</th>
-                  <th className="text-left font-semibold">Detected kind</th>
-                  <th className="text-left font-semibold">Confidence</th>
-                  <th className="text-left font-semibold">Size</th>
-                  <th className="text-left font-semibold">Last commit</th>
-                  <th className="pr-4 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-                    Rows will list repository-relative paths with detection scores from the indexer. Expect pagination and
-                    stable sort by path; binary assets may be omitted or summarized. No endpoint returns file rows yet.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div className="px-6 py-6">
+          <RepositoryFilesBrowser
+            repositoryId={id}
+            defaultBranch={repo.default_branch}
+            repositoryName={repo.name}
+            githubWebBase={webUrl}
+          />
         </div>
       )}
 

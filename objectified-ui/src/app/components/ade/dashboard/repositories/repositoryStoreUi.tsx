@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FileCode2, GitBranch, Github, Gitlab, Globe, Loader2 } from 'lucide-react';
 import { SiBitbucket } from 'react-icons/si';
 import { cn } from '@lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/Tooltip';
 import { RepositoryRowMenu } from './RepositoryRowMenu';
 
 export type RepositoryProvider = 'github' | 'gitlab' | 'bitbucket' | 'public_url';
@@ -22,6 +23,8 @@ export interface DashboardRepository {
   last_scanned_at?: string | null;
   total_files?: number | null;
   importable_count?: number | null;
+  /** Git remote branches (GitHub list-branches at registration); null if unknown. */
+  branch_count?: number | null;
   clone_url?: string | null;
   source?: string | null;
   created_at?: string | null;
@@ -66,6 +69,7 @@ export function dashboardRepositoryFromApi(x: unknown): DashboardRepository | nu
     last_scanned_at: o.last_scanned_at != null ? String(o.last_scanned_at) : null,
     total_files: typeof o.total_files === 'number' ? o.total_files : null,
     importable_count: typeof o.importable_count === 'number' ? o.importable_count : null,
+    branch_count: typeof o.branch_count === 'number' ? o.branch_count : null,
     clone_url: o.clone_url != null ? String(o.clone_url) : null,
     source: o.source != null ? String(o.source) : null,
     created_at: o.created_at != null ? String(o.created_at) : null,
@@ -80,24 +84,63 @@ export function dashboardRepositoriesFromListPayload(data: unknown): DashboardRe
   return raw.map(dashboardRepositoryFromApi).filter((r): r is DashboardRepository => r != null);
 }
 
-/** Summary metric card — aligned with `public/mockups/data-transform/compatibility-report.html` KPI strip. */
+/** Summary metric card — label + value; `subtitle` is shown as a hover tooltip only. */
 export function RepositoryKpiCard({
   label,
   value,
   subtitle,
   valueClassName,
+  valuePending = false,
 }: {
   label: string;
   value: ReactNode;
   subtitle: string;
   valueClassName?: string;
+  /** When true (e.g. repository scan in progress), show a spinner beside the value. */
+  valuePending?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-      <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</p>
-      <div className={cn('mt-1 font-mono text-2xl font-bold tabular-nums tracking-tight', valueClassName)}>{value}</div>
-      <p className="mt-1 text-xs leading-snug text-gray-500 dark:text-gray-400">{subtitle}</p>
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          className={cn(
+            'rounded-lg border border-gray-200 bg-white p-4 text-left outline-none transition-colors',
+            'cursor-default hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600',
+            'focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900'
+          )}
+          aria-busy={valuePending}
+          tabIndex={0}
+        >
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</p>
+          <div
+            className={cn(
+              'mt-1',
+              valuePending
+                ? 'inline-flex min-h-8 items-center gap-2'
+                : 'font-mono text-2xl font-bold tabular-nums tracking-tight',
+              !valuePending && valueClassName
+            )}
+          >
+            {valuePending ? (
+              <>
+                <Loader2
+                  className="h-6 w-6 shrink-0 animate-spin text-indigo-500 dark:text-indigo-400"
+                  aria-hidden
+                />
+                <span className={cn('font-mono text-2xl font-bold tabular-nums tracking-tight', valueClassName)}>
+                  {value}
+                </span>
+              </>
+            ) : (
+              value
+            )}
+          </div>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="start" className="max-w-xs text-left leading-snug">
+        {subtitle}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

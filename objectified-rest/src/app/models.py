@@ -1831,6 +1831,7 @@ class TenantRepositoryRecord(BaseModel):
     last_scanned_at: Optional[str] = None
     total_files: Optional[int] = None
     importable_count: Optional[int] = None
+    branch_count: Optional[int] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -1854,4 +1855,50 @@ class TenantRepositoryGetResponse(BaseModel):
 
     success: bool = True
     repository: TenantRepositoryRecord
+
+
+class TenantRepositoryFileRow(BaseModel):
+    """One indexed file path for the repository Files browser."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    path: str
+    name: str
+    ext: Optional[str] = None
+    size_bytes: Optional[int] = None
+    blob_sha: Optional[str] = None
+    detected_kind: Optional[str] = None
+    display_kind: str
+    confidence: str = "filename"
+
+
+class TenantRepositoryFilesListResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    branch: str
+    branches: List[str]
+    indexed_total: int
+    match_count: int
+    importable_match_count: int
+    limit: int
+    offset: int
+    files: List[TenantRepositoryFileRow]
+
+
+class TenantRepositoryFileContentResponse(BaseModel):
+    """On-demand file body for the repository file detail UI (GitHub-backed repos)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    path: str
+    branch: str
+    display_kind: str
+    confidence: str = "filename"
+    blob_sha: Optional[str] = None
+    size_bytes: Optional[int] = None
+    content: str
+    truncated: bool = False
 

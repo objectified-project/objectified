@@ -45,6 +45,7 @@ _LIST_ROW = {
     "last_scanned_at": None,
     "total_files": None,
     "importable_count": None,
+    "branch_count": None,
 }
 
 
@@ -214,4 +215,107 @@ def test_delete_repository_not_found():
     with patch("app.tenant_repositories_routes.db") as mdb:
         mdb.delete_tenant_repository.return_value = False
         r = client.delete("/v1/tenants/acme/repositories/880e8400-e29b-41d4-a716-446655440099")
+    assert r.status_code == 404
+
+
+def test_list_repository_files_ok():
+    rid = _LIST_ROW["id"]
+    sample = {
+        "indexed_total": 10,
+        "match_count": 2,
+        "importable_match_count": 1,
+        "limit": 50,
+        "offset": 0,
+        "rows": [
+            {
+                "id": "990e8400-e29b-41d4-a716-446655440001",
+                "path": "openapi/a.yaml",
+                "name": "a.yaml",
+                "ext": "yaml",
+                "size_bytes": 100,
+                "blob_sha": "deadbeefcafe",
+                "detected_kind": "openapi-candidate",
+            },
+        ],
+    }
+    with patch("app.tenant_repositories_routes.db") as mdb:
+        mdb.get_tenant_repository.return_value = _LIST_ROW
+        mdb.tenant_repository_files_stats_and_page.return_value = sample
+        mdb.list_tenant_repository_file_branches.return_value = ["main"]
+        r = client.get(f"/v1/tenants/acme/repositories/{rid}/files?branch=main&preset=openapi")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True
+    assert body["branch"] == "main"
+    assert body["indexed_total"] == 10
+    assert body["match_count"] == 2
+    assert body["importable_match_count"] == 1
+    assert len(body["files"]) == 1
+    assert body["files"][0]["path"] == "openapi/a.yaml"
+    assert body["files"][0]["display_kind"] == "OpenAPI"
+    assert body["files"][0]["confidence"] == "filename"
+
+
+def test_list_repository_files_not_found():
+    with patch("app.tenant_repositories_routes.db") as mdb:
+        mdb.get_tenant_repository.return_value = None
+        r = client.get(f"/v1/tenants/acme/repositories/{_LIST_ROW['id']}/files")
+    assert r.status_code == 404
+
+
+def test_list_repository_files_invalid_regex():
+    with patch("app.tenant_repositories_routes.db") as mdb:
+        mdb.get_tenant_repository.return_value = _LIST_ROW
+        r = client.get(f"/v1/tenants/acme/repositories/{_LIST_ROW['id']}/files?regex=(unclosed")
+    assert r.status_code == 400
+
+
+_FILE_ROW = {
+    "id": "990e8400-e29b-41d4-a716-446655440099",
+    "repository_id": _LIST_ROW["id"],
+    "branch": "main",
+    "path": "README.md",
+    "name": "README.md",
+    "ext": "md",
+    "size_bytes": 12,
+    "blob_sha": "abc1234",
+    "detected_kind": "yaml-candidate",
+    "provider": "github",
+    "clone_url": "https://github.com/octocat/Hello-World.git",
+    "repository_full_name": "octocat/Hello-World",
+    "linked_account_id": None,
+    "created_by": _USER_ID,
+    "visibility": "public",
+}
+
+
+def test_get_repository_file_content_ok():
+    rid = _LIST_ROW["id"]
+    fid = _FILE_ROW["id"]
+    with (
+        patch("app.tenant_repositories_routes.db") as mdb,
+        patch(
+            "app.tenant_repositories_routes.fetch_github_repository_file_text",
+            return_value=("hello: world\n", False),
+        ),
+    ):
+        mdb.get_tenant_repository_file_row.return_value = _FILE_ROW
+        r = client.get(f"/v1/tenants/acme/repositories/{rid}/files/{fid}/content")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True
+    assert body["path"] == "README.md"
+    assert body["branch"] == "main"
+    assert body["content"] == "hello: world\n"
+    assert body["truncated"] is False
+    assert body["display_kind"] == "YAML (unclassified)"
+    mdb.insert_workflow_audit.assert_called_once()
+
+
+def test_get_repository_file_content_not_found():
+    rid = _LIST_ROW["id"]
+    fid = _FILE_ROW["id"]
+    with patch("app.tenant_repositories_routes.db") as mdb:
+        mdb.get_tenant_repository_file_row.return_value = None
+        r = client.get(f"/v1/tenants/acme/repositories/{rid}/files/{fid}/content")
     assert r.status_code == 404
