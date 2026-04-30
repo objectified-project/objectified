@@ -21,6 +21,12 @@ We continue to improve the platform based on your feedback with improvements and
 
 ---
 
+## Repositories
+- Added repositories section to the Dashboard.
+- Allows for addition of remote repositories both registered using Linked Accounts and entered manually.
+
+---
+
 ## Studio AI
 - Added the Studio AI chatbot launcher and panel: a floating bubble in the bottom right of the canvas opens a slide-out panel with full-screen mode, toggled with `Cmd+Shift+A` / `Ctrl+Shift+A`.
 - Filled out the Studio AI chat surface to the design guidelines: distinct user/assistant bubbles, typing indicator, markdown rendering, syntax-highlighted code blocks with a copy button, regenerate / thumbs up / thumbs down message actions, and a one-click import button when an assistant reply contains an OpenAPI spec in a ```json``` block.
