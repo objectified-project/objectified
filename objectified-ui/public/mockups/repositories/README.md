@@ -23,15 +23,27 @@ http://localhost:3000/mockups/repositories/index.html
 
 ## Files
 
-| File                       | Purpose                                                                                              |
-| -------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `index.html`               | Mockup hub linking to all repository-store screens                                                   |
-| `repositories.html`        | Master list of registered repositories (linked-account + public URL), with status, last-scan, sizes  |
-| `add-repository.html`      | Add-repository wizard — pick from linked accounts (GitHub/GitLab/Bitbucket) or paste a public URL    |
-| `browse.html`              | File browser for a single repository — table of files with glob filter, regex filter, preset picker  |
-| `file-detail.html`         | Inspect a file's contents, the auto-detected importer kind, and the "Importable" verdict             |
-| `import-mapping.html`      | Map an importable file to an existing project, or create a new project from spec metadata + import   |
-| `imports.html`             | History of files imported from this repository, with version created and link back to the project   |
+All pages share the **projects-mockup** chrome: the fixed top breadcrumb bar,
+the persistent left sidebar (Workspace card + Catalog / Versioning / Settings
+nav with **Repositories** active), and the same theme key
+(`repositories-mockup-theme`). The per-repository screens are consolidated
+into a single **`repository.html`** with in-page tabs (Overview / Files /
+Imports / Settings), mirroring the projects-mockup `project.html` pattern.
+
+| File                       | Purpose                                                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `index.html`               | Mockup hub linking to all repository-store screens                                                                       |
+| `repositories.html`        | Projects-style card grid of registered repos (linked account + public URL) with KPI band and filter bar                  |
+| `repository.html`          | Single-repo detail page with header (provider/branch/score-strip) and tabs: **Overview**, **Files**, **Imports**, **Settings** |
+| `add-repository.html`      | Add-repository wizard — pick from linked accounts (GitHub/GitLab/Bitbucket) or paste a public URL                        |
+| `file-detail.html`         | Drill-down from the **Files** tab — Preview / Raw / Diff / **Visualize** views, detected metadata, importable verdict, suggested target |
+| `import-mapping.html`      | Drill-down from `file-detail.html` — map an importable file to an existing project, or create a new one, then import     |
+
+> The **Files** tab on `repository.html` carries everything that the previous
+> standalone `browse.html` did: comma-separated glob input, regex filter,
+> importable-type preset dropdown, and the file table with detected-kind pills
+> + confidence badges. The **Imports** tab carries everything that the previous
+> standalone `imports.html` did. Those two files have been removed.
 
 ## Feature concept (read this before implementing)
 
@@ -224,6 +236,14 @@ the sibling mockup sets (`mockups/import`, `mockups/git`, `mockups/browser`,
   importable verdicts, project mappings, and import history are hard-coded
 - The "Scan now" / "Re-scan" / "Import" / "Map to project" buttons are inert
 - File contents shown in `file-detail.html` are pre-rendered fixtures
+- The **Visualize** tab on `file-detail.html` is a static SVG + absolutely-
+  positioned div facsimile of a React Flow canvas (no real layout engine,
+  no zoom/pan, no draggable nodes). When implemented for real it should use
+  `@xyflow/react` (already a dependency of `objectified-ui` for the editor),
+  hydrate nodes/edges from the parsed spec server-side via the existing
+  importer pipeline, and reuse the shared node theme tokens (emerald = reuse,
+  indigo = update, purple = nested type, amber = new) so the preview matches
+  the post-import editor visualization 1-for-1.
 - The file-tree breadcrumb does not actually paginate or virtualize
 - The theme toggle and Lucide icon hydration are the only working JS
 

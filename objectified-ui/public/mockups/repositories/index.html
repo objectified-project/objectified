@@ -1,16 +1,11 @@
 <!DOCTYPE html>
-<html lang="en" class="">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Objectified Repository Store — Mockup Hub</title>
+  <title>Repository Store · Mockups</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: { extend: { fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'] } } },
-    };
-  </script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -18,168 +13,177 @@
   <style>
     html, body { font-family: 'Inter', sans-serif; }
     .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #172033 0%, #0f172a 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+    .proj-tab        { border-bottom: 2px solid transparent; }
+    .proj-tab-active { border-bottom: 2px solid #6366f1; color: #4f46e5; }
+    .dark .proj-tab-active { color: #818cf8; }
+    .repo-card { transition: all 0.18s ease; }
+    .repo-card:hover { transform: translateY(-2px); box-shadow: 0 14px 32px -12px rgba(79, 70, 229, 0.22); }
+    .spark-bar { display: inline-block; width: 3px; border-radius: 2px; vertical-align: bottom; }
+    .file-row:hover { background: rgba(99, 102, 241, 0.04); }
+    .dark .file-row:hover { background: rgba(99, 102, 241, 0.08); }
   </style>
 </head>
 <body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-  <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 sticky top-0 z-10">
-    <div class="px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-          <i data-lucide="folder-git-2" class="w-5 h-5 text-white"></i>
-        </div>
-        <div>
-          <h1 class="text-lg font-bold flex items-center gap-2">
-            Objectified Repository Store
-            <span class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">Mockup</span>
-          </h1>
-          <p class="text-xs text-gray-500 dark:text-gray-400">Postgres-backed registry of source repositories · browse, scan, import specs into projects</p>
-        </div>
+
+  <!-- ── Top chrome ─────────────────────────────────────────────────── -->
+  <div class="h-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between px-4 fixed top-0 left-0 right-0 z-30">
+    <div class="flex items-center gap-2 text-sm">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+        <i data-lucide="layout-dashboard" class="w-4 h-4 text-white"></i>
       </div>
-      <button id="themeBtn" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center" title="Toggle theme">
+      <span class="font-semibold">Objectified</span>
+      <span class="text-gray-400">/</span>
+      <span class="text-gray-500 dark:text-gray-400">Control Panel</span>
+      <span class="text-gray-400">/</span><span class="font-semibold text-gray-800 dark:text-gray-100">Repository Store</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="../dashboard/index.html" class="text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-500">← Mockup hub</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center">
         <i data-lucide="sun-moon" class="w-4 h-4"></i>
       </button>
     </div>
-  </header>
+  </div>
 
-  <main class="max-w-6xl mx-auto px-6 py-10">
-    <section class="mb-10">
-      <h2 class="text-3xl font-bold mb-2">Repository Store mockups</h2>
-      <p class="text-gray-600 dark:text-gray-400 max-w-3xl">
-        Visual designs for browsing source repositories that belong to a user's Linked Accounts
-        (GitHub, GitLab, Bitbucket) or to public Git URLs. Files are catalogued in Postgres, then
-        filtered with comma-separated globs, regex, or a preset picker for known importable
-        formats (OpenAPI, Arazzo, AsyncAPI, JSON Schema, GraphQL, Protobuf, &amp; more). Selecting
-        a file fetches its bytes on demand, classifies it, and lets the user map it to an existing
-        project — or seed a new project from spec metadata — and run the existing importer to
-        produce a new project version.
-      </p>
-      <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">
-        Persistence: <strong>Postgres only.</strong> No in-memory stores. See
-        <code class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800">README.md</code> for full
-        notes intended for the LLM that implements this feature.
-      </p>
-    </section>
+  <div class="flex pt-12 min-h-screen">
 
-    <section class="mb-10">
-      <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400 mb-2">
-        <span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span>
-        Registry
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <a href="repositories.html" class="group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center flex-shrink-0">
-              <i data-lucide="library" class="w-5 h-5 text-indigo-600 dark:text-indigo-400"></i>
-            </div>
-            <div>
-              <h3 class="font-semibold group-hover:text-indigo-600 dark:group-hover:text-indigo-400">All Repositories</h3>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">List view: provider, branch, last scan, file count, status.</p>
-              <p class="text-[10px] uppercase tracking-wider text-gray-400 mt-2">repository · repository_branch</p>
-            </div>
+    <!-- ── Sidebar ──────────────────────────────────────────────────── -->
+    <aside class="w-[280px] flex-shrink-0 fixed top-12 left-0 bottom-0 overflow-y-auto z-20 sidebar-light dark:sidebar-dark">
+      <div class="px-4 pt-5 pb-2">
+        <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 px-2 mb-2">Workspace</p>
+        <div class="flex items-center gap-2.5 px-2 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800">
+          <div class="w-8 h-8 rounded-md bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs">AC</div>
+          <div class="min-w-0">
+            <p class="text-xs font-semibold truncate">Acme Corp</p>
+            <p class="text-[10px] text-gray-500 mono truncate">acme · Enterprise</p>
           </div>
-        </a>
-
-        <a href="add-repository.html" class="group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
-              <i data-lucide="git-pull-request-create" class="w-5 h-5 text-emerald-600 dark:text-emerald-400"></i>
-            </div>
-            <div>
-              <h3 class="font-semibold group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Add Repository</h3>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Pick from a Linked Account or paste a public Git URL.</p>
-              <p class="text-[10px] uppercase tracking-wider text-gray-400 mt-2">linked_account · public_url</p>
-            </div>
-          </div>
-        </a>
+          <i data-lucide="chevrons-up-down" class="w-3.5 h-3.5 text-gray-400 flex-shrink-0 ml-auto"></i>
+        </div>
       </div>
-    </section>
-
-    <section class="mb-10">
-      <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400 mb-2">
-        <span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span>
-        Browse &amp; inspect
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <a href="browse.html" class="group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
-              <i data-lucide="folder-tree" class="w-5 h-5 text-violet-600 dark:text-violet-400"></i>
-            </div>
-            <div>
-              <h3 class="font-semibold group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Browse Files</h3>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Glob, regex, importable-type preset filters · ancillary kind labels.</p>
-              <p class="text-[10px] uppercase tracking-wider text-gray-400 mt-2">repository_file</p>
-            </div>
-          </div>
+      <hr class="border-indigo-500/10 mx-3 my-2" />
+      <nav class="px-3 space-y-0.5 pb-3">
+        <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 px-2 pt-1 pb-1.5">Catalog</p>
+        <a href="#" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50">
+          <i data-lucide="layout-dashboard" class="w-4 h-4 text-gray-400"></i> Overview
         </a>
-
-        <a href="file-detail.html" class="group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
-              <i data-lucide="file-search" class="w-5 h-5 text-blue-600 dark:text-blue-400"></i>
-            </div>
-            <div>
-              <h3 class="font-semibold group-hover:text-indigo-600 dark:group-hover:text-indigo-400">File Detail</h3>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Content preview, content-sniffed kind, importable verdict.</p>
-              <p class="text-[10px] uppercase tracking-wider text-gray-400 mt-2">repository_file_content_cache</p>
-            </div>
-          </div>
+        <a href="../projects/index.html" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50">
+          <i data-lucide="folder-open" class="w-4 h-4 text-gray-400"></i> Projects
         </a>
-      </div>
-    </section>
-
-    <section class="mb-10">
-      <div class="flex items-center gap-2 px-3 py-2 font-semibold text-[0.65rem] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400 mb-2">
-        <span class="w-1 h-1 rounded-full bg-indigo-500 opacity-60"></span>
-        Import flow
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <a href="import-mapping.html" class="group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
-              <i data-lucide="git-merge" class="w-5 h-5 text-amber-600 dark:text-amber-400"></i>
-            </div>
-            <div>
-              <h3 class="font-semibold group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Map to Project &amp; Import</h3>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Map to an existing project or seed a new one from spec metadata.</p>
-              <p class="text-[10px] uppercase tracking-wider text-gray-400 mt-2">project · project_version</p>
-            </div>
-          </div>
+        <a href="repositories.html" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium border border-indigo-200 dark:border-indigo-700 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300">
+          <i data-lucide="folder-git-2" class="w-4 h-4"></i> Repositories
         </a>
-
-        <a href="imports.html" class="group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-lg bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center flex-shrink-0">
-              <i data-lucide="history" class="w-5 h-5 text-teal-600 dark:text-teal-400"></i>
-            </div>
-            <div>
-              <h3 class="font-semibold group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Import History</h3>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Files imported from this repo · linked project versions · audit.</p>
-              <p class="text-[10px] uppercase tracking-wider text-gray-400 mt-2">repository_import</p>
-            </div>
-          </div>
+        
+        <a href="#" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50">
+          <i data-lucide="box" class="w-4 h-4 text-gray-400"></i> Classes
         </a>
-      </div>
-    </section>
+        <a href="#" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50">
+          <i data-lucide="list-collapse" class="w-4 h-4 text-gray-400"></i> Properties
+        </a>
+      </nav>
+      <hr class="border-indigo-500/10 mx-3 my-2" />
+      <nav class="px-3 space-y-0.5 pb-3">
+        <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 px-2 pt-1 pb-1.5">Versioning</p>
+        <a href="#" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50">
+          <i data-lucide="git-branch" class="w-4 h-4 text-gray-400"></i> Versions
+        </a>
+        <a href="#" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50">
+          <i data-lucide="rocket" class="w-4 h-4 text-gray-400"></i> Promotions
+        </a>
+        <a href="#" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50">
+          <i data-lucide="download" class="w-4 h-4 text-gray-400"></i> Import history
+        </a>
+      </nav>
+      <hr class="border-indigo-500/10 mx-3 my-2" />
+      <nav class="px-3 space-y-0.5 pb-3">
+        <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 px-2 pt-1 pb-1.5">Settings</p>
+        <a href="#" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50">
+          <i data-lucide="link-2" class="w-4 h-4 text-gray-400"></i> Linked accounts
+        </a>
+        <a href="#" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50">
+          <i data-lucide="settings" class="w-4 h-4 text-gray-400"></i> Workspace settings
+        </a>
+        <a href="#" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50">
+          <i data-lucide="users" class="w-4 h-4 text-gray-400"></i> Members
+        </a>
+      </nav>
+    </aside>
 
-    <section class="mt-12 text-xs text-gray-500 dark:text-gray-400">
-      <p>
-        Companion docs:
-        <code class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800">README.md</code> in this directory contains the full
-        feature concept, Postgres data-model expectations, detected-kind heuristics, preset glob list, and
-        implementation guardrails for the LLM that builds this feature.
-      </p>
-    </section>
-  </main>
+    <main class="ml-[280px] flex-1 min-w-0">
+
+      <div class="px-6 py-6">
+        <div class="flex items-start gap-4 mb-6">
+          <span class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 inline-flex items-center justify-center text-white flex-shrink-0">
+            <i data-lucide="folder-git-2" class="w-6 h-6"></i>
+          </span>
+          <div>
+            <h1 class="text-2xl font-bold">Repository Store</h1>
+            <p class="text-sm text-gray-500 mt-1 max-w-2xl">
+              A Postgres-backed registry of source repositories — from your linked Git accounts or public URLs —
+              that Objectified can scan, classify, and import as project versions.
+            </p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-8">
+          <a href="repositories.html" class="repo-card bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <div class="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center mb-3">
+              <i data-lucide="library" class="w-5 h-5 text-indigo-500"></i>
+            </div>
+            <h3 class="font-semibold mb-1">Repositories</h3>
+            <p class="text-xs text-gray-500 leading-relaxed">All repositories registered in this workspace, with per-repo file counts and importable spec totals.</p>
+          </a>
+          <a href="repository.html" class="repo-card bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <div class="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center mb-3">
+              <i data-lucide="folder-tree" class="w-5 h-5 text-emerald-500"></i>
+            </div>
+            <h3 class="font-semibold mb-1">Repository detail</h3>
+            <p class="text-xs text-gray-500 leading-relaxed">Tabbed view: Overview, Files (browse + filter + classify), Imports, Settings — all for one repo.</p>
+          </a>
+          <a href="add-repository.html" class="repo-card bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <div class="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mb-3">
+              <i data-lucide="plus-circle" class="w-5 h-5 text-purple-500"></i>
+            </div>
+            <h3 class="font-semibold mb-1">Add a repository</h3>
+            <p class="text-xs text-gray-500 leading-relaxed">Connect a linked-account repo or register a public URL. Wizard with provider picker and branch selection.</p>
+          </a>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-8">
+          <a href="file-detail.html" class="repo-card bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <div class="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center mb-3">
+              <i data-lucide="file-search-2" class="w-5 h-5 text-amber-500"></i>
+            </div>
+            <h3 class="font-semibold mb-1">File detail</h3>
+            <p class="text-xs text-gray-500 leading-relaxed">Drill-down from the Files tab: content preview, importable verdict, spec metadata.</p>
+          </a>
+          <a href="import-mapping.html" class="repo-card bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <div class="w-10 h-10 rounded-lg bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center mb-3">
+              <i data-lucide="git-pull-request-arrow" class="w-5 h-5 text-rose-500"></i>
+            </div>
+            <h3 class="font-semibold mb-1">Map &amp; import</h3>
+            <p class="text-xs text-gray-500 leading-relaxed">Map a spec file to an existing project (as a new version) or seed a new project from its metadata.</p>
+          </a>
+        </div>
+
+        <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex gap-3 max-w-3xl">
+          <i data-lucide="info" class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5"></i>
+          <div class="text-sm">
+            <p class="font-semibold text-amber-800 dark:text-amber-200 mb-1">Mockup only — implementation guidance lives in <a href="README.md" class="underline">README.md</a></p>
+            <p class="text-amber-700 dark:text-amber-300 text-xs leading-relaxed">All state must persist to Postgres — no in-memory caches. Detected-kind classification is filename-only at this stage; deeper sniffing happens after a file is opened.</p>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
 
   <script>
-    const themeKey = 'repositories-mockup-theme';
-    const stored = localStorage.getItem(themeKey);
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
-    document.getElementById('themeBtn').addEventListener('click', () => {
+    const THEME_KEY = 'repositories-mockup-theme';
+    if (localStorage.getItem(THEME_KEY) === 'dark') document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn')?.addEventListener('click', () => {
       document.documentElement.classList.toggle('dark');
-      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+      localStorage.setItem(THEME_KEY, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
     });
     lucide.createIcons();
   </script>
