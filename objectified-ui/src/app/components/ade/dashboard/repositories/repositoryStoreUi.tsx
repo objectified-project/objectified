@@ -84,17 +84,81 @@ export function dashboardRepositoriesFromListPayload(data: unknown): DashboardRe
   return raw.map(dashboardRepositoryFromApi).filter((r): r is DashboardRepository => r != null);
 }
 
+function hashSeed(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+export type EstimatedImportableMix = {
+  openapi: number;
+  arazzo: number;
+  jsonSchema: number;
+};
+
+/**
+ * Deterministic split of a repo's `importable_count` into UI kinds until the API returns
+ * real per-kind tallies. The three counts always sum to `importable_count` (or all zero).
+ */
+export function estimatedImportableMixForRepo(
+  importableCount: number | null | undefined,
+  repositoryId: string,
+): EstimatedImportableMix {
+  const T =
+    typeof importableCount === 'number' && importableCount > 0
+      ? Math.floor(importableCount)
+      : 0;
+  if (T === 0) return { openapi: 0, arazzo: 0, jsonSchema: 0 };
+  const h = hashSeed(repositoryId);
+  const w0 = 300 + (h % 700);
+  const w1 = 200 + ((h >> 10) % 600);
+  const w2 = 400 + ((h >> 20) % 500);
+  const s = w0 + w1 + w2;
+  const openapi = Math.floor((T * w0) / s);
+  const arazzo = Math.floor((T * w1) / s);
+  const jsonSchema = T - openapi - arazzo;
+  return { openapi, arazzo, jsonSchema };
+}
+
+export function aggregateEstimatedImportableMix(
+  repos: DashboardRepository[],
+): EstimatedImportableMix & { total: number } {
+  let openapi = 0;
+  let arazzo = 0;
+  let jsonSchema = 0;
+  let total = 0;
+  for (const r of repos) {
+    const t = r.importable_count ?? 0;
+    total += t;
+    const m = estimatedImportableMixForRepo(r.importable_count, r.id);
+    openapi += m.openapi;
+    arazzo += m.arazzo;
+    jsonSchema += m.jsonSchema;
+  }
+  return { openapi, arazzo, jsonSchema, total };
+}
+
+export function formatEstimatedImportableMixInline(mix: EstimatedImportableMix): string {
+  return `OpenAPI ${mix.openapi} · Arazzo ${mix.arazzo} · JSON Schema ${mix.jsonSchema}`;
+}
+
+export const IMPORTABLE_ESTIMATE_DISCLAIMER =
+  'This is an estimated count of the importable files - actual count may vary.';
+
 /** Summary metric card — label + value; `subtitle` is shown as a hover tooltip only. */
 export function RepositoryKpiCard({
   label,
   value,
   subtitle,
+  footnote,
   valueClassName,
   valuePending = false,
 }: {
   label: string;
   value: ReactNode;
   subtitle: string;
+  /** Optional short text shown under the value (not only in the tooltip). */
+  footnote?: string;
   valueClassName?: string;
   /** When true (e.g. repository scan in progress), show a spinner beside the value. */
   valuePending?: boolean;
@@ -135,6 +199,9 @@ export function RepositoryKpiCard({
               value
             )}
           </div>
+          {footnote ? (
+            <p className="mt-2 text-xs leading-snug text-gray-500 dark:text-gray-400">{footnote}</p>
+          ) : null}
         </div>
       </TooltipTrigger>
       <TooltipContent side="bottom" align="start" className="max-w-xs text-left leading-snug">
@@ -151,12 +218,6 @@ export function repoInitials(name: string): string {
   }
   const compact = name.replace(/[^a-zA-Z0-9]/g, '');
   return compact.slice(0, 2).toUpperCase() || 'R';
-}
-
-function hashSeed(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
 }
 
 export function RepositorySparkline({ seed, errorTint }: { seed: string; errorTint?: boolean }) {
@@ -268,6 +329,7 @@ export function RepositoryCard({
 }) {
   const files = repo.total_files ?? 0;
   const importable = repo.importable_count;
+  const importableMix = estimatedImportableMixForRepo(importable, repo.id);
   const scanLabel = formatLastScan(repo.last_scanned_at, repo.status === 'error');
   const grad = gradientForIndex(index);
 
@@ -334,12 +396,19 @@ export function RepositoryCard({
         </span>
       </div>
       <div className="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-700">
-        <div className="flex flex-wrap items-center gap-2 text-[11px]">
-          <span className="rounded bg-indigo-50 px-1.5 py-0.5 font-mono font-semibold text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">
-            {importable != null ? `${importable} importable` : '— importable'}
-          </span>
-          <span className="text-gray-400">·</span>
-          <span className="text-gray-500 dark:text-gray-400">{scanLabel}</span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1 text-[11px]">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded bg-indigo-50 px-1.5 py-0.5 font-mono font-semibold text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">
+              {importable != null ? `${importable} importable` : '— importable'}
+            </span>
+            <span className="text-gray-400">·</span>
+            <span className="text-gray-500 dark:text-gray-400">{scanLabel}</span>
+          </div>
+          {importable != null ? (
+            <p className="text-[10px] leading-snug text-gray-500 dark:text-gray-400">
+              Est. mix: {formatEstimatedImportableMixInline(importableMix)}
+            </p>
+          ) : null}
         </div>
         <RepositorySparkline seed={repo.id} errorTint={repo.status === 'error'} />
       </div>

@@ -37,8 +37,10 @@ import { cn } from '@lib/utils';
 import {
   type DashboardRepository,
   type RepositoryStatus,
+  IMPORTABLE_ESTIMATE_DISCLAIMER,
   RepositoryKpiCard,
   dashboardRepositoryFromApi,
+  estimatedImportableMixForRepo,
   formatLastScan,
   repoInitials,
 } from '@/app/components/ade/dashboard/repositories/repositoryStoreUi';
@@ -229,6 +231,11 @@ export function RepositoryDetailClient() {
   const filesTotal = repo?.total_files ?? 0;
   const importable = repo?.importable_count ?? null;
 
+  const importableMix = useMemo(() => {
+    if (!repo || typeof repo.importable_count !== 'number') return null;
+    return estimatedImportableMixForRepo(repo.importable_count, repo.id);
+  }, [repo]);
+
   const webUrl = useMemo(() => {
     if (!repo?.clone_url) return null;
     const u = repo.clone_url.replace(/\.git$/i, '');
@@ -370,10 +377,11 @@ export function RepositoryDetailClient() {
                 label="Importable"
                 value={importable != null ? importable.toLocaleString() : '—'}
                 subtitle={
-                  importable != null
-                    ? 'From `importable_count` after classification passes over indexed paths.'
+                  importable != null && importableMix
+                    ? `Estimated mix from this repo’s total: OpenAPI ${importableMix.openapi.toLocaleString()}, Arazzo ${importableMix.arazzo.toLocaleString()}, JSON Schema ${importableMix.jsonSchema.toLocaleString()}. Split is a placeholder until indexed paths return real per-kind tallies.`
                     : '`importable_count` is null until detection runs and persists per-repo totals.'
                 }
+                footnote={importable != null ? IMPORTABLE_ESTIMATE_DISCLAIMER : undefined}
                 valueClassName={
                   importable != null ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500'
                 }
@@ -479,9 +487,8 @@ export function RepositoryDetailClient() {
 
             <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
               <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Importable mix</h3>
-              <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                Per-kind counts require indexed file rows. Until then, only the aggregate{' '}
-                <span className="font-mono">importable_count</span> from the repository row is available.
+              <p className="mb-2 text-xs leading-snug text-gray-500 dark:text-gray-400">
+                {IMPORTABLE_ESTIMATE_DISCLAIMER}
               </p>
               <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-200">
                 <li className="flex items-center justify-between">
@@ -489,21 +496,27 @@ export function RepositoryDetailClient() {
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
                     OpenAPI
                   </span>
-                  <span className="font-mono text-xs text-gray-500 dark:text-gray-400">—</span>
+                  <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-200">
+                    {importableMix != null ? importableMix.openapi.toLocaleString() : '—'}
+                  </span>
                 </li>
                 <li className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-indigo-500" />
                     Arazzo
                   </span>
-                  <span className="font-mono text-xs text-gray-500 dark:text-gray-400">—</span>
+                  <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-200">
+                    {importableMix != null ? importableMix.arazzo.toLocaleString() : '—'}
+                  </span>
                 </li>
                 <li className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-purple-500" />
                     JSON Schema
                   </span>
-                  <span className="font-mono text-xs text-gray-500 dark:text-gray-400">—</span>
+                  <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-200">
+                    {importableMix != null ? importableMix.jsonSchema.toLocaleString() : '—'}
+                  </span>
                 </li>
                 <li className="flex items-center justify-between border-t border-gray-100 pt-2 dark:border-gray-700">
                   <span className="inline-flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">

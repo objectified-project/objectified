@@ -42,7 +42,11 @@ import {
   RepositoryCard,
   RepositoryKpiCard,
   RepositorySparkline,
+  IMPORTABLE_ESTIMATE_DISCLAIMER,
+  aggregateEstimatedImportableMix,
   dashboardRepositoriesFromListPayload,
+  estimatedImportableMixForRepo,
+  formatEstimatedImportableMixInline,
   formatLastScan,
   repoInitials,
   repositoryStatusClass,
@@ -157,12 +161,11 @@ export default function RepositoriesPage() {
       public_url: 0 as number,
     };
     let files = 0;
-    let importable = 0;
     let lastScanMs = 0;
+    const importableMix = aggregateEstimatedImportableMix(repos);
     for (const r of repos) {
       byProvider[r.provider] = (byProvider[r.provider] ?? 0) + 1;
       files += r.total_files ?? 0;
-      importable += r.importable_count ?? 0;
       if (r.last_scanned_at) {
         const t = new Date(r.last_scanned_at).getTime();
         if (!Number.isNaN(t)) lastScanMs = Math.max(lastScanMs, t);
@@ -189,7 +192,7 @@ export default function RepositoriesPage() {
       count: repos.length,
       providerSubtitle: providerBits.length ? providerBits.join(" · ") : "—",
       files,
-      importable,
+      importableMix,
       lastScanTitle,
       lastScanSub,
     };
@@ -277,8 +280,9 @@ export default function RepositoriesPage() {
               />
               <RepositoryKpiCard
                 label="Importable"
-                value={kpis.importable.toLocaleString()}
-                subtitle="Sum of detected importable spec files (OpenAPI, Arazzo, JSON Schema, …) once scans classify paths."
+                value={kpis.importableMix.total.toLocaleString()}
+                subtitle={`Workspace estimated mix: ${formatEstimatedImportableMixInline(kpis.importableMix)}. Per-repo totals come from scan classification; kind splits are a deterministic placeholder until indexed files expose real counts.`}
+                footnote={IMPORTABLE_ESTIMATE_DISCLAIMER}
                 valueClassName="text-indigo-600 dark:text-indigo-400"
               />
               <RepositoryKpiCard
@@ -487,11 +491,28 @@ export default function RepositoriesPage() {
                         <td className="text-right font-mono text-xs">
                           {(repo.total_files ?? 0).toLocaleString()}
                         </td>
-                        <td className="text-right">
+                        <td
+                          className="text-right align-top"
+                          title={
+                            repo.importable_count != null
+                              ? `${IMPORTABLE_ESTIMATE_DISCLAIMER} Est. mix: ${formatEstimatedImportableMixInline(estimatedImportableMixForRepo(repo.importable_count, repo.id))}.`
+                              : undefined
+                          }
+                        >
                           {repo.importable_count != null ? (
-                            <span className="rounded bg-indigo-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">
-                              {repo.importable_count}
-                            </span>
+                            <div className="inline-flex flex-col items-end gap-0.5">
+                              <span className="rounded bg-indigo-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">
+                                {repo.importable_count}
+                              </span>
+                              <span className="max-w-[11rem] text-right text-[10px] leading-tight text-gray-500 dark:text-gray-400">
+                                {formatEstimatedImportableMixInline(
+                                  estimatedImportableMixForRepo(
+                                    repo.importable_count,
+                                    repo.id,
+                                  ),
+                                )}
+                              </span>
+                            </div>
                           ) : (
                             <span className="font-mono text-xs text-gray-400">
                               —
