@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit, Layers, TrendingUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit, TrendingUp } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -28,18 +28,17 @@ import { LLMChatPanel } from '../../../components/ade/dashboard/LLMImportDialog'
 import { useDialog } from '../../../components/providers/DialogProvider';
 import { filterSlugInput } from '../../../utils/slug';
 import { SPDX_LICENSES, getLicenseUrl, SPDXLicense } from '../../../utils/spdx-licenses';
-import {
-  PROJECT_START_TEMPLATES,
-  applyProjectStartTemplate,
-  getProjectStartTemplate,
-  type ProjectOpenApiMetadata,
-} from '../../../utils/project-templates';
+import { type ProjectOpenApiMetadata } from '../../../utils/project-templates';
 import {
   PROJECT_DOMAIN_CATEGORIES,
   PROJECT_DOMAIN_CATEGORY_NONE,
   getProjectDomainCategory,
   getProjectDomainCategoryLabel,
 } from '../../../utils/project-domain-categories';
+import {
+  CreateProjectManualFormFields,
+  type CreateProjectManualFormModel,
+} from '../../../components/ade/dashboard/projects/CreateProjectManualFormFields';
 import { getProjectQualityHistory } from '../../../utils/project-quality-score-history';
 import { getNumericScoreTier } from '../../../utils/numeric-score-tier';
 import { ProjectQualityTrendSparkline } from '../../../components/ade/dashboard/ProjectQualityTrendSparkline';
@@ -113,15 +112,10 @@ const Projects = () => {
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
-  const selectedStartTemplateHint = getProjectStartTemplate(selectedStartTemplateId)?.hint;
   const selectedProjectDomainCategory = useMemo(
     () => getProjectDomainCategory(projectDomainCategoryId),
     [projectDomainCategoryId]
   );
-
-  const generateSlug = (name: string) => {
-    return name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-  };
 
   useEffect(() => {
     if (currentTenantId) loadProjects();
@@ -192,20 +186,6 @@ const Projects = () => {
     setSelectedStartTemplateId('blank');
     setProjectDomainCategoryId(PROJECT_DOMAIN_CATEGORY_NONE);
     setShowCreateDialog(true);
-  };
-
-  const applyStartTemplateToForm = (templateId: string) => {
-    setSelectedStartTemplateId(templateId);
-    const { metadata, suggestedDescription } = applyProjectStartTemplate(templateId);
-    setProjectDescription(suggestedDescription);
-    setMetadataSummary(metadata.summary ?? '');
-    setMetadataTermsOfService(metadata.termsOfService ?? '');
-    setMetadataContactName(metadata.contact?.name ?? '');
-    setMetadataContactUrl(metadata.contact?.url ?? '');
-    setMetadataContactEmail(metadata.contact?.email ?? '');
-    setMetadataLicenseName(metadata.license?.name ?? '');
-    setMetadataLicenseIdentifier(metadata.license?.identifier ?? '');
-    setMetadataLicenseUrl(metadata.license?.url ?? '');
   };
 
   const handleImportClick = () => setShowImportDialog(true);
@@ -378,6 +358,55 @@ const Projects = () => {
       const url = getLicenseUrl(license.identifier);
       if (url) setMetadataLicenseUrl(url);
     }
+  };
+
+  const createProjectManualModel: CreateProjectManualFormModel = useMemo(
+    () => ({
+      projectName,
+      projectSlug,
+      projectDescription,
+      selectedStartTemplateId,
+      projectDomainCategoryId,
+      metadataSummary,
+      metadataTermsOfService,
+      metadataContactName,
+      metadataContactUrl,
+      metadataContactEmail,
+      metadataLicenseName,
+      metadataLicenseIdentifier,
+      metadataLicenseUrl,
+    }),
+    [
+      projectName,
+      projectSlug,
+      projectDescription,
+      selectedStartTemplateId,
+      projectDomainCategoryId,
+      metadataSummary,
+      metadataTermsOfService,
+      metadataContactName,
+      metadataContactUrl,
+      metadataContactEmail,
+      metadataLicenseName,
+      metadataLicenseIdentifier,
+      metadataLicenseUrl,
+    ]
+  );
+
+  const patchCreateProjectManual = (patch: Partial<CreateProjectManualFormModel>) => {
+    if (patch.projectName !== undefined) setProjectName(patch.projectName);
+    if (patch.projectSlug !== undefined) setProjectSlug(patch.projectSlug);
+    if (patch.projectDescription !== undefined) setProjectDescription(patch.projectDescription);
+    if (patch.selectedStartTemplateId !== undefined) setSelectedStartTemplateId(patch.selectedStartTemplateId);
+    if (patch.projectDomainCategoryId !== undefined) setProjectDomainCategoryId(patch.projectDomainCategoryId);
+    if (patch.metadataSummary !== undefined) setMetadataSummary(patch.metadataSummary);
+    if (patch.metadataTermsOfService !== undefined) setMetadataTermsOfService(patch.metadataTermsOfService);
+    if (patch.metadataContactName !== undefined) setMetadataContactName(patch.metadataContactName);
+    if (patch.metadataContactUrl !== undefined) setMetadataContactUrl(patch.metadataContactUrl);
+    if (patch.metadataContactEmail !== undefined) setMetadataContactEmail(patch.metadataContactEmail);
+    if (patch.metadataLicenseName !== undefined) setMetadataLicenseName(patch.metadataLicenseName);
+    if (patch.metadataLicenseIdentifier !== undefined) setMetadataLicenseIdentifier(patch.metadataLicenseIdentifier);
+    if (patch.metadataLicenseUrl !== undefined) setMetadataLicenseUrl(patch.metadataLicenseUrl);
   };
 
   if (!session) {
@@ -736,193 +765,21 @@ const Projects = () => {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="manual" className="mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
-          {errorMessage && <Alert variant="error" className="mb-4">{errorMessage}</Alert>}
-          <div className="mb-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 p-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shrink-0">
-                <Layers className="h-5 w-5 text-indigo-600 dark:text-indigo-400" aria-hidden />
-              </div>
-              <div className="flex-1 min-w-0 space-y-2">
-                <Label htmlFor="projectStartTemplate" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  Starting template
-                </Label>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Choose a preset for OpenAPI-oriented fields (summary, contact, license, terms). You can edit everything before creating the project.
-                </p>
-                <Select
-                  value={selectedStartTemplateId}
-                  onValueChange={(id) => applyStartTemplateToForm(id)}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger id="projectStartTemplate" className="max-w-xl">
-                    <SelectValue placeholder="Select a template" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {PROJECT_START_TEMPLATES.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedStartTemplateHint ? (
-                  <p className="text-xs text-gray-500 dark:text-gray-500 max-w-3xl">{selectedStartTemplateHint}</p>
-                ) : null}
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-x divide-gray-200 dark:divide-gray-700">
-            {/* Left: Basic Information */}
-            <div className="flex flex-col pr-4 lg:pr-6">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Basic Information</h3>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="projectName">Project Name *</Label>
-                  <Input id="projectName" value={projectName} onChange={(e) => { setProjectName(e.target.value); if (!projectSlug || projectSlug === generateSlug(projectName)) setProjectSlug(generateSlug(e.target.value)); }} disabled={isLoading} autoFocus />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="projectSlug">Slug *</Label>
-                  <Input id="projectSlug" value={projectSlug} onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))} disabled={isLoading} className="font-mono" />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">URL-friendly identifier (lowercase letters, numbers, and dashes only)</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="projectDescription">Description</Label>
-                  <Textarea id="projectDescription" value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} disabled={isLoading} rows={4} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="projectDomainCategory">Domain category</Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Optional. Classifies the kind of entities and schemas this project models.
-                  </p>
-                  <Select
-                    value={projectDomainCategoryId}
-                    onValueChange={setProjectDomainCategoryId}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger id="projectDomainCategory" className="max-w-xl">
-                      <SelectValue placeholder="None" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={PROJECT_DOMAIN_CATEGORY_NONE}>None</SelectItem>
-                      {PROJECT_DOMAIN_CATEGORIES.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedProjectDomainCategory?.hint ? (
-                    <p className="text-xs text-gray-500 dark:text-gray-500 max-w-xl">{selectedProjectDomainCategory.hint}</p>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-            {/* Right: API Metadata */}
-            <div className="flex flex-col pl-4 lg:pl-6 pt-4 lg:pt-0">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">API Metadata</h3>
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">OpenAPI</h4>
-                  <div className="space-y-2">
-                    <Label htmlFor="createSummary">API Summary</Label>
-                    <Input id="createSummary" value={metadataSummary} onChange={(e) => setMetadataSummary(e.target.value)} disabled={isLoading} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="createTermsOfService">Terms of Service URL</Label>
-                    <div className="flex gap-2">
-                      <Input id="createTermsOfService" type="url" value={metadataTermsOfService} onChange={(e) => setMetadataTermsOfService(e.target.value)} disabled={isLoading} placeholder="https://example.com/terms" className="flex-1 min-w-0" />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        disabled={isLoading || !metadataTermsOfService.trim() || (!metadataTermsOfService.trim().startsWith('http://') && !metadataTermsOfService.trim().startsWith('https://'))}
-                        onClick={() => window.open(metadataTermsOfService.trim(), '_blank', 'noopener,noreferrer')}
-                        title="Open URL in new window"
-                        className="shrink-0"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Contact</h4>
-                  <div className="grid grid-cols-1 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="createContactName">Name</Label>
-                      <Input id="createContactName" value={metadataContactName} onChange={(e) => setMetadataContactName(e.target.value)} disabled={isLoading} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="createContactUrl">URL</Label>
-                      <div className="flex gap-2">
-                        <Input id="createContactUrl" type="url" value={metadataContactUrl} onChange={(e) => setMetadataContactUrl(e.target.value)} disabled={isLoading} className="flex-1 min-w-0" />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          disabled={isLoading || !metadataContactUrl.trim() || (!metadataContactUrl.trim().startsWith('http://') && !metadataContactUrl.trim().startsWith('https://'))}
-                          onClick={() => window.open(metadataContactUrl.trim(), '_blank', 'noopener,noreferrer')}
-                          title="Open URL in new window"
-                          className="shrink-0"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="createContactEmail">Email</Label>
-                      <Input id="createContactEmail" type="email" value={metadataContactEmail} onChange={(e) => setMetadataContactEmail(e.target.value)} disabled={isLoading} />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">License</h4>
-                  <div className="space-y-2">
-                    <Label htmlFor="createLicenseIdentifier">License (SPDX)</Label>
-                    <Select value={metadataLicenseIdentifier} onValueChange={handleLicenseSelect}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a license..." />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60">
-                        {SPDX_LICENSES.slice(0, 50).map((license: SPDXLicense) => (
-                          <SelectItem key={license.identifier} value={license.identifier}>{license.name} ({license.identifier})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="createLicenseName">License Name</Label>
-                      <Input id="createLicenseName" value={metadataLicenseName} onChange={(e) => setMetadataLicenseName(e.target.value)} disabled={isLoading} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="createLicenseUrl">License URL</Label>
-                      <div className="flex gap-2">
-                        <Input id="createLicenseUrl" type="url" value={metadataLicenseUrl} onChange={(e) => setMetadataLicenseUrl(e.target.value)} disabled={isLoading} className="flex-1 min-w-0" />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          disabled={isLoading || !metadataLicenseUrl.trim() || (!metadataLicenseUrl.trim().startsWith('http://') && !metadataLicenseUrl.trim().startsWith('https://'))}
-                          onClick={() => window.open(metadataLicenseUrl.trim(), '_blank', 'noopener,noreferrer')}
-                          title="Open URL in new window"
-                          className="shrink-0"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={isLoading}>Cancel</Button>
-            <Button onClick={handleCreateSubmit} disabled={isLoading} className="bg-gradient-to-r from-purple-500 to-indigo-600">
-              {isLoading ? 'Creating...' : 'Create Project'}
-            </Button>
-          </DialogFooter>
+              <CreateProjectManualFormFields
+                fieldIdPrefix="dashboard-projects-create-"
+                disabled={isLoading}
+                errorMessage={errorMessage}
+                model={createProjectManualModel}
+                onChange={patchCreateProjectManual}
+              />
+              <DialogFooter className="mt-6">
+                <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={isLoading}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateSubmit} disabled={isLoading} className="bg-gradient-to-r from-purple-500 to-indigo-600">
+                  {isLoading ? 'Creating...' : 'Create Project'}
+                </Button>
+              </DialogFooter>
             </TabsContent>
             <TabsContent value="ai" className="mt-4 flex-1 min-h-0 flex flex-col p-0 data-[state=inactive]:hidden">
               {currentTenantId && currentUserId && (

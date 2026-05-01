@@ -789,6 +789,7 @@ export function RepositoryFileDetail({
   file,
   githubWebBase,
   onBack,
+  onMapImport,
 }: {
   repositoryId: string;
   repositoryName: string;
@@ -796,6 +797,7 @@ export function RepositoryFileDetail({
   file: RepositoryFileDetailRow;
   githubWebBase: string | null;
   onBack: () => void;
+  onMapImport: () => void;
 }) {
   const [tab, setTab] = useState<FileViewTab>('source');
   const [payload, setPayload] = useState<FileContentApi | null>(null);
@@ -932,7 +934,7 @@ export function RepositoryFileDetail({
               type="button"
               size="sm"
               className="shrink-0 gap-1.5 bg-indigo-600 hover:bg-indigo-700"
-              onClick={() => toast.message('Import mapping opens when the import wizard is wired to repository files.')}
+              onClick={onMapImport}
             >
               <Download className="h-3.5 w-3.5" aria-hidden />
               Map &amp; import

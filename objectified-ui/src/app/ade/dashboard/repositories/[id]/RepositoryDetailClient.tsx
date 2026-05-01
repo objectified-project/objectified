@@ -558,6 +558,7 @@ export function RepositoryDetailClient() {
             repositoryId={id}
             defaultBranch={repo.default_branch}
             repositoryName={repo.name}
+            repositoryFullName={repo.full_name}
             githubWebBase={webUrl}
           />
         </div>

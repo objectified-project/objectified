@@ -18,6 +18,7 @@ import { Button } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
 import { cn } from '@lib/utils';
 import { RepositoryFileDetail } from '@/app/components/ade/dashboard/repositories/RepositoryFileDetail';
+import { RepositoryFileImportMapping } from '@/app/components/ade/dashboard/repositories/RepositoryFileImportMapping';
 
 export type RepositoryFileApiRow = {
   id: string;
@@ -111,11 +112,14 @@ export function RepositoryFilesBrowser({
   repositoryId,
   defaultBranch,
   repositoryName,
+  repositoryFullName,
   githubWebBase,
 }: {
   repositoryId: string;
   defaultBranch: string;
   repositoryName: string;
+  /** Display slug for Git-linked repos, e.g. `org/repo` */
+  repositoryFullName: string;
   githubWebBase: string | null;
 }) {
   const [branch, setBranch] = useState(defaultBranch);
@@ -144,6 +148,7 @@ export function RepositoryFilesBrowser({
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [detailFile, setDetailFile] = useState<RepositoryFileApiRow | null>(null);
+  const [importFile, setImportFile] = useState<RepositoryFileApiRow | null>(null);
 
   useEffect(() => {
     setBranch(defaultBranch);
@@ -214,6 +219,19 @@ export function RepositoryFilesBrowser({
 
   const pathBreadcrumb = '/';
 
+  if (importFile) {
+    return (
+      <RepositoryFileImportMapping
+        repositoryId={repositoryId}
+        repositoryName={repositoryName}
+        repositoryFullName={repositoryFullName}
+        branch={branch}
+        file={importFile}
+        onBack={() => setImportFile(null)}
+      />
+    );
+  }
+
   if (detailFile) {
     return (
       <RepositoryFileDetail
@@ -223,6 +241,7 @@ export function RepositoryFilesBrowser({
         file={detailFile}
         githubWebBase={githubWebBase}
         onBack={() => setDetailFile(null)}
+        onMapImport={() => setImportFile(detailFile)}
       />
     );
   }
@@ -601,7 +620,7 @@ export function RepositoryFilesBrowser({
                       <button
                         type="button"
                         className="inline-flex items-center gap-1 text-[11px] text-indigo-500 hover:text-indigo-600 dark:text-indigo-400"
-                        onClick={() => setDetailFile(f)}
+                        onClick={() => setImportFile(f)}
                       >
                         <Download className="h-3 w-3" aria-hidden />
                         Import

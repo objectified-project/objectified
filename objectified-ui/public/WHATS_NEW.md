@@ -37,6 +37,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Metadata scraped from the file is presented in the detail screen.
     - File contents can be viewed using a formatted editor in the detail screen in the Source tab.
     - Parsed details can be viewed in the Details tab.
+    - Map and Import form allows for mapping to a new map or a pre-existing project.
 
 ---
 
