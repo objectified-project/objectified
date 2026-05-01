@@ -349,12 +349,29 @@ function unknownMeta(error: string | null): ParsedRepositorySpecMetadata {
 
 const IMPORTABLE_SPEC_FORMATS: ReadonlySet<RepositorySpecFormat> = new Set([
   'openapi',
-  'swagger2',
   'asyncapi',
   'arazzo',
   'json_schema',
   'graphql',
 ]);
+
+/** Shown in repository file detail and Map & import when content parses as Swagger / OpenAPI 2.0. */
+export const REPOSITORY_SWAGGER_OPENAPI2_NOT_IMPORTABLE_MESSAGE =
+  'Swagger / OpenAPI 2.0 is not supported for repository import. Convert the document to OpenAPI 3.0 or 3.1, then try again.';
+
+/** When the `openapi` field is present but not a 3.x semver we can read from metadata. */
+export const REPOSITORY_OPENAPI_VERSION_UNCLEAR_MESSAGE =
+  'Could not confirm an OpenAPI 3.x version in this document. Map & import requires OpenAPI 3.0 or 3.1.';
+
+function openApiMajorFromParsedMetadata(meta: ParsedRepositorySpecMetadata): number | null {
+  if (meta.format !== 'openapi') return null;
+  const spec = meta.spec?.trim() ?? '';
+  const m = /^OpenAPI\s+([\d.]+)/i.exec(spec);
+  if (!m?.[1]) return null;
+  const first = m[1].split('.')[0] ?? '';
+  const major = parseInt(first, 10);
+  return Number.isFinite(major) ? major : null;
+}
 
 export type RepositoryImportableVerdictStatus =
   | 'content_unavailable'
@@ -376,6 +393,8 @@ export type RepositoryImportableVerdict = {
   truncated?: boolean;
   /** Set when `status === 'importable'`. */
   spec?: string | null;
+  /** Set when `status === 'not_importable'` and a concrete reason exists (e.g. unsupported OpenAPI version). */
+  notImportableMessage?: string;
 };
 
 export function getRepositoryFileImportableVerdict(
@@ -400,12 +419,37 @@ export function getRepositoryFileImportableVerdict(
     };
   }
 
+  if (meta.format === 'swagger2') {
+    return {
+      status: 'not_importable',
+      summary: 'unsupported_swagger_openapi_2',
+      format: 'swagger2',
+      notImportableMessage: REPOSITORY_SWAGGER_OPENAPI2_NOT_IMPORTABLE_MESSAGE,
+    };
+  }
+
   if (meta.format === 'unknown' || !IMPORTABLE_SPEC_FORMATS.has(meta.format)) {
     return {
       status: 'not_importable',
       summary: 'not_importable',
       format: 'unknown',
     };
+  }
+
+  if (meta.format === 'openapi') {
+    const major = openApiMajorFromParsedMetadata(meta);
+    if (major == null || major < 3) {
+      const notImportableMessage =
+        major != null && major < 3
+          ? `This file declares OpenAPI ${major}.x. Only OpenAPI 3.0 and 3.1 are supported for repository map and import.`
+          : REPOSITORY_OPENAPI_VERSION_UNCLEAR_MESSAGE;
+      return {
+        status: 'not_importable',
+        summary: 'unsupported_openapi_version',
+        format: 'openapi',
+        notImportableMessage,
+      };
+    }
   }
 
   const truncated = ctx.truncated === true;

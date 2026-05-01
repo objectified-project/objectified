@@ -2,6 +2,8 @@ import {
   extractRepositoryFileDetailTables,
   getRepositoryFileImportableVerdict,
   parseRepositoryFileSpecMetadata,
+  REPOSITORY_OPENAPI_VERSION_UNCLEAR_MESSAGE,
+  REPOSITORY_SWAGGER_OPENAPI2_NOT_IMPORTABLE_MESSAGE,
 } from '@lib/repository-file-spec-metadata';
 
 describe('parseRepositoryFileSpecMetadata', () => {
@@ -274,5 +276,51 @@ paths: {}
     expect(v.status).toBe('content_unavailable');
     expect(v.summary).toBe('content_unavailable');
     expect(v.loadError).toBe('Gateway timeout');
+  });
+
+  it('returns not_importable with unsupported_swagger_openapi_2 for Swagger / OpenAPI 2.0', () => {
+    const doc = {
+      swagger: '2.0',
+      info: { title: 'Legacy', version: '1' },
+      paths: {},
+    };
+    const meta = parseRepositoryFileSpecMetadata(JSON.stringify(doc), 'swagger.json');
+    expect(meta.format).toBe('swagger2');
+    const v = getRepositoryFileImportableVerdict(meta, { loadError: null });
+    expect(v.status).toBe('not_importable');
+    expect(v.summary).toBe('unsupported_swagger_openapi_2');
+    expect(v.format).toBe('swagger2');
+    expect(v.notImportableMessage).toBe(REPOSITORY_SWAGGER_OPENAPI2_NOT_IMPORTABLE_MESSAGE);
+  });
+
+  it('returns not_importable with unsupported_openapi_version when openapi field is below 3.0', () => {
+    const doc = {
+      openapi: '2.0',
+      info: { title: 'Odd', version: '1' },
+      paths: {},
+    };
+    const meta = parseRepositoryFileSpecMetadata(JSON.stringify(doc), 'odd.yaml');
+    expect(meta.format).toBe('openapi');
+    const v = getRepositoryFileImportableVerdict(meta, { loadError: null });
+    expect(v.status).toBe('not_importable');
+    expect(v.summary).toBe('unsupported_openapi_version');
+    expect(v.format).toBe('openapi');
+    expect(v.notImportableMessage).toContain('OpenAPI 2.x');
+  });
+
+  it('returns not_importable with unsupported_openapi_version when OpenAPI semver cannot be read', () => {
+    const yaml = `
+openapi: "x"
+info:
+  title: T
+  version: '1'
+paths: {}
+`;
+    const meta = parseRepositoryFileSpecMetadata(yaml, 'bad-openapi.yaml');
+    expect(meta.format).toBe('openapi');
+    const v = getRepositoryFileImportableVerdict(meta, { loadError: null });
+    expect(v.status).toBe('not_importable');
+    expect(v.summary).toBe('unsupported_openapi_version');
+    expect(v.notImportableMessage).toBe(REPOSITORY_OPENAPI_VERSION_UNCLEAR_MESSAGE);
   });
 });

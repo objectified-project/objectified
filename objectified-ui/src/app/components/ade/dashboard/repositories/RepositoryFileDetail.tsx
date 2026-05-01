@@ -834,6 +834,24 @@ export function RepositoryFileDetail({
     [specMetadata, error, payload?.truncated]
   );
 
+  const mapImportAllowed =
+    !loading && !error && importableVerdict.status === 'importable';
+
+  const mapImportBlockHint = useMemo(() => {
+    if (loading) return null;
+    if (error) return error;
+    if (!payload) return null;
+    if (importableVerdict.status === 'importable') return null;
+    if (importableVerdict.notImportableMessage) return importableVerdict.notImportableMessage;
+    if (importableVerdict.status === 'parse_failed') {
+      return importableVerdict.parseError ?? 'Fix YAML/JSON syntax before this file can be validated for import.';
+    }
+    if (importableVerdict.status === 'content_unavailable') {
+      return importableVerdict.loadError ?? 'Content unavailable.';
+    }
+    return 'Map & import is available only after the loaded file validates as OpenAPI 3.0 / 3.1 or another supported catalog format (AsyncAPI, Arazzo, JSON Schema, GraphQL SDL).';
+  }, [loading, error, payload, importableVerdict]);
+
   const sourceViewStats = useMemo(() => {
     if (!payload) return null;
     return {
@@ -935,11 +953,21 @@ export function RepositoryFileDetail({
               size="sm"
               className="shrink-0 gap-1.5 bg-indigo-600 hover:bg-indigo-700"
               onClick={onMapImport}
+              disabled={!mapImportAllowed}
+              title={!mapImportAllowed ? mapImportBlockHint ?? undefined : undefined}
             >
               <Download className="h-3.5 w-3.5" aria-hidden />
               Map &amp; import
             </Button>
           </div>
+          {mapImportBlockHint ? (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-900/25 dark:text-amber-100">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/90 dark:text-amber-200/90">
+                Map &amp; import unavailable
+              </p>
+              <p className="mt-1 text-xs leading-relaxed">{mapImportBlockHint}</p>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-5 px-6 py-6 lg:grid-cols-3">
@@ -1057,8 +1085,8 @@ export function RepositoryFileDetail({
                 ) : null}
                 {importableVerdict.status === 'not_importable' ? (
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                    Not importable — loaded content does not match a supported specification shape (OpenAPI, Swagger,
-                    AsyncAPI, Arazzo, JSON Schema, or GraphQL SDL).
+                    {importableVerdict.notImportableMessage ??
+                      'Not importable — loaded content does not match a supported specification shape (OpenAPI 3.x, AsyncAPI, Arazzo, JSON Schema, or GraphQL SDL).'}
                   </p>
                 ) : null}
                 {importableVerdict.status === 'importable' ? (

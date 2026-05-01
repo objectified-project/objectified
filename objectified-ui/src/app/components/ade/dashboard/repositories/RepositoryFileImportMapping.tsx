@@ -675,10 +675,12 @@ export function RepositoryFileImportMapping({
                   <>Content unavailable — {importableVerdict.loadError}</>
                 ) : importableVerdict.status === 'parse_failed' ? (
                   <>Could not parse as YAML/JSON: {importableVerdict.parseError}</>
+                ) : importableVerdict.notImportableMessage ? (
+                  <>{importableVerdict.notImportableMessage}</>
                 ) : (
                   <>
                     This file is not recognised as an importable spec from the loaded content. Map &amp; import is
-                    meant for OpenAPI, Swagger, AsyncAPI, Arazzo, JSON Schema, or GraphQL SDL.
+                    meant for OpenAPI 3.x, AsyncAPI, Arazzo, JSON Schema, or GraphQL SDL.
                   </>
                 )}
               </div>
@@ -1051,6 +1053,12 @@ export function RepositoryFileImportMapping({
                 type="button"
                 className="w-full gap-1.5 bg-indigo-600 hover:bg-indigo-700"
                 disabled={!importButtonEnabled}
+                title={
+                  importableVerdict.summary === 'unsupported_swagger_openapi_2' ||
+                  importableVerdict.summary === 'unsupported_openapi_version'
+                    ? importableVerdict.notImportableMessage
+                    : undefined
+                }
                 onClick={onImport}
               >
                 {importSubmitting ? (
