@@ -287,14 +287,11 @@ export function RepositoryFileImportMapping({
   const importButtonEnabled =
     canAttemptImport &&
     !importSubmitting &&
-    (targetMode === 'existing' ? stagedProject !== null : true);
+    (targetMode === 'existing' ? stagedProject !== null : stagedNewProject !== null);
 
-  const primaryActionLabel =
-    targetMode === 'new' && !stagedNewProject
-      ? 'Set up new project…'
-      : specVersionLabel
-        ? `Import as v${specVersionLabel}`
-        : 'Import';
+  const primaryActionLabel = specVersionLabel
+    ? `Import as v${specVersionLabel}`
+    : 'Import';
 
   const openNewProjectDialog = (prefill: CreateProjectManualFormModel | null) => {
     setNewProjectForm(prefill ? { ...prefill } : { ...EMPTY_CREATE_PROJECT_MANUAL_FORM });
@@ -353,7 +350,7 @@ export function RepositoryFileImportMapping({
       return;
     }
     if (targetMode === 'new' && !stagedNewProject) {
-      openNewProjectDialog(null);
+      toast.error('Set up the new project in the Create a new project section, then click Import.');
       return;
     }
     if (targetMode === 'new' && stagedNewProject) {
@@ -615,9 +612,10 @@ export function RepositoryFileImportMapping({
                         Create a new project
                       </p>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Use <strong className="font-medium text-gray-700 dark:text-gray-300">Set up new project…</strong>{' '}
-                        to open the form, then <strong className="font-medium text-gray-700 dark:text-gray-300">Map to This Project</strong>{' '}
-                        to confirm. The catalog project is created when you click Import.
+                        Open the form with <strong className="font-medium text-gray-700 dark:text-gray-300">Set up new project…</strong>, then{' '}
+                        <strong className="font-medium text-gray-700 dark:text-gray-300">Map to This Project</strong> to confirm. When that is done, use{' '}
+                        <strong className="font-medium text-gray-700 dark:text-gray-300">Import</strong> in the panel on the right — the catalog project is
+                        created on import (version ingest is still to be wired).
                       </p>
                       {stagedNewProject ? (
                         <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs dark:border-emerald-800 dark:bg-emerald-900/20">
@@ -650,11 +648,25 @@ export function RepositoryFileImportMapping({
                           </div>
                         </div>
                       ) : (
-                        <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">
-                          Click <strong className="font-medium">Set up new project…</strong>, fill the form, then{' '}
-                          <strong className="font-medium">Map to This Project</strong>. Import then creates the catalog
-                          project (version ingest is still to be wired).
-                        </p>
+                        <div className="mt-3 space-y-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-9 bg-emerald-600 text-white hover:bg-emerald-700"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openNewProjectDialog(null);
+                            }}
+                          >
+                            Set up new project…
+                          </Button>
+                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                            Fill the form, then <strong className="font-medium">Map to This Project</strong>. After that,
+                            click <strong className="font-medium">Import</strong> to create the catalog project (version
+                            ingest is still to be wired).
+                          </p>
+                        </div>
                       )}
                     </div>
                   </label>
@@ -815,8 +827,9 @@ export function RepositoryFileImportMapping({
               ) : null}
               {canAttemptImport && targetMode === 'new' && !stagedNewProject ? (
                 <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                  Use <span className="font-medium">Set up new project…</span> to open the form, then{' '}
-                  <span className="font-medium">Map to This Project</span>. Import creates the project.
+                  Use <span className="font-medium">Set up new project…</span> under Create a new project, then{' '}
+                  <span className="font-medium">Map to This Project</span>. <span className="font-medium">Import</span>{' '}
+                  runs after the project is configured there.
                 </p>
               ) : null}
               {canAttemptImport && targetMode === 'existing' && stagedProject ? (

@@ -217,8 +217,8 @@ export default function RepositoriesPage() {
     <>
       <header className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
               <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
                 <FolderGit2
                   className="h-6 w-6 text-indigo-600 dark:text-indigo-400"
@@ -231,10 +231,11 @@ export default function RepositoriesPage() {
                 explore its files.
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-3">
               <Button
                 type="button"
                 variant="secondary"
+                className="h-auto min-h-10 shrink-0 whitespace-nowrap py-2"
                 onClick={() =>
                   toast.message(
                     "Rescan all repositories will run when scan jobs are wired to the API.",
@@ -242,15 +243,19 @@ export default function RepositoriesPage() {
                 }
                 title="Runs when scan jobs are wired to the API"
               >
-                <RefreshCw className="mr-2 h-4 w-4" aria-hidden />
+                <RefreshCw className="h-4 w-4 shrink-0" aria-hidden />
                 Rescan all
               </Button>
-              <Button asChild>
-                <Link href="/ade/dashboard/repositories/new">
-                  <Plus className="mr-2 h-4 w-4" aria-hidden />
-                  Add repository
-                </Link>
-              </Button>
+              <Link
+                href="/ade/dashboard/repositories/new"
+                className={cn(
+                  buttonVariants(),
+                  "h-auto min-h-10 shrink-0 whitespace-nowrap py-2",
+                )}
+              >
+                <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                Add repository
+              </Link>
             </div>
           </div>
         </div>
@@ -399,7 +404,7 @@ export default function RepositoriesPage() {
                       href="/ade/dashboard/repositories/new"
                       className={cn(
                         buttonVariants({ size: "sm" }),
-                        "[font-size:inherit]",
+                        "h-auto min-h-9 shrink-0 whitespace-nowrap py-2",
                       )}
                     >
                       Add repository
