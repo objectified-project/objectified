@@ -475,6 +475,30 @@ export async function permanentDeleteProject(projectId: string) {
         const classIds = classesResult.rows.map((row: any) => row.id);
 
         if (classIds.length > 0) {
+          // shared_path_response.class_id -> classes ON DELETE SET NULL. Rows that only defined
+          // schema via class_id would have all of (class_id, inline_schema, data) null after the
+          // FK update and violate check_response_schema_defined. Ensure legacy `data` is set first.
+          await client.query(
+            `UPDATE odb.shared_path_response
+             SET data = COALESCE(data, '{}'::jsonb)
+             WHERE class_id = ANY($1::uuid[])
+               AND data IS NULL
+               AND inline_schema IS NULL`,
+            [classIds]
+          );
+
+          // Same pattern: request body content uses class_id OR inline_schema (request_body_content_schema_check).
+          await client.query(
+            `UPDATE odb.shared_path_request_body_content
+             SET inline_schema = COALESCE(
+               inline_schema,
+               '{"type":"object","properties":[]}'::jsonb
+             )
+             WHERE class_id = ANY($1::uuid[])
+               AND inline_schema IS NULL`,
+            [classIds]
+          );
+
           // Delete all class_properties for these classes
           await client.query(
             `DELETE FROM odb.class_properties WHERE class_id = ANY($1)`,
