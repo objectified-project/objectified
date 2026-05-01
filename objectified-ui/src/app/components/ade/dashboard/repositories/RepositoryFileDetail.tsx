@@ -8,6 +8,7 @@ import {
   Download,
   ExternalLink,
   FileCode2,
+  LayoutList,
   Loader2,
   Workflow,
 } from 'lucide-react';
@@ -17,8 +18,10 @@ import { Button } from '@/app/components/ui/Button';
 import { Skeleton } from '@/app/components/ui/Skeleton';
 import { cn } from '@lib/utils';
 import {
+  extractRepositoryFileDetailTables,
   formatMetadataCell,
   parseRepositoryFileSpecMetadata,
+  type RepositoryFileDetailTables,
 } from '@lib/repository-file-spec-metadata';
 
 /** Indexed file row from the repository files list API (subset used by file detail). */
@@ -47,7 +50,7 @@ type FileContentApi = {
   error?: string;
 };
 
-type FileViewTab = 'source' | 'diff' | 'visualize';
+type FileViewTab = 'source' | 'diff' | 'visualize' | 'details';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -200,6 +203,217 @@ function tabBtnClass(active: boolean): string {
   );
 }
 
+function formatDetailFormatLabel(format: RepositoryFileDetailTables['format']): string {
+  switch (format) {
+    case 'openapi':
+      return 'OpenAPI';
+    case 'swagger2':
+      return 'Swagger 2.0';
+    case 'asyncapi':
+      return 'AsyncAPI';
+    case 'arazzo':
+      return 'Arazzo';
+    case 'json_schema':
+      return 'JSON Schema';
+    case 'graphql':
+      return 'GraphQL SDL';
+    default:
+      return 'Unknown';
+  }
+}
+
+const detailTableTh =
+  'whitespace-nowrap px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400';
+const detailTableTd = 'px-3 py-3 align-top text-sm text-gray-800 dark:text-gray-200';
+const detailTableTdMono = cn(detailTableTd, 'font-mono text-[13px] leading-snug');
+
+/** Caps table body height when many rows; short tables stay only as tall as their content. */
+const detailSectionBodyScroll = 'max-h-[min(40vh,440px)] overflow-auto';
+
+function RepositorySpecDetailTables({ tables }: { tables: RepositoryFileDetailTables }) {
+  const emptyCopy =
+    tables.format === 'unknown'
+      ? 'Parse this file as a supported spec (OpenAPI, AsyncAPI, GraphQL SDL, JSON Schema, …) to populate structured rows.'
+      : 'Nothing to list for this section in the current document.';
+
+  return (
+    <div className="flex max-h-[min(92vh,960px)] flex-col gap-3 overflow-y-auto bg-gradient-to-b from-gray-50/95 to-white px-4 pb-4 pt-3 dark:from-gray-950/50 dark:to-gray-900/50">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-3 dark:border-gray-700">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Specification structure</p>
+          <p className="mt-1 max-w-[62rem] text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+            Types and reusable components, schema fields, and routable surfaces (HTTP paths, Async channels, GraphQL
+            operations, or workflows). Each block scrolls independently; tables also scroll horizontally when needed.
+          </p>
+        </div>
+        <span
+          className={cn(
+            'shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold',
+            tables.format === 'unknown'
+              ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+              : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200'
+          )}
+        >
+          {formatDetailFormatLabel(tables.format)}
+        </span>
+      </div>
+
+      {tables.parseError ? (
+        <p className="shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-900/25 dark:text-amber-100">
+          Details tables need valid YAML or JSON. {tables.parseError}
+        </p>
+      ) : null}
+
+      <div className="flex min-w-0 flex-col gap-3">
+        <section className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900/70">
+          <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/90">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Classes</h4>
+            <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+              {tables.classes.length.toLocaleString()} row{tables.classes.length === 1 ? '' : 's'}
+              {tables.truncated.classes ? ' · truncated' : ''}
+            </span>
+          </header>
+          <div className={detailSectionBodyScroll}>
+            {tables.classes.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{emptyCopy}</p>
+            ) : (
+              <table className="w-full min-w-[720px] border-collapse text-left">
+                <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-100 shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:border-gray-700 dark:bg-gray-800">
+                  <tr>
+                    <th className={detailTableTh}>Name</th>
+                    <th className={detailTableTh}>Kind</th>
+                    <th className={detailTableTh}>Schema type</th>
+                    <th className={detailTableTh}>Properties</th>
+                    <th className={detailTableTh}>Description</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {tables.classes.map((row, i) => (
+                    <tr key={`${row.name}-${row.kind}-${i}`} className="hover:bg-gray-50/90 dark:hover:bg-gray-800/50">
+                      <td className={cn(detailTableTdMono, 'font-semibold text-gray-950 dark:text-gray-50')}>
+                        {row.name}
+                      </td>
+                      <td className={detailTableTdMono}>{row.kind}</td>
+                      <td className={detailTableTdMono}>{row.typeSummary ?? '—'}</td>
+                      <td className={detailTableTdMono}>
+                        {row.propertiesCount != null ? row.propertiesCount.toLocaleString() : '—'}
+                      </td>
+                      <td className={cn(detailTableTd, 'max-w-md whitespace-pre-wrap break-words text-gray-600 dark:text-gray-300')}>
+                        {row.description ?? '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+
+        <section className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900/70">
+          <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/90">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Properties</h4>
+            <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+              {tables.properties.length.toLocaleString()} row{tables.properties.length === 1 ? '' : 's'}
+              {tables.truncated.properties ? ' · truncated' : ''}
+            </span>
+          </header>
+          <div className={detailSectionBodyScroll}>
+            {tables.properties.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{emptyCopy}</p>
+            ) : (
+              <table className="w-full min-w-[960px] border-collapse text-left">
+                <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-100 shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:border-gray-700 dark:bg-gray-800">
+                  <tr>
+                    <th className={detailTableTh}>Name</th>
+                    <th className={detailTableTh}>Context</th>
+                    <th className={detailTableTh}>Type</th>
+                    <th className={detailTableTh}>Required</th>
+                    <th className={detailTableTh}>Format</th>
+                    <th className={detailTableTh}>Default</th>
+                    <th className={detailTableTh}>Description</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {tables.properties.map((row, i) => (
+                    <tr key={`${row.context}-${row.name}-${i}`} className="hover:bg-gray-50/90 dark:hover:bg-gray-800/50">
+                      <td className={cn(detailTableTdMono, 'font-semibold text-gray-950 dark:text-gray-50')}>
+                        {row.name}
+                      </td>
+                      <td className={cn(detailTableTdMono, 'text-indigo-800 dark:text-indigo-300')}>{row.context}</td>
+                      <td className={cn(detailTableTdMono, 'max-w-[14rem] whitespace-pre-wrap break-all')}>
+                        {row.typeOrConstraint ?? '—'}
+                      </td>
+                      <td className={detailTableTd}>{row.required === true ? 'Yes' : row.required === false ? 'No' : '—'}</td>
+                      <td className={detailTableTdMono}>{row.format ?? '—'}</td>
+                      <td className={cn(detailTableTdMono, 'max-w-[12rem] whitespace-pre-wrap break-all')}>
+                        {row.defaultValue ?? '—'}
+                      </td>
+                      <td className={cn(detailTableTd, 'max-w-lg whitespace-pre-wrap break-words text-gray-600 dark:text-gray-300')}>
+                        {row.description ?? '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+
+        <section className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900/70">
+          <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/90">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Paths &amp; operations</h4>
+            <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+              {tables.paths.length.toLocaleString()} row{tables.paths.length === 1 ? '' : 's'}
+              {tables.truncated.paths ? ' · truncated' : ''}
+            </span>
+          </header>
+          <div className={detailSectionBodyScroll}>
+            {tables.paths.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{emptyCopy}</p>
+            ) : (
+              <table className="w-full min-w-[960px] border-collapse text-left">
+                <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-100 shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:border-gray-700 dark:bg-gray-800">
+                  <tr>
+                    <th className={detailTableTh}>Location</th>
+                    <th className={detailTableTh}>Verb</th>
+                    <th className={detailTableTh}>Identifier</th>
+                    <th className={detailTableTh}>Summary</th>
+                    <th className={detailTableTh}>Details</th>
+                    <th className={detailTableTh}>Tags</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {tables.paths.map((row, i) => (
+                    <tr
+                      key={`${row.template}-${row.method}-${row.operationId ?? ''}-${i}`}
+                      className="hover:bg-gray-50/90 dark:hover:bg-gray-800/50"
+                    >
+                      <td className={cn(detailTableTdMono, 'max-w-xs font-semibold text-gray-950 dark:text-gray-50')}>
+                        <span className="break-all">{row.template}</span>
+                      </td>
+                      <td className={detailTableTdMono}>{row.method ?? '—'}</td>
+                      <td className={cn(detailTableTdMono, 'max-w-[14rem] break-all')}>{row.operationId ?? '—'}</td>
+                      <td className={cn(detailTableTd, 'max-w-xs whitespace-pre-wrap break-words text-gray-700 dark:text-gray-300')}>
+                        {row.summary ?? '—'}
+                      </td>
+                      <td className={cn(detailTableTd, 'max-w-xl whitespace-pre-wrap break-words text-gray-600 dark:text-gray-300')}>
+                        {row.description ?? '—'}
+                      </td>
+                      <td className={cn(detailTableTd, 'max-w-xs whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400')}>
+                        {row.tags ?? '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function MetadataCardSkeleton() {
   return (
     <div
@@ -299,6 +513,11 @@ export function RepositoryFileDetail({
 
   const specMetadata = useMemo(
     () => parseRepositoryFileSpecMetadata(payload?.content ?? '', file.path),
+    [payload?.content, file.path]
+  );
+
+  const detailTables = useMemo(
+    () => extractRepositoryFileDetailTables(payload?.content ?? '', file.path),
     [payload?.content, file.path]
   );
 
@@ -529,6 +748,7 @@ export function RepositoryFileDetail({
                     <Skeleton className="h-8 w-[4.5rem] rounded-md" />
                     <Skeleton className="h-8 w-[8.5rem] rounded-md" />
                     <Skeleton className="h-8 w-[5.5rem] rounded-md" />
+                    <Skeleton className="h-8 w-[5rem] rounded-md" />
                   </div>
                   <Skeleton className="h-4 w-28 shrink-0 max-sm:hidden" />
                 </div>
@@ -551,6 +771,14 @@ export function RepositoryFileDetail({
                 >
                   <Workflow className="h-3 w-3" aria-hidden />
                   Visualize
+                </button>
+                <button
+                  type="button"
+                  className={cn(tabBtnClass(tab === 'details'), 'inline-flex items-center gap-1')}
+                  onClick={() => setTab('details')}
+                >
+                  <LayoutList className="h-3 w-3" aria-hidden />
+                  Details
                 </button>
               </div>
               {blobUrl ? (
@@ -626,6 +854,7 @@ export function RepositoryFileDetail({
                     </p>
                   </div>
                 )}
+                {tab === 'details' && payload ? <RepositorySpecDetailTables tables={detailTables} /> : null}
               </>
             )}
               </>

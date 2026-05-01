@@ -1,4 +1,7 @@
-import { parseRepositoryFileSpecMetadata } from '@lib/repository-file-spec-metadata';
+import {
+  extractRepositoryFileDetailTables,
+  parseRepositoryFileSpecMetadata,
+} from '@lib/repository-file-spec-metadata';
 
 describe('parseRepositoryFileSpecMetadata', () => {
   it('parses OpenAPI 3 YAML with paths, components, servers', () => {
@@ -152,5 +155,65 @@ servers:
     expect(m.components).toBe(3);
     expect(m.endpoints).toBeNull();
     expect(m.servers).toBeNull();
+  });
+});
+
+describe('extractRepositoryFileDetailTables', () => {
+  it('lists OpenAPI paths, schema classes, and properties', () => {
+    const yaml = `
+openapi: 3.0.1
+info:
+  title: Storefront
+  version: 3.4.0
+paths:
+  /a:
+    get:
+      summary: List A
+  /b:
+    post: {}
+components:
+  schemas:
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+        total:
+          type: number
+`;
+    const t = extractRepositoryFileDetailTables(yaml, 'openapi.yaml');
+    expect(t.format).toBe('openapi');
+    expect(t.parseError).toBeNull();
+    expect(t.paths.map((p) => p.template).sort()).toEqual(['/a', '/b']);
+    expect(t.paths.some((p) => p.template === '/a' && p.method === 'GET')).toBe(true);
+    expect(t.paths.find((p) => p.template === '/a' && p.method === 'GET')?.summary).toBe('List A');
+    expect(t.classes.some((c) => c.name === 'Order' && c.kind === 'schemas')).toBe(true);
+    expect(t.properties.map((p) => p.name).sort()).toEqual(['id', 'total']);
+    expect(t.properties.every((p) => p.context === 'Order')).toBe(true);
+  });
+
+  it('maps GraphQL operations to paths and types to classes', () => {
+    const sdl = `
+type Query {
+  item: String
+}
+type Product {
+  sku: ID!
+  name: String
+}
+`;
+    const t = extractRepositoryFileDetailTables(sdl, 'schema.graphql');
+    expect(t.format).toBe('graphql');
+    expect(t.paths.some((p) => p.template === 'item' && p.method === 'Query')).toBe(true);
+    expect(t.classes.some((c) => c.name === 'Product' && c.kind === 'type')).toBe(true);
+    expect(t.properties.some((p) => p.context === 'Product' && p.name === 'sku')).toBe(true);
+  });
+
+  it('returns empty tables for unknown payloads without parse errors', () => {
+    const t = extractRepositoryFileDetailTables('hello: world\nfoo', 'notes.txt');
+    expect(t.format).toBe('unknown');
+    expect(t.paths).toHaveLength(0);
+    expect(t.classes).toHaveLength(0);
+    expect(t.properties).toHaveLength(0);
   });
 });

@@ -35,7 +35,8 @@ We continue to improve the platform based on your feedback with improvements and
   - Clicking a file in the file browser will present the file details browser
     - File details automatically fetches the file from the repository when clicking to load metadata.
     - Metadata scraped from the file is presented in the detail screen.
-    - File contents can be viewed using a formatted editor in the detail screen.
+    - File contents can be viewed using a formatted editor in the detail screen in the Source tab.
+    - Parsed details can be viewed in the Details tab.
 
 ---
 
