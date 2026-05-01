@@ -347,6 +347,77 @@ function unknownMeta(error: string | null): ParsedRepositorySpecMetadata {
   };
 }
 
+const IMPORTABLE_SPEC_FORMATS: ReadonlySet<RepositorySpecFormat> = new Set([
+  'openapi',
+  'swagger2',
+  'asyncapi',
+  'arazzo',
+  'json_schema',
+  'graphql',
+]);
+
+export type RepositoryImportableVerdictStatus =
+  | 'content_unavailable'
+  | 'parse_failed'
+  | 'not_importable'
+  | 'importable';
+
+/**
+ * Normalised verdict once repository file content is loaded in the detail UI.
+ * Safe to JSON.stringify for tooling, tests, or data attributes.
+ */
+export type RepositoryImportableVerdict = {
+  status: RepositoryImportableVerdictStatus;
+  /** Stable token for automation (matches `status` unless truncated importable). */
+  summary: string;
+  format: RepositorySpecFormat | null;
+  loadError?: string;
+  parseError?: string;
+  truncated?: boolean;
+  /** Set when `status === 'importable'`. */
+  spec?: string | null;
+};
+
+export function getRepositoryFileImportableVerdict(
+  meta: ParsedRepositorySpecMetadata,
+  ctx: { loadError: string | null; truncated?: boolean }
+): RepositoryImportableVerdict {
+  if (ctx.loadError) {
+    return {
+      status: 'content_unavailable',
+      summary: 'content_unavailable',
+      format: null,
+      loadError: ctx.loadError,
+    };
+  }
+
+  if (meta.parseError) {
+    return {
+      status: 'parse_failed',
+      summary: 'parse_failed',
+      format: meta.format === 'unknown' ? null : meta.format,
+      parseError: meta.parseError,
+    };
+  }
+
+  if (meta.format === 'unknown' || !IMPORTABLE_SPEC_FORMATS.has(meta.format)) {
+    return {
+      status: 'not_importable',
+      summary: 'not_importable',
+      format: 'unknown',
+    };
+  }
+
+  const truncated = ctx.truncated === true;
+  return {
+    status: 'importable',
+    summary: truncated ? 'importable_truncated_body' : 'importable',
+    format: meta.format,
+    spec: meta.spec,
+    truncated: truncated || undefined,
+  };
+}
+
 export function formatMetadataCell(n: number | null): string {
   if (n == null) return '—';
   return n.toLocaleString();

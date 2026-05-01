@@ -3,7 +3,10 @@
 import dynamic from 'next/dynamic';
 import {
   AlertTriangle,
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
+  ArrowUpDown,
   Check,
   Download,
   ExternalLink,
@@ -20,7 +23,11 @@ import { cn } from '@lib/utils';
 import {
   extractRepositoryFileDetailTables,
   formatMetadataCell,
+  getRepositoryFileImportableVerdict,
   parseRepositoryFileSpecMetadata,
+  type RepositoryFileDetailClassRow,
+  type RepositoryFileDetailPathRow,
+  type RepositoryFileDetailPropertyRow,
   type RepositoryFileDetailTables,
 } from '@lib/repository-file-spec-metadata';
 
@@ -157,6 +164,16 @@ function formatBytes(n: number | null | undefined): string {
   return `${(n / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
+/** Line count for the string shown in the editor (LF-based; empty buffer counts as one line). */
+function countDisplayLines(content: string): number {
+  if (content.length === 0) return 1;
+  let n = 1;
+  for (let i = 0; i < content.length; i++) {
+    if (content.charCodeAt(i) === 10) n++;
+  }
+  return n;
+}
+
 function shortSha(sha: string | null | undefined): string {
   if (!sha) return '—';
   const s = sha.trim();
@@ -230,7 +247,202 @@ const detailTableTdMono = cn(detailTableTd, 'font-mono text-[13px] leading-snug'
 /** Caps table body height when many rows; short tables stay only as tall as their content. */
 const detailSectionBodyScroll = 'max-h-[min(40vh,440px)] overflow-auto';
 
+type DetailSortDir = 'asc' | 'desc';
+
+type DetailColumnSort = { key: string; dir: DetailSortDir };
+
+function compareDetailStrings(
+  a: string | null | undefined,
+  b: string | null | undefined,
+  dir: DetailSortDir
+): number {
+  const cmp = (a ?? '').localeCompare(b ?? '', undefined, { sensitivity: 'base', numeric: true });
+  return dir === 'asc' ? cmp : -cmp;
+}
+
+/** Null / undefined numeric values sort after finite numbers. */
+function compareDetailNumbers(
+  a: number | null | undefined,
+  b: number | null | undefined,
+  dir: DetailSortDir
+): number {
+  const na = a != null && Number.isFinite(a) ? a : null;
+  const nb = b != null && Number.isFinite(b) ? b : null;
+  if (na == null && nb == null) return 0;
+  if (na == null) return 1;
+  if (nb == null) return -1;
+  const cmp = na - nb;
+  return dir === 'asc' ? cmp : -cmp;
+}
+
+function propertyRequiredSortKey(required: boolean | undefined): string {
+  if (required === true) return '1';
+  if (required === false) return '2';
+  return '3';
+}
+
+function SortableDetailTh({
+  label,
+  sortKey,
+  active,
+  onSort,
+}: {
+  label: string;
+  sortKey: string;
+  active: DetailColumnSort;
+  onSort: (key: string) => void;
+}) {
+  const isActive = active.key === sortKey;
+  const ariaSort = isActive ? (active.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+  return (
+    <th className={detailTableTh} scope="col" aria-sort={ariaSort}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="-mx-1 inline-flex max-w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-gray-200/90 dark:hover:bg-gray-600/60"
+      >
+        <span>{label}</span>
+        {isActive ? (
+          active.dir === 'asc' ? (
+            <ArrowUp className="h-3.5 w-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
+          ) : (
+            <ArrowDown className="h-3.5 w-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
+          )
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-35" aria-hidden />
+        )}
+      </button>
+    </th>
+  );
+}
+
+function cycleDetailSort(prev: DetailColumnSort, key: string): DetailColumnSort {
+  if (prev.key === key) {
+    return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+  }
+  return { key, dir: 'asc' };
+}
+
+function sortClassRows(rows: RepositoryFileDetailClassRow[], sort: DetailColumnSort): RepositoryFileDetailClassRow[] {
+  const next = [...rows];
+  const { key, dir } = sort;
+  next.sort((a, b) => {
+    let c = 0;
+    switch (key) {
+      case 'name':
+        c = compareDetailStrings(a.name, b.name, dir);
+        break;
+      case 'kind':
+        c = compareDetailStrings(a.kind, b.kind, dir);
+        break;
+      case 'typeSummary':
+        c = compareDetailStrings(a.typeSummary, b.typeSummary, dir);
+        break;
+      case 'propertiesCount':
+        c = compareDetailNumbers(a.propertiesCount, b.propertiesCount, dir);
+        break;
+      case 'description':
+        c = compareDetailStrings(a.description, b.description, dir);
+        break;
+      default:
+        c = compareDetailStrings(a.name, b.name, 'asc');
+    }
+    if (c !== 0) return c;
+    return compareDetailStrings(a.name, b.name, 'asc');
+  });
+  return next;
+}
+
+function sortPropertyRows(
+  rows: RepositoryFileDetailPropertyRow[],
+  sort: DetailColumnSort
+): RepositoryFileDetailPropertyRow[] {
+  const next = [...rows];
+  const { key, dir } = sort;
+  next.sort((a, b) => {
+    let c = 0;
+    switch (key) {
+      case 'name':
+        c = compareDetailStrings(a.name, b.name, dir);
+        break;
+      case 'context':
+        c = compareDetailStrings(a.context, b.context, dir);
+        break;
+      case 'typeOrConstraint':
+        c = compareDetailStrings(a.typeOrConstraint, b.typeOrConstraint, dir);
+        break;
+      case 'required':
+        c = compareDetailStrings(propertyRequiredSortKey(a.required), propertyRequiredSortKey(b.required), dir);
+        break;
+      case 'format':
+        c = compareDetailStrings(a.format, b.format, dir);
+        break;
+      case 'defaultValue':
+        c = compareDetailStrings(a.defaultValue, b.defaultValue, dir);
+        break;
+      case 'description':
+        c = compareDetailStrings(a.description, b.description, dir);
+        break;
+      default:
+        c = compareDetailStrings(a.name, b.name, 'asc');
+    }
+    if (c !== 0) return c;
+    return compareDetailStrings(a.context, b.context, 'asc') || compareDetailStrings(a.name, b.name, 'asc');
+  });
+  return next;
+}
+
+function sortPathRows(rows: RepositoryFileDetailPathRow[], sort: DetailColumnSort): RepositoryFileDetailPathRow[] {
+  const next = [...rows];
+  const { key, dir } = sort;
+  next.sort((a, b) => {
+    let c = 0;
+    switch (key) {
+      case 'template':
+        c = compareDetailStrings(a.template, b.template, dir);
+        break;
+      case 'method':
+        c = compareDetailStrings(a.method, b.method, dir);
+        break;
+      case 'operationId':
+        c = compareDetailStrings(a.operationId, b.operationId, dir);
+        break;
+      case 'summary':
+        c = compareDetailStrings(a.summary, b.summary, dir);
+        break;
+      case 'description':
+        c = compareDetailStrings(a.description, b.description, dir);
+        break;
+      case 'tags':
+        c = compareDetailStrings(a.tags, b.tags, dir);
+        break;
+      default:
+        c = compareDetailStrings(a.template, b.template, 'asc');
+    }
+    if (c !== 0) return c;
+    return (
+      compareDetailStrings(a.template, b.template, 'asc') ||
+      compareDetailStrings(a.method ?? '', b.method ?? '', 'asc')
+    );
+  });
+  return next;
+}
+
 function RepositorySpecDetailTables({ tables }: { tables: RepositoryFileDetailTables }) {
+  const [classSort, setClassSort] = useState<DetailColumnSort>({ key: 'name', dir: 'asc' });
+  const [propertySort, setPropertySort] = useState<DetailColumnSort>({ key: 'name', dir: 'asc' });
+  const [pathSort, setPathSort] = useState<DetailColumnSort>({ key: 'template', dir: 'asc' });
+
+  const sortedClasses = useMemo(
+    () => sortClassRows(tables.classes, classSort),
+    [tables.classes, classSort]
+  );
+  const sortedProperties = useMemo(
+    () => sortPropertyRows(tables.properties, propertySort),
+    [tables.properties, propertySort]
+  );
+  const sortedPaths = useMemo(() => sortPathRows(tables.paths, pathSort), [tables.paths, pathSort]);
+
   const emptyCopy =
     tables.format === 'unknown'
       ? 'Parse this file as a supported spec (OpenAPI, AsyncAPI, GraphQL SDL, JSON Schema, …) to populate structured rows.'
@@ -280,15 +492,40 @@ function RepositorySpecDetailTables({ tables }: { tables: RepositoryFileDetailTa
               <table className="w-full min-w-[720px] border-collapse text-left">
                 <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-100 shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:border-gray-700 dark:bg-gray-800">
                   <tr>
-                    <th className={detailTableTh}>Name</th>
-                    <th className={detailTableTh}>Kind</th>
-                    <th className={detailTableTh}>Schema type</th>
-                    <th className={detailTableTh}>Properties</th>
-                    <th className={detailTableTh}>Description</th>
+                    <SortableDetailTh
+                      label="Name"
+                      sortKey="name"
+                      active={classSort}
+                      onSort={(k) => setClassSort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Kind"
+                      sortKey="kind"
+                      active={classSort}
+                      onSort={(k) => setClassSort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Schema type"
+                      sortKey="typeSummary"
+                      active={classSort}
+                      onSort={(k) => setClassSort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Properties"
+                      sortKey="propertiesCount"
+                      active={classSort}
+                      onSort={(k) => setClassSort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Description"
+                      sortKey="description"
+                      active={classSort}
+                      onSort={(k) => setClassSort((p) => cycleDetailSort(p, k))}
+                    />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {tables.classes.map((row, i) => (
+                  {sortedClasses.map((row, i) => (
                     <tr key={`${row.name}-${row.kind}-${i}`} className="hover:bg-gray-50/90 dark:hover:bg-gray-800/50">
                       <td className={cn(detailTableTdMono, 'font-semibold text-gray-950 dark:text-gray-50')}>
                         {row.name}
@@ -324,17 +561,52 @@ function RepositorySpecDetailTables({ tables }: { tables: RepositoryFileDetailTa
               <table className="w-full min-w-[960px] border-collapse text-left">
                 <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-100 shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:border-gray-700 dark:bg-gray-800">
                   <tr>
-                    <th className={detailTableTh}>Name</th>
-                    <th className={detailTableTh}>Context</th>
-                    <th className={detailTableTh}>Type</th>
-                    <th className={detailTableTh}>Required</th>
-                    <th className={detailTableTh}>Format</th>
-                    <th className={detailTableTh}>Default</th>
-                    <th className={detailTableTh}>Description</th>
+                    <SortableDetailTh
+                      label="Name"
+                      sortKey="name"
+                      active={propertySort}
+                      onSort={(k) => setPropertySort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Context"
+                      sortKey="context"
+                      active={propertySort}
+                      onSort={(k) => setPropertySort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Type"
+                      sortKey="typeOrConstraint"
+                      active={propertySort}
+                      onSort={(k) => setPropertySort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Required"
+                      sortKey="required"
+                      active={propertySort}
+                      onSort={(k) => setPropertySort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Format"
+                      sortKey="format"
+                      active={propertySort}
+                      onSort={(k) => setPropertySort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Default"
+                      sortKey="defaultValue"
+                      active={propertySort}
+                      onSort={(k) => setPropertySort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Description"
+                      sortKey="description"
+                      active={propertySort}
+                      onSort={(k) => setPropertySort((p) => cycleDetailSort(p, k))}
+                    />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {tables.properties.map((row, i) => (
+                  {sortedProperties.map((row, i) => (
                     <tr key={`${row.context}-${row.name}-${i}`} className="hover:bg-gray-50/90 dark:hover:bg-gray-800/50">
                       <td className={cn(detailTableTdMono, 'font-semibold text-gray-950 dark:text-gray-50')}>
                         {row.name}
@@ -374,16 +646,46 @@ function RepositorySpecDetailTables({ tables }: { tables: RepositoryFileDetailTa
               <table className="w-full min-w-[960px] border-collapse text-left">
                 <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-100 shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:border-gray-700 dark:bg-gray-800">
                   <tr>
-                    <th className={detailTableTh}>Location</th>
-                    <th className={detailTableTh}>Verb</th>
-                    <th className={detailTableTh}>Identifier</th>
-                    <th className={detailTableTh}>Summary</th>
-                    <th className={detailTableTh}>Details</th>
-                    <th className={detailTableTh}>Tags</th>
+                    <SortableDetailTh
+                      label="Location"
+                      sortKey="template"
+                      active={pathSort}
+                      onSort={(k) => setPathSort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Verb"
+                      sortKey="method"
+                      active={pathSort}
+                      onSort={(k) => setPathSort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Identifier"
+                      sortKey="operationId"
+                      active={pathSort}
+                      onSort={(k) => setPathSort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Summary"
+                      sortKey="summary"
+                      active={pathSort}
+                      onSort={(k) => setPathSort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Details"
+                      sortKey="description"
+                      active={pathSort}
+                      onSort={(k) => setPathSort((p) => cycleDetailSort(p, k))}
+                    />
+                    <SortableDetailTh
+                      label="Tags"
+                      sortKey="tags"
+                      active={pathSort}
+                      onSort={(k) => setPathSort((p) => cycleDetailSort(p, k))}
+                    />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {tables.paths.map((row, i) => (
+                  {sortedPaths.map((row, i) => (
                     <tr
                       key={`${row.template}-${row.method}-${row.operationId ?? ''}-${i}`}
                       className="hover:bg-gray-50/90 dark:hover:bg-gray-800/50"
@@ -520,6 +822,23 @@ export function RepositoryFileDetail({
     () => extractRepositoryFileDetailTables(payload?.content ?? '', file.path),
     [payload?.content, file.path]
   );
+
+  const importableVerdict = useMemo(
+    () =>
+      getRepositoryFileImportableVerdict(specMetadata, {
+        loadError: error,
+        truncated: payload?.truncated === true,
+      }),
+    [specMetadata, error, payload?.truncated]
+  );
+
+  const sourceViewStats = useMemo(() => {
+    if (!payload) return null;
+    return {
+      lines: countDisplayLines(payload.content),
+      sizeLabel: formatBytes(payload.size_bytes ?? file.size_bytes),
+    };
+  }, [payload, file.size_bytes]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -707,15 +1026,63 @@ export function RepositoryFileDetail({
               </dl>
             </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+            <div
+              className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800"
+              data-importable-verdict={JSON.stringify(importableVerdict)}
+              data-testid="repository-file-importable-verdict"
+            >
               <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Importable verdict</h3>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-900/40">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                  Content sniff not run yet — verdict after parse pipeline.
-                </p>
-                <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                  Filename-based detection: <span className="font-mono">{file.detected_kind ?? '—'}</span>. Opening the
-                  file loads raw bytes from the provider for your review.
+                {importableVerdict.status === 'content_unavailable' ? (
+                  <>
+                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                      Content unavailable — cannot evaluate importability.
+                    </p>
+                    <p className="mt-1 font-mono text-xs text-rose-700 dark:text-rose-300">
+                      {importableVerdict.loadError}
+                    </p>
+                  </>
+                ) : null}
+                {importableVerdict.status === 'parse_failed' ? (
+                  <>
+                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                      Not evaluable as YAML/JSON — fix syntax to detect an importable spec.
+                    </p>
+                    <p className="mt-1 font-mono text-xs text-amber-800 dark:text-amber-200">
+                      {importableVerdict.parseError}
+                    </p>
+                  </>
+                ) : null}
+                {importableVerdict.status === 'not_importable' ? (
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Not importable — loaded content does not match a supported specification shape (OpenAPI, Swagger,
+                    AsyncAPI, Arazzo, JSON Schema, or GraphQL SDL).
+                  </p>
+                ) : null}
+                {importableVerdict.status === 'importable' ? (
+                  <>
+                    <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                      Importable — client parse recognised{' '}
+                      <span className="font-semibold">{importableVerdict.spec ?? importableVerdict.format}</span>.
+                    </p>
+                    {importableVerdict.truncated ? (
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                        Body is truncated; verdict reflects only the loaded portion. Open the full file before relying on
+                        counts or structure.
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
+                <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                  Index hint (filename / indexer):{' '}
+                  <span className="font-mono">{file.detected_kind ?? '—'}</span>
+                  {payload ? (
+                    <>
+                      {' '}
+                      · loaded kind: <span className="font-mono">{displayKind}</span>
+                    </>
+                  ) : null}
+                  .
                 </p>
               </div>
               <ul className="mt-3 space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
@@ -802,11 +1169,20 @@ export function RepositoryFileDetail({
               <>
                 {tab === 'source' && (
                   <div className="flex flex-col">
-                    <p className="border-b border-gray-200 bg-gray-50 px-3 py-1.5 font-mono text-[10px] text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
-                      Syntax: <span className="text-indigo-600 dark:text-indigo-400">{monacoLanguage}</span>
-                      <span className="mx-2 text-gray-300 dark:text-gray-600">·</span>
-                      read-only
-                    </p>
+                    <div className="flex w-full min-w-0 flex-nowrap items-center gap-2 border-b border-gray-200 bg-gray-50 px-3 py-1.5 font-mono text-[10px] text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
+                      <span className="min-w-0 flex-1">
+                        Syntax: <span className="text-indigo-600 dark:text-indigo-400">{monacoLanguage}</span>
+                        <span className="mx-2 text-gray-300 dark:text-gray-600">·</span>
+                        read-only
+                      </span>
+                      {sourceViewStats ? (
+                        <span className="shrink-0 text-right tabular-nums text-gray-600 dark:text-gray-300">
+                          {sourceViewStats.lines.toLocaleString()} line{sourceViewStats.lines === 1 ? '' : 's'}
+                          <span className="mx-2 text-gray-300 dark:text-gray-600">·</span>
+                          {sourceViewStats.sizeLabel}
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="h-[min(520px,70vh)] min-h-[240px] w-full overflow-hidden">
                       <MonacoEditor
                         height="100%"
@@ -854,7 +1230,12 @@ export function RepositoryFileDetail({
                     </p>
                   </div>
                 )}
-                {tab === 'details' && payload ? <RepositorySpecDetailTables tables={detailTables} /> : null}
+                {tab === 'details' && payload ? (
+                  <RepositorySpecDetailTables
+                    key={`${file.id}:${payload.blob_sha ?? ''}:${payload.content.length}`}
+                    tables={detailTables}
+                  />
+                ) : null}
               </>
             )}
               </>

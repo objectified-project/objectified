@@ -1,5 +1,6 @@
 import {
   extractRepositoryFileDetailTables,
+  getRepositoryFileImportableVerdict,
   parseRepositoryFileSpecMetadata,
 } from '@lib/repository-file-spec-metadata';
 
@@ -215,5 +216,63 @@ type Product {
     expect(t.paths).toHaveLength(0);
     expect(t.classes).toHaveLength(0);
     expect(t.properties).toHaveLength(0);
+  });
+});
+
+describe('getRepositoryFileImportableVerdict', () => {
+  it('returns importable for recognised OpenAPI with stable serialisable shape', () => {
+    const yaml = `
+openapi: 3.0.1
+info:
+  title: T
+  version: '1'
+paths: {}
+`;
+    const meta = parseRepositoryFileSpecMetadata(yaml, 'openapi.yaml');
+    const v = getRepositoryFileImportableVerdict(meta, { loadError: null });
+    expect(v.status).toBe('importable');
+    expect(v.summary).toBe('importable');
+    expect(v.format).toBe('openapi');
+    expect(v.spec).toBe('OpenAPI 3.0.1');
+    expect(JSON.parse(JSON.stringify(v))).toEqual(v);
+  });
+
+  it('marks importable_truncated_body when truncated flag is set', () => {
+    const yaml = `
+openapi: 3.0.1
+info:
+  title: T
+  version: '1'
+paths: {}
+`;
+    const meta = parseRepositoryFileSpecMetadata(yaml, 'openapi.yaml');
+    const v = getRepositoryFileImportableVerdict(meta, { loadError: null, truncated: true });
+    expect(v.summary).toBe('importable_truncated_body');
+    expect(v.truncated).toBe(true);
+  });
+
+  it('returns not_importable for unknown structure', () => {
+    const meta = parseRepositoryFileSpecMetadata('hello: world\n', 'notes.txt');
+    const v = getRepositoryFileImportableVerdict(meta, { loadError: null });
+    expect(v.status).toBe('not_importable');
+    expect(v.summary).toBe('not_importable');
+    expect(v.format).toBe('unknown');
+  });
+
+  it('returns parse_failed when YAML is invalid', () => {
+    const meta = parseRepositoryFileSpecMetadata('foo: [', 'bad.yaml');
+    expect(meta.parseError).toBeTruthy();
+    const v = getRepositoryFileImportableVerdict(meta, { loadError: null });
+    expect(v.status).toBe('parse_failed');
+    expect(v.summary).toBe('parse_failed');
+    expect(v.parseError).toBe(meta.parseError);
+  });
+
+  it('returns content_unavailable when load failed', () => {
+    const meta = parseRepositoryFileSpecMetadata('', 'x.yaml');
+    const v = getRepositoryFileImportableVerdict(meta, { loadError: 'Gateway timeout' });
+    expect(v.status).toBe('content_unavailable');
+    expect(v.summary).toBe('content_unavailable');
+    expect(v.loadError).toBe('Gateway timeout');
   });
 });
