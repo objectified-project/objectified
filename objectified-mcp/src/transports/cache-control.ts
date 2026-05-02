@@ -1,9 +1,9 @@
 import type { ServerResponse } from 'node:http';
 
-/** Ensures Cache-Control: no-store on every outbound byte (MCP-1.2). */
+/** Ensures Cache-Control: no-store on every outbound HTTP response (MCP-1.2). */
 export function attachCacheControlNoStore(res: ServerResponse): void {
   const ensure = (): void => {
-    if (!res.headersSent && res.getHeader('Cache-Control') === undefined) {
+    if (!res.headersSent) {
       res.setHeader('Cache-Control', 'no-store');
     }
   };
