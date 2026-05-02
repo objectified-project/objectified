@@ -37,10 +37,11 @@ def test_console_script_entrypoint_prints_usage() -> None:
 def test_package_version_matches_pyproject() -> None:
     from objectified_mcp import __version__
 
-    assert __version__ == "0.1.1"
+    assert __version__ == "0.1.2"
 
 
 def test_server_module_exposes_mcp() -> None:
-    from objectified_mcp.server import mcp
+    from objectified_mcp.server import database_lifespan, mcp
 
     assert mcp.name == "Objectified"
+    assert database_lifespan is not None

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, PostgresDsn, SecretStr, field_validator
+from pydantic import Field, PostgresDsn, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -36,6 +36,17 @@ class Settings(BaseSettings):
     transport: Transport = Field(default="stdio")
     http_host: str = Field(default="127.0.0.1", min_length=1)
     http_port: int = Field(default=8765, ge=1, le=65535)
+    database_pool_min_size: int = Field(default=1, ge=1, le=256)
+    database_pool_max_size: int = Field(default=10, ge=1, le=256)
+    database_pool_timeout: float = Field(default=30.0, gt=0, le=600.0)
+
+    @model_validator(mode="after")
+    def pool_size_bounds(self) -> Self:
+        if self.database_pool_max_size < self.database_pool_min_size:
+            raise ValueError(
+                "database_pool_max_size must be greater than or equal to database_pool_min_size",
+            )
+        return self
 
     @field_validator("log_level", mode="before")
     @classmethod
