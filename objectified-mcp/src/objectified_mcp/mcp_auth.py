@@ -70,7 +70,13 @@ def mcp_key_prefix(secret: str) -> str:
 
 
 def normalize_stored_prefix(user_input: str) -> str:
-    """Normalize CLI or human input to the ``odb.mcp_api_keys.prefix`` format."""
+    """Normalize CLI or human input to the ``odb.mcp_api_keys.prefix`` format.
+
+    Raises :exc:`ValueError` if the bare prefix (after stripping a trailing
+    ``...``) is shorter than :data:`_PREFIX_CHARS` characters, because such a
+    string can never match any stored key and ``keys revoke`` would silently
+    do nothing.
+    """
     s = user_input.strip()
     if not s:
         raise ValueError("Prefix must be non-empty.")
@@ -78,9 +84,12 @@ def normalize_stored_prefix(user_input: str) -> str:
         s = s[:-3].strip()
     if not s:
         raise ValueError("Prefix is invalid.")
-    if len(s) >= _PREFIX_CHARS:
-        return s[:_PREFIX_CHARS] + "..."
-    return s + "..."
+    if len(s) < _PREFIX_CHARS:
+        raise ValueError(
+            f"Prefix is too short ({len(s)} chars); "
+            f"supply at least {_PREFIX_CHARS} characters (the first {_PREFIX_CHARS} of the key)."
+        )
+    return s[:_PREFIX_CHARS] + "..."
 
 
 def hash_mcp_api_key_secret(plain: str) -> bytes:
@@ -232,6 +241,7 @@ async def touch_mcp_key_last_used(pool: AsyncConnectionPool, key_id: str) -> Non
             "UPDATE odb.mcp_api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = %s::uuid",
             (key_id,),
         )
+        await conn.commit()
 
 
 def schedule_mcp_key_last_used_touch(pool: AsyncConnectionPool, key_id: str) -> None:

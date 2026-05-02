@@ -17,4 +17,6 @@ async def revoke_mcp_keys_by_prefix(pool: AsyncConnectionPool, prefix: str) -> i
                 """,
                 (prefix,),
             )
-            return int(cur.rowcount or 0)
+            count = int(cur.rowcount or 0)
+        await conn.commit()
+        return count

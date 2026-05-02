@@ -18,6 +18,7 @@ def test_revoke_mcp_keys_by_prefix_returns_rowcount() -> None:
 
     conn = MagicMock()
     conn.cursor = MagicMock(return_value=cm_cur)
+    conn.commit = AsyncMock()
 
     cm_conn = AsyncMock()
     cm_conn.__aenter__ = AsyncMock(return_value=conn)
@@ -30,3 +31,4 @@ def test_revoke_mcp_keys_by_prefix_returns_rowcount() -> None:
 
     assert asyncio.run(run()) == 2
     cur.execute.assert_awaited_once()
+    conn.commit.assert_awaited_once()

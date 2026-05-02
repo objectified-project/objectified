@@ -40,6 +40,10 @@ def test_normalize_stored_prefix_accepts_plain_or_ellipsis() -> None:
         normalize_stored_prefix("   ")
     with pytest.raises(ValueError, match="invalid"):
         normalize_stored_prefix("...")
+    with pytest.raises(ValueError, match="too short"):
+        normalize_stored_prefix("abc")
+    with pytest.raises(ValueError, match="too short"):
+        normalize_stored_prefix("abc...")
 
 
 def test_extract_prefers_http_authorization_over_meta() -> None:
@@ -215,6 +219,7 @@ def test_touch_mcp_key_last_used_executes_update() -> None:
     kid = str(uuid.uuid4())
     conn = MagicMock()
     conn.execute = AsyncMock()
+    conn.commit = AsyncMock()
     cm = AsyncMock()
     cm.__aenter__ = AsyncMock(return_value=conn)
     cm.__aexit__ = AsyncMock(return_value=None)
@@ -226,6 +231,7 @@ def test_touch_mcp_key_last_used_executes_update() -> None:
 
     asyncio.run(run())
     conn.execute.assert_awaited_once()
+    conn.commit.assert_awaited_once()
     call_args = conn.execute.await_args
     assert kid in str(call_args)
 
