@@ -4,10 +4,6 @@ We continue to improve the platform based on your feedback with improvements and
 
 ---
 
-## MCP (preview)
-- New `objectified-mcp` workspace package bootstraps the MCP server with stdio and the `mcp.search` / `mcp.describe` / `mcp.execute` tools.
-- MCP-1.2: Streamable HTTP transport at `/mcp` (`--transport http`, port from `OBJECTIFIED_MCP_PORT`) alongside stdio; HTTP responses use `Cache-Control: no-store`.
-
 ## Importing
 - Race condition fixed in 3.0.1 specification imports
 - Import supports Swagger 2.0 format
