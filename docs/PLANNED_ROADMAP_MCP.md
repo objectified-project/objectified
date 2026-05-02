@@ -86,7 +86,7 @@ process or via Docker.
 
 | # | Issue | Title | Depends on |
 |---|-------|-------|------------|
-| 2.1 | [#2997](../../issues/2997) | Postgres migration: `mcp_api_keys` table | E1 |
+| 2.1 | ~~[#2997](../../issues/2997)~~ | ~~Postgres migration: `mcp_api_keys` table~~ (**completed**) | E1 |
 | 2.2 | [#2998](../../issues/2998) | Key issuance CLI (`mcp keys issue`) | 2.1 |
 | 2.3 | [#2999](../../issues/2999) | API key validator dependency | 2.1 |
 | 2.4 | [#3000](../../issues/3000) | HTTP credential extraction middleware | 1.6, 2.3 |

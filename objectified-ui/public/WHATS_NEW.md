@@ -11,6 +11,7 @@ We continue to improve the platform based on your feedback with improvements and
 - MCP runtime opens a shared async Postgres pool (psycopg 3) at startup, exposes it to tools via lifespan context, runs a health probe (`SELECT 1`), and closes the pool cleanly on shutdown.
 - MCP process logs are structured JSON on stderr (structlog): each line includes `timestamp`, `level`, `event`, `request_id`, and `tool_name`; verbosity is controlled with `OBJECTIFIED_MCP_LOG_LEVEL`.
 - MCP **`ping`** tool returns service id, package version, UTC timestamp, and **`db_ok`** (Postgres `SELECT 1` via the shared pool); on failure **`db_ok`** is false and **`db_error`** carries the exception message.
+- Database migration adds **`odb.mcp_api_keys`** for MCP API key storage (hashed secret, lookup prefix, tenant, JSON scopes, lifecycle timestamps).
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports

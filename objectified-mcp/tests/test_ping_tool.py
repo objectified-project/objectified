@@ -38,9 +38,7 @@ def test_build_ping_response_db_failure_includes_error_string(mock_pool: MagicMo
 
 def test_build_ping_response_db_error_redacts_dsn(mock_pool: MagicMock) -> None:
     """DSN fragments (credentials/hostnames) must be stripped from the returned error."""
-    mock_pool.connection.side_effect = OSError(
-        "could not connect: postgresql://admin:s3cr3t@db.internal:5432/app"
-    )
+    mock_pool.connection.side_effect = OSError("could not connect: postgresql://admin:s3cr3t@db.internal:5432/app")
 
     async def run() -> dict[str, object]:
         return await build_ping_response(mock_pool)
