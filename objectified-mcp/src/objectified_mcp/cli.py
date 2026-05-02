@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import sys
 
 from objectified_mcp import __version__
+
+
+async def _run_stdio_transport() -> None:
+    from objectified_mcp.server import mcp
+
+    await mcp.run_stdio_async()
 
 
 def main() -> None:
@@ -19,9 +26,16 @@ def main() -> None:
         version=f"%(prog)s {__version__}",
     )
     subparsers = parser.add_subparsers(dest="command")
-    subparsers.add_parser(
+    serve_parser = subparsers.add_parser(
         "serve",
-        help="Validate environment configuration (stdio / HTTP transports ship in later tickets).",
+        help="Validate configuration and optionally run the MCP server.",
+    )
+    serve_parser.add_argument(
+        "--transport",
+        choices=("stdio",),
+        default=None,
+        metavar="NAME",
+        help="Run with this transport (omit to validate env and exit). Use stdio for Claude Desktop.",
     )
 
     args = parser.parse_args()
@@ -41,10 +55,15 @@ def main() -> None:
             raise SystemExit(2)
         configure_logging(settings)
         log = structlog.get_logger(__name__)
+        if args.transport == "stdio":
+            with bound_contextvars(request_id="cli-serve-stdio", tool_name=None):
+                log.info("mcp_stdio_starting")
+            asyncio.run(_run_stdio_transport())
+            return
         with bound_contextvars(request_id="cli-serve", tool_name=None):
             log.info(
                 "mcp_configuration_validated",
-                detail="MCP transports are wired in roadmap tickets 1.5 (stdio) and 1.6 (HTTP).",
+                detail="Pass --transport stdio to run locally; HTTP transport is roadmap ticket 1.6.",
             )
         raise SystemExit(0)
 

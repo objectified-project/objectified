@@ -1,4 +1,4 @@
-"""FastMCP application instance (stdio / HTTP transports land in later tickets)."""
+"""FastMCP application instance (HTTP transport lands in roadmap ticket 1.6)."""
 
 from __future__ import annotations
 
