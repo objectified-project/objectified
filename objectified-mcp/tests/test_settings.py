@@ -36,6 +36,36 @@ def test_settings_loads_required_and_optional_from_env(monkeypatch: pytest.Monke
     assert s.http_port == 8765
 
 
+def test_settings_database_pool_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OBJECTIFIED_MCP_DATABASE_URL", "postgresql://localhost/db")
+    monkeypatch.setenv("OBJECTIFIED_MCP_INTERNAL_SECRET", "y" * 16)
+    monkeypatch.setenv("OBJECTIFIED_MCP_DATABASE_POOL_MIN_SIZE", "2")
+    monkeypatch.setenv("OBJECTIFIED_MCP_DATABASE_POOL_MAX_SIZE", "20")
+    monkeypatch.setenv("OBJECTIFIED_MCP_DATABASE_POOL_TIMEOUT", "12.5")
+
+    from objectified_mcp.settings import Settings
+
+    s = Settings(_env_file=None)
+    assert s.database_pool_min_size == 2
+    assert s.database_pool_max_size == 20
+    assert s.database_pool_timeout == 12.5
+
+
+def test_settings_pool_max_below_min_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pydantic import ValidationError
+
+    from objectified_mcp.settings import Settings
+
+    monkeypatch.setenv("OBJECTIFIED_MCP_DATABASE_URL", "postgresql://localhost/db")
+    monkeypatch.setenv("OBJECTIFIED_MCP_INTERNAL_SECRET", "y" * 16)
+    monkeypatch.setenv("OBJECTIFIED_MCP_DATABASE_POOL_MIN_SIZE", "5")
+    monkeypatch.setenv("OBJECTIFIED_MCP_DATABASE_POOL_MAX_SIZE", "3")
+
+    with pytest.raises(ValidationError) as exc:
+        Settings(_env_file=None)
+    assert any(e["type"] == "value_error" for e in exc.value.errors())
+
+
 def test_settings_http_transport_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OBJECTIFIED_MCP_DATABASE_URL", "postgresql://localhost/db")
     monkeypatch.setenv("OBJECTIFIED_MCP_INTERNAL_SECRET", "y" * 16)

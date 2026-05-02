@@ -8,6 +8,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 - New `objectified-mcp` Python package (FastMCP, uv, ruff, mypy) as the foundation for the Model Context Protocol server.
 - MCP server loads typed configuration from the environment via pydantic-settings (`objectified-mcp serve`); see `objectified-mcp/.env.example`.
+- MCP runtime opens a shared async Postgres pool (psycopg 3) at startup, exposes it to tools via lifespan context, runs a health probe (`SELECT 1`), and closes the pool cleanly on shutdown.
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports
