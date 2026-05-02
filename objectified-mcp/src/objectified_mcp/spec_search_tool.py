@@ -131,7 +131,31 @@ def _row_out(row: dict[str, Any]) -> dict[str, Any]:
 
 
 _SEARCH_QUERY = """
-WITH ranked AS (
+WITH pre AS (
+  SELECT
+    s.id,
+    s.tenant_id,
+    s.project_id,
+    s.title,
+    s.version,
+    s.description,
+    s.tags,
+    s.updated_at,
+    tm.tag_match
+  FROM odb.mcp_v_public_specs AS s
+  CROSS JOIN LATERAL (
+    SELECT EXISTS (
+      SELECT 1
+      FROM unnest(s.tags) AS tag
+      WHERE tag ILIKE %(contains)s ESCAPE '\\'
+    ) AS tag_match
+  ) AS tm
+  WHERE
+    s.title ILIKE %(contains)s ESCAPE '\\'
+    OR COALESCE(s.description, '') ILIKE %(contains)s ESCAPE '\\'
+    OR tm.tag_match
+),
+ranked AS (
   SELECT
     id,
     tenant_id,
@@ -151,25 +175,9 @@ WITH ranked AS (
           WHEN COALESCE(description, '') ILIKE %(contains)s ESCAPE '\\' THEN 200
           ELSE 0
         END
-      + CASE
-          WHEN EXISTS (
-            SELECT 1
-            FROM unnest(tags) AS tag
-            WHERE tag ILIKE %(contains)s ESCAPE '\\'
-          )
-          THEN 100
-          ELSE 0
-        END
+      + CASE WHEN tag_match THEN 100 ELSE 0 END
     )::integer AS rank_score
-  FROM odb.mcp_v_public_specs
-  WHERE
-    title ILIKE %(contains)s ESCAPE '\\'
-    OR COALESCE(description, '') ILIKE %(contains)s ESCAPE '\\'
-    OR EXISTS (
-      SELECT 1
-      FROM unnest(tags) AS tag
-      WHERE tag ILIKE %(contains)s ESCAPE '\\'
-    )
+  FROM pre
 )
 SELECT id, tenant_id, project_id, title, version, description, tags, updated_at, rank_score
 FROM ranked
