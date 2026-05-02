@@ -20,6 +20,7 @@ from objectified_mcp.mcp_auth import (
     require_mcp_auth,
     validate_mcp_api_key,
 )
+from objectified_mcp.scope import Scope
 
 _SECRET = "0123456789ab" + "cursor-test-secret"
 
@@ -73,12 +74,13 @@ def _pool_mock(rows: list[dict]) -> MagicMock:
 def test_validate_success_returns_scope() -> None:
     kid = str(uuid.uuid4())
     tid = str(uuid.uuid4())
+    pid = str(uuid.uuid4())
     stored_hash = hash_mcp_api_key_secret(_SECRET).decode("ascii")
     row = {
         "id": kid,
         "tenant_id": tid,
         "label": "unit",
-        "scope_json": {"tenant": True},
+        "scope_json": {"tenants": [tid], "projects": [pid]},
         "key_hash": stored_hash,
         "expires_at": None,
         "revoked_at": None,
@@ -87,7 +89,13 @@ def test_validate_success_returns_scope() -> None:
 
     async def run() -> None:
         auth = await validate_mcp_api_key(pool, _SECRET)
-        assert auth == McpAuthContext(key_id=kid, tenant_id=tid, label="unit", scope={"tenant": True})
+        expected = McpAuthContext(
+            key_id=kid,
+            tenant_id=tid,
+            label="unit",
+            scope=Scope(tenants=[tid], projects=[pid]),
+        )
+        assert auth == expected
 
     asyncio.run(run())
 

@@ -90,7 +90,7 @@ process or via Docker.
 | 2.2 | [#2998](../../issues/2998) | Key issuance CLI (`mcp keys issue`) | 2.1 |
 | 2.3 | ~~[#2999](../../issues/2999)~~ | ~~API key validator dependency~~ (**completed**) | 2.1 |
 | 2.4 | ~~[#3000](../../issues/3000)~~ | ~~HTTP credential extraction middleware~~ (**completed**) | 1.6, 2.3 |
-| 2.5 | [#3001](../../issues/3001) | Scope model (public, tenant, project) | 2.1 |
+| 2.5 | ~~[#3001](../../issues/3001)~~ | ~~Scope model (public, tenant, project)~~ (**completed**) | 2.1 |
 | 2.6 | [#3002](../../issues/3002) | `last_used_at` + revoke command | 2.3 |
 
 #### E3 — Public Read-Only Spec Discovery (#3003)
