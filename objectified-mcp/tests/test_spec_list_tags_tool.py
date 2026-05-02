@@ -114,6 +114,28 @@ def test_cache_expires_after_ttl(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls["n"] == 2
 
 
+def test_cache_mutation_does_not_corrupt_cached_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_fetch(_pool: AsyncConnectionPool) -> list[dict[str, object]]:
+        return [{"tag": "stable", "count": 10}]
+
+    monkeypatch.setattr(
+        "objectified_mcp.spec_list_tags_tool._fetch_tag_counts",
+        fake_fetch,
+    )
+
+    pool = MagicMock(spec=AsyncConnectionPool)
+
+    async def run() -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+        first = await build_spec_list_tags_response(pool)
+        first[0]["count"] = 999  # mutate the returned copy
+        second = await build_spec_list_tags_response(pool)
+        return first, second
+
+    first, second = asyncio.run(run())
+    assert first == [{"tag": "stable", "count": 999}]
+    assert second == [{"tag": "stable", "count": 10}]  # cache is unaffected
+
+
 def test_spec_list_tags_tool_registered_on_mcp() -> None:
     from objectified_mcp.server import mcp
 
