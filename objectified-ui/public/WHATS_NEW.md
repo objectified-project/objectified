@@ -15,6 +15,7 @@ We continue to improve the platform based on your feedback with improvements and
 - MCP tools can require Postgres-backed API keys via FastMCP **`Depends(require_mcp_auth)`**: accepts **`Authorization: Bearer`** on HTTP or **`tools/call` `_meta`** on stdio, verifies bcrypt(SHA-256(secret)) against **`odb.mcp_api_keys`**, and returns a typed scope payload (clear errors for missing auth, unknown keys, expiry, and revocation).
 - Streamable HTTP binds **`Authorization: Bearer`** per request into tool context (**`get_http_bearer_from_context`**) via ASGI middleware plus FastMCP middleware; requests without a Bearer token expose **`None`** (anonymous).
 - MCP API key **`scope_json`** uses a typed **`Scope`** model (`tenants` / `projects` string lists, JSONB): empty lists mean no restriction at that level; **`scope.allows(tenant_id, project_id)`** gates reads (#3001).
+- Successful MCP API key authentication updates **`last_used_at`** in Postgres asynchronously (non-blocking); **`objectified-mcp keys revoke <prefix>`** (also **`mcp keys revoke …`** via the `mcp` console alias) revokes active keys by stored prefix (#3002).
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports

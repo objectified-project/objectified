@@ -25,6 +25,7 @@ Scoped reads use :meth:`objectified_mcp.scope.Scope.allows` on ``auth.scope``; s
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 from datetime import datetime, timezone
@@ -66,6 +67,20 @@ def mcp_key_prefix(secret: str) -> str:
     if len(secret) < _PREFIX_CHARS:
         return secret + "..."
     return secret[:_PREFIX_CHARS] + "..."
+
+
+def normalize_stored_prefix(user_input: str) -> str:
+    """Normalize CLI or human input to the ``odb.mcp_api_keys.prefix`` format."""
+    s = user_input.strip()
+    if not s:
+        raise ValueError("Prefix must be non-empty.")
+    if s.endswith("..."):
+        s = s[:-3].strip()
+    if not s:
+        raise ValueError("Prefix is invalid.")
+    if len(s) >= _PREFIX_CHARS:
+        return s[:_PREFIX_CHARS] + "..."
+    return s + "..."
 
 
 def hash_mcp_api_key_secret(plain: str) -> bytes:
@@ -170,8 +185,10 @@ async def validate_mcp_api_key(pool: AsyncConnectionPool, raw_secret: str) -> Mc
 
     for row in eligible:
         if _verify_hash(raw_secret, row.get("key_hash")):
+            key_id = str(row["id"])
+            schedule_mcp_key_last_used_touch(pool, key_id)
             return McpAuthContext(
-                key_id=str(row["id"]),
+                key_id=key_id,
                 tenant_id=str(row["tenant_id"]),
                 label=str(row["label"]),
                 scope=parse_scope_json(row.get("scope_json")),
@@ -206,3 +223,27 @@ async def require_mcp_auth(
 
 
 McpAuthDependency = Depends(require_mcp_auth)
+
+
+async def touch_mcp_key_last_used(pool: AsyncConnectionPool, key_id: str) -> None:
+    """Persist ``last_used_at`` for a successfully authenticated key."""
+    async with pool.connection() as conn:
+        await conn.execute(
+            "UPDATE odb.mcp_api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = %s::uuid",
+            (key_id,),
+        )
+
+
+def schedule_mcp_key_last_used_touch(pool: AsyncConnectionPool, key_id: str) -> None:
+    """Fire-and-forget ``last_used_at`` update so auth latency stays low."""
+
+    async def _run() -> None:
+        try:
+            await touch_mcp_key_last_used(pool, key_id)
+        except Exception:
+            _log.warning("mcp_api_key_last_used_update_failed", key_id=key_id, exc_info=True)
+
+    try:
+        asyncio.get_running_loop().create_task(_run())
+    except RuntimeError:
+        _log.debug("mcp_api_key_last_used_skip_no_event_loop", key_id=key_id)

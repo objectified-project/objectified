@@ -1,6 +1,6 @@
 {
   "name": "objectified-mcp",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "description": "Yarn workspace anchor for the objectified-mcp Python package (uv + pyproject.toml).",
   "scripts": {

@@ -15,6 +15,31 @@ async def _run_stdio_transport() -> None:
     await mcp.run_stdio_async()
 
 
+async def _run_keys_revoke(prefix: str) -> int:
+    import structlog
+
+    from objectified_mcp.database_pool import create_async_pool, ping_pool
+    from objectified_mcp.key_admin import revoke_mcp_keys_by_prefix
+    from objectified_mcp.logging_config import configure_logging
+    from objectified_mcp.mcp_auth import normalize_stored_prefix
+    from objectified_mcp.settings import get_settings
+
+    settings = get_settings()
+    configure_logging(settings)
+    log = structlog.get_logger(__name__)
+    canonical = normalize_stored_prefix(prefix)
+    pool = create_async_pool(settings, open=False)
+    await pool.open()
+    try:
+        await ping_pool(pool)
+        revoked = await revoke_mcp_keys_by_prefix(pool, canonical)
+        log.info("mcp_keys_revoked", prefix=canonical, count=revoked)
+    finally:
+        await pool.close()
+    print(f"Revoked {revoked} active key(s) matching prefix {canonical}.")
+    return 0 if revoked else 1
+
+
 async def _run_http_transport(host: str, port: int, *, log_level: str) -> None:
     """Streamable HTTP via FastMCP (``http_app`` → ``create_streamable_http_app``); serves MCP at ``/mcp``."""
     from starlette.middleware import Middleware as StarletteMiddleware
@@ -71,6 +96,20 @@ def main() -> None:
         help="TCP port for HTTP transport (default: OBJECTIFIED_MCP_HTTP_PORT).",
     )
 
+    keys_parser = subparsers.add_parser(
+        "keys",
+        help="MCP API key administration (same commands as ``mcp keys`` when using the mcp entrypoint).",
+    )
+    keys_sub = keys_parser.add_subparsers(dest="keys_command", required=True)
+    revoke_parser = keys_sub.add_parser(
+        "revoke",
+        help="Revoke all active keys whose stored prefix matches (see key issuance / dashboard prefix).",
+    )
+    revoke_parser.add_argument(
+        "prefix",
+        help="Key prefix: first 12 characters, with or without a trailing '...'.",
+    )
+
     args = parser.parse_args()
 
     if args.command == "serve":
@@ -112,5 +151,27 @@ def main() -> None:
                 detail="Pass --transport stdio or --transport http to run the server.",
             )
         raise SystemExit(0)
+
+    if args.command == "keys":
+        from pydantic import ValidationError
+
+        from objectified_mcp.mcp_auth import normalize_stored_prefix
+        from objectified_mcp.settings import get_settings
+
+        get_settings.cache_clear()
+        try:
+            get_settings()
+        except ValidationError as exc:
+            print(f"Configuration error:\n{exc}", file=sys.stderr)
+            raise SystemExit(2)
+        if args.keys_command == "revoke":
+            try:
+                normalize_stored_prefix(args.prefix)
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                raise SystemExit(2)
+            code = asyncio.run(_run_keys_revoke(args.prefix))
+            get_settings.cache_clear()
+            raise SystemExit(code)
 
     parser.print_help()
