@@ -35,11 +35,12 @@ export function convertSwaggerToOpenAPI(swaggerDoc: any): SwaggerConversionResul
       };
     }
 
-    if (!swaggerDoc.swagger || !swaggerDoc.swagger.startsWith('2.')) {
+    if (!isSwagger2(swaggerDoc)) {
+      const raw = swaggerDoc.swagger;
       return {
         success: false,
         document: null,
-        error: `Invalid Swagger version: expected 2.x, got ${swaggerDoc.swagger}`,
+        error: `Invalid Swagger version: expected 2.x, got ${raw}`,
         warnings: []
       };
     }
@@ -346,6 +347,37 @@ function convertSchema(schema: any, warnings: string[], context?: string): any {
   return converted;
 }
 
+/** Resolve `#/parameters/<Name>` against `swaggerDoc.parameters`. */
+function resolveSwaggerParameterRef(ref: string, swaggerDoc: any): any | null {
+  const m = ref.match(/^#\/parameters\/(.+)$/);
+  if (!m) return null;
+  const key = m[1];
+  const pool = swaggerDoc?.parameters;
+  if (!pool || typeof pool !== 'object') return null;
+  const resolved = pool[key];
+  return resolved && typeof resolved === 'object' ? resolved : null;
+}
+
+/**
+ * Expand `{ $ref: '#/parameters/...' }` entries (common in Swagger 2.0) so conversion
+ * produces real OpenAPI parameter objects with `name`, `in`, and `schema`.
+ */
+function dereferenceSwaggerParameter(
+  param: any,
+  swaggerDoc: any,
+  seen: Set<string> = new Set()
+): any {
+  if (!param || typeof param !== 'object') return param;
+  const ref = param.$ref;
+  if (typeof ref !== 'string') return param;
+  if (seen.has(ref)) return param;
+  const resolved = resolveSwaggerParameterRef(ref, swaggerDoc);
+  if (!resolved) return param;
+  const nextSeen = new Set(seen);
+  nextSeen.add(ref);
+  return dereferenceSwaggerParameter(resolved, swaggerDoc, nextSeen);
+}
+
 /**
  * Convert paths from Swagger 2.x to OpenAPI 3.x format
  */
@@ -368,7 +400,7 @@ function convertPathItem(pathItem: any, swaggerDoc: any, warnings: string[], pat
   // Copy path-level parameters
   if (pathItem.parameters) {
     converted.parameters = pathItem.parameters.map((param: any) =>
-      convertParameter(param, warnings, pathContext)
+      convertParameter(dereferenceSwaggerParameter(param, swaggerDoc), warnings, pathContext)
     );
   }
 
@@ -403,6 +435,7 @@ function convertOperation(operation: any, swaggerDoc: any, warnings: string[], c
     const { parameters, requestBody } = convertParameters(
       operation.parameters,
       operation.consumes || swaggerDoc.consumes,
+      swaggerDoc,
       warnings,
       context
     );
@@ -442,13 +475,15 @@ function convertOperation(operation: any, swaggerDoc: any, warnings: string[], c
 function convertParameters(
   parameters: any[],
   consumes: string[] | undefined,
+  swaggerDoc: any,
   warnings: string[],
   context: string
 ): { parameters: any[]; requestBody: any | null } {
   const convertedParams: any[] = [];
   let requestBody: any = null;
 
-  for (const param of parameters) {
+  for (const raw of parameters) {
+    const param = dereferenceSwaggerParameter(raw, swaggerDoc);
     if (param.in === 'body') {
       // Convert body parameter to requestBody
       requestBody = {
@@ -670,18 +705,32 @@ export function isSwagger2(doc: any): boolean {
   if (!doc || typeof doc !== 'object') {
     return false;
   }
-  if (!doc.swagger || typeof doc.swagger !== 'string') {
+  const v = doc.swagger;
+  if (v == null) {
     return false;
   }
-  return doc.swagger.startsWith('2.');
+  if (typeof v === 'string') {
+    return v.startsWith('2.');
+  }
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    return v >= 2 && v < 3;
+  }
+  return false;
 }
 
 /**
  * Get the Swagger version from a document
  */
 export function getSwaggerVersion(doc: any): string | null {
-  if (doc && doc.swagger) {
-    return doc.swagger;
+  if (!doc || typeof doc !== 'object' || doc.swagger == null) {
+    return null;
+  }
+  const v = doc.swagger;
+  if (typeof v === 'string') {
+    return v;
+  }
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    return String(v);
   }
   return null;
 }

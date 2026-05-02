@@ -43,6 +43,20 @@ function str(v: unknown): string | null {
   return null;
 }
 
+/** Detect Swagger / OpenAPI 2.x from the `swagger` field (string "2.x" or JSON numeric `2`). */
+function swagger2VersionFromRoot(doc: Record<string, unknown>): string | null {
+  const v = doc.swagger;
+  if (v == null) return null;
+  if (typeof v === 'string') {
+    const t = v.trim();
+    return t.startsWith('2.') ? t : null;
+  }
+  if (typeof v === 'number' && Number.isFinite(v) && v >= 2 && v < 3) {
+    return String(v);
+  }
+  return null;
+}
+
 function parseYamlOrJson(content: string, path: string): { root: unknown } | { error: string } {
   const t = content.trim();
   if (!t) return { error: 'Empty file' };
@@ -349,15 +363,12 @@ function unknownMeta(error: string | null): ParsedRepositorySpecMetadata {
 
 const IMPORTABLE_SPEC_FORMATS: ReadonlySet<RepositorySpecFormat> = new Set([
   'openapi',
+  'swagger2',
   'asyncapi',
   'arazzo',
   'json_schema',
   'graphql',
 ]);
-
-/** Shown in repository file detail and Map & import when content parses as Swagger / OpenAPI 2.0. */
-export const REPOSITORY_SWAGGER_OPENAPI2_NOT_IMPORTABLE_MESSAGE =
-  'Swagger / OpenAPI 2.0 is not supported for repository import. Convert the document to OpenAPI 3.0 or 3.1, then try again.';
 
 /** When the `openapi` field is present but not a 3.x semver we can read from metadata. */
 export const REPOSITORY_OPENAPI_VERSION_UNCLEAR_MESSAGE =
@@ -416,15 +427,6 @@ export function getRepositoryFileImportableVerdict(
       summary: 'parse_failed',
       format: meta.format === 'unknown' ? null : meta.format,
       parseError: meta.parseError,
-    };
-  }
-
-  if (meta.format === 'swagger2') {
-    return {
-      status: 'not_importable',
-      summary: 'unsupported_swagger_openapi_2',
-      format: 'swagger2',
-      notImportableMessage: REPOSITORY_SWAGGER_OPENAPI2_NOT_IMPORTABLE_MESSAGE,
     };
   }
 
@@ -550,8 +552,7 @@ function parseRepositoryFileSpecFullInternal(content: string, path: string): Par
   if (doc.openapi != null && (typeof doc.openapi === 'string' || typeof doc.openapi === 'number')) {
     return { meta: parseOpenApi(doc), doc, graphqlSdl: null };
   }
-  const swaggerVer = str(doc.swagger);
-  if (swaggerVer && swaggerVer.startsWith('2.')) {
+  if (swagger2VersionFromRoot(doc) != null) {
     return { meta: parseSwagger2(doc), doc, graphqlSdl: null };
   }
   if (doc.asyncapi != null) {

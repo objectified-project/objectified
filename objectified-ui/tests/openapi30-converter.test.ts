@@ -112,6 +112,42 @@ describe('OpenAPI 3.0 to 3.1 Converter', () => {
       expect(result.document.components.schemas.Pet.properties.metadata.nullable).toBeUndefined();
     });
 
+    it('removes top-level allOf/oneOf when wrapping nullable composition in anyOf', () => {
+      // Regression: previously the converter left the original allOf at the top
+      // of the schema while ALSO embedding it inside the new anyOf branch,
+      // producing a malformed `{ allOf: [...], anyOf: [{ allOf: [...] }, { type: null }] }`.
+      const doc = {
+        openapi: '3.0.0',
+        info: { title: 'N', version: '1' },
+        components: {
+          schemas: {
+            Thing: {
+              nullable: true,
+              allOf: [{ type: 'object', properties: { x: { type: 'string' } } }],
+            },
+            ThingOne: {
+              nullable: true,
+              oneOf: [{ type: 'string' }, { type: 'integer' }],
+            },
+          },
+        },
+      };
+      const result = convertOpenAPI30ToOpenAPI31(doc);
+      expect(result.success).toBe(true);
+      const t = result.document.components.schemas.Thing;
+      expect(t.allOf).toBeUndefined();
+      expect(t.nullable).toBeUndefined();
+      expect(Array.isArray(t.anyOf)).toBe(true);
+      expect(t.anyOf).toHaveLength(2);
+      expect(t.anyOf[0].allOf).toBeDefined();
+      expect(t.anyOf[1]).toEqual({ type: 'null' });
+
+      const o = result.document.components.schemas.ThingOne;
+      expect(o.oneOf).toBeUndefined();
+      expect(o.anyOf[0].oneOf).toBeDefined();
+      expect(o.anyOf[1]).toEqual({ type: 'null' });
+    });
+
     it('should convert exclusiveMinimum from boolean to numeric', () => {
       const doc = {
         openapi: '3.0.0',

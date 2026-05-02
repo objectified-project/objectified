@@ -37,8 +37,10 @@ const THRIFT_BASE_TO_JSON: Record<string, { type: string; format?: string }> = {
 export function isThrift(content: string): boolean {
   if (!content || typeof content !== 'string') return false;
   const trimmed = content.trim();
-  // include, namespace, struct, enum, union, exception, service
-  if (/\b(include|namespace)\s+/.test(trimmed)) return true;
+  // Thrift `include` uses a quoted path; plain English ("include a link…") must not match.
+  if (/\binclude\s+"/.test(trimmed)) return true;
+  // Thrift `namespace <lang> <name>` — anchor to line start so keys like `x-namespace:` are not matched.
+  if (/^\s*namespace\s+\w+\s+/m.test(trimmed)) return true;
   if (/\bstruct\s+\w+\s*\{/.test(trimmed)) return true;
   if (/\benum\s+\w+\s*\{/.test(trimmed)) return true;
   if (/\bunion\s+\w+\s*\{/.test(trimmed)) return true;

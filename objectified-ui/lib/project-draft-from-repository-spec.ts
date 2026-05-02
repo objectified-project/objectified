@@ -61,7 +61,9 @@ function parseRoot(content: string, path: string): { root: Record<string, unknow
 
 function detectFormat(root: Record<string, unknown>): RepositorySpecFormat {
   if (root.openapi != null) return 'openapi';
-  if (root.swagger === '2.0' || (root.swagger != null && root.info)) return 'swagger2';
+  const sv = root.swagger;
+  if (typeof sv === 'string' && sv.trim().startsWith('2.')) return 'swagger2';
+  if (typeof sv === 'number' && Number.isFinite(sv) && sv >= 2 && sv < 3) return 'swagger2';
   if (root.asyncapi != null) return 'asyncapi';
   if (root.arazzo != null) return 'arazzo';
   return 'unknown';

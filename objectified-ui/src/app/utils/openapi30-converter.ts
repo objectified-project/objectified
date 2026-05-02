@@ -187,20 +187,27 @@ function convertSchema(schema: any, warnings: string[], path: string = ''): any 
         converted.type = [...schema.type, 'null'];
       }
     } else if (schema.allOf || schema.oneOf || schema.anyOf) {
-      // Complex case: wrap in anyOf with null
+      // Complex case: wrap composition in anyOf with null. We must remove the
+      // original composition keys from the top of `converted`, otherwise the
+      // result is malformed (e.g. both `allOf` and `anyOf` at the same level).
       const nullSchema = { type: 'null' };
       if (schema.anyOf) {
         converted.anyOf = [...schema.anyOf, nullSchema];
       } else {
-        // Convert allOf/oneOf to anyOf with null
-        const originalSchema = { ...converted };
+        const originalSchema: any = { ...converted };
         delete originalSchema.nullable;
+        // The original composition is preserved inside the anyOf branch; remove
+        // it from the top-level converted schema to avoid duplicating it.
+        delete converted.allOf;
+        delete converted.oneOf;
+        delete converted.type;
         converted.anyOf = [originalSchema, nullSchema];
       }
     } else {
       // No type specified, add anyOf with null
-      const originalSchema = { ...converted };
+      const originalSchema: any = { ...converted };
       delete originalSchema.nullable;
+      delete originalSchema.anyOf;
       converted.anyOf = [originalSchema, { type: 'null' }];
     }
 

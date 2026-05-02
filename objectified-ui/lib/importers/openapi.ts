@@ -144,36 +144,45 @@ export function collectExternalTypeKeysFromDocument(document: any, selectedSchem
 }
 
 const convertProperty = (propName: string, propSchema: any, required: string[] = []): NormalizedProperty => {
-  const data: any = { ...propSchema };
+  // Tolerate malformed property schemas (null, boolean, primitives) so a single
+  // bad property does not abort the import.
+  const safeSchema: any = propSchema && typeof propSchema === 'object' ? propSchema : {};
+  const data: any = { ...safeSchema };
   const description = data.description;
   delete data.description;
 
-  if (required.includes(propName)) data.required = true;
+  const requiredList = Array.isArray(required) ? required.filter((r) => typeof r === 'string') : [];
+  if (requiredList.includes(propName)) data.required = true;
 
   const result: NormalizedProperty = { name: propName, data, description };
 
   // Inline object
-  if (propSchema.type === 'object' && propSchema.properties) {
-    const nestedRequired = Array.isArray(propSchema.required) ? propSchema.required : [];
+  if (safeSchema.type === 'object' && safeSchema.properties && typeof safeSchema.properties === 'object') {
+    const nestedRequired = Array.isArray(safeSchema.required) ? safeSchema.required : [];
     const children: NormalizedProperty[] = [];
     delete data.properties;
     delete data.required;
-    for (const childName of Object.keys(propSchema.properties)) {
-      children.push(convertProperty(childName, propSchema.properties[childName], nestedRequired));
+    for (const childName of Object.keys(safeSchema.properties)) {
+      children.push(convertProperty(childName, safeSchema.properties[childName], nestedRequired));
     }
     result.children = children;
   }
 
   // Array of objects
-  if (propSchema.type === 'array' && propSchema.items?.type === 'object' && propSchema.items.properties) {
-    const nestedRequired = Array.isArray(propSchema.items.required) ? propSchema.items.required : [];
+  if (
+    safeSchema.type === 'array' &&
+    safeSchema.items && typeof safeSchema.items === 'object' &&
+    safeSchema.items.type === 'object' &&
+    safeSchema.items.properties && typeof safeSchema.items.properties === 'object'
+  ) {
+    const nestedRequired = Array.isArray(safeSchema.items.required) ? safeSchema.items.required : [];
     const children: NormalizedProperty[] = [];
-    const items = { ...propSchema.items };
+    const items = { ...safeSchema.items };
     delete items.properties;
     delete items.required;
     data.items = items;
-    for (const childName of Object.keys(propSchema.items.properties)) {
-      children.push(convertProperty(childName, propSchema.items.properties[childName], nestedRequired));
+    for (const childName of Object.keys(safeSchema.items.properties)) {
+      children.push(convertProperty(childName, safeSchema.items.properties[childName], nestedRequired));
     }
     result.children = children;
   }

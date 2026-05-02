@@ -3,7 +3,6 @@ import {
   getRepositoryFileImportableVerdict,
   parseRepositoryFileSpecMetadata,
   REPOSITORY_OPENAPI_VERSION_UNCLEAR_MESSAGE,
-  REPOSITORY_SWAGGER_OPENAPI2_NOT_IMPORTABLE_MESSAGE,
 } from '@lib/repository-file-spec-metadata';
 
 describe('parseRepositoryFileSpecMetadata', () => {
@@ -278,7 +277,7 @@ paths: {}
     expect(v.loadError).toBe('Gateway timeout');
   });
 
-  it('returns not_importable with unsupported_swagger_openapi_2 for Swagger / OpenAPI 2.0', () => {
+  it('returns importable for Swagger / OpenAPI 2.0 (normalized to OpenAPI 3.1 during project import)', () => {
     const doc = {
       swagger: '2.0',
       info: { title: 'Legacy', version: '1' },
@@ -287,10 +286,22 @@ paths: {}
     const meta = parseRepositoryFileSpecMetadata(JSON.stringify(doc), 'swagger.json');
     expect(meta.format).toBe('swagger2');
     const v = getRepositoryFileImportableVerdict(meta, { loadError: null });
-    expect(v.status).toBe('not_importable');
-    expect(v.summary).toBe('unsupported_swagger_openapi_2');
+    expect(v.status).toBe('importable');
+    expect(v.summary).toBe('importable');
     expect(v.format).toBe('swagger2');
-    expect(v.notImportableMessage).toBe(REPOSITORY_SWAGGER_OPENAPI2_NOT_IMPORTABLE_MESSAGE);
+    expect(v.spec).toBe('Swagger 2.0');
+  });
+
+  it('detects Swagger 2 when swagger is a JSON number (e.g. 2.0)', () => {
+    const doc = {
+      swagger: 2,
+      info: { title: 'Legacy', version: '1' },
+      paths: {},
+    };
+    const meta = parseRepositoryFileSpecMetadata(JSON.stringify(doc), 'swagger.json');
+    expect(meta.format).toBe('swagger2');
+    const v = getRepositoryFileImportableVerdict(meta, { loadError: null });
+    expect(v.status).toBe('importable');
   });
 
   it('returns not_importable with unsupported_openapi_version when openapi field is below 3.0', () => {

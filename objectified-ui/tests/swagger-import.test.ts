@@ -507,6 +507,41 @@ paths:
       expect(result.success).toBe(true);
       expect(result.classes.find(c => c.name === 'Model')).toBeDefined();
     });
+
+    test('should resolve #/parameters/$ref for path operations (Adafruit-style)', () => {
+      const yaml = `
+swagger: "2.0"
+info:
+  title: Ref params API
+  version: "1.0.0"
+paths:
+  "/{username}/feeds":
+    get:
+      parameters:
+        - $ref: "#/parameters/UsernamePath"
+      responses:
+        "200":
+          description: ok
+parameters:
+  UsernamePath:
+    in: path
+    name: username
+    required: true
+    type: string
+`;
+      const result = parseOpenAPISpec(yaml);
+      expect(result.success).toBe(true);
+      const feedsPath = result.paths?.find(p => p.path === '/{username}/feeds');
+      expect(feedsPath).toBeDefined();
+      const getFeeds = feedsPath!.operations.find(o => o.method === 'GET');
+      expect(getFeeds!.parameters.some(p => p.name === 'username' && p.in === 'path')).toBe(true);
+    });
+
+    test('should detect Swagger 2.x when swagger is a JSON number', () => {
+      expect(isSwagger2({ swagger: 2, info: {} })).toBe(true);
+      expect(isSwagger2({ swagger: 2.0, info: {} })).toBe(true);
+      expect(getSwaggerVersion({ swagger: 2 })).toBe('2');
+    });
   });
 
   describe('OAuth2 Flow Conversion', () => {

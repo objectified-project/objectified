@@ -1054,7 +1054,6 @@ export function RepositoryFileImportMapping({
                 className="w-full gap-1.5 bg-indigo-600 hover:bg-indigo-700"
                 disabled={!importButtonEnabled}
                 title={
-                  importableVerdict.summary === 'unsupported_swagger_openapi_2' ||
                   importableVerdict.summary === 'unsupported_openapi_version'
                     ? importableVerdict.notImportableMessage
                     : undefined

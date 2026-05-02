@@ -174,6 +174,16 @@ describe('#240 Thrift Import – unit', () => {
       expect(isThrift('type Query { x: Int }')).toBe(false);
     });
 
+    it('returns false when prose contains "include" or line has x-namespace (OpenAPI / YAML)', () => {
+      // Regression: Ably OpenAPI (APIs-guru) describes RFC 5988 with "include a link…"; old `\binclude\s+` misdetected Thrift.
+      expect(
+        isThrift(
+          'description: Links in the format defined by RFC 5988. This will potentially include a link with relation type `next`.'
+        )
+      ).toBe(false);
+      expect(isThrift('x-namespace: "urn:example"\nopenapi: 3.0.0')).toBe(false);
+    });
+
     it('returns false for null or non-string', () => {
       expect(isThrift(null as any)).toBe(false);
       expect(isThrift(undefined as any)).toBe(false);

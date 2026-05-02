@@ -160,9 +160,13 @@ function resolveReference(ref: string, schemas: any): any {
 }
 
 /**
- * Resolves allOf compositions by merging all schemas together
+ * Resolves allOf compositions by merging all schemas together.
+ * Tracks visited $refs so circular allOf chains do not cause infinite recursion
+ * (which previously surfaced as "Maximum call stack size exceeded" and aborted
+ * the entire import).
  */
-function resolveAllOf(schema: any, schemas: any): any {
+function resolveAllOf(schema: any, schemas: any, seen: Set<string> = new Set()): any {
+  if (!schema || typeof schema !== 'object') return schema;
   if (!schema.allOf || !Array.isArray(schema.allOf)) {
     return schema;
   }
@@ -180,18 +184,25 @@ function resolveAllOf(schema: any, schemas: any): any {
 
   // Merge each schema in allOf
   for (const item of schema.allOf) {
+    if (!item || typeof item !== 'object') continue;
     let itemSchema: any;
 
     // Resolve $ref if present
     if (item.$ref) {
+      if (seen.has(item.$ref)) {
+        // Circular reference - skip to avoid infinite recursion
+        continue;
+      }
       itemSchema = resolveReference(item.$ref, schemas);
       if (!itemSchema) {
         continue; // Skip unresolved references
       }
+      const nextSeen = new Set(seen);
+      nextSeen.add(item.$ref);
       // Recursively resolve allOf in referenced schema
-      itemSchema = resolveAllOf(itemSchema, schemas);
+      itemSchema = resolveAllOf(itemSchema, schemas, nextSeen);
     } else {
-      itemSchema = item;
+      itemSchema = resolveAllOf(item, schemas, seen);
     }
 
     // Merge properties
@@ -226,17 +237,24 @@ function resolveAllOf(schema: any, schemas: any): any {
 export { extractDirectProperties };
 
 /**
- * Converts an OpenAPI schema property to a property data object with nested children
+ * Converts an OpenAPI schema property to a property data object with nested children.
+ * Hardened to tolerate malformed inputs (null/non-object property schemas, non-array
+ * `required`) so a single bad property does not abort the entire import.
  */
 function convertSchemaProperty(propName: string, propSchema: any, required: string[] = []): ParsedProperty {
-  const data: any = { ...propSchema };
+  // Defensive: tolerate null / non-object property schemas (some real-world specs
+  // emit `properties: { foo: null }` or boolean schemas from JSON Schema 2020-12).
+  const safeSchema: any = propSchema && typeof propSchema === 'object' ? propSchema : {};
+  const data: any = { ...safeSchema };
 
   // Remove description from data (it's stored separately)
   const description = data.description;
   delete data.description;
 
-  // Handle required flag
-  if (required.includes(propName)) {
+  // Handle required flag — `required` from caller may be a non-array if the spec
+  // is malformed; treat anything other than an array of strings as "no requireds".
+  const requiredList = Array.isArray(required) ? required.filter((r) => typeof r === 'string') : [];
+  if (requiredList.includes(propName)) {
     data.required = true;
   }
 
@@ -247,8 +265,8 @@ function convertSchemaProperty(propName: string, propSchema: any, required: stri
   };
 
   // Handle inline object properties with nested properties
-  if (propSchema.type === 'object' && propSchema.properties) {
-    const nestedRequired = propSchema.required || [];
+  if (safeSchema.type === 'object' && safeSchema.properties && typeof safeSchema.properties === 'object') {
+    const nestedRequired = Array.isArray(safeSchema.required) ? safeSchema.required : [];
     const children: ParsedProperty[] = [];
 
     // Remove properties and required from data (they'll be stored as children)
@@ -256,8 +274,8 @@ function convertSchemaProperty(propName: string, propSchema: any, required: stri
     delete data.required;
 
     // Recursively convert nested properties
-    for (const childName in propSchema.properties) {
-      const childSchema = propSchema.properties[childName];
+    for (const childName in safeSchema.properties) {
+      const childSchema = safeSchema.properties[childName];
       children.push(convertSchemaProperty(childName, childSchema, nestedRequired));
     }
 
@@ -265,19 +283,24 @@ function convertSchemaProperty(propName: string, propSchema: any, required: stri
   }
 
   // Handle arrays of objects with inline properties
-  if (propSchema.type === 'array' && propSchema.items?.type === 'object' && propSchema.items.properties) {
-    const nestedRequired = propSchema.items.required || [];
+  if (
+    safeSchema.type === 'array' &&
+    safeSchema.items && typeof safeSchema.items === 'object' &&
+    safeSchema.items.type === 'object' &&
+    safeSchema.items.properties && typeof safeSchema.items.properties === 'object'
+  ) {
+    const nestedRequired = Array.isArray(safeSchema.items.required) ? safeSchema.items.required : [];
     const children: ParsedProperty[] = [];
 
     // Remove properties and required from items in data
-    const items = { ...propSchema.items };
+    const items = { ...safeSchema.items };
     delete items.properties;
     delete items.required;
     data.items = items;
 
     // Recursively convert nested properties from items
-    for (const childName in propSchema.items.properties) {
-      const childSchema = propSchema.items.properties[childName];
+    for (const childName in safeSchema.items.properties) {
+      const childSchema = safeSchema.items.properties[childName];
       children.push(convertSchemaProperty(childName, childSchema, nestedRequired));
     }
 
@@ -513,8 +536,18 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
       return parseOpenAPISpecInternal(spec, globalWarnings);
     }
 
+    // Validate parsed spec is a plain object before reading properties on it
+    if (!spec || typeof spec !== 'object' || Array.isArray(spec)) {
+      return {
+        success: false,
+        classes: [],
+        warnings: [],
+        error: 'Invalid specification: expected an OpenAPI document object'
+      };
+    }
+
     // Validate OpenAPI version
-    if (!spec.openapi || !spec.openapi.startsWith('3.')) {
+    if (!spec.openapi || typeof spec.openapi !== 'string' || !spec.openapi.startsWith('3.')) {
       // Check if this might be GraphQL SDL that wasn't parsed yet
       // (This shouldn't normally happen as YAML.parse would fail on GraphQL SDL)
       return {
@@ -737,27 +770,42 @@ function parseOpenAPISpecInternal(spec: any, initialWarnings: string[]): OpenAPI
       const originalSchema = schemas[schemaName];
       const warnings: string[] = [];
       let isSupported = true;
+      let properties: ParsedProperty[] = [];
+      let resolvedDescription: string | undefined;
 
-      const resolvedSchema = resolveAllOf(originalSchema, schemas);
-      const unresolvedRefs = findUnresolvedReferences(resolvedSchema, allSchemaNames);
-      if (unresolvedRefs.length > 0) {
-        warnings.push(
-          `References undefined schemas: ${unresolvedRefs.join(', ')}. ` +
-          `These referenced schemas do not exist in the specification.`
-        );
+      // Isolate per-schema parse work so a single malformed schema does not
+      // abort the entire import (e.g. circular allOf, null property values).
+      try {
+        if (!originalSchema || typeof originalSchema !== 'object') {
+          warnings.push('Schema is not an object; skipping.');
+          isSupported = false;
+        } else {
+          const resolvedSchema = resolveAllOf(originalSchema, schemas);
+          resolvedDescription = resolvedSchema?.description;
+          const unresolvedRefs = findUnresolvedReferences(resolvedSchema, allSchemaNames);
+          if (unresolvedRefs.length > 0) {
+            warnings.push(
+              `References undefined schemas: ${unresolvedRefs.join(', ')}. ` +
+              `These referenced schemas do not exist in the specification.`
+            );
+            isSupported = false;
+          }
+
+          const { properties: directProperties, required: directRequired } = extractDirectProperties(originalSchema);
+          for (const propName in directProperties) {
+            const propSchema = directProperties[propName];
+            properties.push(convertSchemaProperty(propName, propSchema, directRequired));
+          }
+        }
+      } catch (err: any) {
+        warnings.push(`Failed to parse schema: ${err?.message ?? String(err)}`);
         isSupported = false;
-      }
-
-      const { properties: directProperties, required: directRequired } = extractDirectProperties(originalSchema);
-      const properties: ParsedProperty[] = [];
-      for (const propName in directProperties) {
-        const propSchema = directProperties[propName];
-        properties.push(convertSchemaProperty(propName, propSchema, directRequired));
+        properties = [];
       }
 
       classes.push({
         name: schemaName,
-        description: originalSchema.description || resolvedSchema.description,
+        description: (originalSchema && typeof originalSchema === 'object' ? originalSchema.description : undefined) || resolvedDescription,
         properties,
         selected: isSupported,
         warnings,
