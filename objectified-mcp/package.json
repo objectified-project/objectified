@@ -12,6 +12,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "dev": "yarn build && yarn start",
     "start": "node bin/objectified-mcp.js --transport stdio",
     "test": "yarn build && tsx --test tests/server.test.ts"
   },
