@@ -21,7 +21,7 @@ Tools opt in with::
 
 Scoped reads combine :meth:`objectified_mcp.scope.Scope.allows` with revision
 visibility via :func:`objectified_mcp.spec_authorization.authorize_spec` (and
-:parametrized SQL via
+parameterized SQL via
 :func:`objectified_mcp.spec_authorization.build_authorized_spec_sql_predicate`).
 See :class:`objectified_mcp.scope.Scope` for ``scope_json``.
 """

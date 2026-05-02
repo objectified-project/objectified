@@ -120,3 +120,36 @@ def test_build_sql_rejects_bad_identifiers() -> None:
             project_column="v.project_id",
             visibility_column="v.visibility",
         )
+
+
+@pytest.mark.parametrize(
+    "bad_name",
+    [
+        "v..tenant_id",    # consecutive dots
+        "v.tenant_id.",    # trailing dot
+        ".tenant_id",      # leading dot
+        "v. tenant_id",    # space inside
+        "",                # empty string
+    ],
+)
+def test_build_sql_rejects_malformed_dot_identifiers(bad_name: str) -> None:
+    auth = _ctx()
+    with pytest.raises(ValueError):
+        build_authorized_spec_sql_predicate(
+            auth,
+            tenant_column=bad_name,
+            project_column="v.project_id",
+            visibility_column="v.visibility",
+        )
+
+
+def test_build_sql_rejects_bad_identifiers_even_with_deny_all_scope() -> None:
+    """Identifier validation must happen before the deny_all early-return."""
+    auth = _ctx(scope=Scope(deny_all=True))
+    with pytest.raises(ValueError, match="tenant_column"):
+        build_authorized_spec_sql_predicate(
+            auth,
+            tenant_column="v..bad",
+            project_column="v.project_id",
+            visibility_column="v.visibility",
+        )

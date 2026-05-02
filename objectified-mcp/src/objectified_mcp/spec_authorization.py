@@ -17,7 +17,7 @@ from typing import Any, Mapping
 from objectified_mcp.mcp_auth import McpAuthContext
 from objectified_mcp.scope import Scope
 
-_SQL_IDENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_.]*$")
+_SQL_IDENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$")
 
 
 def _validate_qualified_identifier(name: str, *, role: str) -> str:
@@ -98,12 +98,12 @@ def build_authorized_spec_sql_predicate(
     params are ordered: tenant allow-list (if any), project allow-list (if any),
     then the key's ``tenant_id`` text for the private-spec guard.
     """
-    if auth_ctx.scope.deny_all:
-        return "FALSE", []
-
     tenant_column = _validate_qualified_identifier(tenant_column, role="tenant_column")
     project_column = _validate_qualified_identifier(project_column, role="project_column")
     visibility_column = _validate_qualified_identifier(visibility_column, role="visibility_column")
+
+    if auth_ctx.scope.deny_all:
+        return "FALSE", []
 
     scope_sql, scope_params = _scope_predicate_sql(auth_ctx.scope, tenant_column, project_column)
 
