@@ -97,7 +97,7 @@ process or via Docker.
 
 | # | Issue | Title | Depends on |
 |---|-------|-------|------------|
-| 3.1 | [#3004](../../issues/3004) | SQL view: published+public specs | E1 |
+| 3.1 | ~~[#3004](../../issues/3004)~~ | ~~SQL view: published+public specs~~ (**completed**) | E1 |
 | 3.2 | [#3005](../../issues/3005) | Tool `spec.list` (public, paginated) | 3.1 |
 | 3.3 | [#3006](../../issues/3006) | Tool `spec.describe` (public) | 3.1 |
 | 3.4 | [#3007](../../issues/3007) | Tool `spec.search` (keyword) | 3.1 |
