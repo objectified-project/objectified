@@ -1,6 +1,6 @@
 [project]
 name = "objectified-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Model Context Protocol server for Objectified (FastMCP)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,6 +17,8 @@ classifiers = [
 
 dependencies = [
     "fastmcp>=3.2.0",
+    "pydantic>=2.9.2",
+    "pydantic-settings>=2.5.2",
 ]
 
 [project.scripts]

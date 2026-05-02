@@ -1,4 +1,4 @@
-# Objectified 05-2026
+# Objectified 06-2026
 
 We continue to improve the platform based on your feedback with improvements and new features!
 
@@ -7,6 +7,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## MCP
 
 - New `objectified-mcp` Python package (FastMCP, uv, ruff, mypy) as the foundation for the Model Context Protocol server.
+- MCP server loads typed configuration from the environment via pydantic-settings (`objectified-mcp serve`); see `objectified-mcp/.env.example`.
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports
