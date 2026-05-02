@@ -500,6 +500,12 @@ export function RepositoryFileImportMapping({
           userId: currentUserId,
           sourceKind,
           document,
+          repositorySource: {
+            repositoryId,
+            branch,
+            path: file.path,
+            blobSha: payload?.blob_sha ?? file.blob_sha ?? null,
+          },
           project: {
             name: importOptions.projectName || (document?.info?.title || 'New Project'),
             slug:

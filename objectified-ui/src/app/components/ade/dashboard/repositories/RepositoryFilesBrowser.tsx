@@ -12,7 +12,7 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
@@ -73,6 +73,11 @@ function shortSha(sha: string | null | undefined): string {
   return s.length > 7 ? s.slice(0, 7) : s;
 }
 
+/** Escape path for POSIX-regex file listing (`path ~* pattern`). */
+function escapeRegexPath(path: string): string {
+  return path.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+}
+
 function kindPillClass(displayKind: string): string {
   const k = displayKind.toLowerCase();
   if (k.includes('openapi')) {
@@ -114,6 +119,8 @@ export function RepositoryFilesBrowser({
   repositoryName,
   repositoryFullName,
   githubWebBase,
+  filesDeepLink,
+  onFilesDeepLinkConsumed,
 }: {
   repositoryId: string;
   defaultBranch: string;
@@ -121,6 +128,9 @@ export function RepositoryFilesBrowser({
   /** Display slug for Git-linked repos, e.g. `org/repo` */
   repositoryFullName: string;
   githubWebBase: string | null;
+  /** Open this indexed path on the given branch (e.g. from import history deep link). */
+  filesDeepLink?: { path: string; branch: string } | null;
+  onFilesDeepLinkConsumed?: () => void;
 }) {
   const [branch, setBranch] = useState(defaultBranch);
   const [branchSearch, setBranchSearch] = useState('');
@@ -150,6 +160,10 @@ export function RepositoryFilesBrowser({
   const [detailFile, setDetailFile] = useState<RepositoryFileApiRow | null>(null);
   const [importFile, setImportFile] = useState<RepositoryFileApiRow | null>(null);
 
+  const lastDeepLinkKeyDoneRef = useRef<string | null>(null);
+  const onDeepLinkConsumedRef = useRef(onFilesDeepLinkConsumed);
+  onDeepLinkConsumedRef.current = onFilesDeepLinkConsumed;
+
   useEffect(() => {
     setBranch(defaultBranch);
     setBranches((prev) => (prev.includes(defaultBranch) ? prev : [...prev, defaultBranch]));
@@ -157,48 +171,89 @@ export function RepositoryFilesBrowser({
 
   const pageSize = 50;
 
-  const fetchFiles = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const qs = new URLSearchParams();
-    qs.set('branch', branch);
-    qs.set('limit', String(pageSize));
-    qs.set('offset', String(applied.offset));
-    if (applied.regex.trim()) {
-      qs.set('regex', applied.regex.trim());
-    } else {
-      if (applied.preset) qs.set('preset', applied.preset);
-      if (applied.glob.trim()) qs.set('glob', applied.glob.trim());
-    }
-    qs.set('hide_non_importable', applied.hideNonImportable ? 'true' : 'false');
-    qs.set('skip_vendor', applied.skipVendor ? 'true' : 'false');
-    qs.set('include_hidden', applied.includeHidden ? 'true' : 'false');
+  type FetchFilesOpts = { deepLink?: { path: string; branch: string } };
 
-    try {
-      const res = await fetch(
-        `/api/repositories/${encodeURIComponent(repositoryId)}/files?${qs.toString()}`,
-        { credentials: 'include' }
-      );
-      const json = (await res.json().catch(() => ({}))) as FilesApiResponse & { error?: string };
-      if (!res.ok) {
-        throw new Error(typeof json.error === 'string' ? json.error : res.statusText);
+  const fetchFiles = useCallback(
+    async (opts?: FetchFilesOpts) => {
+      setLoading(true);
+      setError(null);
+      const qs = new URLSearchParams();
+      const branchForReq = opts?.deepLink?.branch ?? branch;
+      qs.set('branch', branchForReq);
+      qs.set('limit', String(pageSize));
+      qs.set('offset', String(opts?.deepLink ? 0 : applied.offset));
+
+      if (opts?.deepLink?.path) {
+        qs.set('regex', `^${escapeRegexPath(opts.deepLink.path)}$`);
+        qs.set('hide_non_importable', 'false');
+        qs.set('skip_vendor', applied.skipVendor ? 'true' : 'false');
+        qs.set('include_hidden', applied.includeHidden ? 'true' : 'false');
+      } else {
+        if (applied.regex.trim()) {
+          qs.set('regex', applied.regex.trim());
+        } else {
+          if (applied.preset) qs.set('preset', applied.preset);
+          if (applied.glob.trim()) qs.set('glob', applied.glob.trim());
+        }
+        qs.set('hide_non_importable', applied.hideNonImportable ? 'true' : 'false');
+        qs.set('skip_vendor', applied.skipVendor ? 'true' : 'false');
+        qs.set('include_hidden', applied.includeHidden ? 'true' : 'false');
       }
-      setData(json);
-      setBranches(json.branches?.length ? json.branches : [branch]);
-      setSelected({});
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Could not load files';
-      setError(msg);
-      setData(null);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [repositoryId, branch, applied]);
+
+      try {
+        const res = await fetch(
+          `/api/repositories/${encodeURIComponent(repositoryId)}/files?${qs.toString()}`,
+          { credentials: 'include' }
+        );
+        const json = (await res.json().catch(() => ({}))) as FilesApiResponse & { error?: string };
+        if (!res.ok) {
+          throw new Error(typeof json.error === 'string' ? json.error : res.statusText);
+        }
+        setData(json);
+        setBranches(json.branches?.length ? json.branches : [branchForReq]);
+        setSelected({});
+        if (opts?.deepLink?.path) {
+          const wantPath = opts.deepLink.path;
+          const hit = json.files?.find((f) => f.path === wantPath);
+          if (hit) {
+            setBranch(opts.deepLink.branch);
+            setDetailFile(hit);
+          } else {
+            toast.error('That file is not in the repository index for this branch anymore.');
+          }
+          onDeepLinkConsumedRef.current?.();
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Could not load files';
+        setError(msg);
+        setData(null);
+        toast.error(msg);
+        if (opts?.deepLink) {
+          onDeepLinkConsumedRef.current?.();
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [repositoryId, branch, applied]
+  );
 
   useEffect(() => {
+    if (!filesDeepLink) {
+      lastDeepLinkKeyDoneRef.current = null;
+      return;
+    }
+    const k = `${filesDeepLink.branch}\0${filesDeepLink.path}`;
+    if (lastDeepLinkKeyDoneRef.current === k) return;
+    lastDeepLinkKeyDoneRef.current = k;
+    setBranch(filesDeepLink.branch);
+    void fetchFiles({ deepLink: filesDeepLink });
+  }, [filesDeepLink, fetchFiles]);
+
+  useEffect(() => {
+    if (filesDeepLink) return;
     void fetchFiles();
-  }, [fetchFiles]);
+  }, [fetchFiles, filesDeepLink]);
 
   const filteredBranches = useMemo(() => {
     const q = branchSearch.trim().toLowerCase();

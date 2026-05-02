@@ -12,13 +12,16 @@ import {
   createPropertyTx,
   createClassTx,
   addPropertyToClassTx,
-  getClassesWithPropertiesAndTagsTx
+  getClassesWithPropertiesAndTagsTx,
+  getLatestVersionUuidForProjectTx,
+  listProjectLibraryPropertiesTx,
 } from './import-transaction';
 import { ImportSourceKind, getImporter, NormalizedClass, NormalizedProperty } from '../importers';
 import { withRetry } from '../retry';
 import { permanentDeleteProject } from './helper';
 import { extractPaths, extractSecuritySchemes } from '../../src/app/utils/openapi-import';
 import { importOpenAPIPathsAndSecurity } from './import-openapi-paths-security';
+import { recordTenantRepositoryImport } from './repository-import-metrics';
 
 export type ImportJobState = 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
 
@@ -96,6 +99,13 @@ export interface ImportJobInput {
   };
   /** When set, project creation is skipped and a new version is imported into this catalog project. */
   existingProjectId?: string;
+  /** When set, a metric row is recorded after a successful import (repository file browser). */
+  repositorySource?: {
+    repositoryId: string;
+    branch: string;
+    path: string;
+    blobSha?: string | null;
+  };
 }
 
 interface JobState {
@@ -140,6 +150,30 @@ interface JobState {
 
 const jobs = new Map<string, JobState>();
 
+async function recordRepositoryImportMetricIfApplicable(job: JobState): Promise<void> {
+  const src = job.input.repositorySource;
+  if (!src?.repositoryId?.trim()) return;
+  const projectId = job.result?.projectId;
+  const versionUuid = job.result?.versionId;
+  if (!projectId || !versionUuid) return;
+  try {
+    await recordTenantRepositoryImport({
+      tenantId: job.input.tenantId,
+      repositorySource: {
+        repositoryId: src.repositoryId.trim(),
+        branch: src.branch,
+        path: src.path,
+        blobSha: src.blobSha ?? null,
+      },
+      projectId,
+      versionUuid,
+      importedByUserId: job.input.userId,
+    });
+  } catch (err) {
+    console.error('[import-helper] recordTenantRepositoryImport failed:', err);
+  }
+}
+
 const rndId = () => Math.random().toString(36).slice(2);
 const now = () => Date.now();
 
@@ -166,6 +200,98 @@ function stableStringify(obj: any): string {
   const sortedKeys = Object.keys(obj).sort();
   const pairs = sortedKeys.map(key => JSON.stringify(key) + ':' + stableStringify(obj[key]));
   return '{' + pairs.join(',') + '}';
+}
+
+type NormalizedModel = { classes: NormalizedClass[] };
+
+async function buildPropertyIdMapForImport(
+  client: PoolClient,
+  projectId: string,
+  norm: NormalizedModel,
+  job: JobState,
+  reuseLibraryFromProject: boolean
+): Promise<Map<string, string>> {
+  const propertyMap = new Map<string, { data: any; description?: string; names: Set<string> }>();
+
+  const collectProperties = (props: any[]) => {
+    for (const p of props || []) {
+      const isReference = p.data.$ref || (p.data.type === 'array' && p.data.items?.$ref);
+      if (!isReference) {
+        const sig = stableStringify(p.data);
+        if (!propertyMap.has(sig)) {
+          propertyMap.set(sig, { data: p.data, description: p.description, names: new Set<string>() });
+        }
+        propertyMap.get(sig)!.names.add(p.name);
+      }
+      if (p.children) collectProperties(p.children);
+    }
+  };
+
+  for (const cls of norm.classes) {
+    collectProperties(cls.properties || []);
+  }
+
+  const propertyIdMap = new Map<string, string>();
+  const usedNames = new Set<string>();
+  const sigToLibraryId = new Map<string, string>();
+
+  if (reuseLibraryFromProject) {
+    const rows = await listProjectLibraryPropertiesTx(client, projectId);
+    for (const row of rows) {
+      usedNames.add(row.name);
+      const sig = stableStringify(row.data);
+      if (!sigToLibraryId.has(sig)) sigToLibraryId.set(sig, row.id);
+    }
+    emit(job, 'info', 'LIBRARY_REUSE', `Loaded ${rows.length} property library row(s) for cross-revision reuse`, {
+      projectId,
+    });
+  }
+
+  emit(
+    job,
+    'info',
+    'CREATING_PROPERTIES',
+    `Ensuring ${propertyMap.size} unique property shape(s) in project library` +
+      (reuseLibraryFromProject ? ` (${sigToLibraryId.size} existing shape(s) indexed)` : '')
+  );
+
+  for (const [sig, payload] of propertyMap.entries()) {
+    if (job.canceled) throw new Error('Import canceled');
+
+    const reusedId = sigToLibraryId.get(sig);
+    if (reusedId) {
+      propertyIdMap.set(sig, reusedId);
+      continue;
+    }
+
+    let baseName = Array.from(payload.names)[0];
+    let propName = baseName;
+    let suffix = 1;
+    while (usedNames.has(propName)) {
+      propName = `${baseName}_${suffix}`;
+      suffix++;
+    }
+    usedNames.add(propName);
+
+    emit(job, 'info', 'DEBUG_PROPERTY', `Creating property: ${propName} (used as: ${Array.from(payload.names).join(', ')})`, {
+      description: payload.description,
+      dataType: payload.data?.type,
+    });
+
+    const resProp = JSON.parse(
+      await createPropertyTx(client, projectId, propName, payload.description || null, payload.data)
+    );
+    if (!resProp.success) {
+      emit(job, 'warn', 'PROPERTY_CREATE_WARN', `Could not create property "${propName}": ${resProp.error}`);
+      continue;
+    }
+    propertyIdMap.set(sig, resProp.property.id as string);
+    sigToLibraryId.set(sig, resProp.property.id as string);
+    if (job.summary) job.summary.propertiesCreated++;
+  }
+
+  emit(job, 'info', 'PROPERTIES_READY', `Resolved ${propertyIdMap.size} property library id(s) for class linking`);
+  return propertyIdMap;
 }
 
 // Normalize property data for comparison - removes volatile fields and normalizes structure
@@ -609,57 +735,41 @@ export async function startImport(input: ImportJobInput) {
         }
         if (job.canceled) throw new Error('Import canceled');
         setProgress(job, 'creating-version', 2, 1, input.version.versionId);
+        const reuseLibraryInc = Boolean(existingInc);
+        const parentVersionUuidInc = reuseLibraryInc
+          ? await getLatestVersionUuidForProjectTx(client!, projectId)
+          : null;
         const resVer = JSON.parse(
           await withRetry(
-            () => createVersionTx(client!, projectId, input.userId, input.version.versionId, input.version.description || '', 'Imported from specification'),
+            () =>
+              createVersionTx(
+                client!,
+                projectId,
+                input.userId,
+                input.version.versionId,
+                input.version.description || '',
+                parentVersionUuidInc
+                  ? 'Imported from specification (follow-on revision in same project)'
+                  : 'Imported from specification',
+                parentVersionUuidInc ? { parentVersionUuid: parentVersionUuidInc } : undefined
+              ),
             { maxAttempts: 3, initialDelayMs: 500, label: 'createVersion' }
           )
         );
         if (!resVer.success) throw new Error(resVer.error || 'Failed to create version');
         const versionId = resVer.version.id as string;
-        emit(job, 'info', 'VERSION_CREATED', `Created version: ${input.version.versionId}`, { versionId });
+        emit(job, 'info', 'VERSION_CREATED', `Created version: ${input.version.versionId}`, {
+          versionId,
+          parentVersionUuid: parentVersionUuidInc ?? undefined,
+        });
 
-        const propertyMapInc = new Map<string, { data: any; description?: string; names: Set<string> }>();
-        const propertyIdMapInc = new Map<string, string>();
-        const collectPropertiesInc = (props: any[]) => {
-          for (const p of props || []) {
-            const isReference = p.data.$ref || (p.data.type === 'array' && p.data.items?.$ref);
-            if (!isReference) {
-              const sig = stableStringify(p.data);
-              if (!propertyMapInc.has(sig)) {
-                propertyMapInc.set(sig, { data: p.data, description: p.description, names: new Set<string>() });
-              }
-              propertyMapInc.get(sig)!.names.add(p.name);
-            }
-            if (p.children) collectPropertiesInc(p.children);
-          }
-        };
-        for (const cls of norm.classes) collectPropertiesInc(cls.properties || []);
-
-        emit(job, 'info', 'CREATING_PROPERTIES', `Creating ${propertyMapInc.size} unique properties in library`);
-        const usedNamesInc = new Set<string>();
-        for (const [sig, payload] of propertyMapInc.entries()) {
-          if (job.canceled) throw new Error('Import canceled');
-          let baseName = Array.from(payload.names)[0];
-          let propName = baseName;
-          let suffix = 1;
-          while (usedNamesInc.has(propName)) {
-            propName = `${baseName}_${suffix}`;
-            suffix++;
-          }
-          usedNamesInc.add(propName);
-          emit(job, 'info', 'DEBUG_PROPERTY', `Creating property: ${propName}`, { dataType: payload.data.type });
-          const resProp = JSON.parse(
-            await createPropertyTx(client!, projectId, propName, payload.description || null, payload.data)
-          );
-          if (!resProp.success) {
-            emit(job, 'warn', 'PROPERTY_CREATE_WARN', `Could not create property "${propName}": ${resProp.error}`);
-            continue;
-          }
-          propertyIdMapInc.set(sig, resProp.property.id);
-          if (job.summary) job.summary.propertiesCreated++;
-        }
-        emit(job, 'info', 'PROPERTIES_CREATED', `Created ${propertyIdMapInc.size} properties in library`);
+        const propertyIdMapInc = await buildPropertyIdMapForImport(
+          client!,
+          projectId,
+          norm,
+          job,
+          reuseLibraryInc
+        );
 
         setProgress(job, 'creating-classes', 2 + norm.classes.length, 2);
         let classCountInc = 0;
@@ -708,9 +818,11 @@ export async function startImport(input: ImportJobInput) {
           }
         }
 
+        job.result = { projectId, versionId };
+        await recordRepositoryImportMetricIfApplicable(job);
+
         setProgress(job, 'finalizing', 3 + norm.classes.length, 3 + norm.classes.length);
         job.state = 'completed';
-        job.result = { projectId, versionId };
         if (job.summary) {
           job.summary.totalTime = Date.now() - startTime;
           job.summary.incrementalMode = true;
@@ -753,77 +865,35 @@ export async function startImport(input: ImportJobInput) {
       if (job.canceled) throw new Error('Import canceled');
 
       setProgress(job, 'creating-version', 2, 1, input.version.versionId);
+      const reuseLibraryTx = Boolean(existingTx);
+      const parentVersionUuidTx = reuseLibraryTx
+        ? await getLatestVersionUuidForProjectTx(client!, projectId)
+        : null;
       const resVer = JSON.parse(
         await withRetry(
-          () => createVersionTx(client!, projectId, input.userId, input.version.versionId, input.version.description || '', 'Imported from specification'),
+          () =>
+            createVersionTx(
+              client!,
+              projectId,
+              input.userId,
+              input.version.versionId,
+              input.version.description || '',
+              parentVersionUuidTx
+                ? 'Imported from specification (follow-on revision in same project)'
+                : 'Imported from specification',
+              parentVersionUuidTx ? { parentVersionUuid: parentVersionUuidTx } : undefined
+            ),
           { maxAttempts: 3, initialDelayMs: 500, label: 'createVersion' }
         )
       );
       if (!resVer.success) throw new Error(resVer.error || 'Failed to create version');
       const versionId = resVer.version.id as string;
-      emit(job, 'info', 'VERSION_CREATED', `Created version: ${input.version.versionId}`, { versionId });
+      emit(job, 'info', 'VERSION_CREATED', `Created version: ${input.version.versionId}`, {
+        versionId,
+        parentVersionUuid: parentVersionUuidTx ?? undefined,
+      });
 
-      // Build property library: collect all unique non-reference properties
-      // Key: JSON signature of the property data
-      // Value: { data, description, names } - tracks which names this property appears under
-      const propertyMap = new Map<string, { data: any; description?: string; names: Set<string> }>();
-      const propertyIdMap = new Map<string, string>(); // sig -> propertyId
-
-      const collectProperties = (props: any[]) => {
-        for (const p of props || []) {
-          const isReference = p.data.$ref || (p.data.type === 'array' && p.data.items?.$ref);
-          if (!isReference) {
-            const sig = stableStringify(p.data);
-            if (!propertyMap.has(sig)) {
-              propertyMap.set(sig, { data: p.data, description: p.description, names: new Set<string>() });
-            }
-            // Track all names this property appears under
-            propertyMap.get(sig)!.names.add(p.name);
-          }
-          if (p.children) collectProperties(p.children);
-        }
-      };
-
-      for (const cls of norm.classes) {
-        collectProperties(cls.properties || []);
-      }
-
-      // Create properties in the library using the first/most common name
-      // If name conflicts, append a numeric suffix
-      emit(job, 'info', 'CREATING_PROPERTIES', `Creating ${propertyMap.size} unique properties in library`);
-      const usedNames = new Set<string>();
-
-      for (const [sig, payload] of propertyMap.entries()) {
-        if (job.canceled) throw new Error('Import canceled');
-
-        // Use the first name from the set of names this property appears under
-        // If the name is already used, append a suffix
-        let baseName = Array.from(payload.names)[0];
-        let propName = baseName;
-        let suffix = 1;
-        while (usedNames.has(propName)) {
-          propName = `${baseName}_${suffix}`;
-          suffix++;
-        }
-        usedNames.add(propName);
-
-        emit(job, 'info', 'DEBUG_PROPERTY', `Creating property: ${propName} (used as: ${Array.from(payload.names).join(', ')})`, {
-          description: payload.description,
-          dataType: payload.data.type
-        });
-        const resCreateProp = JSON.parse(
-          await createPropertyTx(client, projectId, propName, payload.description || null, payload.data)
-        );
-        if (!resCreateProp.success) {
-          // If it still fails (maybe due to existing property from a previous import), log and skip
-          emit(job, 'warn', 'PROPERTY_CREATE_WARN', `Could not create property "${propName}": ${resCreateProp.error}`);
-          continue;
-        }
-        emit(job, 'info', 'DEBUG_PROPERTY_CREATED', `Property created with ID: ${resCreateProp.property.id}`);
-        propertyIdMap.set(sig, resCreateProp.property.id);
-        if (job.summary) job.summary.propertiesCreated++;
-      }
-      emit(job, 'info', 'PROPERTIES_CREATED', `Created ${propertyIdMap.size} properties in library`);
+      const propertyIdMap = await buildPropertyIdMapForImport(client, projectId, norm, job, reuseLibraryTx);
 
       // Create classes and link properties
       setProgress(job, 'creating-classes', 2 + norm.classes.length, 2);
@@ -962,6 +1032,8 @@ export async function commitImport(jobId: string): Promise<{ success: boolean; e
         }
       }
     }
+
+    await recordRepositoryImportMetricIfApplicable(job);
 
     job.state = 'completed';
     emit(job, 'info', 'DONE', 'Import completed successfully', job.result);

@@ -108,7 +108,8 @@ export async function createVersionTx(
   creatorId: string,
   versionId: string,
   description: string,
-  changeLog: string
+  changeLog: string,
+  opts?: { parentVersionUuid?: string | null }
 ): Promise<string> {
   try {
     if (!versionId?.trim()) return errorResponse('Version ID is required');
@@ -116,16 +117,60 @@ export async function createVersionTx(
     const planErr = await getPlanBlockMessageForNewVersion(creatorId, client);
     if (planErr) return errorResponse(planErr);
 
-    const result = await client.query(
-      `INSERT INTO odb.versions (project_id, creator_id, version_id, description, change_log) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [projectId, creatorId, versionId.trim(), description?.trim() || null, changeLog?.trim() || null]
-    );
+    const parentUuid = opts?.parentVersionUuid?.trim() || null;
+    const result = parentUuid
+      ? await client.query(
+          `INSERT INTO odb.versions (project_id, creator_id, version_id, description, change_log, parent_version_id) 
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+          [
+            projectId,
+            creatorId,
+            versionId.trim(),
+            description?.trim() || null,
+            changeLog?.trim() || null,
+            parentUuid,
+          ]
+        )
+      : await client.query(
+          `INSERT INTO odb.versions (project_id, creator_id, version_id, description, change_log) 
+           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+          [projectId, creatorId, versionId.trim(), description?.trim() || null, changeLog?.trim() || null]
+        );
     return successResponse({ version: result.rows[0] });
   } catch (error: any) {
     if (error.code === '23505') return errorResponse('A version with this ID already exists in this project');
     return errorResponse(error.message);
   }
+}
+
+/** Latest non-deleted revision (versions.id) for a project — used as parent for incremental catalog imports. */
+export async function getLatestVersionUuidForProjectTx(
+  client: PoolClient,
+  projectId: string
+): Promise<string | null> {
+  const result = await client.query(
+    `SELECT id FROM odb.versions
+     WHERE project_id = $1 AND deleted_at IS NULL
+     ORDER BY created_at DESC NULLS LAST, id DESC
+     LIMIT 1`,
+    [projectId]
+  );
+  const row = result.rows[0];
+  return row?.id ? (row.id as string) : null;
+}
+
+/** Property library rows for reuse when importing another revision into the same project. */
+export async function listProjectLibraryPropertiesTx(
+  client: PoolClient,
+  projectId: string
+): Promise<Array<{ id: string; name: string; description: string | null; data: any }>> {
+  const result = await client.query(
+    `SELECT id, name, description, data
+     FROM odb.properties
+     WHERE project_id = $1 AND deleted_at IS NULL`,
+    [projectId]
+  );
+  return result.rows as Array<{ id: string; name: string; description: string | null; data: any }>;
 }
 
 /**

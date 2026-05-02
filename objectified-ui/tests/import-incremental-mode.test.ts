@@ -22,6 +22,8 @@ const mockCreatePropertyTx = jest.fn();
 const mockCreateClassTx = jest.fn();
 const mockAddPropertyToClassTx = jest.fn();
 const mockGetClassesWithPropertiesAndTagsTx = jest.fn();
+const mockGetLatestVersionUuidForProjectTx = jest.fn(() => Promise.resolve(null));
+const mockListProjectLibraryPropertiesTx = jest.fn(() => Promise.resolve([]));
 
 // When set, createClassTx will return failure for this class name (simulate one class failing)
 let createClassTxFailForClassName: string | null = null;
@@ -43,6 +45,8 @@ jest.mock('../lib/db/import-transaction', () => ({
   },
   addPropertyToClassTx: (...args: any[]) => mockAddPropertyToClassTx(...args),
   getClassesWithPropertiesAndTagsTx: (...args: any[]) => mockGetClassesWithPropertiesAndTagsTx(...args),
+  getLatestVersionUuidForProjectTx: (...args: any[]) => mockGetLatestVersionUuidForProjectTx(...args),
+  listProjectLibraryPropertiesTx: (...args: any[]) => mockListProjectLibraryPropertiesTx(...args),
 }));
 
 const mockNormalizeResult = {
@@ -122,6 +126,8 @@ describe('Import Incremental Mode (#730)', () => {
     mockCreateClassTx.mockReset();
     mockAddPropertyToClassTx.mockReset();
     mockGetClassesWithPropertiesAndTagsTx.mockReset();
+    mockGetLatestVersionUuidForProjectTx.mockReset();
+    mockListProjectLibraryPropertiesTx.mockReset();
 
     mockGetTransactionClient.mockResolvedValue(mockClient);
     mockBeginTransaction.mockResolvedValue(undefined);
@@ -155,6 +161,8 @@ describe('Import Incremental Mode (#730)', () => {
         { name: 'Product', schema: {}, properties: [] },
       ])
     );
+    mockGetLatestVersionUuidForProjectTx.mockResolvedValue(null);
+    mockListProjectLibraryPropertiesTx.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -330,5 +338,40 @@ describe('Import Incremental Mode (#730)', () => {
     expect(mockGetTransactionClient).not.toHaveBeenCalled();
     // When dry run, incremental path is never hit
     expect(status.summary?.incrementalMode).toBeFalsy();
+  });
+
+  test('incremental mode with existingProjectId reuses property library shapes and sets version parent', async () => {
+    mockGetLatestVersionUuidForProjectTx.mockResolvedValue('previous-version-uuid');
+    mockListProjectLibraryPropertiesTx.mockResolvedValue([
+      { id: 'existing-prop-1', name: 'id', description: null, data: { type: 'string' } },
+    ]);
+
+    const inputWithExisting = {
+      ...incrementalInput,
+      existingProjectId: 'already-created-project',
+    };
+
+    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { jobId } = await startImport(inputWithExisting);
+
+    await waitForJobEnd(getImportStatus, jobId);
+
+    expect(mockCreateProjectTx).not.toHaveBeenCalled();
+    expect(mockGetLatestVersionUuidForProjectTx).toHaveBeenCalledWith(
+      expect.anything(),
+      'already-created-project'
+    );
+    expect(mockListProjectLibraryPropertiesTx).toHaveBeenCalledWith(
+      expect.anything(),
+      'already-created-project'
+    );
+
+    // Normalized fixture uses only { type: 'string' } for scalars; one library row covers every occurrence.
+    expect(mockCreatePropertyTx).not.toHaveBeenCalled();
+
+    const versionCalls = mockCreateVersionTx.mock.calls;
+    expect(versionCalls.length).toBeGreaterThanOrEqual(1);
+    const lastCall = versionCalls[versionCalls.length - 1];
+    expect(lastCall[6]).toEqual({ parentVersionUuid: 'previous-version-uuid' });
   });
 });

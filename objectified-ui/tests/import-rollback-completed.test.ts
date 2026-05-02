@@ -49,6 +49,8 @@ jest.mock('../lib/db/import-transaction', () => ({
       ])
     )
   ),
+  getLatestVersionUuidForProjectTx: jest.fn(() => Promise.resolve(null)),
+  listProjectLibraryPropertiesTx: jest.fn(() => Promise.resolve([])),
 }));
 
 const mockNormalizeResult = {

@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Download,
@@ -47,6 +47,59 @@ import {
 import { RepositoryFilesBrowser } from '@/app/components/ade/dashboard/repositories/RepositoryFilesBrowser';
 
 type RepoTab = 'preview' | 'files' | 'imports' | 'settings';
+
+type RepositoryImportMetricApiRow = {
+  id: string;
+  path: string;
+  branch: string;
+  blob_sha: string | null;
+  created_at: string;
+  project_id: string;
+  project_name: string;
+  project_slug: string;
+  catalog_version_label: string;
+  version_uuid: string;
+  imported_by: string | null;
+  imported_by_name: string | null;
+  imported_by_email: string | null;
+};
+
+function shortBlobRef(sha: string | null | undefined): string {
+  if (!sha?.trim()) return '';
+  const s = sha.trim();
+  return s.length > 10 ? `${s.slice(0, 7)}…` : s;
+}
+
+function formatImportedByActor(row: {
+  imported_by_name: string | null;
+  imported_by_email: string | null;
+}): string {
+  const n = row.imported_by_name?.trim();
+  if (n) return n;
+  const e = row.imported_by_email?.trim();
+  if (e) return e;
+  return '—';
+}
+
+function formatRelativeWhen(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return iso;
+  const sec = Math.floor((Date.now() - t) / 1000);
+  if (sec < 45) return 'just now';
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  if (sec < 604800) return `${Math.floor(sec / 86400)}d ago`;
+  return new Date(iso).toLocaleString();
+}
+
+/** Deep-link into Files tab and open the indexed path on the recorded branch. */
+function repositoryImportedFileHref(repositoryId: string, path: string, branch: string): string {
+  const qs = new URLSearchParams();
+  qs.set('tab', 'files');
+  qs.set('path', path);
+  qs.set('branch', branch);
+  return `/ade/dashboard/repositories/${encodeURIComponent(repositoryId)}/preview?${qs.toString()}`;
+}
 
 function providerSlug(repo: DashboardRepository): string {
   if (repo.provider === 'github' && repo.full_name && !repo.full_name.includes('://')) {
@@ -144,6 +197,7 @@ function TabBtn({
 export function RepositoryDetailClient() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = typeof params?.id === 'string' ? params.id : '';
   const { data: session } = useSession();
   const currentTenantId = (session?.user as { current_tenant_id?: string })?.current_tenant_id;
@@ -154,6 +208,37 @@ export function RepositoryDetailClient() {
   const [tab, setTab] = useState<RepoTab>('preview');
   const [removing, setRemoving] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [repoImports, setRepoImports] = useState<RepositoryImportMetricApiRow[]>([]);
+  const [importsLoading, setImportsLoading] = useState(false);
+  const [importsError, setImportsError] = useState<string | null>(null);
+  const [stats30d, setStats30d] = useState<{ totalImports: number; distinctProjects: number } | null>(null);
+
+  const filesDeepLink = useMemo(() => {
+    const path = searchParams.get('path')?.trim();
+    const branch = searchParams.get('branch')?.trim();
+    if (!path || !branch) return null;
+    const t = searchParams.get('tab');
+    if (t != null && t !== '' && t !== 'files') return null;
+    return { path, branch };
+  }, [searchParams]);
+
+  useEffect(() => {
+    const path = searchParams.get('path')?.trim();
+    const branch = searchParams.get('branch')?.trim();
+    if (path && branch) {
+      setTab('files');
+      return;
+    }
+    const t = searchParams.get('tab');
+    if (t === 'files' || t === 'imports' || t === 'settings' || t === 'preview') {
+      setTab(t as RepoTab);
+    }
+  }, [searchParams]);
+
+  const consumeFilesDeepLink = useCallback(() => {
+    if (!id) return;
+    router.replace(`/ade/dashboard/repositories/${encodeURIComponent(id)}/preview?tab=files`, { scroll: false });
+  }, [id, router]);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
@@ -195,6 +280,50 @@ export function RepositoryDetailClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const fetchImports = useCallback(async () => {
+    if (!currentTenantId || !id) return;
+    setImportsLoading(true);
+    setImportsError(null);
+    try {
+      const res = await fetch(`/api/repositories/${encodeURIComponent(id)}/imports?limit=100`, {
+        credentials: 'include',
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        imports?: RepositoryImportMetricApiRow[];
+        stats30d?: { totalImports: number; distinctProjects: number };
+        error?: string;
+      };
+      if (!res.ok || data.success !== true) {
+        throw new Error(typeof data.error === 'string' ? data.error : res.statusText);
+      }
+      setRepoImports(Array.isArray(data.imports) ? data.imports : []);
+      setStats30d(data.stats30d ?? { totalImports: 0, distinctProjects: 0 });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Could not load import history';
+      setImportsError(msg);
+      setRepoImports([]);
+      setStats30d(null);
+    } finally {
+      setImportsLoading(false);
+    }
+  }, [currentTenantId, id]);
+
+  useEffect(() => {
+    if (!repo || !id) return;
+    if (tab !== 'preview' && tab !== 'imports') return;
+    void fetchImports();
+  }, [repo, id, tab, fetchImports]);
+
+  useEffect(() => {
+    if (!repo || !id) return;
+    const onFocus = () => {
+      if (tab === 'preview' || tab === 'imports') void fetchImports();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [repo, id, tab, fetchImports]);
 
   const scanning = repo?.status === 'scanning';
 
@@ -402,8 +531,16 @@ export function RepositoryDetailClient() {
               />
               <RepositoryKpiCard
                 label="Imports (30d)"
-                value="—"
-                subtitle="Requires import events keyed by repository UUID + rolling window (API pending)."
+                value={
+                  importsLoading && stats30d == null ? '—' : (stats30d?.totalImports ?? 0).toLocaleString()
+                }
+                subtitle={
+                  importsLoading && stats30d == null
+                    ? 'Loading import metrics…'
+                    : stats30d != null && stats30d.totalImports > 0
+                      ? `${stats30d.distinctProjects.toLocaleString()} distinct project(s) in the last 30 days.`
+                      : 'Catalog imports from this repo’s Files tab in the last 30 days.'
+                }
                 valuePending={repo.status === 'scanning'}
               />
               <RepositoryKpiCard
@@ -552,12 +689,68 @@ export function RepositoryDetailClient() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                <tr>
-                  <td colSpan={5} className="py-10 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-                    Import audit rows will join file path, target project/version, user id, and timestamp from the import
-                    pipeline. That feed is not connected yet, so there is nothing to show for this repository.
-                  </td>
-                </tr>
+                {importsError ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-sm text-rose-600 dark:text-rose-400">
+                      {importsError}
+                    </td>
+                  </tr>
+                ) : importsLoading && repoImports.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                      Loading imports…
+                    </td>
+                  </tr>
+                ) : repoImports.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-10 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                      No imports yet. Open the Files tab, select a spec, and complete a catalog import to record activity
+                      here.
+                    </td>
+                  </tr>
+                ) : (
+                  repoImports.slice(0, 8).map((row) => {
+                    const blob = shortBlobRef(row.blob_sha);
+                    return (
+                      <tr key={row.id}>
+                        <td className="max-w-[200px] py-2 align-top">
+                          <Link
+                            href={repositoryImportedFileHref(id, row.path, row.branch)}
+                            className="break-all font-mono text-xs text-indigo-600 hover:underline dark:text-indigo-400"
+                          >
+                            {row.path}
+                          </Link>
+                          {blob ? (
+                            <span className="mt-0.5 block text-[11px] text-gray-500 dark:text-gray-400">
+                              blob {blob} · {row.branch}
+                            </span>
+                          ) : (
+                            <span className="mt-0.5 block text-[11px] text-gray-500 dark:text-gray-400">
+                              {row.branch}
+                            </span>
+                          )}
+                        </td>
+                        <td className="align-top">
+                          <Link
+                            href={`/ade/dashboard/versions?projectId=${encodeURIComponent(row.project_id)}`}
+                            className="text-indigo-600 hover:underline dark:text-indigo-400"
+                          >
+                            {row.project_name}
+                          </Link>
+                        </td>
+                        <td className="font-mono text-xs align-top text-gray-800 dark:text-gray-200">
+                          {row.catalog_version_label}
+                        </td>
+                        <td className="align-top text-gray-700 dark:text-gray-300">
+                          {formatImportedByActor(row)}
+                        </td>
+                        <td className="whitespace-nowrap align-top text-gray-600 dark:text-gray-400">
+                          {formatRelativeWhen(row.created_at)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -572,6 +765,8 @@ export function RepositoryDetailClient() {
             repositoryName={repo.name}
             repositoryFullName={repo.full_name}
             githubWebBase={webUrl}
+            filesDeepLink={filesDeepLink}
+            onFilesDeepLinkConsumed={consumeFilesDeepLink}
           />
         </div>
       )}
@@ -581,34 +776,75 @@ export function RepositoryDetailClient() {
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Import history</h3>
-              <fieldset disabled className="flex flex-wrap items-center gap-2 opacity-70">
-                <select className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-100">
-                  <option>All projects</option>
-                </select>
-                <select className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-100">
-                  <option>All outcomes</option>
-                </select>
-              </fieldset>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Successful catalog imports from this repository&apos;s files.
+              </p>
             </div>
             <table className="w-full text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-400">
                 <tr>
                   <th className="px-4 py-2 text-left font-semibold">When</th>
-                  <th className="text-left font-semibold">File · commit</th>
+                  <th className="text-left font-semibold">File · blob</th>
                   <th className="text-left font-semibold">Project · version</th>
                   <th className="text-left font-semibold">Outcome</th>
                   <th className="text-left font-semibold">By</th>
-                  <th className="pr-4 text-right font-semibold" />
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-                    This table needs import transactions referencing repository id, source path, commit SHA, destination
-                    project/version, actor, and outcome codes. Wire the read API first, then enable filters and row
-                    actions.
-                  </td>
-                </tr>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {importsError ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-rose-600 dark:text-rose-400">
+                      {importsError}
+                    </td>
+                  </tr>
+                ) : importsLoading && repoImports.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                      Loading imports…
+                    </td>
+                  </tr>
+                ) : repoImports.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                      No imports recorded yet. Use the Files tab to open a specification and run an import.
+                    </td>
+                  </tr>
+                ) : (
+                  repoImports.map((row) => {
+                    const blob = shortBlobRef(row.blob_sha);
+                    return (
+                      <tr key={row.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-900/40">
+                        <td className="whitespace-nowrap px-4 py-2 align-top text-gray-600 dark:text-gray-400">
+                          {formatRelativeWhen(row.created_at)}
+                        </td>
+                        <td className="max-w-[240px] align-top">
+                          <Link
+                            href={repositoryImportedFileHref(id, row.path, row.branch)}
+                            className="break-all font-mono text-xs text-indigo-600 hover:underline dark:text-indigo-400"
+                          >
+                            {row.path}
+                          </Link>
+                          <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                            {blob ? `blob ${blob} · ${row.branch}` : row.branch}
+                          </div>
+                        </td>
+                        <td className="align-top">
+                          <Link
+                            href={`/ade/dashboard/versions?projectId=${encodeURIComponent(row.project_id)}`}
+                            className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                          >
+                            {row.project_name}
+                          </Link>
+                          <div className="mt-0.5 font-mono text-xs text-gray-600 dark:text-gray-400">
+                            v{row.catalog_version_label}
+                          </div>
+                        </td>
+                        <td className="align-top text-gray-700 dark:text-gray-300">Completed</td>
+                        <td className="align-top text-gray-700 dark:text-gray-300">{formatImportedByActor(row)}</td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

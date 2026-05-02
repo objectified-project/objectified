@@ -63,7 +63,9 @@ jest.mock('../lib/db/import-transaction', () => ({
         }
       ])
     );
-  })
+  }),
+  getLatestVersionUuidForProjectTx: jest.fn(() => Promise.resolve(null)),
+  listProjectLibraryPropertiesTx: jest.fn(() => Promise.resolve([])),
 }));
 
 // Normalized class: two properties with different types so we get two addPropertyToClassTx calls
