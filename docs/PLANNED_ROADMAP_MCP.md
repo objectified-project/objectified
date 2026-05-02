@@ -80,7 +80,7 @@ process or via Docker.
 | 1.4 | ~~[#2992](../../issues/2992)~~ | ~~Structured JSON logging~~ (**completed**) | 1.2 |
 | 1.5 | ~~[#2993](../../issues/2993)~~ | ~~stdio transport entrypoint~~ (**completed**) | 1.1–1.3 |
 | 1.6 | ~~[#2994](../../issues/2994)~~ | ~~Streamable HTTP transport entrypoint~~ (**completed**) | 1.1–1.3 |
-| 1.7 | [#2995](../../issues/2995) | `ping` tool (service + DB health) | 1.3 |
+| 1.7 | ~~[#2995](../../issues/2995)~~ | ~~`ping` tool (service + DB health)~~ (**completed**) | 1.3 |
 
 #### E2 — API Key Authentication (#2996)
 
