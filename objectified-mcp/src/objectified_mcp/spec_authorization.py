@@ -115,3 +115,25 @@ def build_authorized_spec_sql_predicate(
 
     combined = f"({scope_sql}) AND {visibility_sql}"
     return combined, params
+
+
+def build_mcp_scope_sql_predicate(
+    auth_ctx: McpAuthContext,
+    *,
+    tenant_column: str,
+    project_column: str,
+) -> tuple[str, list[Any]]:
+    """Parameterized SQL for scope-only checks on rows that are already public-visible.
+
+    Use on ``odb.mcp_v_public_specs`` (no ``visibility`` column): callers already
+    exclude private revisions. Mirrors the scope half of :func:`authorize_spec`
+    for public visibility (``visibility == "public"``).
+    """
+
+    tenant_column = _validate_qualified_identifier(tenant_column, role="tenant_column")
+    project_column = _validate_qualified_identifier(project_column, role="project_column")
+
+    if auth_ctx.scope.deny_all:
+        return "FALSE", []
+
+    return _scope_predicate_sql(auth_ctx.scope, tenant_column, project_column)

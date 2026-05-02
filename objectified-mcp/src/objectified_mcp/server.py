@@ -7,12 +7,14 @@ from typing import Any
 
 import structlog
 from fastmcp import Context, FastMCP
+from fastmcp.dependencies import CurrentHeaders
 from fastmcp.server.lifespan import lifespan
 from structlog.contextvars import bound_contextvars
 
 from objectified_mcp.database_pool import MCP_DB_POOL_KEY, create_async_pool, get_db_pool, ping_pool
 from objectified_mcp.http_credential_middleware import StashHttpBearerInToolContextMiddleware
 from objectified_mcp.logging_config import configure_logging
+from objectified_mcp.mcp_auth import resolve_optional_mcp_auth
 from objectified_mcp.ping_tool import build_ping_response
 from objectified_mcp.settings import get_settings
 from objectified_mcp.spec_describe_tool import build_spec_describe_response
@@ -58,7 +60,9 @@ async def ping(ctx: Context) -> dict[str, Any]:
 @mcp.tool(
     name="spec.list",
     description=(
-        "List published public OpenAPI specs (cursor pagination over odb.mcp_v_public_specs). "
+        "List published OpenAPI specs with cursor pagination. Anonymous callers see the public catalog "
+        "(odb.mcp_v_public_specs). With Authorization: Bearer <MCP API key> (or stdio meta credentials), "
+        "results merge in-scope public rows plus in-scope private revisions for the key's tenant (#3011). "
         "Optional filters: tenant_id, project_id (UUID strings). "
         "limit defaults to 50, capped at 100. Pass next_cursor from the previous response for the next page."
     ),
@@ -69,14 +73,17 @@ async def spec_list(
     project_id: str | None = None,
     limit: int | None = None,
     cursor: str | None = None,
+    headers: dict[str, str] = CurrentHeaders(),
 ) -> dict[str, Any]:
     pool = get_db_pool(ctx)
+    auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
     return await build_spec_list_response(
         pool,
         tenant_id=tenant_id,
         project_id=project_id,
         limit=limit,
         cursor=cursor,
+        auth_ctx=auth_ctx,
     )
 
 

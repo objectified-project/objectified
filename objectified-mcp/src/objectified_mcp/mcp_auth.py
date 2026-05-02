@@ -23,6 +23,8 @@ Scoped reads combine :meth:`objectified_mcp.scope.Scope.allows` with revision
 visibility via :func:`objectified_mcp.spec_authorization.authorize_spec` (and
 parameterized SQL via
 :func:`objectified_mcp.spec_authorization.build_authorized_spec_sql_predicate`).
+Tools that accept anonymous callers but upgrade when a secret is present use
+:func:`resolve_optional_mcp_auth`.
 See :class:`objectified_mcp.scope.Scope` for ``scope_json``.
 """
 
@@ -44,6 +46,7 @@ from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, ConfigDict, Field
 
 from objectified_mcp.database_pool import get_db_pool
+from objectified_mcp.http_credential_middleware import get_http_bearer_from_context
 from objectified_mcp.scope import Scope, parse_scope_json
 
 _log = structlog.get_logger(__name__)
@@ -214,6 +217,27 @@ async def validate_mcp_api_key(pool: AsyncConnectionPool, raw_secret: str) -> Mc
 
     _log.debug("mcp_api_key_hash_mismatch")
     raise AuthorizationError("Invalid or unknown MCP API key.")
+
+
+async def resolve_optional_mcp_auth(
+    ctx: Context,
+    pool: AsyncConnectionPool,
+    *,
+    headers: dict[str, str],
+) -> McpAuthContext | None:
+    """Return validated :class:`McpAuthContext` when a credential is present, else ``None``.
+
+    Checks HTTP headers and JSON-RPC ``meta`` like :func:`require_mcp_auth`, then the
+    Bearer secret stashed from streamable HTTP middleware when headers omit it (#3011).
+    """
+    rc = ctx.request_context
+    meta = rc.meta if rc else None
+    raw = extract_raw_mcp_api_key(http_headers=headers, request_meta=meta)
+    if raw is None:
+        raw = await get_http_bearer_from_context(ctx)
+    if raw is None:
+        return None
+    return await validate_mcp_api_key(pool, raw)
 
 
 async def require_mcp_auth(

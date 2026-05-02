@@ -9,6 +9,7 @@ from objectified_mcp.scope import Scope
 from objectified_mcp.spec_authorization import (
     authorize_spec,
     build_authorized_spec_sql_predicate,
+    build_mcp_scope_sql_predicate,
 )
 
 
@@ -125,11 +126,11 @@ def test_build_sql_rejects_bad_identifiers() -> None:
 @pytest.mark.parametrize(
     "bad_name",
     [
-        "v..tenant_id",    # consecutive dots
-        "v.tenant_id.",    # trailing dot
-        ".tenant_id",      # leading dot
-        "v. tenant_id",    # space inside
-        "",                # empty string
+        "v..tenant_id",  # consecutive dots
+        "v.tenant_id.",  # trailing dot
+        ".tenant_id",  # leading dot
+        "v. tenant_id",  # space inside
+        "",  # empty string
     ],
 )
 def test_build_sql_rejects_malformed_dot_identifiers(bad_name: str) -> None:
@@ -153,3 +154,25 @@ def test_build_sql_rejects_bad_identifiers_even_with_deny_all_scope() -> None:
             project_column="v.project_id",
             visibility_column="v.visibility",
         )
+
+
+def test_build_mcp_scope_sql_predicate_deny_all() -> None:
+    auth = _ctx(scope=Scope(deny_all=True))
+    sql, params = build_mcp_scope_sql_predicate(
+        auth,
+        tenant_column="ps.tenant_id",
+        project_column="ps.project_id",
+    )
+    assert sql == "FALSE"
+    assert params == []
+
+
+def test_build_mcp_scope_sql_predicate_unrestricted() -> None:
+    auth = _ctx()
+    sql, params = build_mcp_scope_sql_predicate(
+        auth,
+        tenant_column="ps.tenant_id",
+        project_column="ps.project_id",
+    )
+    assert sql == "TRUE"
+    assert params == []

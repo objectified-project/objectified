@@ -1,4 +1,4 @@
-"""MCP ``spec.list`` tool: paginated public specs from ``odb.mcp_v_public_specs`` (#3005)."""
+"""MCP ``spec.list`` tool: paginated specs — public catalog plus private rows when authed (#3005, #3011)."""
 
 from __future__ import annotations
 
@@ -11,6 +11,12 @@ from uuid import UUID
 
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
+
+from objectified_mcp.mcp_auth import McpAuthContext
+from objectified_mcp.spec_authorization import (
+    build_authorized_spec_sql_predicate,
+    build_mcp_scope_sql_predicate,
+)
 
 CURSOR_VERSION = 1
 MAX_PAGE_SIZE = 100
@@ -121,7 +127,7 @@ def _row_out(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-_LIST_QUERY = """
+_LIST_QUERY_ANONYMOUS = """
     SELECT id, tenant_id, project_id, title, version, description, tags, updated_at
     FROM odb.mcp_v_public_specs
     WHERE (%(tenant)s::uuid IS NULL OR tenant_id = %(tenant)s::uuid)
@@ -134,6 +140,45 @@ _LIST_QUERY = """
     LIMIT %(lim)s
 """
 
+# Positional %%s — filled via str.format with scope/auth fragments from spec_authorization.
+_LIST_QUERY_AUTHENTICATED = """
+SELECT id, tenant_id, project_id, title, version, description, tags, updated_at
+FROM (
+  SELECT id, tenant_id, project_id, title, version, description, tags, updated_at
+  FROM odb.mcp_v_public_specs AS ps
+  WHERE (%s::uuid IS NULL OR ps.tenant_id = %s::uuid)
+    AND (%s::uuid IS NULL OR ps.project_id = %s::uuid)
+    AND ({public_scope})
+
+  UNION ALL
+
+  SELECT v.id, p.tenant_id, v.project_id, p.name AS title, v.version_id AS version,
+         v.description,
+         COALESCE(tg.tags, ARRAY[]::TEXT[]) AS tags,
+         GREATEST(v.updated_at, p.updated_at, COALESCE(tg.max_tag_updated_at, '-infinity'::timestamptz)) AS updated_at
+  FROM odb.versions v
+  INNER JOIN odb.projects p ON p.id = v.project_id
+  LEFT JOIN LATERAL (
+    SELECT array_agg(vt.name ORDER BY vt.name) AS tags,
+           max(vt.updated_at) AS max_tag_updated_at
+    FROM odb.version_tags vt
+    WHERE vt.version_id = v.id AND vt.project_id = v.project_id
+  ) tg ON TRUE
+  WHERE v.deleted_at IS NULL
+    AND p.deleted_at IS NULL
+    AND v.enabled IS TRUE
+    AND p.enabled IS TRUE
+    AND v.published IS TRUE
+    AND v.visibility = 'private'::odb.visibility_type
+    AND ({private_auth})
+    AND (%s::uuid IS NULL OR p.tenant_id = %s::uuid)
+    AND (%s::uuid IS NULL OR v.project_id = %s::uuid)
+) AS merged
+WHERE (%s::timestamptz IS NULL OR (merged.updated_at, merged.id) < (%s::timestamptz, %s::uuid))
+ORDER BY merged.updated_at DESC, merged.id DESC
+LIMIT %s
+"""
+
 
 async def build_spec_list_response(
     pool: AsyncConnectionPool,
@@ -142,8 +187,14 @@ async def build_spec_list_response(
     project_id: str | None = None,
     limit: int | None = None,
     cursor: str | None = None,
+    auth_ctx: McpAuthContext | None = None,
 ) -> dict[str, Any]:
-    """Return ``items``, ``has_more``, and ``next_cursor`` for public specs."""
+    """Return ``items``, ``has_more``, and ``next_cursor``.
+
+    Anonymous callers see published public specs only. Authenticated callers get the
+    same response shape with public rows filtered by key scope plus in-scope private
+    revisions for their tenant (see #3011).
+    """
     tenant = _parse_optional_uuid("tenant_id", tenant_id)
     project = _parse_optional_uuid("project_id", project_id)
     lim = _clamp_limit(limit)
@@ -151,17 +202,55 @@ async def build_spec_list_response(
     cur_ts = decoded[0] if decoded else None
     cur_id = decoded[1] if decoded else None
 
-    params: dict[str, Any] = {
-        "tenant": tenant,
-        "project": project,
-        "cur_ts": cur_ts,
-        "cur_id": cur_id,
-        "lim": lim + 1,
-    }
+    if auth_ctx is not None and auth_ctx.scope.deny_all:
+        return {"items": [], "has_more": False, "next_cursor": None}
+
+    if auth_ctx is None:
+        params: dict[str, Any] = {
+            "tenant": tenant,
+            "project": project,
+            "cur_ts": cur_ts,
+            "cur_id": cur_id,
+            "lim": lim + 1,
+        }
+        query = _LIST_QUERY_ANONYMOUS
+        exec_params: dict[str, Any] | tuple[Any, ...] = params
+    else:
+        public_scope_sql, public_scope_params = build_mcp_scope_sql_predicate(
+            auth_ctx,
+            tenant_column="ps.tenant_id",
+            project_column="ps.project_id",
+        )
+        private_auth_sql, private_auth_params = build_authorized_spec_sql_predicate(
+            auth_ctx,
+            tenant_column="p.tenant_id",
+            project_column="v.project_id",
+            visibility_column="v.visibility",
+        )
+        query = _LIST_QUERY_AUTHENTICATED.format(
+            public_scope=public_scope_sql,
+            private_auth=private_auth_sql,
+        )
+        exec_params = (
+            tenant,
+            tenant,
+            project,
+            project,
+            *public_scope_params,
+            *private_auth_params,
+            tenant,
+            tenant,
+            project,
+            project,
+            cur_ts,
+            cur_ts,
+            cur_id,
+            lim + 1,
+        )
 
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
-            await cur.execute(_LIST_QUERY, params)
+            await cur.execute(query, exec_params)
             rows = await cur.fetchall()
 
     has_more = len(rows) > lim

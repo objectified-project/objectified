@@ -8,6 +8,8 @@ from uuid import UUID, uuid4
 import pytest
 from psycopg_pool import AsyncConnectionPool
 
+from objectified_mcp.mcp_auth import McpAuthContext
+from objectified_mcp.scope import Scope
 from objectified_mcp.spec_list_tool import (
     MAX_PAGE_SIZE,
     InvalidSpecListCursorError,
@@ -240,3 +242,73 @@ def test_build_spec_list_response_cursor_binding() -> None:
     _sql, params = cur.execute.await_args.args
     assert params["cur_ts"] == ts
     assert params["cur_id"] == sid
+
+
+def test_build_spec_list_response_deny_all_returns_empty_without_query() -> None:
+    pool = MagicMock(spec=AsyncConnectionPool)
+    pool.connection = MagicMock()
+
+    auth = McpAuthContext(
+        key_id="00000000-0000-4000-8000-000000000001",
+        tenant_id=str(uuid4()),
+        label="x",
+        scope=Scope(deny_all=True),
+    )
+
+    async def run() -> dict[str, object]:
+        return await build_spec_list_response(pool, auth_ctx=auth)
+
+    out = asyncio.run(run())
+    assert out == {"items": [], "has_more": False, "next_cursor": None}
+    pool.connection.assert_not_called()
+
+
+def test_build_spec_list_response_authenticated_merged_sql() -> None:
+    tid = uuid4()
+    pid = uuid4()
+    auth = McpAuthContext(
+        key_id="00000000-0000-4000-8000-000000000002",
+        tenant_id=str(tid),
+        label="k",
+        scope=Scope(),
+    )
+    rows = [_sample_row()]
+    pool, cur = _pool_mock_for_fetch(rows)
+
+    async def run() -> None:
+        await build_spec_list_response(pool, tenant_id=str(tid), project_id=str(pid), limit=5, auth_ctx=auth)
+
+    asyncio.run(run())
+    sql, params = cur.execute.await_args.args
+    assert "UNION ALL" in sql
+    assert "mcp_v_public_specs" in sql
+    assert "visibility = 'private'" in sql
+    assert isinstance(params, tuple)
+    assert params[0:4] == (tid, tid, pid, pid)
+    assert params[4] == str(auth.tenant_id)
+    assert params[5:9] == (tid, tid, pid, pid)
+    assert params[-4:] == (None, None, None, 6)
+
+
+def test_build_spec_list_response_authenticated_cursor_binding_tuple() -> None:
+    sid = UUID("44444444-4444-4444-8444-444444444444")
+    ts = datetime(2026, 5, 3, 10, 0, tzinfo=timezone.utc)
+    cursor = encode_spec_list_cursor(ts, sid)
+    auth = McpAuthContext(
+        key_id="00000000-0000-4000-8000-000000000003",
+        tenant_id=str(uuid4()),
+        label="k",
+        scope=Scope(),
+    )
+    rows = [_sample_row()]
+    pool, cur = _pool_mock_for_fetch(rows)
+
+    async def run() -> None:
+        await build_spec_list_response(pool, cursor=cursor, auth_ctx=auth)
+
+    asyncio.run(run())
+    _sql, params = cur.execute.await_args.args
+    assert isinstance(params, tuple)
+    assert params[-4] == ts
+    assert params[-3] == ts
+    assert params[-2] == sid
