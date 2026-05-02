@@ -11,6 +11,7 @@ from fastmcp.server.lifespan import lifespan
 from structlog.contextvars import bound_contextvars
 
 from objectified_mcp.database_pool import MCP_DB_POOL_KEY, create_async_pool, get_db_pool, ping_pool
+from objectified_mcp.http_credential_middleware import StashHttpBearerInToolContextMiddleware
 from objectified_mcp.logging_config import configure_logging
 from objectified_mcp.ping_tool import build_ping_response
 from objectified_mcp.settings import get_settings
@@ -40,6 +41,7 @@ async def database_lifespan(server: Any) -> Any:
 
 
 mcp = FastMCP("Objectified", lifespan=database_lifespan)
+mcp.add_middleware(StashHttpBearerInToolContextMiddleware())
 
 
 @mcp.tool

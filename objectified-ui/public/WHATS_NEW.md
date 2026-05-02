@@ -13,6 +13,7 @@ We continue to improve the platform based on your feedback with improvements and
 - MCP **`ping`** tool returns service id, package version, UTC timestamp, and **`db_ok`** (Postgres `SELECT 1` via the shared pool); on failure **`db_ok`** is false and **`db_error`** carries the exception message.
 - Database migration adds **`odb.mcp_api_keys`** for MCP API key storage (hashed secret, lookup prefix, tenant, JSON scopes, lifecycle timestamps).
 - MCP tools can require Postgres-backed API keys via FastMCP **`Depends(require_mcp_auth)`**: accepts **`Authorization: Bearer`** on HTTP or **`tools/call` `_meta`** on stdio, verifies bcrypt(SHA-256(secret)) against **`odb.mcp_api_keys`**, and returns a typed scope payload (clear errors for missing auth, unknown keys, expiry, and revocation).
+- Streamable HTTP binds **`Authorization: Bearer`** per request into tool context (**`get_http_bearer_from_context`**) via ASGI middleware plus FastMCP middleware; requests without a Bearer token expose **`None`** (anonymous).
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports

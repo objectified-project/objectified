@@ -17,6 +17,9 @@ async def _run_stdio_transport() -> None:
 
 async def _run_http_transport(host: str, port: int, *, log_level: str) -> None:
     """Streamable HTTP via FastMCP (``http_app`` → ``create_streamable_http_app``); serves MCP at ``/mcp``."""
+    from starlette.middleware import Middleware as StarletteMiddleware
+
+    from objectified_mcp.http_credential_middleware import HttpCredentialExtractionMiddleware
     from objectified_mcp.server import mcp
 
     await mcp.run_http_async(
@@ -25,6 +28,7 @@ async def _run_http_transport(host: str, port: int, *, log_level: str) -> None:
         port=port,
         path="/mcp",
         log_level=log_level.lower(),
+        middleware=[StarletteMiddleware(HttpCredentialExtractionMiddleware)],
     )
 
 
