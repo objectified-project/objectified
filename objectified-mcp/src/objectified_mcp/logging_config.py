@@ -23,6 +23,8 @@ def reset_logging_state_for_tests() -> None:
     root = logging.getLogger()
     for h in root.handlers[:]:
         root.removeHandler(h)
+        h.close()
+    root.setLevel(logging.WARNING)
     clear_contextvars()
     _CONFIGURED = False
 
@@ -78,7 +80,6 @@ def configure_logging(settings: Settings, *, force: bool = False) -> None:
     global _CONFIGURED
     if _CONFIGURED and not force:
         return
-    _CONFIGURED = True
 
     level: Final[int] = getattr(logging, settings.log_level)
 
@@ -105,3 +106,4 @@ def configure_logging(settings: Settings, *, force: bool = False) -> None:
     handler.setFormatter(formatter)
     root.addHandler(handler)
     root.setLevel(level)
+    _CONFIGURED = True
