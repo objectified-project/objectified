@@ -293,7 +293,7 @@ def test_build_spec_list_response_authenticated_merged_sql() -> None:
     assert params[-4:] == (None, None, None, 6)
 
 
-def test_build_spec_list_response_schedules_audit_per_private_row() -> None:
+def test_build_spec_list_response_schedules_audit_batch_for_private_rows() -> None:
     tid = uuid4()
     pid = uuid4()
     auth = McpAuthContext(
@@ -302,23 +302,44 @@ def test_build_spec_list_response_schedules_audit_per_private_row() -> None:
         label="k",
         scope=Scope(),
     )
-    priv_id = uuid4()
+    priv_id1 = uuid4()
+    priv_id2 = uuid4()
     rows = [
         _sample_row(),
-        _sample_row(spec_id=priv_id, spec_visibility="private"),
+        _sample_row(spec_id=priv_id1, spec_visibility="private"),
+        _sample_row(spec_id=priv_id2, spec_visibility="private"),
     ]
     pool, _cur = _pool_mock_for_fetch(rows)
 
     async def run() -> None:
-        with patch("objectified_mcp.spec_list_tool.schedule_mcp_private_access_audit") as sched:
+        with patch("objectified_mcp.spec_list_tool.schedule_mcp_private_access_audit_batch") as sched:
             await build_spec_list_response(pool, tenant_id=str(tid), project_id=str(pid), limit=10, auth_ctx=auth)
-            assert sched.call_count == 1
             sched.assert_called_once_with(
                 pool,
                 key_id=auth.key_id,
                 tool="spec.list",
-                spec_id=str(priv_id),
+                spec_ids=[str(priv_id1), str(priv_id2)],
             )
+
+    asyncio.run(run())
+
+
+def test_build_spec_list_response_no_audit_when_no_private_rows() -> None:
+    tid = uuid4()
+    pid = uuid4()
+    auth = McpAuthContext(
+        key_id="00000000-0000-4000-8000-000000000099",
+        tenant_id=str(tid),
+        label="k",
+        scope=Scope(),
+    )
+    rows = [_sample_row(), _sample_row()]  # both public
+    pool, _cur = _pool_mock_for_fetch(rows)
+
+    async def run() -> None:
+        with patch("objectified_mcp.spec_list_tool.schedule_mcp_private_access_audit_batch") as sched:
+            await build_spec_list_response(pool, tenant_id=str(tid), project_id=str(pid), limit=10, auth_ctx=auth)
+            sched.assert_not_called()
 
     asyncio.run(run())
 

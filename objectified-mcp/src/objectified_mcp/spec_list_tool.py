@@ -12,7 +12,7 @@ from uuid import UUID
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
-from objectified_mcp.mcp_access_audit import schedule_mcp_private_access_audit
+from objectified_mcp.mcp_access_audit import schedule_mcp_private_access_audit_batch
 from objectified_mcp.mcp_auth import McpAuthContext
 from objectified_mcp.spec_authorization import (
     build_authorized_spec_sql_predicate,
@@ -260,14 +260,14 @@ async def build_spec_list_response(
     page = rows[:lim]
 
     if auth_ctx is not None:
-        for r in page:
-            if r.get("spec_visibility") == "private":
-                schedule_mcp_private_access_audit(
-                    pool,
-                    key_id=auth_ctx.key_id,
-                    tool="spec.list",
-                    spec_id=str(r["id"]),
-                )
+        private_spec_ids = [str(r["id"]) for r in page if r.get("spec_visibility") == "private"]
+        if private_spec_ids:
+            schedule_mcp_private_access_audit_batch(
+                pool,
+                key_id=auth_ctx.key_id,
+                tool="spec.list",
+                spec_ids=private_spec_ids,
+            )
 
     items = [_row_out(r) for r in page]
 
