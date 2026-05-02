@@ -31,7 +31,7 @@ COMMENT ON COLUMN odb.mcp_api_keys.prefix IS
   'Non-secret prefix copied from the issued key for indexed lookup before hash verification.';
 
 COMMENT ON COLUMN odb.mcp_api_keys.scope_json IS
-  'Authorization scopes for this key (shape defined by MCP key issuance; JSON object).';
+  'Read scope JSON: {"tenants":[uuid,...],"projects":[uuid,...]}. Empty lists = public at that dimension; see objectified_mcp.scope.Scope (#3001).';
 
 COMMENT ON COLUMN odb.mcp_api_keys.revoked_at IS
   'When set, the key must be rejected regardless of expires_at.';

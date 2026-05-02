@@ -18,6 +18,9 @@ Tools opt in with::
     @mcp.tool
     async def example(auth: McpAuthContext = Depends(require_mcp_auth)) -> str:
         ...
+
+Scoped reads use :meth:`objectified_mcp.scope.Scope.allows` on ``auth.scope``; see
+:class:`objectified_mcp.scope.Scope` for the JSON persisted in ``scope_json``.
 """
 
 from __future__ import annotations
@@ -37,6 +40,7 @@ from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, ConfigDict, Field
 
 from objectified_mcp.database_pool import get_db_pool
+from objectified_mcp.scope import Scope, parse_scope_json
 
 _log = structlog.get_logger(__name__)
 
@@ -49,12 +53,12 @@ _BEARER_PREFIX = re.compile(r"(?i)^Bearer\s+")
 class McpAuthContext(BaseModel):
     """Authenticated MCP caller derived from ``odb.mcp_api_keys``."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     key_id: str
     tenant_id: str
     label: str
-    scope: dict[str, Any] = Field(default_factory=dict)
+    scope: Scope = Field(default_factory=Scope)
 
 
 def mcp_key_prefix(secret: str) -> str:
@@ -166,18 +170,11 @@ async def validate_mcp_api_key(pool: AsyncConnectionPool, raw_secret: str) -> Mc
 
     for row in eligible:
         if _verify_hash(raw_secret, row.get("key_hash")):
-            raw_scope = row.get("scope_json")
-            if raw_scope is None:
-                scope: dict[str, Any] = {}
-            elif not isinstance(raw_scope, dict):
-                scope = dict(raw_scope)
-            else:
-                scope = raw_scope
             return McpAuthContext(
                 key_id=str(row["id"]),
                 tenant_id=str(row["tenant_id"]),
                 label=str(row["label"]),
-                scope=scope,
+                scope=parse_scope_json(row.get("scope_json")),
             )
 
     if not eligible:

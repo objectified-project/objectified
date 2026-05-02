@@ -14,6 +14,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Database migration adds **`odb.mcp_api_keys`** for MCP API key storage (hashed secret, lookup prefix, tenant, JSON scopes, lifecycle timestamps).
 - MCP tools can require Postgres-backed API keys via FastMCP **`Depends(require_mcp_auth)`**: accepts **`Authorization: Bearer`** on HTTP or **`tools/call` `_meta`** on stdio, verifies bcrypt(SHA-256(secret)) against **`odb.mcp_api_keys`**, and returns a typed scope payload (clear errors for missing auth, unknown keys, expiry, and revocation).
 - Streamable HTTP binds **`Authorization: Bearer`** per request into tool context (**`get_http_bearer_from_context`**) via ASGI middleware plus FastMCP middleware; requests without a Bearer token expose **`None`** (anonymous).
+- MCP API key **`scope_json`** uses a typed **`Scope`** model (`tenants` / `projects` string lists, JSONB): empty lists mean no restriction at that level; **`scope.allows(tenant_id, project_id)`** gates reads (#3001).
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports
