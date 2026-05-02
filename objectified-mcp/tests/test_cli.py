@@ -24,8 +24,7 @@ def test_module_help_prints_usage() -> None:
 def test_console_script_entrypoint_prints_usage() -> None:
     """Validates the [project.scripts] entrypoint (cli.main) directly."""
     result = subprocess.run(
-        [sys.executable, "-c",
-         "from objectified_mcp.cli import main; main()"],
+        [sys.executable, "-c", "from objectified_mcp.cli import main; main()"],
         capture_output=True,
         text=True,
         cwd=_ROOT,
@@ -38,7 +37,7 @@ def test_console_script_entrypoint_prints_usage() -> None:
 def test_package_version_matches_pyproject() -> None:
     from objectified_mcp import __version__
 
-    assert __version__ == "0.1.0"
+    assert __version__ == "0.1.1"
 
 
 def test_server_module_exposes_mcp() -> None:

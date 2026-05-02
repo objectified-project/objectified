@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 from objectified_mcp import __version__
 
@@ -17,5 +18,22 @@ def main() -> None:
         action="version",
         version=f"%(prog)s {__version__}",
     )
-    parser.parse_args()
+    subparsers = parser.add_subparsers(dest="command")
+    subparsers.add_parser(
+        "serve",
+        help="Validate environment configuration (stdio / HTTP transports ship in later tickets).",
+    )
+
+    args = parser.parse_args()
+
+    if args.command == "serve":
+        from objectified_mcp.settings import get_settings
+
+        get_settings()
+        print(
+            "Configuration loaded. MCP transports are wired in roadmap tickets 1.5 (stdio) and 1.6 (HTTP).",
+            file=sys.stderr,
+        )
+        raise SystemExit(0)
+
     parser.print_help()
