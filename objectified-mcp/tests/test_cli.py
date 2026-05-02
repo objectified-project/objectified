@@ -29,6 +29,43 @@ def test_module_help_prints_usage() -> None:
     assert result.stderr == ""
 
 
+def test_keys_revoke_invokes_runner(monkeypatch: pytest.MonkeyPatch) -> None:
+    from objectified_mcp.cli import main
+    from objectified_mcp.settings import get_settings
+
+    get_settings.cache_clear()
+    for key, value in _MIN_ENV.items():
+        monkeypatch.setenv(key, value)
+
+    recorded: list[str] = []
+
+    async def stub_revoke(prefix: str) -> int:
+        recorded.append(prefix)
+        return 0
+
+    monkeypatch.setattr("objectified_mcp.cli._run_keys_revoke", stub_revoke)
+    monkeypatch.setattr(sys, "argv", ["objectified-mcp", "keys", "revoke", "abcdefghijkl"])
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 0
+    assert recorded == ["abcdefghijkl"]
+    get_settings.cache_clear()
+
+
+def test_keys_revoke_rejects_invalid_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    from objectified_mcp.cli import main
+    from objectified_mcp.settings import get_settings
+
+    get_settings.cache_clear()
+    for key, value in _MIN_ENV.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(sys, "argv", ["objectified-mcp", "keys", "revoke", "..."])
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 2
+    get_settings.cache_clear()
+
+
 def test_console_script_entrypoint_prints_usage() -> None:
     """Validates the [project.scripts] entrypoint (cli.main) directly."""
     result = subprocess.run(
@@ -45,7 +82,7 @@ def test_console_script_entrypoint_prints_usage() -> None:
 def test_package_version_matches_pyproject() -> None:
     from objectified_mcp import __version__
 
-    assert __version__ == "0.1.9"
+    assert __version__ == "0.1.10"
 
 
 def test_serve_validate_only_exits_without_stdio(monkeypatch: pytest.MonkeyPatch) -> None:
