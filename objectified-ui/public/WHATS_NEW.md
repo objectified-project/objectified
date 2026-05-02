@@ -16,6 +16,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Streamable HTTP binds **`Authorization: Bearer`** per request into tool context (**`get_http_bearer_from_context`**) via ASGI middleware plus FastMCP middleware; requests without a Bearer token expose **`None`** (anonymous).
 - MCP API key **`scope_json`** uses a typed **`Scope`** model (`tenants` / `projects` string lists, JSONB): empty lists mean no restriction at that level; **`scope.allows(tenant_id, project_id)`** gates reads (#3001).
 - Successful MCP API key authentication updates **`last_used_at`** in Postgres asynchronously (non-blocking); **`objectified-mcp keys revoke <prefix>`** (also **`mcp keys revoke …`** via the `mcp` console alias) revokes active keys by stored prefix (#3002).
+- Database view **`odb.mcp_v_public_specs`** exposes published, public schema revisions for MCP discovery (project title, semantic version, description, sorted tag names, timestamps); dev checklist data lives in **`objectified-db/fixtures/mcp_public_specs_dev.sql`** (#3004).
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports
