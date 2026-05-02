@@ -441,9 +441,8 @@ export function RepositoryDetailClient() {
       {!loading && repo && tab === 'preview' && (
         <div className="space-y-6 px-6 py-6">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Snapshot of this repository&apos;s registration, scan posture, and import activity. Matches the Repository
-            Store mockup <span className="font-mono text-xs">repository.html</span> Preview (overview) tab — data fills in
-            as scan and import APIs land.
+            Snapshot of this repository&apos;s registration, scan posture, and import activity. More detail appears here
+            as scan jobs and import history are exposed through the API.
           </p>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
