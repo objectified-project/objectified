@@ -90,7 +90,13 @@ describe('objectified-mcp transports (integration)', () => {
   it('lists tools over Streamable HTTP', async (t) => {
     const registry = ActionRegistry.instance();
     const upstream = RestClient.withBaseUrl('http://127.0.0.1:8000');
-    const http = await listenHttpTransport({ registry, upstream, port: 0, host: '127.0.0.1' });
+    const http = await listenHttpTransport({
+      registry,
+      upstream,
+      port: 0,
+      host: '127.0.0.1',
+      anonymous: true,
+    });
 
     const transport = new StreamableHTTPClientTransport(
       new URL(`http://127.0.0.1:${http.port}/mcp`),
@@ -112,7 +118,13 @@ describe('objectified-mcp transports (integration)', () => {
   it('sets Cache-Control: no-store on HTTP responses', async (t) => {
     const registry = ActionRegistry.instance();
     const upstream = RestClient.withBaseUrl('http://127.0.0.1:8000');
-    const http = await listenHttpTransport({ registry, upstream, port: 0, host: '127.0.0.1' });
+    const http = await listenHttpTransport({
+      registry,
+      upstream,
+      port: 0,
+      host: '127.0.0.1',
+      anonymous: true,
+    });
     t.after(async () => {
       await http.close();
     });
@@ -128,6 +140,7 @@ describe('objectified-mcp transports (integration)', () => {
       args: [bin, '--transport', 'stdio'],
       cwd: pkgRoot,
       stderr: 'pipe',
+      env: { ...process.env, OBJECTIFIED_MCP_ALLOW_ANONYMOUS: '1' },
     });
     const client = new Client({ name: 'test-harness', version: '0.0.0' }, { capabilities: {} });
     await client.connect(transport);
@@ -146,7 +159,11 @@ describe('objectified-mcp transports (integration)', () => {
     const bin = join(pkgRoot, 'bin', 'objectified-mcp.js');
     const child = spawn('node', [bin, '--transport', 'stdio'], {
       cwd: pkgRoot,
-      env: { ...process.env, OBJECTIFIED_MCP_STDIO_IDLE_MS: '150' },
+      env: {
+        ...process.env,
+        OBJECTIFIED_MCP_STDIO_IDLE_MS: '150',
+        OBJECTIFIED_MCP_ALLOW_ANONYMOUS: '1',
+      },
       stdio: ['ignore', 'ignore', 'ignore'],
     });
 

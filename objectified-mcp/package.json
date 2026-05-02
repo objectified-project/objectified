@@ -1,6 +1,6 @@
 {
   "name": "objectified-mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Model Context Protocol server for Objectified (stdio + Streamable HTTP)",
   "type": "module",
@@ -14,10 +14,11 @@
     "build": "tsc",
     "dev": "yarn build && yarn start",
     "start": "node bin/objectified-mcp.js --transport stdio",
-    "test": "yarn build && tsx --test tests/server.test.ts"
+    "test": "yarn build && tsx --test tests/server.test.ts tests/auth.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "redis": "^5.10.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {

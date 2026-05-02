@@ -2,7 +2,7 @@ import psycopg2
 import json
 import logging
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import bcrypt
 import numpy as np
 from psycopg2.extras import Json, RealDictCursor
@@ -653,6 +653,7 @@ class Database:
 
         query = """
             SELECT ak.id, ak.tenant_id, ak.key_hash, ak.expires_at, ak.enabled,
+                   ak.purpose,
                    t.id as tenant_id, t.slug as tenant_slug, t.name as tenant_name
             FROM odb.api_keys ak
             JOIN odb.tenants t ON ak.tenant_id = t.id
@@ -661,6 +662,7 @@ class Database:
               AND ak.enabled = true
               AND t.deleted_at IS NULL
               AND t.enabled = true
+              AND (COALESCE(ak.purpose, 'rest') = 'rest' OR COALESCE(ak.purpose, 'rest') = 'both')
               AND (ak.expires_at IS NULL OR ak.expires_at > CURRENT_TIMESTAMP)
         """
         results = self.execute_query(query, (key_prefix,))
@@ -677,9 +679,17 @@ class Database:
             try:
                 if bcrypt.checkpw(api_key_bytes, key_hash):
                     api_key_data = dict(row)
-                    # Update last_used_at
+                    # Update last_used_at at most once per minute per key
                     try:
-                        update_query = "UPDATE odb.api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = %s"
+                        update_query = """
+                            UPDATE odb.api_keys
+                            SET last_used_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                              AND (
+                                  last_used_at IS NULL
+                                  OR last_used_at < CURRENT_TIMESTAMP - INTERVAL '60 seconds'
+                              )
+                        """
                         conn = self.connect()
                         with conn.cursor() as cursor:
                             cursor.execute(update_query, (api_key_data['id'],))
@@ -691,6 +701,124 @@ class Database:
                 continue
 
         return None
+
+    def resolve_api_key_token(
+        self,
+        token: str,
+        required_purpose: str,
+        *,
+        clock_skew_seconds: int = 30,
+        touch_last_used: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Resolve a raw API key for REST or MCP internal auth.
+
+        required_purpose: "mcp" or "rest" — key must be "both" or match that purpose.
+
+        Returns a dict with valid: bool, and either success fields or reason in
+        {KEY_NOT_FOUND, KEY_REVOKED, KEY_EXPIRED, KEY_WRONG_PURPOSE}.
+        """
+        if required_purpose not in ("mcp", "rest"):
+            return {"valid": False, "reason": "KEY_NOT_FOUND"}
+
+        if not token or not str(token).strip() or len(str(token).strip()) < 12:
+            return {"valid": False, "reason": "KEY_NOT_FOUND"}
+
+        token = str(token).strip()
+        key_prefix = token[:12] + "..."
+        api_key_bytes = token.encode("utf-8")
+
+        query = """
+            SELECT ak.id, ak.tenant_id, ak.key_hash, ak.expires_at, ak.enabled, ak.deleted_at,
+                   ak.purpose, ak.scopes, ak.owner_user_id,
+                   t.enabled AS tenant_enabled, t.deleted_at AS tenant_deleted_at
+            FROM odb.api_keys ak
+            JOIN odb.tenants t ON ak.tenant_id = t.id
+            WHERE ak.key_prefix = %s
+        """
+        rows = self.execute_query(query, (key_prefix,))
+        if not rows:
+            return {"valid": False, "reason": "KEY_NOT_FOUND"}
+
+        now = datetime.now(timezone.utc)
+        skew = timedelta(seconds=max(0, int(clock_skew_seconds)))
+
+        for row in rows:
+            key_hash = row["key_hash"]
+            if isinstance(key_hash, str):
+                key_hash = key_hash.encode("utf-8")
+            try:
+                if not bcrypt.checkpw(api_key_bytes, key_hash):
+                    continue
+            except (ValueError, TypeError):
+                continue
+
+            purpose = row.get("purpose") or "rest"
+
+            if row.get("deleted_at") is not None or row.get("enabled") is False:
+                return {"valid": False, "reason": "KEY_REVOKED"}
+            if row.get("tenant_deleted_at") is not None or row.get("tenant_enabled") is False:
+                return {"valid": False, "reason": "KEY_REVOKED"}
+
+            exp = row.get("expires_at")
+            if exp is not None:
+                if getattr(exp, "tzinfo", None) is None:
+                    exp = exp.replace(tzinfo=timezone.utc)
+                if exp <= now - skew:
+                    return {"valid": False, "reason": "KEY_EXPIRED"}
+
+            if required_purpose == "mcp" and purpose == "rest":
+                return {"valid": False, "reason": "KEY_WRONG_PURPOSE"}
+            if required_purpose == "rest" and purpose == "mcp":
+                return {"valid": False, "reason": "KEY_WRONG_PURPOSE"}
+
+            scopes = row.get("scopes")
+            if scopes is None:
+                scopes_list: List[str] = []
+            elif isinstance(scopes, list):
+                scopes_list = [str(s) for s in scopes]
+            else:
+                scopes_list = []
+
+            owner = row.get("owner_user_id")
+            user_id_val = str(owner) if owner is not None else None
+
+            if touch_last_used:
+                try:
+                    update_query = """
+                        UPDATE odb.api_keys
+                        SET last_used_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                          AND (
+                              last_used_at IS NULL
+                              OR last_used_at < CURRENT_TIMESTAMP - INTERVAL '60 seconds'
+                          )
+                    """
+                    conn = self.connect()
+                    with conn.cursor() as cursor:
+                        cursor.execute(update_query, (row["id"],))
+                        conn.commit()
+                except Exception:
+                    pass
+
+            exp_out = row.get("expires_at")
+            expires_at_out = None
+            if exp_out is not None:
+                if getattr(exp_out, "tzinfo", None) is None:
+                    exp_out = exp_out.replace(tzinfo=timezone.utc)
+                expires_at_out = exp_out.isoformat()
+
+            return {
+                "valid": True,
+                "user_id": user_id_val,
+                "tenant_id": str(row["tenant_id"]),
+                "scopes": scopes_list,
+                "expires_at": expires_at_out,
+                "revoked": False,
+                "key_id": str(row["id"]),
+            }
+
+        return {"valid": False, "reason": "KEY_NOT_FOUND"}
 
     def get_tags_for_project(self, project_id: str) -> List[Dict[str, Any]]:
         """Get all tags for a specific project."""

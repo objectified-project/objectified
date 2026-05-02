@@ -9,6 +9,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { attachCacheControlNoStore } from './cache-control.js';
 import type { ActionRegistry } from '../registry/index.js';
 import { createObjectifiedMcpServer } from '../server.js';
+import { parseBearerAuthorization, resolveApiKeyFromEnv } from '../upstream/auth.js';
 import type { RestClient } from '../upstream/client.js';
 
 export const DEFAULT_HTTP_PORT = 4040;
@@ -83,6 +84,8 @@ export async function listenHttpTransport(options: {
   upstream: RestClient;
   port: number;
   host?: string;
+  /** Skip MCP API-key gate (tests / local wiring only). */
+  anonymous?: boolean;
 }): Promise<{ port: number; close: () => Promise<void> }> {
   const sessions = new Map<string, SessionEntry>();
   const host = options.host ?? '0.0.0.0';
@@ -103,6 +106,7 @@ export async function listenHttpTransport(options: {
       await dispatchMcpRequest(req, res, {
         registry: options.registry,
         upstream: options.upstream,
+        anonymous: options.anonymous ?? false,
         sessions,
       });
     } catch (err) {
@@ -166,7 +170,12 @@ export async function listenHttpTransport(options: {
 async function dispatchMcpRequest(
   req: IncomingMessage,
   res: ServerResponse,
-  ctx: { registry: ActionRegistry; upstream: RestClient; sessions: Map<string, SessionEntry> },
+  ctx: {
+    registry: ActionRegistry;
+    upstream: RestClient;
+    anonymous: boolean;
+    sessions: Map<string, SessionEntry>;
+  },
 ): Promise<void> {
   const sessionId = getSessionHeader(req);
 
@@ -198,7 +207,16 @@ async function dispatchMcpRequest(
       return;
     }
 
-    const mcpServer = createObjectifiedMcpServer(ctx.registry, ctx.upstream);
+    const mcpServer = createObjectifiedMcpServer(
+      ctx.registry,
+      ctx.upstream,
+      ctx.anonymous
+        ? { kind: 'none' }
+        : {
+            kind: 'api_key',
+            getToken: () => parseBearerAuthorization(req) ?? resolveApiKeyFromEnv(),
+          },
+    );
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (sid) => {

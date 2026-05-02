@@ -1,10 +1,20 @@
+import type { IncomingMessage } from 'node:http';
+
 /**
  * API key used against objectified-rest (HTTP header or stdio env).
- * Full resolution ships in MCP-1.3 / MCP-1.4.
  */
 export function resolveApiKeyFromEnv(): string | undefined {
   const key = process.env.OBJECTIFIED_MCP_KEY;
   return key?.trim() || undefined;
+}
+
+/** `Authorization: Bearer <token>` when present (Streamable HTTP). */
+export function parseBearerAuthorization(req: IncomingMessage): string | undefined {
+  const raw = req.headers.authorization ?? req.headers.Authorization;
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  if (!v || !v.startsWith('Bearer ')) return undefined;
+  const t = v.slice('Bearer '.length).trim();
+  return t || undefined;
 }
 
 export function resolveRestBaseUrl(): string {

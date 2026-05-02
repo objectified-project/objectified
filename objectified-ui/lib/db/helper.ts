@@ -2507,6 +2507,7 @@ export async function validateApiKey(apiKey: string) {
        WHERE ak.key_prefix = $1 
        AND ak.deleted_at IS NULL 
        AND ak.enabled = true
+       AND (COALESCE(ak.purpose, 'rest') = 'rest' OR COALESCE(ak.purpose, 'rest') = 'both')
        AND t.deleted_at IS NULL
        AND t.enabled = true`,
       [keyPrefix]

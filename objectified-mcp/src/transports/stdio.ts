@@ -2,6 +2,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import type { ActionRegistry } from '../registry/index.js';
 import { createObjectifiedMcpServer } from '../server.js';
+import { resolveApiKeyFromEnv } from '../upstream/auth.js';
 import type { RestClient } from '../upstream/client.js';
 
 const DEFAULT_IDLE_MS = 5 * 60 * 1000;
@@ -16,9 +17,15 @@ function parsePositiveMs(raw: string | undefined, fallback: number): number {
 export async function runStdioTransport(deps: {
   registry: ActionRegistry;
   upstream: RestClient;
+  /** Skip MCP API-key gate (tests / local wiring only). */
+  anonymous?: boolean;
 }): Promise<void> {
   const idleMs = parsePositiveMs(process.env.OBJECTIFIED_MCP_STDIO_IDLE_MS, DEFAULT_IDLE_MS);
-  const server = createObjectifiedMcpServer(deps.registry, deps.upstream);
+  const server = createObjectifiedMcpServer(
+    deps.registry,
+    deps.upstream,
+    deps.anonymous ? { kind: 'none' } : { kind: 'api_key', getToken: () => resolveApiKeyFromEnv() },
+  );
   const transport = new StdioServerTransport();
 
   let idleTimer: NodeJS.Timeout | undefined;

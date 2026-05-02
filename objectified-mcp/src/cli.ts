@@ -1,5 +1,7 @@
 import { parseArgs } from 'node:util';
 
+import { getSharedSessionAuthCache } from './auth/global-cache.js';
+import { startMcpKeyRevokeSubscriber } from './auth/revoke-subscriber.js';
 import { DEFAULT_HTTP_PORT, listenHttpTransport } from './transports/http.js';
 import { runStdioTransport } from './transports/stdio.js';
 import { ActionRegistry } from './registry/index.js';
@@ -36,23 +38,30 @@ async function main(): Promise<void> {
 
   const registry = ActionRegistry.instance();
   const upstream = RestClient.fromEnv();
+  const anonymous = process.env.OBJECTIFIED_MCP_ALLOW_ANONYMOUS === '1';
 
-  if (transport === 'stdio') {
-    await runStdioTransport({ registry, upstream });
-    return;
+  const stopSubscriber = await startMcpKeyRevokeSubscriber(getSharedSessionAuthCache());
+
+  try {
+    if (transport === 'stdio') {
+      await runStdioTransport({ registry, upstream, anonymous });
+      return;
+    }
+
+    const port = parsePort(process.env.OBJECTIFIED_MCP_PORT, DEFAULT_HTTP_PORT);
+    const host = process.env.OBJECTIFIED_MCP_HOST ?? '0.0.0.0';
+    const http = await listenHttpTransport({ registry, upstream, port, host, anonymous });
+
+    await new Promise<void>((resolve) => {
+      const stop = (): void => {
+        void http.close().finally(() => resolve());
+      };
+      process.once('SIGINT', stop);
+      process.once('SIGTERM', stop);
+    });
+  } finally {
+    await stopSubscriber();
   }
-
-  const port = parsePort(process.env.OBJECTIFIED_MCP_PORT, DEFAULT_HTTP_PORT);
-  const host = process.env.OBJECTIFIED_MCP_HOST ?? '0.0.0.0';
-  const http = await listenHttpTransport({ registry, upstream, port, host });
-
-  await new Promise<void>((resolve) => {
-    const stop = (): void => {
-      void http.close().finally(() => resolve());
-    };
-    process.once('SIGINT', stop);
-    process.once('SIGTERM', stop);
-  });
 }
 
 await main();

@@ -7,6 +7,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## MCP (preview)
 - New `objectified-mcp` workspace package bootstraps the MCP server with stdio and the `mcp.search` / `mcp.describe` / `mcp.execute` tools.
 - MCP-1.2: Streamable HTTP transport at `/mcp` (`--transport http`, port from `OBJECTIFIED_MCP_PORT`) alongside stdio; HTTP responses use `Cache-Control: no-store`.
+- MCP-1.3: MCP sessions authenticate via API keys (`Authorization: Bearer …` on HTTP, `OBJECTIFIED_MCP_KEY` on stdio), resolved through `objectified-rest` with optional Redis `mcp.key.revoked` cache eviction; database adds key `purpose` / `scopes` for REST vs MCP separation.
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports

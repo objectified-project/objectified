@@ -40,6 +40,22 @@ class Settings(BaseSettings):
         ),
     )
 
+    # MCP internal resolve + revocation fan-out (#2824)
+    internal_api_secret: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_INTERNAL_API_SECRET",
+            "internal_api_secret",
+        ),
+    )
+    redis_url: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_REDIS_URL",
+            "redis_url",
+        ),
+    )
+
     @property
     def effective_database_url(self) -> str:
         """Get the database URL, preferring DATABASE_URL over building from components."""

@@ -1410,7 +1410,7 @@ MCP v1 release; `(V2)` items are explicitly enterprise.
 
 1. ~~[#2822] MCP-1.1 — `objectified-mcp` package + MCP SDK bootstrap **(MVP)**~~ **Done**
 2. ~~[#2823] MCP-1.2 — Transport adapters (stdio + Streamable HTTP) **(MVP)**~~ **Done**
-3. [#2824] MCP-1.3 — API-key authentication via Linked Accounts **(MVP)**
+3. ~~[#2824] MCP-1.3 — API-key authentication via Linked Accounts **(MVP)**~~ **Done**
 4. [#2825] MCP-1.4 — Tenant scoping + RBAC scope guard **(MVP, parallel)**
 5. [#2826] MCP-1.5 — Per-key rate limits **(MVP, parallel)**
 6. [#2827] MCP-1.6 — Workflow audit integration **(MVP, parallel)**
