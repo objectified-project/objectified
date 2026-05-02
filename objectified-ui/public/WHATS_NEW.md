@@ -21,6 +21,7 @@ We continue to improve the platform based on your feedback with improvements and
 - MCP tool **`spec.describe`** loads one public spec by revision UUID and returns **`id`**, **`title`**, **`version`**, **`description`**, **`owner`** (tenant slug), **`tags`**, and **`updated_at`** (UTC **`Z`**); missing, unpublished, or private revisions surface as not-found (#3006).
 - MCP tool **`spec.search`** keyword-searches public specs (**ILIKE** over title, description, and tag names); **`q`** must be non-empty after trimming; results include **`rank_score`** and use the same **`limit`** / **`next_cursor`** pagination pattern as **`spec.list`** (#3007).
 - MCP tool **`spec.list_tags`** returns distinct public-spec tag names with usage counts as **`[{tag, count}, …]`**, sorted by count descending (then tag name ascending); results are cached in-process for **60 seconds** (#3008).
+- MCP **`authorize_spec`** combines API key **scope** with revision **visibility** (public rows need scope only; private rows also require the spec tenant to match the key); **`build_authorized_spec_sql_predicate`** emits the same rules as a parameterized SQL **`WHERE`** fragment (#3010).
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports
