@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   FolderOpen,
   File,
@@ -15,6 +15,7 @@ import {
   Bookmark,
   BookmarkPlus,
   Trash2,
+  History,
 } from 'lucide-react';
 import { SiGithub, SiGitlab, SiGoogle, SiAmazon } from 'react-icons/si';
 import { getLinkedAccountsForUser } from '../../../../../lib/db/helper';
@@ -27,6 +28,12 @@ import {
   normalizeGitImportSpecPath,
   removeGitImportSavedRepo,
 } from '../../../utils/git-import-saved-repos';
+import {
+  loadGitImportRecentSpecs,
+  recordGitImportRecentSpec,
+  recentSpecsForAccountAndOptionalRepo,
+  type GitImportRecentSpec,
+} from '../../../utils/git-import-recent-specs';
 import { Button } from '../../../components/ui/Button';
 
 interface GitImportPanelProps {
@@ -61,6 +68,19 @@ function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function formatRecentOpenedAt(ts: number): string {
+  try {
+    return new Date(ts).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  } catch {
+    return '—';
+  }
+}
+
 export const GitImportPanel: React.FC<GitImportPanelProps> = ({
   userId,
   onSpecificationFetched
@@ -92,6 +112,9 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
   const [fetchedFilename, setFetchedFilename] = useState<string | null>(null);
   const [fileMetadata, setFileMetadata] = useState<FileMetadataPreview | null>(null);
   const [savedRepos, setSavedRepos] = useState<GitImportSavedRepo[]>([]);
+  const [recentSpecs, setRecentSpecs] = useState<GitImportRecentSpec[]>([]);
+  /** Middle column: full repo list vs recent spec opens for this account (optionally scoped to the selected repo). */
+  const [repositoryListTab, setRepositoryListTab] = useState<'all' | 'history'>('all');
 
   const loadLinkedAccounts = useCallback(async () => {
     setIsLoadingAccounts(true);
@@ -113,6 +136,7 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
   useEffect(() => {
     if (typeof window === 'undefined' || !userId) return;
     setSavedRepos(loadGitImportSavedRepos(userId));
+    setRecentSpecs(loadGitImportRecentSpecs(userId));
   }, [userId]);
 
   const getProviderIcon = (provider: string) => {
@@ -202,6 +226,7 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
   };
 
   const handleSelectAccount = async (account: LinkedAccount) => {
+    setRepositoryListTab('all');
     setSelectedAccount(account);
     setSelectedRepo(null);
     setRepoFiles([]);
@@ -352,8 +377,46 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
     }
   };
 
-  const resolveContentRef = () =>
-    selectedTag || selectedBranch || selectedRepo?.default_branch || 'main';
+  const loadRemoteSpecAndPublish = useCallback(
+    async (
+      account: LinkedAccount,
+      repo: GitHubRepoSummary,
+      refKind: GitImportRecentSpec['refKind'],
+      refName: string,
+      normalizedSpecPath: string
+    ) => {
+      const ref = refName;
+      const response = await fetch(
+        `/api/sso/${account.provider.toLowerCase()}/content?accountId=${encodeURIComponent(account.id)}&repo=${encodeURIComponent(repo.full_name)}&path=${encodeURIComponent(normalizedSpecPath)}&branch=${encodeURIComponent(ref)}`
+      );
+
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof errBody.error === 'string' ? errBody.error : response.statusText
+        );
+      }
+
+      const data = await response.json();
+      const content = data.content as string;
+      const filename = normalizedSpecPath.split('/').pop() || normalizedSpecPath;
+      const metadata = extractFileMetadata(content);
+      setFetchedContent(content);
+      setFetchedFilename(filename);
+      setFileMetadata(metadata);
+      onSpecificationFetched(content, filename, metadata);
+      const { items } = recordGitImportRecentSpec(userId, {
+        accountId: account.id,
+        provider: account.provider,
+        repoFullName: repo.full_name,
+        refKind,
+        refName,
+        specPath: normalizedSpecPath,
+      });
+      setRecentSpecs(items);
+    },
+    [userId, onSpecificationFetched]
+  );
 
   const handleSelectFile = async (file: RepoFileEntry) => {
     if (!selectedAccount || !selectedRepo) return;
@@ -381,25 +444,15 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
     setErrorMessage('');
 
     try {
-      const ref = resolveContentRef();
-      const response = await fetch(
-        `/api/sso/${selectedAccount.provider.toLowerCase()}/content?accountId=${encodeURIComponent(selectedAccount.id)}&repo=${encodeURIComponent(selectedRepo.full_name)}&path=${encodeURIComponent(file.path)}&branch=${encodeURIComponent(ref)}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch file content: ${response.statusText}`);
+      const refKind: GitImportRecentSpec['refKind'] = selectedTag ? 'tag' : 'branch';
+      const refName =
+        selectedTag || selectedBranch || selectedRepo.default_branch || 'main';
+      const pathNorm = normalizeGitImportSpecPath(file.path);
+      if (!pathNorm) {
+        setErrorMessage('Invalid file path.');
+        return;
       }
-
-      const data = await response.json();
-      const content = data.content;
-      const filename = file.name;
-
-      const metadata = extractFileMetadata(content);
-      setFetchedContent(content);
-      setFetchedFilename(filename);
-      setFileMetadata(metadata);
-
-      onSpecificationFetched(content, filename, metadata);
+      await loadRemoteSpecAndPublish(selectedAccount, selectedRepo, refKind, refName, pathNorm);
     } catch (error: unknown) {
       setErrorMessage(`Failed to load file: ${formatError(error)}`);
     } finally {
@@ -435,25 +488,15 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
     setErrorMessage('');
 
     try {
-      const ref = resolveContentRef();
-      const response = await fetch(
-        `/api/sso/${selectedAccount.provider.toLowerCase()}/content?accountId=${encodeURIComponent(selectedAccount.id)}&repo=${encodeURIComponent(selectedRepo.full_name)}&path=${encodeURIComponent(raw)}&branch=${encodeURIComponent(ref)}`
-      );
-
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => ({}));
-        throw new Error(errBody.error || response.statusText);
+      const refKind: GitImportRecentSpec['refKind'] = selectedTag ? 'tag' : 'branch';
+      const refName =
+        selectedTag || selectedBranch || selectedRepo.default_branch || 'main';
+      const pathNorm = normalizeGitImportSpecPath(raw);
+      if (!pathNorm) {
+        setErrorMessage('Enter a file path (e.g. specs/openapi.yaml).');
+        return;
       }
-
-      const data = await response.json();
-      const content = data.content;
-      const filename = base;
-
-      const metadata = extractFileMetadata(content);
-      setFetchedContent(content);
-      setFetchedFilename(filename);
-      setFileMetadata(metadata);
-      onSpecificationFetched(content, filename, metadata);
+      await loadRemoteSpecAndPublish(selectedAccount, selectedRepo, refKind, refName, pathNorm);
     } catch (error: unknown) {
       setErrorMessage(`Failed to load file: ${formatError(error)}`);
     } finally {
@@ -572,6 +615,15 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
       }
 
       await loadRepoRootAtRef(account, repo, ref, false);
+
+      if (specNorm) {
+        const refKind: GitImportRecentSpec['refKind'] = bookmark.refKind;
+        const refName =
+          bookmark.refKind === 'tag'
+            ? bookmark.refName
+            : bookmark.refName || repo.default_branch || 'main';
+        await loadRemoteSpecAndPublish(account, repo, refKind, refName, specNorm);
+      }
     } catch (error: unknown) {
       setErrorMessage(formatError(error));
     } finally {
@@ -579,11 +631,34 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
     }
   };
 
+  const handleOpenRecentFromHistory = async (entry: GitImportRecentSpec) => {
+    const synthetic: GitImportSavedRepo = {
+      id: entry.id,
+      accountId: entry.accountId,
+      provider: entry.provider,
+      repoFullName: entry.repoFullName,
+      refKind: entry.refKind,
+      refName: entry.refName,
+      specPath: entry.specPath,
+      savedAt: entry.openedAt,
+    };
+    await handleOpenSaved(synthetic);
+  };
+
   // Filter repositories based on search query
   const filteredRepos = repositories.filter((repo: GitHubRepoSummary) =>
     repo.name.toLowerCase().includes(repoSearchQuery.toLowerCase()) ||
     (repo.description && repo.description.toLowerCase().includes(repoSearchQuery.toLowerCase()))
   );
+
+  const historyListEntries = useMemo(() => {
+    if (!selectedAccount || repositoryListTab !== 'history') return [];
+    return recentSpecsForAccountAndOptionalRepo(
+      recentSpecs,
+      selectedAccount.id,
+      selectedRepo ? selectedRepo.full_name : null
+    );
+  }, [recentSpecs, selectedAccount, selectedRepo, repositoryListTab]);
 
   if (isLoadingAccounts) {
     return (
@@ -883,14 +958,60 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
 
         {/* Column 2: Repositories */}
         <div className="w-1/3 min-w-[200px] max-w-[300px] border-r border-gray-200 dark:border-gray-700 flex flex-col min-h-0">
-          <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0">
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Repositories
-            </span>
+          <div className="px-2 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0 space-y-2">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">
+                Repositories
+              </span>
+              {selectedAccount ? (
+                <div
+                  className="flex shrink-0 rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-0.5"
+                  role="tablist"
+                  aria-label="Repository list mode"
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={repositoryListTab === 'all'}
+                    onClick={() => setRepositoryListTab('all')}
+                    disabled={isLoading}
+                    className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                      repositoryListTab === 'all'
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/80'
+                    } disabled:opacity-50`}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={repositoryListTab === 'history'}
+                    onClick={() => setRepositoryListTab('history')}
+                    disabled={isLoading}
+                    className={`flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                      repositoryListTab === 'history'
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/80'
+                    } disabled:opacity-50`}
+                  >
+                    <History className="h-3 w-3" aria-hidden />
+                    History
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            {repositoryListTab === 'history' && selectedAccount ? (
+              <p className="text-[10px] leading-snug text-gray-500 dark:text-gray-400">
+                {selectedRepo
+                  ? 'Specs you opened from this repository on this device.'
+                  : 'Specs you opened from any repository for this account on this device.'}
+              </p>
+            ) : null}
           </div>
 
           {/* Search Box */}
-          {selectedAccount && repositories.length > 0 && (
+          {repositoryListTab === 'all' && selectedAccount && repositories.length > 0 && (
             <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -912,6 +1033,44 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
                   Select an account
                 </span>
               </div>
+            ) : repositoryListTab === 'history' ? (
+              historyListEntries.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                  <History className="h-8 w-8 text-gray-300 dark:text-gray-600 mb-2" aria-hidden />
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    {selectedRepo
+                      ? 'No recent imports for this repository yet. Open a spec from the file column to list it here.'
+                      : 'No recent imports yet. Open a spec from a repository, then return here to re-open it quickly.'}
+                  </span>
+                </div>
+              ) : (
+                historyListEntries.map((entry) => {
+                  const showRepo = !selectedRepo;
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => !isLoading && void handleOpenRecentFromHistory(entry)}
+                      disabled={isLoading}
+                      className={`w-full px-3 py-2 border-b border-gray-100 dark:border-gray-700 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-900 dark:text-gray-100 ${
+                        isLoading ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
+                      }`}
+                    >
+                      {showRepo ? (
+                        <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 truncate">
+                          {entry.repoFullName}
+                        </div>
+                      ) : null}
+                      <div className="text-sm font-medium truncate">{entry.specPath}</div>
+                      <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                        {entry.refKind === 'tag' ? `Tag ${entry.refName}` : `Branch ${entry.refName}`}
+                        <span className="mx-1">·</span>
+                        {formatRecentOpenedAt(entry.openedAt)}
+                      </div>
+                    </button>
+                  );
+                })
+              )
             ) : isLoading && repositories.length === 0 ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />

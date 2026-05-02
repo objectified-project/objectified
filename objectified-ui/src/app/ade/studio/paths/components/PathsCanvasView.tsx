@@ -6,6 +6,7 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  Panel,
   useNodesState,
   useEdgesState,
   Node,
@@ -66,7 +67,7 @@ import PathResponseBodyNode, { PathResponseBodyData } from './PathResponseBodyNo
 import ClassDropChoiceDialog, { ClassDropAction } from '../../../../components/dialogs/ClassDropChoiceDialog';
 import PathTemplateNode from './PathTemplateNode';
 import { OPERATION_COLORS } from './paths-operation-colors';
-import { Trash2, Lock, Unlock, AlertTriangle, Eye, Copy, Check } from 'lucide-react';
+import { Trash2, Lock, Unlock, AlertTriangle, Eye, Copy, Check, LayoutGrid } from 'lucide-react';
 import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../../lib/db/helper';
@@ -99,6 +100,7 @@ import {
   serializePathsCanvas,
   type PathsCanvasBlob,
 } from '../lib/paths-canvas-persist';
+import { applyAutoLayout, type AutoLayoutOptions } from '../../../../utils/canvas-auto-layout';
 import {
   labelPathToOperation,
   labelOperationToParameter,
@@ -108,6 +110,15 @@ import {
   pathsCanvasEdgeLabelBgStyle,
   labelForManualConnection,
 } from '../lib/paths-canvas-edge-labels';
+
+const PATHS_CANVAS_AUTO_LAYOUT_OPTIONS: Partial<AutoLayoutOptions> = {
+  nodeSpacingX: 64,
+  nodeSpacingY: 168,
+  padding: 56,
+  direction: 'TB',
+  centerNodes: true,
+  minimizeCrossings: true,
+};
 
 // Enhanced Operation Node Component with Schema Drop Zones - Vertical Layout
 function OperationNode({ data }: {
@@ -3100,10 +3111,19 @@ function PathsCanvasInner({
           }
         }
 
-        const merged = mergePathsCanvasLayout(computedNodes, allEdges, blob);
+        const noSavedNodeLayout = !blob?.nodes?.length || blob.nodes.length === 0;
         const noSavedCanvas =
           canvasUpdatedAt == null &&
           (!blob?.nodes?.length || blob.nodes.length === 0);
+
+        // No persisted node positions: Sugiyama-style top-down layers (path → ops → params / responses /
+        // request bodies → bodies / classes). Avoids legacy hard-coded coords (e.g. request bodies at x < 0).
+        const nodesForPersistMerge =
+          noSavedNodeLayout && computedNodes.length > 0
+            ? applyAutoLayout(computedNodes, allEdges, PATHS_CANVAS_AUTO_LAYOUT_OPTIONS)
+            : computedNodes;
+
+        const merged = mergePathsCanvasLayout(nodesForPersistMerge, allEdges, blob);
         viewportToApplyRef.current = noSavedCanvas ? null : merged.viewport;
         shouldFitAfterLoadRef.current = noSavedCanvas;
 
@@ -3152,6 +3172,15 @@ function PathsCanvasInner({
       });
     }, 650);
   }, [canvasPersistReady, selectedVersionId, selectedPathId, getViewport, nodes, edges]);
+
+  const handlePathsCanvasAutoLayout = useCallback(() => {
+    if (!canvasPersistReady || nodes.length === 0) return;
+    const nextNodes = applyAutoLayout(nodes, edges, PATHS_CANVAS_AUTO_LAYOUT_OPTIONS);
+    setNodes(nextNodes);
+    window.requestAnimationFrame(() => {
+      fitView({ padding: 0.2, duration: 240 });
+    });
+  }, [canvasPersistReady, nodes, edges, setNodes, fitView]);
 
   const flushPathsCanvasNow = useCallback(async () => {
     if (!canvasPersistReady || !selectedVersionId || !selectedPathId) return;
@@ -4551,6 +4580,21 @@ function PathsCanvasInner({
           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden"
           style={{ borderRadius: '6px', overflow: 'hidden', boxShadow: 'none' }}
         />
+        {selectedPathId && (
+          <Panel position="top-right" className="m-2">
+            <button
+              type="button"
+              onClick={handlePathsCanvasAutoLayout}
+              disabled={!canvasPersistReady || nodes.length === 0}
+              className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              title="Arrange nodes in a top-down layered layout and fit the view. Saves with your path canvas."
+              aria-label="Auto-arrange path canvas layout"
+            >
+              <LayoutGrid className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Auto layout
+            </button>
+          </Panel>
+        )}
         {(alignmentGuides.horizontal.length > 0 || alignmentGuides.vertical.length > 0) && (() => {
           const viewport = getViewport();
           return (
