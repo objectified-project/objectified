@@ -65,7 +65,7 @@ def test_parse_scope_json_round_trip_lists() -> None:
 
 def test_parse_scope_json_ignores_unknown_keys_and_legacy_shape() -> None:
     assert parse_scope_json({"tenant": True}) == Scope()
-    assert parse_scope_json({"tenants": ["x"], "extra": 1}) == Scope(tenants=["x"])
+    assert parse_scope_json({"tenants": ["x"], "extra": 1}) == Scope(tenants=("x",))
 
 
 def test_parse_scope_json_wrong_field_type_denies_all(caplog: Any) -> None:
@@ -84,7 +84,7 @@ def test_parse_scope_json_wrong_field_type_denies_all(caplog: Any) -> None:
 def test_parse_scope_json_filters_non_string_items() -> None:
     """Non-string items inside a valid list are silently filtered out."""
     s = parse_scope_json({"tenants": [1, "keep", None]})
-    assert s == Scope(tenants=("keep",))
+    assert s == Scope(tenants=["keep"])
 
 
 def test_parse_scope_json_non_dict_denies_all(caplog: Any) -> None:
