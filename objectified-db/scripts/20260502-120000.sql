@@ -22,10 +22,7 @@ CREATE TABLE IF NOT EXISTS mcp_api_keys (
 CREATE INDEX IF NOT EXISTS idx_mcp_api_keys_prefix ON odb.mcp_api_keys (prefix);
 
 COMMENT ON TABLE odb.mcp_api_keys IS
-  'MCP authentication keys (#2997). Constraints: key_hash UNIQUE (one row per stored secret); '
-  'tenant_id NOT NULL FK → tenants ON DELETE CASCADE; created_by FK → users ON DELETE SET NULL; '
-  'chk_mcp_api_keys_expires_after_created — expires_at must be NULL or >= created_at; '
-  'chk_mcp_api_keys_revoked_after_created — revoked_at must be NULL or >= created_at.';
+  'MCP authentication keys (#2997); column and constraint comments document invariants.';
 
 COMMENT ON COLUMN odb.mcp_api_keys.key_hash IS
   'Bcrypt (or equivalent) hash of the full secret; never store plaintext.';
