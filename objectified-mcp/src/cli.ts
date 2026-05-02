@@ -1,10 +1,16 @@
 import { parseArgs } from 'node:util';
 
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-
+import { DEFAULT_HTTP_PORT, listenHttpTransport } from './transports/http.js';
+import { runStdioTransport } from './transports/stdio.js';
 import { ActionRegistry } from './registry/index.js';
-import { createObjectifiedMcpServer } from './server.js';
 import { RestClient } from './upstream/client.js';
+
+function parsePort(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n <= 0 || n > 65535) return fallback;
+  return n;
+}
 
 async function main(): Promise<void> {
   const { values } = parseArgs({
@@ -12,17 +18,17 @@ async function main(): Promise<void> {
     options: {
       transport: {
         type: 'string',
-        default: 'stdio',
       },
     },
     strict: true,
     allowPositionals: false,
   });
 
-  const transport = values.transport ?? 'stdio';
-  if (transport !== 'stdio') {
+  const transport = values.transport ?? process.env.OBJECTIFIED_MCP_TRANSPORT ?? 'stdio';
+
+  if (transport !== 'stdio' && transport !== 'http') {
     console.error(
-      `Transport "${transport}" is not implemented yet. Only --transport stdio is supported (see MCP-1.2).`,
+      `Transport "${transport}" is invalid. Use --transport stdio|http or OBJECTIFIED_MCP_TRANSPORT.`,
     );
     process.exitCode = 2;
     return;
@@ -30,9 +36,23 @@ async function main(): Promise<void> {
 
   const registry = ActionRegistry.instance();
   const upstream = RestClient.fromEnv();
-  const server = createObjectifiedMcpServer(registry, upstream);
 
-  await server.connect(new StdioServerTransport());
+  if (transport === 'stdio') {
+    await runStdioTransport({ registry, upstream });
+    return;
+  }
+
+  const port = parsePort(process.env.OBJECTIFIED_MCP_PORT, DEFAULT_HTTP_PORT);
+  const host = process.env.OBJECTIFIED_MCP_HOST ?? '0.0.0.0';
+  const http = await listenHttpTransport({ registry, upstream, port, host });
+
+  await new Promise<void>((resolve) => {
+    const stop = (): void => {
+      void http.close().finally(() => resolve());
+    };
+    process.once('SIGINT', stop);
+    process.once('SIGTERM', stop);
+  });
 }
 
 await main();
