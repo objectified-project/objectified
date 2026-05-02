@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from objectified_mcp.scope import Scope, parse_scope_json
 
@@ -40,6 +41,15 @@ def test_allows_tenant_and_project() -> None:
     assert not s.allows(tid_ok, pid_bad)
 
 
+def test_scope_tenants_projects_are_tuples() -> None:
+    """Fields are stored as tuples even when constructed with lists."""
+    s = Scope(tenants=["a", "b"], projects=["p"])
+    assert isinstance(s.tenants, tuple)
+    assert isinstance(s.projects, tuple)
+    assert s.tenants == ("a", "b")
+    assert s.projects == ("p",)
+
+
 def test_parse_scope_json_none_and_empty_dict() -> None:
     assert parse_scope_json(None) == Scope()
     assert parse_scope_json({}) == Scope()
@@ -58,13 +68,34 @@ def test_parse_scope_json_ignores_unknown_keys_and_legacy_shape() -> None:
     assert parse_scope_json({"tenants": ["x"], "extra": 1}) == Scope(tenants=["x"])
 
 
-def test_parse_scope_json_coerces_non_lists_and_non_strings() -> None:
-    assert parse_scope_json({"tenants": "bad"}) == Scope()
-    assert parse_scope_json({"tenants": [1, "keep", None]}) == Scope(tenants=["keep"])
+def test_parse_scope_json_wrong_field_type_denies_all(caplog: Any) -> None:
+    """A non-list ``tenants``/``projects`` value is invalid → deny-all + warning."""
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="objectified_mcp.scope"):
+        bad_tenants = parse_scope_json({"tenants": "bad"})
+        bad_projects = parse_scope_json({"projects": 42})
+    assert bad_tenants.deny_all is True
+    assert not bad_tenants.allows(str(uuid.uuid4()), str(uuid.uuid4()))
+    assert bad_projects.deny_all is True
+    assert len(caplog.records) >= 2
 
 
-def test_parse_scope_json_non_dict() -> None:
-    assert parse_scope_json([1, 2]) == Scope()
+def test_parse_scope_json_filters_non_string_items() -> None:
+    """Non-string items inside a valid list are silently filtered out."""
+    s = parse_scope_json({"tenants": [1, "keep", None]})
+    assert s == Scope(tenants=("keep",))
+
+
+def test_parse_scope_json_non_dict_denies_all(caplog: Any) -> None:
+    """Non-dict (and non-None, non-Scope) raw values → deny-all + warning."""
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="objectified_mcp.scope"):
+        s = parse_scope_json([1, 2])
+    assert s.deny_all is True
+    assert not s.allows(str(uuid.uuid4()), str(uuid.uuid4()))
+    assert len(caplog.records) >= 1
 
 
 def test_parse_scope_json_scope_instance() -> None:
