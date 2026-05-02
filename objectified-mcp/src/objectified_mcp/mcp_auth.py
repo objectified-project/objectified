@@ -1,0 +1,211 @@
+"""MCP API key extraction and validation (#2999).
+
+Credentials may arrive on streamable HTTP via ``Authorization: Bearer <secret>`` or,
+for stdio (no HTTP request), via ``tools/call`` JSON-RPC ``params._meta``:
+
+- ``authorization`` / ``objectified_authorization``: optional Bearer prefix
+- ``objectified_api_key`` / ``api_key``: raw secret
+
+Stored secrets use **SHA-256 of the UTF-8 secret, then bcrypt**, matching the planned
+``mcp keys issue`` workflow (long secrets safe for bcrypt's 72-byte limit).
+
+Tools opt in with::
+
+    from fastmcp.dependencies import Depends
+
+    from objectified_mcp.mcp_auth import McpAuthContext, require_mcp_auth
+
+    @mcp.tool
+    async def example(auth: McpAuthContext = Depends(require_mcp_auth)) -> str:
+        ...
+"""
+
+from __future__ import annotations
+
+import hashlib
+import re
+from datetime import datetime, timezone
+from typing import Any
+
+import bcrypt
+import structlog
+from fastmcp import Context
+from fastmcp.dependencies import CurrentHeaders, Depends
+from fastmcp.exceptions import AuthorizationError
+from psycopg.rows import dict_row
+from psycopg_pool import AsyncConnectionPool
+from pydantic import BaseModel, ConfigDict, Field
+
+from objectified_mcp.database_pool import get_db_pool
+
+_log = structlog.get_logger(__name__)
+
+MIN_SECRET_LEN = 12
+_PREFIX_CHARS = 12
+
+_BEARER_PREFIX = re.compile(r"(?i)^Bearer\s+")
+
+
+class McpAuthContext(BaseModel):
+    """Authenticated MCP caller derived from ``odb.mcp_api_keys``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    key_id: str
+    tenant_id: str
+    label: str
+    scope: dict[str, Any] = Field(default_factory=dict)
+
+
+def mcp_key_prefix(secret: str) -> str:
+    """Indexed lookup prefix; aligns with dashboard-style ``first12 + '...'``."""
+    if len(secret) < _PREFIX_CHARS:
+        return secret + "..."
+    return secret[:_PREFIX_CHARS] + "..."
+
+
+def hash_mcp_api_key_secret(plain: str) -> bytes:
+    """Return bcrypt bytes for storing ``key_hash`` (ASCII utf-8 safe for VARCHAR)."""
+    digest = hashlib.sha256(plain.encode("utf-8")).digest()
+    return bcrypt.hashpw(digest, bcrypt.gensalt())
+
+
+def _strip_bearer(value: str) -> str:
+    value = value.strip()
+    if _BEARER_PREFIX.match(value):
+        return value.split(None, 1)[1].strip()
+    return value
+
+
+def meta_as_dict(meta: Any) -> dict[str, Any]:
+    if meta is None:
+        return {}
+    if isinstance(meta, dict):
+        base = dict(meta)
+    else:
+        dump = getattr(meta, "model_dump", None)
+        base = dump(mode="python") if callable(dump) else {}
+    inner = base.get("_meta")
+    if isinstance(inner, dict):
+        merged = {**base, **inner}
+        return merged
+    return base
+
+
+def extract_raw_mcp_api_key(*, http_headers: dict[str, str], request_meta: Any) -> str | None:
+    """Resolve secret from HTTP headers first, then MCP request meta."""
+    auth = http_headers.get("authorization")
+    if isinstance(auth, str) and auth.strip():
+        stripped = _strip_bearer(auth)
+        if stripped:
+            return stripped
+
+    meta = meta_as_dict(request_meta)
+    for key in ("authorization", "objectified_authorization"):
+        val = meta.get(key)
+        if isinstance(val, str) and val.strip():
+            return _strip_bearer(val)
+    for key in ("objectified_api_key", "api_key"):
+        val = meta.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return None
+
+
+def _verify_hash(secret: str, key_hash: Any) -> bool:
+    if isinstance(key_hash, memoryview):
+        key_hash = key_hash.tobytes()
+    elif isinstance(key_hash, str):
+        key_hash = key_hash.encode("utf-8")
+    digest = hashlib.sha256(secret.encode("utf-8")).digest()
+    try:
+        return bool(bcrypt.checkpw(digest, key_hash))
+    except (ValueError, TypeError):
+        return False
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _as_utc_aware(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+async def validate_mcp_api_key(pool: AsyncConnectionPool, raw_secret: str) -> McpAuthContext:
+    """Load key row by prefix, enforce lifecycle, verify bcrypt(SHA256(secret))."""
+    if not raw_secret or len(raw_secret) < MIN_SECRET_LEN:
+        raise AuthorizationError("Invalid or unknown MCP API key.")
+
+    prefix = mcp_key_prefix(raw_secret)
+    query = """
+        SELECT id, tenant_id, scope_json, label, key_hash, expires_at, revoked_at
+        FROM odb.mcp_api_keys
+        WHERE prefix = %s
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(query, (prefix,))
+            rows = await cur.fetchall()
+
+    if not rows:
+        _log.debug("mcp_api_key_unknown_prefix")
+        raise AuthorizationError("Invalid or unknown MCP API key.")
+
+    now = _utc_now()
+    eligible: list[dict[str, Any]] = []
+    for row in rows:
+        if row.get("revoked_at") is not None:
+            continue
+        exp = row.get("expires_at")
+        if exp is not None and _as_utc_aware(exp) <= now:
+            continue
+        eligible.append(row)
+
+    for row in eligible:
+        if _verify_hash(raw_secret, row.get("key_hash")):
+            raw_scope = row.get("scope_json")
+            if raw_scope is None:
+                scope: dict[str, Any] = {}
+            elif not isinstance(raw_scope, dict):
+                scope = dict(raw_scope)
+            else:
+                scope = raw_scope
+            return McpAuthContext(
+                key_id=str(row["id"]),
+                tenant_id=str(row["tenant_id"]),
+                label=str(row["label"]),
+                scope=scope,
+            )
+
+    if not eligible:
+        if any(r.get("revoked_at") is not None for r in rows):
+            raise AuthorizationError("This MCP API key has been revoked.")
+        if any(r.get("expires_at") is not None and _as_utc_aware(r["expires_at"]) <= now for r in rows):
+            raise AuthorizationError("This MCP API key has expired.")
+
+    _log.debug("mcp_api_key_hash_mismatch")
+    raise AuthorizationError("Invalid or unknown MCP API key.")
+
+
+async def require_mcp_auth(
+    ctx: Context,
+    headers: dict[str, str] = CurrentHeaders(),
+) -> McpAuthContext:
+    """FastMCP dependency: bearer / meta credential → ``McpAuthContext``."""
+    rc = ctx.request_context
+    meta = rc.meta if rc else None
+    raw = extract_raw_mcp_api_key(http_headers=headers, request_meta=meta)
+    if raw is None:
+        raise AuthorizationError(
+            "MCP authentication required: send Authorization: Bearer <api_key> over HTTP, "
+            "or pass the same secret in tools/call params._meta "
+            "(authorization, objectified_authorization, objectified_api_key, or api_key)."
+        )
+    pool = get_db_pool(ctx)
+    return await validate_mcp_api_key(pool, raw)
+
+
+McpAuthDependency = Depends(require_mcp_auth)
