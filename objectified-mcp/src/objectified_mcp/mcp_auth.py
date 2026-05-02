@@ -19,8 +19,11 @@ Tools opt in with::
     async def example(auth: McpAuthContext = Depends(require_mcp_auth)) -> str:
         ...
 
-Scoped reads use :meth:`objectified_mcp.scope.Scope.allows` on ``auth.scope``; see
-:class:`objectified_mcp.scope.Scope` for the JSON persisted in ``scope_json``.
+Scoped reads combine :meth:`objectified_mcp.scope.Scope.allows` with revision
+visibility via :func:`objectified_mcp.spec_authorization.authorize_spec` (and
+parameterized SQL via
+:func:`objectified_mcp.spec_authorization.build_authorized_spec_sql_predicate`).
+See :class:`objectified_mcp.scope.Scope` for ``scope_json``.
 """
 
 from __future__ import annotations

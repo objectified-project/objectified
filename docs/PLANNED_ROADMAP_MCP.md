@@ -107,7 +107,7 @@ process or via Docker.
 
 | # | Issue | Title | Depends on |
 |---|-------|-------|------------|
-| 4.1 | [#3010](../../issues/3010) | Authorization layer: scope ∩ visibility | 2.5, 3.1 |
+| 4.1 | ~~[#3010](../../issues/3010)~~ | ~~Authorization layer: scope ∩ visibility~~ (**completed**) | 2.5, 3.1 |
 | 4.2 | [#3011](../../issues/3011) | Extend `spec.list` with private results when authorized | 4.1, 3.2 |
 | 4.3 | [#3012](../../issues/3012) | Extend `spec.describe` with private results when authorized | 4.1, 3.3 |
 | 4.4 | [#3013](../../issues/3013) | Audit log table + insert on private read | 2.1 |
