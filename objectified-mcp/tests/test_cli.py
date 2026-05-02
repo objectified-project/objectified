@@ -80,9 +80,14 @@ def test_console_script_entrypoint_prints_usage() -> None:
 
 
 def test_package_version_matches_pyproject() -> None:
+    import tomllib
+    from pathlib import Path
+
     from objectified_mcp import __version__
 
-    assert __version__ == "0.1.11"
+    root = Path(__file__).resolve().parents[1]
+    data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert __version__ == data["project"]["version"]
 
 
 def test_serve_validate_only_exits_without_stdio(monkeypatch: pytest.MonkeyPatch) -> None:

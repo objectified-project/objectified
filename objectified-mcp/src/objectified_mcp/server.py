@@ -17,6 +17,7 @@ from objectified_mcp.ping_tool import build_ping_response
 from objectified_mcp.settings import get_settings
 from objectified_mcp.spec_describe_tool import build_spec_describe_response
 from objectified_mcp.spec_list_tool import build_spec_list_response
+from objectified_mcp.spec_search_tool import build_spec_search_response
 
 _log = structlog.get_logger(__name__)
 
@@ -89,3 +90,22 @@ async def spec_list(
 async def spec_describe(ctx: Context, spec_id: str) -> dict[str, Any]:
     pool = get_db_pool(ctx)
     return await build_spec_describe_response(pool, spec_id=spec_id)
+
+
+@mcp.tool(
+    name="spec.search",
+    description=(
+        "Search published public OpenAPI specs by keyword over title, description, and tag names "
+        "(ILIKE, case-insensitive). Required q must be non-empty after trimming. "
+        "Results are ranked (title prefix > title contains > description > tag match). "
+        "limit defaults to 50, capped at 100. Pass next_cursor from the previous response for the next page."
+    ),
+)
+async def spec_search(
+    ctx: Context,
+    q: str,
+    limit: int | None = None,
+    cursor: str | None = None,
+) -> dict[str, Any]:
+    pool = get_db_pool(ctx)
+    return await build_spec_search_response(pool, q=q, limit=limit, cursor=cursor)
