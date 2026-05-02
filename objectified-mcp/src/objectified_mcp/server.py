@@ -1,4 +1,4 @@
-"""FastMCP application instance (HTTP transport lands in roadmap ticket 1.6)."""
+"""FastMCP application instance (stdio and streamable HTTP via ``objectified-mcp serve``)."""
 
 from __future__ import annotations
 
