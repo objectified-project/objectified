@@ -27,9 +27,15 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "serve":
+        from pydantic import ValidationError
+
         from objectified_mcp.settings import get_settings
 
-        get_settings()
+        try:
+            get_settings()
+        except ValidationError as exc:
+            print(f"Configuration error:\n{exc}", file=sys.stderr)
+            raise SystemExit(2)
         print(
             "Configuration loaded. MCP transports are wired in roadmap tickets 1.5 (stdio) and 1.6 (HTTP).",
             file=sys.stderr,

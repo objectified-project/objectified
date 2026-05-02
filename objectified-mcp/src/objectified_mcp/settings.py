@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, PostgresDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -23,9 +23,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    database_url: str = Field(
+    database_url: PostgresDsn = Field(
         ...,
-        min_length=1,
         description="PostgreSQL connection URI for the Objectified database.",
     )
     internal_secret: SecretStr = Field(
