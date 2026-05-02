@@ -6,12 +6,13 @@ import uuid
 from typing import Any
 
 import structlog
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.server.lifespan import lifespan
 from structlog.contextvars import bound_contextvars
 
-from objectified_mcp.database_pool import MCP_DB_POOL_KEY, create_async_pool, ping_pool
+from objectified_mcp.database_pool import MCP_DB_POOL_KEY, create_async_pool, get_db_pool, ping_pool
 from objectified_mcp.logging_config import configure_logging
+from objectified_mcp.ping_tool import build_ping_response
 from objectified_mcp.settings import get_settings
 
 _log = structlog.get_logger(__name__)
@@ -36,3 +37,10 @@ async def database_lifespan(server: Any) -> Any:
 
 
 mcp = FastMCP("Objectified", lifespan=database_lifespan)
+
+
+@mcp.tool
+async def ping(ctx: Context) -> dict[str, Any]:
+    """Smoke-test: service name, package version, Postgres reachability, UTC timestamp."""
+    pool = get_db_pool(ctx)
+    return await build_ping_response(pool)
