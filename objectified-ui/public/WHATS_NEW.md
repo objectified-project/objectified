@@ -19,6 +19,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Corrects opacity of overlay buttons in canvas.
 - Combined Projects and Versions page for better design and navigation.
 - Corrected versions lifecycle filter so that selecting a blank list no longer clears out the entire form.
+- Showing the theme form now displays properly instead of jumping on the screen.
 
 ---
 
