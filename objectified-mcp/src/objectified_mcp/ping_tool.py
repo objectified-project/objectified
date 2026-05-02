@@ -2,13 +2,29 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any
 
+import structlog
 from psycopg_pool import AsyncConnectionPool
 
 from objectified_mcp import __version__
 from objectified_mcp.database_pool import ping_pool
+
+_log = structlog.get_logger(__name__)
+
+# Matches scheme://[user[:pass]@]host patterns (e.g. postgresql://admin:s3cr3t@db.host/name).
+_DSN_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9+\-.]*://\S*@\S+")
+_MAX_DB_ERROR_LEN = 200
+
+
+def _sanitize_db_error(exc: BaseException) -> str:
+    """Return a safe, bounded error string with DSN credentials/hostnames redacted."""
+    msg = _DSN_RE.sub("[redacted]", str(exc))
+    if len(msg) > _MAX_DB_ERROR_LEN:
+        msg = msg[:_MAX_DB_ERROR_LEN] + "..."
+    return msg
 
 
 async def build_ping_response(pool: AsyncConnectionPool) -> dict[str, Any]:
@@ -22,5 +38,6 @@ async def build_ping_response(pool: AsyncConnectionPool) -> dict[str, Any]:
     try:
         await ping_pool(pool)
     except Exception as exc:
-        return {**common, "db_ok": False, "db_error": str(exc)}
+        _log.warning("ping_db_probe_failed", error=str(exc))
+        return {**common, "db_ok": False, "db_error": _sanitize_db_error(exc)}
     return {**common, "db_ok": True}

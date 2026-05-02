@@ -28,8 +28,11 @@ async def database_lifespan(server: Any) -> Any:
         try:
             _log.info("database_pool_opening")
             await pool.open()
-            await ping_pool(pool)
-            _log.info("database_pool_ready")
+            try:
+                await ping_pool(pool)
+                _log.info("database_pool_ready")
+            except Exception as exc:
+                _log.warning("database_pool_probe_failed_at_startup", error=str(exc))
             yield {MCP_DB_POOL_KEY: pool}
         finally:
             _log.info("database_pool_closing")
