@@ -11,6 +11,7 @@ from psycopg_pool import AsyncConnectionPool
 from objectified_mcp.spec_list_tool import (
     MAX_PAGE_SIZE,
     InvalidSpecListCursorError,
+    _clamp_limit,
     build_spec_list_response,
     decode_spec_list_cursor,
     encode_spec_list_cursor,
@@ -68,10 +69,15 @@ def test_encode_spec_list_cursor_is_stable_and_roundtrips() -> None:
     assert got_ts == ts.astimezone(timezone.utc)
 
 
-def test_decode_spec_list_cursor_none_and_blank() -> None:
+def test_decode_spec_list_cursor_none_returns_none() -> None:
     assert decode_spec_list_cursor(None) is None
-    assert decode_spec_list_cursor("") is None
-    assert decode_spec_list_cursor("   ") is None
+
+
+def test_decode_spec_list_cursor_blank_raises() -> None:
+    with pytest.raises(InvalidSpecListCursorError):
+        decode_spec_list_cursor("")
+    with pytest.raises(InvalidSpecListCursorError):
+        decode_spec_list_cursor("   ")
 
 
 def test_decode_spec_list_cursor_rejects_garbage() -> None:
@@ -165,3 +171,72 @@ def test_spec_list_tool_registered_on_mcp() -> None:
 
 def test_max_page_size_constant() -> None:
     assert MAX_PAGE_SIZE == 100
+
+
+def test_decode_spec_list_cursor_rejects_naive_timestamp() -> None:
+    import base64
+    import json
+
+    raw = json.dumps({"v": 1, "i": str(uuid4()), "u": "2026-01-01T00:00:00"}).encode()
+    token = base64.urlsafe_b64encode(raw).decode().rstrip("=")
+    with pytest.raises(InvalidSpecListCursorError, match="timezone"):
+        decode_spec_list_cursor(token)
+
+
+def test_clamp_limit_rejects_non_positive() -> None:
+    with pytest.raises(ValueError, match="limit"):
+        _clamp_limit(0)
+    with pytest.raises(ValueError, match="limit"):
+        _clamp_limit(-5)
+
+
+def test_build_spec_list_response_rejects_non_positive_limit() -> None:
+    pool, _cur = _pool_mock_for_fetch([])
+
+    async def run() -> None:
+        await build_spec_list_response(pool, limit=0)
+
+    with pytest.raises(ValueError, match="limit"):
+        asyncio.run(run())
+
+
+def test_build_spec_list_response_tenant_filter_binding() -> None:
+    tid = uuid4()
+    rows = [_sample_row()]
+    pool, cur = _pool_mock_for_fetch(rows)
+
+    async def run() -> None:
+        await build_spec_list_response(pool, tenant_id=str(tid))
+
+    asyncio.run(run())
+    _sql, params = cur.execute.await_args.args
+    assert params["tenant"] == tid
+
+
+def test_build_spec_list_response_project_filter_binding() -> None:
+    pid = uuid4()
+    rows = [_sample_row()]
+    pool, cur = _pool_mock_for_fetch(rows)
+
+    async def run() -> None:
+        await build_spec_list_response(pool, project_id=str(pid))
+
+    asyncio.run(run())
+    _sql, params = cur.execute.await_args.args
+    assert params["project"] == pid
+
+
+def test_build_spec_list_response_cursor_binding() -> None:
+    sid = UUID("33333333-3333-4333-8333-333333333333")
+    ts = datetime(2026, 5, 2, 15, 30, 45, tzinfo=timezone.utc)
+    cursor = encode_spec_list_cursor(ts, sid)
+    rows = [_sample_row()]
+    pool, cur = _pool_mock_for_fetch(rows)
+
+    async def run() -> None:
+        await build_spec_list_response(pool, cursor=cursor)
+
+    asyncio.run(run())
+    _sql, params = cur.execute.await_args.args
+    assert params["cur_ts"] == ts
+    assert params["cur_id"] == sid

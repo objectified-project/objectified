@@ -45,8 +45,10 @@ def _b64url_pad(s: str) -> str:
 
 def decode_spec_list_cursor(raw: str | None) -> tuple[datetime, UUID] | None:
     """Decode ``cursor`` into ``(updated_at, id)`` or ``None`` when absent."""
-    if raw is None or not raw.strip():
+    if raw is None:
         return None
+    if not raw.strip():
+        raise InvalidSpecListCursorError("Invalid spec.list cursor (empty value).")
     try:
         blob = base64.urlsafe_b64decode(_b64url_pad(raw.strip()))
         obj = json.loads(blob.decode("utf-8"))
@@ -71,6 +73,11 @@ def decode_spec_list_cursor(raw: str | None) -> tuple[datetime, UUID] | None:
     except ValueError as exc:
         raise InvalidSpecListCursorError("Invalid spec.list cursor (bad timestamp).") from exc
 
+    if parsed_at.tzinfo is None:
+        raise InvalidSpecListCursorError(
+            "Invalid spec.list cursor (timestamp must include timezone offset)."
+        )
+
     try:
         parsed_id = UUID(i_raw.strip())
     except ValueError as exc:
@@ -83,7 +90,7 @@ def _clamp_limit(limit: int | None) -> int:
     if limit is None:
         return DEFAULT_PAGE_SIZE
     if limit < 1:
-        return 1
+        raise ValueError(f"limit must be at least 1, got {limit}.")
     return min(limit, MAX_PAGE_SIZE)
 
 
