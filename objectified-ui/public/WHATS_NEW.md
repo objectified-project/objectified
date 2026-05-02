@@ -23,6 +23,7 @@ We continue to improve the platform based on your feedback with improvements and
 - MCP tool **`spec.list_tags`** returns distinct public-spec tag names with usage counts as **`[{tag, count}, …]`**, sorted by count descending (then tag name ascending); results are cached in-process for **60 seconds** (#3008).
 - MCP **`authorize_spec`** combines API key **scope** with revision **visibility** (public rows need scope only; private rows also require the spec tenant to match the key); **`build_authorized_spec_sql_predicate`** emits the same rules as a parameterized SQL **`WHERE`** fragment (#3010).
 - MCP **`spec.list`** with a valid API key merges **in-scope public** rows with **in-scope private** published revisions for the key's tenant (same **`items`** / **`has_more`** / **`next_cursor`** shape as anonymous listing); **`resolve_optional_mcp_auth`** resolves credentials from headers, **`tools/call`** meta, or the HTTP Bearer stash (#3011).
+- MCP **`spec.describe`** uses the same optional auth path: anonymous callers resolve **public** revisions only; with a valid API key, **in-scope private** published revisions for that tenant return the same metadata shape (**`id`**, **`title`**, **`version`**, **`description`**, **`owner`**, **`tags`**, **`updated_at`**); missing or inaccessible revisions stay **not-found** (#3012).
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports
