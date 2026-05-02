@@ -243,6 +243,7 @@ async def build_spec_list_response(
             project,
             project,
             cur_ts,
+            cur_ts,
             cur_id,
             lim + 1,
         )

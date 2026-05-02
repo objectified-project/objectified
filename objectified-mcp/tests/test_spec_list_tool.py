@@ -287,7 +287,7 @@ def test_build_spec_list_response_authenticated_merged_sql() -> None:
     assert params[0:4] == (tid, tid, pid, pid)
     assert params[4] == str(auth.tenant_id)
     assert params[5:9] == (tid, tid, pid, pid)
-    assert params[-3:] == (None, None, 6)
+    assert params[-4:] == (None, None, None, 6)
 
 
 def test_build_spec_list_response_authenticated_cursor_binding_tuple() -> None:
@@ -309,5 +309,6 @@ def test_build_spec_list_response_authenticated_cursor_binding_tuple() -> None:
     asyncio.run(run())
     _sql, params = cur.execute.await_args.args
     assert isinstance(params, tuple)
+    assert params[-4] == ts
     assert params[-3] == ts
     assert params[-2] == sid
