@@ -101,7 +101,7 @@ process or via Docker.
 | 3.2 | ~~[#3005](../../issues/3005)~~ | ~~Tool `spec.list` (public, paginated)~~ (**completed**) | 3.1 |
 | 3.3 | ~~[#3006](../../issues/3006)~~ | ~~Tool `spec.describe` (public)~~ (**completed**) | 3.1 |
 | 3.4 | ~~[#3007](../../issues/3007)~~ | ~~Tool `spec.search` (keyword)~~ (**completed**) | 3.1 |
-| 3.5 | [#3008](../../issues/3008) | Tool `spec.list_tags` | 3.1 |
+| 3.5 | ~~[#3008](../../issues/3008)~~ | ~~Tool `spec.list_tags`~~ (**completed**) | 3.1 |
 
 #### E4 — Private Spec Access (#3009)
 

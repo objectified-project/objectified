@@ -16,6 +16,7 @@ from objectified_mcp.logging_config import configure_logging
 from objectified_mcp.ping_tool import build_ping_response
 from objectified_mcp.settings import get_settings
 from objectified_mcp.spec_describe_tool import build_spec_describe_response
+from objectified_mcp.spec_list_tags_tool import build_spec_list_tags_response
 from objectified_mcp.spec_list_tool import build_spec_list_response
 from objectified_mcp.spec_search_tool import build_spec_search_response
 
@@ -109,3 +110,16 @@ async def spec_search(
 ) -> dict[str, Any]:
     pool = get_db_pool(ctx)
     return await build_spec_search_response(pool, q=q, limit=limit, cursor=cursor)
+
+
+@mcp.tool(
+    name="spec.list_tags",
+    description=(
+        "Distinct version-tag names across published public OpenAPI specs with counts of specs "
+        "that expose each tag (via odb.mcp_v_public_specs). Sorted by count descending, "
+        "then tag name ascending. Response is cached in-memory for 60 seconds."
+    ),
+)
+async def spec_list_tags(ctx: Context) -> list[dict[str, Any]]:
+    pool = get_db_pool(ctx)
+    return await build_spec_list_tags_response(pool)
