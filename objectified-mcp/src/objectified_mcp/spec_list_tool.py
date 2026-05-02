@@ -12,6 +12,7 @@ from uuid import UUID
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
+from objectified_mcp.mcp_access_audit import schedule_mcp_private_access_audit_batch
 from objectified_mcp.mcp_auth import McpAuthContext
 from objectified_mcp.spec_authorization import (
     build_authorized_spec_sql_predicate,
@@ -142,9 +143,10 @@ _LIST_QUERY_ANONYMOUS = """
 
 # Positional %%s — filled via str.format with scope/auth fragments from spec_authorization.
 _LIST_QUERY_AUTHENTICATED = """
-SELECT id, tenant_id, project_id, title, version, description, tags, updated_at
+SELECT id, tenant_id, project_id, title, version, description, tags, updated_at, spec_visibility
 FROM (
-  SELECT id, tenant_id, project_id, title, version, description, tags, updated_at
+  SELECT id, tenant_id, project_id, title, version, description, tags, updated_at,
+         'public'::text AS spec_visibility
   FROM odb.mcp_v_public_specs AS ps
   WHERE (%s::uuid IS NULL OR ps.tenant_id = %s::uuid)
     AND (%s::uuid IS NULL OR ps.project_id = %s::uuid)
@@ -155,7 +157,8 @@ FROM (
   SELECT v.id, p.tenant_id, v.project_id, p.name AS title, v.version_id AS version,
          v.description,
          COALESCE(tg.tags, ARRAY[]::TEXT[]) AS tags,
-         GREATEST(v.updated_at, p.updated_at, COALESCE(tg.max_tag_updated_at, '-infinity'::timestamptz)) AS updated_at
+         GREATEST(v.updated_at, p.updated_at, COALESCE(tg.max_tag_updated_at, '-infinity'::timestamptz)) AS updated_at,
+         'private'::text AS spec_visibility
   FROM odb.versions v
   INNER JOIN odb.projects p ON p.id = v.project_id
   LEFT JOIN LATERAL (
@@ -255,6 +258,17 @@ async def build_spec_list_response(
 
     has_more = len(rows) > lim
     page = rows[:lim]
+
+    if auth_ctx is not None:
+        private_spec_ids = [str(r["id"]) for r in page if r.get("spec_visibility") == "private"]
+        if private_spec_ids:
+            schedule_mcp_private_access_audit_batch(
+                pool,
+                key_id=auth_ctx.key_id,
+                tool="spec.list",
+                spec_ids=private_spec_ids,
+            )
+
     items = [_row_out(r) for r in page]
 
     next_cursor: str | None = None

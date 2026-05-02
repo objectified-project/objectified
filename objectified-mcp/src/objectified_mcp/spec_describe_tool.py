@@ -10,6 +10,7 @@ from fastmcp.exceptions import NotFoundError
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
+from objectified_mcp.mcp_access_audit import schedule_mcp_private_access_audit
 from objectified_mcp.mcp_auth import McpAuthContext
 from objectified_mcp.spec_authorization import (
     build_authorized_spec_sql_predicate,
@@ -35,7 +36,7 @@ _DESCRIBE_QUERY_ANONYMOUS = """
 
 # Positional %%s — ``public_scope`` / ``private_auth`` fragments add their own placeholders.
 _DESCRIBE_QUERY_AUTHENTICATED = """
-SELECT id, title, version, description, owner, tags, updated_at
+SELECT id, title, version, description, owner, tags, updated_at, spec_visibility
 FROM (
   SELECT
     s.id,
@@ -44,7 +45,8 @@ FROM (
     s.description,
     t.slug AS owner,
     s.tags,
-    s.updated_at
+    s.updated_at,
+    'public'::text AS spec_visibility
   FROM odb.mcp_v_public_specs s
   INNER JOIN odb.tenants t ON t.id = s.tenant_id
   WHERE s.id = %s::uuid
@@ -61,7 +63,8 @@ FROM (
     v.description,
     tn.slug AS owner,
     COALESCE(tg.tags, ARRAY[]::TEXT[]) AS tags,
-    GREATEST(v.updated_at, p.updated_at, COALESCE(tg.max_tag_updated_at, '-infinity'::timestamptz)) AS updated_at
+    GREATEST(v.updated_at, p.updated_at, COALESCE(tg.max_tag_updated_at, '-infinity'::timestamptz)) AS updated_at,
+    'private'::text AS spec_visibility
   FROM odb.versions v
   INNER JOIN odb.projects p ON p.id = v.project_id
   INNER JOIN odb.tenants tn ON tn.id = p.tenant_id
@@ -165,5 +168,13 @@ async def build_spec_describe_response(
 
     if row is None:
         raise NotFoundError("Unknown or non-public spec.")
+
+    if auth_ctx is not None and row.get("spec_visibility") == "private":
+        schedule_mcp_private_access_audit(
+            pool,
+            key_id=auth_ctx.key_id,
+            tool="spec.describe",
+            spec_id=str(row["id"]),
+        )
 
     return _row_to_metadata(row)

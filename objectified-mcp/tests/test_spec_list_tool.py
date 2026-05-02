@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -24,6 +24,7 @@ def _sample_row(
     *,
     spec_id: UUID | None = None,
     updated_at: datetime | None = None,
+    spec_visibility: str = "public",
 ) -> dict[str, object]:
     sid = spec_id or uuid4()
     ts = updated_at or datetime(2026, 5, 1, 12, 0, tzinfo=timezone.utc)
@@ -36,6 +37,7 @@ def _sample_row(
         "description": None,
         "tags": ["alpha"],
         "updated_at": ts,
+        "spec_visibility": spec_visibility,
     }
 
 
@@ -283,11 +285,63 @@ def test_build_spec_list_response_authenticated_merged_sql() -> None:
     assert "UNION ALL" in sql
     assert "mcp_v_public_specs" in sql
     assert "visibility = 'private'" in sql
+    assert "spec_visibility" in sql
     assert isinstance(params, tuple)
     assert params[0:4] == (tid, tid, pid, pid)
     assert params[4] == str(auth.tenant_id)
     assert params[5:9] == (tid, tid, pid, pid)
     assert params[-4:] == (None, None, None, 6)
+
+
+def test_build_spec_list_response_schedules_audit_batch_for_private_rows() -> None:
+    tid = uuid4()
+    pid = uuid4()
+    auth = McpAuthContext(
+        key_id="00000000-0000-4000-8000-000000000099",
+        tenant_id=str(tid),
+        label="k",
+        scope=Scope(),
+    )
+    priv_id1 = uuid4()
+    priv_id2 = uuid4()
+    rows = [
+        _sample_row(),
+        _sample_row(spec_id=priv_id1, spec_visibility="private"),
+        _sample_row(spec_id=priv_id2, spec_visibility="private"),
+    ]
+    pool, _cur = _pool_mock_for_fetch(rows)
+
+    async def run() -> None:
+        with patch("objectified_mcp.spec_list_tool.schedule_mcp_private_access_audit_batch") as sched:
+            await build_spec_list_response(pool, tenant_id=str(tid), project_id=str(pid), limit=10, auth_ctx=auth)
+            sched.assert_called_once_with(
+                pool,
+                key_id=auth.key_id,
+                tool="spec.list",
+                spec_ids=[str(priv_id1), str(priv_id2)],
+            )
+
+    asyncio.run(run())
+
+
+def test_build_spec_list_response_no_audit_when_no_private_rows() -> None:
+    tid = uuid4()
+    pid = uuid4()
+    auth = McpAuthContext(
+        key_id="00000000-0000-4000-8000-000000000099",
+        tenant_id=str(tid),
+        label="k",
+        scope=Scope(),
+    )
+    rows = [_sample_row(), _sample_row()]  # both public
+    pool, _cur = _pool_mock_for_fetch(rows)
+
+    async def run() -> None:
+        with patch("objectified_mcp.spec_list_tool.schedule_mcp_private_access_audit_batch") as sched:
+            await build_spec_list_response(pool, tenant_id=str(tid), project_id=str(pid), limit=10, auth_ctx=auth)
+            sched.assert_not_called()
+
+    asyncio.run(run())
 
 
 def test_build_spec_list_response_authenticated_cursor_binding_tuple() -> None:
