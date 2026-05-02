@@ -86,6 +86,7 @@ def test_cli_serve_exits_zero_with_valid_env(monkeypatch: pytest.MonkeyPatch) ->
         "OBJECTIFIED_MCP_DATABASE_URL": "postgresql://localhost/db",
         "OBJECTIFIED_MCP_INTERNAL_SECRET": "s" * 16,
     }
+    env.pop("OBJECTIFIED_MCP_TRANSPORT", None)
     with tempfile.TemporaryDirectory() as tmpdir:
         result = subprocess.run(
             [sys.executable, "-m", "objectified_mcp", "serve"],
