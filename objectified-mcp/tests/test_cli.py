@@ -4,8 +4,16 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 _ROOT = Path(__file__).resolve().parents[1]
+
+_MIN_ENV = {
+    "OBJECTIFIED_MCP_DATABASE_URL": "postgresql://localhost/db",
+    "OBJECTIFIED_MCP_INTERNAL_SECRET": "x" * 16,
+}
 
 
 def test_module_help_prints_usage() -> None:
@@ -37,7 +45,36 @@ def test_console_script_entrypoint_prints_usage() -> None:
 def test_package_version_matches_pyproject() -> None:
     from objectified_mcp import __version__
 
-    assert __version__ == "0.1.3"
+    assert __version__ == "0.1.4"
+
+
+def test_serve_validate_only_exits_without_stdio(monkeypatch: pytest.MonkeyPatch) -> None:
+    from objectified_mcp.cli import main
+    from objectified_mcp.settings import get_settings
+
+    get_settings.cache_clear()
+    for key, value in _MIN_ENV.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(sys, "argv", ["objectified-mcp", "serve"])
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 0
+    get_settings.cache_clear()
+
+
+def test_serve_stdio_runs_fastmcp_stdio(monkeypatch: pytest.MonkeyPatch) -> None:
+    from objectified_mcp.cli import main
+    from objectified_mcp.settings import get_settings
+
+    get_settings.cache_clear()
+    for key, value in _MIN_ENV.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(sys, "argv", ["objectified-mcp", "serve", "--transport", "stdio"])
+    mock_stdio = AsyncMock(return_value=None)
+    with patch("objectified_mcp.server.mcp.run_stdio_async", mock_stdio):
+        main()
+    mock_stdio.assert_awaited_once()
+    get_settings.cache_clear()
 
 
 def test_server_module_exposes_mcp() -> None:
