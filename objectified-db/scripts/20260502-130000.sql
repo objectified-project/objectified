@@ -10,13 +10,16 @@ SELECT
   v.version_id AS version,
   v.description,
   COALESCE(tg.tags, ARRAY[]::TEXT[]) AS tags,
-  v.updated_at
+  GREATEST(v.updated_at, p.updated_at, COALESCE(tg.max_tag_updated_at, '-infinity'::timestamptz)) AS updated_at
 FROM odb.versions v
 INNER JOIN odb.projects p ON p.id = v.project_id
 LEFT JOIN LATERAL (
-  SELECT array_agg(vt.name ORDER BY vt.name) AS tags
+  SELECT
+    array_agg(vt.name ORDER BY vt.name) AS tags,
+    max(vt.updated_at) AS max_tag_updated_at
   FROM odb.version_tags vt
   WHERE vt.version_id = v.id
+    AND vt.project_id = v.project_id
 ) tg ON TRUE
 WHERE v.deleted_at IS NULL
   AND p.deleted_at IS NULL
@@ -50,4 +53,4 @@ COMMENT ON COLUMN odb.mcp_v_public_specs.tags IS
   'Sorted distinct git-like tag names (version_tags.name) pointing at this revision; empty array if none.';
 
 COMMENT ON COLUMN odb.mcp_v_public_specs.updated_at IS
-  'Last update time of the revision row (versions.updated_at).';
+  'Freshness cursor: GREATEST of versions.updated_at, projects.updated_at, and the latest version_tags.updated_at for this revision. Advances on project renames and tag mutations, not just revision edits.';
