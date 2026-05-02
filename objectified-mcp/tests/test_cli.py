@@ -37,7 +37,7 @@ def test_console_script_entrypoint_prints_usage() -> None:
 def test_package_version_matches_pyproject() -> None:
     from objectified_mcp import __version__
 
-    assert __version__ == "0.1.2"
+    assert __version__ == "0.1.3"
 
 
 def test_server_module_exposes_mcp() -> None:

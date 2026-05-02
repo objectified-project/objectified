@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -127,7 +128,13 @@ def test_cli_serve_exits_zero_with_valid_env(monkeypatch: pytest.MonkeyPatch) ->
             env=env,
         )
     assert result.returncode == 0
-    assert "Configuration loaded" in result.stderr
+    line = result.stderr.strip().splitlines()[-1]
+    payload = json.loads(line)
+    assert payload["event"] == "mcp_configuration_validated"
+    assert payload["request_id"] == "cli-serve"
+    assert "tool_name" in payload
+    assert "timestamp" in payload
+    assert payload["level"] == "info"
 
 
 def test_cli_serve_fails_fast_without_database_url(monkeypatch: pytest.MonkeyPatch) -> None:

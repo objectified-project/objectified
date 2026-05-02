@@ -27,19 +27,25 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "serve":
+        import structlog
         from pydantic import ValidationError
+        from structlog.contextvars import bound_contextvars
 
+        from objectified_mcp.logging_config import configure_logging
         from objectified_mcp.settings import get_settings
 
         try:
-            get_settings()
+            settings = get_settings()
         except ValidationError as exc:
             print(f"Configuration error:\n{exc}", file=sys.stderr)
             raise SystemExit(2)
-        print(
-            "Configuration loaded. MCP transports are wired in roadmap tickets 1.5 (stdio) and 1.6 (HTTP).",
-            file=sys.stderr,
-        )
+        configure_logging(settings)
+        log = structlog.get_logger(__name__)
+        with bound_contextvars(request_id="cli-serve", tool_name=None):
+            log.info(
+                "mcp_configuration_validated",
+                detail="MCP transports are wired in roadmap tickets 1.5 (stdio) and 1.6 (HTTP).",
+            )
         raise SystemExit(0)
 
     parser.print_help()
