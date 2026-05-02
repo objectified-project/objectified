@@ -90,14 +90,22 @@ async def spec_list(
 @mcp.tool(
     name="spec.describe",
     description=(
-        "Return metadata for a single published public OpenAPI spec revision by id (UUID). "
+        "Return metadata for a single published OpenAPI spec revision by id (UUID). "
         "Fields: id, title, version, description, owner (tenant slug), tags, updated_at (UTC Z). "
-        "Raises not-found when the revision is missing, unpublished, private, or unknown."
+        "Anonymous callers see public revisions only (odb.mcp_v_public_specs). "
+        "With Authorization: Bearer <MCP API key> (or stdio meta credentials), in-scope private "
+        "published revisions for the key's tenant are included (#3012). "
+        "Raises not-found when the revision is missing, out of scope, or not accessible."
     ),
 )
-async def spec_describe(ctx: Context, spec_id: str) -> dict[str, Any]:
+async def spec_describe(
+    ctx: Context,
+    spec_id: str,
+    headers: dict[str, str] = CurrentHeaders(),
+) -> dict[str, Any]:
     pool = get_db_pool(ctx)
-    return await build_spec_describe_response(pool, spec_id=spec_id)
+    auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
+    return await build_spec_describe_response(pool, spec_id=spec_id, auth_ctx=auth_ctx)
 
 
 @mcp.tool(

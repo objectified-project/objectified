@@ -9,6 +9,8 @@ import pytest
 from fastmcp.exceptions import NotFoundError
 from psycopg_pool import AsyncConnectionPool
 
+from objectified_mcp.mcp_auth import McpAuthContext
+from objectified_mcp.scope import Scope
 from objectified_mcp.spec_describe_tool import build_spec_describe_response
 
 
@@ -94,6 +96,53 @@ def test_build_spec_describe_response_not_found() -> None:
 
     with pytest.raises(NotFoundError, match="Unknown or non-public"):
         asyncio.run(run())
+
+
+def test_build_spec_describe_response_deny_all_raises_without_query() -> None:
+    pool = MagicMock(spec=AsyncConnectionPool)
+    pool.connection = MagicMock()
+
+    auth = McpAuthContext(
+        key_id="00000000-0000-4000-8000-000000000001",
+        tenant_id=str(uuid4()),
+        label="x",
+        scope=Scope(deny_all=True),
+    )
+
+    async def run() -> None:
+        await build_spec_describe_response(pool, spec_id=str(uuid4()), auth_ctx=auth)
+
+    with pytest.raises(NotFoundError, match="Unknown or non-public"):
+        asyncio.run(run())
+    pool.connection.assert_not_called()
+
+
+def test_build_spec_describe_response_authenticated_merged_sql() -> None:
+    sid = uuid4()
+    tid = uuid4()
+    auth = McpAuthContext(
+        key_id="00000000-0000-4000-8000-000000000002",
+        tenant_id=str(tid),
+        label="k",
+        scope=Scope(),
+    )
+    row = _sample_row(spec_id=sid)
+    pool, cur = _pool_mock_for_fetchone(row)
+
+    async def run() -> dict[str, object]:
+        return await build_spec_describe_response(pool, spec_id=str(sid), auth_ctx=auth)
+
+    out = asyncio.run(run())
+    assert out["id"] == str(sid)
+
+    sql, params = cur.execute.await_args.args
+    assert "UNION ALL" in sql
+    assert "mcp_v_public_specs" in sql
+    assert "visibility = 'private'" in sql
+    assert isinstance(params, tuple)
+    assert params[0] == sid
+    assert params[1] == sid
+    assert params[2] == str(auth.tenant_id)
 
 
 def test_build_spec_describe_invalid_uuid() -> None:
