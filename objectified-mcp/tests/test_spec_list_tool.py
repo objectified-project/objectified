@@ -173,6 +173,17 @@ def test_spec_list_tool_registered_on_mcp() -> None:
     assert tool.name == "spec.list"
 
 
+def test_spec_list_my_specs_tool_registered_on_mcp() -> None:
+    from objectified_mcp.server import mcp
+
+    async def load() -> object:
+        return await mcp.get_tool("spec.list_my_specs")
+
+    tool = asyncio.run(load())
+    assert tool is not None
+    assert tool.name == "spec.list_my_specs"
+
+
 def test_max_page_size_constant() -> None:
     assert MAX_PAGE_SIZE == 100
 
@@ -319,6 +330,39 @@ def test_build_spec_list_response_schedules_audit_batch_for_private_rows() -> No
                 key_id=auth.key_id,
                 tool="spec.list",
                 spec_ids=[str(priv_id1), str(priv_id2)],
+            )
+
+    asyncio.run(run())
+
+
+def test_build_spec_list_response_schedules_audit_with_custom_tool_name() -> None:
+    tid = uuid4()
+    pid = uuid4()
+    auth = McpAuthContext(
+        key_id="00000000-0000-4000-8000-000000000099",
+        tenant_id=str(tid),
+        label="k",
+        scope=Scope(),
+    )
+    priv_id = uuid4()
+    rows = [_sample_row(spec_id=priv_id, spec_visibility="private")]
+    pool, _cur = _pool_mock_for_fetch(rows)
+
+    async def run() -> None:
+        with patch("objectified_mcp.spec_list_tool.schedule_mcp_private_access_audit_batch") as sched:
+            await build_spec_list_response(
+                pool,
+                tenant_id=str(tid),
+                project_id=str(pid),
+                limit=10,
+                auth_ctx=auth,
+                private_access_audit_tool="spec.list_my_specs",
+            )
+            sched.assert_called_once_with(
+                pool,
+                key_id=auth.key_id,
+                tool="spec.list_my_specs",
+                spec_ids=[str(priv_id)],
             )
 
     asyncio.run(run())

@@ -182,8 +182,43 @@ def test_require_mcp_auth_missing_credential() -> None:
     ctx.request_context = None
 
     async def run() -> None:
-        with pytest.raises(AuthorizationError, match="MCP authentication required"):
-            await require_mcp_auth(ctx, {})
+        with patch(
+            "objectified_mcp.mcp_auth.get_http_bearer_from_context",
+            new=AsyncMock(return_value=None),
+        ):
+            with pytest.raises(AuthorizationError, match="MCP authentication required"):
+                await require_mcp_auth(ctx, {})
+
+    asyncio.run(run())
+
+
+def test_require_mcp_auth_uses_http_bearer_stash_when_headers_missing_token() -> None:
+    kid = str(uuid.uuid4())
+    tid = str(uuid.uuid4())
+    stored_hash = hash_mcp_api_key_secret(_SECRET).decode("ascii")
+    row = {
+        "id": kid,
+        "tenant_id": tid,
+        "label": "live",
+        "scope_json": {},
+        "key_hash": stored_hash,
+        "expires_at": None,
+        "revoked_at": None,
+    }
+    pool = _pool_mock([row])
+    ctx = MagicMock(spec=Context)
+    ctx.request_context = None
+    ctx.lifespan_context = {MCP_DB_POOL_KEY: pool}
+
+    async def run() -> None:
+        with patch("objectified_mcp.mcp_auth.schedule_mcp_key_last_used_touch") as sched:
+            with patch(
+                "objectified_mcp.mcp_auth.get_http_bearer_from_context",
+                new=AsyncMock(return_value=_SECRET),
+            ):
+                auth = await require_mcp_auth(ctx, {})
+        sched.assert_called_once_with(pool, kid)
+        assert auth.key_id == kid
 
     asyncio.run(run())
 

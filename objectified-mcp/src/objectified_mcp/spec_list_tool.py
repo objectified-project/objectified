@@ -191,6 +191,7 @@ async def build_spec_list_response(
     limit: int | None = None,
     cursor: str | None = None,
     auth_ctx: McpAuthContext | None = None,
+    private_access_audit_tool: str = "spec.list",
 ) -> dict[str, Any]:
     """Return ``items``, ``has_more``, and ``next_cursor``.
 
@@ -265,7 +266,7 @@ async def build_spec_list_response(
             schedule_mcp_private_access_audit_batch(
                 pool,
                 key_id=auth_ctx.key_id,
-                tool="spec.list",
+                tool=private_access_audit_tool,
                 spec_ids=private_spec_ids,
             )
 
