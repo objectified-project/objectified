@@ -45,7 +45,7 @@ def test_console_script_entrypoint_prints_usage() -> None:
 def test_package_version_matches_pyproject() -> None:
     from objectified_mcp import __version__
 
-    assert __version__ == "0.1.7"
+    assert __version__ == "0.1.8"
 
 
 def test_serve_validate_only_exits_without_stdio(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -86,6 +86,9 @@ def test_serve_http_runs_fastmcp_streamable_http(monkeypatch: pytest.MonkeyPatch
     assert call_kw["port"] == 9999
     assert call_kw["path"] == "/mcp"
     assert call_kw["log_level"] == "info"
+    mw = call_kw["middleware"]
+    assert len(mw) == 1
+    assert mw[0].cls.__name__ == "HttpCredentialExtractionMiddleware"
     get_settings.cache_clear()
 
 
