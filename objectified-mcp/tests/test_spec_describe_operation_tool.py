@@ -26,7 +26,14 @@ def test_extract_operation_detail_op_param_overrides_path_ref_param() -> None:
             "/items": {
                 "parameters": [{"$ref": "#/components/parameters/Limit"}],
                 "get": {
-                    "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer"}, "description": "op-level"}],
+                    "parameters": [
+                        {
+                            "name": "limit",
+                            "in": "query",
+                            "schema": {"type": "integer"},
+                            "description": "op-level",
+                        }
+                    ],
                     "responses": {"200": {"description": "ok"}},
                 },
             }
@@ -335,7 +342,7 @@ def test_build_spec_describe_operation_private_audited() -> None:
 
 
 def test_build_spec_describe_operation_allows_oversize_openapi_payload() -> None:
-    """describe_operation bypasses the JSON byte cap so large specs don't raise ToolError (apply_json_payload_cap=False)."""
+    """Bypass JSON byte cap (apply_json_payload_cap=False) so large specs avoid ToolError."""
     sid = uuid4()
     row = _openapi_row(spec_id=sid)
     huge = {
