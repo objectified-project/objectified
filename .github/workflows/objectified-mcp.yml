@@ -6,11 +6,17 @@ on:
     paths:
       - 'objectified-mcp/**'
       - 'objectified-rest/**'
+      - 'docker-compose.yml'
+      - 'docker-compose.env.example'
+      - 'objectified-db/**'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'objectified-mcp/**'
       - 'objectified-rest/**'
+      - 'docker-compose.yml'
+      - 'docker-compose.env.example'
+      - 'objectified-db/**'
   workflow_dispatch:
 
 jobs:
@@ -21,6 +27,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Validate Docker Compose specification
+        run: docker compose config
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
