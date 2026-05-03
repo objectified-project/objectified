@@ -43,11 +43,17 @@ export interface ChatSendContext {
    * Ollama model tag (e.g. `qwen2.5:latest`) when using `createOllamaChatResponder` (#265).
    */
   ollamaModel?: string;
+  /**
+   * Called as streamed assistant text grows (e.g. Ollama SSE). The shell passes this so the
+   * pending bubble updates live; responders that do not stream can ignore it (#520).
+   */
+  onStreamDelta?: (accumulatedMarkdown: string) => void;
 }
 
 /**
  * Adapter the chat shell calls when the user submits or regenerates. Returns
- * the assistant's full markdown reply. Implementations may stream internally;
- * the shell only renders the resolved value.
+ * the assistant's full markdown reply. When the shell supplies `onStreamDelta`,
+ * streaming responders should invoke it as content arrives; the shell still uses
+ * the resolved return value as the final assistant text.
  */
 export type ChatSendFn = (ctx: ChatSendContext) => Promise<string>;

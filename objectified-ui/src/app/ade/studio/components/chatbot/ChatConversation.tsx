@@ -367,6 +367,14 @@ export function ChatConversation({
           isRegenerate,
           studioContext: studioContextRef.current,
           ollamaModel: useLiveOllama ? selectedOllamaModel : undefined,
+          onStreamDelta: (accumulated) => {
+            if (requestIdRef.current !== requestId) return;
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === pendingId ? { ...message, content: accumulated, pending: true } : message,
+              ),
+            );
+          },
         });
       } catch (error) {
         console.error('Chat assistant failed to respond', error);

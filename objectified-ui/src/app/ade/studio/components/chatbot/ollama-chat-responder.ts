@@ -3,7 +3,9 @@
  *
  * Posts to `/api/ollama/chat` with the model from context, maps the transcript
  * to Ollama message shape, injects Studio context into the latest user turn,
- * and accumulates the SSE stream into a single markdown string.
+ * and reads the SSE stream. When `onStreamDelta` is set on the context (#520),
+ * each chunk is forwarded so the UI can render incrementally; the returned
+ * string is still the full accumulated markdown.
  */
 
 import { injectChatContext } from './chat-context';
@@ -34,7 +36,7 @@ export function createOllamaChatResponder(): ChatSendFn {
       throw new Error(detail || `Chat request failed (${response.status})`);
     }
 
-    const text = await accumulateOllamaSseFromResponse(response);
+    const text = await accumulateOllamaSseFromResponse(response, ctx.onStreamDelta);
     return text.trim().length > 0 ? text : 'The model returned an empty reply.';
   };
 }
@@ -64,7 +66,10 @@ function buildOllamaChatMessages(
   return out;
 }
 
-async function accumulateOllamaSseFromResponse(response: Response): Promise<string> {
+async function accumulateOllamaSseFromResponse(
+  response: Response,
+  onDelta?: (accumulatedMarkdown: string) => void,
+): Promise<string> {
   const reader = response.body?.getReader();
   if (!reader) return '';
 
@@ -86,7 +91,10 @@ async function accumulateOllamaSseFromResponse(response: Response): Promise<stri
       if (data === '[DONE]') continue;
       try {
         const event = JSON.parse(data) as { content?: string };
-        if (event.content) accumulated += event.content;
+        if (event.content) {
+          accumulated += event.content;
+          onDelta?.(accumulated);
+        }
       } catch {
         /* ignore malformed SSE lines */
       }
