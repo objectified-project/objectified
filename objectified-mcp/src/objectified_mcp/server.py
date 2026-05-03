@@ -21,6 +21,7 @@ from objectified_mcp.spec_describe_operation_tool import build_spec_describe_ope
 from objectified_mcp.spec_describe_tool import build_spec_describe_response
 from objectified_mcp.spec_export_yaml_tool import build_spec_export_yaml_response
 from objectified_mcp.spec_get_openapi_tool import build_spec_get_openapi_response
+from objectified_mcp.spec_list_components_tool import build_spec_list_components_response
 from objectified_mcp.spec_list_operations_tool import build_spec_list_operations_response
 from objectified_mcp.spec_list_tags_tool import build_spec_list_tags_response
 from objectified_mcp.spec_list_tool import build_spec_list_response
@@ -202,6 +203,25 @@ async def spec_list_operations(
     pool = get_db_pool(ctx)
     auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
     return await build_spec_list_operations_response(pool, spec_id=spec_id, auth_ctx=auth_ctx)
+
+
+@mcp.tool(
+    name="spec.list_components",
+    description=(
+        "Return OpenAPI component names for a published spec revision by id (UUID), grouped by kind: "
+        "schemas, parameters, responses, securitySchemes. Each kind maps to a sorted list of "
+        "component keys; kinds with no entries are omitted. Same visibility and auth rules as "
+        "spec.get_openapi (#3020)."
+    ),
+)
+async def spec_list_components(
+    ctx: Context,
+    spec_id: str,
+    headers: dict[str, str] = CurrentHeaders(),
+) -> dict[str, list[str]]:
+    pool = get_db_pool(ctx)
+    auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
+    return await build_spec_list_components_response(pool, spec_id=spec_id, auth_ctx=auth_ctx)
 
 
 @mcp.tool(

@@ -52,11 +52,7 @@ def resolve_openapi_refs(root: dict[str, Any], node: Any, stack: frozenset[str])
                 return deepcopy(node)
             new_stack = frozenset({*stack, ref})
             resolved = resolve_openapi_refs(root, deepcopy(target), new_stack)
-            siblings = {
-                k: resolve_openapi_refs(root, deepcopy(v), new_stack)
-                for k, v in node.items()
-                if k != "$ref"
-            }
+            siblings = {k: resolve_openapi_refs(root, deepcopy(v), new_stack) for k, v in node.items() if k != "$ref"}
             if siblings and isinstance(resolved, dict):
                 return {**resolved, **siblings}
             return resolved
