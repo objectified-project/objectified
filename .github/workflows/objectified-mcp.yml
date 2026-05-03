@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main, develop ]
     paths:
+      - '.github/workflows/objectified-mcp.yml'
       - 'objectified-mcp/**'
       - 'objectified-rest/**'
       - 'docker-compose.yml'
@@ -12,6 +13,7 @@ on:
   pull_request:
     branches: [ main, develop ]
     paths:
+      - '.github/workflows/objectified-mcp.yml'
       - 'objectified-mcp/**'
       - 'objectified-rest/**'
       - 'docker-compose.yml'
@@ -23,6 +25,23 @@ jobs:
   test:
     name: Lint, type-check and test objectified-mcp
     runs-on: ubuntu-latest
+    env:
+      OBJECTIFIED_MCP_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/objectified_ci
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: objectified_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d objectified_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout code
