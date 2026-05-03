@@ -308,9 +308,13 @@ export function ChatConversation({
     }
   }, [restoreLastConversation, initialMessages, scope, store]);
 
+  // Only scroll to the bottom when new messages are appended (length increases).
+  // Skipping content-only updates (streaming chunks) prevents the scroll animation
+  // from restarting on every token and fighting the user's own scrolling.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages]);
+  }, [messages.length]);
 
   // Auto-persist whenever the transcript settles (no pending turns).
   // Guard: only run when the change was user-originated (send / regenerate),
@@ -367,6 +371,14 @@ export function ChatConversation({
           isRegenerate,
           studioContext: studioContextRef.current,
           ollamaModel: useLiveOllama ? selectedOllamaModel : undefined,
+          onStreamAccumulated: (accumulated) => {
+            if (requestIdRef.current !== requestId) return;
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === pendingId ? { ...message, content: accumulated, pending: true } : message,
+              ),
+            );
+          },
         });
       } catch (error) {
         console.error('Chat assistant failed to respond', error);

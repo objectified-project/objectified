@@ -76,6 +76,30 @@ describe('createOllamaChatResponder', () => {
     expect(body.messages).toEqual([{ role: 'user', content: 'Hi' }]);
   });
 
+  it('invokes onStreamAccumulated with accumulated text for each content chunk', async () => {
+    const deltas: string[] = [];
+    global.fetch = jest.fn().mockResolvedValue(
+      mockSseResponse([
+        'data: {"content":"Hello","done":false}\n\n',
+        'data: {"content":" world","done":false}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+
+    const responder = createOllamaChatResponder();
+    const messages: ChatMessage[] = [{ id: 'u1', role: 'user', content: 'Hi' }];
+    const out = await responder({
+      messages,
+      prompt: 'Hi',
+      isRegenerate: false,
+      ollamaModel: 'qwen2.5:latest',
+      onStreamAccumulated: (acc) => deltas.push(acc),
+    });
+
+    expect(out).toBe('Hello world');
+    expect(deltas).toEqual(['Hello', 'Hello world']);
+  });
+
   it('injects studio context into the latest user message only', async () => {
     global.fetch = jest.fn().mockResolvedValue(
       mockSseResponse(['data: {"content":"ok","done":true}\n\n', 'data: [DONE]\n\n']),

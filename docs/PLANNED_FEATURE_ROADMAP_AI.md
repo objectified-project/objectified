@@ -92,7 +92,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 **Ollama API Integration** 📋 PLANNED
 - 📋 **Streaming Responses**:
-    - 📋 Server-Sent Events (SSE) for streaming
+    - ✅ Server-Sent Events (SSE) for streaming (#520)
     - 📋 Token-by-token display
     - 📋 Cancel generation mid-stream
     - 📋 Progress indication
@@ -108,7 +108,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                                 |
 |--------|-----------------------------------------------------|
-| #520   | Streaming responses from Ollama                     |
 | #521   | Token-by-token usage display                        |
 | #522   | Cancel generation mid-stream                        |
 | #523   | Show progress indication during generation          |
