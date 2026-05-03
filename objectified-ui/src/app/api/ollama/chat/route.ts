@@ -9,6 +9,22 @@ const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function usageFromOllamaPayload(data: Record<string, unknown>): { promptTokens?: number; completionTokens?: number } | undefined {
+  const p = data.prompt_eval_count;
+  const c = data.eval_count;
+  const usage: { promptTokens?: number; completionTokens?: number } = {};
+  if (typeof p === 'number') usage.promptTokens = p;
+  if (typeof c === 'number') usage.completionTokens = c;
+  return Object.keys(usage).length > 0 ? usage : undefined;
+}
+
+function pickAssistantContent(data: Record<string, unknown>): string | undefined {
+  const message = data.message;
+  if (!message || typeof message !== 'object') return undefined;
+  const raw = (message as { content?: unknown }).content;
+  return typeof raw === 'string' && raw.length > 0 ? raw : undefined;
+}
+
 const CLASS_SKELETON_SYSTEM = `You are an expert at defining JSON Schema (OpenAPI 3.1) class/schema definitions. The user will describe a class they want to create. Your only job is to output a single JSON code block that defines that class.
 
 # Output format
@@ -38,7 +54,7 @@ Respond with exactly one JSON code block in this shape:
 
 function buildClassSkeletonSystem(options: {
   existingClassNames?: string[];
-  existingProperties?: Array<{ name: string; description?: string | null; data?: any }>;
+  existingProperties?: Array<{ name: string; description?: string | null; data?: Record<string, unknown> }>;
 }): string {
   let extra = '';
   if (options.existingClassNames?.length) {
@@ -47,7 +63,13 @@ function buildClassSkeletonSystem(options: {
   if (options.existingProperties?.length) {
     extra += `\n\n# Existing project properties (reuse by using the exact "name" in your schema.properties; these are shared across classes)\n`;
     options.existingProperties.forEach((p) => {
-      const typeStr = p.data?.type ?? (p.data?.$ref ? `$ref` : 'object');
+      const d = p.data;
+      const typeStr =
+        typeof d?.type === 'string'
+          ? d.type
+          : d && '$ref' in d && d.$ref
+            ? `$ref`
+            : 'object';
       extra += `- ${p.name}: ${typeStr}${p.description ? ` — ${String(p.description).slice(0, 60)}` : ''}\n`;
     });
   }
@@ -222,15 +244,17 @@ commentary, or thinking output.`;
               // Process any remaining buffer
               if (buffer.trim() && !closed) {
                 try {
-                  const data = JSON.parse(buffer);
-                  if (data.message?.content) {
-                    const event = {
-                      content: data.message.content,
-                      done: data.done || false,
-                    };
+                  const data = JSON.parse(buffer) as Record<string, unknown>;
+                  const content = pickAssistantContent(data);
+                  const usage = usageFromOllamaPayload(data);
+                  const isDone = Boolean(data.done);
+                  if (content || usage) {
+                    const event: Record<string, unknown> = { done: isDone };
+                    if (content) event.content = content;
+                    if (usage) event.usage = usage;
                     safeEnqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
                   }
-                } catch (e) {
+                } catch {
                   // Ignore parse errors on final buffer
                 }
               }
@@ -257,22 +281,22 @@ commentary, or thinking output.`;
               if (!line.trim() || closed) continue;
 
               try {
-                const data = JSON.parse(line);
+                const data = JSON.parse(line) as Record<string, unknown>;
+                const content = pickAssistantContent(data);
+                const usage = usageFromOllamaPayload(data);
+                const isDone = Boolean(data.done);
 
-                // Send the message content immediately if available
-                if (data.message?.content) {
-                  const event = {
-                    content: data.message.content,
-                    done: data.done || false,
-                  };
-
+                if (content || usage) {
+                  const event: Record<string, unknown> = { done: isDone };
+                  if (content) event.content = content;
+                  if (usage) event.usage = usage;
                   if (!safeEnqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))) {
                     break;
                   }
                 }
 
                 // If this is the last message, signal completion
-                if (data.done) {
+                if (isDone) {
                   safeEnqueue(encoder.encode('data: [DONE]\n\n'));
                   safeClose();
                   return;
@@ -306,10 +330,11 @@ commentary, or thinking output.`;
         'Connection': 'keep-alive',
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in Ollama chat:', error);
+    const message = error instanceof Error ? error.message : 'Failed to process chat request';
     return new Response(
-      JSON.stringify({ error: error.message || 'Failed to process chat request' }),
+      JSON.stringify({ error: message || 'Failed to process chat request' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }

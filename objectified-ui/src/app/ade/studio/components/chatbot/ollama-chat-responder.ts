@@ -5,11 +5,17 @@
  * to Ollama message shape, injects Studio context into the latest user turn,
  * and reads the SSE stream. When `onStreamAccumulated` is set on the context (#520),
  * each chunk is forwarded so the UI can render incrementally; the returned
- * string is still the full accumulated markdown.
+ * string is still the full accumulated markdown. Token estimates and Ollama-reported
+ * usage are forwarded on the same callback (#521).
  */
 
 import { injectChatContext } from './chat-context';
-import type { ChatMessage, ChatSendContext, ChatSendFn } from './types';
+import type {
+  ChatMessage,
+  ChatSendContext,
+  ChatSendFn,
+  ChatStreamAccumulatedMeta,
+} from './types';
 
 export function createOllamaChatResponder(): ChatSendFn {
   return async (ctx: ChatSendContext) => {
@@ -19,6 +25,7 @@ export function createOllamaChatResponder(): ChatSendFn {
     }
 
     const messages = buildOllamaChatMessages(ctx.messages, ctx.studioContext);
+    const estimatedPromptTokens = approximateTokensFromJson(JSON.stringify(messages));
 
     const response = await fetch('/api/ollama/chat', {
       method: 'POST',
@@ -36,7 +43,10 @@ export function createOllamaChatResponder(): ChatSendFn {
       throw new Error(detail || `Chat request failed (${response.status})`);
     }
 
-    const text = await accumulateOllamaSseFromResponse(response, ctx.onStreamAccumulated);
+    const text = await accumulateOllamaSseFromResponse(response, {
+      estimatedPromptTokens,
+      onDelta: ctx.onStreamAccumulated,
+    });
     return text.trim().length > 0 ? text : 'The model returned an empty reply.';
   };
 }
@@ -66,16 +76,55 @@ function buildOllamaChatMessages(
   return out;
 }
 
+/** Rough token count (÷4 chars) for live UI; not a tokenizer. */
+function approximateTokensFromJson(serialized: string): number {
+  if (serialized.length === 0) return 0;
+  return Math.max(1, Math.ceil(serialized.length / 4));
+}
+
+function approximateCompletionTokens(markdown: string): number {
+  if (markdown.length === 0) return 0;
+  return Math.max(1, Math.ceil(markdown.length / 4));
+}
+
 async function accumulateOllamaSseFromResponse(
   response: Response,
-  onDelta?: (accumulatedMarkdown: string) => void,
+  options: {
+    estimatedPromptTokens: number;
+    onDelta?: (accumulatedMarkdown: string, meta: ChatStreamAccumulatedMeta) => void;
+  },
 ): Promise<string> {
+  const { estimatedPromptTokens, onDelta } = options;
   const reader = response.body?.getReader();
   if (!reader) return '';
 
   const decoder = new TextDecoder();
   let buffer = '';
   let accumulated = '';
+
+  function emitIfNeeded(
+    contentAppended: boolean,
+    usage?: { promptTokens?: number; completionTokens?: number },
+  ): void {
+    if (!onDelta) return;
+    const estimatedCompletionTokens = approximateCompletionTokens(accumulated);
+    const meta: ChatStreamAccumulatedMeta = {
+      estimatedPromptTokens,
+      estimatedCompletionTokens,
+    };
+    if (usage && (typeof usage.promptTokens === 'number' || typeof usage.completionTokens === 'number')) {
+      meta.measured = {
+        promptTokens:
+          typeof usage.promptTokens === 'number' ? usage.promptTokens : estimatedPromptTokens,
+        completionTokens:
+          typeof usage.completionTokens === 'number'
+            ? usage.completionTokens
+            : estimatedCompletionTokens,
+      };
+    }
+    if (!contentAppended && !meta.measured) return;
+    onDelta(accumulated, meta);
+  }
 
   while (true) {
     const { done, value } = await reader.read();
@@ -90,11 +139,16 @@ async function accumulateOllamaSseFromResponse(
       const data = line.slice(6);
       if (data === '[DONE]') continue;
       try {
-        const event = JSON.parse(data) as { content?: string };
+        const event = JSON.parse(data) as {
+          content?: string;
+          usage?: { promptTokens?: number; completionTokens?: number };
+        };
+        let appended = false;
         if (event.content) {
           accumulated += event.content;
-          onDelta?.(accumulated);
+          appended = true;
         }
+        emitIfNeeded(appended, event.usage);
       } catch {
         /* ignore malformed SSE lines */
       }

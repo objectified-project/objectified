@@ -8,6 +8,19 @@
 
 import type { ChatStudioContext } from './chat-context';
 
+/** Token hints passed with each streaming update from Ollama-backed responders (#521). */
+export interface ChatStreamAccumulatedMeta {
+  /** Rough prompt size from the serialized chat payload (characters ÷ 4). */
+  estimatedPromptTokens: number;
+  /** Rough completion size from accumulated assistant text so far (characters ÷ 4). */
+  estimatedCompletionTokens: number;
+  /** Exact counts from Ollama when the server forwards usage on the final SSE chunk. */
+  measured?: {
+    promptTokens: number;
+    completionTokens: number;
+  };
+}
+
 export type ChatRole = 'user' | 'assistant';
 
 export type ChatFeedback = 'up' | 'down';
@@ -47,14 +60,16 @@ export interface ChatSendContext {
    * Called as streamed assistant text grows (e.g. Ollama SSE). Receives the full
    * accumulated markdown seen so far — NOT the latest delta chunk. The shell passes
    * this so the pending bubble updates live; responders that do not stream can ignore it (#520).
+   * When present, `meta` carries live token estimates and optional measured usage (#521).
    */
-  onStreamAccumulated?: (accumulatedMarkdown: string) => void;
+  onStreamAccumulated?: (accumulatedMarkdown: string, meta?: ChatStreamAccumulatedMeta) => void;
 }
 
 /**
  * Adapter the chat shell calls when the user submits or regenerates. Returns
  * the assistant's full markdown reply. When the shell supplies `onStreamAccumulated`,
  * streaming responders should invoke it as content arrives; the shell still uses
- * the resolved return value as the final assistant text.
+ * the resolved return value as the final assistant text. Streaming callers may pass
+ * a second argument to `onStreamAccumulated` for token usage (#521).
  */
 export type ChatSendFn = (ctx: ChatSendContext) => Promise<string>;

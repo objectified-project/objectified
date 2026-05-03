@@ -27,7 +27,7 @@ import {
 } from './ollama-model-defaults';
 import { createOllamaChatResponder } from './ollama-chat-responder';
 import type { DetectedOpenApiSpec } from './openapi-detection';
-import type { ChatFeedback, ChatMessage, ChatSendFn } from './types';
+import type { ChatFeedback, ChatMessage, ChatSendFn, ChatStreamAccumulatedMeta } from './types';
 
 /**
  * Studio AI chat conversation surface (#258, #259, #260, #261).
@@ -49,6 +49,8 @@ import type { ChatFeedback, ChatMessage, ChatSendFn } from './types';
  *   - With `ollamaTransport` (#265), lists generative models from Ollama and
  *     sends turns through `/api/ollama/chat`; falls back to the demo when the
  *     server has no models or the list request fails.
+ *   - With live Ollama (#521), a footer shows prompt/output token estimates while
+ *     streaming and replaces them with measured counts when the model finishes.
  *   - With `tenantId` + `studioContext.project` (#266), the chosen model is
  *     remembered per project (and optionally per tenant) in localStorage so
  *     each workspace reopens on its preferred tag when Ollama still exposes it.
@@ -246,6 +248,10 @@ export function ChatConversation({
   const useLiveOllama =
     ollamaTransport && modelsStatus === 'ready' && ollamaModels.length > 0 && selectedOllamaModel.length > 0;
 
+  React.useEffect(() => {
+    if (!useLiveOllama) setStreamUsage(null);
+  }, [useLiveOllama]);
+
   const responder = React.useMemo(() => {
     if (onSendMessage) return onSendMessage;
     if (useLiveOllama) return ollamaResponder;
@@ -264,6 +270,7 @@ export function ChatConversation({
   );
 
   const [messages, setMessages] = React.useState<ChatMessage[]>(() => initialMessages ?? []);
+  const [streamUsage, setStreamUsage] = React.useState<ChatStreamAccumulatedMeta | null>(null);
   const [isBusy, setIsBusy] = React.useState(false);
   const [view, setView] = React.useState<'chat' | 'history'>('chat');
   const [activeId, setActiveId] = React.useState<string | null>(null);
@@ -311,7 +318,6 @@ export function ChatConversation({
   // Only scroll to the bottom when new messages are appended (length increases).
   // Skipping content-only updates (streaming chunks) prevents the scroll animation
   // from restarting on every token and fighting the user's own scrolling.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages.length]);
@@ -361,6 +367,7 @@ export function ChatConversation({
         pending: true,
       };
       setIsBusy(true);
+      if (useLiveOllama) setStreamUsage(null);
       setMessages([...transcript, pendingMessage]);
 
       let reply: string;
@@ -371,8 +378,17 @@ export function ChatConversation({
           isRegenerate,
           studioContext: studioContextRef.current,
           ollamaModel: useLiveOllama ? selectedOllamaModel : undefined,
-          onStreamAccumulated: (accumulated) => {
+          onStreamAccumulated: (accumulated, meta) => {
             if (requestIdRef.current !== requestId) return;
+            if (useLiveOllama) {
+              setStreamUsage(
+                meta ?? {
+                  estimatedPromptTokens: 0,
+                  estimatedCompletionTokens:
+                    accumulated.length === 0 ? 0 : Math.max(1, Math.ceil(accumulated.length / 4)),
+                },
+              );
+            }
             setMessages((current) =>
               current.map((message) =>
                 message.id === pendingId ? { ...message, content: accumulated, pending: true } : message,
@@ -383,6 +399,7 @@ export function ChatConversation({
       } catch (error) {
         console.error('Chat assistant failed to respond', error);
         reply = 'Sorry — the assistant could not respond. Please try again.';
+        if (useLiveOllama) setStreamUsage(null);
       }
 
       if (requestIdRef.current !== requestId) return;
@@ -459,6 +476,7 @@ export function ChatConversation({
   const handleNewConversation = React.useCallback(() => {
     requestIdRef.current += 1;
     setIsBusy(false);
+    setStreamUsage(null);
     pendingPersistRef.current = false;
     resetActive();
     setView('chat');
@@ -469,6 +487,7 @@ export function ChatConversation({
     if (!askConfirm('Clear the current conversation? It will be removed from your history.')) return;
     requestIdRef.current += 1;
     setIsBusy(false);
+    setStreamUsage(null);
     pendingPersistRef.current = false;
     if (activeId) store.remove(activeId);
     resetActive();
@@ -506,6 +525,7 @@ export function ChatConversation({
       if (!conversation) return;
       // Loading from store — do not trigger an auto-persist for this change.
       pendingPersistRef.current = false;
+      setStreamUsage(null);
       setMessages(conversation.messages);
       setActiveId(conversation.id);
       setActiveCreatedAt(conversation.createdAt);
@@ -607,6 +627,8 @@ export function ChatConversation({
               <ChatContextChip studioContext={studioContext!} />
             </div>
           )}
+
+          {useLiveOllama && streamUsage && <TokenUsageStrip meta={streamUsage} />}
 
           <ChatComposer onSend={handleSend} isBusy={isBusy} />
         </>
@@ -815,6 +837,28 @@ interface EmptyStateProps {
   message?: string;
   suggestions: readonly string[];
   onSelect: (prompt: string) => void;
+}
+
+function TokenUsageStrip({ meta }: { meta: ChatStreamAccumulatedMeta }) {
+  const measured = meta.measured;
+  const inCount = measured?.promptTokens ?? meta.estimatedPromptTokens;
+  const outCount = measured?.completionTokens ?? meta.estimatedCompletionTokens;
+  const total = inCount + outCount;
+  const exact = Boolean(measured);
+  return (
+    <div
+      className="border-t border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400"
+      data-testid="studio-ai-chat-token-usage"
+      aria-live="polite"
+    >
+      <span className="tabular-nums">
+        <span className="font-medium text-gray-800 dark:text-gray-200">{total}</span>
+        {' tokens · '}
+        {inCount} in · {outCount} out
+        {exact ? '' : ' (estimated)'}
+      </span>
+    </div>
+  );
 }
 
 function EmptyState({ message, suggestions, onSelect }: EmptyStateProps) {
