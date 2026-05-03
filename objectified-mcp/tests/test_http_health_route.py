@@ -19,15 +19,18 @@ def test_health_returns_200_json(monkeypatch: pytest.MonkeyPatch, mock_pool: obj
 
     get_settings.cache_clear()
 
-    from objectified_mcp.server import mcp
+    try:
+        from objectified_mcp.server import mcp
 
-    with patch("objectified_mcp.server.create_async_pool", return_value=mock_pool):
-        app = mcp.http_app(
-            path="/mcp",
-            middleware=[StarletteMiddleware(HttpCredentialExtractionMiddleware)],
-        )
-        with TestClient(app) as client:
-            response = client.get("/health")
+        with patch("objectified_mcp.server.create_async_pool", return_value=mock_pool):
+            app = mcp.http_app(
+                path="/mcp",
+                middleware=[StarletteMiddleware(HttpCredentialExtractionMiddleware)],
+            )
+            with TestClient(app) as client:
+                response = client.get("/health")
 
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+    finally:
+        get_settings.cache_clear()

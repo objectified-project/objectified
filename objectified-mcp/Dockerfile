@@ -8,8 +8,11 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 WORKDIR /build
 
-COPY objectified-rest /build/objectified-rest
-COPY objectified-mcp /build/objectified-mcp
+COPY objectified-rest/pyproject.toml /build/objectified-rest/pyproject.toml
+COPY objectified-rest/src /build/objectified-rest/src
+COPY objectified-mcp/pyproject.toml /build/objectified-mcp/pyproject.toml
+COPY objectified-mcp/uv.lock /build/objectified-mcp/uv.lock
+COPY objectified-mcp/src /build/objectified-mcp/src
 
 WORKDIR /build/objectified-mcp
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -39,4 +42,4 @@ EXPOSE 8765
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen(f\"http://127.0.0.1:{os.environ.get('OBJECTIFIED_MCP_HTTP_PORT','8765')}/health\", timeout=4)"
 
-CMD ["objectified-mcp", "serve", "--transport", "http", "--host", "0.0.0.0"]
+CMD ["objectified-mcp", "serve", "--transport", "http"]

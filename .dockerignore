@@ -1,3 +1,14 @@
 # Keeps `docker build -f objectified-mcp/Dockerfile .` contexts small and avoids copying local venvs.
 **/.venv
 .git
+**/node_modules
+**/dist
+**/.turbo
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/coverage
+**/.coverage
