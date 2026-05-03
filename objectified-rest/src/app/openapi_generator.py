@@ -208,6 +208,34 @@ def _load_paths_for_version(version_id: str) -> List[Dict[str, Any]]:
     return paths
 
 
+def _security_schemes_from_rows(scheme_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    security_schemes: Dict[str, Any] = {}
+    for row in scheme_rows:
+        if row.get("scheme_type") == "apiKey":
+            security_schemes[row["scheme_name"]] = {
+                "type": "apiKey",
+                "name": row.get("param_name") or row["scheme_name"],
+                "in": row.get("in_location") or "header",
+                **({"description": row["description"]} if row.get("description") else {}),
+            }
+    return security_schemes
+
+
+def _servers_from_rows(server_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    servers_list: List[Dict[str, Any]] = []
+    for row in server_rows:
+        s: Dict[str, Any] = {"url": row.get("url") or ""}
+        if row.get("description"):
+            s["description"] = row["description"]
+        variables = row.get("variables")
+        if variables:
+            variables = parse_json_field(variables) if isinstance(variables, str) else variables
+            if isinstance(variables, dict) and variables:
+                s["variables"] = variables
+        servers_list.append(s)
+    return servers_list
+
+
 def generate_openapi_spec(
     tenant_slug: str,
     project_slug: str,
@@ -217,6 +245,9 @@ def generate_openapi_spec(
     project_description: Optional[str] = None,
     version_db_id: Optional[str] = None,
     revision_metadata: Any = None,
+    paths_data: Optional[List[Dict[str, Any]]] = None,
+    security_scheme_rows: Optional[List[Dict[str, Any]]] = None,
+    server_rows: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Generate a complete OpenAPI 3.1.0 specification for all classes in a version."""
 
@@ -234,52 +265,44 @@ def generate_openapi_spec(
     # Load paths for this version if version_db_id is provided
     # exclude_private=True so operations marked x-private are hidden from Swagger
     paths: Dict[str, Any] = {}
-    if version_db_id:
+    resolved_paths_data: List[Dict[str, Any]] = []
+    if paths_data is not None:
+        resolved_paths_data = paths_data
+    elif version_db_id:
         try:
-            paths_data = _load_paths_for_version(version_db_id)
-            if paths_data:
-                paths = generate_paths_for_openapi(paths_data, options={"exclude_private": True})
+            resolved_paths_data = _load_paths_for_version(version_db_id)
         except Exception as e:
             # Log error but continue - paths are optional
             print(f"Warning: Could not load paths for version {version_id}: {e}")
+    if resolved_paths_data:
+        paths = generate_paths_for_openapi(resolved_paths_data, options={"exclude_private": True})
 
     # Load security schemes (API Key header/query/cookie, etc.)
     security_schemes: Dict[str, Any] = {}
-    if version_db_id:
+    resolved_scheme_rows: List[Dict[str, Any]] = []
+    if security_scheme_rows is not None:
+        resolved_scheme_rows = security_scheme_rows
+    elif version_db_id:
         try:
             from .database import db
             if db:
-                scheme_rows = db.get_security_schemes_for_version(version_db_id)
-                for row in scheme_rows:
-                    if row.get('scheme_type') == 'apiKey':
-                        security_schemes[row['scheme_name']] = {
-                            'type': 'apiKey',
-                            'name': row.get('param_name') or row['scheme_name'],
-                            'in': row.get('in_location') or 'header',
-                            **({'description': row['description']} if row.get('description') else {}),
-                        }
+                resolved_scheme_rows = db.get_security_schemes_for_version(version_db_id)
         except Exception as e:
             print(f"Warning: Could not load security schemes for version {version_id}: {e}")
+    security_schemes = _security_schemes_from_rows(resolved_scheme_rows)
 
     # Load servers (multiple server definitions: url, description, variables)
-    servers_list: List[Dict[str, Any]] = []
-    if version_db_id:
+    resolved_server_rows: List[Dict[str, Any]] = []
+    if server_rows is not None:
+        resolved_server_rows = server_rows
+    elif version_db_id:
         try:
             from .database import db
             if db:
-                server_rows = db.get_servers_for_version(version_db_id)
-                for row in server_rows:
-                    s: Dict[str, Any] = {"url": row.get("url") or ""}
-                    if row.get("description"):
-                        s["description"] = row["description"]
-                    variables = row.get("variables")
-                    if variables:
-                        variables = parse_json_field(variables) if isinstance(variables, str) else variables
-                        if isinstance(variables, dict) and variables:
-                            s["variables"] = variables
-                    servers_list.append(s)
+                resolved_server_rows = db.get_servers_for_version(version_db_id)
         except Exception as e:
             print(f"Warning: Could not load servers for version {version_id}: {e}")
+    servers_list = _servers_from_rows(resolved_server_rows)
 
     # Build components
     components: Dict[str, Any] = {"schemas": schemas}

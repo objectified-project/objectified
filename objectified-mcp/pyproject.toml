@@ -1,6 +1,6 @@
 [project]
 name = "objectified-mcp"
-version = "0.1.19"
+version = "0.1.20"
 description = "Model Context Protocol server for Objectified (FastMCP)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,6 +16,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "objectified-rest",
     "bcrypt>=4.0",
     "fastmcp>=3.2.0",
     "structlog>=24.4.0",
@@ -55,8 +56,11 @@ python_version = "3.11"
 strict = true
 warn_unused_configs = true
 explicit_package_bases = true
-mypy_path = "src"
+mypy_path = ["src", "../objectified-rest/src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "../objectified-rest/src"]
+
+[tool.uv.sources]
+objectified-rest = { path = "../objectified-rest", editable = true }

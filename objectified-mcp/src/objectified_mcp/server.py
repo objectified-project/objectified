@@ -18,6 +18,7 @@ from objectified_mcp.mcp_auth import McpAuthContext, require_mcp_auth, resolve_o
 from objectified_mcp.ping_tool import build_ping_response
 from objectified_mcp.settings import get_settings
 from objectified_mcp.spec_describe_tool import build_spec_describe_response
+from objectified_mcp.spec_get_openapi_tool import build_spec_get_openapi_response
 from objectified_mcp.spec_list_tags_tool import build_spec_list_tags_response
 from objectified_mcp.spec_list_tool import build_spec_list_response
 from objectified_mcp.spec_search_tool import build_spec_search_response
@@ -136,6 +137,27 @@ async def spec_describe(
     pool = get_db_pool(ctx)
     auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
     return await build_spec_describe_response(pool, spec_id=spec_id, auth_ctx=auth_ctx)
+
+
+@mcp.tool(
+    name="spec.get_openapi",
+    description=(
+        "Return the generated OpenAPI 3.1 document (JSON object) for a published spec revision by id (UUID). "
+        "Matches the REST schema export shape (paths, components.schemas, servers, securitySchemes). "
+        "Anonymous callers: public revisions only. With Authorization: Bearer <MCP API key>, in-scope private "
+        "published revisions for the tenant are included (#3016). "
+        "Raises not-found when inaccessible. If the serialized document exceeds the configured byte cap "
+        "(OBJECTIFIED_MCP_OPENAPI_MAX_JSON_BYTES), returns an error analogous to HTTP 413."
+    ),
+)
+async def spec_get_openapi(
+    ctx: Context,
+    spec_id: str,
+    headers: dict[str, str] = CurrentHeaders(),
+) -> dict[str, Any]:
+    pool = get_db_pool(ctx)
+    auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
+    return await build_spec_get_openapi_response(pool, spec_id=spec_id, auth_ctx=auth_ctx)
 
 
 @mcp.tool(
