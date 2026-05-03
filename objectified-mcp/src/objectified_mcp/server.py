@@ -20,6 +20,7 @@ from objectified_mcp.settings import get_settings
 from objectified_mcp.spec_describe_tool import build_spec_describe_response
 from objectified_mcp.spec_export_yaml_tool import build_spec_export_yaml_response
 from objectified_mcp.spec_get_openapi_tool import build_spec_get_openapi_response
+from objectified_mcp.spec_list_operations_tool import build_spec_list_operations_response
 from objectified_mcp.spec_list_tags_tool import build_spec_list_tags_response
 from objectified_mcp.spec_list_tool import build_spec_list_response
 from objectified_mcp.spec_search_tool import build_spec_search_response
@@ -180,6 +181,26 @@ async def spec_export_yaml(
     pool = get_db_pool(ctx)
     auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
     return await build_spec_export_yaml_response(pool, spec_id=spec_id, auth_ctx=auth_ctx)
+
+
+@mcp.tool(
+    name="spec.list_operations",
+    description=(
+        "Return a compact index of HTTP operations for a published spec revision by id (UUID): "
+        "each item has path, method, operation_id, summary, and tags. Sorted by path then method. "
+        "Same visibility and auth rules as spec.get_openapi: anonymous callers see public revisions only; "
+        "with Authorization: Bearer <MCP API key>, in-scope private published revisions are included (#3018). "
+        "Does not return the full OpenAPI document."
+    ),
+)
+async def spec_list_operations(
+    ctx: Context,
+    spec_id: str,
+    headers: dict[str, str] = CurrentHeaders(),
+) -> list[dict[str, Any]]:
+    pool = get_db_pool(ctx)
+    auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
+    return await build_spec_list_operations_response(pool, spec_id=spec_id, auth_ctx=auth_ctx)
 
 
 @mcp.tool(
