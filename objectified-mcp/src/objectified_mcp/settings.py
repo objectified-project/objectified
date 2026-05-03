@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     database_pool_min_size: int = Field(default=1, ge=1, le=256)
     database_pool_max_size: int = Field(default=10, ge=1, le=256)
     database_pool_timeout: float = Field(default=30.0, gt=0, le=600.0)
+    openapi_max_json_bytes: int = Field(
+        default=2_097_152,
+        ge=1024,
+        le=100_000_000,
+        description="Max UTF-8 size of json-serialized OpenAPI from spec.get_openapi (413-style limit).",
+    )
 
     @model_validator(mode="after")
     def pool_size_bounds(self) -> Self:
