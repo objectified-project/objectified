@@ -134,12 +134,24 @@ export function ChatConversation({
     async function loadModels() {
       try {
         const res = await fetch('/api/ollama/models');
+        if (!res.ok) {
+          if (!cancelled) {
+            setOllamaModels([]);
+            setSelectedOllamaModel('');
+            setModelsStatus('error');
+          }
+          return;
+        }
         const data = (await res.json()) as {
           success?: boolean;
           models?: OllamaModelRow[];
         };
         if (cancelled) return;
-        if (data.success && Array.isArray(data.models) && data.models.length > 0) {
+        if (data.success === false) {
+          setOllamaModels([]);
+          setSelectedOllamaModel('');
+          setModelsStatus('error');
+        } else if (data.success && Array.isArray(data.models) && data.models.length > 0) {
           setOllamaModels(data.models);
           setSelectedOllamaModel((prev) => {
             const names = data.models!.map((m) => m.name);
