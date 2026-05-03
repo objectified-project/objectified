@@ -118,11 +118,9 @@ function buildPropertySchema(prop: any, allProperties: any[]): any {
     }
   }
 
-  // Restore the property's own required flag (boolean) for the caller to handle
-  // This is separate from the nested required array which is for child properties
-  if (selfRequired === true) {
-    propData.required = true;
-  } else if (selfRequired === false && !Array.isArray(propData.required)) {
+  // Parent-level "this property is required" is read from prop.data in buildClassSchema.
+  // Do not set boolean required on propData when required is already the inner object array.
+  if (selfRequired === false && !Array.isArray(propData.required)) {
     propData.required = false;
   }
 
@@ -152,17 +150,20 @@ export function buildClassSchema(classData: any): any {
 
     topLevelProperties.forEach((prop: any) => {
       const propSchema = buildPropertySchema(prop, classData.properties);
+      const raw =
+        typeof prop.data === 'string' ? JSON.parse(prop.data || '{}') : { ...(prop.data || {}) };
+      const requiredOnParent = raw.required === true;
+      const booleanRequiredOnSchema =
+        !Array.isArray(propSchema.required) && propSchema.required === true;
 
-      // Handle required flag - it belongs in the class schema's required array, not the property
-      // Check for boolean true specifically (not truthy, as required could be an array for nested props)
-      if (propSchema.required === true) {
+      if (requiredOnParent || booleanRequiredOnSchema) {
         required.push(prop.name);
+      }
+      if (booleanRequiredOnSchema) {
         delete propSchema.required;
-      } else if (propSchema.required === false) {
-        // If property data explicitly sets required=false, remove the field
+      } else if (propSchema.required === false && !Array.isArray(propSchema.required)) {
         delete propSchema.required;
       }
-      // Note: If propSchema.required is an array (from nested properties), keep it as-is
 
       properties[prop.name] = propSchema;
     });

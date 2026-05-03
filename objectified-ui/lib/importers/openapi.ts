@@ -160,12 +160,16 @@ const convertProperty = (propName: string, propSchema: any, required: string[] =
   if (safeSchema.type === 'object' && safeSchema.properties && typeof safeSchema.properties === 'object') {
     const nestedRequired = Array.isArray(safeSchema.required) ? safeSchema.required : [];
     const children: NormalizedProperty[] = [];
+    const wasRequiredOnParent = data.required === true;
     delete data.properties;
     delete data.required;
     for (const childName of Object.keys(safeSchema.properties)) {
       children.push(convertProperty(childName, safeSchema.properties[childName], nestedRequired));
     }
     result.children = children;
+    if (wasRequiredOnParent) {
+      data.required = true;
+    }
   }
 
   // Array of objects
