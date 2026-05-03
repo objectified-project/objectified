@@ -25,6 +25,7 @@ We continue to improve the platform based on your feedback with improvements and
 - MCP **`spec.list`** with a valid API key merges **in-scope public** rows with **in-scope private** published revisions for the key's tenant (same **`items`** / **`has_more`** / **`next_cursor`** shape as anonymous listing); **`resolve_optional_mcp_auth`** resolves credentials from headers, **`tools/call`** meta, or the HTTP Bearer stash (#3011).
 - MCP **`spec.describe`** uses the same optional auth path: anonymous callers resolve **public** revisions only; with a valid API key, **in-scope private** published revisions for that tenant return the same metadata shape (**`id`**, **`title`**, **`version`**, **`description`**, **`owner`**, **`tags`**, **`updated_at`**); missing or inaccessible revisions stay **not-found** (#3012).
 - Database table **`odb.mcp_access_audit`** records MCP API key **`key_id`**, tool name, **`spec_id`** (revision UUID), timestamp **`at`**, **`success`**, and optional **`error`** for traceability; **`spec.list`** and **`spec.describe`** enqueue **non-blocking** inserts after each **private** revision returned to an authenticated caller (#3013).
+- MCP tool **`spec.list_my_specs`** lists specs readable by the **current API key only** (same merged public/private semantics and pagination as authenticated **`spec.list`**); calls **without** a key are rejected (**`Depends(require_mcp_auth)`**); private rows are audited under tool name **`spec.list_my_specs`** (#3014).
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports

@@ -244,10 +244,16 @@ async def require_mcp_auth(
     ctx: Context,
     headers: dict[str, str] = CurrentHeaders(),
 ) -> McpAuthContext:
-    """FastMCP dependency: bearer / meta credential → ``McpAuthContext``."""
+    """FastMCP dependency: bearer / meta credential → ``McpAuthContext``.
+
+    Like :func:`resolve_optional_mcp_auth`, falls back to the HTTP Bearer stash when headers
+    and meta omit the secret (#3011).
+    """
     rc = ctx.request_context
     meta = rc.meta if rc else None
     raw = extract_raw_mcp_api_key(http_headers=headers, request_meta=meta)
+    if raw is None:
+        raw = await get_http_bearer_from_context(ctx)
     if raw is None:
         raise AuthorizationError(
             "MCP authentication required: send Authorization: Bearer <api_key> over HTTP, "

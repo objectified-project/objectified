@@ -7,14 +7,14 @@ from typing import Any
 
 import structlog
 from fastmcp import Context, FastMCP
-from fastmcp.dependencies import CurrentHeaders
+from fastmcp.dependencies import CurrentHeaders, Depends
 from fastmcp.server.lifespan import lifespan
 from structlog.contextvars import bound_contextvars
 
 from objectified_mcp.database_pool import MCP_DB_POOL_KEY, create_async_pool, get_db_pool, ping_pool
 from objectified_mcp.http_credential_middleware import StashHttpBearerInToolContextMiddleware
 from objectified_mcp.logging_config import configure_logging
-from objectified_mcp.mcp_auth import resolve_optional_mcp_auth
+from objectified_mcp.mcp_auth import McpAuthContext, require_mcp_auth, resolve_optional_mcp_auth
 from objectified_mcp.ping_tool import build_ping_response
 from objectified_mcp.settings import get_settings
 from objectified_mcp.spec_describe_tool import build_spec_describe_response
@@ -84,6 +84,36 @@ async def spec_list(
         limit=limit,
         cursor=cursor,
         auth_ctx=auth_ctx,
+    )
+
+
+@mcp.tool(
+    name="spec.list_my_specs",
+    description=(
+        "List OpenAPI spec revisions this MCP API key can read: in-scope public catalog rows "
+        "(odb.mcp_v_public_specs) plus in-scope private published revisions for the key's tenant "
+        "(same rules as spec.list when authenticated). Requires API key — anonymous calls are rejected. "
+        "Response shape matches spec.list: items, has_more, next_cursor. "
+        "Optional tenant_id / project_id (UUID strings). limit defaults to 50, capped at 100 (#3014)."
+    ),
+)
+async def spec_list_my_specs(
+    ctx: Context,
+    tenant_id: str | None = None,
+    project_id: str | None = None,
+    limit: int | None = None,
+    cursor: str | None = None,
+    auth: McpAuthContext = Depends(require_mcp_auth),
+) -> dict[str, Any]:
+    pool = get_db_pool(ctx)
+    return await build_spec_list_response(
+        pool,
+        tenant_id=tenant_id,
+        project_id=project_id,
+        limit=limit,
+        cursor=cursor,
+        auth_ctx=auth,
+        private_access_audit_tool="spec.list_my_specs",
     )
 
 
