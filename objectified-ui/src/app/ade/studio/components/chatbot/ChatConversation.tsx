@@ -252,6 +252,10 @@ export function ChatConversation({
     if (!useLiveOllama) setStreamUsage(null);
   }, [useLiveOllama]);
 
+  React.useEffect(() => {
+    setStreamUsage(null);
+  }, [studioContext?.project?.id, studioContext?.version?.id]);
+
   const responder = React.useMemo(() => {
     if (onSendMessage) return onSendMessage;
     if (useLiveOllama) return ollamaResponder;
