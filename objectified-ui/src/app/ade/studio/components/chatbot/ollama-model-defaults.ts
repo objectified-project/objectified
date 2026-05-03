@@ -27,6 +27,19 @@ function projectCompositeKey(tenantId: string, projectId: string): string {
   return `${tenantId}::${projectId}`;
 }
 
+/**
+ * Build the normalized scope key used to detect workspace changes and guard
+ * model re-selection. Both ids are trimmed and null-coalesced before
+ * combining, matching the same normalization applied during persistence and
+ * lookup so comparisons never mis-fire due to incidental whitespace.
+ */
+export function ollamaModelScopeKey(
+  tenantId: string | null | undefined,
+  projectId: string | null | undefined,
+): string {
+  return `${tenantId?.trim() ?? ''}::${projectId?.trim() ?? ''}`;
+}
+
 export function readOllamaModelDefaults(storage: StorageLike): OllamaModelDefaultsV1 {
   if (!storage) return emptyDefaults();
   try {

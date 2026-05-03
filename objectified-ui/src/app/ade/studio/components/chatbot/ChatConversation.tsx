@@ -20,6 +20,7 @@ import {
 } from './conversation-store';
 import { createDemoChatResponder } from './demo-responder';
 import {
+  ollamaModelScopeKey,
   persistOllamaModelChoiceForScope,
   persistOllamaModelTenantDefault,
   resolvePreferredOllamaModel,
@@ -108,6 +109,20 @@ const PROMPT_SUGGESTIONS: readonly string[] = [
   'How would I model a multi-tenant audit log?',
 ];
 
+/**
+ * Safe accessor for `window.localStorage` that returns `null` instead of
+ * throwing when the storage is unavailable (e.g. `SecurityError` in
+ * privacy-restricted browser contexts). Preferences are best-effort.
+ */
+function safeLocalStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function ChatConversation({
   onSendMessage,
   onImportSpec,
@@ -137,12 +152,13 @@ export function ChatConversation({
 
   const handleSelectOllamaModel = React.useCallback(
     (name: string) => {
-      setSelectedOllamaModel(name);
+      const normalized = name.trim();
+      setSelectedOllamaModel(normalized);
       persistOllamaModelChoiceForScope({
         tenantId: tenantId ?? null,
         projectId: studioContext?.project?.id ?? null,
-        modelName: name,
-        storage: typeof window !== 'undefined' ? window.localStorage : null,
+        modelName: normalized,
+        storage: safeLocalStorage(),
       });
     },
     [tenantId, studioContext?.project?.id],
@@ -152,7 +168,7 @@ export function ChatConversation({
     persistOllamaModelTenantDefault({
       tenantId: tenantId ?? null,
       modelName: selectedOllamaModel,
-      storage: typeof window !== 'undefined' ? window.localStorage : null,
+      storage: safeLocalStorage(),
     });
   }, [tenantId, selectedOllamaModel]);
 
@@ -167,8 +183,8 @@ export function ChatConversation({
 
     let cancelled = false;
     setModelsStatus('loading');
-    const ls = typeof window !== 'undefined' ? window.localStorage : null;
-    const scopeKeyNow = `${tenantId ?? ''}::${studioContext?.project?.id ?? ''}`;
+    const ls = safeLocalStorage();
+    const scopeKeyNow = ollamaModelScopeKey(tenantId, studioContext?.project?.id);
 
     function applyErrorState() {
       setOllamaModels([]);
