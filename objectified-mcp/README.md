@@ -8,7 +8,7 @@ Use **[uv](https://docs.astral.sh/uv/)** with **Python ≥ 3.11**. Environment v
 
 ### Database
 
-The server needs PostgreSQL with the Objectified schema applied; startup fails if the pool cannot connect.
+The server needs PostgreSQL with the Objectified schema applied. Startup fails if the connection pool cannot open; a failed initial `SELECT 1` probe only logs a warning and the server continues.
 
 **Option A — Docker from the repository root** (Postgres + migrations only; does not start the MCP image):
 
@@ -22,7 +22,7 @@ With default **`docker-compose.yml`** credentials, set **`OBJECTIFIED_MCP_DATABA
 
 **Option B — Your own cluster** — use any migrated database URI in **`OBJECTIFIED_MCP_DATABASE_URL`**.
 
-### Install, env, and run (five commands)
+### Install, env, and run
 
 After the database is ready:
 
