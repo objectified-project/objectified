@@ -29,6 +29,7 @@ We continue to improve the platform based on your feedback with improvements and
 - MCP tool **`spec.get_openapi`** returns the generated **OpenAPI 3.1** document as JSON for a published revision UUID (same shape as REST **`GET /v1/schema/{tenant}/{project}/{version}`**): anonymous callers get **public** revisions only; with an MCP API key, **in-scope private** revisions are included; responses larger than **`OBJECTIFIED_MCP_OPENAPI_MAX_JSON_BYTES`** (default **2 MiB**) are rejected with an error described as **HTTP 413** (#3016).
 - MCP tool **`spec.export_yaml`** returns the same generated document as **`openapi_yaml`** YAML text (REST-aligned **`yaml.dump`** settings); visibility, auth, private access audit, and UTF-8 size cap match **`spec.get_openapi`** (#3017).
 - MCP tool **`spec.list_operations`** returns a compact **`[{path, method, operation_id, summary, tags}, …]`** index for a revision UUID (sorted by path then method), with the same visibility and auth rules as **`spec.get_openapi`**, without returning the full OpenAPI document; private reads are audited as **`spec.list_operations`** (#3018).
+- MCP tool **`spec.describe_operation`** returns **`parameters`** (merged path + operation), **`requestBody`**, **`responses`**, and **`security`** for a revision UUID and **`path`** / **`method`**; internal **`#/…`** **`$ref`** values are expanded; unknown paths or methods are **not-found**; visibility, auth, and private audit match **`spec.get_openapi`** (#3019).
 
 ## Importing
 - Race condition fixed in 3.0.1 specification imports
