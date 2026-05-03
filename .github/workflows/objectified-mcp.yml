@@ -5,10 +5,12 @@ on:
     branches: [ main, develop ]
     paths:
       - 'objectified-mcp/**'
+      - 'objectified-rest/**'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'objectified-mcp/**'
+      - 'objectified-rest/**'
   workflow_dispatch:
 
 jobs:

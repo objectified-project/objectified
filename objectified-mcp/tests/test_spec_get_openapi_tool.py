@@ -223,6 +223,84 @@ def test_build_spec_get_openapi_returns_valid_json_shape() -> None:
     assert "components" in parsed
 
 
+def test_build_spec_get_openapi_deny_all_raises_without_query() -> None:
+    pool = MagicMock(spec=AsyncConnectionPool)
+    pool.connection = MagicMock()
+
+    auth = McpAuthContext(
+        key_id="00000000-0000-4000-8000-000000000001",
+        tenant_id=str(uuid4()),
+        label="x",
+        scope=Scope(deny_all=True),
+    )
+
+    async def run() -> None:
+        await build_spec_get_openapi_response(pool, spec_id=str(uuid4()), auth_ctx=auth)
+
+    with pytest.raises(NotFoundError, match="Unknown or non-public"):
+        asyncio.run(run())
+    pool.connection.assert_not_called()
+
+
+def test_build_spec_get_openapi_authenticated_merged_sql() -> None:
+    sid = uuid4()
+    tid = uuid4()
+    auth = McpAuthContext(
+        key_id="00000000-0000-4000-8000-000000000002",
+        tenant_id=str(tid),
+        label="k",
+        scope=Scope(),
+    )
+    row = _openapi_row(spec_id=sid)
+    sample_spec = {
+        "openapi": "3.1.0",
+        "info": {"title": "x", "version": "1"},
+        "paths": {},
+        "components": {"schemas": {}},
+    }
+
+    pool = MagicMock(spec=AsyncConnectionPool)
+    describe_cur = MagicMock()
+    describe_cur.execute = AsyncMock()
+    describe_cur.fetchone = AsyncMock(return_value=row)
+    describe_cm = AsyncMock()
+    describe_cm.__aenter__.return_value = describe_cur
+    describe_cm.__aexit__.return_value = None
+    conn = MagicMock()
+    conn.cursor = MagicMock(return_value=describe_cm)
+    conn_cm = AsyncMock()
+    conn_cm.__aenter__.return_value = conn
+    conn_cm.__aexit__.return_value = None
+    pool.connection = MagicMock(return_value=conn_cm)
+
+    async def fake_fetch(_conn: object, _revision_id: UUID) -> tuple:
+        return ([], {}, [], [], [])
+
+    with (
+        patch("objectified_mcp.spec_get_openapi_tool.fetch_openapi_generation_inputs_async", side_effect=fake_fetch),
+        patch("objectified_mcp.spec_get_openapi_tool.generate_openapi_spec", return_value=sample_spec),
+        patch("objectified_mcp.spec_get_openapi_tool.get_settings") as gs,
+    ):
+        gs.return_value.openapi_max_json_bytes = 1_000_000
+
+        async def run() -> dict[str, object]:
+            return await build_spec_get_openapi_response(pool, spec_id=str(sid), auth_ctx=auth)
+
+        out = asyncio.run(run())
+
+    assert out == sample_spec
+
+    sql, params = describe_cur.execute.await_args.args
+    assert "UNION ALL" in sql
+    assert "mcp_v_public_specs" in sql
+    assert "visibility = 'private'" in sql
+    assert "spec_visibility" in sql
+    assert isinstance(params, tuple)
+    assert params[0] == sid
+    assert params[1] == sid
+    assert params[2] == str(auth.tenant_id)
+
+
 def test_spec_get_openapi_tool_registered_on_mcp() -> None:
     from objectified_mcp.server import mcp
 
