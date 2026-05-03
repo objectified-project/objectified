@@ -76,7 +76,7 @@ describe('createOllamaChatResponder', () => {
     expect(body.messages).toEqual([{ role: 'user', content: 'Hi' }]);
   });
 
-  it('invokes onStreamDelta with accumulated text for each content chunk', async () => {
+  it('invokes onStreamAccumulated with accumulated text for each content chunk', async () => {
     const deltas: string[] = [];
     global.fetch = jest.fn().mockResolvedValue(
       mockSseResponse([
@@ -93,7 +93,7 @@ describe('createOllamaChatResponder', () => {
       prompt: 'Hi',
       isRegenerate: false,
       ollamaModel: 'qwen2.5:latest',
-      onStreamDelta: (acc) => deltas.push(acc),
+      onStreamAccumulated: (acc) => deltas.push(acc),
     });
 
     expect(out).toBe('Hello world');

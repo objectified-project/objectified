@@ -682,6 +682,58 @@ describe('ChatConversation', () => {
     expect(onImportSpec.mock.calls[0][0].version).toBe('3.1.0');
   });
 
+  it('updates the pending bubble incrementally via onStreamAccumulated and commits the final reply (#520)', async () => {
+    let capturedStreamAccumulated: ((text: string) => void) | undefined;
+    let pendingResolve: ((text: string) => void) | null = null;
+
+    const streamingResponder: ChatSendFn = ({ onStreamAccumulated }) => {
+      capturedStreamAccumulated = onStreamAccumulated;
+      return new Promise<string>((resolve) => {
+        pendingResolve = resolve;
+      });
+    };
+
+    render(<ChatConversation onSendMessage={streamingResponder} />);
+
+    fireEvent.change(screen.getByTestId('studio-ai-chat-input'), { target: { value: 'stream me' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-send'));
+
+    // Pending bubble appears with the typing indicator (empty content)
+    await waitFor(() => {
+      expect(screen.getByTestId('studio-ai-chat-typing')).toBeInTheDocument();
+    });
+
+    // First streamed chunk — typing indicator gives way to partial content
+    await act(async () => {
+      capturedStreamAccumulated?.('Hello');
+    });
+    expect(screen.queryByTestId('studio-ai-chat-typing')).not.toBeInTheDocument();
+    const bubbleAfterFirstChunk = screen
+      .getAllByTestId('studio-ai-chat-bubble')
+      .find((b) => b.getAttribute('data-role') === 'assistant')!;
+    expect(bubbleAfterFirstChunk).toHaveTextContent('Hello');
+
+    // Second chunk replaces the accumulated text (not double-appended)
+    await act(async () => {
+      capturedStreamAccumulated?.('Hello world');
+    });
+    const bubbleAfterSecondChunk = screen
+      .getAllByTestId('studio-ai-chat-bubble')
+      .find((b) => b.getAttribute('data-role') === 'assistant')!;
+    expect(bubbleAfterSecondChunk).toHaveTextContent('Hello world');
+    expect(bubbleAfterSecondChunk).not.toHaveTextContent('Hello Hello world');
+
+    // Responder resolves — pending state clears and assistant actions appear
+    await act(async () => {
+      pendingResolve?.('Hello world!');
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId('studio-ai-chat-typing')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Hello world!')).toBeInTheDocument();
+    expect(screen.getByTestId('studio-ai-chat-regenerate')).toBeInTheDocument();
+  });
+
   describe('Ollama transport (#265)', () => {
     const originalFetch = global.fetch;
 

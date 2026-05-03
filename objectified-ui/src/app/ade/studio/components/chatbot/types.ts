@@ -44,15 +44,16 @@ export interface ChatSendContext {
    */
   ollamaModel?: string;
   /**
-   * Called as streamed assistant text grows (e.g. Ollama SSE). The shell passes this so the
-   * pending bubble updates live; responders that do not stream can ignore it (#520).
+   * Called as streamed assistant text grows (e.g. Ollama SSE). Receives the full
+   * accumulated markdown seen so far — NOT the latest delta chunk. The shell passes
+   * this so the pending bubble updates live; responders that do not stream can ignore it (#520).
    */
-  onStreamDelta?: (accumulatedMarkdown: string) => void;
+  onStreamAccumulated?: (accumulatedMarkdown: string) => void;
 }
 
 /**
  * Adapter the chat shell calls when the user submits or regenerates. Returns
- * the assistant's full markdown reply. When the shell supplies `onStreamDelta`,
+ * the assistant's full markdown reply. When the shell supplies `onStreamAccumulated`,
  * streaming responders should invoke it as content arrives; the shell still uses
  * the resolved return value as the final assistant text.
  */

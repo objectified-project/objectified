@@ -3,7 +3,7 @@
  *
  * Posts to `/api/ollama/chat` with the model from context, maps the transcript
  * to Ollama message shape, injects Studio context into the latest user turn,
- * and reads the SSE stream. When `onStreamDelta` is set on the context (#520),
+ * and reads the SSE stream. When `onStreamAccumulated` is set on the context (#520),
  * each chunk is forwarded so the UI can render incrementally; the returned
  * string is still the full accumulated markdown.
  */
@@ -36,7 +36,7 @@ export function createOllamaChatResponder(): ChatSendFn {
       throw new Error(detail || `Chat request failed (${response.status})`);
     }
 
-    const text = await accumulateOllamaSseFromResponse(response, ctx.onStreamDelta);
+    const text = await accumulateOllamaSseFromResponse(response, ctx.onStreamAccumulated);
     return text.trim().length > 0 ? text : 'The model returned an empty reply.';
   };
 }
