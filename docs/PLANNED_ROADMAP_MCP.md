@@ -120,7 +120,7 @@ process or via Docker.
 | 5.1 | ~~[#3016](../../issues/3016)~~ | ~~Tool `spec.get_openapi` (JSON)~~ (**completed**) | 3.1, 4.1 |
 | 5.2 | ~~[#3017](../../issues/3017)~~ | ~~Tool `spec.export_yaml`~~ (**completed**) | 5.1 |
 | 5.3 | ~~[#3018](../../issues/3018)~~ | ~~Tool `spec.list_operations`~~ (**completed**) | 5.1 |
-| 5.4 | [#3019](../../issues/3019) | Tool `spec.describe_operation` | 5.3 |
+| 5.4 | ~~[#3019](../../issues/3019)~~ | ~~Tool `spec.describe_operation`~~ (**completed**) | 5.3 |
 | 5.5 | [#3020](../../issues/3020) | Tool `spec.list_components` | 5.1 |
 | 5.6 | [#3021](../../issues/3021) | Tool `spec.describe_component` | 5.5 |
 

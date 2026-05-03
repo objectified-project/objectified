@@ -17,6 +17,7 @@ from objectified_mcp.logging_config import configure_logging
 from objectified_mcp.mcp_auth import McpAuthContext, require_mcp_auth, resolve_optional_mcp_auth
 from objectified_mcp.ping_tool import build_ping_response
 from objectified_mcp.settings import get_settings
+from objectified_mcp.spec_describe_operation_tool import build_spec_describe_operation_response
 from objectified_mcp.spec_describe_tool import build_spec_describe_response
 from objectified_mcp.spec_export_yaml_tool import build_spec_export_yaml_response
 from objectified_mcp.spec_get_openapi_tool import build_spec_get_openapi_response
@@ -201,6 +202,34 @@ async def spec_list_operations(
     pool = get_db_pool(ctx)
     auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
     return await build_spec_list_operations_response(pool, spec_id=spec_id, auth_ctx=auth_ctx)
+
+
+@mcp.tool(
+    name="spec.describe_operation",
+    description=(
+        "Return OpenAPI fragments for one HTTP operation on a published spec revision: ``parameters`` "
+        "(path-item + operation merge, operation wins same name/in), ``requestBody``, ``responses``, "
+        "and ``security`` (operation override or document default). Internal ``#/…`` ``$ref`` values "
+        "are expanded; external refs are left as-is. Same visibility and auth rules as "
+        "spec.get_openapi (#3019). Raises not-found for inaccessible revisions or unknown path/method."
+    ),
+)
+async def spec_describe_operation(
+    ctx: Context,
+    spec_id: str,
+    path: str,
+    method: str,
+    headers: dict[str, str] = CurrentHeaders(),
+) -> dict[str, Any]:
+    pool = get_db_pool(ctx)
+    auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
+    return await build_spec_describe_operation_response(
+        pool,
+        spec_id=spec_id,
+        path=path,
+        method=method,
+        auth_ctx=auth_ctx,
+    )
 
 
 @mcp.tool(
