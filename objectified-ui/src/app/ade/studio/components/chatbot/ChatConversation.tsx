@@ -131,15 +131,17 @@ export function ChatConversation({
     let cancelled = false;
     setModelsStatus('loading');
 
+    function applyErrorState() {
+      setOllamaModels([]);
+      setSelectedOllamaModel('');
+      setModelsStatus('error');
+    }
+
     async function loadModels() {
       try {
         const res = await fetch('/api/ollama/models');
         if (!res.ok) {
-          if (!cancelled) {
-            setOllamaModels([]);
-            setSelectedOllamaModel('');
-            setModelsStatus('error');
-          }
+          if (!cancelled) applyErrorState();
           return;
         }
         const data = (await res.json()) as {
@@ -148,9 +150,7 @@ export function ChatConversation({
         };
         if (cancelled) return;
         if (data.success === false) {
-          setOllamaModels([]);
-          setSelectedOllamaModel('');
-          setModelsStatus('error');
+          applyErrorState();
         } else if (data.success && Array.isArray(data.models) && data.models.length > 0) {
           setOllamaModels(data.models);
           setSelectedOllamaModel((prev) => {
@@ -165,11 +165,7 @@ export function ChatConversation({
           setModelsStatus('empty');
         }
       } catch {
-        if (!cancelled) {
-          setOllamaModels([]);
-          setSelectedOllamaModel('');
-          setModelsStatus('error');
-        }
+        if (!cancelled) applyErrorState();
       }
     }
 
