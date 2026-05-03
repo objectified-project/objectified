@@ -26,5 +26,5 @@ ENV PATH="/opt/sem/bin:${PATH}"
 WORKDIR /app
 COPY scripts/ /app/scripts/
 
-# Run sem-apply with URL from POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_PORT
-ENTRYPOINT ["/bin/sh", "-c", "sem-apply --url \"postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/\""]
+# Run sem-apply with URL from POSTGRES_* (database name defaults to objectified)
+ENTRYPOINT ["/bin/sh", "-c", "sem-apply --url \"postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB:-objectified}\""]

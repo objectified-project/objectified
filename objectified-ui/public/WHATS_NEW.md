@@ -6,6 +6,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## MCP
 
+- Root **`docker-compose.yml`** spins up **Postgres 16** (named volume **`objectified_postgres_data`**), a one-shot **`migrate`** image (**`objectified-db`** / schema-evolution-manager), and **`mcp`** (HTTP on **`8765`** by default); use **`docker compose up --build --wait`** from the repo root. Env overrides: **`docker-compose.env.example`** (#3024).
 - Multi-stage **`objectified-mcp/Dockerfile`** (uv builder + slim runtime, non-root user, **`GET /health`** liveness + **`HEALTHCHECK`**) — build from repo root: **`docker build -f objectified-mcp/Dockerfile .`** (#3023).
 - New `objectified-mcp` Python package (FastMCP, uv, ruff, mypy) as the foundation for the Model Context Protocol server.
 - MCP server loads typed configuration from the environment via pydantic-settings (`objectified-mcp serve`); **`objectified-mcp serve --transport stdio`** runs the FastMCP stdio transport for Claude Desktop and similar hosts; **`objectified-mcp serve --transport http`** exposes streamable HTTP at **`/mcp`** with configurable **`--host`** / **`--port`** (or env defaults); see `objectified-mcp/.env.example`.
