@@ -19,6 +19,12 @@ import {
   type StoredConversationScope,
 } from './conversation-store';
 import { createDemoChatResponder } from './demo-responder';
+import {
+  ollamaModelScopeKey,
+  persistOllamaModelChoiceForScope,
+  persistOllamaModelTenantDefault,
+  resolvePreferredOllamaModel,
+} from './ollama-model-defaults';
 import { createOllamaChatResponder } from './ollama-chat-responder';
 import type { DetectedOpenApiSpec } from './openapi-detection';
 import type { ChatFeedback, ChatMessage, ChatSendFn } from './types';
@@ -43,6 +49,9 @@ import type { ChatFeedback, ChatMessage, ChatSendFn } from './types';
  *   - With `ollamaTransport` (#265), lists generative models from Ollama and
  *     sends turns through `/api/ollama/chat`; falls back to the demo when the
  *     server has no models or the list request fails.
+ *   - With `tenantId` + `studioContext.project` (#266), the chosen model is
+ *     remembered per project (and optionally per tenant) in localStorage so
+ *     each workspace reopens on its preferred tag when Ollama still exposes it.
  */
 export interface ChatConversationProps {
   /** Adapter invoked to produce assistant replies. Defaults to the demo responder. */
@@ -87,6 +96,11 @@ export interface ChatConversationProps {
    * Ollama chat route. Ignored when `onSendMessage` is provided.
    */
   ollamaTransport?: boolean;
+  /**
+   * Current tenant id from the signed-in session (#266). With `studioContext.project`,
+   * model choice is persisted per project; with tenant alone, per tenant.
+   */
+  tenantId?: string | null;
 }
 
 const PROMPT_SUGGESTIONS: readonly string[] = [
@@ -94,6 +108,20 @@ const PROMPT_SUGGESTIONS: readonly string[] = [
   'Generate an OpenAPI spec for a small catalog API',
   'How would I model a multi-tenant audit log?',
 ];
+
+/**
+ * Safe accessor for `window.localStorage` that returns `null` instead of
+ * throwing when the storage is unavailable (e.g. `SecurityError` in
+ * privacy-restricted browser contexts). Preferences are best-effort.
+ */
+function safeLocalStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 export function ChatConversation({
   onSendMessage,
@@ -106,6 +134,7 @@ export function ChatConversation({
   confirmAction,
   onExportConversation,
   ollamaTransport = false,
+  tenantId,
 }: ChatConversationProps) {
   type OllamaModelRow = { name: string };
   type ModelsStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
@@ -116,12 +145,36 @@ export function ChatConversation({
     ollamaTransport ? 'loading' : 'idle',
   );
   const [modelsRetryToken, bumpModelsRetry] = React.useReducer((n: number) => n + 1, 0);
+  const ollamaModelScopeKeyRef = React.useRef<string | null>(null);
 
   const demoResponder = React.useMemo(() => createDemoChatResponder(), []);
   const ollamaResponder = React.useMemo(() => createOllamaChatResponder(), []);
 
+  const handleSelectOllamaModel = React.useCallback(
+    (name: string) => {
+      const normalized = name.trim();
+      setSelectedOllamaModel(normalized);
+      persistOllamaModelChoiceForScope({
+        tenantId: tenantId ?? null,
+        projectId: studioContext?.project?.id ?? null,
+        modelName: normalized,
+        storage: safeLocalStorage(),
+      });
+    },
+    [tenantId, studioContext?.project?.id],
+  );
+
+  const handlePersistTenantOllamaDefault = React.useCallback(() => {
+    persistOllamaModelTenantDefault({
+      tenantId: tenantId ?? null,
+      modelName: selectedOllamaModel,
+      storage: safeLocalStorage(),
+    });
+  }, [tenantId, selectedOllamaModel]);
+
   React.useEffect(() => {
     if (!ollamaTransport) {
+      ollamaModelScopeKeyRef.current = null;
       setModelsStatus('idle');
       setOllamaModels([]);
       setSelectedOllamaModel('');
@@ -130,6 +183,8 @@ export function ChatConversation({
 
     let cancelled = false;
     setModelsStatus('loading');
+    const ls = safeLocalStorage();
+    const scopeKeyNow = ollamaModelScopeKey(tenantId, studioContext?.project?.id);
 
     function applyErrorState() {
       setOllamaModels([]);
@@ -155,8 +210,16 @@ export function ChatConversation({
           setOllamaModels(data.models);
           setSelectedOllamaModel((prev) => {
             const names = data.models!.map((m) => m.name);
-            if (prev && names.includes(prev)) return prev;
-            return data.models![0].name;
+            const prevScope = ollamaModelScopeKeyRef.current;
+            ollamaModelScopeKeyRef.current = scopeKeyNow;
+            const scopeUnchanged = prevScope === scopeKeyNow;
+            if (scopeUnchanged && prev && names.includes(prev)) return prev;
+            return resolvePreferredOllamaModel({
+              tenantId: tenantId ?? null,
+              projectId: studioContext?.project?.id ?? null,
+              availableModelNames: names,
+              storage: ls,
+            });
           });
           setModelsStatus('ready');
         } else {
@@ -173,7 +236,12 @@ export function ChatConversation({
     return () => {
       cancelled = true;
     };
-  }, [ollamaTransport, modelsRetryToken]);
+  }, [
+    ollamaTransport,
+    modelsRetryToken,
+    tenantId,
+    studioContext?.project?.id,
+  ]);
 
   const useLiveOllama =
     ollamaTransport && modelsStatus === 'ready' && ollamaModels.length > 0 && selectedOllamaModel.length > 0;
@@ -471,8 +539,10 @@ export function ChatConversation({
           status={ollamaTransport && modelsStatus === 'idle' ? 'loading' : modelsStatus}
           models={ollamaModels}
           selectedModel={selectedOllamaModel}
-          onSelectModel={setSelectedOllamaModel}
+          onSelectModel={handleSelectOllamaModel}
           onRetry={bumpModelsRetry}
+          showTenantDefaultButton={Boolean(tenantId && studioContext?.project?.id)}
+          onPersistTenantDefault={handlePersistTenantOllamaDefault}
         />
       )}
       <ChatToolbar
@@ -541,6 +611,8 @@ interface OllamaModelBarProps {
   selectedModel: string;
   onSelectModel: (name: string) => void;
   onRetry: () => void;
+  showTenantDefaultButton?: boolean;
+  onPersistTenantDefault?: () => void;
 }
 
 function OllamaModelBar({
@@ -549,6 +621,8 @@ function OllamaModelBar({
   selectedModel,
   onSelectModel,
   onRetry,
+  showTenantDefaultButton,
+  onPersistTenantDefault,
 }: OllamaModelBarProps) {
   if (status === 'idle') return null;
 
@@ -586,21 +660,34 @@ function OllamaModelBar({
         </span>
       )}
       {status === 'ready' && (
-        <label className="flex flex-wrap items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-          <span className="font-medium text-gray-600 dark:text-gray-400">Model</span>
-          <select
-            data-testid="studio-ai-chat-ollama-model-select"
-            className="max-w-[min(100%,18rem)] rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-            value={selectedModel}
-            onChange={(e) => onSelectModel(e.target.value)}
-          >
-            {models.map((m) => (
-              <option key={m.name} value={m.name}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex flex-wrap items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+            <span className="font-medium text-gray-600 dark:text-gray-400">Model</span>
+            <select
+              data-testid="studio-ai-chat-ollama-model-select"
+              className="max-w-[min(100%,18rem)] rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              value={selectedModel}
+              onChange={(e) => onSelectModel(e.target.value)}
+            >
+              {models.map((m) => (
+                <option key={m.name} value={m.name}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {showTenantDefaultButton && onPersistTenantDefault && (
+            <button
+              type="button"
+              data-testid="studio-ai-chat-ollama-tenant-default"
+              title="Remember this model as the default for every project in this tenant (project-specific defaults still win when set)."
+              onClick={onPersistTenantDefault}
+              className="inline-flex h-7 items-center rounded-md border border-gray-300 bg-white px-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              Tenant default
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
