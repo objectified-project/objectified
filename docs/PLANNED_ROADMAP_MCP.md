@@ -122,7 +122,7 @@ process or via Docker.
 | 5.3 | ~~[#3018](../../issues/3018)~~ | ~~Tool `spec.list_operations`~~ (**completed**) | 5.1 |
 | 5.4 | ~~[#3019](../../issues/3019)~~ | ~~Tool `spec.describe_operation`~~ (**completed**) | 5.3 |
 | 5.5 | ~~[#3020](../../issues/3020)~~ | ~~Tool `spec.list_components`~~ (**completed**) | 5.1 |
-| 5.6 | [#3021](../../issues/3021) | Tool `spec.describe_component` | 5.5 |
+| 5.6 | ~~[#3021](../../issues/3021)~~ | ~~Tool `spec.describe_component`~~ (**completed**) | 5.5 |
 
 #### E6 — Packaging & Hosting (#3022)
 

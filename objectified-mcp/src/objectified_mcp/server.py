@@ -17,6 +17,7 @@ from objectified_mcp.logging_config import configure_logging
 from objectified_mcp.mcp_auth import McpAuthContext, require_mcp_auth, resolve_optional_mcp_auth
 from objectified_mcp.ping_tool import build_ping_response
 from objectified_mcp.settings import get_settings
+from objectified_mcp.spec_describe_component_tool import build_spec_describe_component_response
 from objectified_mcp.spec_describe_operation_tool import build_spec_describe_operation_response
 from objectified_mcp.spec_describe_tool import build_spec_describe_response
 from objectified_mcp.spec_export_yaml_tool import build_spec_export_yaml_response
@@ -222,6 +223,34 @@ async def spec_list_components(
     pool = get_db_pool(ctx)
     auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
     return await build_spec_list_components_response(pool, spec_id=spec_id, auth_ctx=auth_ctx)
+
+
+@mcp.tool(
+    name="spec.describe_component",
+    description=(
+        "Return one OpenAPI component definition for a published spec revision by id (UUID): ``kind`` is "
+        "schemas, parameters, responses, or securitySchemes (same grouping as spec.list_components); ``name`` "
+        "is the component key in that section. Internal ``#/…`` ``$ref`` values are expanded; external refs "
+        "are left as-is. Same visibility and auth rules as spec.get_openapi (#3021). Raises not-found for "
+        "inaccessible revisions or unknown kind/name."
+    ),
+)
+async def spec_describe_component(
+    ctx: Context,
+    spec_id: str,
+    kind: str,
+    name: str,
+    headers: dict[str, str] = CurrentHeaders(),
+) -> Any:
+    pool = get_db_pool(ctx)
+    auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
+    return await build_spec_describe_component_response(
+        pool,
+        spec_id=spec_id,
+        kind=kind,
+        name=name,
+        auth_ctx=auth_ctx,
+    )
 
 
 @mcp.tool(

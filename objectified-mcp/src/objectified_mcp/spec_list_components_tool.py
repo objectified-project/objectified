@@ -9,8 +9,8 @@ from psycopg_pool import AsyncConnectionPool
 from objectified_mcp.mcp_auth import McpAuthContext
 from objectified_mcp.spec_get_openapi_tool import build_spec_get_openapi_response
 
-# OpenAPI ``components`` kinds callers care about (subset of the spec).
-_COMPONENT_KINDS = ("schemas", "parameters", "responses", "securitySchemes")
+# OpenAPI ``components`` kinds exposed by MCP list/describe tools (subset of the spec).
+MCP_COMPONENT_KINDS: tuple[str, ...] = ("schemas", "parameters", "responses", "securitySchemes")
 
 
 def grouped_components_from_openapi(spec: dict[str, Any]) -> dict[str, list[str]]:
@@ -20,7 +20,7 @@ def grouped_components_from_openapi(spec: dict[str, Any]) -> dict[str, list[str]
         return {}
 
     out: dict[str, list[str]] = {}
-    for kind in _COMPONENT_KINDS:
+    for kind in MCP_COMPONENT_KINDS:
         section = components_raw.get(kind)
         if not isinstance(section, dict) or not section:
             continue
