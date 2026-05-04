@@ -26,6 +26,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Studio AI chat shows live token usage (estimated while streaming, then Ollama-reported counts when each reply finishes).
 - Studio AI chat includes **Stop** while a reply is generating so you can cancel mid-stream; partial text is kept when the model had already streamed content.
 - Studio AI chat shows an indeterminate progress bar while the assistant is generating a reply.
+- Identical Ollama chat requests are served from an in-memory exact-match cache when a prior reply completed successfully, reducing load on your model server (disable with `OLLAMA_CHAT_CACHE_DISABLED`).
 
 ---
 
