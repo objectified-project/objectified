@@ -8,6 +8,7 @@ const EMBEDDING_DIMENSIONS = 2000; // pgvector HNSW index max
 
 export interface EmbeddingOptions {
   dimensions?: number;
+  signal?: AbortSignal;
 }
 
 /**
@@ -22,6 +23,7 @@ export async function getEmbedding(
 ): Promise<number[] | null> {
   const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
   const dimensions = options.dimensions ?? EMBEDDING_DIMENSIONS;
+  const { signal } = options;
 
   try {
     const res = await fetch(`${baseUrl}/api/embed`, {
@@ -33,6 +35,7 @@ export async function getEmbedding(
         dimensions,
         truncate: true,
       }),
+      signal,
     });
 
     if (!res.ok) {
@@ -49,6 +52,8 @@ export async function getEmbedding(
 
     return vectors[0];
   } catch (err) {
+    // AbortErrors are expected when the request is cancelled; don't log them as errors.
+    if (err instanceof Error && err.name === 'AbortError') return null;
     console.error('[embedding] Ollama request error:', err);
     return null;
   }

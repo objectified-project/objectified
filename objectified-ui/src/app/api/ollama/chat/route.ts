@@ -3,10 +3,17 @@
  */
 
 import { NextRequest } from 'next/server';
+import { getEmbedding } from '@lib/embedding';
 import { isAbortError } from '../../../ade/studio/components/chatbot/abort-errors';
 import {
+  findSemanticallySimilarCachedResponse,
   getCachedOllamaChatResponse,
+  isOllamaQueryCacheDisabled,
+  isOllamaSemanticCacheDisabled,
   ollamaChatCacheKey,
+  ollamaChatMessagesFingerprint,
+  ollamaChatSemanticContextKey,
+  ollamaSemanticCacheThreshold,
   setCachedOllamaChatResponse,
 } from './query-cache';
 
@@ -103,7 +110,7 @@ function buildDataQuerySystem(options: { tableNames?: string[]; currentTableName
 
 export async function POST(request: NextRequest) {
   try {
-    const { model, messages, task, existingClassNames, existingProperties, tableNames, currentTableName } = await request.json();
+    const { model, messages, task, existingClassNames, existingProperties, tableNames, currentTableName, versionId } = await request.json();
 
     if (typeof model !== 'string' || !model.trim() || !messages || !Array.isArray(messages)) {
       return new Response(
@@ -188,7 +195,18 @@ commentary, or thinking output.`;
       existingProperties: isClassSkeleton ? existingProperties : undefined,
       tableNames: isDataQuery ? tableNames : undefined,
       currentTableName: isDataQuery ? currentTableName : undefined,
+      versionId: typeof versionId === 'string' ? versionId : undefined,
       messages,
+    });
+
+    const semanticContextKey = ollamaChatSemanticContextKey({
+      model: typeof model === 'string' ? model : '',
+      task: typeof task === 'string' ? task : undefined,
+      existingClassNames: isClassSkeleton ? existingClassNames : undefined,
+      existingProperties: isClassSkeleton ? existingProperties : undefined,
+      tableNames: isDataQuery ? tableNames : undefined,
+      currentTableName: isDataQuery ? currentTableName : undefined,
+      versionId: typeof versionId === 'string' ? versionId : undefined,
     });
 
     const cached = getCachedOllamaChatResponse(cacheKey);
@@ -215,6 +233,55 @@ commentary, or thinking output.`;
           'X-Ollama-Chat-Cache': 'HIT',
         },
       });
+    }
+
+    let messagesEmbedding: number[] | null = null;
+    if (!isOllamaQueryCacheDisabled() && !isOllamaSemanticCacheDisabled()) {
+      messagesEmbedding = await getEmbedding(ollamaChatMessagesFingerprint(messages), {
+        signal: request.signal,
+      });
+      if (request.signal.aborted) {
+        return new Response(null, { status: 499 });
+      }
+    }
+
+    if (messagesEmbedding) {
+      const semanticHit = findSemanticallySimilarCachedResponse({
+        semanticContextKey,
+        embedding: messagesEmbedding,
+        threshold: ollamaSemanticCacheThreshold(),
+      });
+      if (semanticHit) {
+        const { entry: similar } = semanticHit;
+        // Promote into exact cache so repeated identical prompts skip the embed roundtrip.
+        setCachedOllamaChatResponse(cacheKey, {
+          text: similar.text,
+          semanticContextKey,
+          embedding: messagesEmbedding,
+        });
+        const encoder = new TextEncoder();
+        const hitStream = new ReadableStream({
+          start(controller) {
+            if (request.signal.aborted) {
+              controller.close();
+              return;
+            }
+            // Do not forward usage: those token counts belong to the original request.
+            const event: Record<string, unknown> = { done: true, content: similar.text };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            controller.close();
+          },
+        });
+        return new Response(hitStream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive',
+            'X-Ollama-Chat-Cache': 'HIT-SEMANTIC',
+          },
+        });
+      }
     }
 
     // Make request to Ollama with streaming
@@ -300,7 +367,15 @@ commentary, or thinking output.`;
           if (request.signal.aborted || closed) return;
           if (!sawOllamaDone) return;
           if (fullAssistant.trim().length === 0) return;
-          setCachedOllamaChatResponse(cacheKey, { text: fullAssistant, usage: lastUsage });
+          const semanticMeta =
+            messagesEmbedding && !isOllamaSemanticCacheDisabled()
+              ? { semanticContextKey, embedding: messagesEmbedding }
+              : {};
+          setCachedOllamaChatResponse(cacheKey, {
+            text: fullAssistant,
+            usage: lastUsage,
+            ...semanticMeta,
+          });
         }
 
         try {
