@@ -17,14 +17,14 @@ function maxEntries(): number {
   const raw = process.env.OLLAMA_CHAT_CACHE_MAX_ENTRIES;
   if (!raw) return DEFAULT_MAX_ENTRIES;
   const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? Math.min(n, 10_000) : DEFAULT_MAX_ENTRIES;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 1_000) : DEFAULT_MAX_ENTRIES;
 }
 
 function maxTextChars(): number {
   const raw = process.env.OLLAMA_CHAT_CACHE_MAX_RESPONSE_CHARS;
   if (!raw) return DEFAULT_MAX_TEXT_CHARS;
   const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? Math.min(n, 2_000_000) : DEFAULT_MAX_TEXT_CHARS;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 500_000) : DEFAULT_MAX_TEXT_CHARS;
 }
 
 export function isOllamaQueryCacheDisabled(): boolean {
@@ -72,31 +72,27 @@ export function ollamaChatCacheKey(input: OllamaChatCacheKeyInput): string {
 
 class LruMap {
   private readonly map = new Map<string, OllamaChatCacheEntry>();
-  private readonly order: string[] = [];
 
   constructor(private readonly limit: number) {}
 
   get(key: string): OllamaChatCacheEntry | undefined {
     const entry = this.map.get(key);
     if (!entry) return undefined;
-    const i = this.order.indexOf(key);
-    if (i >= 0) {
-      this.order.splice(i, 1);
-      this.order.push(key);
-    }
+    // Refresh insertion order so this key sorts as most-recently-used.
+    this.map.delete(key);
+    this.map.set(key, entry);
     return entry;
   }
 
   set(key: string, value: OllamaChatCacheEntry): void {
     if (this.map.has(key)) {
-      const i = this.order.indexOf(key);
-      if (i >= 0) this.order.splice(i, 1);
-    } else if (this.order.length >= this.limit) {
-      const oldest = this.order.shift();
-      if (oldest) this.map.delete(oldest);
+      this.map.delete(key);
+    } else if (this.map.size >= this.limit) {
+      // The first key in a Map is the oldest (least-recently-used).
+      const oldest = this.map.keys().next().value;
+      if (oldest !== undefined) this.map.delete(oldest);
     }
     this.map.set(key, value);
-    this.order.push(key);
   }
 }
 

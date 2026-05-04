@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
   try {
     const { model, messages, task, existingClassNames, existingProperties, tableNames, currentTableName } = await request.json();
 
-    if (!model || !messages || !Array.isArray(messages)) {
+    if (typeof model !== 'string' || !model.trim() || !messages || !Array.isArray(messages)) {
       return new Response(
         JSON.stringify({ error: 'Invalid request: model and messages are required' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -282,12 +282,18 @@ commentary, or thinking output.`;
         let lastUsage: { promptTokens?: number; completionTokens?: number } | undefined;
         let sawOllamaDone = false;
 
-        function ingestAssistantPayload(data: Record<string, unknown>): void {
-          const piece = pickAssistantContent(data);
-          if (piece) fullAssistant += piece;
+        function ingestAssistantPayload(data: Record<string, unknown>): {
+          content: string | undefined;
+          usage: { promptTokens?: number; completionTokens?: number } | undefined;
+          done: boolean;
+        } {
+          const content = pickAssistantContent(data);
           const usage = usageFromOllamaPayload(data);
+          const done = Boolean(data.done);
+          if (content) fullAssistant += content;
           if (usage) lastUsage = usage;
-          if (Boolean(data.done)) sawOllamaDone = true;
+          if (done) sawOllamaDone = true;
+          return { content, usage, done };
         }
 
         function tryStoreCache(): void {
@@ -306,10 +312,7 @@ commentary, or thinking output.`;
               if (buffer.trim() && !closed) {
                 try {
                   const data = JSON.parse(buffer) as Record<string, unknown>;
-                  ingestAssistantPayload(data);
-                  const content = pickAssistantContent(data);
-                  const usage = usageFromOllamaPayload(data);
-                  const isDone = Boolean(data.done);
+                  const { content, usage, done: isDone } = ingestAssistantPayload(data);
                   if (content || usage) {
                     const event: Record<string, unknown> = { done: isDone };
                     if (content) event.content = content;
@@ -345,10 +348,7 @@ commentary, or thinking output.`;
 
               try {
                 const data = JSON.parse(line) as Record<string, unknown>;
-                ingestAssistantPayload(data);
-                const content = pickAssistantContent(data);
-                const usage = usageFromOllamaPayload(data);
-                const isDone = Boolean(data.done);
+                const { content, usage, done: isDone } = ingestAssistantPayload(data);
 
                 if (content || usage) {
                   const event: Record<string, unknown> = { done: isDone };
