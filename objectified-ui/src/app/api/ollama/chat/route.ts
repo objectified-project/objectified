@@ -3,6 +3,7 @@
  */
 
 import { NextRequest } from 'next/server';
+import { isAbortError } from '../../ade/studio/components/chatbot/abort-errors';
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 
@@ -312,11 +313,7 @@ commentary, or thinking output.`;
           }
         } catch (error) {
           if (!closed) {
-            const isAbort =
-              (error instanceof DOMException && error.name === 'AbortError') ||
-              (typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError') ||
-              request.signal.aborted;
-            if (!isAbort) {
+            if (!isAbortError(error, request.signal)) {
               console.error('Error reading stream:', error);
             }
             try {
@@ -339,11 +336,7 @@ commentary, or thinking output.`;
     });
   } catch (error: unknown) {
     // AbortError is normal (client disconnected or user clicked Stop) — don't log or 500.
-    const isAbort =
-      (error instanceof DOMException && error.name === 'AbortError') ||
-      (typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError') ||
-      request.signal.aborted;
-    if (isAbort) {
+    if (isAbortError(error, request.signal)) {
       return new Response(null, { status: 499 });
     }
     console.error('Error in Ollama chat:', error);
