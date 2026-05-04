@@ -20,7 +20,7 @@ import type { ChatFeedback, ChatMessage } from './types';
  *     component, with the chat-specific `<ChatCodeBlock>` for fences
  *   - assistant messages expose Regenerate and thumbs up/down feedback
  *   - assistant messages with a recognizably-OpenAPI ```json``` block expose
- *     a one-click Import button
+ *     a **Preview changes** button (#519) that opens the import preview flow in the shell
  */
 export interface ChatBubbleProps {
   message: ChatMessage;
@@ -28,7 +28,7 @@ export interface ChatBubbleProps {
   isLatestAssistant?: boolean;
   onRegenerate?: () => void;
   onFeedback?: (feedback: ChatFeedback) => void;
-  /** Receives the raw JSON of the spec the user chose to import. */
+  /** When the user previews an import from a ```json``` OpenAPI block (apply is confirmed in the shell). */
   onImportSpec?: (spec: DetectedOpenApiSpec) => void;
 }
 
@@ -162,7 +162,7 @@ function AssistantActions({
             className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 dark:border-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 dark:hover:bg-indigo-900/60"
           >
             <Download className="h-3.5 w-3.5" />
-            {specs.length > 1 ? `Import spec ${index + 1}` : 'Import OpenAPI spec'}
+            {specs.length > 1 ? `Preview changes (${index + 1})` : 'Preview changes'}
           </button>
         ))}
     </div>

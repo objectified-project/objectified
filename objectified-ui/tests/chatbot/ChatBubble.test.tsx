@@ -102,7 +102,7 @@ describe('ChatBubble', () => {
     const onImportSpec = jest.fn();
     render(<ChatBubble message={specMessage} onImportSpec={onImportSpec} />);
     const importButton = screen.getByTestId('studio-ai-chat-import-spec-0');
-    expect(importButton).toHaveTextContent(/Import OpenAPI spec/i);
+    expect(importButton).toHaveTextContent(/Preview changes/i);
     fireEvent.click(importButton);
     expect(onImportSpec).toHaveBeenCalledTimes(1);
     expect(onImportSpec.mock.calls[0][0].version).toBe('3.1.0');

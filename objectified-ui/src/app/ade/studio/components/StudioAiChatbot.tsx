@@ -177,8 +177,8 @@ function ChatbotPanel({ mode, onModeChange, onClose, studioContext, tenantId }: 
   const toggleFullscreen = () =>
     onModeChange(isFullscreen ? 'slide' : 'fullscreen');
 
-  // Until project-aware import lands in a follow-up, surface the detected
-  // spec via a toast so reviewers see the affordance fire end-to-end.
+  // Import is previewed in the chat shell (#519) before this runs; until
+  // project-aware import lands in a follow-up, surface the detected spec via a toast.
   const handleImportSpec = React.useCallback((spec: DetectedOpenApiSpec) => {
     const title = (spec.spec.info as { title?: string } | undefined)?.title ?? 'OpenAPI spec';
     toast.success(`Ready to import: ${title}`, {
