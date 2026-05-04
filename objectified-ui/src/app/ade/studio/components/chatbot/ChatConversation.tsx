@@ -27,6 +27,7 @@ import {
   resolvePreferredOllamaModel,
 } from './ollama-model-defaults';
 import { createOllamaChatResponder } from './ollama-chat-responder';
+import { AiImportPreviewDialog } from './AiImportPreviewDialog';
 import type { DetectedOpenApiSpec } from './openapi-detection';
 import type { ChatFeedback, ChatMessage, ChatSendFn, ChatStreamAccumulatedMeta } from './types';
 import { isAbortError } from './abort-errors';
@@ -55,6 +56,8 @@ import { isAbortError } from './abort-errors';
  *     streaming and replaces them with measured counts when the model finishes.
  *   - While a turn is in flight (#523), an indeterminate progress bar appears under
  *     the toolbar so generation is obvious before and during streamed tokens.
+ *   - OpenAPI import from chat (#519): **Preview changes** opens a modal with a formatted
+ *     spec and summary; **Apply import** invokes `onImportSpec` so nothing applies without confirmation.
  *   - The composer can **Stop** an in-flight turn (#522): `AbortSignal` is passed to
  *     the responder so streaming fetch/SSE readers unwind and partial text is kept.
  *   - With `tenantId` + `studioContext.project` (#266), the chosen model is
@@ -64,7 +67,7 @@ import { isAbortError } from './abort-errors';
 export interface ChatConversationProps {
   /** Adapter invoked to produce assistant replies. Defaults to the demo responder. */
   onSendMessage?: ChatSendFn;
-  /** Called when the user clicks "Import OpenAPI spec" on a message. */
+  /** Called after the user confirms **Apply import** in the OpenAPI preview dialog (#519). */
   onImportSpec?: (spec: DetectedOpenApiSpec) => void;
   /** Optional starter messages — useful for tests and previews. */
   initialMessages?: ChatMessage[];
@@ -154,6 +157,7 @@ export function ChatConversation({
   );
   const [modelsRetryToken, bumpModelsRetry] = React.useReducer((n: number) => n + 1, 0);
   const ollamaModelScopeKeyRef = React.useRef<string | null>(null);
+  const [openapiImportPreview, setOpenapiImportPreview] = React.useState<DetectedOpenApiSpec | null>(null);
 
   const demoResponder = React.useMemo(() => createDemoChatResponder(), []);
   const ollamaResponder = React.useMemo(() => createOllamaChatResponder(), []);
@@ -490,6 +494,29 @@ export function ChatConversation({
     []
   );
 
+  const isApplyingSpecRef = React.useRef(false);
+
+  const handleOpenApiImportPreviewRequest = React.useCallback((detected: DetectedOpenApiSpec) => {
+    isApplyingSpecRef.current = false;
+    setOpenapiImportPreview(detected);
+  }, []);
+
+  const handleConfirmOpenApiImportApply = React.useCallback(() => {
+    if (openapiImportPreview && onImportSpec && !isApplyingSpecRef.current) {
+      isApplyingSpecRef.current = true;
+      const specToApply = openapiImportPreview;
+      setOpenapiImportPreview(null);
+      onImportSpec(specToApply);
+    }
+  }, [openapiImportPreview, onImportSpec]);
+
+  const handleOpenApiImportPreviewDialogChange = React.useCallback((next: boolean) => {
+    if (!next) {
+      isApplyingSpecRef.current = false;
+      setOpenapiImportPreview(null);
+    }
+  }, []);
+
   const askConfirm = React.useCallback(
     (message: string) => {
       const fn = confirmAction ?? defaultConfirm;
@@ -660,7 +687,7 @@ export function ChatConversation({
                     isLatestAssistant={message.id === lastAssistantId}
                     onRegenerate={message.id === lastAssistantId ? handleRegenerate : undefined}
                     onFeedback={(feedback) => handleFeedback(message.id, feedback)}
-                    onImportSpec={onImportSpec}
+                    onRequestImportSpecPreview={onImportSpec ? handleOpenApiImportPreviewRequest : undefined}
                   />
                 ))}
                 <div ref={messagesEndRef} aria-hidden />
@@ -679,6 +706,15 @@ export function ChatConversation({
           <ChatComposer onSend={handleSend} isBusy={isBusy} onStop={handleStopStreaming} />
         </>
       )}
+
+      {onImportSpec ? (
+        <AiImportPreviewDialog
+          open={openapiImportPreview !== null}
+          spec={openapiImportPreview}
+          onOpenChange={handleOpenApiImportPreviewDialogChange}
+          onConfirmApply={handleConfirmOpenApiImportApply}
+        />
+      ) : null}
     </div>
   );
 }

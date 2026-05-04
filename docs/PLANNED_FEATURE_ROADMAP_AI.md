@@ -57,13 +57,12 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - 📋 "Apply to current class" → Modify selected class
     - "Generate path for this" → Create CRUD endpoints
     - 📋 "Copy to clipboard" → Copy generated JSON/YAML
-- 📋 Preview changes before applying
+- ✅ Preview changes before applying (#519)
 - Undo AI-generated changes
 
 | Ticket | Feature Description             |
 |--------|---------------------------------|
 | #518   | Quick Actions from Chat         |
-| #519   | Preview changes before applying |
 
 ### Ollama Integration
 

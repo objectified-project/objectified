@@ -729,8 +729,41 @@ describe('ChatConversation', () => {
 
     const importButton = await screen.findByTestId('studio-ai-chat-import-spec-0');
     fireEvent.click(importButton);
+    expect(screen.getByTestId('studio-ai-chat-import-preview-dialog')).toBeInTheDocument();
+    expect(onImportSpec).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('studio-ai-chat-import-preview-apply'));
     expect(onImportSpec).toHaveBeenCalledTimes(1);
     expect(onImportSpec.mock.calls[0][0].version).toBe('3.1.0');
+  });
+
+  it('closes the OpenAPI import preview without applying when Cancel is used (#519)', async () => {
+    const onImportSpec = jest.fn();
+    const responder: ChatSendFn = () =>
+      Promise.resolve(
+        [
+          'Spec ready:',
+          '',
+          '```json',
+          JSON.stringify({
+            openapi: '3.1.0',
+            info: { title: 'Sample', version: '0.1.0' },
+            components: { schemas: {} },
+          }),
+          '```',
+        ].join('\n')
+      );
+
+    render(<ChatConversation onSendMessage={responder} onImportSpec={onImportSpec} />);
+    fireEvent.change(screen.getByTestId('studio-ai-chat-input'), { target: { value: 'spec' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-send'));
+
+    const importButton = await screen.findByTestId('studio-ai-chat-import-spec-0');
+    fireEvent.click(importButton);
+    fireEvent.click(screen.getByTestId('studio-ai-chat-import-preview-cancel'));
+
+    expect(onImportSpec).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('studio-ai-chat-import-preview-dialog')).not.toBeInTheDocument();
   });
 
   it('updates the pending bubble incrementally via onStreamAccumulated and commits the final reply (#520)', async () => {
