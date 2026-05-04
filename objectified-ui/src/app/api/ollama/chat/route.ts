@@ -110,7 +110,7 @@ function buildDataQuerySystem(options: { tableNames?: string[]; currentTableName
 
 export async function POST(request: NextRequest) {
   try {
-    const { model, messages, task, existingClassNames, existingProperties, tableNames, currentTableName } = await request.json();
+    const { model, messages, task, existingClassNames, existingProperties, tableNames, currentTableName, versionId } = await request.json();
 
     if (typeof model !== 'string' || !model.trim() || !messages || !Array.isArray(messages)) {
       return new Response(
@@ -195,6 +195,7 @@ commentary, or thinking output.`;
       existingProperties: isClassSkeleton ? existingProperties : undefined,
       tableNames: isDataQuery ? tableNames : undefined,
       currentTableName: isDataQuery ? currentTableName : undefined,
+      versionId: typeof versionId === 'string' ? versionId : undefined,
       messages,
     });
 
@@ -205,6 +206,7 @@ commentary, or thinking output.`;
       existingProperties: isClassSkeleton ? existingProperties : undefined,
       tableNames: isDataQuery ? tableNames : undefined,
       currentTableName: isDataQuery ? currentTableName : undefined,
+      versionId: typeof versionId === 'string' ? versionId : undefined,
     });
 
     const cached = getCachedOllamaChatResponse(cacheKey);
@@ -244,12 +246,19 @@ commentary, or thinking output.`;
     }
 
     if (messagesEmbedding) {
-      const similar = findSemanticallySimilarCachedResponse({
+      const semanticHit = findSemanticallySimilarCachedResponse({
         semanticContextKey,
         embedding: messagesEmbedding,
         threshold: ollamaSemanticCacheThreshold(),
       });
-      if (similar) {
+      if (semanticHit) {
+        const { entry: similar } = semanticHit;
+        // Promote into exact cache so repeated identical prompts skip the embed roundtrip.
+        setCachedOllamaChatResponse(cacheKey, {
+          text: similar.text,
+          semanticContextKey,
+          embedding: messagesEmbedding,
+        });
         const encoder = new TextEncoder();
         const hitStream = new ReadableStream({
           start(controller) {
@@ -257,8 +266,8 @@ commentary, or thinking output.`;
               controller.close();
               return;
             }
+            // Do not forward usage: those token counts belong to the original request.
             const event: Record<string, unknown> = { done: true, content: similar.text };
-            if (similar.usage) event.usage = similar.usage;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
             controller.enqueue(encoder.encode('data: [DONE]\n\n'));
             controller.close();

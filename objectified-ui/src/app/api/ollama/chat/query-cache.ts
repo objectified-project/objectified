@@ -72,6 +72,8 @@ export type OllamaChatCacheKeyInput = {
   existingProperties?: unknown;
   tableNames?: unknown;
   currentTableName?: unknown;
+  /** Optional version/project scope to prevent cross-tenant semantic cache hits. */
+  versionId?: string;
   messages: unknown;
 };
 
@@ -84,6 +86,7 @@ export function ollamaChatSemanticContextKey(input: Omit<OllamaChatCacheKeyInput
     existingProperties: input.existingProperties ?? null,
     tableNames: input.tableNames ?? null,
     currentTableName: input.currentTableName ?? null,
+    versionId: input.versionId ?? null,
   });
   return createHash('sha256').update(payload, 'utf8').digest('hex');
 }
@@ -117,6 +120,7 @@ export function ollamaChatCacheKey(input: OllamaChatCacheKeyInput): string {
     existingProperties: input.existingProperties ?? null,
     tableNames: input.tableNames ?? null,
     currentTableName: input.currentTableName ?? null,
+    versionId: input.versionId ?? null,
     messages: input.messages,
   });
   return createHash('sha256').update(payload, 'utf8').digest('hex');
@@ -186,25 +190,34 @@ export type SemanticCacheLookup = {
   threshold: number;
 };
 
+export type SemanticCacheHit = {
+  key: string;
+  entry: OllamaChatCacheEntry;
+};
+
 /**
  * Best cache entry whose structural context matches and embedding cosine ≥ threshold.
- * Picks the highest similarity among qualifying entries.
+ * Picks the highest similarity among qualifying entries and promotes it in the LRU.
  */
 export function findSemanticallySimilarCachedResponse(
   lookup: SemanticCacheLookup,
-): OllamaChatCacheEntry | undefined {
+): SemanticCacheHit | undefined {
   if (isOllamaQueryCacheDisabled() || isOllamaSemanticCacheDisabled()) return undefined;
   const { semanticContextKey, embedding, threshold } = lookup;
-  let best: OllamaChatCacheEntry | undefined;
+  let bestKey: string | undefined;
   let bestSim = threshold;
-  for (const [, entry] of getStore().entries()) {
+  for (const [key, entry] of getStore().entries()) {
     if (entry.semanticContextKey !== semanticContextKey) continue;
     if (!entry.embedding || entry.embedding.length !== embedding.length) continue;
     const sim = cosineSimilarity(embedding, entry.embedding);
     if (sim >= bestSim) {
       bestSim = sim;
-      best = entry;
+      bestKey = key;
     }
   }
-  return best;
+  if (bestKey === undefined) return undefined;
+  // Promote the hit to most-recently-used so it outlives less-reused entries.
+  const entry = getStore().get(bestKey);
+  if (!entry) return undefined;
+  return { key: bestKey, entry };
 }

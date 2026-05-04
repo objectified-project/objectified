@@ -114,6 +114,16 @@ describe('ollamaChatSemanticContextKey', () => {
     const c = ollamaChatSemanticContextKey({ model: 'a', task: 't2' });
     expect(new Set([a, b, c]).size).toBe(3);
   });
+
+  it('changes when versionId differs (prevents cross-tenant cache hits)', () => {
+    const base = { model: 'm', task: 'class_skeleton' };
+    const k1 = ollamaChatSemanticContextKey({ ...base, versionId: 'v1' });
+    const k2 = ollamaChatSemanticContextKey({ ...base, versionId: 'v2' });
+    const kNone = ollamaChatSemanticContextKey({ ...base });
+    expect(k1).not.toBe(k2);
+    expect(k1).not.toBe(kNone);
+    expect(k2).not.toBe(kNone);
+  });
 });
 
 describe('ollamaChatMessagesFingerprint', () => {
@@ -167,7 +177,25 @@ describe('findSemanticallySimilarCachedResponse', () => {
       embedding: [...query],
       threshold: 0.9,
     });
-    expect(found?.text).toBe('higher similarity');
+    expect(found?.entry.text).toBe('higher similarity');
+  });
+
+  it('returns both key and entry on semantic hit', () => {
+    const ctx = 'ctx-525-key-' + Math.random().toString(36).slice(2);
+    const hitKey = `525-key-${Math.random().toString(36).slice(2)}`;
+    setCachedOllamaChatResponse(hitKey, {
+      text: 'keyed entry',
+      semanticContextKey: ctx,
+      embedding: [1, 0],
+    });
+    const found = findSemanticallySimilarCachedResponse({
+      semanticContextKey: ctx,
+      embedding: [1, 0],
+      threshold: 0.5,
+    });
+    expect(found).toBeDefined();
+    expect(found?.key).toBe(hitKey);
+    expect(found?.entry.text).toBe('keyed entry');
   });
 
   it('returns undefined when semantic cache is disabled', () => {

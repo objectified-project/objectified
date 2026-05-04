@@ -52,6 +52,8 @@ export async function getEmbedding(
 
     return vectors[0];
   } catch (err) {
+    // AbortErrors are expected when the request is cancelled; don't log them as errors.
+    if (err instanceof Error && err.name === 'AbortError') return null;
     console.error('[embedding] Ollama request error:', err);
     return null;
   }
