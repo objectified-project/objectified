@@ -50,40 +50,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
 | #263   | Add guardrails to prevent sensitive data exposure  |
 | #264   | Add guardrails to prevent further sensitive issues |
 
-**Quick Actions from Chat** 📋 PLANNED
-- ✅ AI responses include action buttons (#518):
-    - ✅ "Create this class" → One-click class creation
-    - ✅ "Add these properties" → Batch property addition
-    - ✅ "Apply to current class" → Modify selected class
-    - "Generate path for this" → Create CRUD endpoints
-    - ✅ "Copy to clipboard" → Copy generated JSON/YAML
-- ✅ Preview changes before applying (#519)
-- Undo AI-generated changes
-
 ### Ollama Integration
-
-**Ollama Connection** 📋 PLANNED
-- **Configuration**:
-    - Ollama server URL configuration (cluster support)
-    - Multiple server endpoints for load balancing
-    - Health check and failover
-    - Connection timeout settings
-    - Retry policies
-- **Model Selection**:
-    - Choose from available models (queried live from Ollama; includes Qwen 2.5, Llama 3.2, CodeLlama, custom tags when installed):
-        - Qwen 2.5
-        - Llama 3.2
-        - CodeLlama for code-specific tasks
-        - Custom fine-tuned models
-    - Model switching per task type
-    - Model performance comparison
-    - ✅ Default model per tenant/project (#266)
-- **Resource Management**:
-    - GPU memory monitoring
-    - Request queuing for high load
-    - Priority queues for different users
-    - Rate limiting per user/tenant
-    - Usage tracking and quotas
 
 **Ollama API Integration** 📋 PLANNED
 - 📋 **Streaming Responses**:
@@ -314,3 +281,36 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ Regenerate response button
     - ✅ Thumbs up/down for feedback
     - ✅ OpenAPI Specifications are parsed using ```json``` markers, click button to view/accept import
+
+**Quick Actions from Chat** 📋 PLANNED
+- ✅ AI responses include action buttons (#518):
+    - ✅ "Create this class" → One-click class creation
+    - ✅ "Add these properties" → Batch property addition
+    - ✅ "Apply to current class" → Modify selected class
+    - "Generate path for this" → Create CRUD endpoints
+    - ✅ "Copy to clipboard" → Copy generated JSON/YAML
+- ✅ Preview changes before applying (#519)
+- Undo AI-generated changes
+
+**Ollama Connection** 📋 PLANNED
+- **Configuration**:
+    - Ollama server URL configuration (cluster support)
+    - Multiple server endpoints for load balancing
+    - Health check and failover
+    - Connection timeout settings
+    - Retry policies
+- **Model Selection**:
+    - Choose from available models (queried live from Ollama; includes Qwen 2.5, Llama 3.2, CodeLlama, custom tags when installed):
+        - Qwen 2.5
+        - Llama 3.2
+        - CodeLlama for code-specific tasks
+        - Custom fine-tuned models
+    - Model switching per task type
+    - Model performance comparison
+    - ✅ Default model per tenant/project (#266)
+- **Resource Management**:
+    - GPU memory monitoring
+    - Request queuing for high load
+    - Priority queues for different users
+    - Rate limiting per user/tenant
+    - Usage tracking and quotas
