@@ -57,16 +57,44 @@ function createDeferredResponder(): {
 } {
   const calls: ResponderCall[] = [];
   let pendingResolve: ((text: string) => void) | null = null;
-  const responder: ChatSendFn = ({ prompt, isRegenerate, studioContext }) => {
+  let abortCleanup: (() => void) | null = null;
+
+  const responder: ChatSendFn = ({ prompt, isRegenerate, studioContext, signal }) => {
     calls.push({ prompt, isRegenerate, studioContext });
-    return new Promise<string>((resolve) => {
-      pendingResolve = resolve;
+    abortCleanup?.();
+    abortCleanup = null;
+
+    return new Promise<string>((resolve, reject) => {
+      const onAbort = () => {
+        pendingResolve = null;
+        abortCleanup?.();
+        abortCleanup = null;
+        reject(new DOMException('The operation was aborted.', 'AbortError'));
+      };
+
+      if (signal) {
+        if (signal.aborted) {
+          queueMicrotask(onAbort);
+          return;
+        }
+        signal.addEventListener('abort', onAbort, { once: true });
+        const s = signal;
+        abortCleanup = () => s.removeEventListener('abort', onAbort);
+      }
+
+      pendingResolve = (text: string) => {
+        abortCleanup?.();
+        abortCleanup = null;
+        resolve(text);
+      };
     });
   };
   return {
     responder,
     calls,
     resolveWith(text: string) {
+      abortCleanup?.();
+      abortCleanup = null;
       const fn = pendingResolve;
       pendingResolve = null;
       if (fn) fn(text);
@@ -132,6 +160,26 @@ describe('ChatConversation', () => {
     });
 
     expect(screen.getByTestId('studio-ai-chat-input')).not.toBeDisabled();
+  });
+
+  it('Stop aborts an in-flight responder turn and leaves a stopped message (#522)', async () => {
+    const { responder } = createDeferredResponder();
+    render(<ChatConversation onSendMessage={responder} />);
+
+    fireEvent.change(screen.getByTestId('studio-ai-chat-input'), { target: { value: 'hello' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-send'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('studio-ai-chat-stop')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('studio-ai-chat-stop'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Generation stopped.')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('studio-ai-chat-input')).not.toBeDisabled();
+    expect(screen.queryByTestId('studio-ai-chat-stop')).not.toBeInTheDocument();
   });
 
   it('Regenerate re-uses the last user prompt, drops the prior reply, and flags isRegenerate', async () => {

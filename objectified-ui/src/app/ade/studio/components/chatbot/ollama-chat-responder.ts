@@ -17,6 +17,15 @@ import type {
   ChatStreamAccumulatedMeta,
 } from './types';
 
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException && error.name === 'AbortError') ||
+    (typeof error === 'object' &&
+      error !== null &&
+      (error as { name?: string }).name === 'AbortError')
+  );
+}
+
 export function createOllamaChatResponder(): ChatSendFn {
   return async (ctx: ChatSendContext) => {
     const model = ctx.ollamaModel?.trim();
@@ -26,28 +35,47 @@ export function createOllamaChatResponder(): ChatSendFn {
 
     const messages = buildOllamaChatMessages(ctx.messages, ctx.studioContext);
     const estimatedPromptTokens = approximateTokensFromJson(JSON.stringify(messages));
+    let lastAccumulated = '';
 
-    const response = await fetch('/api/ollama/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages }),
-    });
+    const forwardDelta = (accumulatedMarkdown: string, meta: ChatStreamAccumulatedMeta) => {
+      lastAccumulated = accumulatedMarkdown;
+      ctx.onStreamAccumulated?.(accumulatedMarkdown, meta);
+    };
 
-    if (!response.ok) {
-      let detail = '';
-      try {
-        detail = await response.text();
-      } catch {
-        /* ignore */
+    try {
+      const response = await fetch('/api/ollama/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages }),
+        signal: ctx.signal,
+      });
+
+      if (!response.ok) {
+        let detail = '';
+        try {
+          detail = await response.text();
+        } catch {
+          /* ignore */
+        }
+        throw new Error(detail || `Chat request failed (${response.status})`);
       }
-      throw new Error(detail || `Chat request failed (${response.status})`);
-    }
 
-    const text = await accumulateOllamaSseFromResponse(response, {
-      estimatedPromptTokens,
-      onDelta: ctx.onStreamAccumulated,
-    });
-    return text.trim().length > 0 ? text : 'The model returned an empty reply.';
+      const text = await accumulateOllamaSseFromResponse(response, {
+        estimatedPromptTokens,
+        onDelta: forwardDelta,
+        signal: ctx.signal,
+      });
+      const trimmed = text.trim();
+      if (trimmed.length > 0) return trimmed;
+      if (ctx.signal?.aborted) return 'Generation stopped.';
+      return 'The model returned an empty reply.';
+    } catch (error) {
+      if (ctx.signal?.aborted && isAbortError(error)) {
+        const t = lastAccumulated.trim();
+        return t.length > 0 ? lastAccumulated : 'Generation stopped.';
+      }
+      throw error;
+    }
   };
 }
 
@@ -92,9 +120,10 @@ async function accumulateOllamaSseFromResponse(
   options: {
     estimatedPromptTokens: number;
     onDelta?: (accumulatedMarkdown: string, meta: ChatStreamAccumulatedMeta) => void;
+    signal?: AbortSignal;
   },
 ): Promise<string> {
-  const { estimatedPromptTokens, onDelta } = options;
+  const { estimatedPromptTokens, onDelta, signal } = options;
   const reader = response.body?.getReader();
   if (!reader) return '';
 
@@ -127,7 +156,20 @@ async function accumulateOllamaSseFromResponse(
   }
 
   while (true) {
-    const { done, value } = await reader.read();
+    if (signal?.aborted) {
+      await reader.cancel().catch(() => {});
+      break;
+    }
+    let readResult: ReadableStreamReadResult<Uint8Array>;
+    try {
+      readResult = await reader.read();
+    } catch (error) {
+      if (signal?.aborted && isAbortError(error)) {
+        break;
+      }
+      throw error;
+    }
+    const { done, value } = readResult;
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split('\n');

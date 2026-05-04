@@ -94,7 +94,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
 - 📋 **Streaming Responses**:
     - ✅ Server-Sent Events (SSE) for streaming (#520)
     - ✅ Token-by-token usage display (#521)
-    - 📋 Cancel generation mid-stream
+    - ✅ Cancel generation mid-stream (#522)
     - 📋 Progress indication
 - 📋 **Caching**:
     - 📋 Cache common queries
@@ -108,7 +108,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                                 |
 |--------|-----------------------------------------------------|
-| #522   | Cancel generation mid-stream                        |
 | #523   | Show progress indication during generation          |
 | #524   | Cache common queries to Ollama                      |
 | #525   | Semantic similarity matching for cache              |

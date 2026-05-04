@@ -29,6 +29,15 @@ import { createOllamaChatResponder } from './ollama-chat-responder';
 import type { DetectedOpenApiSpec } from './openapi-detection';
 import type { ChatFeedback, ChatMessage, ChatSendFn, ChatStreamAccumulatedMeta } from './types';
 
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException && error.name === 'AbortError') ||
+    (typeof error === 'object' &&
+      error !== null &&
+      (error as { name?: string }).name === 'AbortError')
+  );
+}
+
 /**
  * Studio AI chat conversation surface (#258, #259, #260, #261).
  *
@@ -51,6 +60,8 @@ import type { ChatFeedback, ChatMessage, ChatSendFn, ChatStreamAccumulatedMeta }
  *     server has no models or the list request fails.
  *   - With live Ollama (#521), a footer shows prompt/output token estimates while
  *     streaming and replaces them with measured counts when the model finishes.
+ *   - The composer can **Stop** an in-flight turn (#522): `AbortSignal` is passed to
+ *     the responder so streaming fetch/SSE readers unwind and partial text is kept.
  *   - With `tenantId` + `studioContext.project` (#266), the chosen model is
  *     remembered per project (and optionally per tenant) in localStorage so
  *     each workspace reopens on its preferred tag when Ollama still exposes it.
@@ -283,6 +294,8 @@ export function ChatConversation({
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const requestIdRef = React.useRef(0);
+  const streamAbortRef = React.useRef<AbortController | null>(null);
+  const streamPartialRef = React.useRef('');
   const studioContextRef = React.useRef<ChatStudioContext | undefined>(studioContext);
   const lastRestoreScopeRef = React.useRef<string | null>(null);
   // Set to true only by user-originated transcript changes (send / regenerate).
@@ -359,6 +372,10 @@ export function ChatConversation({
     return null;
   }, [messages]);
 
+  const handleStopStreaming = React.useCallback(() => {
+    streamAbortRef.current?.abort();
+  }, []);
+
   const runAssistantTurn = React.useCallback(
     async (transcript: ChatMessage[], prompt: string, isRegenerate: boolean) => {
       const requestId = requestIdRef.current + 1;
@@ -370,6 +387,10 @@ export function ChatConversation({
         content: '',
         pending: true,
       };
+      const ac = new AbortController();
+      streamAbortRef.current = ac;
+      streamPartialRef.current = '';
+
       setIsBusy(true);
       if (useLiveOllama) setStreamUsage(null);
       setMessages([...transcript, pendingMessage]);
@@ -382,8 +403,10 @@ export function ChatConversation({
           isRegenerate,
           studioContext: studioContextRef.current,
           ollamaModel: useLiveOllama ? selectedOllamaModel : undefined,
+          signal: ac.signal,
           onStreamAccumulated: (accumulated, meta) => {
             if (requestIdRef.current !== requestId) return;
+            streamPartialRef.current = accumulated;
             if (useLiveOllama) {
               setStreamUsage(
                 meta ?? {
@@ -401,9 +424,23 @@ export function ChatConversation({
           },
         });
       } catch (error) {
-        console.error('Chat assistant failed to respond', error);
-        reply = 'Sorry — the assistant could not respond. Please try again.';
+        if (!isAbortError(error)) {
+          console.error('Chat assistant failed to respond', error);
+        }
+        if (isAbortError(error)) {
+          const partial = streamPartialRef.current.trim();
+          reply = partial.length > 0 ? streamPartialRef.current : 'Generation stopped.';
+        } else {
+          reply = 'Sorry — the assistant could not respond. Please try again.';
+        }
         if (useLiveOllama) setStreamUsage(null);
+      } finally {
+        if (streamAbortRef.current === ac) {
+          streamAbortRef.current = null;
+        }
+        if (requestIdRef.current === requestId) {
+          setIsBusy(false);
+        }
       }
 
       if (requestIdRef.current !== requestId) return;
@@ -413,7 +450,6 @@ export function ChatConversation({
           message.id === pendingId ? { ...message, content: reply, pending: false } : message
         )
       );
-      setIsBusy(false);
     },
     [responder, useLiveOllama, selectedOllamaModel]
   );
@@ -478,6 +514,7 @@ export function ChatConversation({
   }, []);
 
   const handleNewConversation = React.useCallback(() => {
+    streamAbortRef.current?.abort();
     requestIdRef.current += 1;
     setIsBusy(false);
     setStreamUsage(null);
@@ -489,6 +526,7 @@ export function ChatConversation({
   const handleClearCurrent = React.useCallback(() => {
     if (messages.length === 0) return;
     if (!askConfirm('Clear the current conversation? It will be removed from your history.')) return;
+    streamAbortRef.current?.abort();
     requestIdRef.current += 1;
     setIsBusy(false);
     setStreamUsage(null);
@@ -527,6 +565,9 @@ export function ChatConversation({
     (id: string) => {
       const conversation = store.get(id);
       if (!conversation) return;
+      streamAbortRef.current?.abort();
+      requestIdRef.current += 1;
+      setIsBusy(false);
       // Loading from store — do not trigger an auto-persist for this change.
       pendingPersistRef.current = false;
       setStreamUsage(null);
@@ -634,7 +675,7 @@ export function ChatConversation({
 
           {useLiveOllama && streamUsage && <TokenUsageStrip meta={streamUsage} />}
 
-          <ChatComposer onSend={handleSend} isBusy={isBusy} />
+          <ChatComposer onSend={handleSend} isBusy={isBusy} onStop={handleStopStreaming} />
         </>
       )}
     </div>

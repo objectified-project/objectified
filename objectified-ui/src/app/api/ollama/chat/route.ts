@@ -186,6 +186,7 @@ commentary, or thinking output.`;
         messages: fullMessages,
         stream: true,
       }),
+      signal: request.signal,
     });
 
     if (!ollamaResponse.ok) {

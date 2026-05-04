@@ -24,6 +24,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Studio chatbot remembers your preferred Ollama tag per project (and per tenant), with an optional control to set a tenant-wide default when you are inside a project.
 - Studio AI chat streams Ollama replies over SSE so assistant text appears incrementally as the model generates.
 - Studio AI chat shows live token usage (estimated while streaming, then Ollama-reported counts when each reply finishes).
+- Studio AI chat includes **Stop** while a reply is generating so you can cancel mid-stream; partial text is kept when the model had already streamed content.
 
 ---
 

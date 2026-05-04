@@ -67,4 +67,14 @@ describe('ChatComposer', () => {
     fireEvent.keyDown(screen.getByTestId('studio-ai-chat-input'), { key: 'Enter' });
     expect(onSend).not.toHaveBeenCalled();
   });
+
+  it('shows Stop and invokes onStop while busy when onStop is set (#522)', () => {
+    const onSend = jest.fn();
+    const onStop = jest.fn();
+    render(<ChatComposer onSend={onSend} isBusy onStop={onStop} />);
+    expect(screen.getByTestId('studio-ai-chat-stop')).toBeInTheDocument();
+    expect(screen.queryByTestId('studio-ai-chat-send')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('studio-ai-chat-stop'));
+    expect(onStop).toHaveBeenCalledTimes(1);
+  });
 });
