@@ -35,10 +35,14 @@ export function createOllamaChatResponder(): ChatSendFn {
       ctx.onStreamAccumulated?.(accumulatedMarkdown, meta);
     };
 
-    const schemaContextFingerprint =
-      ctx.studioContext && !isChatStudioContextEmpty(ctx.studioContext)
-        ? await computeStudioSchemaFingerprint(ctx.studioContext)
-        : undefined;
+    let schemaContextFingerprint: string | undefined;
+    if (ctx.studioContext && !isChatStudioContextEmpty(ctx.studioContext)) {
+      try {
+        schemaContextFingerprint = await computeStudioSchemaFingerprint(ctx.studioContext);
+      } catch {
+        /* Web Crypto unavailable: skip optional cache-busting fingerprint */
+      }
+    }
 
     try {
       const response = await fetch('/api/ollama/chat', {

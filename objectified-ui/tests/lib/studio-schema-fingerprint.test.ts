@@ -63,4 +63,23 @@ describe('computeStudioSchemaFingerprint', () => {
     );
     expect(before).not.toBe(after);
   });
+
+  it('changes when a property field changes', async () => {
+    const before = await computeStudioSchemaFingerprint(baseCtx());
+    const after = await computeStudioSchemaFingerprint(
+      baseCtx({
+        properties: [
+          {
+            id: 'pr1',
+            name: 'email',
+            type: 'string',
+            format: 'email',
+            required: false,
+            description: 'User email address',
+          },
+        ],
+      }),
+    );
+    expect(before).not.toBe(after);
+  });
 });
