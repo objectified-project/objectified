@@ -13,6 +13,7 @@ export function ChatBusyProgressIndicator() {
     >
       <div
         role="progressbar"
+        aria-label="Chat response progress"
         aria-valuetext="Generating response"
         className="relative h-1 w-full overflow-hidden bg-gray-200 dark:bg-gray-700"
       >
