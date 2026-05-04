@@ -3,7 +3,9 @@
  *
  * When an assistant message contains specific CTAs (plain or wrapped in
  * markdown bold), the chat shell surfaces matching buttons. Copy uses the
- * first ```json``` / ```yaml``` / ```yml``` fence in the message as payload.
+ * first non-empty ```json```/```jsonc``` fence anywhere in the message (even if a
+ * ```yaml```/```yml``` fence appears earlier), falling back to the first non-empty
+ * ```yaml```/```yml``` fence when no JSON/JSONC fence exists.
  */
 
 export type StudioChatWorkspaceActionKind = 'create_class' | 'batch_add_properties' | 'apply_current_class';

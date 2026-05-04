@@ -187,10 +187,6 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     return map;
   }, [classes]);
 
-  // Expose handleClassEdit via ref for canvas to trigger
-  const handleClassEditRef = React.useRef<((classItem: ClassItem) => Promise<void>) | null>(null);
-  const handleClassAddRef = React.useRef<() => Promise<void>>(async () => {});
-
   // Permission check helpers
   const checkVersionSelected = () => checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog);
   const checkProjectSelected = () => checkPermissions(!!selectedProjectId, 'Please select a project from the canvas first', alertDialog);
@@ -207,12 +203,10 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     setClassDialog({ open: true, selectedClass: classItem });
   };
 
-  // Keep refs updated (canvas + AI chat quick actions #518)
+  // Keep canvas global updated so canvas nodes can trigger the edit dialog (#518)
   React.useEffect(() => {
-    handleClassAddRef.current = handleClassAdd;
-    handleClassEditRef.current = handleClassEdit;
     (window as any).__studioHandleClassEdit = handleClassEdit;
-  }, [handleClassAdd, handleClassEdit]);
+  }, [handleClassEdit]);
 
   const handleClassDelete = async (classId: string) => {
     if (!(await checkVersionSelected()) || !(await checkNotReadOnly('delete classes'))) return;
@@ -232,7 +226,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const handleChatWorkspaceAction = React.useCallback(
     async (action: StudioChatWorkspaceAction) => {
       if (action.kind === 'create_class') {
-        await handleClassAddRef.current();
+        await handleClassAdd();
         return;
       }
       if (action.kind === 'batch_add_properties' || action.kind === 'apply_current_class') {
@@ -245,13 +239,10 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
           });
           return;
         }
-        const openEdit = handleClassEditRef.current;
-        if (openEdit) {
-          await openEdit(selectedClass);
-        }
+        await handleClassEdit(selectedClass);
       }
     },
-    [selectedCanvasNodeIds, classes, alertDialog],
+    [handleClassAdd, handleClassEdit, selectedCanvasNodeIds, classes, alertDialog],
   );
 
   // Property handlers

@@ -4,7 +4,7 @@ import {
 } from '../../src/app/ade/studio/components/chatbot/assistant-action-detection';
 
 describe('extractFirstJsonOrYamlFenceBody', () => {
-  it('prefers the first json fence over later yaml', () => {
+  it('prefers JSON over YAML even when YAML appears first', () => {
     const md = [
       'Intro',
       '```yaml',
