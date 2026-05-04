@@ -23,6 +23,7 @@ We continue to improve the platform based on your feedback with improvements and
 - AI chatbot lists Ollama models from your server and lets you pick which model answers each conversation (falls back to the offline assistant when Ollama is unavailable).
 - Studio chatbot remembers your preferred Ollama tag per project (and per tenant), with an optional control to set a tenant-wide default when you are inside a project.
 - Studio AI chat streams Ollama replies over SSE so assistant text appears incrementally as the model generates.
+- Studio AI chat shows live token usage (estimated while streaming, then Ollama-reported counts when each reply finishes).
 
 ---
 

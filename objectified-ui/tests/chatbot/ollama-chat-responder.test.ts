@@ -3,7 +3,7 @@
  */
 
 import { createOllamaChatResponder } from '../../src/app/ade/studio/components/chatbot/ollama-chat-responder';
-import type { ChatMessage } from '../../src/app/ade/studio/components/chatbot/types';
+import type { ChatMessage, ChatStreamAccumulatedMeta } from '../../src/app/ade/studio/components/chatbot/types';
 
 /** Minimal `Response` shape for `accumulateOllamaSseFromResponse` without relying on global `ReadableStream`. */
 function mockSseResponse(sseLines: string[]) {
@@ -98,6 +98,37 @@ describe('createOllamaChatResponder', () => {
 
     expect(out).toBe('Hello world');
     expect(deltas).toEqual(['Hello', 'Hello world']);
+  });
+
+  it('passes token meta with each chunk and measured usage when the server sends it (#521)', async () => {
+    const metas: ChatStreamAccumulatedMeta[] = [];
+    global.fetch = jest.fn().mockResolvedValue(
+      mockSseResponse([
+        'data: {"content":"Hi","done":false}\n\n',
+        'data: {"content":"!","done":true,"usage":{"promptTokens":100,"completionTokens":2}}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+
+    const responder = createOllamaChatResponder();
+    const messages: ChatMessage[] = [{ id: 'u1', role: 'user', content: 'Hi' }];
+    const out = await responder({
+      messages,
+      prompt: 'Hi',
+      isRegenerate: false,
+      ollamaModel: 'qwen2.5:latest',
+      onStreamAccumulated: (_acc, meta) => {
+        if (meta) metas.push(meta);
+      },
+    });
+
+    expect(out).toBe('Hi!');
+    expect(metas.length).toBeGreaterThanOrEqual(2);
+    expect(metas[0].estimatedPromptTokens).toBeGreaterThan(0);
+    expect(metas[0].estimatedCompletionTokens).toBeGreaterThan(0);
+    expect(metas[0].measured).toBeUndefined();
+    const withMeasured = metas.find((m) => m.measured);
+    expect(withMeasured?.measured).toEqual({ promptTokens: 100, completionTokens: 2 });
   });
 
   it('injects studio context into the latest user message only', async () => {
