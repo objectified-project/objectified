@@ -15,6 +15,10 @@
  * acknowledge canvas selection, and reuse existing class / property names
  * inside the demo OpenAPI spec.
  *
+ * #518: demo replies append quick-action CTAs so the chat UI can show
+ * **Create this class**, **Add these properties**, **Apply to current class**,
+ * and **Copy to clipboard** without running a live model.
+ *
  * #260 layers in multi-turn awareness. Each call asks
  * `summarizeConversationHistory` to classify the prompt against the prior
  * transcript and we branch on the result:
@@ -87,6 +91,7 @@ export const createDemoChatResponder = (): ChatSendFn => async ({
       'A few things to consider next:',
       ...suggestions,
     );
+    appendStudioChatQuickActionDemo(lines, { includeYamlSample: false });
     return lines.join('\n') + variation;
   }
 
@@ -107,6 +112,7 @@ export const createDemoChatResponder = (): ChatSendFn => async ({
     '',
     'Try asking for an "OpenAPI spec" to see the import affordance.',
   );
+  appendStudioChatQuickActionDemo(lines, { includeYamlSample: true });
   return lines.join('\n') + variation;
 };
 
@@ -138,6 +144,7 @@ function buildClarificationReply({
     '',
     'Drop a follow-up like "make `name` required" or "remove `priceCents`" and I\'ll re-ship the same schema with the edit applied.',
   );
+  appendStudioChatQuickActionDemo(lines, { includeYamlSample: true });
   return lines.join('\n') + variation;
 }
 
@@ -166,6 +173,7 @@ function buildRefinementReply({
     '',
     'Need another change? Ask me to add, remove, rename, or require a property and I\'ll keep iterating.',
   );
+  appendStudioChatQuickActionDemo(lines, { includeYamlSample: false });
   return lines.join('\n') + variation;
 }
 
@@ -364,4 +372,28 @@ function deriveRequired(
 ): string[] {
   const required = Object.keys(properties).filter((name) => name === 'id' || name === 'name');
   return required.length > 0 ? required : Object.keys(properties).slice(0, 1);
+}
+
+/** Appends markdown that triggers Studio quick-action buttons (#518). */
+function appendStudioChatQuickActionDemo(
+  lines: string[],
+  opts: { includeYamlSample: boolean },
+): void {
+  lines.push(
+    '',
+    '---',
+    '',
+    'These phrases surface quick actions in the Studio chat UI:',
+    '',
+    '**Create this class**',
+    '',
+    '**Add these properties**',
+    '',
+    '**Apply to current class**',
+    '',
+  );
+  if (opts.includeYamlSample) {
+    lines.push('```yaml', 'demo_quick_action: true', '```', '');
+  }
+  lines.push('**Copy to clipboard**');
 }

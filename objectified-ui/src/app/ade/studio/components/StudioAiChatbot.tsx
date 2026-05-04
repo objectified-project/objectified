@@ -35,6 +35,7 @@ import { toast } from 'sonner';
 import { Bot, Maximize2, Minimize2, Sparkles, X } from 'lucide-react';
 import { matchesStudioAiChatbotShortcut } from '@/app/utils/studio-keybindings';
 import { ChatConversation } from './chatbot/ChatConversation';
+import type { StudioChatWorkspaceAction } from './chatbot/assistant-action-detection';
 import type { ChatStudioContext } from './chatbot/chat-context';
 import type { DetectedOpenApiSpec } from './chatbot/openapi-detection';
 
@@ -78,6 +79,8 @@ export interface StudioAiChatbotProps {
   studioContext?: ChatStudioContext;
   /** Current tenant id from the session (#266) — enables per-tenant/project Ollama defaults. */
   tenantId?: string | null;
+  /** Studio layout handler for assistant quick-action buttons (#518). */
+  onChatWorkspaceAction?: (action: StudioChatWorkspaceAction) => void | Promise<void>;
 }
 
 /**
@@ -89,6 +92,7 @@ export function StudioAiChatbot({
   initialMode = 'closed',
   studioContext,
   tenantId,
+  onChatWorkspaceAction,
 }: StudioAiChatbotProps = {}) {
   const pathname = usePathname();
   const [mode, setMode] = React.useState<StudioAiChatbotMode>(initialMode);
@@ -135,6 +139,7 @@ export function StudioAiChatbot({
           onClose={close}
           studioContext={studioContext}
           tenantId={tenantId}
+          onChatWorkspaceAction={onChatWorkspaceAction}
         />
       )}
     </>
@@ -165,9 +170,17 @@ interface ChatbotPanelProps {
   onClose: () => void;
   studioContext?: ChatStudioContext;
   tenantId?: string | null;
+  onChatWorkspaceAction?: (action: StudioChatWorkspaceAction) => void | Promise<void>;
 }
 
-function ChatbotPanel({ mode, onModeChange, onClose, studioContext, tenantId }: ChatbotPanelProps) {
+function ChatbotPanel({
+  mode,
+  onModeChange,
+  onClose,
+  studioContext,
+  tenantId,
+  onChatWorkspaceAction,
+}: ChatbotPanelProps) {
   const isFullscreen = mode === 'fullscreen';
 
   const containerClasses = isFullscreen
@@ -234,6 +247,7 @@ function ChatbotPanel({ mode, onModeChange, onClose, studioContext, tenantId }: 
       <div className="flex min-h-0 flex-1 flex-col">
         <ChatConversation
           onImportSpec={handleImportSpec}
+          onChatWorkspaceAction={onChatWorkspaceAction}
           studioContext={studioContext}
           tenantId={tenantId}
           ollamaTransport

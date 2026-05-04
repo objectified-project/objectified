@@ -51,18 +51,14 @@ This outlines the planned features for integrating AI capabilities into Objectif
 | #264   | Add guardrails to prevent further sensitive issues |
 
 **Quick Actions from Chat** 📋 PLANNED
-- 📋 AI responses include action buttons:
-    - 📋 "Create this class" → One-click class creation
-    - 📋 "Add these properties" → Batch property addition
-    - 📋 "Apply to current class" → Modify selected class
+- ✅ AI responses include action buttons (#518):
+    - ✅ "Create this class" → One-click class creation
+    - ✅ "Add these properties" → Batch property addition
+    - ✅ "Apply to current class" → Modify selected class
     - "Generate path for this" → Create CRUD endpoints
-    - 📋 "Copy to clipboard" → Copy generated JSON/YAML
+    - ✅ "Copy to clipboard" → Copy generated JSON/YAML
 - ✅ Preview changes before applying (#519)
 - Undo AI-generated changes
-
-| Ticket | Feature Description             |
-|--------|---------------------------------|
-| #518   | Quick Actions from Chat         |
 
 ### Ollama Integration
 

@@ -28,6 +28,7 @@ import {
 } from './ollama-model-defaults';
 import { createOllamaChatResponder } from './ollama-chat-responder';
 import { AiImportPreviewDialog } from './AiImportPreviewDialog';
+import type { StudioChatWorkspaceAction } from './assistant-action-detection';
 import type { DetectedOpenApiSpec } from './openapi-detection';
 import type { ChatFeedback, ChatMessage, ChatSendFn, ChatStreamAccumulatedMeta } from './types';
 import { isAbortError } from './abort-errors';
@@ -58,6 +59,8 @@ import { isAbortError } from './abort-errors';
  *     the toolbar so generation is obvious before and during streamed tokens.
  *   - OpenAPI import from chat (#519): **Preview changes** opens a modal with a formatted
  *     spec and summary; **Apply import** invokes `onImportSpec` so nothing applies without confirmation.
+ *   - Quick actions (#518): assistant CTAs such as **Create this class** surface buttons; the layout
+ *     wires `onChatWorkspaceAction` into class create / edit flows.
  *   - The composer can **Stop** an in-flight turn (#522): `AbortSignal` is passed to
  *     the responder so streaming fetch/SSE readers unwind and partial text is kept.
  *   - With `tenantId` + `studioContext.project` (#266), the chosen model is
@@ -69,6 +72,8 @@ export interface ChatConversationProps {
   onSendMessage?: ChatSendFn;
   /** Called after the user confirms **Apply import** in the OpenAPI preview dialog (#519). */
   onImportSpec?: (spec: DetectedOpenApiSpec) => void;
+  /** Wired from the studio layout for quick-action buttons on assistant messages (#518). */
+  onChatWorkspaceAction?: (action: StudioChatWorkspaceAction) => void | Promise<void>;
   /** Optional starter messages — useful for tests and previews. */
   initialMessages?: ChatMessage[];
   /** Optional empty-state body copy. */
@@ -137,6 +142,7 @@ function safeLocalStorage(): Storage | null {
 export function ChatConversation({
   onSendMessage,
   onImportSpec,
+  onChatWorkspaceAction,
   initialMessages,
   emptyStateMessage,
   studioContext,
@@ -688,6 +694,7 @@ export function ChatConversation({
                     onRegenerate={message.id === lastAssistantId ? handleRegenerate : undefined}
                     onFeedback={(feedback) => handleFeedback(message.id, feedback)}
                     onRequestImportSpecPreview={onImportSpec ? handleOpenApiImportPreviewRequest : undefined}
+                    onChatWorkspaceAction={onChatWorkspaceAction}
                   />
                 ))}
                 <div ref={messagesEndRef} aria-hidden />

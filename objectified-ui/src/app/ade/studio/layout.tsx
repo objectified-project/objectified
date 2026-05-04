@@ -24,6 +24,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ADE_SUBHEADER_RESERVE_PX } from '../constants/subheader-layout';
 import { GitCommandPalette } from './components/GitCommandPalette';
 import { StudioAiChatbot } from './components/StudioAiChatbot';
+import type { StudioChatWorkspaceAction } from './components/chatbot/assistant-action-detection';
 import type { ChatStudioContext, ChatStudioProperty } from './components/chatbot/chat-context';
 import StudioFooterBar from './components/StudioFooterBar';
 import { FEATURE_GITLIKE } from '@lib/feature-flags';
@@ -186,12 +187,6 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     return map;
   }, [classes]);
 
-  // Expose handleClassEdit via ref for canvas to trigger
-  const handleClassEditRef = React.useRef<((classItem: ClassItem) => Promise<void>) | null>(null);
-  React.useEffect(() => {
-    (window as any).__studioHandleClassEdit = handleClassEditRef.current;
-  }, []);
-
   // Permission check helpers
   const checkVersionSelected = () => checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog);
   const checkProjectSelected = () => checkPermissions(!!selectedProjectId, 'Please select a project from the canvas first', alertDialog);
@@ -208,9 +203,8 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     setClassDialog({ open: true, selectedClass: classItem });
   };
 
-  // Keep ref updated
+  // Keep canvas global updated so canvas nodes can trigger the edit dialog (#518)
   React.useEffect(() => {
-    handleClassEditRef.current = handleClassEdit;
     (window as any).__studioHandleClassEdit = handleClassEdit;
   }, [handleClassEdit]);
 
@@ -228,6 +222,28 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     if (!(await checkVersionSelected()) || !(await checkNotReadOnly('add classes'))) return;
     setClassTemplateDialog({ open: true });
   };
+
+  const handleChatWorkspaceAction = React.useCallback(
+    async (action: StudioChatWorkspaceAction) => {
+      if (action.kind === 'create_class') {
+        await handleClassAdd();
+        return;
+      }
+      if (action.kind === 'batch_add_properties' || action.kind === 'apply_current_class') {
+        const idSet = new Set(selectedCanvasNodeIds);
+        const selectedClass = classes.find((c) => idSet.has(c.id));
+        if (!selectedClass) {
+          await alertDialog({
+            message: 'Select a class on the canvas first so Studio knows which class to open.',
+            variant: 'warning',
+          });
+          return;
+        }
+        await handleClassEdit(selectedClass);
+      }
+    },
+    [handleClassAdd, handleClassEdit, selectedCanvasNodeIds, classes, alertDialog],
+  );
 
   // Property handlers
   const handlePropertyAdd = async () => {
@@ -649,7 +665,11 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
           across the canvas and paths surfaces. Hidden in presentation mode to keep
           the canvas chrome-free. */}
       {!canvasPresentationMode && (
-        <StudioAiChatbot studioContext={chatbotStudioContext} tenantId={currentTenantId} />
+        <StudioAiChatbot
+          studioContext={chatbotStudioContext}
+          tenantId={currentTenantId}
+          onChatWorkspaceAction={handleChatWorkspaceAction}
+        />
       )}
 
       {/* Programmatic state of the canvas — pinned to the bottom of the studio layout.
