@@ -182,4 +182,51 @@ describe('createOllamaChatResponder', () => {
       }),
     ).rejects.toThrow();
   });
+
+  it('passes AbortSignal to fetch when provided (#522)', async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      mockSseResponse(['data: {"content":"x","done":true}\n\n', 'data: [DONE]\n\n']),
+    );
+
+    const ac = new AbortController();
+    const responder = createOllamaChatResponder();
+    await responder({
+      messages: [{ id: 'u1', role: 'user', content: 'Hi' }],
+      prompt: 'Hi',
+      isRegenerate: false,
+      ollamaModel: 'm',
+      signal: ac.signal,
+    });
+
+    const init = (global.fetch as jest.Mock).mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBe(ac.signal);
+  });
+
+  it('returns Generation stopped. when fetch aborts before any body (#522)', async () => {
+    global.fetch = jest.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      const signal = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        const onAbort = () => {
+          reject(new DOMException('Aborted', 'AbortError'));
+        };
+        if (signal?.aborted) {
+          queueMicrotask(onAbort);
+          return;
+        }
+        signal?.addEventListener('abort', onAbort, { once: true });
+      });
+    });
+
+    const ac = new AbortController();
+    const responder = createOllamaChatResponder();
+    const p = responder({
+      messages: [{ id: 'u1', role: 'user', content: 'Hi' }],
+      prompt: 'Hi',
+      isRegenerate: false,
+      ollamaModel: 'm',
+      signal: ac.signal,
+    });
+    ac.abort();
+    await expect(p).resolves.toBe('Generation stopped.');
+  });
 });

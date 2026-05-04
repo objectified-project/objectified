@@ -63,6 +63,11 @@ export interface ChatSendContext {
    * When present, `meta` carries live token estimates and optional measured usage (#521).
    */
   onStreamAccumulated?: (accumulatedMarkdown: string, meta?: ChatStreamAccumulatedMeta) => void;
+  /**
+   * When the UI stops generation (#522), the shell aborts this signal. Streaming
+   * responders should pass it to `fetch` and/or body readers so work unwinds promptly.
+   */
+  signal?: AbortSignal;
 }
 
 /**

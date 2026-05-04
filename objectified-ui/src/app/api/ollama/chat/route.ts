@@ -3,6 +3,7 @@
  */
 
 import { NextRequest } from 'next/server';
+import { isAbortError } from '../../ade/studio/components/chatbot/abort-errors';
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 
@@ -186,6 +187,7 @@ commentary, or thinking output.`;
         messages: fullMessages,
         stream: true,
       }),
+      signal: request.signal,
     });
 
     if (!ollamaResponse.ok) {
@@ -311,7 +313,9 @@ commentary, or thinking output.`;
           }
         } catch (error) {
           if (!closed) {
-            console.error('Error reading stream:', error);
+            if (!isAbortError(error, request.signal)) {
+              console.error('Error reading stream:', error);
+            }
             try {
               controller.error(error);
             } catch {
@@ -331,6 +335,10 @@ commentary, or thinking output.`;
       },
     });
   } catch (error: unknown) {
+    // AbortError is normal (client disconnected or user clicked Stop) — don't log or 500.
+    if (isAbortError(error, request.signal)) {
+      return new Response(null, { status: 499 });
+    }
     console.error('Error in Ollama chat:', error);
     const message = error instanceof Error ? error.message : 'Failed to process chat request';
     return new Response(
