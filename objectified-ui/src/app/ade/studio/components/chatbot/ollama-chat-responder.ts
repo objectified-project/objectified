@@ -16,15 +16,7 @@ import type {
   ChatSendFn,
   ChatStreamAccumulatedMeta,
 } from './types';
-
-function isAbortError(error: unknown): boolean {
-  return (
-    (error instanceof DOMException && error.name === 'AbortError') ||
-    (typeof error === 'object' &&
-      error !== null &&
-      (error as { name?: string }).name === 'AbortError')
-  );
-}
+import { isAbortError } from './abort-errors';
 
 export function createOllamaChatResponder(): ChatSendFn {
   return async (ctx: ChatSendContext) => {

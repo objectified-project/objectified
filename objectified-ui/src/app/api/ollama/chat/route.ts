@@ -312,7 +312,13 @@ commentary, or thinking output.`;
           }
         } catch (error) {
           if (!closed) {
-            console.error('Error reading stream:', error);
+            const isAbort =
+              (error instanceof DOMException && error.name === 'AbortError') ||
+              (typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError') ||
+              request.signal.aborted;
+            if (!isAbort) {
+              console.error('Error reading stream:', error);
+            }
             try {
               controller.error(error);
             } catch {
@@ -332,6 +338,14 @@ commentary, or thinking output.`;
       },
     });
   } catch (error: unknown) {
+    // AbortError is normal (client disconnected or user clicked Stop) — don't log or 500.
+    const isAbort =
+      (error instanceof DOMException && error.name === 'AbortError') ||
+      (typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError') ||
+      request.signal.aborted;
+    if (isAbort) {
+      return new Response(null, { status: 499 });
+    }
     console.error('Error in Ollama chat:', error);
     const message = error instanceof Error ? error.message : 'Failed to process chat request';
     return new Response(

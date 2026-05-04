@@ -28,15 +28,7 @@ import {
 import { createOllamaChatResponder } from './ollama-chat-responder';
 import type { DetectedOpenApiSpec } from './openapi-detection';
 import type { ChatFeedback, ChatMessage, ChatSendFn, ChatStreamAccumulatedMeta } from './types';
-
-function isAbortError(error: unknown): boolean {
-  return (
-    (error instanceof DOMException && error.name === 'AbortError') ||
-    (typeof error === 'object' &&
-      error !== null &&
-      (error as { name?: string }).name === 'AbortError')
-  );
-}
+import { isAbortError } from './abort-errors';
 
 /**
  * Studio AI chat conversation surface (#258, #259, #260, #261).
