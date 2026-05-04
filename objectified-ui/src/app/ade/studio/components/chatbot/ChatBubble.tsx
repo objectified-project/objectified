@@ -28,8 +28,8 @@ export interface ChatBubbleProps {
   isLatestAssistant?: boolean;
   onRegenerate?: () => void;
   onFeedback?: (feedback: ChatFeedback) => void;
-  /** When the user previews an import from a ```json``` OpenAPI block (apply is confirmed in the shell). */
-  onImportSpec?: (spec: DetectedOpenApiSpec) => void;
+  /** When the user clicks "Preview changes" on a ```json``` OpenAPI block (opens the preview dialog in the shell). */
+  onRequestImportSpecPreview?: (spec: DetectedOpenApiSpec) => void;
 }
 
 export function ChatBubble({
@@ -37,7 +37,7 @@ export function ChatBubble({
   isLatestAssistant = false,
   onRegenerate,
   onFeedback,
-  onImportSpec,
+  onRequestImportSpecPreview,
 }: ChatBubbleProps) {
   const isUser = message.role === 'user';
   const specs = React.useMemo(
@@ -80,7 +80,7 @@ export function ChatBubble({
             specs={specs}
             onRegenerate={onRegenerate}
             onFeedback={onFeedback}
-            onImportSpec={onImportSpec}
+            onRequestImportSpecPreview={onRequestImportSpecPreview}
           />
         )}
       </div>
@@ -112,7 +112,7 @@ interface AssistantActionsProps {
   specs: DetectedOpenApiSpec[];
   onRegenerate?: () => void;
   onFeedback?: (feedback: ChatFeedback) => void;
-  onImportSpec?: (spec: DetectedOpenApiSpec) => void;
+  onRequestImportSpecPreview?: (spec: DetectedOpenApiSpec) => void;
 }
 
 function AssistantActions({
@@ -121,7 +121,7 @@ function AssistantActions({
   specs,
   onRegenerate,
   onFeedback,
-  onImportSpec,
+  onRequestImportSpecPreview,
 }: AssistantActionsProps) {
   const feedback = message.feedback;
   return (
@@ -152,12 +152,12 @@ function AssistantActions({
           />
         </>
       )}
-      {onImportSpec &&
+      {onRequestImportSpecPreview &&
         specs.map((spec, index) => (
           <button
             key={`spec-${index}`}
             type="button"
-            onClick={() => onImportSpec(spec)}
+            onClick={() => onRequestImportSpecPreview(spec)}
             data-testid={`studio-ai-chat-import-spec-${index}`}
             className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 dark:border-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 dark:hover:bg-indigo-900/60"
           >

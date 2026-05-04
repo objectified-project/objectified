@@ -494,19 +494,27 @@ export function ChatConversation({
     []
   );
 
+  const isApplyingSpecRef = React.useRef(false);
+
   const handleOpenApiImportPreviewRequest = React.useCallback((detected: DetectedOpenApiSpec) => {
+    isApplyingSpecRef.current = false;
     setOpenapiImportPreview(detected);
   }, []);
 
   const handleConfirmOpenApiImportApply = React.useCallback(() => {
-    if (openapiImportPreview && onImportSpec) {
-      onImportSpec(openapiImportPreview);
+    if (openapiImportPreview && onImportSpec && !isApplyingSpecRef.current) {
+      isApplyingSpecRef.current = true;
+      const specToApply = openapiImportPreview;
+      setOpenapiImportPreview(null);
+      onImportSpec(specToApply);
     }
-    setOpenapiImportPreview(null);
   }, [openapiImportPreview, onImportSpec]);
 
   const handleOpenApiImportPreviewDialogChange = React.useCallback((next: boolean) => {
-    if (!next) setOpenapiImportPreview(null);
+    if (!next) {
+      isApplyingSpecRef.current = false;
+      setOpenapiImportPreview(null);
+    }
   }, []);
 
   const askConfirm = React.useCallback(
@@ -679,7 +687,7 @@ export function ChatConversation({
                     isLatestAssistant={message.id === lastAssistantId}
                     onRegenerate={message.id === lastAssistantId ? handleRegenerate : undefined}
                     onFeedback={(feedback) => handleFeedback(message.id, feedback)}
-                    onImportSpec={onImportSpec ? handleOpenApiImportPreviewRequest : undefined}
+                    onRequestImportSpecPreview={onImportSpec ? handleOpenApiImportPreviewRequest : undefined}
                   />
                 ))}
                 <div ref={messagesEndRef} aria-hidden />

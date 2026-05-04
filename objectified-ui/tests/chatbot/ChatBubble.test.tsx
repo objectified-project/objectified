@@ -99,25 +99,25 @@ describe('ChatBubble', () => {
   });
 
   it('renders an Import button when the message contains an OpenAPI spec', () => {
-    const onImportSpec = jest.fn();
-    render(<ChatBubble message={specMessage} onImportSpec={onImportSpec} />);
+    const onRequestImportSpecPreview = jest.fn();
+    render(<ChatBubble message={specMessage} onRequestImportSpecPreview={onRequestImportSpecPreview} />);
     const importButton = screen.getByTestId('studio-ai-chat-import-spec-0');
     expect(importButton).toHaveTextContent(/Preview changes/i);
     fireEvent.click(importButton);
-    expect(onImportSpec).toHaveBeenCalledTimes(1);
-    expect(onImportSpec.mock.calls[0][0].version).toBe('3.1.0');
+    expect(onRequestImportSpecPreview).toHaveBeenCalledTimes(1);
+    expect(onRequestImportSpecPreview.mock.calls[0][0].version).toBe('3.1.0');
   });
 
-  it('does not render an Import button when onImportSpec is not provided', () => {
+  it('does not render an Import button when onRequestImportSpecPreview is not provided', () => {
     render(<ChatBubble message={specMessage} />);
     expect(screen.queryByTestId('studio-ai-chat-import-spec-0')).not.toBeInTheDocument();
   });
 
   it('does not render an Import button on user messages or assistant text without a spec', () => {
-    const { rerender } = render(<ChatBubble message={userMessage} onImportSpec={() => undefined} />);
+    const { rerender } = render(<ChatBubble message={userMessage} onRequestImportSpecPreview={() => undefined} />);
     expect(screen.queryByTestId('studio-ai-chat-import-spec-0')).not.toBeInTheDocument();
 
-    rerender(<ChatBubble message={assistantMessage} onImportSpec={() => undefined} />);
+    rerender(<ChatBubble message={assistantMessage} onRequestImportSpecPreview={() => undefined} />);
     expect(screen.queryByTestId('studio-ai-chat-import-spec-0')).not.toBeInTheDocument();
   });
 });
