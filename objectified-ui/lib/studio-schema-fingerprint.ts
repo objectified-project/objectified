@@ -41,14 +41,19 @@ async function sha256HexUtf8(text: string): Promise<string> {
 }
 
 /** Memoises fingerprints so repeated sends with an unchanged schema skip re-hashing. */
-const _fingerprintCache = new Map<string, string>();
+const FINGERPRINT_CACHE_MAX = 16;
+const fingerprintCache = new Map<string, string>();
 
 /** SHA-256 hex of canonical schema state — send as `schemaContextFingerprint` on `/api/ollama/chat`. */
 export async function computeStudioSchemaFingerprint(ctx: ChatStudioContext): Promise<string> {
   const key = stableStringify(canonicalStudioSchemaState(ctx));
-  const cached = _fingerprintCache.get(key);
+  const cached = fingerprintCache.get(key);
   if (cached !== undefined) return cached;
   const hash = await sha256HexUtf8(key);
-  _fingerprintCache.set(key, hash);
+  if (fingerprintCache.size >= FINGERPRINT_CACHE_MAX) {
+    const oldest = fingerprintCache.keys().next().value;
+    if (oldest !== undefined) fingerprintCache.delete(oldest);
+  }
+  fingerprintCache.set(key, hash);
   return hash;
 }
