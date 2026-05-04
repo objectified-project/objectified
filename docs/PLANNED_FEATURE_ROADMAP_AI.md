@@ -97,7 +97,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ Cancel generation mid-stream (#522)
     - ✅ Progress indication (#523)
 - 📋 **Caching**:
-    - 📋 Cache common queries
+    - ✅ Cache common queries (#524)
     - 📋 Semantic similarity matching
     - 📋 Cache invalidation on schema changes
 - 📋 **Guardrails**:
@@ -108,7 +108,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                                 |
 |--------|-----------------------------------------------------|
-| #524   | Cache common queries to Ollama                      |
 | #525   | Semantic similarity matching for cache              |
 | #526   | Cache invalidation on schema changes                |
 | #527   | Implementation of Guardrails for prompts/responses  |

@@ -4,6 +4,11 @@
 
 import { NextRequest } from 'next/server';
 import { isAbortError } from '../../../ade/studio/components/chatbot/abort-errors';
+import {
+  getCachedOllamaChatResponse,
+  ollamaChatCacheKey,
+  setCachedOllamaChatResponse,
+} from './query-cache';
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 
@@ -100,7 +105,7 @@ export async function POST(request: NextRequest) {
   try {
     const { model, messages, task, existingClassNames, existingProperties, tableNames, currentTableName } = await request.json();
 
-    if (!model || !messages || !Array.isArray(messages)) {
+    if (typeof model !== 'string' || !model.trim() || !messages || !Array.isArray(messages)) {
       return new Response(
         JSON.stringify({ error: 'Invalid request: model and messages are required' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -176,6 +181,42 @@ commentary, or thinking output.`;
     // Prepare messages with system prompt
     const fullMessages = [systemMessage, ...messages];
 
+    const cacheKey = ollamaChatCacheKey({
+      model: typeof model === 'string' ? model : '',
+      task: typeof task === 'string' ? task : undefined,
+      existingClassNames: isClassSkeleton ? existingClassNames : undefined,
+      existingProperties: isClassSkeleton ? existingProperties : undefined,
+      tableNames: isDataQuery ? tableNames : undefined,
+      currentTableName: isDataQuery ? currentTableName : undefined,
+      messages,
+    });
+
+    const cached = getCachedOllamaChatResponse(cacheKey);
+    if (cached) {
+      const encoder = new TextEncoder();
+      const hitStream = new ReadableStream({
+        start(controller) {
+          if (request.signal.aborted) {
+            controller.close();
+            return;
+          }
+          const event: Record<string, unknown> = { done: true, content: cached.text };
+          if (cached.usage) event.usage = cached.usage;
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          controller.close();
+        },
+      });
+      return new Response(hitStream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+          'X-Ollama-Chat-Cache': 'HIT',
+        },
+      });
+    }
+
     // Make request to Ollama with streaming
     const ollamaResponse = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
       method: 'POST',
@@ -237,6 +278,30 @@ commentary, or thinking output.`;
         }
 
         let buffer = '';
+        let fullAssistant = '';
+        let lastUsage: { promptTokens?: number; completionTokens?: number } | undefined;
+        let sawOllamaDone = false;
+
+        function ingestAssistantPayload(data: Record<string, unknown>): {
+          content: string | undefined;
+          usage: { promptTokens?: number; completionTokens?: number } | undefined;
+          done: boolean;
+        } {
+          const content = pickAssistantContent(data);
+          const usage = usageFromOllamaPayload(data);
+          const done = Boolean(data.done);
+          if (content) fullAssistant += content;
+          if (usage) lastUsage = usage;
+          if (done) sawOllamaDone = true;
+          return { content, usage, done };
+        }
+
+        function tryStoreCache(): void {
+          if (request.signal.aborted || closed) return;
+          if (!sawOllamaDone) return;
+          if (fullAssistant.trim().length === 0) return;
+          setCachedOllamaChatResponse(cacheKey, { text: fullAssistant, usage: lastUsage });
+        }
 
         try {
           while (true) {
@@ -247,9 +312,7 @@ commentary, or thinking output.`;
               if (buffer.trim() && !closed) {
                 try {
                   const data = JSON.parse(buffer) as Record<string, unknown>;
-                  const content = pickAssistantContent(data);
-                  const usage = usageFromOllamaPayload(data);
-                  const isDone = Boolean(data.done);
+                  const { content, usage, done: isDone } = ingestAssistantPayload(data);
                   if (content || usage) {
                     const event: Record<string, unknown> = { done: isDone };
                     if (content) event.content = content;
@@ -262,6 +325,7 @@ commentary, or thinking output.`;
               }
 
               if (!closed) {
+                tryStoreCache();
                 safeEnqueue(encoder.encode('data: [DONE]\n\n'));
                 safeClose();
               }
@@ -284,9 +348,7 @@ commentary, or thinking output.`;
 
               try {
                 const data = JSON.parse(line) as Record<string, unknown>;
-                const content = pickAssistantContent(data);
-                const usage = usageFromOllamaPayload(data);
-                const isDone = Boolean(data.done);
+                const { content, usage, done: isDone } = ingestAssistantPayload(data);
 
                 if (content || usage) {
                   const event: Record<string, unknown> = { done: isDone };
@@ -299,6 +361,7 @@ commentary, or thinking output.`;
 
                 // If this is the last message, signal completion
                 if (isDone) {
+                  tryStoreCache();
                   safeEnqueue(encoder.encode('data: [DONE]\n\n'));
                   safeClose();
                   return;
@@ -331,7 +394,8 @@ commentary, or thinking output.`;
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
+        'X-Ollama-Chat-Cache': 'MISS',
       },
     });
   } catch (error: unknown) {
