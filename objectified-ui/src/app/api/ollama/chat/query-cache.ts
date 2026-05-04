@@ -89,8 +89,7 @@ class LruMap {
       this.map.delete(key);
     } else if (this.map.size >= this.limit) {
       // The first key in a Map is the oldest (least-recently-used).
-      const oldest = this.map.keys().next().value;
-      if (oldest !== undefined) this.map.delete(oldest);
+      this.map.delete(this.map.keys().next().value as string);
     }
     this.map.set(key, value);
   }
