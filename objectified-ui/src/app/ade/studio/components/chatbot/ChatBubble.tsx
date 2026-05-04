@@ -2,11 +2,17 @@
 
 import * as React from 'react';
 import type { Components } from 'react-markdown';
-import { Bot, Download, RefreshCw, ThumbsDown, ThumbsUp, User } from 'lucide-react';
+import { Bot, ClipboardCopy, Download, ListPlus, Pencil, Plus, RefreshCw, ThumbsDown, ThumbsUp, User } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Markdown } from '@/app/components/ui/Markdown';
 import { ChatCodeBlock } from './ChatCodeBlock';
 import { ChatTypingIndicator } from './ChatTypingIndicator';
+import {
+  detectChatQuickActions,
+  type DetectedChatQuickAction,
+  type StudioChatWorkspaceAction,
+} from './assistant-action-detection';
 import { detectOpenApiSpecs, type DetectedOpenApiSpec } from './openapi-detection';
 import type { ChatFeedback, ChatMessage } from './types';
 
@@ -21,6 +27,7 @@ import type { ChatFeedback, ChatMessage } from './types';
  *   - assistant messages expose Regenerate and thumbs up/down feedback
  *   - assistant messages with a recognizably-OpenAPI ```json``` block expose
  *     a **Preview changes** button (#519) that opens the import preview flow in the shell
+ *   - assistant messages that include quick-action CTAs expose matching buttons (#518)
  */
 export interface ChatBubbleProps {
   message: ChatMessage;
@@ -30,6 +37,8 @@ export interface ChatBubbleProps {
   onFeedback?: (feedback: ChatFeedback) => void;
   /** When the user clicks "Preview changes" on a ```json``` OpenAPI block (opens the preview dialog in the shell). */
   onRequestImportSpecPreview?: (spec: DetectedOpenApiSpec) => void;
+  /** Studio layout wires class/property flows for quick-action buttons (#518). */
+  onChatWorkspaceAction?: (action: StudioChatWorkspaceAction) => void | Promise<void>;
 }
 
 export function ChatBubble({
@@ -38,10 +47,15 @@ export function ChatBubble({
   onRegenerate,
   onFeedback,
   onRequestImportSpecPreview,
+  onChatWorkspaceAction,
 }: ChatBubbleProps) {
   const isUser = message.role === 'user';
   const specs = React.useMemo(
     () => (isUser ? [] : detectOpenApiSpecs(message.content)),
+    [isUser, message.content]
+  );
+  const quickActions = React.useMemo(
+    () => (isUser ? [] : detectChatQuickActions(message.content)),
     [isUser, message.content]
   );
 
@@ -78,9 +92,11 @@ export function ChatBubble({
             message={message}
             isLatest={isLatestAssistant}
             specs={specs}
+            quickActions={quickActions}
             onRegenerate={onRegenerate}
             onFeedback={onFeedback}
             onRequestImportSpecPreview={onRequestImportSpecPreview}
+            onChatWorkspaceAction={onChatWorkspaceAction}
           />
         )}
       </div>
@@ -110,18 +126,22 @@ interface AssistantActionsProps {
   message: ChatMessage;
   isLatest: boolean;
   specs: DetectedOpenApiSpec[];
+  quickActions: DetectedChatQuickAction[];
   onRegenerate?: () => void;
   onFeedback?: (feedback: ChatFeedback) => void;
   onRequestImportSpecPreview?: (spec: DetectedOpenApiSpec) => void;
+  onChatWorkspaceAction?: (action: StudioChatWorkspaceAction) => void | Promise<void>;
 }
 
 function AssistantActions({
   message,
   isLatest,
   specs,
+  quickActions,
   onRegenerate,
   onFeedback,
   onRequestImportSpecPreview,
+  onChatWorkspaceAction,
 }: AssistantActionsProps) {
   const feedback = message.feedback;
   return (
@@ -165,7 +185,89 @@ function AssistantActions({
             {specs.length > 1 ? `Preview changes (${index + 1})` : 'Preview changes'}
           </button>
         ))}
+      {quickActions.map((action, index) => (
+        <QuickActionButton
+          key={`quick-${action.kind}-${index}`}
+          action={action}
+          index={index}
+          onChatWorkspaceAction={onChatWorkspaceAction}
+        />
+      ))}
     </div>
+  );
+}
+
+function QuickActionButton({
+  action,
+  index,
+  onChatWorkspaceAction,
+}: {
+  action: DetectedChatQuickAction;
+  index: number;
+  onChatWorkspaceAction?: (a: StudioChatWorkspaceAction) => void | Promise<void>;
+}) {
+  if (action.kind === 'copy_generated_payload') {
+    return (
+      <button
+        type="button"
+        data-testid={`studio-ai-chat-quick-copy-${index}`}
+        onClick={async () => {
+          if (typeof navigator === 'undefined' || !navigator.clipboard) {
+            toast.error('Clipboard is not available in this environment.');
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(action.payload);
+            toast.success('Copied JSON/YAML to clipboard.');
+          } catch {
+            toast.error('Could not copy to the clipboard.');
+          }
+        }}
+        className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-800 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+      >
+        <ClipboardCopy className="h-3.5 w-3.5" />
+        Copy JSON/YAML
+      </button>
+    );
+  }
+
+  if (!onChatWorkspaceAction) return null;
+
+  const meta: Record<
+    StudioChatWorkspaceAction['kind'],
+    { label: string; icon: React.ReactNode; testId: string }
+  > = {
+    create_class: {
+      label: 'Create this class',
+      icon: <Plus className="h-3.5 w-3.5" />,
+      testId: 'studio-ai-chat-quick-create-class',
+    },
+    batch_add_properties: {
+      label: 'Add these properties',
+      icon: <ListPlus className="h-3.5 w-3.5" />,
+      testId: 'studio-ai-chat-quick-batch-properties',
+    },
+    apply_current_class: {
+      label: 'Apply to current class',
+      icon: <Pencil className="h-3.5 w-3.5" />,
+      testId: 'studio-ai-chat-quick-apply-class',
+    },
+  };
+
+  const { label, icon, testId } = meta[action.kind];
+
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={() => {
+        void onChatWorkspaceAction({ kind: action.kind });
+      }}
+      className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100 dark:hover:bg-emerald-900/50"
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 

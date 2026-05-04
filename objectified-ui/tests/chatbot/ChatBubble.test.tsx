@@ -16,6 +16,10 @@ import '@testing-library/jest-dom';
 import { ChatBubble } from '../../src/app/ade/studio/components/chatbot/ChatBubble';
 import type { ChatMessage } from '../../src/app/ade/studio/components/chatbot/types';
 
+jest.mock('sonner', () => ({
+  toast: { success: jest.fn(), error: jest.fn() },
+}));
+
 const userMessage: ChatMessage = { id: 'u1', role: 'user', content: 'Design a User class please' };
 const assistantMessage: ChatMessage = {
   id: 'a1',
@@ -36,6 +40,24 @@ const specMessage: ChatMessage = {
     '',
     '```json',
     JSON.stringify({ openapi: '3.1.0', info: { title: 'X', version: '1' }, components: { schemas: {} } }),
+    '```',
+  ].join('\n'),
+};
+
+const quickActionMessage: ChatMessage = {
+  id: 'a-quick',
+  role: 'assistant',
+  content: [
+    'Draft ready.',
+    '',
+    '**Create this class**',
+    '',
+    '**Apply to current class**',
+    '',
+    '**Copy to clipboard**',
+    '',
+    '```json',
+    '{"demo":true}',
     '```',
   ].join('\n'),
 };
@@ -119,5 +141,26 @@ describe('ChatBubble', () => {
 
     rerender(<ChatBubble message={assistantMessage} onRequestImportSpecPreview={() => undefined} />);
     expect(screen.queryByTestId('studio-ai-chat-import-spec-0')).not.toBeInTheDocument();
+  });
+
+  it('renders quick-action buttons when CTAs are present (#518)', () => {
+    const onChatWorkspaceAction = jest.fn();
+    render(
+      <ChatBubble
+        message={quickActionMessage}
+        onChatWorkspaceAction={onChatWorkspaceAction}
+      />
+    );
+    expect(screen.getByTestId('studio-ai-chat-quick-create-class')).toBeInTheDocument();
+    expect(screen.getByTestId('studio-ai-chat-quick-apply-class')).toBeInTheDocument();
+    expect(screen.getByTestId('studio-ai-chat-quick-copy-2')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('studio-ai-chat-quick-create-class'));
+    expect(onChatWorkspaceAction).toHaveBeenCalledWith({ kind: 'create_class' });
+  });
+
+  it('hides studio quick actions when onChatWorkspaceAction is omitted (#518)', () => {
+    render(<ChatBubble message={quickActionMessage} />);
+    expect(screen.queryByTestId('studio-ai-chat-quick-create-class')).not.toBeInTheDocument();
+    expect(screen.getByTestId('studio-ai-chat-quick-copy-2')).toBeInTheDocument();
   });
 });

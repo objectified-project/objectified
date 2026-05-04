@@ -30,6 +30,7 @@ We continue to improve the platform based on your feedback with improvements and
 - When a request is not an exact key match, the chat route can still reuse a prior reply if the same model/task/context applies and Ollama returns a similar enough embedding for the message payload (cosine threshold, default 0.92); disable with `OLLAMA_CHAT_CACHE_SEMANTIC_DISABLED` or tune with `OLLAMA_CHAT_CACHE_SEMANTIC_THRESHOLD` (uses the same Ollama embed endpoint as snapshot vectorization).
 - Ollama chat cache keys include a fingerprint of the version’s class and property schemas when you use the Studio AI chatbot, so edits to OpenAPI/JSON Schema state do not reuse stale cached replies.
 - Studio AI chat **Preview changes** opens a modal with a formatted OpenAPI summary and JSON before **Apply import** runs the import action (cancel returns you to the chat with no import).
+- Assistant replies that include phrases such as **Create this class**, **Add these properties**, **Apply to current class**, or **Copy to clipboard** (with a JSON or YAML code block) show quick-action buttons: new class, open the selected class for editing, or copy the fenced payload.
 
 ---
 
