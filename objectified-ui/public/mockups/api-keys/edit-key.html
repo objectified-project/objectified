@@ -325,9 +325,9 @@
                   <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Preferred transport</label>
                   <div class="flex items-center gap-3" id="transport-btns">
                     <button id="tb-http" onclick="selectTransport('http')" class="flex-1 py-2.5 text-sm rounded-lg border-2 border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300 font-semibold flex items-center justify-center gap-2"><i data-lucide="wifi" class="w-4 h-4"></i> Streamable HTTP</button>
-                    <button id="tb-stdio" onclick="selectTransport('stdio')" class="flex-1 py-2.5 text-sm rounded-lg border-2 border-gray-200 dark:border-gray-700 text-gray-500 flex items-center justify-center gap-2"><i data-lucide="terminal" class="w-4 h-4"></i> stdio</button>
+                    <button id="tb-stdio" onclick="selectTransport('stdio')" class="flex-1 py-2.5 text-sm rounded-lg border-2 border-gray-200 dark:border-gray-700 text-gray-500 flex items-center justify-center gap-2"><i data-lucide="terminal" class="w-4 h-4"></i> stdio <span class="text-[10px] font-semibold uppercase tracking-wider ml-1 px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-300">Enterprise</span></button>
                   </div>
-                  <p class="text-[11px] text-gray-400 mt-1.5">Streamable HTTP is recommended for hosted agents. Use stdio for local CLI-based MCP clients.</p>
+                  <p class="text-[11px] text-gray-400 mt-1.5">Streamable HTTP is recommended for all deployments. stdio is available to <strong class="text-gray-500 dark:text-gray-300">self-hosted enterprise customers only</strong> for local on-premises CLI-based MCP clients.</p>
                 </div>
 
                 <div>
