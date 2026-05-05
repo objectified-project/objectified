@@ -123,16 +123,12 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 ### AI Schema Review & Improvement
 
-**Improvement Suggestions** 📋 PLANNED
-- 📋 "Consider adding pagination to this list endpoint"
-- 📋 "This schema could benefit from inheritance using allOf"
-- 📋 "Add a discriminator for this polymorphic type"
-- 📋 "Consider breaking this large schema into smaller components"
-- 📋 "Add error responses for common failure scenarios"
-
-| Ticket | Feature Description             |
-|--------|---------------------------------|
-| #495   | Adds AI improvement suggestions |
+**Improvement Suggestions** ✅ (#495 — Studio chat / Ollama system prompt + offline demo)
+- ✅ "Consider adding pagination to this list endpoint"
+- ✅ "This schema could benefit from inheritance using allOf"
+- ✅ "Add a discriminator for this polymorphic type"
+- ✅ "Consider breaking this large schema into smaller components"
+- ✅ "Add error responses for common failure scenarios"
 
 **Actionable Recommendations** 📋 PLANNED
 - 📋 AI-powered suggestions for improvement:

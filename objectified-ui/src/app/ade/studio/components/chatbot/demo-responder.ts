@@ -19,6 +19,10 @@
  * **Create this class**, **Add these properties**, **Apply to current class**,
  * and **Copy to clipboard** without running a live model.
  *
+ * #495: spec and class-draft replies include **Improvement suggestions** so the
+ * offline demo matches live-model guidance (pagination, allOf, discriminator,
+ * component splits, error-response notes).
+ *
  * #260 layers in multi-turn awareness. Each call asks
  * `summarizeConversationHistory` to classify the prompt against the prior
  * transcript and we branch on the result:
@@ -100,7 +104,8 @@ export const createDemoChatResponder = (): ChatSendFn => async ({
       JSON.stringify(spec, null, 2),
       '```',
       '',
-      'A few things to consider next:',
+      '**Improvement suggestions**',
+      '',
       ...suggestions,
     );
     appendStudioChatQuickActionDemo(lines, { includeYamlSample: false });
@@ -187,6 +192,12 @@ function buildDemoClassDraftRefinementReply(input: {
     ),
     '```',
     '',
+    '**Improvement suggestions**',
+    '',
+    '- Consider extracting repeated audit fields (`createdAt`, `updatedAt`) into a shared base schema composed with `allOf`.',
+    '- If this type participates in a polymorphic union, add a `discriminator` when variants need stable identification.',
+    '- When the property list grows, split cross-cutting groups into `$ref` components under `components/schemas`.',
+    '',
     '**Create this class**',
     '',
     'Ask for another change in the preview dialog or here in chat.',
@@ -211,7 +222,7 @@ function applyDemoHeuristicClassRefinement(
       : {};
   schema.properties = props;
 
-  let required: string[] = Array.isArray(schema.required)
+  const required: string[] = Array.isArray(schema.required)
     ? [...schema.required].filter((x): x is string => typeof x === 'string')
     : [];
 
@@ -304,6 +315,12 @@ function buildRefinementReply({
     JSON.stringify(refined, null, 2),
     '```',
     '',
+    '**Improvement suggestions**',
+    '',
+    '- Consider adding pagination (cursor or offset/limit) when this resource is exposed as a collection endpoint.',
+    '- Consider standard error response bodies (validation, not found) when you document operations alongside these schemas.',
+    '- If several schemas share the same embedded shape, model the shared part once with `allOf` and `$ref`.',
+    '',
     'Need another change? Ask me to add, remove, rename, or require a property and I\'ll keep iterating.',
   );
   appendStudioChatQuickActionDemo(lines, { includeYamlSample: false });
@@ -374,18 +391,23 @@ function describeGrounding(ctx: ChatStudioContext | undefined): string | null {
 
 function buildContextAwareSuggestions(ctx: ChatStudioContext | undefined): string[] {
   const suggestions = [
-    '- Tighten property descriptions for documentation scoring',
-    '- Add `examples` arrays where missing',
-    '- Decide whether to expose this through a path operation in a follow-up',
+    '- Consider adding pagination to list endpoints that return many rows from this model.',
+    '- Consider breaking large schemas into smaller `components/schemas` fragments composed with `$ref` when one object mixes unrelated concerns.',
+    '- Add shared validation or metadata fields via `allOf` referencing a common base schema when multiple types repeat the same shape.',
+    '- Add a `discriminator` when you model polymorphic payloads with `oneOf` / `anyOf`.',
+    '- Plan explicit error response schemas (validation, conflict, not found) when you add path operations later.',
+    '- Tighten descriptions and add `examples` arrays where documentation tooling expects them.',
   ];
   if (!ctx || isChatStudioContextEmpty(ctx)) return suggestions;
   const selected = getSelectedClasses(ctx);
   if (selected.length > 0) {
     const names = selected.slice(0, 3).map((cls) => `\`${cls.name}\``).join(', ');
-    suggestions.unshift(`- Cross-check the new schema against your selected ${selected.length === 1 ? 'class' : 'classes'} (${names})`);
+    suggestions.unshift(`- Cross-check the new schema against your selected ${selected.length === 1 ? 'class' : 'classes'} (${names}) before importing.`);
   } else if (ctx.classes.length > 0) {
     const sample = ctx.classes.slice(0, 3).map((cls) => `\`${cls.name}\``).join(', ');
-    suggestions.unshift(`- Reuse the names already in this version when possible (e.g. ${sample})`);
+    suggestions.unshift(
+      `- Reuse schema names already in this version when wiring \`$ref\` (e.g. ${sample}).`,
+    );
   }
   return suggestions;
 }

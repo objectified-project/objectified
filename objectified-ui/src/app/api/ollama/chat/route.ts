@@ -61,6 +61,8 @@ Then output exactly one JSON code block in this shape:
 }
 \`\`\`
 
+After that JSON block, add a markdown section titled exactly **Improvement suggestions** with 2–5 bullets: actionable schema/API notes for this class (e.g. \`allOf\` for shared bases, \`discriminator\` with \`oneOf\`, splitting large objects into referenced components, pagination or error-response considerations when list/query APIs are added later). Keep bullets specific to what you generated.
+
 # Rules
 
 - "name" must be PascalCase and contain only letters, numbers, and underscores (A-Za-z0-9_).
@@ -74,7 +76,7 @@ Then output exactly one JSON code block in this shape:
 - For $ref inside the schema, use format "#/components/schemas/ClassName" when referencing other classes.
 - Property names in "properties" should be camelCase. Include "description" (and optionally "summary") on the schema and on properties where helpful.
 - Keep the class a clear skeleton: include the structure the user asked for, but you do not need to exhaust every option. Prefer properties and required; add allOf/anyOf/oneOf/discriminator/additionalProperties etc. only when they fit the user's description.
-- Apart from the optional **Suggested properties** and **Suggested relationships** sections and the single JSON code block, do not add other commentary.
+- Apart from the optional **Suggested properties** and **Suggested relationships** sections, the single JSON code block, and the required **Improvement suggestions** section, do not add other commentary.
 
 # Iterative refinement
 
@@ -167,9 +169,8 @@ export async function POST(request: NextRequest) {
 - When generating a complete specification, wrap it in a JSON code block: \`\`\`json\n{spec}\n\`\`\`
 - Include proper info section with title, version, description, license, contact details
 - Add servers section with at least one server URL (localhost is fine), and tags section with relevant tags
-- Generate only schemas. Do not generate paths.
+- Generate only schemas. Do not generate paths or path items inside the JSON document.
 - Use components/schemas for all schema definitions
-- Include appropriate HTTP methods and response codes
 - Always generate descriptions and summaries to all properties and schemas
 - Encourage using $ref for schema references when properties are reused
 - Avoid duplicating properties: use $ref instead
@@ -177,10 +178,10 @@ export async function POST(request: NextRequest) {
 - **CORRECT: { "$ref": "#/components/schemas/User" }**
 - When you need to reference a class/schema, use: "#/components/schemas/ClassName"
 - Use advanced schema features like patternProperties, discriminators, conditional rules, and allOf/oneOf/anyOf where applicable
-- Be conversational and explain your design decisions
+- Keep prose concise; put brief rationale into **Improvement suggestions** bullets where it helps
 - Support incremental improvements to existing specs
 - Do not generate clips of schemas in the response: The output should be the final schema
-- Do not make up rules or paths that are not possible in OpenAPI 3.1.0
+- Do not make up rules or constructs that are not possible in OpenAPI 3.1.0
 
 # Generation instructions
 
@@ -203,8 +204,19 @@ export async function POST(request: NextRequest) {
 - All classes must include examples
 - Examples must be provided in an "examples" array
 
-Make adjustments to the schema as needed based on user feedback and requests for changes.  Provide no additional feedback,
-commentary, or thinking output.`;
+Make adjustments to the schema as needed based on user feedback and requests for changes.
+
+# Improvement suggestions (#495)
+
+Immediately after the JSON code block, add a markdown section titled exactly **Improvement suggestions** with a bullet list of 2–5 short, actionable items tailored to the schemas you produced and the user's domain. Each bullet should read like a concrete next step (not generic platitudes). Draw from these patterns when they apply; rephrase for context:
+
+- Consider adding pagination to list or collection endpoints when this API exposes large result sets (e.g. cursor or offset/limit).
+- Consider modeling shared fields once with \`allOf\` when several schemas repeat the same base shape (inheritance / composition).
+- Consider adding a \`discriminator\` when polymorphic types use \`oneOf\`/\`anyOf\` and variants need stable identification.
+- Consider splitting an oversized schema into smaller \`#/components/schemas\` pieces composed with \`$ref\` when one object mixes unrelated concerns.
+- Consider standard error responses (validation, not found, conflict, etc.) when operations are documented later.
+
+Do not repeat the full JSON spec outside the code block. Do not add other sections beyond the spec JSON and **Improvement suggestions**, unless the user explicitly asks for a different layout.`;
 
     const systemMessage = {
       role: 'system',
