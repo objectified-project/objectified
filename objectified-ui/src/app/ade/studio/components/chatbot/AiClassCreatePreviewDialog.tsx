@@ -51,10 +51,10 @@ export function AiClassCreatePreviewDialog({
     return parseClassDefinitionFromAssistantMarkdown(assistantMarkdown);
   }, [assistantMarkdown]);
 
-  const pretty = React.useMemo(() => {
+  const schemaJson = React.useMemo(() => {
     if (!parsed) return '';
     try {
-      return JSON.stringify({ name: parsed.name, description: parsed.description, schema: parsed.schema }, null, 2);
+      return JSON.stringify(parsed.schema, null, 2);
     } catch {
       return '';
     }
@@ -72,7 +72,8 @@ export function AiClassCreatePreviewDialog({
           <DialogHeader className="space-y-2 text-left">
             <DialogTitle>Preview class schema</DialogTitle>
             <DialogDescription className="text-left">
-              Review the generated JSON Schema before continuing. Cancel to return to the chat with no changes.
+              Review the class metadata and the formatted JSON Schema below before continuing. Cancel to return to the
+              chat with no changes.
             </DialogDescription>
           </DialogHeader>
           {parsed ? (
@@ -112,12 +113,19 @@ export function AiClassCreatePreviewDialog({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-3">
-          <pre
-            className="max-h-[min(50vh,28rem)] overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed text-gray-900 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100"
-            data-testid="studio-ai-chat-class-create-preview-json"
-          >
-            {pretty || assistantMarkdown || '—'}
-          </pre>
+          <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="border-b border-gray-200 bg-gray-100 px-3 py-1.5 dark:border-gray-700 dark:bg-gray-900">
+              <span className="text-xs font-mono text-gray-700 dark:text-gray-300">
+                {schemaJson ? 'JSON Schema' : 'Assistant response'}
+              </span>
+            </div>
+            <pre
+              className="max-h-[min(50vh,28rem)] overflow-auto bg-gray-50 p-3 text-xs leading-relaxed text-gray-900 dark:bg-gray-950 dark:text-gray-100"
+              data-testid="studio-ai-chat-class-create-preview-json"
+            >
+              {schemaJson || assistantMarkdown || '—'}
+            </pre>
+          </div>
         </div>
 
         <DialogFooter className="border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-700 dark:bg-gray-900/80 sm:justify-end">
