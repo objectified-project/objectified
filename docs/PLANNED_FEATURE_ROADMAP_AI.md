@@ -103,23 +103,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 | #275   | Adds trigger conditions for the Suggestion UI      |
 | #276   | Adds analyze button for properties analysis        |
 
-**Type and Constraint Inference** 📋 PLANNED
-- ✅ Suggest type based on property name (#277 — chat refinement + class-skeleton prompt guidance):
-    - ✅ `email` → string with email format
-    - ✅ `createdAt` → string with date-time format
-    - ✅ `age` → integer with minimum 0
-    - ✅ `price` → number with minimum 0
-    - ✅ `isActive` → boolean
-- ✅ Suggest constraints (#278 — chat refinement merges inferred keywords into new properties):
-    - ✅ String length limits (`email`, `password`, `description`, …)
-    - ✅ Numeric ranges (`age`, `percentage`, `latitude`, …)
-    - ✅ Pattern validation (`slug`, `sku`, `phone`, ISO codes, …)
-    - ✅ Required vs optional (`id` suggested required when added without an explicit type)
-
-| Ticket | Feature Description                        |
-|--------|--------------------------------------------|
-| ~~#278~~ | ~~Adds constraint suggestions for properties~~ ✅ Done |
-
 **Actionable Recommendations** 📋 PLANNED
 - 📋 AI-powered suggestions for improvement:
     - 📋 "Add descriptions to 12 classes to improve docs score"
@@ -299,3 +282,16 @@ This outlines the planned features for integrating AI capabilities into Objectif
 - ✅ "Add a discriminator for this polymorphic type"
 - ✅ "Consider breaking this large schema into smaller components"
 - ✅ "Add error responses for common failure scenarios"
+
+**Type and Constraint Inference** 📋 PLANNED
+- ✅ Suggest type based on property name (#277 — chat refinement + class-skeleton prompt guidance):
+    - ✅ `email` → string with email format
+    - ✅ `createdAt` → string with date-time format
+    - ✅ `age` → integer with minimum 0
+    - ✅ `price` → number with minimum 0
+    - ✅ `isActive` → boolean
+- ✅ Suggest constraints (#278 — chat refinement merges inferred keywords into new properties):
+    - ✅ String length limits (`email`, `password`, `description`, …)
+    - ✅ Numeric ranges (`age`, `percentage`, `latitude`, …)
+    - ✅ Pattern validation (`slug`, `sku`, `phone`, ISO codes, …)
+    - ✅ Required vs optional (`id` suggested required when added without an explicit type)
