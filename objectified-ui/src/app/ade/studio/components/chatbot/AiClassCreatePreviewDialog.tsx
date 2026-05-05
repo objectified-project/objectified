@@ -202,6 +202,7 @@ export function AiClassCreatePreviewDialog({
             </div>
             <textarea
               data-testid="studio-ai-chat-class-create-preview-refine-input"
+              aria-label="Refinement instructions"
               value={refineText}
               disabled={refinementBusy}
               onChange={(e) => setRefineText(e.target.value)}

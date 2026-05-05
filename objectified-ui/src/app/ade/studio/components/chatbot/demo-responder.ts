@@ -135,7 +135,10 @@ function buildDemoClassDraftRefinementReply(input: {
   variation: string;
 }): string {
   const { prompt, groundingLine, continuityLine, variation } = input;
-  const fenceBody = extractFirstJsonOrYamlFenceBody(prompt);
+  const currentDefMarker = 'Current definition:';
+  const markerIdx = prompt.indexOf(currentDefMarker);
+  const searchIn = markerIdx >= 0 ? prompt.slice(markerIdx + currentDefMarker.length) : prompt;
+  const fenceBody = extractFirstJsonOrYamlFenceBody(searchIn);
   if (!fenceBody) {
     return ['Could not find a JSON draft to refine in your message.', variation].filter(Boolean).join('\n');
   }

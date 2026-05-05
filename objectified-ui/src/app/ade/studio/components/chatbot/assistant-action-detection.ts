@@ -249,7 +249,7 @@ export function buildClassDraftRefinementUserMessage(parsed: ParsedAiClassDefini
     draftJson,
     '```',
     '',
-    'Reply with the updated class using the same structure as usual: optional **Suggested properties** and **Suggested relationships**, then exactly one ```json code block with name, description, and schema. Apply my instructions on top of the current definition; preserve fields I did not ask to remove.',
+    'Reply with the updated class using the same structure as usual: optional **Suggested properties** and **Suggested relationships**, then exactly one JSON code block (fenced with json) containing name, description, and schema. Apply my instructions on top of the current definition; preserve fields I did not ask to remove.',
   ].join('\n');
 }
 
