@@ -57,6 +57,10 @@ export interface ChatSendContext {
    */
   ollamaModel?: string;
   /**
+   * When `class_skeleton`, `/api/ollama/chat` uses the JSON Schema class task (same as Create Class with AI; #532 refinement).
+   */
+  ollamaTask?: 'class_skeleton';
+  /**
    * Called as streamed assistant text grows (e.g. Ollama SSE). Receives the full
    * accumulated markdown seen so far — NOT the latest delta chunk. The shell passes
    * this so the pending bubble updates live; responders that do not stream can ignore it (#520).

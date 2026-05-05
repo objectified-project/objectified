@@ -35,6 +35,12 @@
 import type { ChatStudioContext, ChatStudioProperty } from './chat-context';
 import { getSelectedClasses, isChatStudioContextEmpty } from './chat-context';
 import {
+  extractFirstJsonOrYamlFenceBody,
+  summarizeJsonSchemaProperties,
+  userMessageIsClassDraftRefinement,
+  type ParsedAiClassDefinition,
+} from './assistant-action-detection';
+import {
   applyRefinementsToSpec,
   summarizeConversationHistory,
   type ChatHistorySummary,
@@ -56,6 +62,10 @@ export const createDemoChatResponder = (): ChatSendFn => async ({
   const variation = isRegenerate ? '\n\n_Regenerated with a slightly different angle._' : '';
   const groundingLine = describeGrounding(studioContext);
   const continuityLine = describeContinuity(history);
+
+  if (userMessageIsClassDraftRefinement(prompt)) {
+    return buildDemoClassDraftRefinementReply({ prompt, groundingLine, continuityLine, variation });
+  }
 
   if (history.intent === 'clarification') {
     return buildClarificationReply({ history, groundingLine, continuityLine, variation });
@@ -117,6 +127,127 @@ export const createDemoChatResponder = (): ChatSendFn => async ({
   appendStudioChatQuickActionDemo(lines, { includeYamlSample: true });
   return lines.join('\n') + variation;
 };
+
+function buildDemoClassDraftRefinementReply(input: {
+  prompt: string;
+  groundingLine: string | null;
+  continuityLine: string | null;
+  variation: string;
+}): string {
+  const { prompt, groundingLine, continuityLine, variation } = input;
+  const currentDefMarker = 'Current definition:';
+  const markerIdx = prompt.indexOf(currentDefMarker);
+  const searchIn = markerIdx >= 0 ? prompt.slice(markerIdx + currentDefMarker.length) : prompt;
+  const fenceBody = extractFirstJsonOrYamlFenceBody(searchIn);
+  if (!fenceBody) {
+    return ['Could not find a JSON draft to refine in your message.', variation].filter(Boolean).join('\n');
+  }
+  let parsedBody: ParsedAiClassDefinition | null = null;
+  try {
+    const raw = JSON.parse(fenceBody) as Record<string, unknown>;
+    if (raw && typeof raw.name === 'string' && raw.schema) {
+      const name = raw.name.replace(/[^A-Za-z0-9_]/g, '') || '';
+      if (name) {
+        parsedBody = {
+          name,
+          description: typeof raw.description === 'string' ? raw.description : null,
+          schema: raw.schema,
+        };
+      }
+    }
+  } catch {
+    parsedBody = null;
+  }
+  if (!parsedBody) {
+    return ['The current definition block was not valid JSON for refinement.', variation].join('\n');
+  }
+
+  const instructionMatch = prompt.match(/My instructions:\s*\n([\s\S]*?)\n\nCurrent definition:/i);
+  const instructionLine = instructionMatch?.[1]?.trim() ?? '';
+  const refined = applyDemoHeuristicClassRefinement(parsedBody, instructionLine.toLowerCase());
+
+  const propLines = summarizeJsonSchemaProperties(refined.schema).map(
+    (p) => `- ${p.name} — ${p.suggestedType}`,
+  );
+  const lines: string[] = [
+    `Updated the class draft${groundingLine ? ` ${groundingLine}` : ''}.`,
+    '',
+    '**Suggested properties**',
+    ...(propLines.length > 0 ? propLines : ['- (no typed properties yet)']),
+    '',
+    '```json',
+    JSON.stringify(
+      {
+        name: refined.name,
+        description: refined.description ?? '',
+        schema: refined.schema,
+      },
+      null,
+      2,
+    ),
+    '```',
+    '',
+    '**Create this class**',
+    '',
+    'Ask for another change in the preview dialog or here in chat.',
+  ];
+  if (continuityLine) lines.splice(1, 0, '', continuityLine);
+  return lines.join('\n') + variation;
+}
+
+function applyDemoHeuristicClassRefinement(
+  def: ParsedAiClassDefinition,
+  inst: string,
+): ParsedAiClassDefinition {
+  const schema =
+    def.schema && typeof def.schema === 'object' && !Array.isArray(def.schema)
+      ? ({ ...(def.schema as Record<string, unknown>) } as Record<string, unknown>)
+      : { type: 'object', properties: {} };
+
+  if (schema.type !== 'object') schema.type = 'object';
+  const props =
+    typeof schema.properties === 'object' && schema.properties !== null && !Array.isArray(schema.properties)
+      ? ({ ...(schema.properties as Record<string, unknown>) } as Record<string, unknown>)
+      : {};
+  schema.properties = props;
+
+  let required: string[] = Array.isArray(schema.required)
+    ? [...schema.required].filter((x): x is string => typeof x === 'string')
+    : [];
+
+  if (inst.includes('phone')) {
+    props.phoneNumber = { type: 'string', description: 'Phone number' };
+  }
+  if (inst.includes('email') && (inst.includes('required') || inst.includes('make'))) {
+    if (!props.email) props.email = { type: 'string', format: 'email' };
+    if (!required.includes('email')) required.push('email');
+  }
+  if (inst.includes('password') && (inst.includes('length') || inst.includes('validation'))) {
+    const pw =
+      props.password && typeof props.password === 'object' && !Array.isArray(props.password)
+        ? ({ ...(props.password as Record<string, unknown>) } as Record<string, unknown>)
+        : { type: 'string' };
+    pw.minLength = 8;
+    props.password = pw;
+  }
+  if (inst.includes('timestamp') || inst.includes('audit')) {
+    props.createdAt = {
+      type: 'string',
+      format: 'date-time',
+      description: 'Creation timestamp',
+    };
+    props.updatedAt = {
+      type: 'string',
+      format: 'date-time',
+      description: 'Last update timestamp',
+    };
+  }
+
+  if (required.length > 0) schema.required = required;
+  else delete schema.required;
+
+  return { name: def.name, description: def.description, schema };
+}
 
 interface ReplyBuilderInput {
   history: ChatHistorySummary;

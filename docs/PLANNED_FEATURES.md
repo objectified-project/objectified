@@ -255,7 +255,7 @@ Implement in this order so each step stays testable. **Issue → roadmap ID** fo
 | C.5 | **Chat shell:** placement, design guidelines | **#257**, **#258** |
 | C.6 | **Conversation + context:** context awareness, multi-turn, history actions | **#259**, **#260**, **#261** |
 | C.7 | **Quick actions + apply:** actions from chat, preview before apply | **#518** (done), **#519** |
-| C.8 | **NL → schema:** description → schema, examples, preview surface | **#267**, **#268** (done), **#528–#532** |
+| C.8 | **NL → schema:** description → schema, examples, preview surface | **#267**, **#268** (done), **#528–#532** (done) |
 | C.9 | **Property assist:** suggestions, dropdown, bulk, triggers, analysis | **#269–#276**, **#277**, **#278** |
 | C.10 | **Higher insights (post-MVP polish):** improvement suggestions, docs generation, layout hints, etc. | **#253–#256**, **#495**, **#609–#623** (schedule after core chat works) |
 
@@ -280,7 +280,7 @@ Implement in this order so each step stays testable. **Issue → roadmap ID** fo
 
 **Manual:**
 
-1. Prompt → **preview** → accept/reject; schema matches **classes**/**versions** (**#528–#532**).
+1. Prompt → **preview** → refine in preview / accept / reject; schema matches **classes**/**versions** (**#528–#532**, incl. iterative refinement **#532**).
 2. **Guardrails:** injection / PII cases per **#263**, **#527**.
 
 ---

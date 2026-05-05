@@ -12,6 +12,10 @@
  *     comparisons, and re-rolls
  */
 
+import {
+  buildClassDraftRefinementUserMessage,
+  parseClassDefinitionFromAssistantMarkdown,
+} from '../../src/app/ade/studio/components/chatbot/assistant-action-detection';
 import { createDemoChatResponder } from '../../src/app/ade/studio/components/chatbot/demo-responder';
 import { detectOpenApiSpecs } from '../../src/app/ade/studio/components/chatbot/openapi-detection';
 import {
@@ -67,6 +71,37 @@ describe('createDemoChatResponder', () => {
     });
     expect(reply).toMatch(/Markdown/);
     expect(detectOpenApiSpecs(reply)).toHaveLength(0);
+  });
+
+  it('refines an embedded class skeleton draft heuristically (#532)', async () => {
+    const draftMd = [
+      '```json',
+      JSON.stringify({
+        name: 'User',
+        description: '',
+        schema: {
+          type: 'object',
+          properties: {
+            email: { type: 'string' },
+            password: { type: 'string' },
+          },
+        },
+      }),
+      '```',
+    ].join('\n');
+    const parsed = parseClassDefinitionFromAssistantMarkdown(draftMd);
+    expect(parsed).not.toBeNull();
+    const prompt = buildClassDraftRefinementUserMessage(parsed!, 'Add a phone number field');
+    const reply = await responder({
+      messages: [{ id: 'u1', role: 'user', content: prompt }],
+      prompt,
+      isRegenerate: false,
+    });
+    expect(reply).toContain('phoneNumber');
+    const out = parseClassDefinitionFromAssistantMarkdown(reply);
+    expect(out).not.toBeNull();
+    const props = (out!.schema as { properties?: Record<string, unknown> }).properties ?? {};
+    expect(props.phoneNumber).toBeDefined();
   });
 
   it('annotates the reply when the user regenerates', async () => {

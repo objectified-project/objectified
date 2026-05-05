@@ -18,11 +18,22 @@ import {
   type ParsedAiClassDefinition,
 } from './assistant-action-detection';
 
+const REFINE_EXAMPLES = [
+  'Add a phone number field',
+  'Make email required',
+  'Add validation for password length',
+  'Include timestamps for audit',
+] as const;
+
 export interface AiClassCreatePreviewDialogProps {
   open: boolean;
   assistantMarkdown: string | null;
   onOpenChange: (open: boolean) => void;
   onConfirmCreate: () => void;
+  /** While the assistant is refining the draft (#532). */
+  refinementBusy?: boolean;
+  /** Sends a refinement turn from the preview; transcript updates in the chat behind the modal. */
+  onRequestRefinement?: (instruction: string) => void;
 }
 
 export function AiClassCreatePreviewDialog({
@@ -30,7 +41,15 @@ export function AiClassCreatePreviewDialog({
   assistantMarkdown,
   onOpenChange,
   onConfirmCreate,
+  refinementBusy = false,
+  onRequestRefinement,
 }: AiClassCreatePreviewDialogProps) {
+  const [refineText, setRefineText] = React.useState('');
+
+  React.useEffect(() => {
+    if (open) setRefineText('');
+  }, [open, assistantMarkdown]);
+
   const parsed = React.useMemo<ParsedAiClassDefinition | null>(() => {
     if (!assistantMarkdown) return null;
     return parseClassDefinitionFromAssistantMarkdown(assistantMarkdown);
@@ -77,7 +96,7 @@ export function AiClassCreatePreviewDialog({
             <DialogTitle>Preview class schema</DialogTitle>
             <DialogDescription className="text-left">
               Review the class metadata, property types, relationship hints, and the formatted JSON Schema below before
-              continuing. Cancel to return to the chat with no changes.
+              continuing. Use refine to iterate on the draft in chat; cancel leaves the workspace unchanged.
             </DialogDescription>
           </DialogHeader>
           {parsed ? (
@@ -164,6 +183,48 @@ export function AiClassCreatePreviewDialog({
             </pre>
           </div>
         </div>
+
+        {onRequestRefinement && parsed ? (
+          <div className="border-t border-gray-200 px-6 py-3 dark:border-gray-700">
+            <p className="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">Refine with the assistant</p>
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {REFINE_EXAMPLES.map((ex) => (
+                <button
+                  key={ex}
+                  type="button"
+                  disabled={refinementBusy}
+                  className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-xs text-gray-700 transition-colors hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                  onClick={() => setRefineText(ex)}
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
+            <textarea
+              data-testid="studio-ai-chat-class-create-preview-refine-input"
+              aria-label="Refinement instructions"
+              value={refineText}
+              disabled={refinementBusy}
+              onChange={(e) => setRefineText(e.target.value)}
+              placeholder="e.g. Add a phone number field, make email required…"
+              rows={2}
+              className="mb-2 w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-900"
+            />
+            <button
+              type="button"
+              data-testid="studio-ai-chat-class-create-preview-refine-submit"
+              disabled={refinementBusy || !refineText.trim()}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-indigo-500"
+              onClick={() => {
+                const t = refineText.trim();
+                if (!t || refinementBusy) return;
+                onRequestRefinement(t);
+              }}
+            >
+              {refinementBusy ? 'Waiting for assistant…' : 'Ask assistant to refine'}
+            </button>
+          </div>
+        ) : null}
 
         <DialogFooter className="border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-700 dark:bg-gray-900/80 sm:justify-end">
           <button

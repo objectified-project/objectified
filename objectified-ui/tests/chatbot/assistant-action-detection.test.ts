@@ -1,10 +1,13 @@
 import {
+  buildClassDraftRefinementUserMessage,
+  CLASS_DRAFT_REFINE_HEADING,
   detectChatQuickActions,
   extractFirstJsonOrYamlFenceBody,
   extractSuggestedRelationshipBulletsFromAssistantMarkdown,
   inferJsonSchemaRelationships,
   parseClassDefinitionFromAssistantMarkdown,
   summarizeJsonSchemaProperties,
+  userMessageIsClassDraftRefinement,
 } from '../../src/app/ade/studio/components/chatbot/assistant-action-detection';
 
 describe('extractFirstJsonOrYamlFenceBody', () => {
@@ -226,5 +229,37 @@ describe('summarizeJsonSchemaProperties', () => {
       { name: 'matrix', suggestedType: 'array<array<number>>' },
       { name: 'tags', suggestedType: 'array<array>' },
     ]);
+  });
+});
+
+describe('class draft refinement (#532)', () => {
+  it('buildClassDraftRefinementUserMessage embeds draft json and instructions', () => {
+    const parsed = parseClassDefinitionFromAssistantMarkdown(
+      [
+        '```json',
+        JSON.stringify({
+          name: 'User',
+          description: 'A user',
+          schema: { type: 'object', properties: { email: { type: 'string' } } },
+        }),
+        '```',
+      ].join('\n'),
+    );
+    expect(parsed).not.toBeNull();
+    const msg = buildClassDraftRefinementUserMessage(parsed!, 'Make email required');
+    expect(msg).toContain(CLASS_DRAFT_REFINE_HEADING);
+    expect(msg).toContain('Make email required');
+    expect(msg).toContain('Current definition:');
+    expect(msg).toContain('"email"');
+  });
+
+  it('userMessageIsClassDraftRefinement detects structured refinement turns', () => {
+    const parsed = parseClassDefinitionFromAssistantMarkdown(
+      ['```json', JSON.stringify({ name: 'X', schema: { type: 'object', properties: {} } }), '```'].join('\n'),
+    );
+    expect(parsed).not.toBeNull();
+    const msg = buildClassDraftRefinementUserMessage(parsed!, ' tweak ');
+    expect(userMessageIsClassDraftRefinement('plain text')).toBe(false);
+    expect(userMessageIsClassDraftRefinement(msg)).toBe(true);
   });
 });

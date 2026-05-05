@@ -90,15 +90,15 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ JSON Schema format display (#529)
     - ✅ Property list with types (#530)
     - ✅ Relationship suggestions (#531)
-- 📋 **Iterative Refinement**:
-    - 📋 "Add a phone number field"
-    - 📋 "Make email required"
-    - 📋 "Add validation for password length"
-    - 📋 "Include timestamps for audit"
+- ✅ **Iterative Refinement** (#532):
+    - ✅ "Add a phone number field"
+    - ✅ "Make email required"
+    - ✅ "Add validation for password length"
+    - ✅ "Include timestamps for audit"
 
 | Ticket | Feature Description                                      |
 |--------|----------------------------------------------------------|
-| #532   | Iterative refinement of generated schemas                |
+| ~~#532~~ | ~~Iterative refinement of generated schemas~~ **Done** |
 
 ### AI-Powered Property Suggestions
 

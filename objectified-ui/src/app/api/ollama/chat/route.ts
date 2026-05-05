@@ -74,7 +74,11 @@ Then output exactly one JSON code block in this shape:
 - For $ref inside the schema, use format "#/components/schemas/ClassName" when referencing other classes.
 - Property names in "properties" should be camelCase. Include "description" (and optionally "summary") on the schema and on properties where helpful.
 - Keep the class a clear skeleton: include the structure the user asked for, but you do not need to exhaust every option. Prefer properties and required; add allOf/anyOf/oneOf/discriminator/additionalProperties etc. only when they fit the user's description.
-- Apart from the optional **Suggested properties** and **Suggested relationships** sections and the single JSON code block, do not add other commentary.`;
+- Apart from the optional **Suggested properties** and **Suggested relationships** sections and the single JSON code block, do not add other commentary.
+
+# Iterative refinement
+
+When the user's message includes a \`\`\`json block labeled as the **current** class definition (same shape as your output: name, optional description, schema) and asks you to change it, reply with a **complete merged** definition in the same output format. Preserve properties and constraints they did not ask to remove. Honor requests such as: add or remove fields, change which properties are required, add validations (minLength, maxLength, pattern, format, numeric bounds), add audit timestamps, or adjust descriptions.`;
 
 function buildClassSkeletonSystem(options: {
   existingClassNames?: string[];

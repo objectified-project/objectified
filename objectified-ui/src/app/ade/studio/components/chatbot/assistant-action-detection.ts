@@ -156,6 +156,9 @@ export type DetectedChatQuickAction =
   | { kind: 'apply_current_class' }
   | { kind: 'copy_generated_payload'; payload: string };
 
+/** Marks Studio chat user turns that carry a class draft + refinement instructions (#532). */
+export const CLASS_DRAFT_REFINE_HEADING = '**Refine class draft**';
+
 const FENCE_RE = /```([a-zA-Z0-9_-]+)\s*\n([\s\S]*?)```/g;
 
 function phrasePresent(markdown: string, phrase: string): boolean {
@@ -210,6 +213,44 @@ export function parseClassDefinitionFromAssistantMarkdown(content: string): Pars
   } catch {
     return null;
   }
+}
+
+export function userMessageIsClassDraftRefinement(content: string): boolean {
+  if (!content) return false;
+  return content.includes(CLASS_DRAFT_REFINE_HEADING) && content.includes('Current definition:');
+}
+
+/**
+ * User message body for iterative class refinement from the preview dialog (#532).
+ * The model receives the current `{ name, description, schema }` JSON and plain-language edits.
+ */
+export function buildClassDraftRefinementUserMessage(parsed: ParsedAiClassDefinition, instruction: string): string {
+  const draft = {
+    name: parsed.name,
+    description: parsed.description?.trim() ? parsed.description : '',
+    schema: parsed.schema,
+  };
+  let draftJson: string;
+  try {
+    draftJson = JSON.stringify(draft, null, 2);
+  } catch {
+    draftJson = '{"name":"InvalidDraft","schema":{"type":"object","properties":{}}}';
+  }
+
+  return [
+    CLASS_DRAFT_REFINE_HEADING,
+    '',
+    'My instructions:',
+    instruction.trim(),
+    '',
+    'Current definition:',
+    '',
+    '```json',
+    draftJson,
+    '```',
+    '',
+    'Reply with the updated class using the same structure as usual: optional **Suggested properties** and **Suggested relationships**, then exactly one JSON code block (fenced with json) containing name, description, and schema. Apply my instructions on top of the current definition; preserve fields I did not ask to remove.',
+  ].join('\n');
 }
 
 /**
