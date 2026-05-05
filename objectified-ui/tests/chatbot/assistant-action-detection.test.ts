@@ -166,6 +166,18 @@ describe('inferJsonSchemaRelationships', () => {
       { property: 'items', detail: 'collection of LineItem' },
     ]);
   });
+
+  it('does not throw when items is null (malformed/partial schema)', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        tags: { type: 'array', items: null },
+        owner: { $ref: '#/components/schemas/User' },
+      },
+    };
+    expect(() => inferJsonSchemaRelationships(schema)).not.toThrow();
+    expect(inferJsonSchemaRelationships(schema)).toEqual([{ property: 'owner', detail: 'references User' }]);
+  });
 });
 
 describe('summarizeJsonSchemaProperties', () => {

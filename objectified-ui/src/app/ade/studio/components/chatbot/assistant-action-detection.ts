@@ -104,7 +104,7 @@ function relationshipDetailForPropertySchema(sub: unknown): string | null {
     return `references ${refLeafFromSchemaRef(o.$ref)}`;
   }
 
-  if (o.type === 'array' && o.items !== undefined && typeof o.items === 'object' && !Array.isArray(o.items)) {
+  if (o.type === 'array' && o.items != null && typeof o.items === 'object' && !Array.isArray(o.items)) {
     const items = o.items as Record<string, unknown>;
     if (typeof items.$ref === 'string') {
       return `collection of ${refLeafFromSchemaRef(items.$ref)}`;
