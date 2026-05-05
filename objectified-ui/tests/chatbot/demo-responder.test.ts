@@ -47,6 +47,18 @@ describe('createDemoChatResponder', () => {
     expect(detectOpenApiSpecs(reply)).toHaveLength(1);
   });
 
+  it('returns an OpenAPI spec for a plain-language description without spec keywords (#267)', async () => {
+    const reply = await responder({
+      messages: [],
+      prompt:
+        'I need a blog platform with posts, authors, and comments where each comment references a post',
+      isRegenerate: false,
+    });
+    expect(reply).toMatch(/```json/);
+    expect(detectOpenApiSpecs(reply)).toHaveLength(1);
+    expect(reply).toMatch(/Import OpenAPI spec/);
+  });
+
   it('returns a generic onboarding reply for unrelated prompts', async () => {
     const reply = await responder({
       messages: [],
