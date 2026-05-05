@@ -84,4 +84,27 @@ describe('parseClassDefinitionFromAssistantMarkdown', () => {
     expect(parseClassDefinitionFromAssistantMarkdown('```json\n{}\n```')).toBeNull();
     expect(parseClassDefinitionFromAssistantMarkdown('no fence')).toBeNull();
   });
+
+  it('parses a jsonc fence (not only json)', () => {
+    const md = [
+      '```jsonc',
+      JSON.stringify({
+        name: 'Product',
+        description: 'A product',
+        schema: { type: 'object' },
+      }),
+      '```',
+    ].join('\n');
+    const parsed = parseClassDefinitionFromAssistantMarkdown(md);
+    expect(parsed?.name).toBe('Product');
+    expect(parsed?.description).toBe('A product');
+  });
+
+  it('parses a fence whose closing ``` has no preceding newline', () => {
+    // Inline close: the body and ``` run together without a trailing \n
+    const payload = JSON.stringify({ name: 'Order', schema: { type: 'object' } });
+    const md = '```json\n' + payload + '```';
+    const parsed = parseClassDefinitionFromAssistantMarkdown(md);
+    expect(parsed?.name).toBe('Order');
+  });
 });
