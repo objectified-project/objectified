@@ -47,6 +47,8 @@ import {
   scrollToSection,
   useFormViewMode,
 } from './form';
+import { AiClassCreatePreviewDialog } from '@/app/ade/studio/components/chatbot/AiClassCreatePreviewDialog';
+import { parseClassDefinitionFromAssistantMarkdown } from '@/app/ade/studio/components/chatbot/assistant-action-detection';
 
 // Custom hook for dark mode detection - prioritizes localStorage, then system preference
 const useDarkMode = () => {
@@ -233,9 +235,25 @@ interface ClassEditDialogProps {
       url?: string;
     };
   };
+  /** When opening Add Class from chat (#528), seed AI mode with this assistant markdown. */
+  aiAssistantSeedMarkdown?: string | null;
+  onAiAssistantSeedConsumed?: () => void;
 }
 
-const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false, onSave, projectId = '', versionId = '', projectTags = [], projectMetadata }: ClassEditDialogProps) => {
+const ClassEditDialog = ({
+  open,
+  onClose,
+  editingClassData,
+  nodes,
+  isReadOnly = false,
+  onSave,
+  projectId = '',
+  versionId = '',
+  projectTags = [],
+  projectMetadata,
+  aiAssistantSeedMarkdown = null,
+  onAiAssistantSeedConsumed,
+}: ClassEditDialogProps) => {
   const isDark = useDarkMode();
 
   const [activeTab, setActiveTab] = useState('edit');
@@ -276,6 +294,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   const [aiLoadingModels, setAiLoadingModels] = useState(true);
   const [aiCreateError, setAiCreateError] = useState('');
   const [aiProjectProperties, setAiProjectProperties] = useState<Array<{ id: string; name: string; description?: string | null; data: any }>>([]);
+  const [aiCreatePreviewContent, setAiCreatePreviewContent] = useState<string | null>(null);
   const [newDependentSchemaProperty, setNewDependentSchemaProperty] = useState('');
   const aiMessagesEndRef = useRef<HTMLDivElement>(null);
   const aiAbortControllerRef = useRef<AbortController | null>(null);
@@ -741,28 +760,16 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   }, [open, showAIChatMode, projectId]);
 
   useEffect(() => {
+    if (!open || editingClassData || !aiAssistantSeedMarkdown?.trim()) return;
+    const md = aiAssistantSeedMarkdown.trim();
+    setShowAIChatMode(true);
+    setAiMessages([{ role: 'assistant', content: md }]);
+    onAiAssistantSeedConsumed?.();
+  }, [open, editingClassData, aiAssistantSeedMarkdown, onAiAssistantSeedConsumed]);
+
+  useEffect(() => {
     aiMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [aiMessages, aiStreamingContent]);
-
-  // Extract class definition JSON from assistant message (```json ... ```)
-  const extractClassDefinition = (content: string): { name: string; description: string | null; schema: any } | null => {
-    const jsonBlockRegex = /```json\s*\n([\s\S]*?)\n```/;
-    const match = content.match(jsonBlockRegex);
-    if (!match) return null;
-    try {
-      const parsed = JSON.parse(match[1].trim());
-      if (!parsed || typeof parsed.name !== 'string' || !parsed.schema) return null;
-      const name = parsed.name.replace(/[^A-Za-z0-9_]/g, '') || null;
-      if (!name) return null;
-      return {
-        name,
-        description: typeof parsed.description === 'string' ? parsed.description : null,
-        schema: parsed.schema,
-      };
-    } catch {
-      return null;
-    }
-  };
 
   const handleAiSendMessage = async () => {
     if (!aiInput.trim() || !aiSelectedModel || aiLoading) return;
@@ -841,7 +848,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   };
 
   const handleAiCreateClass = async (content: string) => {
-    const def = extractClassDefinition(content);
+    const def = parseClassDefinitionFromAssistantMarkdown(content);
     if (!def || !versionId) {
       setAiCreateError(def ? 'No version selected.' : 'No valid class definition in this message.');
       return;
@@ -851,7 +858,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       return;
     }
     setAiCreateError('');
-    const schema = { ...def.schema };
+    const rawSchema = def.schema;
+    if (!rawSchema || typeof rawSchema !== 'object' || Array.isArray(rawSchema)) {
+      setAiCreateError('Invalid schema in class definition.');
+      return;
+    }
+    const schema: Record<string, any> = { ...(rawSchema as Record<string, any>) };
     if (schema.type !== 'object') schema.type = 'object';
     if (typeof schema.properties !== 'object') schema.properties = {};
     try {
@@ -1525,6 +1537,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()} modal={true}>
       <DialogContent
         className="max-w-7xl h-[90vh] max-h-[900px] p-0 flex flex-col overflow-hidden"
@@ -1635,7 +1648,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 </div>
               )}
               {aiMessages.map((message, index) => {
-                const classDef = message.role === 'assistant' ? extractClassDefinition(message.content) : null;
+                const classDef =
+                  message.role === 'assistant' ? parseClassDefinitionFromAssistantMarkdown(message.content) : null;
                 const hasClassDef = classDef !== null;
                 return (
                   <div key={index} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -1664,9 +1678,15 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                         )}
                       </div>
                       {message.role === 'assistant' && hasClassDef && (
-                        <Button type="button" variant="outline" size="sm" className="mt-2 gap-2 text-indigo-600 dark:text-indigo-400" onClick={() => handleAiCreateClass(message.content)}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 gap-2 text-indigo-600 dark:text-indigo-400"
+                          onClick={() => setAiCreatePreviewContent(message.content)}
+                        >
                           <Plus className="h-4 w-4" />
-                          Create this class
+                          Preview & create
                         </Button>
                       )}
                     </div>
@@ -1724,7 +1744,9 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   Send
                 </Button>
               </div>
-              <p className="mt-2 mb-0 text-xs text-gray-500 dark:text-gray-400 text-center">AI can make mistakes — review the generated schema before creating.</p>
+              <p className="mt-2 mb-0 text-xs text-gray-500 dark:text-gray-400 text-center">
+                AI can make mistakes — use Preview & create to review the schema before it is saved.
+              </p>
             </div>
           </>
         ) : (
@@ -3120,6 +3142,19 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         )}
       </DialogContent>
     </Dialog>
+
+    <AiClassCreatePreviewDialog
+      open={aiCreatePreviewContent !== null}
+      assistantMarkdown={aiCreatePreviewContent}
+      onOpenChange={(next) => !next && setAiCreatePreviewContent(null)}
+      onConfirmCreate={() => {
+        const c = aiCreatePreviewContent;
+        if (!c) return;
+        setAiCreatePreviewContent(null);
+        void handleAiCreateClass(c);
+      }}
+    />
+    </>
   );
 };
 

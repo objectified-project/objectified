@@ -37,6 +37,8 @@ export interface ChatBubbleProps {
   onFeedback?: (feedback: ChatFeedback) => void;
   /** When the user clicks "Preview changes" on a ```json``` OpenAPI block (opens the preview dialog in the shell). */
   onRequestImportSpecPreview?: (spec: DetectedOpenApiSpec) => void;
+  /** Opens the class-schema preview dialog before `create_class` workspace actions (#528). */
+  onRequestClassCreatePreview?: (assistantMarkdown: string) => void;
   /** Studio layout wires class/property flows for quick-action buttons (#518). */
   onChatWorkspaceAction?: (action: StudioChatWorkspaceAction) => void | Promise<void>;
 }
@@ -47,6 +49,7 @@ export function ChatBubble({
   onRegenerate,
   onFeedback,
   onRequestImportSpecPreview,
+  onRequestClassCreatePreview,
   onChatWorkspaceAction,
 }: ChatBubbleProps) {
   const isUser = message.role === 'user';
@@ -96,6 +99,7 @@ export function ChatBubble({
             onRegenerate={onRegenerate}
             onFeedback={onFeedback}
             onRequestImportSpecPreview={onRequestImportSpecPreview}
+            onRequestClassCreatePreview={onRequestClassCreatePreview}
             onChatWorkspaceAction={onChatWorkspaceAction}
           />
         )}
@@ -130,6 +134,7 @@ interface AssistantActionsProps {
   onRegenerate?: () => void;
   onFeedback?: (feedback: ChatFeedback) => void;
   onRequestImportSpecPreview?: (spec: DetectedOpenApiSpec) => void;
+  onRequestClassCreatePreview?: (assistantMarkdown: string) => void;
   onChatWorkspaceAction?: (action: StudioChatWorkspaceAction) => void | Promise<void>;
 }
 
@@ -141,6 +146,7 @@ function AssistantActions({
   onRegenerate,
   onFeedback,
   onRequestImportSpecPreview,
+  onRequestClassCreatePreview,
   onChatWorkspaceAction,
 }: AssistantActionsProps) {
   const feedback = message.feedback;
@@ -190,6 +196,8 @@ function AssistantActions({
           key={`quick-${action.kind}-${index}`}
           action={action}
           index={index}
+          assistantMessageMarkdown={message.content}
+          onRequestClassCreatePreview={onRequestClassCreatePreview}
           onChatWorkspaceAction={onChatWorkspaceAction}
         />
       ))}
@@ -200,10 +208,14 @@ function AssistantActions({
 function QuickActionButton({
   action,
   index,
+  assistantMessageMarkdown,
+  onRequestClassCreatePreview,
   onChatWorkspaceAction,
 }: {
   action: DetectedChatQuickAction;
   index: number;
+  assistantMessageMarkdown: string;
+  onRequestClassCreatePreview?: (markdown: string) => void;
   onChatWorkspaceAction?: (a: StudioChatWorkspaceAction) => void | Promise<void>;
 }) {
   if (action.kind === 'copy_generated_payload') {
@@ -261,7 +273,11 @@ function QuickActionButton({
       type="button"
       data-testid={testId}
       onClick={() => {
-        void onChatWorkspaceAction({ kind: action.kind });
+        if (action.kind === 'create_class' && onRequestClassCreatePreview) {
+          onRequestClassCreatePreview(assistantMessageMarkdown);
+          return;
+        }
+        void onChatWorkspaceAction?.({ kind: action.kind });
       }}
       className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100 dark:hover:bg-emerald-900/50"
     >

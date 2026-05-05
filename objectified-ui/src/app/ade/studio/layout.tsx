@@ -98,7 +98,11 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const [isLoadingProperties, setIsLoadingProperties] = useState(false);
 
   // Dialog state
-  const [classDialog, setClassDialog] = useState({ open: false, selectedClass: null as ClassItem | null });
+  const [classDialog, setClassDialog] = useState({
+    open: false,
+    selectedClass: null as ClassItem | null,
+    aiAssistantSeedMarkdown: null as string | null,
+  });
   const [classImportDialog, setClassImportDialog] = useState({ open: false });
   const [propertyDialog, setPropertyDialog] = useState({ open: false, mode: 'add' as 'add' | 'edit', selectedProperty: null as PropertyItem | null });
   const [propertyTemplateDialog, setPropertyTemplateDialog] = useState({ open: false });
@@ -195,12 +199,12 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   // Class handlers
   const handleClassAdd = async () => {
     if (!(await checkVersionSelected()) || !(await checkNotReadOnly('add classes'))) return;
-    setClassDialog({ open: true, selectedClass: null });
+    setClassDialog({ open: true, selectedClass: null, aiAssistantSeedMarkdown: null });
   };
 
   const handleClassEdit = async (classItem: ClassItem) => {
     if (!(await checkVersionSelected()) || !(await checkNotReadOnly('edit classes'))) return;
-    setClassDialog({ open: true, selectedClass: classItem });
+    setClassDialog({ open: true, selectedClass: classItem, aiAssistantSeedMarkdown: null });
   };
 
   // Keep canvas global updated so canvas nodes can trigger the edit dialog (#518)
@@ -226,7 +230,13 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const handleChatWorkspaceAction = React.useCallback(
     async (action: StudioChatWorkspaceAction) => {
       if (action.kind === 'create_class') {
-        await handleClassAdd();
+        if (!(await checkVersionSelected()) || !(await checkNotReadOnly('add classes'))) return;
+        const seed = action.assistantMarkdown?.trim();
+        setClassDialog({
+          open: true,
+          selectedClass: null,
+          aiAssistantSeedMarkdown: seed || null,
+        });
         return;
       }
       if (action.kind === 'batch_add_properties' || action.kind === 'apply_current_class') {
@@ -242,7 +252,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         await handleClassEdit(selectedClass);
       }
     },
-    [handleClassAdd, handleClassEdit, selectedCanvasNodeIds, classes, alertDialog],
+    [checkVersionSelected, checkNotReadOnly, handleClassEdit, selectedCanvasNodeIds, classes, alertDialog],
   );
 
   // Property handlers
@@ -547,9 +557,13 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       <ClassEditDialog
         open={classDialog.open}
         onClose={() => {
-          setClassDialog({ open: false, selectedClass: null });
+          setClassDialog({ open: false, selectedClass: null, aiAssistantSeedMarkdown: null });
         }}
         editingClassData={classDialog.selectedClass}
+        aiAssistantSeedMarkdown={classDialog.aiAssistantSeedMarkdown}
+        onAiAssistantSeedConsumed={() =>
+          setClassDialog((d) => ({ ...d, aiAssistantSeedMarkdown: null }))
+        }
         nodes={classNodes}
         isReadOnly={isReadOnly}
         onSave={() => {
