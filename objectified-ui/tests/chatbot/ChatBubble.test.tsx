@@ -158,6 +158,21 @@ describe('ChatBubble', () => {
     expect(onChatWorkspaceAction).toHaveBeenCalledWith({ kind: 'create_class' });
   });
 
+  it('routes Create this class through preview when onRequestClassCreatePreview is set (#528)', () => {
+    const onRequestClassCreatePreview = jest.fn();
+    const onChatWorkspaceAction = jest.fn();
+    render(
+      <ChatBubble
+        message={quickActionMessage}
+        onRequestClassCreatePreview={onRequestClassCreatePreview}
+        onChatWorkspaceAction={onChatWorkspaceAction}
+      />
+    );
+    fireEvent.click(screen.getByTestId('studio-ai-chat-quick-create-class'));
+    expect(onRequestClassCreatePreview).toHaveBeenCalledWith(quickActionMessage.content);
+    expect(onChatWorkspaceAction).not.toHaveBeenCalled();
+  });
+
   it('hides studio quick actions when onChatWorkspaceAction is omitted (#518)', () => {
     render(<ChatBubble message={quickActionMessage} />);
     expect(screen.queryByTestId('studio-ai-chat-quick-create-class')).not.toBeInTheDocument();

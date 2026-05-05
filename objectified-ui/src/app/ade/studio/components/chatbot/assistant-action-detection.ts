@@ -12,6 +12,43 @@ export type StudioChatWorkspaceActionKind = 'create_class' | 'batch_add_properti
 
 export interface StudioChatWorkspaceAction {
   kind: StudioChatWorkspaceActionKind;
+  /**
+   * Raw assistant markdown from chat after the user confirms **Create this class**
+   * in the preview dialog (#528). The layout opens Add Class in AI mode with this
+   * message seeded so the user can review and create.
+   */
+  assistantMarkdown?: string;
+}
+
+/** Parsed `{ name, description, schema }` from a ```json``` block in assistant output. */
+export interface ParsedAiClassDefinition {
+  name: string;
+  description: string | null;
+  schema: unknown;
+}
+
+/**
+ * Extracts the class skeleton JSON from assistant markdown (same shape as the
+ * Create Class with AI flow in ClassEditDialog).
+ */
+export function parseClassDefinitionFromAssistantMarkdown(content: string): ParsedAiClassDefinition | null {
+  if (!content) return null;
+  const jsonBlockRegex = /```json\s*\n([\s\S]*?)\n```/;
+  const match = content.match(jsonBlockRegex);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[1].trim()) as Record<string, unknown>;
+    if (!parsed || typeof parsed.name !== 'string' || !parsed.schema) return null;
+    const name = parsed.name.replace(/[^A-Za-z0-9_]/g, '') || '';
+    if (!name) return null;
+    return {
+      name,
+      description: typeof parsed.description === 'string' ? parsed.description : null,
+      schema: parsed.schema,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export type DetectedChatQuickAction =

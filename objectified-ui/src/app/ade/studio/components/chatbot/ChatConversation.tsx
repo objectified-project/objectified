@@ -27,6 +27,7 @@ import {
   resolvePreferredOllamaModel,
 } from './ollama-model-defaults';
 import { createOllamaChatResponder } from './ollama-chat-responder';
+import { AiClassCreatePreviewDialog } from './AiClassCreatePreviewDialog';
 import { AiImportPreviewDialog } from './AiImportPreviewDialog';
 import type { StudioChatWorkspaceAction } from './assistant-action-detection';
 import type { DetectedOpenApiSpec } from './openapi-detection';
@@ -61,6 +62,7 @@ import { isAbortError } from './abort-errors';
  *     spec and summary; **Apply import** invokes `onImportSpec` so nothing applies without confirmation.
  *   - Quick actions (#518): assistant CTAs such as **Create this class** surface buttons; the layout
  *     wires `onChatWorkspaceAction` into class create / edit flows.
+ *   - **Create this class** (#528): opens a schema preview modal before the workspace action runs.
  *   - The composer can **Stop** an in-flight turn (#522): `AbortSignal` is passed to
  *     the responder so streaming fetch/SSE readers unwind and partial text is kept.
  *   - With `tenantId` + `studioContext.project` (#266), the chosen model is
@@ -165,6 +167,7 @@ export function ChatConversation({
   const [modelsRetryToken, bumpModelsRetry] = React.useReducer((n: number) => n + 1, 0);
   const ollamaModelScopeKeyRef = React.useRef<string | null>(null);
   const [openapiImportPreview, setOpenapiImportPreview] = React.useState<DetectedOpenApiSpec | null>(null);
+  const [classCreatePreviewMarkdown, setClassCreatePreviewMarkdown] = React.useState<string | null>(null);
 
   const demoResponder = React.useMemo(() => createDemoChatResponder(), []);
   const ollamaResponder = React.useMemo(() => createOllamaChatResponder(), []);
@@ -524,6 +527,21 @@ export function ChatConversation({
     }
   }, []);
 
+  const handleRequestClassCreatePreview = React.useCallback((markdown: string) => {
+    setClassCreatePreviewMarkdown(markdown);
+  }, []);
+
+  const handleClassCreatePreviewDialogChange = React.useCallback((next: boolean) => {
+    if (!next) setClassCreatePreviewMarkdown(null);
+  }, []);
+
+  const handleConfirmClassCreateFromPreview = React.useCallback(() => {
+    if (!classCreatePreviewMarkdown || !onChatWorkspaceAction) return;
+    const md = classCreatePreviewMarkdown;
+    setClassCreatePreviewMarkdown(null);
+    void onChatWorkspaceAction({ kind: 'create_class', assistantMarkdown: md });
+  }, [classCreatePreviewMarkdown, onChatWorkspaceAction]);
+
   const askConfirm = React.useCallback(
     (message: string) => {
       const fn = confirmAction ?? defaultConfirm;
@@ -695,6 +713,7 @@ export function ChatConversation({
                     onRegenerate={message.id === lastAssistantId ? handleRegenerate : undefined}
                     onFeedback={(feedback) => handleFeedback(message.id, feedback)}
                     onRequestImportSpecPreview={onImportSpec ? handleOpenApiImportPreviewRequest : undefined}
+                    onRequestClassCreatePreview={onChatWorkspaceAction ? handleRequestClassCreatePreview : undefined}
                     onChatWorkspaceAction={onChatWorkspaceAction}
                   />
                 ))}
@@ -721,6 +740,15 @@ export function ChatConversation({
           spec={openapiImportPreview}
           onOpenChange={handleOpenApiImportPreviewDialogChange}
           onConfirmApply={handleConfirmOpenApiImportApply}
+        />
+      ) : null}
+
+      {onChatWorkspaceAction ? (
+        <AiClassCreatePreviewDialog
+          open={classCreatePreviewMarkdown !== null}
+          assistantMarkdown={classCreatePreviewMarkdown}
+          onOpenChange={handleClassCreatePreviewDialogChange}
+          onConfirmCreate={handleConfirmClassCreateFromPreview}
         />
       ) : null}
     </div>

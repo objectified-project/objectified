@@ -777,6 +777,43 @@ describe('ChatConversation', () => {
     expect(screen.queryByTestId('studio-ai-chat-import-preview-dialog')).not.toBeInTheDocument();
   });
 
+  it('opens class create preview before the workspace action (#528)', async () => {
+    const onChatWorkspaceAction = jest.fn();
+    const responder: ChatSendFn = () =>
+      Promise.resolve(
+        [
+          'Draft ready.',
+          '',
+          '**Create this class**',
+          '',
+          '```json',
+          JSON.stringify({
+            name: 'Widget',
+            description: 'A widget',
+            schema: { type: 'object', properties: { id: { type: 'string' } } },
+          }),
+          '```',
+        ].join('\n')
+      );
+
+    render(<ChatConversation onSendMessage={responder} onChatWorkspaceAction={onChatWorkspaceAction} />);
+    fireEvent.change(screen.getByTestId('studio-ai-chat-input'), { target: { value: 'make class' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-send'));
+
+    const createBtn = await screen.findByTestId('studio-ai-chat-quick-create-class');
+    fireEvent.click(createBtn);
+
+    expect(screen.getByTestId('studio-ai-chat-class-create-preview-dialog')).toBeInTheDocument();
+    expect(onChatWorkspaceAction).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('studio-ai-chat-class-create-preview-confirm'));
+    expect(onChatWorkspaceAction).toHaveBeenCalledTimes(1);
+    expect(onChatWorkspaceAction.mock.calls[0][0]).toMatchObject({
+      kind: 'create_class',
+      assistantMarkdown: expect.stringContaining('Widget'),
+    });
+  });
+
   it('updates the pending bubble incrementally via onStreamAccumulated and commits the final reply (#520)', async () => {
     let capturedStreamAccumulated: ((text: string) => void) | undefined;
     let pendingResolve: ((text: string) => void) | null = null;

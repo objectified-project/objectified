@@ -86,7 +86,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ "Generate a blog post schema with author reference, tags, and comments"
     - ✅ "Create a REST API for managing a todo list application"
 - 📋 **Generation Output**:
-    - 📋 Preview generated schema before creation
+    - ✅ Preview generated schema before creation (#528)
     - 📋 JSON Schema format display
     - 📋 Property list with types
     - 📋 Relationship suggestions
@@ -98,7 +98,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                                      |
 |--------|----------------------------------------------------------|
-| #528   | Preview generated schema before creation                 |
 | #529   | JSON Schema format display on preview                    |
 | #530   | Property list with types on preview                      |
 | #531   | Relationship suggestions on preview                      |
