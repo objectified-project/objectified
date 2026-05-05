@@ -25,7 +25,7 @@ describe('userPromptRequestsSchemaFromDescription (#267)', () => {
     expect(userPromptRequestsSchemaFromDescription('hello')).toBe(false);
   });
 
-  it('is false for vague “create” lines without modeling vocabulary', () => {
+  it('is false for vague "create" lines without modeling vocabulary', () => {
     expect(userPromptRequestsSchemaFromDescription('create something cool')).toBe(false);
   });
 
@@ -35,5 +35,38 @@ describe('userPromptRequestsSchemaFromDescription (#267)', () => {
         'Here are the requirements: users must authenticate with email and belong to organizations',
       ),
     ).toBe(true);
+  });
+
+  it('is true for polite prompts that lead into a modeling request', () => {
+    // Greeting prefix should not suppress detection when the tail is a schema request.
+    expect(
+      userPromptRequestsSchemaFromDescription(
+        'Hi, I need a blog platform with posts and comments',
+      ),
+    ).toBe(true);
+    expect(
+      userPromptRequestsSchemaFromDescription(
+        'Hello, we want to model a library system with books and members',
+      ),
+    ).toBe(true);
+  });
+
+  it('is true for direct noun lists after "I need" / "we want" without an article', () => {
+    // The entity-list pattern should catch these even without modeling vocabulary.
+    expect(
+      userPromptRequestsSchemaFromDescription('I need users, roles, and permissions'),
+    ).toBe(true);
+    expect(
+      userPromptRequestsSchemaFromDescription('We want posts and comments'),
+    ).toBe(true);
+    expect(
+      userPromptRequestsSchemaFromDescription('I need products, orders, and customers'),
+    ).toBe(true);
+  });
+
+  it('is false when "I need/want" is followed by support or meta words', () => {
+    // Common non-entity words after need/want should not trigger schema generation.
+    expect(userPromptRequestsSchemaFromDescription('I need help and support')).toBe(false);
+    expect(userPromptRequestsSchemaFromDescription('I need more information')).toBe(false);
   });
 });
