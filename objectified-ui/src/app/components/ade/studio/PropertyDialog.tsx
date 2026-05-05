@@ -513,9 +513,9 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
 
   const advancedScrollRef = useRef<HTMLDivElement>(null);
 
-  // Load property data when dialog opens in edit mode
+  // Load property data when dialog opens in edit mode, or when adding with an AI/template seed (#609).
   useEffect(() => {
-    if (open && property && mode === 'edit') {
+    if (open && property && (mode === 'edit' || mode === 'add')) {
       setPropertyName(property.name);
 
       // Check if property type is an array (for nullable detection)

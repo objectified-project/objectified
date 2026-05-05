@@ -16,6 +16,7 @@ import PropertyDialog from '@/app/components/ade/studio/PropertyDialog';
 import ClassEditDialog from '@/app/components/ade/studio/ClassEditDialog';
 import ClassImportDialog from '@/app/components/ade/studio/ClassImportDialog';
 import PropertyTemplateBrowserDialog from '@/app/components/ade/studio/PropertyTemplateBrowserDialog';
+import { AiPropertySuggestionsDialog } from '@/app/components/ade/studio/AiPropertySuggestionsDialog';
 import ClassTemplateBrowserDialog from '@/app/components/ade/studio/ClassTemplateBrowserDialog';
 import TagManager from '@/app/components/ade/studio/TagManager';
 import { getClassesForVersion, getTagsForProject } from '../../../../lib/db/helper';
@@ -106,6 +107,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const [classImportDialog, setClassImportDialog] = useState({ open: false });
   const [propertyDialog, setPropertyDialog] = useState({ open: false, mode: 'add' as 'add' | 'edit', selectedProperty: null as PropertyItem | null });
   const [propertyTemplateDialog, setPropertyTemplateDialog] = useState({ open: false });
+  const [aiPropertySuggestionsOpen, setAiPropertySuggestionsOpen] = useState(false);
   const [classTemplateDialog, setClassTemplateDialog] = useState({ open: false });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, target: null as { type: 'class' | 'property'; id: string } | null });
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
@@ -266,6 +268,11 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     setPropertyTemplateDialog({ open: true });
   };
 
+  const handlePropertyAiSuggest = async () => {
+    if (!(await checkProjectSelected()) || !(await checkNotReadOnly('add properties'))) return;
+    setAiPropertySuggestionsOpen(true);
+  };
+
   const handlePropertyEdit = async (propertyItem: PropertyItem) => {
     if (!(await checkProjectSelected()) || !(await checkNotReadOnly('edit properties'))) return;
     setPropertyDialog({ open: true, mode: 'edit', selectedProperty: propertyItem });
@@ -363,7 +370,11 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       toggleClassVisibilityFn?.(classId, visible);
       triggerCanvasRefresh();
     },
-    onPropertyAdd: handlePropertyAdd, onPropertyEdit: handlePropertyEdit, onPropertyDelete: handlePropertyDelete, onPropertyTemplates: handlePropertyTemplates,
+    onPropertyAdd: handlePropertyAdd,
+    onPropertyEdit: handlePropertyEdit,
+    onPropertyDelete: handlePropertyDelete,
+    onPropertyTemplates: handlePropertyTemplates,
+    onPropertyAiSuggest: handlePropertyAiSuggest,
     onPropertySelect: (propertyItem) => console.log('Property selected:', propertyItem),
     onGroupAdd: () => {
       if (createGroupFn) {
@@ -599,6 +610,22 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         onSubmit={handlePropertySubmit}
         availableClasses={classes.map(c => c.name)}
       />
+
+      {selectedProjectId && (
+        <AiPropertySuggestionsDialog
+          open={aiPropertySuggestionsOpen}
+          onClose={() => setAiPropertySuggestionsOpen(false)}
+          tenantId={currentTenantId}
+          projectId={selectedProjectId}
+          versionId={selectedVersionId}
+          existingClasses={classes.map((c) => c.name)}
+          existingProperties={properties}
+          studioContext={chatbotStudioContext}
+          onCreatePropertyFromSuggestion={(seed) => {
+            setPropertyDialog({ open: true, mode: 'add', selectedProperty: seed });
+          }}
+        />
+      )}
 
       {/* Property Template Browser Dialog */}
       <PropertyTemplateBrowserDialog

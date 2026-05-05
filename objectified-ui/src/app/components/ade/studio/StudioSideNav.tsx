@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Search, Plus, Pencil, Trash2, FileX, Upload, Library, ChevronDown, ChevronUp, ChevronRight, Eye, EyeOff, Boxes, ListTree, Layers } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, FileX, Upload, Library, ChevronDown, ChevronUp, ChevronRight, Eye, EyeOff, Boxes, ListTree, Layers, Bot } from 'lucide-react';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 import SidebarDensityToggle from '@/app/components/sidebar/SidebarDensityToggle';
@@ -67,6 +67,8 @@ export interface StudioSideNavCallbacks {
   onPropertyDelete?: (propertyId: string) => void;
   onPropertySelect?: (propertyItem: PropertyItem) => void;
   onPropertyTemplates?: () => void;
+  /** Open AI-assisted property suggestions (#609) */
+  onPropertyAiSuggest?: () => void;
 
   // Groups callbacks
   onGroupAdd?: () => void;
@@ -868,6 +870,23 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   className="w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-emerald-500 to-emerald-600 text-white hover:shadow-emerald-500/40"
                 >
                   <Library className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  data-testid="studio-sidebar-ai-property-suggestions"
+                  onClick={() => callbacks.onPropertyAiSuggest?.()}
+                  disabled={!selectedProjectId || isReadOnly}
+                  aria-label="Suggest properties with AI"
+                  title={
+                    !selectedProjectId
+                      ? 'Select a project first'
+                      : isReadOnly
+                        ? 'Cannot edit published version'
+                        : 'Suggest reusable properties with AI'
+                  }
+                  className="w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-violet-500 to-purple-600 text-white hover:shadow-violet-500/40"
+                >
+                  <Bot className="w-4 h-4" aria-hidden />
                 </button>
                 <button
                   type="button"

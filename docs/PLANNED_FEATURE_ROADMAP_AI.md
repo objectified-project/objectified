@@ -122,15 +122,12 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 ### AI Properties Insights
 
-**Property Creation Suggestions** 📋 PLANNED
+**Property Creation Suggestions** — ✅ **#609 delivered** (Studio Properties sidebar: AI suggestions dialog with thinking/summary, pick a suggestion, open in Add Property). Further items below remain roadmap.
+
 - 📋 Common property sets for specific class types
 - 📋 Industry-standard property recommendations
 - 📋 Context-aware property suggestions based on existing schema
 - 📋 Property naming convention analysis
-
-| Ticket | Feature Description              |
-|--------|----------------------------------|
-| #609   | AI Property Creation Suggestions |
 
 ### AI Schema Health Insights
 

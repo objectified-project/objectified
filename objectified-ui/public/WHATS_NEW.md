@@ -20,6 +20,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## Export
 
 ## Studio
+- Properties sidebar includes an **AI suggest properties** control (robot): describe what you need, review thinking and summary around the suggestion chips, inspect each proposal, then **Open in Add Property** to create it (#609).
 - Studio AI chat schema refinements infer JSON Schema type and common constraints from well-known property names (`email`, `createdAt`, `age`, `price`, `isActive`) when you add a field without specifying a type; the class-skeleton Ollama prompt uses the same conventions (#277).
 - Chat refinement inference now adds typical validation hints from names—string lengths, numeric bounds, regex patterns, and marking `id` as required when added without a type (#278).
 - Studio AI assistant (live Ollama and offline demo) appends an **Improvement suggestions** section after OpenAPI sketches—actionable bullets such as pagination, `allOf` inheritance, discriminators, splitting large schemas, and standard error shapes (#495).
