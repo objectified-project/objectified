@@ -46,10 +46,10 @@ export function propertyItemToExistingApiShape(p: PropertyItem): {
 
 function suggestionToSeedProperty(s: AiPropertySuggestion): PropertyItem {
   return {
+    ...(s.schema as Record<string, unknown>),
     id: '__ai_seed__',
     name: s.name,
     description: s.description,
-    ...(s.schema as Record<string, unknown>),
   } as PropertyItem;
 }
 
@@ -236,6 +236,8 @@ export function AiPropertySuggestionsDialog({
 
       const full = await accumulateOllamaSse(response, ac.signal, (acc) => setStreamText(acc));
       setStreamText(full);
+
+      if (ac.signal.aborted) return;
 
       const structured = parseAiPropertySuggestionsResponse(full);
       if (structured) {
