@@ -72,34 +72,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 |--------|-----------------------------------------------------|
 | #527   | Implementation of Guardrails for prompts/responses  |
 
-### Natural Language to Schema
-
-**Schema Generation from Description** 📋 PLANNED
-- 📋 **Input Methods**:
-    - ✅ Free-form text description (#267 — Studio AI chat: offline demo + Ollama system prompt)
-    - 📋 Structured prompts with templates
-    - 📋 Voice input (speech-to-text)
-    - 📋 Paste requirements document
-- ✅ **Example Prompts** (#268):
-    - ✅ "Create a User class with email, password hash, created date, and roles array"
-    - ✅ "I need an e-commerce order with line items, shipping address, and payment info"
-    - ✅ "Generate a blog post schema with author reference, tags, and comments"
-    - ✅ "Create a REST API for managing a todo list application"
-- 📋 **Generation Output**:
-    - ✅ Preview generated schema before creation (#528)
-    - ✅ JSON Schema format display (#529)
-    - ✅ Property list with types (#530)
-    - ✅ Relationship suggestions (#531)
-- ✅ **Iterative Refinement** (#532):
-    - ✅ "Add a phone number field"
-    - ✅ "Make email required"
-    - ✅ "Add validation for password length"
-    - ✅ "Include timestamps for audit"
-
-| Ticket | Feature Description                                      |
-|--------|----------------------------------------------------------|
-| ~~#532~~ | ~~Iterative refinement of generated schemas~~ **Done** |
-
 ### AI-Powered Property Suggestions
 
 **Smart Property Recommendations** 📋 PLANNED
@@ -308,3 +280,27 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - Priority queues for different users
     - Rate limiting per user/tenant
     - Usage tracking and quotas
+
+### Natural Language to Schema
+
+**Schema Generation from Description** 📋 PLANNED
+- 📋 **Input Methods**:
+    - ✅ Free-form text description (#267 — Studio AI chat: offline demo + Ollama system prompt)
+    - 📋 Structured prompts with templates
+    - 📋 Voice input (speech-to-text)
+    - 📋 Paste requirements document
+- ✅ **Example Prompts** (#268):
+    - ✅ "Create a User class with email, password hash, created date, and roles array"
+    - ✅ "I need an e-commerce order with line items, shipping address, and payment info"
+    - ✅ "Generate a blog post schema with author reference, tags, and comments"
+    - ✅ "Create a REST API for managing a todo list application"
+- 📋 **Generation Output**:
+    - ✅ Preview generated schema before creation (#528)
+    - ✅ JSON Schema format display (#529)
+    - ✅ Property list with types (#530)
+    - ✅ Relationship suggestions (#531)
+- ✅ **Iterative Refinement** (#532):
+    - ✅ "Add a phone number field"
+    - ✅ "Make email required"
+    - ✅ "Add validation for password length"
+    - ✅ "Include timestamps for audit"
