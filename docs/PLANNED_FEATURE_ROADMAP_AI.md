@@ -80,11 +80,11 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - 📋 Structured prompts with templates
     - 📋 Voice input (speech-to-text)
     - 📋 Paste requirements document
-- 📋 **Example Prompts**:
-    - 📋 "Create a User class with email, password hash, created date, and roles array"
-    - 📋 "I need an e-commerce order with line items, shipping address, and payment info"
-    - 📋 "Generate a blog post schema with author reference, tags, and comments"
-    - 📋 "Create a REST API for managing a todo list application"
+- ✅ **Example Prompts** (#268):
+    - ✅ "Create a User class with email, password hash, created date, and roles array"
+    - ✅ "I need an e-commerce order with line items, shipping address, and payment info"
+    - ✅ "Generate a blog post schema with author reference, tags, and comments"
+    - ✅ "Create a REST API for managing a todo list application"
 - 📋 **Generation Output**:
     - 📋 Preview generated schema before creation
     - 📋 JSON Schema format display
@@ -98,7 +98,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                                      |
 |--------|----------------------------------------------------------|
-| #268   | Adds example prompts                                     |
 | #528   | Preview generated schema before creation                 |
 | #529   | JSON Schema format display on preview                    |
 | #530   | Property list with types on preview                      |
