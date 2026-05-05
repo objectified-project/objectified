@@ -120,15 +120,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 | #255   | Estimated score impact for each fix    |
 | #256   | Add bulk apply recommendations         |
 
-### AI Properties Insights
-
-**Property Creation Suggestions** — ✅ **#609 delivered** (Studio Properties sidebar: AI suggestions dialog with thinking/summary, pick a suggestion, open in Add Property). Further items below remain roadmap.
-
-- 📋 Common property sets for specific class types
-- 📋 Industry-standard property recommendations
-- 📋 Context-aware property suggestions based on existing schema
-- 📋 Property naming convention analysis
-
 ### AI Schema Health Insights
 
 **Schema Complexity Analysis** 📋 PLANNED
@@ -292,3 +283,11 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ Numeric ranges (`age`, `percentage`, `latitude`, …)
     - ✅ Pattern validation (`slug`, `sku`, `phone`, ISO codes, …)
     - ✅ Required vs optional (`id` suggested required when added without an explicit type)
+
+### AI Properties Insights
+
+**Property Creation Suggestions**
+- ✅ Common property sets for specific class types
+- ✅ Industry-standard property recommendations
+- ✅ Context-aware property suggestions based on existing schema
+- ✅ Property naming convention analysis
