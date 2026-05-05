@@ -87,7 +87,7 @@ interface UserWithLicense {
   plan_code: string | null;
 }
 
-type Tab = 'licenses' | 'featureFlags' | 'flagPackages' | 'assignments';
+type LicenseManagementTab = 'licenses' | 'featureFlags' | 'flagPackages' | 'assignments';
 
 interface FeatureFlagGroup {
   id: string;
@@ -634,8 +634,12 @@ function Modal({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function LicenseManagementClient() {
-  const [activeTab, setActiveTab] = useState<Tab>('licenses');
+export default function LicenseManagementClient({
+  initialTab = 'licenses',
+}: {
+  initialTab?: LicenseManagementTab;
+} = {}) {
+  const [activeTab, setActiveTab] = useState<LicenseManagementTab>(initialTab);
   const [licenses, setLicenses] = useState<License[]>([]);
   const [featureFlags, setFeatureFlags] = useState<FeatureFlag[]>([]);
   const [flagGroups, setFlagGroups] = useState<FeatureFlagGroup[]>([]);
@@ -744,7 +748,7 @@ export default function LicenseManagementClient() {
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  const TABS: { id: Tab; label: string; icon: React.ReactNode; count: number }[] = [
+  const TABS: { id: LicenseManagementTab; label: string; icon: React.ReactNode; count: number }[] = [
     { id: 'licenses',      label: 'Licenses',        icon: <Award className="w-4 h-4" />,    count: licenses.length },
     { id: 'featureFlags',  label: 'Feature Flags',   icon: <Flag className="w-4 h-4" />,     count: featureFlags.length },
     { id: 'flagPackages',  label: 'Flag packages',   icon: <Package className="w-4 h-4" />, count: flagGroups.length },
@@ -916,7 +920,16 @@ export default function LicenseManagementClient() {
             {loading ? (
               <div className="text-center text-gray-500 dark:text-gray-400 py-12">Loading…</div>
             ) : featureFlags.length === 0 ? (
-              <div className="py-12 text-center text-gray-500 dark:text-slate-400">No feature flags defined.</div>
+              <div className="py-12 text-center text-gray-500 dark:text-slate-400 space-y-4">
+                <p>No feature flags defined yet.</p>
+                <button
+                  type="button"
+                  onClick={() => { setEditingFlag(null); setFlagModal('create'); }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Create your first feature flag
+                </button>
+              </div>
             ) : (
               <div className="space-y-2">
                 {featureFlags.map(ff => (

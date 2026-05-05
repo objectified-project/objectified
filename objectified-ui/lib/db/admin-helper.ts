@@ -1028,6 +1028,11 @@ export async function deleteLicense(licenseId: string) {
 
 // ==================== Feature Flag Management ====================
 
+function normalizeFeatureFlagUrlPatterns(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === 'string');
+}
+
 /**
  * Get all feature flags
  */
@@ -1038,7 +1043,11 @@ export async function getAllFeatureFlags() {
        FROM odb.feature_flags
        ORDER BY label`
     );
-    return successResponse({ featureFlags: result.rows });
+    const featureFlags = result.rows.map((row: Record<string, unknown>) => ({
+      ...row,
+      url_patterns: normalizeFeatureFlagUrlPatterns(row.url_patterns),
+    }));
+    return successResponse({ featureFlags });
   } catch (error: any) {
     console.error('Error fetching feature flags:', error);
     return errorResponse(error.message);
@@ -1062,7 +1071,10 @@ export async function createFeatureFlag(
        RETURNING id, name, label, description, url_patterns, is_preview, enabled, created_at`,
       [name, label, description, JSON.stringify(urlPatterns), isPreview]
     );
-    return successResponse({ featureFlag: result.rows[0] });
+    const row = result.rows[0] as Record<string, unknown>;
+    return successResponse({
+      featureFlag: { ...row, url_patterns: normalizeFeatureFlagUrlPatterns(row.url_patterns) },
+    });
   } catch (error: any) {
     if (error.code === '23505') return errorResponse(`A feature flag named "${name}" already exists`);
     console.error('Error creating feature flag:', error);
@@ -1105,7 +1117,10 @@ export async function updateFeatureFlag(
       values
     );
     if (result.rowCount === 0) return errorResponse('Feature flag not found');
-    return successResponse({ featureFlag: result.rows[0] });
+    const row = result.rows[0] as Record<string, unknown>;
+    return successResponse({
+      featureFlag: { ...row, url_patterns: normalizeFeatureFlagUrlPatterns(row.url_patterns) },
+    });
   } catch (error: any) {
     console.error('Error updating feature flag:', error);
     return errorResponse(error.message);
