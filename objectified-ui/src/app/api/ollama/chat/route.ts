@@ -126,6 +126,62 @@ function buildDataQuerySystem(options: { tableNames?: string[]; currentTableName
   return s;
 }
 
+const PROPERTY_SUGGESTIONS_SYSTEM = `You help API designers propose reusable JSON Schema property definitions for a project's property library (OpenAPI 3.1).
+
+# Output format
+
+Return exactly one markdown fenced JSON block and nothing else — no preamble, no commentary outside the fence:
+
+\`\`\`json
+{
+  "thinking": "2–5 sentences: how you interpreted the request and how you chose the suggestions.",
+  "summary": "2–4 sentences: overview of the suggestion set and how the user might adopt them in Studio.",
+  "suggestions": [
+    {
+      "name": "camelCasePropertyName",
+      "description": "Human-readable description for the property library.",
+      "schema": { },
+      "thinking": "1–3 sentences: why this property fits the user's ask.",
+      "summary": "Very short label (e.g. primary email)"
+    }
+  ]
+}
+\`\`\`
+
+# Rules
+
+- "suggestions" must contain at least one item; for broad asks prefer roughly 3–8 distinct properties.
+- Each "name" must be camelCase and unique within "suggestions".
+- Each "schema" must be a valid JSON Schema object describing a single reusable property (the shape stored as property \`data\` in Studio — not wrapped in an outer "properties" object).
+- Use "$ref": "#/components/schemas/ClassName" only when that class appears in **Existing classes** below; otherwise use inline types.
+- Prefer practical constraints: string + format, bounded numbers, enums as JSON arrays, arrays with typed \`items\`, etc.
+- Do not reuse names from **Existing project properties** unless the user explicitly wants a variant — then pick a clearly distinct camelCase name.
+- "thinking" at the root is your overall reasoning; each suggestion's "thinking" is specific to that row.`;
+
+function buildPropertySuggestionsSystem(options: {
+  existingClassNames?: string[];
+  existingProperties?: Array<{ name: string; description?: string | null; data?: Record<string, unknown> }>;
+}): string {
+  let extra = '';
+  if (options.existingClassNames?.length) {
+    extra += `\n\n# Existing classes (reference only with $ref: "#/components/schemas/ClassName")\n${options.existingClassNames.join(', ')}`;
+  }
+  if (options.existingProperties?.length) {
+    extra += `\n\n# Existing project properties (avoid duplicate names unless the user asks for variants)\n`;
+    options.existingProperties.forEach((p) => {
+      const d = p.data;
+      const typeStr =
+        typeof d?.type === 'string'
+          ? d.type
+          : d && typeof d === 'object' && '$ref' in d && d.$ref
+            ? '$ref'
+            : 'object';
+      extra += `- ${p.name}: ${typeStr}${p.description ? ` — ${String(p.description).slice(0, 80)}` : ''}\n`;
+    });
+  }
+  return PROPERTY_SUGGESTIONS_SYSTEM + extra;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -149,6 +205,7 @@ export async function POST(request: NextRequest) {
 
     const isClassSkeleton = task === 'class_skeleton';
     const isDataQuery = task === 'data_query';
+    const isPropertySuggestions = task === 'property_suggestions';
 
     // Create a system message to guide the LLM
     const systemContent = isClassSkeleton
@@ -161,7 +218,12 @@ export async function POST(request: NextRequest) {
             tableNames: Array.isArray(tableNames) ? tableNames : undefined,
             currentTableName: typeof currentTableName === 'string' ? currentTableName : undefined,
           })
-        : `You are an expert API designer and OpenAPI specification generator. Your task is to help users create OpenAPI 3.1.0 specifications based on their natural language descriptions.
+        : isPropertySuggestions
+          ? buildPropertySuggestionsSystem({
+              existingClassNames: Array.isArray(existingClassNames) ? existingClassNames : undefined,
+              existingProperties: Array.isArray(existingProperties) ? existingProperties : undefined,
+            })
+          : `You are an expert API designer and OpenAPI specification generator. Your task is to help users create OpenAPI 3.1.0 specifications based on their natural language descriptions.
 
 # Rules
 
@@ -230,8 +292,8 @@ Do not repeat the full JSON spec outside the code block. Do not add other sectio
     const cacheKey = ollamaChatCacheKey({
       model: typeof model === 'string' ? model : '',
       task: typeof task === 'string' ? task : undefined,
-      existingClassNames: isClassSkeleton ? existingClassNames : undefined,
-      existingProperties: isClassSkeleton ? existingProperties : undefined,
+      existingClassNames: isClassSkeleton || isPropertySuggestions ? existingClassNames : undefined,
+      existingProperties: isClassSkeleton || isPropertySuggestions ? existingProperties : undefined,
       tableNames: isDataQuery ? tableNames : undefined,
       currentTableName: isDataQuery ? currentTableName : undefined,
       versionId: typeof versionId === 'string' ? versionId : undefined,
@@ -242,8 +304,8 @@ Do not repeat the full JSON spec outside the code block. Do not add other sectio
     const semanticContextKey = ollamaChatSemanticContextKey({
       model: typeof model === 'string' ? model : '',
       task: typeof task === 'string' ? task : undefined,
-      existingClassNames: isClassSkeleton ? existingClassNames : undefined,
-      existingProperties: isClassSkeleton ? existingProperties : undefined,
+      existingClassNames: isClassSkeleton || isPropertySuggestions ? existingClassNames : undefined,
+      existingProperties: isClassSkeleton || isPropertySuggestions ? existingProperties : undefined,
       tableNames: isDataQuery ? tableNames : undefined,
       currentTableName: isDataQuery ? currentTableName : undefined,
       versionId: typeof versionId === 'string' ? versionId : undefined,
