@@ -240,12 +240,16 @@ describe('applyRefinementsToSpec', () => {
       components: { schemas: { Product: { properties: Record<string, Record<string, unknown>> } } };
     };
     const p = out.components.schemas.Product.properties;
-    expect(p.email).toMatchObject({ type: 'string', format: 'email' });
+    expect(p.email).toMatchObject({
+      type: 'string',
+      format: 'email',
+      maxLength: 254,
+    });
     expect(p.createdAt).toMatchObject({ type: 'string', format: 'date-time' });
-    expect(p.age).toMatchObject({ type: 'integer', minimum: 0 });
+    expect(p.age).toMatchObject({ type: 'integer', minimum: 0, maximum: 150 });
     expect(p.price).toMatchObject({ type: 'number', minimum: 0 });
     expect(p.isActive).toMatchObject({ type: 'boolean' });
-    expect(p.notes).toMatchObject({ type: 'string' });
+    expect(p.notes).toMatchObject({ type: 'string', maxLength: 10000 });
     expect(p.notes.format).toBeUndefined();
   });
 
@@ -319,6 +323,52 @@ describe('applyRefinementsToSpec', () => {
     ]) as { components: { schemas: { Product: { properties: Record<string, { type: string }>; required: string[] } } } };
     expect(out.components.schemas.Product.properties.tenantId.type).toBe('string');
     expect(out.components.schemas.Product.required).toContain('tenantId');
+  });
+
+  it('infers constraint hints for common names (#278)', () => {
+    const out = applyRefinementsToSpec(baseSpec(), [
+      { kind: 'add-property', name: 'password' },
+      { kind: 'add-property', name: 'percentage' },
+      { kind: 'add-property', name: 'slug' },
+      { kind: 'add-property', name: 'latitude' },
+    ]) as {
+      components: { schemas: { Product: { properties: Record<string, Record<string, unknown>> } } };
+    };
+    const pr = out.components.schemas.Product.properties;
+    expect(pr.password).toMatchObject({ minLength: 8, maxLength: 256 });
+    expect(pr.percentage).toMatchObject({ minimum: 0, maximum: 100 });
+    expect(pr.slug).toMatchObject({ pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' });
+    expect(pr.latitude).toMatchObject({ minimum: -90, maximum: 90 });
+  });
+
+  it('adds id with uuid constraints and marks it required when inferred (#278)', () => {
+    const spec: Record<string, unknown> = {
+      openapi: '3.1.0',
+      info: { title: 'x', version: '0.1.0' },
+      components: {
+        schemas: {
+          Widget: {
+            type: 'object',
+            properties: {},
+          },
+        },
+      },
+    };
+    const out = applyRefinementsToSpec(spec, [{ kind: 'add-property', name: 'id' }]) as {
+      components: {
+        schemas: {
+          Widget: {
+            properties: Record<string, Record<string, unknown>>;
+            required?: string[];
+          };
+        };
+      };
+    };
+    expect(out.components.schemas.Widget.properties.id).toMatchObject({
+      type: 'string',
+      format: 'uuid',
+    });
+    expect(out.components.schemas.Widget.required).toContain('id');
   });
 
   it('infers schema when require-property adds a missing known name (#277)', () => {

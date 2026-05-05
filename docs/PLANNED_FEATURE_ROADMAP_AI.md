@@ -110,15 +110,15 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ `age` → integer with minimum 0
     - ✅ `price` → number with minimum 0
     - ✅ `isActive` → boolean
-- 📋 Suggest constraints:
-    - 📋 String length limits
-    - 📋 Numeric ranges
-    - 📋 Pattern validation
-    - 📋 Required vs optional
+- ✅ Suggest constraints (#278 — chat refinement merges inferred keywords into new properties):
+    - ✅ String length limits (`email`, `password`, `description`, …)
+    - ✅ Numeric ranges (`age`, `percentage`, `latitude`, …)
+    - ✅ Pattern validation (`slug`, `sku`, `phone`, ISO codes, …)
+    - ✅ Required vs optional (`id` suggested required when added without an explicit type)
 
 | Ticket | Feature Description                        |
 |--------|--------------------------------------------|
-| #278   | Adds constraint suggestions for properties |
+| ~~#278~~ | ~~Adds constraint suggestions for properties~~ ✅ Done |
 
 **Actionable Recommendations** 📋 PLANNED
 - 📋 AI-powered suggestions for improvement:
