@@ -143,4 +143,18 @@ describe('summarizeJsonSchemaProperties', () => {
     };
     expect(summarizeJsonSchemaProperties(schema)).toEqual([{ name: 'id', suggestedType: 'string | number' }]);
   });
+
+  it('preserves nested array type rather than collapsing to plain array', () => {
+    const schema = {
+      properties: {
+        matrix: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+        tags: { type: 'array', items: { type: 'array' } },
+      },
+    };
+    const rows = summarizeJsonSchemaProperties(schema);
+    expect(rows).toEqual([
+      { name: 'matrix', suggestedType: 'array<array<number>>' },
+      { name: 'tags', suggestedType: 'array<array>' },
+    ]);
+  });
 });

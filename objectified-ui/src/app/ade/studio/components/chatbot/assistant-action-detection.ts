@@ -55,7 +55,7 @@ function formatSuggestedJsonSchemaType(sub: unknown): string {
     if (t === 'array') {
       if (o.items === undefined) return 'array';
       const inner = formatSuggestedJsonSchemaType(o.items);
-      return inner === 'array' ? 'array' : `array<${inner}>`;
+      return `array<${inner}>`;
     }
     return t;
   }

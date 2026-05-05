@@ -48,6 +48,12 @@ export function AiClassCreatePreviewDialog({
     [parsed],
   );
 
+  const hasPropertiesObject = React.useMemo(() => {
+    if (!parsed) return false;
+    const s = parsed.schema;
+    return s !== null && typeof s === 'object' && !Array.isArray(s) && 'properties' in (s as object);
+  }, [parsed]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -76,7 +82,9 @@ export function AiClassCreatePreviewDialog({
                 <dt className="font-medium text-gray-700 dark:text-gray-300">Properties (suggested types)</dt>
                 <dd className="mt-1">
                   {propsList.length === 0 ? (
-                    <span className="text-gray-500 dark:text-gray-500">No properties object</span>
+                    <span className="text-gray-500 dark:text-gray-500">
+                      {hasPropertiesObject ? 'No properties defined' : 'No properties object'}
+                    </span>
                   ) : (
                     <ul className="m-0 max-h-40 list-inside list-disc overflow-y-auto pl-1">
                       {propsList.map((p) => (
