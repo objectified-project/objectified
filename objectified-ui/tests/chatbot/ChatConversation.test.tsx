@@ -819,6 +819,69 @@ describe('ChatConversation', () => {
     });
   });
 
+  it('refreshes the class create preview after Ask assistant to refine (#532)', async () => {
+    const onChatWorkspaceAction = jest.fn();
+    let sendCount = 0;
+    const responder: ChatSendFn = async (ctx) => {
+      sendCount += 1;
+      if (sendCount === 1) {
+        return [
+          'Draft ready.',
+          '',
+          '**Create this class**',
+          '',
+          '```json',
+          JSON.stringify({
+            name: 'Widget',
+            description: 'A widget',
+            schema: { type: 'object', properties: { id: { type: 'string' } } },
+          }),
+          '```',
+        ].join('\n');
+      }
+      expect(ctx.ollamaTask).toBe('class_skeleton');
+      if (ctx.prompt.includes('**Refine class draft**')) {
+        return [
+          'Updated.',
+          '',
+          '```json',
+          JSON.stringify({
+            name: 'Widget',
+            description: 'A widget',
+            schema: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                phoneNumber: { type: 'string' },
+              },
+            },
+          }),
+          '```',
+        ].join('\n');
+      }
+      return 'unexpected';
+    };
+
+    render(<ChatConversation onSendMessage={responder} onChatWorkspaceAction={onChatWorkspaceAction} />);
+    fireEvent.change(screen.getByTestId('studio-ai-chat-input'), { target: { value: 'make class' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-send'));
+
+    const createBtn = await screen.findByTestId('studio-ai-chat-quick-create-class');
+    fireEvent.click(createBtn);
+
+    const refineInput = screen.getByTestId('studio-ai-chat-class-create-preview-refine-input');
+    fireEvent.change(refineInput, { target: { value: 'Add a phone number field' } });
+    fireEvent.click(screen.getByTestId('studio-ai-chat-class-create-preview-refine-submit'));
+
+    await waitFor(() => {
+      const previewSchema = screen.getByTestId('studio-ai-chat-class-create-preview-json');
+      expect(previewSchema.textContent).toContain('phoneNumber');
+    });
+
+    expect(sendCount).toBe(2);
+    expect(onChatWorkspaceAction).not.toHaveBeenCalled();
+  });
+
   it('updates the pending bubble incrementally via onStreamAccumulated and commits the final reply (#520)', async () => {
     let capturedStreamAccumulated: ((text: string) => void) | undefined;
     let pendingResolve: ((text: string) => void) | null = null;

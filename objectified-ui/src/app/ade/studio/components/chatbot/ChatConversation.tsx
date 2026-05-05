@@ -29,7 +29,11 @@ import {
 import { createOllamaChatResponder } from './ollama-chat-responder';
 import { AiClassCreatePreviewDialog } from './AiClassCreatePreviewDialog';
 import { AiImportPreviewDialog } from './AiImportPreviewDialog';
-import type { StudioChatWorkspaceAction } from './assistant-action-detection';
+import {
+  buildClassDraftRefinementUserMessage,
+  parseClassDefinitionFromAssistantMarkdown,
+  type StudioChatWorkspaceAction,
+} from './assistant-action-detection';
 import type { DetectedOpenApiSpec } from './openapi-detection';
 import type { ChatFeedback, ChatMessage, ChatSendFn, ChatStreamAccumulatedMeta } from './types';
 import { isAbortError } from './abort-errors';
@@ -63,6 +67,7 @@ import { isAbortError } from './abort-errors';
  *   - Quick actions (#518): assistant CTAs such as **Create this class** surface buttons; the layout
  *     wires `onChatWorkspaceAction` into class create / edit flows.
  *   - **Create this class** (#528): opens a schema preview modal before the workspace action runs.
+ *   - Preview **Ask assistant to refine** (#532): sends the draft back through the model with plain-language edits and refreshes the preview when the reply parses as a class definition.
  *   - The composer can **Stop** an in-flight turn (#522): `AbortSignal` is passed to
  *     the responder so streaming fetch/SSE readers unwind and partial text is kept.
  *   - With `tenantId` + `studioContext.project` (#266), the chosen model is
@@ -312,6 +317,8 @@ export function ChatConversation({
   // messages are loaded from the store (restore / open-from-history) so we
   // never re-persist a conversation that already matches what is stored.
   const pendingPersistRef = React.useRef(false);
+  /** True while the class preview dialog should accept an updated draft from the assistant (#532). */
+  const classPreviewRefinementActiveRef = React.useRef(false);
   React.useEffect(() => {
     studioContextRef.current = studioContext;
   }, [studioContext]);
@@ -385,8 +392,18 @@ export function ChatConversation({
     streamAbortRef.current?.abort();
   }, []);
 
+  type AssistantTurnOptions = {
+    ollamaTask?: 'class_skeleton';
+    onTurnSettled?: (reply: string) => void;
+  };
+
   const runAssistantTurn = React.useCallback(
-    async (transcript: ChatMessage[], prompt: string, isRegenerate: boolean) => {
+    async (
+      transcript: ChatMessage[],
+      prompt: string,
+      isRegenerate: boolean,
+      turnOptions?: AssistantTurnOptions,
+    ) => {
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
       const pendingId = createId();
@@ -412,6 +429,7 @@ export function ChatConversation({
           isRegenerate,
           studioContext: studioContextRef.current,
           ollamaModel: useLiveOllama ? selectedOllamaModel : undefined,
+          ollamaTask: turnOptions?.ollamaTask,
           signal: ac.signal,
           onStreamAccumulated: (accumulated, meta) => {
             if (requestIdRef.current !== requestId) return;
@@ -459,6 +477,7 @@ export function ChatConversation({
           message.id === pendingId ? { ...message, content: reply, pending: false } : message
         )
       );
+      turnOptions?.onTurnSettled?.(reply);
     },
     [responder, useLiveOllama, selectedOllamaModel]
   );
@@ -532,12 +551,40 @@ export function ChatConversation({
   }, []);
 
   const handleClassCreatePreviewDialogChange = React.useCallback((next: boolean) => {
-    if (!next) setClassCreatePreviewMarkdown(null);
+    if (!next) {
+      classPreviewRefinementActiveRef.current = false;
+      setClassCreatePreviewMarkdown(null);
+    }
   }, []);
+
+  const handleClassCreateRefinement = React.useCallback(
+    (instruction: string) => {
+      const md = classCreatePreviewMarkdown;
+      if (!md || !instruction.trim()) return;
+      const parsed = parseClassDefinitionFromAssistantMarkdown(md);
+      if (!parsed) return;
+      classPreviewRefinementActiveRef.current = true;
+      const userContent = buildClassDraftRefinementUserMessage(parsed, instruction.trim());
+      const userMessage: ChatMessage = { id: createId(), role: 'user', content: userContent };
+      const nextTranscript = [...messages, userMessage];
+      pendingPersistRef.current = true;
+      setMessages(nextTranscript);
+      void runAssistantTurn(nextTranscript, userContent, false, {
+        ollamaTask: 'class_skeleton',
+        onTurnSettled: (reply) => {
+          if (!classPreviewRefinementActiveRef.current) return;
+          const nextDef = parseClassDefinitionFromAssistantMarkdown(reply);
+          if (nextDef) setClassCreatePreviewMarkdown(reply);
+        },
+      });
+    },
+    [messages, runAssistantTurn, classCreatePreviewMarkdown],
+  );
 
   const handleConfirmClassCreateFromPreview = React.useCallback(() => {
     if (!classCreatePreviewMarkdown || !onChatWorkspaceAction) return;
     const md = classCreatePreviewMarkdown;
+    classPreviewRefinementActiveRef.current = false;
     setClassCreatePreviewMarkdown(null);
     void onChatWorkspaceAction({ kind: 'create_class', assistantMarkdown: md });
   }, [classCreatePreviewMarkdown, onChatWorkspaceAction]);
@@ -749,6 +796,8 @@ export function ChatConversation({
           assistantMarkdown={classCreatePreviewMarkdown}
           onOpenChange={handleClassCreatePreviewDialogChange}
           onConfirmCreate={handleConfirmClassCreateFromPreview}
+          refinementBusy={classCreatePreviewMarkdown !== null && isBusy}
+          onRequestRefinement={handleClassCreateRefinement}
         />
       ) : null}
     </div>

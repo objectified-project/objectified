@@ -45,14 +45,33 @@ export function createOllamaChatResponder(): ChatSendFn {
     }
 
     try {
+      const payload: Record<string, unknown> = {
+        model,
+        messages,
+        ...(schemaContextFingerprint ? { schemaContextFingerprint } : {}),
+      };
+
+      if (ctx.ollamaTask === 'class_skeleton') {
+        payload.task = 'class_skeleton';
+        const sc = ctx.studioContext;
+        if (sc && !isChatStudioContextEmpty(sc)) {
+          payload.existingClassNames = sc.classes.map((c) => c.name).filter(Boolean);
+          payload.existingProperties = sc.properties.map((p) => ({
+            name: p.name,
+            description: p.description ?? null,
+            data: {
+              ...(typeof p.type === 'string' ? { type: p.type } : {}),
+              ...(typeof p.format === 'string' ? { format: p.format } : {}),
+            },
+          }));
+          if (sc.version?.id) payload.versionId = sc.version.id;
+        }
+      }
+
       const response = await fetch('/api/ollama/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          messages,
-          ...(schemaContextFingerprint ? { schemaContextFingerprint } : {}),
-        }),
+        body: JSON.stringify(payload),
         signal: ctx.signal,
       });
 

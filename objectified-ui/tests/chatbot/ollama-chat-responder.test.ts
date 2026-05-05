@@ -227,6 +227,40 @@ describe('createOllamaChatResponder', () => {
     expect(init.signal).toBe(ac.signal);
   });
 
+  it('sends task class_skeleton and studio lists when ollamaTask is set (#532)', async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      mockSseResponse(['data: {"content":"ok","done":true}\n\n', 'data: [DONE]\n\n']),
+    );
+
+    const responder = createOllamaChatResponder();
+    await responder({
+      messages: [{ id: 'u1', role: 'user', content: 'Refine' }],
+      prompt: 'Refine',
+      isRegenerate: false,
+      ollamaModel: 'llama3.2:latest',
+      ollamaTask: 'class_skeleton',
+      studioContext: {
+        project: { id: 'p1', name: 'Demo' },
+        version: { id: 'v1', label: '1.0' },
+        classes: [{ id: 'c1', name: 'User', schema: {} }],
+        properties: [{ id: 'pr1', name: 'email', type: 'string', format: 'email' }],
+        selectedClassIds: [],
+      },
+    });
+
+    const init = (global.fetch as jest.Mock).mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(init.body as string) as {
+      task?: string;
+      existingClassNames?: string[];
+      existingProperties?: Array<{ name: string }>;
+      versionId?: string;
+    };
+    expect(body.task).toBe('class_skeleton');
+    expect(body.existingClassNames).toEqual(['User']);
+    expect(body.existingProperties?.[0]?.name).toBe('email');
+    expect(body.versionId).toBe('v1');
+  });
+
   it('returns Generation stopped. when fetch aborts before any body (#522)', async () => {
     global.fetch = jest.fn().mockImplementation((_url: string, init?: RequestInit) => {
       const signal = init?.signal;
