@@ -277,6 +277,26 @@ describe('applyRefinementsToSpec', () => {
     expect(out.components.schemas.Product.properties.priceCents.type).toBe('number');
   });
 
+  it('clears stale inferred constraints when an explicit type is provided for an existing property (#277)', () => {
+    // First, add createdAt without a type so inference kicks in (gives string + format: date-time).
+    const step1 = applyRefinementsToSpec(baseSpec(), [{ kind: 'add-property', name: 'createdAt' }]) as {
+      components: { schemas: { Product: { properties: Record<string, Record<string, unknown>> } } };
+    };
+    expect(step1.components.schemas.Product.properties.createdAt).toMatchObject({
+      type: 'string',
+      format: 'date-time',
+    });
+
+    // Now re-add with an explicit type — format must be cleared to avoid contradictory schema.
+    const step2 = applyRefinementsToSpec(step1, [{ kind: 'add-property', name: 'createdAt', type: 'integer' }]) as {
+      components: { schemas: { Product: { properties: Record<string, Record<string, unknown>> } } };
+    };
+    const prop = step2.components.schemas.Product.properties.createdAt;
+    expect(prop.type).toBe('integer');
+    expect(prop.format).toBeUndefined();
+    expect(prop.minimum).toBeUndefined();
+  });
+
   it('removes a property and prunes required entries', () => {
     const out = applyRefinementsToSpec(baseSpec(), [
       { kind: 'remove-property', name: 'id' },

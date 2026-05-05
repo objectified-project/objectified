@@ -426,8 +426,14 @@ function applyOpToSchema(schema: SchemaShape, op: ChatRefinementOp): void {
   switch (op.kind) {
     case 'add-property': {
       if (props[op.name]) {
-        // Property already exists — only update its type if a new one was provided.
-        if (op.type) props[op.name].type = op.type;
+        if (op.type) {
+          // Explicit type provided — replace the entire shape to avoid stale
+          // constraints (format, minimum, etc.) left over from previous inference.
+          props[op.name] = {
+            type: op.type,
+            ...(props[op.name].description ? { description: props[op.name].description } : {}),
+          };
+        }
       } else if (op.type) {
         props[op.name] = {
           type: op.type,
