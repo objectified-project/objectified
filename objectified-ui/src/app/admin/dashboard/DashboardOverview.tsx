@@ -11,7 +11,7 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, trendUp }) => (
-  <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg p-6 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
+  <div className="rounded-lg border border-slate-200 bg-white p-6 transition-colors hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700">
     <div className="flex items-start justify-between mb-4">
       <div className="p-2 bg-red-600/20 rounded-lg">
         {icon}
@@ -31,14 +31,14 @@ export default function DashboardOverview() {
   return (
     <>
       {/* Header */}
-      <header className="bg-white/80 dark:bg-gray-800/50 border-b border-slate-200 dark:border-gray-700 backdrop-blur-sm">
+      <header className="shrink-0 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="px-6 py-4">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-6 dark:bg-slate-950">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <StatCard
@@ -70,13 +70,13 @@ export default function DashboardOverview() {
         </div>
 
         {/* Info Banner */}
-        <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/50 dark:bg-blue-950/50">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
           <div>
-            <h3 className="text-blue-400 font-semibold text-sm mb-1">
+            <h3 className="mb-1 text-sm font-semibold text-blue-900 dark:text-blue-300">
               Admin Portal - Initial Setup
             </h3>
-            <p className="text-blue-300 text-sm">
+            <p className="text-sm text-blue-800 dark:text-blue-200/90">
               This is the foundation for your super admin portal. Use the sidebar to navigate between different management sections.
               The User Management section is now fully implemented with signup approval and user management features.
             </p>
@@ -84,8 +84,8 @@ export default function DashboardOverview() {
         </div>
 
         {/* Footer Info */}
-        <div className="mt-auto pt-6 border-t border-slate-200 dark:border-gray-700">
-          <div className="text-center text-gray-500 text-sm">
+        <div className="mt-auto border-t border-slate-200 pt-6 dark:border-slate-800">
+          <div className="text-center text-sm text-gray-500 dark:text-slate-400">
             <p>Super Admin Portal • Objectified Internal Use Only</p>
             <p className="mt-1">Session expires after 8 hours of inactivity</p>
           </div>

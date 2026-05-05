@@ -1128,6 +1128,178 @@ export async function deleteFeatureFlag(flagId: string) {
   }
 }
 
+// ==================== Feature Flag Groups (packages) ====================
+
+/**
+ * List all feature flag groups with their member flags
+ */
+export async function getAllFeatureFlagGroups() {
+  try {
+    const result = await connectionPool.query(
+      `SELECT
+         g.id,
+         g.name,
+         g.label,
+         g.description,
+         g.created_at,
+         g.updated_at,
+         COALESCE(
+           json_agg(
+             jsonb_build_object(
+               'id',         ff.id,
+               'name',       ff.name,
+               'label',      ff.label,
+               'is_preview', ff.is_preview
+             )
+             ORDER BY ff.label
+           ) FILTER (WHERE ff.id IS NOT NULL),
+           '[]'
+         ) AS feature_flags
+       FROM odb.feature_flag_groups g
+       LEFT JOIN odb.feature_flag_group_members m ON m.group_id = g.id
+       LEFT JOIN odb.feature_flags ff ON ff.id = m.feature_flag_id
+       GROUP BY g.id
+       ORDER BY g.label`
+    );
+    return successResponse({ groups: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching feature flag groups:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Create a feature flag group and optional initial members
+ */
+export async function createFeatureFlagGroup(
+  name: string,
+  label: string,
+  description: string | null,
+  featureFlagIds: string[]
+) {
+  const client = await connectionPool.connect();
+  try {
+    await client.query('BEGIN');
+    const insert = await client.query(
+      `INSERT INTO odb.feature_flag_groups (name, label, description)
+       VALUES ($1, $2, $3)
+       RETURNING id, name, label, description, created_at, updated_at`,
+      [name, label, description]
+    );
+    const group = insert.rows[0];
+    const uniqueFlagIds = [...new Set(featureFlagIds)];
+    if (uniqueFlagIds.length > 0) {
+      const values = uniqueFlagIds.map((_, i) => `($1, $${i + 2})`).join(', ');
+      await client.query(
+        `INSERT INTO odb.feature_flag_group_members (group_id, feature_flag_id) VALUES ${values}`,
+        [group.id, ...uniqueFlagIds]
+      );
+    }
+    await client.query('COMMIT');
+    return successResponse({ group });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    if (error.code === '23505') return errorResponse(`A feature flag package named "${name}" already exists`);
+    console.error('Error creating feature flag group:', error);
+    return errorResponse(error.message);
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Update a feature flag group's metadata and/or replace its members
+ */
+export async function updateFeatureFlagGroup(
+  groupId: string,
+  updates: {
+    label?: string;
+    description?: string | null;
+    featureFlagIds?: string[];
+  }
+) {
+  if (
+    updates.label === undefined &&
+    updates.description === undefined &&
+    updates.featureFlagIds === undefined
+  ) {
+    return errorResponse('No updates provided');
+  }
+
+  const client = await connectionPool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+    if (updates.label !== undefined) {
+      fields.push(`label = $${idx++}`);
+      values.push(updates.label);
+    }
+    if (updates.description !== undefined) {
+      fields.push(`description = $${idx++}`);
+      values.push(updates.description);
+    }
+    if (fields.length > 0) {
+      fields.push(`updated_at = CURRENT_TIMESTAMP`);
+      values.push(groupId);
+      const res = await client.query(
+        `UPDATE odb.feature_flag_groups SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id`,
+        values
+      );
+      if (res.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return errorResponse('Feature flag package not found');
+      }
+    } else {
+      const check = await client.query(`SELECT id FROM odb.feature_flag_groups WHERE id = $1`, [groupId]);
+      if (check.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return errorResponse('Feature flag package not found');
+      }
+    }
+
+    if (updates.featureFlagIds !== undefined) {
+      await client.query(`DELETE FROM odb.feature_flag_group_members WHERE group_id = $1`, [groupId]);
+      const uniqueIds = [...new Set(updates.featureFlagIds)];
+      if (uniqueIds.length > 0) {
+        const placeholders = uniqueIds.map((_, i) => `($1, $${i + 2})`).join(', ');
+        await client.query(
+          `INSERT INTO odb.feature_flag_group_members (group_id, feature_flag_id) VALUES ${placeholders}`,
+          [groupId, ...uniqueIds]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    return successResponse({ message: 'Feature flag package updated' });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error updating feature flag group:', error);
+    return errorResponse(error.message);
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Delete a feature flag group (members removed by CASCADE)
+ */
+export async function deleteFeatureFlagGroup(groupId: string) {
+  try {
+    const result = await connectionPool.query(
+      `DELETE FROM odb.feature_flag_groups WHERE id = $1 RETURNING id, label`,
+      [groupId]
+    );
+    if (result.rowCount === 0) return errorResponse('Feature flag package not found');
+    return successResponse({ deleted: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error deleting feature flag group:', error);
+    return errorResponse(error.message);
+  }
+}
+
 // ==================== User License Assignments ====================
 
 /**

@@ -376,7 +376,7 @@ export default function PropertyTemplateManagementClient() {
   };
 
   return (
-    <div className="p-6">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-6 dark:bg-slate-950 dark:text-slate-100">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -391,7 +391,7 @@ export default function PropertyTemplateManagementClient() {
         <div className="flex gap-2">
           <button
             onClick={loadData}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-gray-700 hover:bg-slate-300 dark:hover:bg-gray-600 text-gray-700 dark:text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-600 text-gray-700 dark:text-white rounded-lg transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -411,9 +411,13 @@ export default function PropertyTemplateManagementClient() {
 
       {/* Message */}
       {message && (
-        <div className={`mb-4 p-4 rounded-lg flex items-center gap-2 ${
-          message.type === 'success' ? 'bg-green-900/50 text-green-200' : 'bg-red-900/50 text-red-200'
-        }`}>
+        <div
+          className={`mb-4 flex items-center gap-2 rounded-lg border p-4 ${
+            message.type === 'success'
+              ? 'border-green-300 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950/50 dark:text-green-200'
+              : 'border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200'
+          }`}
+        >
           {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
           {message.text}
         </div>
@@ -422,31 +426,31 @@ export default function PropertyTemplateManagementClient() {
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total_templates}</div>
             <div className="text-gray-500 dark:text-gray-400 text-sm">Total Templates</div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div className="text-2xl font-bold text-amber-400">{stats.system_templates}</div>
             <div className="text-gray-500 dark:text-gray-400 text-sm">System</div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div className="text-2xl font-bold text-blue-400">{stats.tenant_templates}</div>
             <div className="text-gray-500 dark:text-gray-400 text-sm">Tenant</div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div className="text-2xl font-bold text-green-400">{stats.enabled_templates}</div>
             <div className="text-gray-500 dark:text-gray-400 text-sm">Enabled</div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div className="text-2xl font-bold text-red-400">{stats.disabled_templates}</div>
             <div className="text-gray-500 dark:text-gray-400 text-sm">Disabled</div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div className="text-2xl font-bold text-purple-400">{stats.total_usage}</div>
             <div className="text-gray-500 dark:text-gray-400 text-sm">Total Usage</div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div className="text-2xl font-bold text-cyan-400">{stats.category_count}</div>
             <div className="text-gray-500 dark:text-gray-400 text-sm">Categories</div>
           </div>
@@ -454,7 +458,7 @@ export default function PropertyTemplateManagementClient() {
       )}
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-6">
+      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap gap-4">
           {/* Search */}
           <div className="flex-1 min-w-64">
@@ -465,7 +469,7 @@ export default function PropertyTemplateManagementClient() {
                 placeholder="Search by name, description, or tags..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-700 border border-slate-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -474,7 +478,7 @@ export default function PropertyTemplateManagementClient() {
           <select
             value={selectedCategory || ''}
             onChange={(e) => setSelectedCategory(e.target.value || null)}
-            className="px-4 py-2 bg-white dark:bg-gray-700 border border-slate-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="">All Categories</option>
             {categories.map(cat => (
@@ -494,7 +498,7 @@ export default function PropertyTemplateManagementClient() {
                   setShowSystemOnly(e.target.checked);
                   if (e.target.checked) setShowTenantOnly(false);
                 }}
-                className="w-4 h-4 rounded bg-white dark:bg-gray-700 border-slate-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                className="w-4 h-4 rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500"
               />
               <span className="text-gray-700 dark:text-gray-300 text-sm">System Only</span>
             </label>
@@ -506,7 +510,7 @@ export default function PropertyTemplateManagementClient() {
                   setShowTenantOnly(e.target.checked);
                   if (e.target.checked) setShowSystemOnly(false);
                 }}
-                className="w-4 h-4 rounded bg-white dark:bg-gray-700 border-slate-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                className="w-4 h-4 rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500"
               />
               <span className="text-gray-700 dark:text-gray-300 text-sm">Tenant Only</span>
             </label>
@@ -515,9 +519,9 @@ export default function PropertyTemplateManagementClient() {
       </div>
 
       {/* Templates Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <table className="w-full">
-          <thead className="bg-slate-50 dark:bg-gray-700">
+          <thead className="bg-slate-50 dark:bg-slate-800">
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-300">Template</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-300">Category</th>
@@ -528,7 +532,7 @@ export default function PropertyTemplateManagementClient() {
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-300">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-gray-700">
+          <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
             {loading ? (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
@@ -573,7 +577,7 @@ export default function PropertyTemplateManagementClient() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <code className="text-sm text-gray-600 dark:text-gray-300 bg-slate-100 dark:bg-gray-700 px-2 py-1 rounded">
+                      <code className="text-sm text-gray-600 dark:text-gray-300 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
                         {template.schema?.type || 'object'}
                         {template.schema?.format && ` (${template.schema.format})`}
                       </code>
@@ -592,7 +596,7 @@ export default function PropertyTemplateManagementClient() {
                       <div className="relative flex justify-end">
                         <button
                           onClick={() => setOpenDropdownId(openDropdownId === template.id ? null : template.id)}
-                          className="p-2 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                         >
                           <MoreVertical className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                         </button>
@@ -606,13 +610,13 @@ export default function PropertyTemplateManagementClient() {
                             />
 
                             {/* Dropdown menu */}
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg shadow-lg z-20 py-1">
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-20 py-1">
                               <button
                                 onClick={() => {
                                   openViewDialog(template);
                                   setOpenDropdownId(null);
                                 }}
-                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-colors"
                               >
                                 <Eye className="w-4 h-4 text-gray-400" />
                                 View Details
@@ -622,7 +626,7 @@ export default function PropertyTemplateManagementClient() {
                                   openEditDialog(template);
                                   setOpenDropdownId(null);
                                 }}
-                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-colors"
                               >
                                 <Edit className="w-4 h-4 text-blue-400" />
                                 Edit Template
@@ -632,29 +636,29 @@ export default function PropertyTemplateManagementClient() {
                                   copySchemaToClipboard(template.schema);
                                   setOpenDropdownId(null);
                                 }}
-                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-colors"
                               >
                                 <Copy className="w-4 h-4 text-gray-400" />
                                 Copy Schema
                               </button>
-                              <div className="border-t border-slate-200 dark:border-gray-600 my-1" />
+                              <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
                               <button
                                 onClick={() => {
                                   handleToggleStatus(template);
                                   setOpenDropdownId(null);
                                 }}
-                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-colors"
                               >
                                 <Power className={`w-4 h-4 ${template.enabled ? 'text-green-400' : 'text-red-400'}`} />
                                 {template.enabled ? 'Disable Template' : 'Enable Template'}
                               </button>
-                              <div className="border-t border-slate-200 dark:border-gray-600 my-1" />
+                              <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
                               <button
                                 onClick={() => {
                                   handleDelete(template);
                                   setOpenDropdownId(null);
                                 }}
-                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-slate-100 dark:hover:bg-gray-600 transition-colors"
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                                 Delete Template
@@ -675,8 +679,8 @@ export default function PropertyTemplateManagementClient() {
       {/* Create/Edit Dialog */}
       {(showCreateDialog || showEditDialog) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {showCreateDialog ? 'Create New Template' : 'Edit Template'}
               </h2>
@@ -687,7 +691,7 @@ export default function PropertyTemplateManagementClient() {
                   setSelectedTemplate(null);
                   resetForm();
                 }}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
               >
                 <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               </button>
@@ -702,7 +706,7 @@ export default function PropertyTemplateManagementClient() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., UUID, Email, Created At"
-                  className="w-full px-4 py-2 bg-white dark:bg-gray-700 border border-slate-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
@@ -714,7 +718,7 @@ export default function PropertyTemplateManagementClient() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Brief description of the template"
-                  className="w-full px-4 py-2 bg-white dark:bg-gray-700 border border-slate-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
@@ -727,7 +731,7 @@ export default function PropertyTemplateManagementClient() {
                       type="checkbox"
                       checked={useCustomCategory}
                       onChange={(e) => setUseCustomCategory(e.target.checked)}
-                      className="w-4 h-4 rounded bg-white dark:bg-gray-700 border-slate-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                      className="w-4 h-4 rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-gray-500 dark:text-gray-400 text-sm">Create new category</span>
                   </label>
@@ -738,13 +742,13 @@ export default function PropertyTemplateManagementClient() {
                       value={formData.customCategory}
                       onChange={(e) => setFormData({ ...formData, customCategory: e.target.value })}
                       placeholder="Enter new category name (e.g., medical, legal, custom-fields)"
-                      className="w-full px-4 py-2 bg-white dark:bg-gray-700 border border-slate-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   ) : (
                     <select
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-4 py-2 bg-white dark:bg-gray-700 border border-slate-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       {Object.entries(categoryConfig).map(([key, config]) => (
                         <option key={key} value={key}>
@@ -770,7 +774,7 @@ export default function PropertyTemplateManagementClient() {
                   onChange={(e) => setFormData({ ...formData, schema: e.target.value })}
                   rows={10}
                   placeholder='{"type": "string", "format": "uuid", "description": "...", "example": "..."}'
-                  className="w-full px-4 py-2 bg-white dark:bg-gray-700 border border-slate-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
                 />
               </div>
 
@@ -782,7 +786,7 @@ export default function PropertyTemplateManagementClient() {
                   value={formData.tags}
                   onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
                   placeholder="id, uuid, identifier, primary-key"
-                  className="w-full px-4 py-2 bg-white dark:bg-gray-700 border border-slate-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
@@ -793,7 +797,7 @@ export default function PropertyTemplateManagementClient() {
                     type="checkbox"
                     checked={formData.isSystem}
                     onChange={(e) => setFormData({ ...formData, isSystem: e.target.checked })}
-                    className="w-4 h-4 rounded bg-white dark:bg-gray-700 border-slate-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                    className="w-4 h-4 rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500"
                   />
                   <span className="text-gray-700 dark:text-gray-300">System Template</span>
                 </label>
@@ -802,14 +806,14 @@ export default function PropertyTemplateManagementClient() {
                     type="checkbox"
                     checked={formData.isPublic}
                     onChange={(e) => setFormData({ ...formData, isPublic: e.target.checked })}
-                    className="w-4 h-4 rounded bg-white dark:bg-gray-700 border-slate-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                    className="w-4 h-4 rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500"
                   />
                   <span className="text-gray-700 dark:text-gray-300">Public</span>
                 </label>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-gray-700">
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-800">
               <button
                 onClick={() => {
                   setShowCreateDialog(false);
@@ -817,7 +821,7 @@ export default function PropertyTemplateManagementClient() {
                   setSelectedTemplate(null);
                   resetForm();
                 }}
-                className="px-4 py-2 bg-slate-200 dark:bg-gray-700 hover:bg-slate-300 dark:hover:bg-gray-600 text-gray-700 dark:text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-600 text-gray-700 dark:text-white rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -835,8 +839,8 @@ export default function PropertyTemplateManagementClient() {
       {/* View Dialog */}
       {showViewDialog && selectedTemplate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedTemplate.name}</h2>
                 {selectedTemplate.is_system && (
@@ -848,7 +852,7 @@ export default function PropertyTemplateManagementClient() {
                   setShowViewDialog(false);
                   setSelectedTemplate(null);
                 }}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
               >
                 <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               </button>
@@ -907,7 +911,7 @@ export default function PropertyTemplateManagementClient() {
                   <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Tags</label>
                   <div className="flex flex-wrap gap-1">
                     {selectedTemplate.tags.map((tag, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-sm">
+                      <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 rounded text-sm">
                         <Tag className="w-3 h-3" />
                         {tag}
                       </span>
@@ -928,7 +932,7 @@ export default function PropertyTemplateManagementClient() {
                     Copy
                   </button>
                 </div>
-                <pre className="bg-slate-100 dark:bg-gray-900 rounded-lg p-4 overflow-auto max-h-60 text-sm text-gray-700 dark:text-gray-300 font-mono">
+                <pre className="bg-slate-100 dark:bg-slate-950 rounded-lg p-4 overflow-auto max-h-60 text-sm text-gray-700 dark:text-gray-300 font-mono">
                   {JSON.stringify(selectedTemplate.schema, null, 2)}
                 </pre>
               </div>
@@ -958,7 +962,7 @@ export default function PropertyTemplateManagementClient() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-gray-700">
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-800">
               <button
                 onClick={() => {
                   setShowViewDialog(false);
@@ -973,7 +977,7 @@ export default function PropertyTemplateManagementClient() {
                   setShowViewDialog(false);
                   setSelectedTemplate(null);
                 }}
-                className="px-4 py-2 bg-slate-200 dark:bg-gray-700 hover:bg-slate-300 dark:hover:bg-gray-600 text-gray-700 dark:text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-600 text-gray-700 dark:text-white rounded-lg transition-colors"
               >
                 Close
               </button>

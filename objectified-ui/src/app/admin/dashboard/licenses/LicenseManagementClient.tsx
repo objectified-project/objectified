@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Award,
   Flag,
@@ -19,6 +19,7 @@ import {
   ToggleLeft,
   ToggleRight,
   ShieldCheck,
+  Package,
 } from 'lucide-react';
 import {
   getAllLicenses,
@@ -30,12 +31,15 @@ import {
   createFeatureFlag,
   updateFeatureFlag,
   deleteFeatureFlag,
+  getAllFeatureFlagGroups,
+  createFeatureFlagGroup,
+  updateFeatureFlagGroup,
+  deleteFeatureFlagGroup,
   getAllUsersWithLicenses,
   assignLicenseToUser,
   removeUserLicense,
-  setUserFeatureFlag,
-  removeUserFeatureFlag,
 } from '../../../../../lib/db/admin-helper';
+import { FeatureFlagUserOverridesPanel } from '../components/FeatureFlagUserOverridesPanel';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -83,7 +87,17 @@ interface UserWithLicense {
   plan_code: string | null;
 }
 
-type Tab = 'licenses' | 'featureFlags' | 'assignments';
+type Tab = 'licenses' | 'featureFlags' | 'flagPackages' | 'assignments';
+
+interface FeatureFlagGroup {
+  id: string;
+  name: string;
+  label: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  feature_flags: FeatureFlagRef[];
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -194,7 +208,7 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
           <input
             value={name}
             onChange={e => setName(e.target.value)}
-            className="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500"
+            className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500"
             placeholder="e.g. Paid"
           />
         </div>
@@ -202,8 +216,8 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
           <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Type *</label>
           <select
             value={licenseType}
-            onChange={e => setLicenseType(e.target.value as any)}
-            className="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500"
+            onChange={e => setLicenseType(e.target.value as 'free' | 'paid' | 'sponsor')}
+            className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500"
           >
             <option value="free">Free</option>
             <option value="paid">Paid</option>
@@ -218,7 +232,7 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
           value={description}
           onChange={e => setDescription(e.target.value)}
           rows={2}
-          className="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"
+          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"
           placeholder="Short description of this license tier"
         />
       </div>
@@ -230,7 +244,7 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
           value={seatsJson}
           onChange={e => { setSeatsJson(e.target.value); validateSeats(e.target.value); }}
           rows={4}
-          className={`w-full bg-white dark:bg-gray-900 border rounded-lg px-3 py-2 text-green-300 font-mono text-sm focus:outline-none resize-none ${seatsError ? 'border-red-600' : 'border-slate-300 dark:border-gray-600 focus:border-indigo-500'}`}
+          className={`w-full bg-white dark:bg-slate-900 border rounded-lg px-3 py-2 text-green-300 font-mono text-sm focus:outline-none resize-none ${seatsError ? 'border-red-600' : 'border-slate-300 dark:border-slate-700 focus:border-indigo-500'}`}
         />
         {seatsError && <p className="text-xs text-red-400">{seatsError}</p>}
       </div>
@@ -247,7 +261,7 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
                 className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${
                   selectedFlags.has(ff.id)
                     ? 'bg-indigo-900/30 border-indigo-600'
-                    : 'bg-slate-50 dark:bg-gray-800/60 border-slate-300 dark:border-gray-700 hover:border-slate-400 dark:hover:border-gray-500'
+                    : 'bg-slate-50 dark:bg-slate-900/60 border-slate-300 dark:border-slate-800 hover:border-slate-400 dark:hover:border-slate-600'
                 }`}
               >
                 <input
@@ -270,7 +284,7 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 border border-slate-300 dark:border-gray-600 hover:border-slate-400 dark:hover:border-gray-400 transition-colors">
+        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 transition-colors">
           Cancel
         </button>
         <button
@@ -342,7 +356,7 @@ function FlagForm({ existing, onSave, onCancel }: FlagFormProps) {
             value={name}
             onChange={e => setName(e.target.value)}
             disabled={!!existing}
-            className="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white font-mono text-sm focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+            className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white font-mono text-sm focus:outline-none focus:border-indigo-500 disabled:opacity-50"
             placeholder="ai_assistant"
           />
           <p className="text-xs text-gray-500">Lowercase, underscores only. Cannot be changed after creation.</p>
@@ -352,7 +366,7 @@ function FlagForm({ existing, onSave, onCancel }: FlagFormProps) {
           <input
             value={label}
             onChange={e => setLabel(e.target.value)}
-            className="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500"
+            className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500"
             placeholder="AI Assistant"
           />
         </div>
@@ -364,7 +378,7 @@ function FlagForm({ existing, onSave, onCancel }: FlagFormProps) {
           value={description}
           onChange={e => setDescription(e.target.value)}
           rows={2}
-          className="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"
+          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"
         />
       </div>
 
@@ -377,7 +391,7 @@ function FlagForm({ existing, onSave, onCancel }: FlagFormProps) {
           value={urlsRaw}
           onChange={e => setUrlsRaw(e.target.value)}
           rows={4}
-          className="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-600 rounded-lg px-3 py-2 text-green-300 font-mono text-sm focus:outline-none focus:border-indigo-500 resize-none"
+          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-green-300 font-mono text-sm focus:outline-none focus:border-indigo-500 resize-none"
           placeholder={`/ade/studio\n/api/ollama`}
         />
       </div>
@@ -394,7 +408,7 @@ function FlagForm({ existing, onSave, onCancel }: FlagFormProps) {
       </label>
 
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 border border-slate-300 dark:border-gray-600 hover:border-slate-400 dark:hover:border-gray-400 transition-colors">
+        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 transition-colors">
           Cancel
         </button>
         <button
@@ -409,19 +423,210 @@ function FlagForm({ existing, onSave, onCancel }: FlagFormProps) {
   );
 }
 
+// ─── Feature flag package form ───────────────────────────────────────────────
+
+interface FlagPackageFormProps {
+  existing?: FeatureFlagGroup | null;
+  allFlags: FeatureFlag[];
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+function FlagPackageForm({ existing, allFlags, onSave, onCancel }: FlagPackageFormProps) {
+  const [name, setName] = useState(existing?.name ?? '');
+  const [label, setLabel] = useState(existing?.label ?? '');
+  const [description, setDescription] = useState(existing?.description ?? '');
+  const [selected, setSelected] = useState<Set<string>>(
+    new Set(existing?.feature_flags.map(f => f.id) ?? [])
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const toggle = (id: string) => {
+    setSelected(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !label.trim()) {
+      setError('Name and Label are required');
+      return;
+    }
+    if (!/^[a-z0-9_]+$/.test(name.trim())) {
+      setError('Name must be lowercase alphanumeric + underscores only');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      let res: string;
+      const ids = [...selected];
+      if (existing) {
+        res = await updateFeatureFlagGroup(existing.id, {
+          label: label.trim(),
+          description: description.trim() || null,
+          featureFlagIds: ids,
+        });
+      } else {
+        res = await createFeatureFlagGroup(
+          name.trim(),
+          label.trim(),
+          description.trim() || null,
+          ids
+        );
+      }
+      const data = JSON.parse(res);
+      if (!data.success) {
+        setError(data.error);
+        return;
+      }
+      onSave();
+    } catch {
+      setError('Unexpected error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <div className="flex items-start gap-2 p-3 bg-red-900/20 border border-red-700 rounded-lg text-red-400 text-sm">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Machine Name *</label>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            disabled={!!existing}
+            className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white font-mono text-sm focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+            placeholder="standard_features"
+          />
+          <p className="text-xs text-gray-500">Cannot be changed after creation.</p>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Display Label *</label>
+          <input
+            value={label}
+            onChange={e => setLabel(e.target.value)}
+            className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500"
+            placeholder="Standard features"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Description</label>
+        <textarea
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          rows={2}
+          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Flags in this package</label>
+        {allFlags.length === 0 ? (
+          <p className="text-xs text-gray-500 italic">Create feature flags first.</p>
+        ) : (
+          <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-800 divide-y divide-slate-200 dark:divide-slate-800">
+            {allFlags.map(ff => (
+              <label
+                key={ff.id}
+                className={`flex items-start gap-3 px-3 py-2 cursor-pointer select-none ${
+                  selected.has(ff.id)
+                    ? 'bg-indigo-900/20 border-l-2 border-l-indigo-500'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/90'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(ff.id)}
+                  onChange={() => toggle(ff.id)}
+                  className="mt-1 accent-indigo-500"
+                />
+                <span className="flex flex-col min-w-0">
+                  <span className="text-sm text-gray-900 dark:text-white font-medium flex items-center gap-1.5">
+                    {ff.label}
+                    {ff.is_preview && <PreviewBadge />}
+                  </span>
+                  <span className="text-xs text-gray-500 font-mono truncate">{ff.name}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+        >
+          {saving ? 'Saving…' : existing ? 'Save Package' : 'Create Package'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 // ─── Modal wrapper ────────────────────────────────────────────────────────────
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function Modal({
+  title,
+  onClose,
+  children,
+  fixedViewportHeight = false,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  /** When true, dialog is exactly 90vh tall and only the body scrolls (stable layout). */
+  fixedViewportHeight?: boolean;
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-gray-700">
+      <div
+        className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl w-full flex flex-col overflow-hidden ${
+          fixedViewportHeight
+            ? 'max-w-3xl h-[90vh] max-h-[90vh]'
+            : 'max-w-2xl max-h-[90vh] overflow-y-auto'
+        }`}
+      >
+        <div className="flex shrink-0 items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <h3 className="text-gray-900 dark:text-white font-semibold text-lg">{title}</h3>
           <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div
+          className={
+            fixedViewportHeight
+              ? 'flex min-h-0 flex-1 flex-col overflow-hidden px-6 py-5'
+              : 'px-6 py-5'
+          }
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -433,6 +638,7 @@ export default function LicenseManagementClient() {
   const [activeTab, setActiveTab] = useState<Tab>('licenses');
   const [licenses, setLicenses] = useState<License[]>([]);
   const [featureFlags, setFeatureFlags] = useState<FeatureFlag[]>([]);
+  const [flagGroups, setFlagGroups] = useState<FeatureFlagGroup[]>([]);
   const [usersWithLicenses, setUsersWithLicenses] = useState<UserWithLicense[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -440,8 +646,10 @@ export default function LicenseManagementClient() {
   // Modals
   const [licenseModal, setLicenseModal] = useState<'create' | 'edit' | null>(null);
   const [flagModal, setFlagModal] = useState<'create' | 'edit' | null>(null);
+  const [packageModal, setPackageModal] = useState<'create' | 'edit' | null>(null);
   const [editingLicense, setEditingLicense] = useState<License | null>(null);
   const [editingFlag, setEditingFlag] = useState<FeatureFlag | null>(null);
+  const [editingPackage, setEditingPackage] = useState<FeatureFlagGroup | null>(null);
 
   // Expanded licenses (to show feature flags)
   const [expandedLicenses, setExpandedLicenses] = useState<Set<string>>(new Set());
@@ -461,14 +669,17 @@ export default function LicenseManagementClient() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [lr, ffr, ur] = await Promise.all([
+      const [lr, ffr, ur, gr] = await Promise.all([
         getAllLicenses(),
         getAllFeatureFlags(),
         getAllUsersWithLicenses(),
+        getAllFeatureFlagGroups(),
       ]);
       const ld = JSON.parse(lr); if (ld.success) setLicenses(ld.licenses);
       const fd = JSON.parse(ffr); if (fd.success) setFeatureFlags(fd.featureFlags);
       const ud = JSON.parse(ur); if (ud.success) setUsersWithLicenses(ud.users);
+      const gd = JSON.parse(gr);
+      setFlagGroups(gd.success ? (gd.groups ?? []) : []);
     } catch {
       showMessage('error', 'Failed to load data');
     } finally {
@@ -502,6 +713,15 @@ export default function LicenseManagementClient() {
     else showMessage('error', res.error);
   };
 
+  const handleDeletePackage = async (g: FeatureFlagGroup) => {
+    if (!confirm(`Delete package "${g.label}"? Existing per-user overrides are not changed.`)) return;
+    const res = JSON.parse(await deleteFeatureFlagGroup(g.id));
+    if (res.success) {
+      showMessage('success', `Package "${g.label}" deleted`);
+      loadAll();
+    } else showMessage('error', res.error);
+  };
+
   // ── Assignments tab ───────────────────────────────────────────────────────
 
   const handleAssignLicense = async (userId: string, licenseId: string) => {
@@ -525,28 +745,31 @@ export default function LicenseManagementClient() {
   // ─────────────────────────────────────────────────────────────────────────
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode; count: number }[] = [
-    { id: 'licenses',     label: 'Licenses',      icon: <Award className="w-4 h-4" />,  count: licenses.length },
-    { id: 'featureFlags', label: 'Feature Flags',  icon: <Flag className="w-4 h-4" />,   count: featureFlags.length },
-    { id: 'assignments',  label: 'Assignments',    icon: <Users className="w-4 h-4" />,  count: usersWithLicenses.filter(u => u.license_id).length },
+    { id: 'licenses',      label: 'Licenses',        icon: <Award className="w-4 h-4" />,    count: licenses.length },
+    { id: 'featureFlags',  label: 'Feature Flags',   icon: <Flag className="w-4 h-4" />,     count: featureFlags.length },
+    { id: 'flagPackages',  label: 'Flag packages',   icon: <Package className="w-4 h-4" />, count: flagGroups.length },
+    { id: 'assignments',   label: 'Assignments',     icon: <Users className="w-4 h-4" />,   count: usersWithLicenses.filter(u => u.license_id).length },
   ];
 
   return (
     <>
       {/* Header */}
-      <header className="bg-white/80 dark:bg-gray-800/50 border-b border-slate-200 dark:border-gray-700 backdrop-blur-sm">
+      <header className="shrink-0 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">License Management</h2>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Define license plans, feature flags, and assign licenses to users</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+              Define license plans, feature flags, flag packages for bulk grants, and assign licenses to users
+            </p>
           </div>
-          <button onClick={loadAll} disabled={loading} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 border border-slate-300 dark:border-gray-600 hover:border-slate-400 dark:hover:border-gray-400 transition-colors disabled:opacity-50">
+          <button onClick={loadAll} disabled={loading} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 transition-colors disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6 space-y-4">
+      <main className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-50 p-6 dark:bg-slate-950">
         {/* Message banner */}
         {message && (
           <div className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${message.type === 'success' ? 'bg-green-900/20 border-green-700 text-green-400' : 'bg-red-900/20 border-red-700 text-red-400'}`}>
@@ -556,7 +779,7 @@ export default function LicenseManagementClient() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-slate-100 dark:bg-gray-800/60 border border-slate-200 dark:border-gray-700 rounded-lg p-1">
+        <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900">
           {TABS.map(tab => (
             <button
               key={tab.id}
@@ -564,12 +787,12 @@ export default function LicenseManagementClient() {
               className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors flex-1 justify-center ${
                 activeTab === tab.id
                   ? 'bg-indigo-600 text-white'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-gray-700/60'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800/60'
               }`}
             >
               {tab.icon}
               {tab.label}
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab.id ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-gray-700'}`}>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab.id ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-slate-800'}`}>
                 {tab.count}
               </span>
             </button>
@@ -591,11 +814,11 @@ export default function LicenseManagementClient() {
             {loading ? (
               <div className="text-center text-gray-500 dark:text-gray-400 py-12">Loading…</div>
             ) : licenses.length === 0 ? (
-              <div className="text-center text-gray-500 py-12">No license plans defined.</div>
+              <div className="py-12 text-center text-gray-500 dark:text-slate-400">No license plans defined.</div>
             ) : (
               <div className="space-y-2">
                 {licenses.map(lic => (
-                  <div key={lic.id} className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                  <div key={lic.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
                     <div className="flex items-center gap-4 px-5 py-4">
                       <div className="p-2 bg-indigo-600/20 rounded-lg">
                         <Award className="w-5 h-5 text-indigo-400" />
@@ -626,21 +849,21 @@ export default function LicenseManagementClient() {
                             if (next.has(lic.id)) next.delete(lic.id); else next.add(lic.id);
                             return next;
                           })}
-                          className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
+                          className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           title="Toggle feature flags"
                         >
                           {expandedLicenses.has(lic.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </button>
                         <button
                           onClick={() => { setEditingLicense(lic); setLicenseModal('edit'); }}
-                          className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
+                          className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           title="Edit"
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteLicense(lic)}
-                          className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-400 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
+                          className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -649,14 +872,14 @@ export default function LicenseManagementClient() {
                     </div>
 
                     {expandedLicenses.has(lic.id) && (
-                      <div className="border-t border-slate-200 dark:border-gray-700 px-5 py-3 bg-slate-50 dark:bg-gray-900/40">
+                      <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 dark:border-slate-800 dark:bg-slate-950">
                         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Included Feature Flags</p>
                         {lic.feature_flags.length === 0 ? (
                           <p className="text-xs text-gray-600 italic">No feature flags assigned to this license.</p>
                         ) : (
                           <div className="flex flex-wrap gap-2">
                             {lic.feature_flags.map(ff => (
-                              <span key={ff.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded-full text-xs text-gray-700 dark:text-gray-200">
+                              <span key={ff.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-full text-xs text-gray-700 dark:text-gray-200">
                                 <Flag className="w-3 h-3 text-indigo-400" />
                                 {ff.label}
                                 {ff.is_preview && <PreviewBadge />}
@@ -666,7 +889,7 @@ export default function LicenseManagementClient() {
                         )}
 
                         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mt-3 mb-1">Seats JSON</p>
-                        <pre className="text-xs text-green-300 font-mono bg-gray-950 rounded-lg px-3 py-2 overflow-x-auto">
+                        <pre className="overflow-x-auto rounded-lg bg-slate-950 px-3 py-2 font-mono text-xs text-green-300 dark:bg-black/50">
                           {JSON.stringify(lic.seats, null, 2)}
                         </pre>
                       </div>
@@ -693,18 +916,20 @@ export default function LicenseManagementClient() {
             {loading ? (
               <div className="text-center text-gray-500 dark:text-gray-400 py-12">Loading…</div>
             ) : featureFlags.length === 0 ? (
-              <div className="text-center text-gray-500 py-12">No feature flags defined.</div>
+              <div className="py-12 text-center text-gray-500 dark:text-slate-400">No feature flags defined.</div>
             ) : (
               <div className="space-y-2">
                 {featureFlags.map(ff => (
-                  <div key={ff.id} className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-5 py-4 flex items-start gap-4">
+                  <div key={ff.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-4 flex items-start gap-4">
                     <div className="p-2 bg-purple-600/20 rounded-lg mt-0.5 shrink-0">
                       <Flag className="w-4 h-4 text-purple-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-gray-900 dark:text-white font-semibold">{ff.label}</span>
-                        <code className="text-xs text-gray-400 bg-gray-900 px-1.5 py-0.5 rounded font-mono">{ff.name}</code>
+                        <code className="rounded bg-slate-200 px-1.5 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                          {ff.name}
+                        </code>
                         {ff.is_preview && <PreviewBadge />}
                         {!ff.enabled && <span className="text-xs text-gray-500 italic">disabled</span>}
                       </div>
@@ -714,8 +939,12 @@ export default function LicenseManagementClient() {
                       {ff.url_patterns.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {ff.url_patterns.map((p, i) => (
-                            <span key={i} className="flex items-center gap-1 text-xs text-green-300 bg-gray-900 border border-gray-700 px-2 py-0.5 rounded font-mono">
-                              <Link className="w-2.5 h-2.5 text-gray-500" />{p}
+                            <span
+                              key={i}
+                              className="flex items-center gap-1 rounded border border-slate-300 bg-slate-100 px-2 py-0.5 font-mono text-xs text-green-700 dark:border-slate-700 dark:bg-slate-950 dark:text-green-300"
+                            >
+                              <Link className="h-2.5 w-2.5 text-slate-500 dark:text-slate-400" />
+                              {p}
                             </span>
                           ))}
                         </div>
@@ -724,21 +953,105 @@ export default function LicenseManagementClient() {
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => handleToggleFlag(ff)}
-                        className={`p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors ${ff.enabled ? 'text-green-400' : 'text-gray-600'}`}
+                        className={`p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${ff.enabled ? 'text-green-400' : 'text-gray-600'}`}
                         title={ff.enabled ? 'Disable' : 'Enable'}
                       >
                         {ff.enabled ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
                       </button>
                       <button
                         onClick={() => { setEditingFlag(ff); setFlagModal('edit'); }}
-                        className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
+                        className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                         title="Edit"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteFlag(ff)}
-                        className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-400 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
+                        className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Flag packages tab ─────────────────────────────────────────────── */}
+        {activeTab === 'flagPackages' && (
+          <div className="space-y-3">
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  setEditingPackage(null);
+                  setPackageModal('create');
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
+              >
+                <Plus className="w-4 h-4" /> New flag package
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="text-center text-gray-500 dark:text-gray-400 py-12">Loading…</div>
+            ) : flagGroups.length === 0 ? (
+              <div className="py-12 text-center text-gray-500 dark:text-slate-400">
+                No flag packages yet. Create one to group several feature flags for faster grants on users.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {flagGroups.map(g => (
+                  <div
+                    key={g.id}
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-4 flex items-start gap-4"
+                  >
+                    <div className="p-2 bg-indigo-600/20 rounded-lg mt-0.5 shrink-0">
+                      <Package className="w-4 h-4 text-indigo-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-gray-900 dark:text-white font-semibold">{g.label}</span>
+                        <code className="rounded bg-slate-200 px-1.5 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                          {g.name}
+                        </code>
+                      </div>
+                      {g.description && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{g.description}</p>
+                      )}
+                      {g.feature_flags.length === 0 ? (
+                        <p className="text-xs text-gray-600 italic mt-2">No flags in this package yet.</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {g.feature_flags.map(ff => (
+                            <span
+                              key={ff.id}
+                              className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-full text-xs text-gray-700 dark:text-gray-200"
+                            >
+                              <Flag className="w-3 h-3 text-indigo-400" />
+                              {ff.label}
+                              {ff.is_preview && <PreviewBadge />}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => {
+                          setEditingPackage(g);
+                          setPackageModal('edit');
+                        }}
+                        className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeletePackage(g)}
+                        className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                         title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -760,7 +1073,7 @@ export default function LicenseManagementClient() {
                 placeholder="Search users…"
                 value={assignSearch}
                 onChange={e => setAssignSearch(e.target.value)}
-                className="flex-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-400 dark:placeholder-gray-500"
+                className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-400 dark:placeholder-slate-500"
               />
               <span className="text-xs text-gray-500 shrink-0">{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}</span>
             </div>
@@ -768,19 +1081,19 @@ export default function LicenseManagementClient() {
             {loading ? (
               <div className="text-center text-gray-500 dark:text-gray-400 py-12">Loading…</div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-gray-700">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-slate-50 dark:bg-gray-800/80 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                    <tr className="bg-slate-50 dark:bg-slate-900/80 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                       <th className="px-4 py-3 font-medium">User</th>
                       <th className="px-4 py-3 font-medium">Assigned License</th>
                       <th className="px-4 py-3 font-medium">Seats</th>
                       <th className="px-4 py-3 font-medium text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-gray-700/60">
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
                     {filteredUsers.map(user => (
-                      <tr key={user.id} className="bg-white dark:bg-gray-800/30 hover:bg-slate-50 dark:hover:bg-gray-800/60 transition-colors">
+                      <tr key={user.id} className="bg-white dark:bg-slate-900/30 hover:bg-slate-50 dark:hover:bg-slate-800/90 transition-colors">
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-900 dark:text-white">{user.name}</div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">{user.email}</div>
@@ -819,22 +1132,22 @@ export default function LicenseManagementClient() {
                                 Assign
                               </button>
                               {assigningUser?.id === user.id && (
-                                <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-600 rounded-xl shadow-2xl p-2 min-w-[200px]">
+                                <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl p-2 min-w-[200px]">
                                   {licenses.filter(l => l.enabled).map(lic => (
                                     <button
                                       key={lic.id}
                                       onClick={() => handleAssignLicense(user.id, lic.id)}
-                                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left hover:bg-slate-50 dark:hover:bg-gray-800 text-gray-900 dark:text-white transition-colors"
+                                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-gray-900 dark:text-white transition-colors"
                                     >
                                       <Badge type={lic.license_type} />
                                       {lic.name}
                                       {lic.id === user.license_id && <CheckCircle className="w-3.5 h-3.5 text-green-400 ml-auto" />}
                                     </button>
                                   ))}
-                                  <div className="border-t border-slate-200 dark:border-gray-700 mt-1 pt-1">
+                                  <div className="border-t border-slate-200 dark:border-slate-800 mt-1 pt-1">
                                     <button
                                       onClick={() => { setOverrideUser(user); setAssigningUser(null); }}
-                                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left hover:bg-slate-50 dark:hover:bg-gray-800 text-indigo-300 transition-colors"
+                                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-indigo-300 transition-colors"
                                     >
                                       <Flag className="w-3.5 h-3.5" /> Override Flags…
                                     </button>
@@ -842,7 +1155,7 @@ export default function LicenseManagementClient() {
                                   {user.license_id && (
                                     <button
                                       onClick={() => { handleRemoveLicense(user); setAssigningUser(null); }}
-                                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left hover:bg-slate-50 dark:hover:bg-gray-800 text-red-400 transition-colors"
+                                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-red-400 transition-colors"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" /> Remove License
                                     </button>
@@ -891,14 +1204,42 @@ export default function LicenseManagementClient() {
         </Modal>
       )}
 
+      {packageModal && (
+        <Modal
+          title={packageModal === 'create' ? 'New flag package' : `Edit package — ${editingPackage?.label}`}
+          onClose={() => setPackageModal(null)}
+        >
+          <FlagPackageForm
+            existing={packageModal === 'edit' ? editingPackage : null}
+            allFlags={featureFlags}
+            onSave={() => {
+              setPackageModal(null);
+              loadAll();
+              showMessage('success', 'Flag package saved');
+            }}
+            onCancel={() => setPackageModal(null)}
+          />
+        </Modal>
+      )}
+
       {/* ── Per-user flag override Modal ───────────────────────────────────── */}
       {overrideUser && (
-        <OverrideFlagsModal
-          user={overrideUser}
-          allFlags={featureFlags}
-          onClose={() => { setOverrideUser(null); loadAll(); }}
-          showMessage={showMessage}
-        />
+        <Modal
+          fixedViewportHeight
+          title={`Feature flags — ${overrideUser.name}`}
+          onClose={() => {
+            setOverrideUser(null);
+            loadAll();
+          }}
+        >
+          <FeatureFlagUserOverridesPanel
+            className="h-full min-h-0"
+            userId={overrideUser.id}
+            userName={overrideUser.name}
+            userEmail={overrideUser.email}
+            onNotify={showMessage}
+          />
+        </Modal>
       )}
 
       {/* Click-outside to close assign dropdown */}
@@ -906,132 +1247,5 @@ export default function LicenseManagementClient() {
         <div className="fixed inset-0 z-10" onClick={() => setAssigningUser(null)} />
       )}
     </>
-  );
-}
-
-// ─── Per-user feature flag override modal ────────────────────────────────────
-
-interface OverrideFlagsModalProps {
-  user: UserWithLicense;
-  allFlags: FeatureFlag[];
-  onClose: () => void;
-  showMessage: (type: 'success' | 'error', text: string) => void;
-}
-
-function OverrideFlagsModal({ user, allFlags, onClose, showMessage }: OverrideFlagsModalProps) {
-  const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchOverrides = async () => {
-      const { getUserLicense } = await import('../../../../../lib/db/admin-helper');
-      const res = JSON.parse(await getUserLicense(user.id));
-      if (res.success && res.license?.user_overrides) {
-        const map = new Map<string, boolean>();
-        for (const o of res.license.user_overrides) map.set(o.id, o.enabled);
-        setOverrides(map);
-      }
-      setLoading(false);
-    };
-    fetchOverrides();
-  }, [user.id]);
-
-  const handleToggle = async (ff: FeatureFlag, enabled: boolean) => {
-    setSaving(ff.id);
-    try {
-      const res = JSON.parse(await setUserFeatureFlag(user.id, ff.id, enabled));
-      if (res.success) {
-        setOverrides(prev => new Map(prev).set(ff.id, enabled));
-        showMessage('success', `Override for "${ff.label}" ${enabled ? 'granted' : 'revoked'}`);
-      } else {
-        showMessage('error', res.error);
-      }
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const handleClear = async (ff: FeatureFlag) => {
-    setSaving(ff.id);
-    try {
-      const res = JSON.parse(await removeUserFeatureFlag(user.id, ff.id));
-      if (res.success) {
-        setOverrides(prev => { const m = new Map(prev); m.delete(ff.id); return m; });
-        showMessage('success', `Override for "${ff.label}" cleared (reverts to license default)`);
-      } else {
-        showMessage('error', res.error);
-      }
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  return (
-    <Modal title={`Feature Flag Overrides — ${user.name}`} onClose={onClose}>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        Set explicit grant/revoke overrides for this user. Overrides take precedence over the license plan.
-      </p>
-      {loading ? (
-        <div className="text-center text-gray-500 dark:text-gray-400 py-8">Loading…</div>
-      ) : (
-        <div className="space-y-2">
-          {allFlags.map(ff => {
-            const override = overrides.has(ff.id) ? overrides.get(ff.id) : null;
-            return (
-              <div key={ff.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-gray-900/60 rounded-lg border border-slate-200 dark:border-gray-700">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-900 dark:text-white text-sm font-medium">{ff.label}</span>
-                    {ff.is_preview && <PreviewBadge />}
-                  </div>
-                  <p className="text-xs text-gray-500 font-mono">{ff.name}</p>
-                  {override === null && (
-                    <p className="text-xs text-gray-600 italic mt-0.5">No override — using license default</p>
-                  )}
-                  {override === true && (
-                    <p className="text-xs text-green-500 mt-0.5">✓ Explicitly granted</p>
-                  )}
-                  {override === false && (
-                    <p className="text-xs text-red-400 mt-0.5">✗ Explicitly revoked</p>
-                  )}
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  <button
-                    onClick={() => handleToggle(ff, true)}
-                    disabled={saving === ff.id}
-                    className={`px-2.5 py-1.5 text-xs rounded-lg font-medium transition-colors ${override === true ? 'bg-green-700 text-green-100' : 'bg-slate-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-green-800 hover:text-green-200'} disabled:opacity-50`}
-                  >
-                    Grant
-                  </button>
-                  <button
-                    onClick={() => handleToggle(ff, false)}
-                    disabled={saving === ff.id}
-                    className={`px-2.5 py-1.5 text-xs rounded-lg font-medium transition-colors ${override === false ? 'bg-red-800 text-red-100' : 'bg-slate-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-red-900 hover:text-red-200'} disabled:opacity-50`}
-                  >
-                    Revoke
-                  </button>
-                  {override !== null && (
-                    <button
-                      onClick={() => handleClear(ff)}
-                      disabled={saving === ff.id}
-                      className="px-2.5 py-1.5 text-xs rounded-lg font-medium bg-slate-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
-                      title="Clear override (revert to license default)"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      <div className="flex justify-end pt-4">
-        <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 border border-slate-300 dark:border-gray-600 hover:border-slate-400 dark:hover:border-gray-400 transition-colors">
-          Done
-        </button>
-      </div>
-    </Modal>
   );
 }
