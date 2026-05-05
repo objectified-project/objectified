@@ -115,7 +115,9 @@ export function AiClassCreatePreviewDialog({
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-3">
           <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600">
             <div className="border-b border-gray-200 bg-gray-100 px-3 py-1.5 dark:border-gray-700 dark:bg-gray-900">
-              <span className="text-xs font-mono text-gray-700 dark:text-gray-300">JSON Schema</span>
+              <span className="text-xs font-mono text-gray-700 dark:text-gray-300">
+                {schemaJson ? 'JSON Schema' : 'Assistant response'}
+              </span>
             </div>
             <pre
               className="max-h-[min(50vh,28rem)] overflow-auto bg-gray-50 p-3 text-xs leading-relaxed text-gray-900 dark:bg-gray-950 dark:text-gray-100"
