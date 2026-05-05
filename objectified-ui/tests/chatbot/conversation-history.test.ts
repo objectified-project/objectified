@@ -227,11 +227,74 @@ describe('applyRefinementsToSpec', () => {
     expect(out.components.schemas.Product.properties.phone.type).toBe('string');
   });
 
+  it('infers schema from property name when type is omitted (#277)', () => {
+    const ops: ChatRefinementOp[] = [
+      { kind: 'add-property', name: 'email' },
+      { kind: 'add-property', name: 'createdAt' },
+      { kind: 'add-property', name: 'age' },
+      { kind: 'add-property', name: 'price' },
+      { kind: 'add-property', name: 'isActive' },
+      { kind: 'add-property', name: 'notes' },
+    ];
+    const out = applyRefinementsToSpec(baseSpec(), ops) as {
+      components: { schemas: { Product: { properties: Record<string, Record<string, unknown>> } } };
+    };
+    const p = out.components.schemas.Product.properties;
+    expect(p.email).toMatchObject({ type: 'string', format: 'email' });
+    expect(p.createdAt).toMatchObject({ type: 'string', format: 'date-time' });
+    expect(p.age).toMatchObject({ type: 'integer', minimum: 0 });
+    expect(p.price).toMatchObject({ type: 'number', minimum: 0 });
+    expect(p.isActive).toMatchObject({ type: 'boolean' });
+    expect(p.notes).toMatchObject({ type: 'string' });
+    expect(p.notes.format).toBeUndefined();
+  });
+
+  it('matches inference case-insensitively on property name (#277)', () => {
+    const out = applyRefinementsToSpec(baseSpec(), [{ kind: 'add-property', name: 'Email' }]) as {
+      components: { schemas: { Product: { properties: Record<string, { type: string; format?: string }> } } };
+    };
+    expect(out.components.schemas.Product.properties.Email).toMatchObject({
+      type: 'string',
+      format: 'email',
+    });
+  });
+
+  it('does not override an explicit type with name inference (#277)', () => {
+    const out = applyRefinementsToSpec(baseSpec(), [
+      { kind: 'add-property', name: 'createdAt', type: 'integer' },
+    ]) as {
+      components: { schemas: { Product: { properties: Record<string, Record<string, unknown>> } } };
+    };
+    const pr = out.components.schemas.Product.properties.createdAt;
+    expect(pr.type).toBe('integer');
+    expect(pr.format).toBeUndefined();
+  });
+
   it('updates the type of an existing property when add is requested with a type', () => {
     const out = applyRefinementsToSpec(baseSpec(), [
       { kind: 'add-property', name: 'priceCents', type: 'number' },
     ]) as { components: { schemas: { Product: { properties: Record<string, { type: string }> } } } };
     expect(out.components.schemas.Product.properties.priceCents.type).toBe('number');
+  });
+
+  it('clears stale inferred constraints when an explicit type is provided for an existing property (#277)', () => {
+    // First, add createdAt without a type so inference kicks in (gives string + format: date-time).
+    const step1 = applyRefinementsToSpec(baseSpec(), [{ kind: 'add-property', name: 'createdAt' }]) as {
+      components: { schemas: { Product: { properties: Record<string, Record<string, unknown>> } } };
+    };
+    expect(step1.components.schemas.Product.properties.createdAt).toMatchObject({
+      type: 'string',
+      format: 'date-time',
+    });
+
+    // Now re-add with an explicit type — format must be cleared to avoid contradictory schema.
+    const step2 = applyRefinementsToSpec(step1, [{ kind: 'add-property', name: 'createdAt', type: 'integer' }]) as {
+      components: { schemas: { Product: { properties: Record<string, Record<string, unknown>> } } };
+    };
+    const prop = step2.components.schemas.Product.properties.createdAt;
+    expect(prop.type).toBe('integer');
+    expect(prop.format).toBeUndefined();
+    expect(prop.minimum).toBeUndefined();
   });
 
   it('removes a property and prunes required entries', () => {
@@ -256,6 +319,16 @@ describe('applyRefinementsToSpec', () => {
     ]) as { components: { schemas: { Product: { properties: Record<string, { type: string }>; required: string[] } } } };
     expect(out.components.schemas.Product.properties.tenantId.type).toBe('string');
     expect(out.components.schemas.Product.required).toContain('tenantId');
+  });
+
+  it('infers schema when require-property adds a missing known name (#277)', () => {
+    const out = applyRefinementsToSpec(baseSpec(), [
+      { kind: 'require-property', name: 'isActive' },
+    ]) as {
+      components: { schemas: { Product: { properties: Record<string, Record<string, unknown>>; required: string[] } } };
+    };
+    expect(out.components.schemas.Product.properties.isActive).toMatchObject({ type: 'boolean' });
+    expect(out.components.schemas.Product.required).toContain('isActive');
   });
 
   it('renames a property and updates the required list', () => {

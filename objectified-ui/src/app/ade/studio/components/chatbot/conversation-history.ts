@@ -26,6 +26,7 @@
  */
 
 import { detectOpenApiSpecs, type DetectedOpenApiSpec } from './openapi-detection';
+import { inferSchemaShapeFromPropertyName } from './property-name-schema-inference';
 import type { ChatMessage } from './types';
 
 /** Number of trailing turns kept in the prompt-injection excerpt list. */
@@ -425,11 +426,24 @@ function applyOpToSchema(schema: SchemaShape, op: ChatRefinementOp): void {
   switch (op.kind) {
     case 'add-property': {
       if (props[op.name]) {
-        // Property already exists — only update its type if a new one was provided.
-        if (op.type) props[op.name].type = op.type;
-      } else {
+        if (op.type) {
+          // Explicit type provided — replace the entire shape to avoid stale
+          // constraints (format, minimum, etc.) left over from previous inference.
+          props[op.name] = {
+            type: op.type,
+            ...(props[op.name].description ? { description: props[op.name].description } : {}),
+          };
+        }
+      } else if (op.type) {
         props[op.name] = {
-          type: op.type ?? 'string',
+          type: op.type,
+          description: `Added in follow-up: ${op.name}.`,
+        };
+      } else {
+        const inferred = inferSchemaShapeFromPropertyName(op.name);
+        props[op.name] = {
+          type: 'string',
+          ...inferred,
           description: `Added in follow-up: ${op.name}.`,
         };
       }
@@ -442,8 +456,10 @@ function applyOpToSchema(schema: SchemaShape, op: ChatRefinementOp): void {
     }
     case 'require-property': {
       if (!props[op.name]) {
+        const inferred = inferSchemaShapeFromPropertyName(op.name);
         props[op.name] = {
           type: 'string',
+          ...inferred,
           description: `Added (required) in follow-up: ${op.name}.`,
         };
       }

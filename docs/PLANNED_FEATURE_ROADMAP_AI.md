@@ -104,12 +104,12 @@ This outlines the planned features for integrating AI capabilities into Objectif
 | #276   | Adds analyze button for properties analysis        |
 
 **Type and Constraint Inference** 📋 PLANNED
-- 📋 Suggest type based on property name:
-    - 📋 `email` → string with email format
-    - 📋 `createdAt` → string with date-time format
-    - 📋 `age` → integer with minimum 0
-    - 📋 `price` → number with minimum 0
-    - 📋 `isActive` → boolean
+- ✅ Suggest type based on property name (#277 — chat refinement + class-skeleton prompt guidance):
+    - ✅ `email` → string with email format
+    - ✅ `createdAt` → string with date-time format
+    - ✅ `age` → integer with minimum 0
+    - ✅ `price` → number with minimum 0
+    - ✅ `isActive` → boolean
 - 📋 Suggest constraints:
     - 📋 String length limits
     - 📋 Numeric ranges
@@ -118,7 +118,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                        |
 |--------|--------------------------------------------|
-| #277   | Adds type inference based on property name |
 | #278   | Adds constraint suggestions for properties |
 
 **Actionable Recommendations** 📋 PLANNED
