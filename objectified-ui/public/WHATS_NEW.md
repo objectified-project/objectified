@@ -21,6 +21,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## Studio
 - Studio AI chat schema refinements infer JSON Schema type and common constraints from well-known property names (`email`, `createdAt`, `age`, `price`, `isActive`) when you add a field without specifying a type; the class-skeleton Ollama prompt uses the same conventions (#277).
+- Chat refinement inference now adds typical validation hints from names—string lengths, numeric bounds, regex patterns, and marking `id` as required when added without a type (#278).
 - Studio AI assistant (live Ollama and offline demo) appends an **Improvement suggestions** section after OpenAPI sketches—actionable bullets such as pagination, `allOf` inheritance, discriminators, splitting large schemas, and standard error shapes (#495).
 - Studio AI chat empty state offers example prompts for schema and API generation (#268).
 - Studio AI chat treats plain-language domain descriptions (and similar phrasing) as requests to draft OpenAPI `components/schemas`, including when Ollama is connected (#267).

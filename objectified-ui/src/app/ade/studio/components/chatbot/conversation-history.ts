@@ -26,7 +26,7 @@
  */
 
 import { detectOpenApiSpecs, type DetectedOpenApiSpec } from './openapi-detection';
-import { inferSchemaShapeFromPropertyName } from './property-name-schema-inference';
+import { inferPropertyShapeFromName } from './property-name-schema-inference';
 import type { ChatMessage } from './types';
 
 /** Number of trailing turns kept in the prompt-injection excerpt list. */
@@ -440,12 +440,15 @@ function applyOpToSchema(schema: SchemaShape, op: ChatRefinementOp): void {
           description: `Added in follow-up: ${op.name}.`,
         };
       } else {
-        const inferred = inferSchemaShapeFromPropertyName(op.name);
+        const inferred = inferPropertyShapeFromName(op.name);
         props[op.name] = {
           type: 'string',
-          ...inferred,
+          ...inferred.schema,
           description: `Added in follow-up: ${op.name}.`,
         };
+        if (inferred.suggestRequired && !schema.required!.includes(op.name)) {
+          schema.required!.push(op.name);
+        }
       }
       return;
     }
@@ -456,10 +459,10 @@ function applyOpToSchema(schema: SchemaShape, op: ChatRefinementOp): void {
     }
     case 'require-property': {
       if (!props[op.name]) {
-        const inferred = inferSchemaShapeFromPropertyName(op.name);
+        const inferred = inferPropertyShapeFromName(op.name);
         props[op.name] = {
           type: 'string',
-          ...inferred,
+          ...inferred.schema,
           description: `Added (required) in follow-up: ${op.name}.`,
         };
       }
