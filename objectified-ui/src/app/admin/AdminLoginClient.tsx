@@ -41,18 +41,18 @@ export default function AdminLoginClient() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-100 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-gray-800 rounded-lg shadow-2xl p-8 border border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 border border-slate-200 dark:border-gray-700">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-red-600 rounded-full mb-4">
               <Lock className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               Super Admin
             </h1>
-            <p className="text-gray-400 text-sm">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
               Objectified Administration Portal
             </p>
           </div>
@@ -75,7 +75,7 @@ export default function AdminLoginClient() {
             <div className="mb-6">
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-300 mb-2"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
               >
                 Admin Password
               </label>
@@ -86,7 +86,7 @@ export default function AdminLoginClient() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-gray-900 border border-slate-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
                   placeholder="Enter admin password"
                   required
                   disabled={isLoading}
@@ -126,7 +126,7 @@ export default function AdminLoginClient() {
         <div className="mt-6 text-center">
           <a
             href="/"
-            className="text-gray-500 hover:text-gray-400 text-sm transition-colors"
+            className="text-slate-500 hover:text-slate-700 dark:text-gray-500 dark:hover:text-gray-400 text-sm transition-colors"
           >
             ← Back to Objectified
           </a>

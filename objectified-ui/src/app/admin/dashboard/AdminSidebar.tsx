@@ -13,6 +13,7 @@ import {
   Building2,
   Package,
   LayoutGrid,
+  Award,
 } from 'lucide-react';
 import SidebarShell, { SidebarSectionLabel } from '../../components/sidebar/SidebarShell';
 import SidebarDensityToggle from '../../components/sidebar/SidebarDensityToggle';
@@ -35,6 +36,7 @@ const OVERVIEW: AdminMenuItem = {
 const MANAGEMENT_ITEMS: AdminMenuItem[] = [
   { id: 'users', path: '/admin/dashboard/users', icon: <Users className="w-4 h-4" />, title: 'User Management' },
   { id: 'tenants', path: '/admin/dashboard/tenants', icon: <Building2 className="w-4 h-4" />, title: 'Tenant Management' },
+  { id: 'licenses', path: '/admin/dashboard/licenses', icon: <Award className="w-4 h-4" />, title: 'License Management' },
   { id: 'templates', path: '/admin/dashboard/templates', icon: <Package className="w-4 h-4" />, title: 'Property Templates' },
   { id: 'payments', path: '/admin/dashboard/payments', icon: <CreditCard className="w-4 h-4" />, title: 'Payment Management' },
   { id: 'database', path: '/admin/dashboard/database', icon: <Database className="w-4 h-4" />, title: 'Database Administration' },

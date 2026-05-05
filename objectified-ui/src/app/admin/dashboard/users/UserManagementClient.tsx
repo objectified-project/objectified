@@ -14,9 +14,13 @@ import {
   AlertCircle,
   MoreVertical,
   Power,
+  Award,
+  Flag,
+  ShieldCheck,
+  ShieldOff,
+  RotateCcw,
 } from 'lucide-react';
 import {
-  getAllUsers,
   getAllSignups,
   createUserFromSignup,
   deleteSignup,
@@ -24,6 +28,14 @@ import {
   deleteUser,
   getUserStats,
   getSignupStats,
+  getAllUsersWithLicenses,
+  getAllLicenses,
+  assignLicenseToUser,
+  removeUserLicense,
+  getAllFeatureFlags,
+  getUserLicense,
+  setUserFeatureFlag,
+  removeUserFeatureFlag,
 } from '../../../../../lib/db/admin-helper';
 
 interface User {
@@ -34,6 +46,9 @@ interface User {
   enabled: boolean;
   created_at: string;
   updated_at: string;
+  license_id: string | null;
+  license_name: string | null;
+  license_type: string | null;
 }
 
 interface Signup {
@@ -59,9 +74,45 @@ interface SignupStats {
   signups_today: number;
 }
 
+interface License {
+  id: string;
+  name: string;
+  license_type: string;
+  enabled: boolean;
+}
+
+interface FeatureFlag {
+  id: string;
+  name: string;
+  label: string;
+  description: string | null;
+  is_preview: boolean;
+  enabled: boolean;
+}
+
+/** 'grant' | 'revoke' | 'default' — 'default' means no user-level override */
+type FlagOverride = 'grant' | 'revoke' | 'default';
+
+interface FlagsModalState {
+  user: User;
+  allFlags: FeatureFlag[];
+  /** flags bundled with the user's current license */
+  licenseFlags: Set<string>;
+  /** user-level overrides: flagId -> enabled */
+  overrides: Record<string, boolean>;
+  saving: Set<string>;
+}
+
+const LICENSE_TYPE_COLORS: Record<string, string> = {
+  free:    'bg-slate-700 text-slate-200',
+  paid:    'bg-indigo-700 text-indigo-100',
+  sponsor: 'bg-amber-700 text-amber-100',
+};
+
 export default function UserManagementClient() {
   const [users, setUsers] = useState<User[]>([]);
   const [signups, setSignups] = useState<Signup[]>([]);
+  const [licenses, setLicenses] = useState<License[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [signupStats, setSignupStats] = useState<SignupStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +122,8 @@ export default function UserManagementClient() {
   const [openUserDropdown, setOpenUserDropdown] = useState<string | null>(null);
   const [signupDropdownPos, setSignupDropdownPos] = useState<{ top: number; right: number } | null>(null);
   const [userDropdownPos, setUserDropdownPos] = useState<{ top: number; right: number } | null>(null);
+  const [licenseSubMenu, setLicenseSubMenu] = useState<string | null>(null);
+  const [flagsModal, setFlagsModal] = useState<FlagsModalState | null>(null);
 
   useEffect(() => {
     loadData();
@@ -79,27 +132,161 @@ export default function UserManagementClient() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [usersRes, signupsRes, userStatsRes, signupStatsRes] = await Promise.all([
-        getAllUsers(),
+      const [usersRes, signupsRes, userStatsRes, signupStatsRes, licensesRes] = await Promise.all([
+        getAllUsersWithLicenses(),
         getAllSignups(),
         getUserStats(),
         getSignupStats(),
+        getAllLicenses(),
       ]);
 
       const usersData = JSON.parse(usersRes);
       const signupsData = JSON.parse(signupsRes);
       const userStatsData = JSON.parse(userStatsRes);
       const signupStatsData = JSON.parse(signupStatsRes);
+      const licensesData = JSON.parse(licensesRes);
 
       if (usersData.success) setUsers(usersData.users);
       if (signupsData.success) setSignups(signupsData.signups);
       if (userStatsData.success) setUserStats(userStatsData.stats);
       if (signupStatsData.success) setSignupStats(signupStatsData.stats);
+      if (licensesData.success) setLicenses(licensesData.licenses.filter((l: License) => l.enabled));
     } catch (error) {
       console.error('Error loading data:', error);
       showMessage('error', 'Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAssignLicense = async (userId: string, licenseId: string) => {
+    try {
+      const result = await assignLicenseToUser(userId, licenseId);
+      const data = JSON.parse(result);
+      if (data.success) {
+        showMessage('success', 'License assigned successfully');
+        await loadData();
+      } else {
+        showMessage('error', data.error || 'Failed to assign license');
+      }
+    } catch {
+      showMessage('error', 'Failed to assign license');
+    } finally {
+      setLicenseSubMenu(null);
+      setOpenUserDropdown(null);
+    }
+  };
+
+  const handleRemoveLicense = async (userId: string) => {
+    try {
+      const result = await removeUserLicense(userId);
+      const data = JSON.parse(result);
+      if (data.success) {
+        showMessage('success', 'License removed');
+        await loadData();
+      } else {
+        showMessage('error', data.error || 'Failed to remove license');
+      }
+    } catch {
+      showMessage('error', 'Failed to remove license');
+    } finally {
+      setOpenUserDropdown(null);
+    }
+  };
+
+  const handleOpenFlagsModal = async (user: User) => {
+    setOpenUserDropdown(null);
+    try {
+      const [flagsRes, licenseRes] = await Promise.all([
+        getAllFeatureFlags(),
+        getUserLicense(user.id),
+      ]);
+      const flagsData = JSON.parse(flagsRes);
+      const licenseData = JSON.parse(licenseRes);
+
+      const allFlags: FeatureFlag[] = flagsData.success ? flagsData.featureFlags : [];
+      const licenseInfo = licenseData.success ? licenseData.license : null;
+
+      const licenseFlags = new Set<string>(
+        (licenseInfo?.license_feature_flags ?? []).map((f: { id: string }) => f.id)
+      );
+      const overrides: Record<string, boolean> = {};
+      for (const ov of (licenseInfo?.user_overrides ?? [])) {
+        overrides[ov.id] = ov.enabled;
+      }
+
+      setFlagsModal({ user, allFlags, licenseFlags, overrides, saving: new Set() });
+    } catch {
+      showMessage('error', 'Failed to load feature flags');
+    }
+  };
+
+  const handleSetFlagOverride = async (flagId: string, enabled: boolean) => {
+    if (!flagsModal) return;
+    setFlagsModal(prev => prev ? { ...prev, saving: new Set([...prev.saving, flagId]) } : prev);
+    try {
+      const result = await setUserFeatureFlag(flagsModal.user.id, flagId, enabled);
+      const data = JSON.parse(result);
+      if (data.success) {
+        setFlagsModal(prev => {
+          if (!prev) return prev;
+          const overrides = { ...prev.overrides, [flagId]: enabled };
+          const saving = new Set(prev.saving);
+          saving.delete(flagId);
+          return { ...prev, overrides, saving };
+        });
+      } else {
+        showMessage('error', data.error || 'Failed to update flag');
+        setFlagsModal(prev => {
+          if (!prev) return prev;
+          const saving = new Set(prev.saving);
+          saving.delete(flagId);
+          return { ...prev, saving };
+        });
+      }
+    } catch {
+      showMessage('error', 'Failed to update flag');
+      setFlagsModal(prev => {
+        if (!prev) return prev;
+        const saving = new Set(prev.saving);
+        saving.delete(flagId);
+        return { ...prev, saving };
+      });
+    }
+  };
+
+  const handleClearFlagOverride = async (flagId: string) => {
+    if (!flagsModal) return;
+    setFlagsModal(prev => prev ? { ...prev, saving: new Set([...prev.saving, flagId]) } : prev);
+    try {
+      const result = await removeUserFeatureFlag(flagsModal.user.id, flagId);
+      const data = JSON.parse(result);
+      if (data.success) {
+        setFlagsModal(prev => {
+          if (!prev) return prev;
+          const overrides = { ...prev.overrides };
+          delete overrides[flagId];
+          const saving = new Set(prev.saving);
+          saving.delete(flagId);
+          return { ...prev, overrides, saving };
+        });
+      } else {
+        showMessage('error', data.error || 'Failed to clear override');
+        setFlagsModal(prev => {
+          if (!prev) return prev;
+          const saving = new Set(prev.saving);
+          saving.delete(flagId);
+          return { ...prev, saving };
+        });
+      }
+    } catch {
+      showMessage('error', 'Failed to clear override');
+      setFlagsModal(prev => {
+        if (!prev) return prev;
+        const saving = new Set(prev.saving);
+        saving.delete(flagId);
+        return { ...prev, saving };
+      });
     }
   };
 
@@ -218,10 +405,10 @@ export default function UserManagementClient() {
   return (
     <>
       {/* Header */}
-      <header className="bg-gray-800/50 border-b border-gray-700 backdrop-blur-sm">
+      <header className="bg-white/80 dark:bg-gray-800/50 border-b border-slate-200 dark:border-gray-700 backdrop-blur-sm">
         <div className="px-6 py-4">
-          <h2 className="text-2xl font-bold text-white">User Management</h2>
-          <p className="text-gray-400 text-sm mt-1">Manage user accounts and approve signups</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Manage user accounts and approve signups</p>
         </div>
       </header>
 
@@ -248,14 +435,14 @@ export default function UserManagementClient() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+        <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-blue-600/20 rounded-lg">
               <Users className="w-5 h-5 text-blue-400" />
             </div>
             <div>
-              <p className="text-gray-400 text-xs">Total Users</p>
-              <p className="text-white text-xl font-bold">{userStats?.total_users || 0}</p>
+              <p className="text-gray-500 dark:text-gray-400 text-xs">Total Users</p>
+              <p className="text-gray-900 dark:text-white text-xl font-bold">{userStats?.total_users || 0}</p>
             </div>
           </div>
           <p className="text-gray-500 text-xs">
@@ -263,14 +450,14 @@ export default function UserManagementClient() {
           </p>
         </div>
 
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+        <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-green-600/20 rounded-lg">
               <UserCheck className="w-5 h-5 text-green-400" />
             </div>
             <div>
-              <p className="text-gray-400 text-xs">Verified Users</p>
-              <p className="text-white text-xl font-bold">{userStats?.verified_users || 0}</p>
+              <p className="text-gray-500 dark:text-gray-400 text-xs">Verified Users</p>
+              <p className="text-gray-900 dark:text-white text-xl font-bold">{userStats?.verified_users || 0}</p>
             </div>
           </div>
           <p className="text-gray-500 text-xs">
@@ -278,14 +465,14 @@ export default function UserManagementClient() {
           </p>
         </div>
 
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+        <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-purple-600/20 rounded-lg">
               <UserPlus className="w-5 h-5 text-purple-400" />
             </div>
             <div>
-              <p className="text-gray-400 text-xs">Pending Signups</p>
-              <p className="text-white text-xl font-bold">{signupStats?.total_signups || 0}</p>
+              <p className="text-gray-500 dark:text-gray-400 text-xs">Pending Signups</p>
+              <p className="text-gray-900 dark:text-white text-xl font-bold">{signupStats?.total_signups || 0}</p>
             </div>
           </div>
           <p className="text-gray-500 text-xs">
@@ -293,14 +480,14 @@ export default function UserManagementClient() {
           </p>
         </div>
 
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+        <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-orange-600/20 rounded-lg">
               <Calendar className="w-5 h-5 text-orange-400" />
             </div>
             <div>
-              <p className="text-gray-400 text-xs">Recent Signups</p>
-              <p className="text-white text-xl font-bold">{signupStats?.signups_7_days || 0}</p>
+              <p className="text-gray-500 dark:text-gray-400 text-xs">Recent Signups</p>
+              <p className="text-gray-900 dark:text-white text-xl font-bold">{signupStats?.signups_7_days || 0}</p>
             </div>
           </div>
           <p className="text-gray-500 text-xs">Last 7 days</p>
@@ -308,13 +495,13 @@ export default function UserManagementClient() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-700">
+      <div className="flex gap-2 border-b border-slate-200 dark:border-gray-700">
         <button
           onClick={() => setActiveTab('signups')}
           className={`px-4 py-2 font-medium text-sm transition-colors relative ${
             activeTab === 'signups'
               ? 'text-red-400'
-              : 'text-gray-400 hover:text-gray-300'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >
           Pending Signups
@@ -332,7 +519,7 @@ export default function UserManagementClient() {
           className={`px-4 py-2 font-medium text-sm transition-colors relative ${
             activeTab === 'users'
               ? 'text-red-400'
-              : 'text-gray-400 hover:text-gray-300'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >
           Active Users
@@ -347,7 +534,7 @@ export default function UserManagementClient() {
         <button
           onClick={loadData}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-gray-700 hover:bg-slate-300 dark:hover:bg-gray-600 text-gray-700 dark:text-white rounded-lg transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -361,7 +548,7 @@ export default function UserManagementClient() {
         </div>
       ) : activeTab === 'signups' ? (
         // Signups Table
-        <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg overflow-hidden">
           {signups.length === 0 ? (
             <div className="p-12 text-center">
               <UserPlus className="w-12 h-12 text-gray-600 mx-auto mb-4" />
@@ -370,44 +557,44 @@ export default function UserManagementClient() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-900 border-b border-gray-700">
+                <thead className="bg-slate-50 dark:bg-gray-900 border-b border-slate-200 dark:border-gray-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Email
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Source
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Date
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
                   {signups.map((signup) => (
-                    <tr key={signup.email_address} className="hover:bg-gray-750">
+                    <tr key={signup.email_address} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-white">{signup.name}</div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{signup.name}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <Mail className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-300">{signup.email_address}</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-300">{signup.email_address}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-400">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
                           {signup.signup_source || 'Direct'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-400">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
                           {formatDate(signup.signup_date)}
                         </span>
                       </td>
@@ -422,7 +609,7 @@ export default function UserManagementClient() {
                               });
                               setOpenSignupDropdown(openSignupDropdown === signup.email_address ? null : signup.email_address);
                             }}
-                            className="p-2 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
+                            className="p-2 hover:bg-slate-100 dark:hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-gray-700 dark:hover:text-white"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
@@ -434,7 +621,7 @@ export default function UserManagementClient() {
                                 onClick={() => setOpenSignupDropdown(null)}
                               />
                               <div
-                                className="fixed w-44 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-[101]"
+                                className="fixed w-44 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg shadow-lg z-[101]"
                                 style={{
                                   top: `${signupDropdownPos.top}px`,
                                   right: `${signupDropdownPos.right}px`
@@ -446,7 +633,7 @@ export default function UserManagementClient() {
                                       setOpenSignupDropdown(null);
                                       handleCreateUserFromSignup(signup);
                                     }}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-green-400 hover:text-green-300 transition-colors"
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-3 text-green-400 hover:text-green-300 transition-colors"
                                   >
                                     <UserCheck className="w-4 h-4" />
                                     Create User
@@ -456,7 +643,7 @@ export default function UserManagementClient() {
                                       setOpenSignupDropdown(null);
                                       handleDeleteSignup(signup.email_address);
                                     }}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-red-400 hover:text-red-300 transition-colors"
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-3 text-red-400 hover:text-red-300 transition-colors"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                     Delete Signup
@@ -476,7 +663,7 @@ export default function UserManagementClient() {
         </div>
       ) : (
         // Users Table
-        <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg overflow-hidden">
           {users.length === 0 ? (
             <div className="p-12 text-center">
               <Users className="w-12 h-12 text-gray-600 mx-auto mb-4" />
@@ -485,28 +672,31 @@ export default function UserManagementClient() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-900 border-b border-gray-700">
+                <thead className="bg-slate-50 dark:bg-gray-900 border-b border-slate-200 dark:border-gray-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       User
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Email
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      License
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Created
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
                   {users.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-750">
+                    <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-red-600/20 rounded-full flex items-center justify-center">
@@ -514,14 +704,24 @@ export default function UserManagementClient() {
                               {user.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <div className="text-sm font-medium text-white">{user.name}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <Mail className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-300">{user.email}</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-300">{user.email}</span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {user.license_name && user.license_type ? (
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${LICENSE_TYPE_COLORS[user.license_type] ?? 'bg-gray-700 text-gray-200'}`}>
+                            <Award className="w-3 h-3" />
+                            {user.license_name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400 dark:text-gray-600 italic">No license</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
@@ -548,7 +748,7 @@ export default function UserManagementClient() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-400">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
                           {formatDate(user.created_at)}
                         </span>
                       </td>
@@ -563,7 +763,7 @@ export default function UserManagementClient() {
                               });
                               setOpenUserDropdown(openUserDropdown === user.id ? null : user.id);
                             }}
-                            className="p-2 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
+                            className="p-2 hover:bg-slate-100 dark:hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-gray-700 dark:hover:text-white"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
@@ -575,7 +775,7 @@ export default function UserManagementClient() {
                                 onClick={() => setOpenUserDropdown(null)}
                               />
                               <div
-                                className="fixed w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-[101]"
+                                className="fixed w-52 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg shadow-lg z-[101]"
                                 style={{
                                   top: `${userDropdownPos.top}px`,
                                   right: `${userDropdownPos.right}px`
@@ -587,7 +787,7 @@ export default function UserManagementClient() {
                                       setOpenUserDropdown(null);
                                       handleToggleUserVerified(user);
                                     }}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-gray-300 hover:text-white transition-colors"
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
                                   >
                                     {user.verified ? (
                                       <>
@@ -606,7 +806,7 @@ export default function UserManagementClient() {
                                       setOpenUserDropdown(null);
                                       handleToggleUserEnabled(user);
                                     }}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-gray-300 hover:text-white transition-colors"
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
                                   >
                                     {user.enabled ? (
                                       <>
@@ -620,16 +820,65 @@ export default function UserManagementClient() {
                                       </>
                                     )}
                                   </button>
-                                  <button
-                                    onClick={() => {
-                                      setOpenUserDropdown(null);
-                                      handleDeleteUser(user);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-red-400 hover:text-red-300 transition-colors"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete User
-                                  </button>
+
+                                  <div className="border-t border-slate-200 dark:border-gray-700 mt-1 pt-1">
+                                    <div className="relative">
+                                      <button
+                                        onClick={() => setLicenseSubMenu(licenseSubMenu === user.id ? null : user.id)}
+                                        className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-3 text-indigo-300 hover:text-indigo-200 transition-colors"
+                                      >
+                                        <Award className="w-4 h-4" />
+                                        Assign License…
+                                      </button>
+                                      {licenseSubMenu === user.id && (
+                                        <div className="pl-4 pb-1">
+                                          {licenses.map(lic => (
+                                            <button
+                                              key={lic.id}
+                                              onClick={() => handleAssignLicense(user.id, lic.id)}
+                                              className="w-full px-3 py-1.5 text-left text-xs hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors rounded"
+                                            >
+                                              <span className={`w-2 h-2 rounded-full ${lic.license_type === 'free' ? 'bg-slate-400' : lic.license_type === 'paid' ? 'bg-indigo-400' : 'bg-amber-400'}`} />
+                                              {lic.name}
+                                              {lic.id === user.license_id && <CheckCircle className="w-3 h-3 text-green-400 ml-auto" />}
+                                            </button>
+                                          ))}
+                                          {user.license_id && (
+                                            <button
+                                              onClick={() => handleRemoveLicense(user.id)}
+                                              className="w-full px-3 py-1.5 text-left text-xs hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors rounded"
+                                            >
+                                              <Trash2 className="w-3 h-3" />
+                                              Remove License
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="border-t border-slate-200 dark:border-gray-700 mt-1 pt-1">
+                                    <button
+                                      onClick={() => handleOpenFlagsModal(user)}
+                                      className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-3 text-emerald-300 hover:text-emerald-200 transition-colors"
+                                    >
+                                      <Flag className="w-4 h-4" />
+                                      Manage Feature Flags…
+                                    </button>
+                                  </div>
+
+                                  <div className="border-t border-slate-200 dark:border-gray-700 mt-1 pt-1">
+                                    <button
+                                      onClick={() => {
+                                        setOpenUserDropdown(null);
+                                        handleDeleteUser(user);
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-3 text-red-400 hover:text-red-300 transition-colors"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Delete User
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             </>
@@ -646,6 +895,124 @@ export default function UserManagementClient() {
       )}
         </div>
       </main>
+
+      {/* Feature Flags Modal */}
+      {flagsModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setFlagsModal(null)} />
+          <div className="relative bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col">
+            {/* Modal header */}
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200 dark:border-gray-700">
+              <div className="p-2 bg-emerald-600/20 rounded-lg">
+                <Flag className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-gray-900 dark:text-white font-semibold text-lg">Feature Flags</h3>
+                <p className="text-gray-400 text-xs truncate">{flagsModal.user.name} — {flagsModal.user.email}</p>
+              </div>
+              <button onClick={() => setFlagsModal(null)} className="text-gray-400 hover:text-white p-1 rounded transition-colors">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Legend */}
+            <div className="px-6 pt-3 pb-2 flex items-center gap-4 text-xs text-gray-500 border-b border-slate-200 dark:border-gray-800">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Included in license</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Preview flag</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> User override active</span>
+            </div>
+
+            {/* Flag list */}
+            <div className="overflow-y-auto flex-1 divide-y divide-slate-200 dark:divide-gray-800">
+              {flagsModal.allFlags.length === 0 ? (
+                <p className="text-gray-500 text-sm text-center py-10">No feature flags defined.</p>
+              ) : flagsModal.allFlags.map(flag => {
+                const inLicense = flagsModal.licenseFlags.has(flag.id);
+                const override = flagsModal.overrides[flag.id]; // boolean | undefined
+                const hasOverride = override !== undefined;
+                const isSaving = flagsModal.saving.has(flag.id);
+
+                return (
+                  <div key={flag.id} className={`px-6 py-4 ${isSaving ? 'opacity-50' : ''}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-gray-900 dark:text-white text-sm font-medium">{flag.label}</span>
+                          <span className="text-gray-500 text-xs font-mono">{flag.name}</span>
+                          {inLicense && (
+                            <span className="px-1.5 py-0.5 bg-emerald-900/50 text-emerald-400 text-xs rounded border border-emerald-800">license</span>
+                          )}
+                          {flag.is_preview && (
+                            <span className="px-1.5 py-0.5 bg-amber-900/50 text-amber-400 text-xs rounded border border-amber-800">preview</span>
+                          )}
+                          {hasOverride && (
+                            <span className={`px-1.5 py-0.5 text-xs rounded border ${override ? 'bg-blue-900/50 text-blue-400 border-blue-800' : 'bg-red-900/50 text-red-400 border-red-800'}`}>
+                              {override ? 'granted' : 'revoked'}
+                            </span>
+                          )}
+                        </div>
+                        {flag.description && (
+                          <p className="text-gray-500 text-xs mt-1">{flag.description}</p>
+                        )}
+                      </div>
+
+                      {/* Override controls */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          title="Grant (force enabled for this user)"
+                          disabled={isSaving}
+                          onClick={() => handleSetFlagOverride(flag.id, true)}
+                          className={`p-1.5 rounded transition-colors ${
+                            hasOverride && override === true
+                              ? 'bg-blue-600 text-white'
+                              : 'text-gray-400 dark:text-gray-500 hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-gray-800'
+                          }`}
+                        >
+                          <ShieldCheck className="w-4 h-4" />
+                        </button>
+                        <button
+                          title="Revoke (force disabled for this user)"
+                          disabled={isSaving}
+                          onClick={() => handleSetFlagOverride(flag.id, false)}
+                          className={`p-1.5 rounded transition-colors ${
+                            hasOverride && override === false
+                              ? 'bg-red-600 text-white'
+                              : 'text-gray-400 dark:text-gray-500 hover:text-red-400 hover:bg-slate-100 dark:hover:bg-gray-800'
+                          }`}
+                        >
+                          <ShieldOff className="w-4 h-4" />
+                        </button>
+                        <button
+                          title="Use license default (clear override)"
+                          disabled={isSaving || !hasOverride}
+                          onClick={() => handleClearFlagOverride(flag.id)}
+                          className={`p-1.5 rounded transition-colors ${
+                            !hasOverride
+                              ? 'text-gray-700 cursor-default'
+                              : 'text-gray-400 dark:text-gray-500 hover:text-yellow-400 hover:bg-slate-100 dark:hover:bg-gray-800'
+                          }`}
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 border-t border-slate-200 dark:border-gray-700 flex justify-end">
+              <button
+                onClick={() => setFlagsModal(null)}
+                className="px-4 py-2 bg-slate-200 dark:bg-gray-700 hover:bg-slate-300 dark:hover:bg-gray-600 text-gray-700 dark:text-white text-sm rounded-lg transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

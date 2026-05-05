@@ -11,7 +11,7 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, trendUp }) => (
-  <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 hover:border-gray-600 transition-colors">
+  <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg p-6 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
     <div className="flex items-start justify-between mb-4">
       <div className="p-2 bg-red-600/20 rounded-lg">
         {icon}
@@ -22,8 +22,8 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, trendUp 
         </span>
       )}
     </div>
-    <h3 className="text-gray-400 text-sm font-medium mb-1">{title}</h3>
-    <p className="text-white text-2xl font-bold">{value}</p>
+    <h3 className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-1">{title}</h3>
+    <p className="text-gray-900 dark:text-white text-2xl font-bold">{value}</p>
   </div>
 );
 
@@ -31,9 +31,9 @@ export default function DashboardOverview() {
   return (
     <>
       {/* Header */}
-      <header className="bg-gray-800/50 border-b border-gray-700 backdrop-blur-sm">
+      <header className="bg-white/80 dark:bg-gray-800/50 border-b border-slate-200 dark:border-gray-700 backdrop-blur-sm">
         <div className="px-6 py-4">
-          <h2 className="text-2xl font-bold text-white">Dashboard Overview</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
         </div>
       </header>
 
@@ -84,7 +84,7 @@ export default function DashboardOverview() {
         </div>
 
         {/* Footer Info */}
-        <div className="mt-auto pt-6 border-t border-gray-700">
+        <div className="mt-auto pt-6 border-t border-slate-200 dark:border-gray-700">
           <div className="text-center text-gray-500 text-sm">
             <p>Super Admin Portal • Objectified Internal Use Only</p>
             <p className="mt-1">Session expires after 8 hours of inactivity</p>
