@@ -61,7 +61,7 @@ Then output exactly one JSON code block in this shape:
 }
 \`\`\`
 
-After that JSON block, add a markdown section titled exactly **Improvement suggestions** with 2–4 bullets: actionable schema/API notes for this class (e.g. \`allOf\` for shared bases, \`discriminator\` with \`oneOf\`, splitting large objects into referenced components, pagination or error-response considerations when list/query APIs are added later). Keep bullets specific to what you generated.
+After that JSON block, add a markdown section titled exactly **Improvement suggestions** with 2–5 bullets: actionable schema/API notes for this class (e.g. \`allOf\` for shared bases, \`discriminator\` with \`oneOf\`, splitting large objects into referenced components, pagination or error-response considerations when list/query APIs are added later). Keep bullets specific to what you generated.
 
 # Rules
 
@@ -76,7 +76,7 @@ After that JSON block, add a markdown section titled exactly **Improvement sugge
 - For $ref inside the schema, use format "#/components/schemas/ClassName" when referencing other classes.
 - Property names in "properties" should be camelCase. Include "description" (and optionally "summary") on the schema and on properties where helpful.
 - Keep the class a clear skeleton: include the structure the user asked for, but you do not need to exhaust every option. Prefer properties and required; add allOf/anyOf/oneOf/discriminator/additionalProperties etc. only when they fit the user's description.
-- Apart from the optional **Suggested properties**, **Suggested relationships**, and **Improvement suggestions** sections and the single JSON code block, do not add other commentary.
+- Apart from the optional **Suggested properties** and **Suggested relationships** sections, the single JSON code block, and the required **Improvement suggestions** section, do not add other commentary.
 
 # Iterative refinement
 
