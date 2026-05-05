@@ -76,7 +76,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 **Schema Generation from Description** 📋 PLANNED
 - 📋 **Input Methods**:
-    - 📋 Free-form text description
+    - ✅ Free-form text description (#267 — Studio AI chat: offline demo + Ollama system prompt)
     - 📋 Structured prompts with templates
     - 📋 Voice input (speech-to-text)
     - 📋 Paste requirements document
@@ -98,7 +98,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                                      |
 |--------|----------------------------------------------------------|
-| #267   | Adds the ability to generate a schema from a description |
 | #268   | Adds example prompts                                     |
 | #528   | Preview generated schema before creation                 |
 | #529   | JSON Schema format display on preview                    |

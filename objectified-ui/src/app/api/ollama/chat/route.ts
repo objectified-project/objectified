@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
 
 # Rules
 
+- When the user describes a domain, product, entities, or pasted requirements in plain language — even if they never say "OpenAPI" or "schema" — treat that as a request to produce or extend \`#/components/schemas\` accordingly (unless they clearly want non-schema advice only).
 - Always generate valid OpenAPI 3.1.0 specifications
 - When generating a complete specification, wrap it in a JSON code block: \`\`\`json\n{spec}\n\`\`\`
 - Include proper info section with title, version, description, license, contact details

@@ -41,6 +41,7 @@ import {
   type ChatRefinementOp,
 } from './conversation-history';
 import type { ChatSendFn } from './types';
+import { userPromptRequestsSchemaFromDescription } from './schema-from-description-intent';
 
 const SPEC_DEMO_PROMPTS = ['openapi', 'spec', 'schema', 'api'];
 
@@ -71,7 +72,8 @@ export const createDemoChatResponder = (): ChatSendFn => async ({
 
   const wantsSpec =
     history.intent === 'comparison' ||
-    SPEC_DEMO_PROMPTS.some((needle) => lower.includes(needle));
+    SPEC_DEMO_PROMPTS.some((needle) => lower.includes(needle)) ||
+    userPromptRequestsSchemaFromDescription(prompt);
 
   if (wantsSpec) {
     const spec = buildSampleSpec(studioContext, history);
