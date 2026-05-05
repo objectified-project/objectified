@@ -120,9 +120,10 @@ export interface ChatConversationProps {
 }
 
 const PROMPT_SUGGESTIONS: readonly string[] = [
+  'Create a User class with email, password hash, created date, and roles array',
   'I need an e-commerce order with line items, shipping address, and payment info',
-  'Sketch a User class with email, password hash, and roles',
-  'Generate an OpenAPI spec for a small catalog API',
+  'Generate a blog post schema with author reference, tags, and comments',
+  'Create a REST API for managing a todo list application',
 ];
 
 /**

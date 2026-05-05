@@ -120,6 +120,17 @@ describe('ChatConversation', () => {
     expect(suggestions.length).toBeGreaterThanOrEqual(3);
   });
 
+  it('shows the four NL→schema example prompts on the empty state (#268)', () => {
+    render(<ChatConversation />);
+    const labels = screen.getAllByTestId('studio-ai-chat-suggestion').map((el) => el.textContent?.trim() ?? '');
+    expect(labels).toEqual([
+      'Create a User class with email, password hash, created date, and roles array',
+      'I need an e-commerce order with line items, shipping address, and payment info',
+      'Generate a blog post schema with author reference, tags, and comments',
+      'Create a REST API for managing a todo list application',
+    ]);
+  });
+
   it('clicking a suggestion seeds the conversation as a user message', async () => {
     const { responder, calls, resolveWith } = createDeferredResponder();
     render(<ChatConversation onSendMessage={responder} />);
