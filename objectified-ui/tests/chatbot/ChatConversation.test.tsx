@@ -806,6 +806,11 @@ describe('ChatConversation', () => {
     expect(screen.getByTestId('studio-ai-chat-class-create-preview-dialog')).toBeInTheDocument();
     expect(onChatWorkspaceAction).not.toHaveBeenCalled();
 
+    const previewSchema = screen.getByTestId('studio-ai-chat-class-create-preview-json');
+    expect(previewSchema.textContent).toContain('"type": "object"');
+    expect(previewSchema.textContent).toContain('"id"');
+    expect(previewSchema.textContent).not.toMatch(/"name"\s*:\s*"Widget"/);
+
     fireEvent.click(screen.getByTestId('studio-ai-chat-class-create-preview-confirm'));
     expect(onChatWorkspaceAction).toHaveBeenCalledTimes(1);
     expect(onChatWorkspaceAction.mock.calls[0][0]).toMatchObject({

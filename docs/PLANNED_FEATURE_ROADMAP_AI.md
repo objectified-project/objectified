@@ -87,7 +87,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ "Create a REST API for managing a todo list application"
 - 📋 **Generation Output**:
     - ✅ Preview generated schema before creation (#528)
-    - 📋 JSON Schema format display
+    - ✅ JSON Schema format display (#529)
     - 📋 Property list with types
     - 📋 Relationship suggestions
 - 📋 **Iterative Refinement**:
@@ -98,7 +98,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                                      |
 |--------|----------------------------------------------------------|
-| #529   | JSON Schema format display on preview                    |
 | #530   | Property list with types on preview                      |
 | #531   | Relationship suggestions on preview                      |
 | #532   | Iterative refinement of generated schemas                |

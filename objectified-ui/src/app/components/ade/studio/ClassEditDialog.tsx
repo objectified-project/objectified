@@ -1663,11 +1663,23 @@ const ClassEditDialog = ({
                         {message.role === 'assistant' && hasClassDef && classDef ? (
                           <div className="rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
                             <div className="bg-gray-800 dark:bg-gray-900 px-3 py-1.5 border-b border-gray-700">
-                              <span className="text-xs font-mono text-gray-300">JSON</span>
+                              <span className="text-xs font-mono text-gray-300">JSON Schema</span>
+                            </div>
+                            <div className="bg-gray-900 dark:bg-black px-4 py-2 border-b border-gray-800 space-y-1 text-xs">
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-500">Class name</span>{' '}
+                                <span className="font-mono text-gray-200">{classDef.name}</span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-500">Description</span>{' '}
+                                <span className="text-gray-300">
+                                  {classDef.description?.trim() ? classDef.description : '—'}
+                                </span>
+                              </div>
                             </div>
                             <pre className="bg-gray-900 dark:bg-black p-4 overflow-x-auto m-0 text-left">
                               <code className="text-sm font-mono text-green-400 dark:text-green-300 whitespace-pre">
-                                {JSON.stringify({ name: classDef.name, description: classDef.description, schema: classDef.schema }, null, 2)}
+                                {JSON.stringify(classDef.schema, null, 2)}
                               </code>
                             </pre>
                           </div>
