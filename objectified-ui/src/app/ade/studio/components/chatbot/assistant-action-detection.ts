@@ -33,11 +33,22 @@ export interface SchemaPropertySummaryRow {
   suggestedType: string;
 }
 
+/** Property-level link to another schema via `$ref`, for relationship preview (#531). */
+export interface SchemaInferredRelationshipRow {
+  property: string;
+  detail: string;
+}
+
 function propertiesRecordFromSchema(schema: unknown): Record<string, unknown> | null {
   if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return null;
   const raw = (schema as { properties?: unknown }).properties;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   return raw as Record<string, unknown>;
+}
+
+function refLeafFromSchemaRef(ref: string): string {
+  const leaf = ref.split('/').pop();
+  return leaf ?? ref;
 }
 
 function formatSuggestedJsonSchemaType(sub: unknown): string {
@@ -46,7 +57,7 @@ function formatSuggestedJsonSchemaType(sub: unknown): string {
 
   if (typeof o.$ref === 'string') {
     const ref = o.$ref;
-    const leaf = ref.split('/').pop();
+    const leaf = refLeafFromSchemaRef(ref);
     return leaf ? `ref (${leaf})` : ref;
   }
 
@@ -83,6 +94,60 @@ export function summarizeJsonSchemaProperties(schema: unknown): SchemaPropertySu
     name,
     suggestedType: formatSuggestedJsonSchemaType(sub),
   }));
+}
+
+function relationshipDetailForPropertySchema(sub: unknown): string | null {
+  if (!sub || typeof sub !== 'object' || Array.isArray(sub)) return null;
+  const o = sub as Record<string, unknown>;
+
+  if (typeof o.$ref === 'string') {
+    return `references ${refLeafFromSchemaRef(o.$ref)}`;
+  }
+
+  if (o.type === 'array' && o.items != null && typeof o.items === 'object' && !Array.isArray(o.items)) {
+    const items = o.items as Record<string, unknown>;
+    if (typeof items.$ref === 'string') {
+      return `collection of ${refLeafFromSchemaRef(items.$ref)}`;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Lists properties whose schema uses `$ref` or `array` + `items.$ref` (#531).
+ */
+export function inferJsonSchemaRelationships(schema: unknown): SchemaInferredRelationshipRow[] {
+  const props = propertiesRecordFromSchema(schema);
+  if (!props) return [];
+  const rows: SchemaInferredRelationshipRow[] = [];
+  for (const [name, sub] of Object.entries(props)) {
+    const detail = relationshipDetailForPropertySchema(sub);
+    if (detail) rows.push({ property: name, detail });
+  }
+  return rows;
+}
+
+const SUGGESTED_RELATIONSHIPS_HEADING = /\*\*Suggested relationships\*\*/i;
+
+/**
+ * Bullet lines under **Suggested relationships** in assistant markdown (#531).
+ * Stops before the first ``` fence so the JSON block is never consumed as bullets.
+ */
+export function extractSuggestedRelationshipBulletsFromAssistantMarkdown(markdown: string): string[] {
+  if (!markdown) return [];
+  const match = markdown.match(SUGGESTED_RELATIONSHIPS_HEADING);
+  if (!match || match.index === undefined) return [];
+  const start = match.index + match[0].length;
+  const tail = markdown.slice(start);
+  const fenceAt = tail.search(/\n```/);
+  const section = fenceAt >= 0 ? tail.slice(0, fenceAt) : tail;
+  const out: string[] = [];
+  for (const line of section.split('\n')) {
+    const m = line.match(/^\s*[-*]\s+(.+)$/);
+    if (m) out.push(m[1].trim());
+  }
+  return out;
 }
 
 export type DetectedChatQuickAction =

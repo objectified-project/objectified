@@ -1,6 +1,8 @@
 import {
   detectChatQuickActions,
   extractFirstJsonOrYamlFenceBody,
+  extractSuggestedRelationshipBulletsFromAssistantMarkdown,
+  inferJsonSchemaRelationships,
   parseClassDefinitionFromAssistantMarkdown,
   summarizeJsonSchemaProperties,
 } from '../../src/app/ade/studio/components/chatbot/assistant-action-detection';
@@ -107,6 +109,74 @@ describe('parseClassDefinitionFromAssistantMarkdown', () => {
     const md = '```json\n' + payload + '```';
     const parsed = parseClassDefinitionFromAssistantMarkdown(md);
     expect(parsed?.name).toBe('Order');
+  });
+});
+
+describe('extractSuggestedRelationshipBulletsFromAssistantMarkdown', () => {
+  it('returns bullets under **Suggested relationships** before the json fence', () => {
+    const md = [
+      '**Suggested relationships**',
+      '- lineItems — one-to-many LineItem',
+      '* customer — many-to-one Customer',
+      '',
+      '```json',
+      '{"name":"Order","schema":{"type":"object","properties":{}}}',
+      '```',
+    ].join('\n');
+    expect(extractSuggestedRelationshipBulletsFromAssistantMarkdown(md)).toEqual([
+      'lineItems — one-to-many LineItem',
+      'customer — many-to-one Customer',
+    ]);
+  });
+
+  it('returns empty when the heading is missing', () => {
+    expect(extractSuggestedRelationshipBulletsFromAssistantMarkdown('**Suggested properties**\n- a — string\n')).toEqual(
+      [],
+    );
+  });
+
+  it('does not treat json fence content as bullets', () => {
+    const md = [
+      '**Suggested relationships**',
+      '',
+      '```json',
+      '{"x":1}',
+      '```',
+    ].join('\n');
+    expect(extractSuggestedRelationshipBulletsFromAssistantMarkdown(md)).toEqual([]);
+  });
+});
+
+describe('inferJsonSchemaRelationships', () => {
+  it('returns empty when there are no refs', () => {
+    expect(inferJsonSchemaRelationships({ type: 'object', properties: { name: { type: 'string' } } })).toEqual([]);
+  });
+
+  it('detects property $ref and array items $ref', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        owner: { $ref: '#/components/schemas/User' },
+        tags: { type: 'array', items: { type: 'string' } },
+        items: { type: 'array', items: { $ref: '#/components/schemas/LineItem' } },
+      },
+    };
+    expect(inferJsonSchemaRelationships(schema)).toEqual([
+      { property: 'owner', detail: 'references User' },
+      { property: 'items', detail: 'collection of LineItem' },
+    ]);
+  });
+
+  it('does not throw when items is null (malformed/partial schema)', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        tags: { type: 'array', items: null },
+        owner: { $ref: '#/components/schemas/User' },
+      },
+    };
+    expect(() => inferJsonSchemaRelationships(schema)).not.toThrow();
+    expect(inferJsonSchemaRelationships(schema)).toEqual([{ property: 'owner', detail: 'references User' }]);
   });
 });
 

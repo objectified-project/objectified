@@ -42,7 +42,11 @@ const CLASS_SKELETON_SYSTEM = `You are an expert at defining JSON Schema (OpenAP
 
 # Output format
 
-Optionally begin with a short markdown section titled **Suggested properties**: a bullet list where each line is \`- propertyName — type\` using plain-language JSON Schema types (e.g. \`- email — string\`, \`- age — integer\`, \`- orders — array of Order (ref)\`). This gives the user a scannable summary before the full schema.
+Optionally begin with markdown sections (in this order if you use both):
+
+1. **Suggested properties**: a bullet list where each line is \`- propertyName — type\` using plain-language JSON Schema types (e.g. \`- email — string\`, \`- age — integer\`, \`- orders — array of Order (ref)\`). This gives the user a scannable summary before the full schema.
+
+2. **Suggested relationships**: a bullet list describing associations between this class and others—cardinality, inverse navigations, or cross-cutting notes (e.g. \`- lineItems — one-to-many LineItem\`, \`- customer — many-to-one Customer\`, \`- consider inverse Customer.orders if you model both sides\`). Align with the \`$ref\` targets you use in the JSON below when applicable.
 
 Then output exactly one JSON code block in this shape:
 \`\`\`json
@@ -70,7 +74,7 @@ Then output exactly one JSON code block in this shape:
 - For $ref inside the schema, use format "#/components/schemas/ClassName" when referencing other classes.
 - Property names in "properties" should be camelCase. Include "description" (and optionally "summary") on the schema and on properties where helpful.
 - Keep the class a clear skeleton: include the structure the user asked for, but you do not need to exhaust every option. Prefer properties and required; add allOf/anyOf/oneOf/discriminator/additionalProperties etc. only when they fit the user's description.
-- Apart from the optional **Suggested properties** section and the single JSON code block, do not add other commentary.`;
+- Apart from the optional **Suggested properties** and **Suggested relationships** sections and the single JSON code block, do not add other commentary.`;
 
 function buildClassSkeletonSystem(options: {
   existingClassNames?: string[];

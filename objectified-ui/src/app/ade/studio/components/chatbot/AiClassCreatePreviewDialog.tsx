@@ -11,6 +11,8 @@ import {
   DialogTitle,
 } from '@/app/components/ui/Dialog';
 import {
+  extractSuggestedRelationshipBulletsFromAssistantMarkdown,
+  inferJsonSchemaRelationships,
   parseClassDefinitionFromAssistantMarkdown,
   summarizeJsonSchemaProperties,
   type ParsedAiClassDefinition,
@@ -54,6 +56,16 @@ export function AiClassCreatePreviewDialog({
     return s !== null && typeof s === 'object' && !Array.isArray(s) && 'properties' in (s as object);
   }, [parsed]);
 
+  const inferredRelationships = React.useMemo(
+    () => (parsed ? inferJsonSchemaRelationships(parsed.schema) : []),
+    [parsed],
+  );
+
+  const relationshipBullets = React.useMemo(
+    () => (assistantMarkdown ? extractSuggestedRelationshipBulletsFromAssistantMarkdown(assistantMarkdown) : []),
+    [assistantMarkdown],
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -64,7 +76,7 @@ export function AiClassCreatePreviewDialog({
           <DialogHeader className="space-y-2 text-left">
             <DialogTitle>Preview class schema</DialogTitle>
             <DialogDescription className="text-left">
-              Review the class metadata, the suggested type for each property, and the formatted JSON Schema below before
+              Review the class metadata, property types, relationship hints, and the formatted JSON Schema below before
               continuing. Cancel to return to the chat with no changes.
             </DialogDescription>
           </DialogHeader>
@@ -97,6 +109,37 @@ export function AiClassCreatePreviewDialog({
                   )}
                 </dd>
               </div>
+              <div className="sm:col-span-2">
+                <dt className="font-medium text-gray-700 dark:text-gray-300">Relationships (from schema)</dt>
+                <dd className="mt-1">
+                  {inferredRelationships.length === 0 ? (
+                    <span className="text-gray-500 dark:text-gray-500">
+                      No $ref links on properties (direct or array items).
+                    </span>
+                  ) : (
+                    <ul className="m-0 max-h-32 list-inside list-disc overflow-y-auto pl-1">
+                      {inferredRelationships.map((r) => (
+                        <li key={r.property}>
+                          <span className="font-mono">{r.property}</span>
+                          <span className="text-gray-500 dark:text-gray-500"> — {r.detail}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </dd>
+              </div>
+              {relationshipBullets.length > 0 ? (
+                <div className="sm:col-span-2">
+                  <dt className="font-medium text-gray-700 dark:text-gray-300">Suggested relationships</dt>
+                  <dd className="mt-1">
+                    <ul className="m-0 max-h-32 list-inside list-disc overflow-y-auto pl-1">
+                      {relationshipBullets.map((line, i) => (
+                        <li key={`${i}-${line.slice(0, 48)}`}>{line}</li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              ) : null}
             </dl>
           ) : (
             <p className="mt-3 text-sm text-amber-800 dark:text-amber-200">
