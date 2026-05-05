@@ -89,7 +89,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ Preview generated schema before creation (#528)
     - ✅ JSON Schema format display (#529)
     - ✅ Property list with types (#530)
-    - 📋 Relationship suggestions
+    - ✅ Relationship suggestions (#531)
 - 📋 **Iterative Refinement**:
     - 📋 "Add a phone number field"
     - 📋 "Make email required"
@@ -98,7 +98,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                                      |
 |--------|----------------------------------------------------------|
-| #531   | Relationship suggestions on preview                      |
 | #532   | Iterative refinement of generated schemas                |
 
 ### AI-Powered Property Suggestions
