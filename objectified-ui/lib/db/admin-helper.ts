@@ -842,6 +842,522 @@ export async function deletePropertyTemplateAdmin(templateId: string) {
   }
 }
 
+// ==================== License Management ====================
+
+/**
+ * Get all license definitions with their assigned feature flags
+ */
+export async function getAllLicenses() {
+  try {
+    const result = await connectionPool.query(
+      `SELECT
+         l.id, l.name, l.description, l.license_type, l.seats, l.enabled,
+         l.created_at, l.updated_at,
+         COALESCE(
+           json_agg(
+             json_build_object(
+               'id',         ff.id,
+               'name',       ff.name,
+               'label',      ff.label,
+               'is_preview', ff.is_preview
+             ) ORDER BY ff.label
+           ) FILTER (WHERE ff.id IS NOT NULL),
+           '[]'
+         ) AS feature_flags
+       FROM odb.licenses l
+       LEFT JOIN odb.license_feature_flags lff ON lff.license_id = l.id
+       LEFT JOIN odb.feature_flags ff           ON ff.id = lff.feature_flag_id
+       GROUP BY l.id
+       ORDER BY l.license_type, l.name`
+    );
+    return successResponse({ licenses: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching licenses:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Get a single license by ID with its feature flags
+ */
+export async function getLicenseById(licenseId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT
+         l.id, l.name, l.description, l.license_type, l.seats, l.enabled,
+         l.created_at, l.updated_at,
+         COALESCE(
+           json_agg(
+             json_build_object(
+               'id',         ff.id,
+               'name',       ff.name,
+               'label',      ff.label,
+               'is_preview', ff.is_preview
+             ) ORDER BY ff.label
+           ) FILTER (WHERE ff.id IS NOT NULL),
+           '[]'
+         ) AS feature_flags
+       FROM odb.licenses l
+       LEFT JOIN odb.license_feature_flags lff ON lff.license_id = l.id
+       LEFT JOIN odb.feature_flags ff           ON ff.id = lff.feature_flag_id
+       WHERE l.id = $1
+       GROUP BY l.id`,
+      [licenseId]
+    );
+    if (result.rowCount === 0) return errorResponse('License not found');
+    return successResponse({ license: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error fetching license:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Create a new license plan
+ */
+export async function createLicense(
+  name: string,
+  description: string | null,
+  licenseType: 'free' | 'paid' | 'sponsor',
+  seats: Record<string, number>,
+  featureFlagIds: string[] = []
+) {
+  try {
+    const result = await connectionPool.query(
+      `INSERT INTO odb.licenses (name, description, license_type, seats)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, name, description, license_type, seats, enabled, created_at`,
+      [name, description, licenseType, JSON.stringify(seats)]
+    );
+    const license = result.rows[0];
+
+    if (featureFlagIds.length > 0) {
+      const placeholders = featureFlagIds.map((_, i) => `($1, $${i + 2})`).join(', ');
+      await connectionPool.query(
+        `INSERT INTO odb.license_feature_flags (license_id, feature_flag_id) VALUES ${placeholders}
+         ON CONFLICT DO NOTHING`,
+        [license.id, ...featureFlagIds]
+      );
+    }
+
+    return successResponse({ license });
+  } catch (error: any) {
+    console.error('Error creating license:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Update an existing license plan
+ */
+export async function updateLicense(
+  licenseId: string,
+  updates: {
+    name?: string;
+    description?: string | null;
+    licenseType?: 'free' | 'paid' | 'sponsor';
+    seats?: Record<string, number>;
+    enabled?: boolean;
+    featureFlagIds?: string[];
+  }
+) {
+  try {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (updates.name      !== undefined) { fields.push(`name = $${idx++}`);         values.push(updates.name); }
+    if (updates.description !== undefined) { fields.push(`description = $${idx++}`); values.push(updates.description); }
+    if (updates.licenseType !== undefined) { fields.push(`license_type = $${idx++}`); values.push(updates.licenseType); }
+    if (updates.seats     !== undefined) { fields.push(`seats = $${idx++}`);         values.push(JSON.stringify(updates.seats)); }
+    if (updates.enabled   !== undefined) { fields.push(`enabled = $${idx++}`);       values.push(updates.enabled); }
+
+    if (fields.length > 0) {
+      fields.push(`updated_at = CURRENT_TIMESTAMP`);
+      values.push(licenseId);
+      const result = await connectionPool.query(
+        `UPDATE odb.licenses SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id`,
+        values
+      );
+      if (result.rowCount === 0) return errorResponse('License not found');
+    }
+
+    if (updates.featureFlagIds !== undefined) {
+      await connectionPool.query(
+        `DELETE FROM odb.license_feature_flags WHERE license_id = $1`, [licenseId]
+      );
+      if (updates.featureFlagIds.length > 0) {
+        const placeholders = updates.featureFlagIds.map((_, i) => `($1, $${i + 2})`).join(', ');
+        await connectionPool.query(
+          `INSERT INTO odb.license_feature_flags (license_id, feature_flag_id) VALUES ${placeholders}
+           ON CONFLICT DO NOTHING`,
+          [licenseId, ...updates.featureFlagIds]
+        );
+      }
+    }
+
+    return getLicenseById(licenseId);
+  } catch (error: any) {
+    console.error('Error updating license:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Delete a license (hard delete; blocks if users are assigned)
+ */
+export async function deleteLicense(licenseId: string) {
+  try {
+    const assigned = await connectionPool.query(
+      `SELECT COUNT(*)::int AS c FROM odb.user_entitlements WHERE license_id = $1`,
+      [licenseId]
+    );
+    if ((assigned.rows[0]?.c ?? 0) > 0) {
+      return errorResponse('Cannot delete: this license is currently assigned to one or more users. Reassign them first.');
+    }
+    const result = await connectionPool.query(
+      `DELETE FROM odb.licenses WHERE id = $1 RETURNING id, name`, [licenseId]
+    );
+    if (result.rowCount === 0) return errorResponse('License not found');
+    return successResponse({ deleted: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error deleting license:', error);
+    return errorResponse(error.message);
+  }
+}
+
+// ==================== Feature Flag Management ====================
+
+/**
+ * Get all feature flags
+ */
+export async function getAllFeatureFlags() {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, name, label, description, url_patterns, is_preview, enabled, created_at, updated_at
+       FROM odb.feature_flags
+       ORDER BY label`
+    );
+    return successResponse({ featureFlags: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching feature flags:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Create a feature flag
+ */
+export async function createFeatureFlag(
+  name: string,
+  label: string,
+  description: string | null,
+  urlPatterns: string[],
+  isPreview: boolean = false
+) {
+  try {
+    const result = await connectionPool.query(
+      `INSERT INTO odb.feature_flags (name, label, description, url_patterns, is_preview)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, label, description, url_patterns, is_preview, enabled, created_at`,
+      [name, label, description, JSON.stringify(urlPatterns), isPreview]
+    );
+    return successResponse({ featureFlag: result.rows[0] });
+  } catch (error: any) {
+    if (error.code === '23505') return errorResponse(`A feature flag named "${name}" already exists`);
+    console.error('Error creating feature flag:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Update a feature flag
+ */
+export async function updateFeatureFlag(
+  flagId: string,
+  updates: {
+    label?: string;
+    description?: string | null;
+    urlPatterns?: string[];
+    isPreview?: boolean;
+    enabled?: boolean;
+  }
+) {
+  try {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (updates.label       !== undefined) { fields.push(`label = $${idx++}`);        values.push(updates.label); }
+    if (updates.description !== undefined) { fields.push(`description = $${idx++}`);  values.push(updates.description); }
+    if (updates.urlPatterns !== undefined) { fields.push(`url_patterns = $${idx++}`); values.push(JSON.stringify(updates.urlPatterns)); }
+    if (updates.isPreview   !== undefined) { fields.push(`is_preview = $${idx++}`);   values.push(updates.isPreview); }
+    if (updates.enabled     !== undefined) { fields.push(`enabled = $${idx++}`);      values.push(updates.enabled); }
+
+    if (fields.length === 0) return errorResponse('No updates provided');
+
+    fields.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(flagId);
+
+    const result = await connectionPool.query(
+      `UPDATE odb.feature_flags SET ${fields.join(', ')} WHERE id = $${idx}
+       RETURNING id, name, label, description, url_patterns, is_preview, enabled, updated_at`,
+      values
+    );
+    if (result.rowCount === 0) return errorResponse('Feature flag not found');
+    return successResponse({ featureFlag: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error updating feature flag:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Delete a feature flag (hard delete)
+ */
+export async function deleteFeatureFlag(flagId: string) {
+  try {
+    const result = await connectionPool.query(
+      `DELETE FROM odb.feature_flags WHERE id = $1 RETURNING id, name`, [flagId]
+    );
+    if (result.rowCount === 0) return errorResponse('Feature flag not found');
+    return successResponse({ deleted: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error deleting feature flag:', error);
+    return errorResponse(error.message);
+  }
+}
+
+// ==================== User License Assignments ====================
+
+/**
+ * Get all users with their assigned license
+ */
+export async function getAllUsersWithLicenses() {
+  try {
+    const result = await connectionPool.query(
+      `SELECT
+         u.id, u.name, u.email, u.enabled, u.verified,
+         ue.license_id,
+         l.name        AS license_name,
+         l.license_type,
+         l.seats,
+         ue.plan_code
+       FROM odb.users u
+       LEFT JOIN odb.user_entitlements ue ON ue.user_id = u.id
+       LEFT JOIN odb.licenses          l  ON l.id = ue.license_id
+       WHERE u.deleted_at IS NULL
+       ORDER BY u.name`
+    );
+    return successResponse({ users: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching users with licenses:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Get the license assigned to a specific user, including effective feature flags
+ */
+export async function getUserLicense(userId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT
+         l.id          AS license_id,
+         l.name        AS license_name,
+         l.license_type,
+         l.seats,
+         ue.plan_code,
+         COALESCE(
+           json_agg(
+             DISTINCT jsonb_build_object(
+               'id',         ff.id,
+               'name',       ff.name,
+               'label',      ff.label,
+               'is_preview', ff.is_preview
+             )
+           ) FILTER (WHERE ff.id IS NOT NULL),
+           '[]'
+         ) AS license_feature_flags,
+         COALESCE(
+           json_agg(
+             DISTINCT jsonb_build_object(
+               'id',         uff_ff.id,
+               'name',       uff_ff.name,
+               'label',      uff_ff.label,
+               'enabled',    uff.enabled,
+               'is_preview', uff_ff.is_preview
+             )
+           ) FILTER (WHERE uff.feature_flag_id IS NOT NULL),
+           '[]'
+         ) AS user_overrides
+       FROM odb.user_entitlements ue
+       LEFT JOIN odb.licenses              l      ON l.id = ue.license_id
+       LEFT JOIN odb.license_feature_flags lff    ON lff.license_id = l.id
+       LEFT JOIN odb.feature_flags         ff     ON ff.id = lff.feature_flag_id
+       LEFT JOIN odb.user_feature_flags    uff    ON uff.user_id = ue.user_id
+       LEFT JOIN odb.feature_flags         uff_ff ON uff_ff.id = uff.feature_flag_id
+       WHERE ue.user_id = $1
+       GROUP BY l.id, l.name, l.license_type, l.seats, ue.plan_code`,
+      [userId]
+    );
+    return successResponse({ license: result.rows[0] ?? null });
+  } catch (error: any) {
+    console.error('Error fetching user license:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Assign a license to a user (upserts user_entitlements)
+ */
+export async function assignLicenseToUser(userId: string, licenseId: string) {
+  try {
+    const licenseResult = await connectionPool.query(
+      `SELECT license_type FROM odb.licenses WHERE id = $1`, [licenseId]
+    );
+    if (licenseResult.rowCount === 0) return errorResponse('License not found');
+
+    await connectionPool.query(
+      `INSERT INTO odb.user_entitlements (user_id, plan_code, max_tenants, max_projects, max_versions, license_id)
+       VALUES ($1, $2, 1, 1, 3, $3)
+       ON CONFLICT (user_id) DO UPDATE
+         SET license_id = EXCLUDED.license_id,
+             plan_code  = EXCLUDED.plan_code`,
+      [userId, licenseResult.rows[0].license_type, licenseId]
+    );
+    return successResponse({ message: 'License assigned successfully' });
+  } catch (error: any) {
+    console.error('Error assigning license:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Remove the license assignment from a user
+ */
+export async function removeUserLicense(userId: string) {
+  try {
+    await connectionPool.query(
+      `UPDATE odb.user_entitlements SET license_id = NULL WHERE user_id = $1`, [userId]
+    );
+    return successResponse({ message: 'License removed' });
+  } catch (error: any) {
+    console.error('Error removing user license:', error);
+    return errorResponse(error.message);
+  }
+}
+
+// ==================== User Feature Flag Overrides ====================
+
+/**
+ * Set (upsert) a per-user feature flag override
+ */
+export async function setUserFeatureFlag(
+  userId: string,
+  featureFlagId: string,
+  enabled: boolean,
+  grantedBy?: string
+) {
+  try {
+    await connectionPool.query(
+      `INSERT INTO odb.user_feature_flags (user_id, feature_flag_id, enabled, granted_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, feature_flag_id) DO UPDATE
+         SET enabled    = EXCLUDED.enabled,
+             granted_by = EXCLUDED.granted_by,
+             granted_at = CURRENT_TIMESTAMP`,
+      [userId, featureFlagId, enabled, grantedBy ?? null]
+    );
+    return successResponse({ message: 'Feature flag override saved' });
+  } catch (error: any) {
+    console.error('Error setting user feature flag:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Remove a per-user feature flag override (reverts to license default)
+ */
+export async function removeUserFeatureFlag(userId: string, featureFlagId: string) {
+  try {
+    await connectionPool.query(
+      `DELETE FROM odb.user_feature_flags WHERE user_id = $1 AND feature_flag_id = $2`,
+      [userId, featureFlagId]
+    );
+    return successResponse({ message: 'Feature flag override removed' });
+  } catch (error: any) {
+    console.error('Error removing user feature flag:', error);
+    return errorResponse(error.message);
+  }
+}
+
+// ==================== Tenant Feature Flag Overrides ====================
+
+/**
+ * Set (upsert) a per-tenant feature flag override
+ */
+export async function setTenantFeatureFlag(
+  tenantId: string,
+  featureFlagId: string,
+  enabled: boolean,
+  grantedBy?: string
+) {
+  try {
+    await connectionPool.query(
+      `INSERT INTO odb.tenant_feature_flags (tenant_id, feature_flag_id, enabled, granted_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (tenant_id, feature_flag_id) DO UPDATE
+         SET enabled    = EXCLUDED.enabled,
+             granted_by = EXCLUDED.granted_by,
+             granted_at = CURRENT_TIMESTAMP`,
+      [tenantId, featureFlagId, enabled, grantedBy ?? null]
+    );
+    return successResponse({ message: 'Tenant feature flag override saved' });
+  } catch (error: any) {
+    console.error('Error setting tenant feature flag:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Remove a per-tenant feature flag override
+ */
+export async function removeTenantFeatureFlag(tenantId: string, featureFlagId: string) {
+  try {
+    await connectionPool.query(
+      `DELETE FROM odb.tenant_feature_flags WHERE tenant_id = $1 AND feature_flag_id = $2`,
+      [tenantId, featureFlagId]
+    );
+    return successResponse({ message: 'Tenant feature flag override removed' });
+  } catch (error: any) {
+    console.error('Error removing tenant feature flag:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Get all feature flag overrides for a tenant
+ */
+export async function getTenantFeatureFlags(tenantId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT
+         ff.id, ff.name, ff.label, ff.description, ff.is_preview,
+         tff.enabled, tff.granted_at
+       FROM odb.tenant_feature_flags tff
+       JOIN odb.feature_flags ff ON ff.id = tff.feature_flag_id
+       WHERE tff.tenant_id = $1
+       ORDER BY ff.label`,
+      [tenantId]
+    );
+    return successResponse({ featureFlags: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching tenant feature flags:', error);
+    return errorResponse(error.message);
+  }
+}
+
 /**
  * Toggle property template enabled status
  */
