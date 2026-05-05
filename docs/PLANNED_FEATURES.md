@@ -257,7 +257,7 @@ Implement in this order so each step stays testable. **Issue → roadmap ID** fo
 | C.7 | **Quick actions + apply:** actions from chat, preview before apply | **#518** (done), **#519** |
 | C.8 | **NL → schema:** description → schema, examples, preview surface | **#267**, **#268** (done), **#528–#532** (done) |
 | C.9 | **Property assist:** suggestions, dropdown, bulk, triggers, analysis | **#269–#276**, **#277**, **#278** |
-| C.10 | **Higher insights (post-MVP polish):** improvement suggestions, docs generation, layout hints, etc. | **#253–#256**, **#495**, **#609–#623** (schedule after core chat works) |
+| C.10 | **Higher insights (post-MVP polish):** improvement suggestions, docs generation, layout hints, etc. | **#253–#256**, **#609–#623** (schedule after core chat works) |
 
 ### C.2 Codebase alignment
 

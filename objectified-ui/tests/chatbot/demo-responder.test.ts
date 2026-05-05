@@ -49,6 +49,8 @@ describe('createDemoChatResponder', () => {
     });
     expect(reply).toMatch(/```json/);
     expect(detectOpenApiSpecs(reply)).toHaveLength(1);
+    expect(reply).toMatch(/\*\*Improvement suggestions\*\*/);
+    expect(reply).toMatch(/pagination/i);
   });
 
   it('returns an OpenAPI spec for a plain-language description without spec keywords (#267)', async () => {
@@ -98,6 +100,7 @@ describe('createDemoChatResponder', () => {
       isRegenerate: false,
     });
     expect(reply).toContain('phoneNumber');
+    expect(reply).toMatch(/\*\*Improvement suggestions\*\*/);
     const out = parseClassDefinitionFromAssistantMarkdown(reply);
     expect(out).not.toBeNull();
     const props = (out!.schema as { properties?: Record<string, unknown> }).properties ?? {};
@@ -207,6 +210,7 @@ describe('createDemoChatResponder', () => {
       });
       expect(refinement).toMatch(/Updated the previous schema/);
       expect(refinement).toMatch(/added `phone`/);
+      expect(refinement).toMatch(/\*\*Improvement suggestions\*\*/);
       const refinedSpecs = detectOpenApiSpecs(refinement);
       expect(refinedSpecs).toHaveLength(1);
       const refinedSchema = (refinedSpecs[0].spec as {

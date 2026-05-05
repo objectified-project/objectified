@@ -20,6 +20,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## Export
 
 ## Studio
+- Studio AI assistant (live Ollama and offline demo) appends an **Improvement suggestions** section after OpenAPI sketches—actionable bullets such as pagination, `allOf` inheritance, discriminators, splitting large schemas, and standard error shapes (#495).
 - Studio AI chat empty state offers example prompts for schema and API generation (#268).
 - Studio AI chat treats plain-language domain descriptions (and similar phrasing) as requests to draft OpenAPI `components/schemas`, including when Ollama is connected (#267).
 - AI chatbot lists Ollama models from your server and lets you pick which model answers each conversation (falls back to the offline assistant when Ollama is unavailable).
