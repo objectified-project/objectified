@@ -89,12 +89,11 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ Property suggestion dropdown (#270)
     - ✅ Bulk accept/reject (#271)
     - ✅ Customize before adding (#272)
-    - 📋 "Add all suggested" button
+    - ✅ "Add all suggested" button (#274)
     - ✅ Explanation for each suggestion (#273)
 
 | Ticket | Feature Description                                |
 |--------|----------------------------------------------------|
-| #274   | Adds "Add all suggested" button                    |
 | #275   | Adds trigger conditions for the Suggestion UI      |
 | #276   | Adds analyze button for properties analysis        |
 

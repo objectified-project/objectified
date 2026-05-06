@@ -445,13 +445,13 @@ export function AiPropertySuggestionsDialog({
                     type="button"
                     variant="outline"
                     size="sm"
-                    data-testid="ai-property-suggestions-accept-all"
+                    data-testid="ai-property-suggestions-add-all-suggested"
                     disabled={activeSuggestionRows.length === 0}
                     onClick={handleAcceptAll}
                     className="border-emerald-300 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-200 dark:hover:bg-emerald-950/40"
                   >
                     <ListChecks className="h-4 w-4" aria-hidden />
-                    Accept all
+                    Add all suggested
                   </Button>
                   <Button
                     type="button"
@@ -470,7 +470,7 @@ export function AiPropertySuggestionsDialog({
               {acceptAllError && (
                 <p
                   className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-100"
-                  data-testid="ai-property-suggestions-accept-all-error"
+                  data-testid="ai-property-suggestions-add-all-error"
                 >
                   {acceptAllError}
                 </p>
@@ -551,7 +551,7 @@ export function AiPropertySuggestionsDialog({
                   Customize before adding
                 </h3>
                 <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">
-                  Adjust the name, description, and JSON Schema, then open Add Property or use Accept all.
+                  Adjust the name, description, and JSON Schema, then open Add Property or use Add all suggested.
                 </p>
                 <label htmlFor="ai-prop-suggest-edit-name" className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
                   Property name
