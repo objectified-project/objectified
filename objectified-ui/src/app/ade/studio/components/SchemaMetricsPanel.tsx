@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid, Box, Layers, FileText, Type, Network, FileDown } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid, Box, Layers, FileText, Type, Network, FileDown, Brain } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import * as Popover from '@radix-ui/react-popover';
 import { cn } from '../../../../../lib/utils';
@@ -85,6 +85,7 @@ export default function SchemaMetricsPanel({
     propertiesMissingDocumentation,
     namingCompliance,
     dependencyMetricsPerClass = [],
+    cognitiveComplexityPerClass = [],
   } = metrics;
 
   const docsScoreTier = getNumericScoreTier(documentationCompletionPercentage);
@@ -675,6 +676,45 @@ export default function SchemaMetricsPanel({
                           <td className="py-1 px-2 text-right tabular-nums text-gray-600 dark:text-gray-400">
                             {row.betweenness.toFixed(2)}
                           </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* #610: Cognitive complexity per class (for humans + AI digest) */}
+          {cognitiveComplexityPerClass.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                <Brain className="w-3 h-3" />
+                Cognitive complexity per class
+              </div>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+                Props + weighted outgoing refs (anyOf/oneOf count double). Higher scores mean more to hold in mind when reading the model.
+              </p>
+              <div className="rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden max-h-48 overflow-y-auto">
+                <table className="w-full text-[11px] border-collapse">
+                  <thead className="sticky top-0 bg-gray-50 dark:bg-gray-700/80 text-left">
+                    <tr>
+                      <th className="py-1.5 px-2 font-medium text-gray-600 dark:text-gray-400">Class</th>
+                      <th className="py-1.5 px-2 font-medium text-gray-600 dark:text-gray-400 text-right w-14">Score</th>
+                      <th className="py-1.5 px-2 font-medium text-gray-600 dark:text-gray-400 text-right w-12">Props</th>
+                      <th className="py-1.5 px-2 font-medium text-gray-600 dark:text-gray-400 text-right w-12">Refs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...cognitiveComplexityPerClass]
+                      .sort((a, b) => b.score - a.score || a.className.localeCompare(b.className))
+                      .map((row, i) => (
+                        <tr key={row.classId} className={i % 2 === 0 ? 'bg-white dark:bg-gray-800/50' : 'bg-gray-50/80 dark:bg-gray-700/30'}>
+                          <td className="py-1 px-2 truncate max-w-[100px] text-gray-800 dark:text-gray-200 font-medium" title={row.className}>
+                            {row.className}
+                          </td>
+                          <td className="py-1 px-2 text-right tabular-nums font-medium text-gray-800 dark:text-gray-200">{row.score}</td>
+                          <td className="py-1 px-2 text-right tabular-nums text-gray-600 dark:text-gray-400">{row.propertyContribution}</td>
+                          <td className="py-1 px-2 text-right tabular-nums text-gray-600 dark:text-gray-400">{row.referenceContribution}</td>
                         </tr>
                       ))}
                   </tbody>

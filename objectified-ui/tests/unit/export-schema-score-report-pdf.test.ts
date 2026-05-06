@@ -71,6 +71,7 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
       propertiesNonCamel: [],
     },
     dependencyMetricsPerClass: [],
+    cognitiveComplexityPerClass: [],
     ...overrides,
   };
 }
@@ -143,6 +144,18 @@ describe('downloadSchemaScoreReportPdf', () => {
       downloadSchemaScoreReportPdf({ metrics, projectName: 'P', versionLabel: 'v1' })
     ).not.toThrow();
     expect(mockSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes cognitive complexity section when rows are present', () => {
+    const metrics = makeMinimalMetrics({
+      cognitiveComplexityPerClass: [
+        { classId: 'c1', className: 'Heavy', score: 15, propertyContribution: 12, referenceContribution: 3 },
+      ],
+    });
+    downloadSchemaScoreReportPdf({ metrics, projectName: 'P', versionLabel: 'v1' });
+    const joined = (mockText.mock.calls as Array<[string, ...unknown[]]>).map((c) => String(c[0])).join('\n');
+    expect(joined).toContain('Cognitive complexity per class');
+    expect(joined).toContain('Heavy | 15 | 12 | 3');
   });
 
   it('does not throw with dependency metrics and layout quality', () => {

@@ -8,6 +8,7 @@ import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
 const MAX_NAMES = 48;
 const MAX_PROP_ROWS = 60;
 const MAX_DEP_ROWS = 24;
+const MAX_COGNITIVE_ROWS = 40;
 
 function take<T>(arr: T[], n: number): T[] {
   return arr.length <= n ? arr : arr.slice(0, n);
@@ -87,6 +88,19 @@ export function buildStudioMetricsDigestForAi(
     lines.push('- Heaviest classes by degree (sample):');
     for (const row of take(sorted, MAX_DEP_ROWS)) {
       lines.push(`  - ${row.className}: in ${row.inDegree}, out ${row.outDegree}, betweenness ${row.betweenness.toFixed(3)}`);
+    }
+  }
+
+  if (metrics.cognitiveComplexityPerClass?.length) {
+    const sorted = [...metrics.cognitiveComplexityPerClass].sort((a, b) => b.score - a.score || a.className.localeCompare(b.className));
+    lines.push('- Per-class cognitive complexity (#610; props + weighted refs; higher = harder to reason about):');
+    for (const row of take(sorted, MAX_COGNITIVE_ROWS)) {
+      lines.push(
+        `  - ${row.className}: ${row.score} (props +${row.propertyContribution}, refs +${row.referenceContribution})`,
+      );
+    }
+    if (sorted.length > MAX_COGNITIVE_ROWS) {
+      lines.push(`  … and ${sorted.length - MAX_COGNITIVE_ROWS} more classes`);
     }
   }
 
