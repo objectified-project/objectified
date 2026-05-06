@@ -2,8 +2,25 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit, TrendingUp, Undo2 } from 'lucide-react';
+import { useEffect, useState, useRef, useMemo, useCallback, type ReactNode } from 'react';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  FolderOpen,
+  Lock,
+  Upload,
+  AlertTriangle,
+  MoreVertical,
+  ExternalLink,
+  Bot,
+  FileEdit,
+  TrendingUp,
+  Undo2,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -54,6 +71,11 @@ import {
   dashboardTbodyClass,
   dashboardTrHoverClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
+import {
+  sortProjectsDashboardRows,
+  type ProjectsDashboardSortColumn,
+  type ProjectsDashboardSortDirection,
+} from '@/app/utils/projects-dashboard-sort';
 
 type ProjectMetadata = ProjectOpenApiMetadata;
 
@@ -62,6 +84,8 @@ interface Project {
   tenant_id: string;
   creator_id: string;
   name: string;
+  /** URL slug from API when present */
+  slug?: string;
   description: string;
   enabled: boolean;
   deleted_at: string | null;
@@ -70,6 +94,54 @@ interface Project {
   creator_name: string;
   creator_email: string;
   metadata?: ProjectMetadata;
+}
+
+function ProjectsSortTh({
+  column,
+  sortColumn,
+  sortDirection,
+  onSortClick,
+  className,
+  testId,
+  ariaLabel,
+  children,
+}: {
+  column: ProjectsDashboardSortColumn;
+  sortColumn: ProjectsDashboardSortColumn;
+  sortDirection: ProjectsDashboardSortDirection;
+  onSortClick: (c: ProjectsDashboardSortColumn) => void;
+  className: string;
+  testId: string;
+  ariaLabel: string;
+  children: ReactNode;
+}) {
+  const active = sortColumn === column;
+  return (
+    <th
+      scope="col"
+      className={className}
+      aria-sort={active ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        className="inline-flex w-full max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-xs font-medium uppercase tracking-wider text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+        onClick={() => onSortClick(column)}
+        data-testid={testId}
+        aria-label={ariaLabel}
+      >
+        <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 truncate">{children}</span>
+        {active ? (
+          sortDirection === 'asc' ? (
+            <ArrowUp className="h-3.5 w-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
+          ) : (
+            <ArrowDown className="h-3.5 w-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
+          )
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+        )}
+      </button>
+    </th>
+  );
 }
 
 const Projects = () => {
@@ -111,6 +183,8 @@ const Projects = () => {
   const [qualityHistoryEpoch, setQualityHistoryEpoch] = useState(0);
   const [qualityTrendProject, setQualityTrendProject] = useState<Project | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
+  const [sortColumn, setSortColumn] = useState<ProjectsDashboardSortColumn>('name');
+  const [sortDirection, setSortDirection] = useState<ProjectsDashboardSortDirection>('asc');
   const prevImportOpen = useRef(false);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
@@ -147,6 +221,32 @@ const Projects = () => {
     }
     return m;
   }, [projects, qualityHistoryEpoch]);
+
+  const latestQualityByProjectId = useMemo(() => {
+    const out: Record<string, number | null> = {};
+    for (const p of projects) {
+      const qh = projectQualityHistoryMap[p.id] ?? [];
+      const last = qh.length > 0 ? qh[qh.length - 1] : null;
+      out[p.id] = last != null ? last.overall : null;
+    }
+    return out;
+  }, [projects, projectQualityHistoryMap]);
+
+  const sortedProjects = useMemo(
+    () => sortProjectsDashboardRows(projects, sortColumn, sortDirection, latestQualityByProjectId),
+    [projects, sortColumn, sortDirection, latestQualityByProjectId]
+  );
+
+  const handleProjectsSortHeaderClick = useCallback((column: ProjectsDashboardSortColumn) => {
+    setSortColumn((prevCol) => {
+      if (prevCol === column) {
+        setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+        return prevCol;
+      }
+      setSortDirection('asc');
+      return column;
+    });
+  }, []);
 
   const loadProjects = useCallback(async () => {
     if (!currentTenantId) {
@@ -545,37 +645,91 @@ const Projects = () => {
             <table className="min-w-full">
               <thead className={dashboardTableTheadClass}>
                 <tr>
-                  <th scope="col" className={`${dashboardThClass} w-64`}>
+                  <ProjectsSortTh
+                    column="name"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSortClick={handleProjectsSortHeaderClick}
+                    className={`${dashboardThClass} w-64`}
+                    testId="projects-sort-name"
+                    ariaLabel="Sort by project name"
+                  >
                     Project Name
-                  </th>
-                  <th scope="col" className={dashboardThClass}>
+                  </ProjectsSortTh>
+                  <ProjectsSortTh
+                    column="description"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSortClick={handleProjectsSortHeaderClick}
+                    className={dashboardThClass}
+                    testId="projects-sort-description"
+                    ariaLabel="Sort by description"
+                  >
                     Description
-                  </th>
-                  <th scope="col" className={`${dashboardThClass} w-[11rem]`}>
-                    <span className="inline-flex items-center gap-1.5">
-                      <TrendingUp className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
-                      Quality trend
-                    </span>
-                  </th>
-                  <th scope="col" className={`${dashboardThClass} w-48`}>
+                  </ProjectsSortTh>
+                  <ProjectsSortTh
+                    column="quality"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSortClick={handleProjectsSortHeaderClick}
+                    className={`${dashboardThClass} w-[11rem]`}
+                    testId="projects-sort-quality"
+                    ariaLabel="Sort by latest quality score"
+                  >
+                    <TrendingUp className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+                    Quality trend
+                  </ProjectsSortTh>
+                  <ProjectsSortTh
+                    column="status"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSortClick={handleProjectsSortHeaderClick}
+                    className={`${dashboardThClass} w-48`}
+                    testId="projects-sort-status"
+                    ariaLabel="Sort by status"
+                  >
                     Status
-                  </th>
-                  <th scope="col" className={`${dashboardThClass} w-56`}>
+                  </ProjectsSortTh>
+                  <ProjectsSortTh
+                    column="creator"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSortClick={handleProjectsSortHeaderClick}
+                    className={`${dashboardThClass} w-56`}
+                    testId="projects-sort-creator"
+                    ariaLabel="Sort by creator"
+                  >
                     Created By
-                  </th>
-                  <th scope="col" className={`${dashboardThClass} w-40`}>
+                  </ProjectsSortTh>
+                  <ProjectsSortTh
+                    column="created"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSortClick={handleProjectsSortHeaderClick}
+                    className={`${dashboardThClass} w-40`}
+                    testId="projects-sort-created"
+                    ariaLabel="Sort by created date"
+                  >
                     Created
-                  </th>
-                  <th scope="col" className={`${dashboardThClass} w-40`}>
+                  </ProjectsSortTh>
+                  <ProjectsSortTh
+                    column="updated"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSortClick={handleProjectsSortHeaderClick}
+                    className={`${dashboardThClass} w-40`}
+                    testId="projects-sort-updated"
+                    ariaLabel="Sort by updated date"
+                  >
                     Updated
-                  </th>
-                  <th scope="col" className={`${dashboardThRightClass} w-24`}>
-
+                  </ProjectsSortTh>
+                  <th scope="col" className={`${dashboardThRightClass} w-24`} aria-sort="none">
+                    <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
               <tbody className={dashboardTbodyClass}>
-                {projects.map((project) => {
+                {sortedProjects.map((project) => {
                   const domainCategoryLabel = getProjectDomainCategoryLabel(project.metadata?.domainCategory);
                   const isDeleted = Boolean(project.deleted_at);
                   return (
@@ -603,8 +757,8 @@ const Projects = () => {
                         <div className="text-sm font-semibold text-gray-900 dark:text-white truncate max-w-xs" title={project.name}>
                           {project.name}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate" title={(project as any).slug}>
-                          {(project as any).slug || '—'}
+                        <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate" title={project.slug}>
+                          {project.slug || '—'}
                         </div>
                         {domainCategoryLabel ? (
                           <span
