@@ -22,7 +22,7 @@ import { Textarea } from '../../../components/ui/Textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/ui/Tabs';
 import { toast } from 'sonner';
-import { createProject, updateProject, deleteProject, permanentDeleteProject } from '../../../../../lib/db/helper';
+import { createProject, updateProject, deleteProject, permanentDeleteProject, restoreProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 import ImportDialog from '../../../components/ade/dashboard/ImportDialog';
 import { LLMChatPanel } from '../../../components/ade/dashboard/LLMImportDialog';
@@ -295,7 +295,8 @@ const Projects = () => {
   const handleDelete = async (projectId: string) => {
     const confirmed = await confirmDialog({
       title: 'Delete Project',
-      message: 'Are you sure you want to delete this project? This action cannot be undone.',
+      message:
+        'This soft-deletes the project (it is hidden from pickers). You can undelete it later from Projects by turning on "Show deleted".',
       variant: 'danger',
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
@@ -314,22 +315,22 @@ const Projects = () => {
 
   const handleRestore = async (project: Project) => {
     const confirmed = await confirmDialog({
-      title: 'Restore Project',
-      message: `Restore "${project.name}"? It will be enabled again and visible in all project pickers.`,
+      title: 'Undelete Project',
+      message: `Undelete "${project.name}"? It will return to normal lists and pickers with the same enabled/disabled state it had before deletion.`,
       variant: 'info',
-      confirmLabel: 'Restore',
+      confirmLabel: 'Undelete',
       cancelLabel: 'Cancel',
     });
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`/api/projects/${project.id}/restore`, { method: 'POST' });
-      const data = await response.json();
-      if (data.success) {
-        toast.success('Project restored.');
+      const result = await restoreProject(project.id);
+      const response = JSON.parse(result);
+      if (response.success) {
+        toast.success('Project undeleted.');
         await loadProjects();
       } else {
-        await alertDialog({ message: data.error || 'Failed to restore project', variant: 'error' });
+        await alertDialog({ message: response.error || 'Failed to undelete project', variant: 'error' });
       }
     } catch (error: any) {
       await alertDialog({ message: error.message || 'An error occurred', variant: 'error' });
@@ -581,7 +582,7 @@ const Projects = () => {
                     }}
                     title={
                       isDeleted
-                        ? 'This project is deleted — use actions to restore or permanently delete'
+                        ? 'This project is deleted — use Undelete or the actions menu to restore it, or permanently delete'
                         : 'View versions for this project'
                     }
                   >
@@ -689,7 +690,21 @@ const Projects = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="relative">
+                      <div className="relative inline-flex items-center justify-end gap-0.5">
+                        {isDeleted ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleRestore(project);
+                            }}
+                            className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors text-emerald-600 dark:text-emerald-400"
+                            title="Undelete project"
+                            aria-label={`Undelete project ${project.name}`}
+                          >
+                            <Undo2 className="h-4 w-4" />
+                          </button>
+                        ) : null}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -757,7 +772,7 @@ const Projects = () => {
                                     className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
                                   >
                                     <Undo2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                                    Restore Project
+                                    Undelete Project
                                   </button>
                                 )}
                                 <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
