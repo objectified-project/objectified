@@ -41,6 +41,13 @@ interface Project {
   id: string;
   name: string;
   slug: string;
+  metadata?: Record<string, unknown> | null;
+}
+
+function readProjectDomainCategory(metadata: unknown): string | null {
+  if (!metadata || typeof metadata !== 'object') return null;
+  const raw = (metadata as Record<string, unknown>).domainCategory;
+  return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null;
 }
 
 interface Version {
@@ -107,6 +114,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     pathsQualityRevision,
     focusPathsCanvasNodeFn,
     setSelectedProjectName,
+    setSelectedProjectDomainCategoryId,
     setSelectedVersionLabel,
   } = useStudio();
 
@@ -242,11 +250,13 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   React.useEffect(() => {
     if (!selectedProjectId) {
       setSelectedProjectName(null);
+      setSelectedProjectDomainCategoryId(null);
       return;
     }
     const project = projects.find((p) => String(p.id) === String(selectedProjectId));
     setSelectedProjectName(project?.name ?? null);
-  }, [selectedProjectId, projects, setSelectedProjectName]);
+    setSelectedProjectDomainCategoryId(readProjectDomainCategory(project?.metadata));
+  }, [selectedProjectId, projects, setSelectedProjectName, setSelectedProjectDomainCategoryId]);
 
   React.useEffect(() => {
     if (!selectedVersion) {

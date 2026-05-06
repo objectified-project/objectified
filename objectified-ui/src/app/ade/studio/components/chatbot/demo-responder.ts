@@ -38,6 +38,7 @@
 
 import type { ChatStudioContext, ChatStudioProperty } from './chat-context';
 import { getSelectedClasses, isChatStudioContextEmpty } from './chat-context';
+import { collectStudioAiBestPracticeLinesFromStudio } from '@/app/utils/studio-ai-best-practice-tips';
 import {
   extractFirstJsonOrYamlFenceBody,
   summarizeJsonSchemaProperties,
@@ -399,6 +400,10 @@ function buildContextAwareSuggestions(ctx: ChatStudioContext | undefined): strin
     '- Tighten descriptions and add `examples` arrays where documentation tooling expects them.',
   ];
   if (!ctx || isChatStudioContextEmpty(ctx)) return suggestions;
+  const domainTips = collectStudioAiBestPracticeLinesFromStudio(ctx);
+  for (let i = domainTips.length - 1; i >= 0; i -= 1) {
+    suggestions.unshift(domainTips[i]);
+  }
   const selected = getSelectedClasses(ctx);
   if (selected.length > 0) {
     const names = selected.slice(0, 3).map((cls) => `\`${cls.name}\``).join(', ');

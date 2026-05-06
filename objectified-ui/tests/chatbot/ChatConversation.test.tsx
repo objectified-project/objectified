@@ -131,6 +131,32 @@ describe('ChatConversation', () => {
     ]);
   });
 
+  it('shows workspace best-practice tips when project domainCategory signals e-commerce (#615)', () => {
+    const studioContext: ChatStudioContext = {
+      ...EMPTY_CHAT_STUDIO_CONTEXT,
+      project: { id: 'p1', name: 'Shop', domainCategory: 'ecommerce' },
+      version: { id: 'v1', label: 'v1' },
+      classes: [],
+      properties: [],
+      selectedClassIds: [],
+    };
+    render(<ChatConversation restoreLastConversation={false} studioContext={studioContext} />);
+    expect(screen.getByTestId('studio-ai-chat-best-practice-tips')).toHaveTextContent('inventory tracking');
+  });
+
+  it('shows auth-oriented tips when class names suggest tokens or sessions (#615)', () => {
+    const studioContext: ChatStudioContext = {
+      ...EMPTY_CHAT_STUDIO_CONTEXT,
+      project: { id: 'p1', name: 'Auth svc' },
+      version: { id: 'v1', label: 'v1' },
+      classes: [{ id: 'c1', name: 'RefreshToken' }],
+      properties: [],
+      selectedClassIds: [],
+    };
+    render(<ChatConversation restoreLastConversation={false} studioContext={studioContext} />);
+    expect(screen.getByTestId('studio-ai-chat-best-practice-tips')).toHaveTextContent('refresh token');
+  });
+
   it('clicking a suggestion seeds the conversation as a user message', async () => {
     const { responder, calls, resolveWith } = createDeferredResponder();
     render(<ChatConversation onSendMessage={responder} />);

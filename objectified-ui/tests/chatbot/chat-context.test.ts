@@ -97,6 +97,16 @@ describe('summarizeChatStudioContext', () => {
     expect(summary).toMatch(/Properties \(2\):.*email.*id/);
   });
 
+  it('includes project domain in the summary when domainCategory is set (#615)', () => {
+    const summary = summarizeChatStudioContext(
+      makeContext({
+        project: { id: 'proj-1', name: 'Acme Catalog', domainCategory: 'ecommerce' },
+      }),
+    );
+    expect(summary).toMatch(/Project domain/);
+    expect(summary).toMatch(/E-commerce/);
+  });
+
   it('caps the visible class names with an overflow marker', () => {
     const classes = Array.from({ length: CHAT_CONTEXT_CLASS_CAP + 5 }, (_, i) => ({
       id: `c${i}`,
@@ -111,6 +121,16 @@ describe('summarizeChatStudioContext', () => {
 describe('buildChatContextPreamble', () => {
   it('returns an empty string when there is no context to share', () => {
     expect(buildChatContextPreamble(EMPTY_CHAT_STUDIO_CONTEXT)).toBe('');
+  });
+
+  it('adds domain-aware best practices to the preamble when tips apply (#615)', () => {
+    const preamble = buildChatContextPreamble(
+      makeContext({
+        project: { id: 'proj-1', name: 'Acme Catalog', domainCategory: 'saas' },
+      }),
+    );
+    expect(preamble).toMatch(/Domain-aware best practices/);
+    expect(preamble).toMatch(/tenant isolation/i);
   });
 
   it('includes a schema preview for selected classes only', () => {

@@ -216,6 +216,9 @@ interface StudioContextType {
   /** Resolved display label for the selected project, published by StudioHeader once projects load. */
   selectedProjectName: string | null;
   setSelectedProjectName: (name: string | null) => void;
+  /** Project metadata `domainCategory` id for the selected project, published by StudioHeader (#615). */
+  selectedProjectDomainCategoryId: string | null;
+  setSelectedProjectDomainCategoryId: (id: string | null) => void;
   /** Resolved display label for the selected version (e.g. "v1.2.3"), published by StudioHeader. */
   selectedVersionLabel: string | null;
   setSelectedVersionLabel: (label: string | null) => void;
@@ -406,6 +409,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     );
   }, []);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
+  const [selectedProjectDomainCategoryId, setSelectedProjectDomainCategoryId] = useState<string | null>(null);
   const [selectedVersionLabel, setSelectedVersionLabel] = useState<string | null>(null);
 
   const [pathsViewMode, setPathsViewModeState] = useState<'canvas' | 'code'>(() => {
@@ -723,6 +727,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setCanvasViewport,
       selectedProjectName,
       setSelectedProjectName,
+      selectedProjectDomainCategoryId,
+      setSelectedProjectDomainCategoryId,
       selectedVersionLabel,
       setSelectedVersionLabel,
       pathsViewMode,
