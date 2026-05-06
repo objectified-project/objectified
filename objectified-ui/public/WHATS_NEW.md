@@ -24,6 +24,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## Export
 
 ## Dashboard
+- **Published Versions**: opening a **private** revision’s OpenAPI, Swagger UI, Arazzo, or JSON Schema link **reuses an API key saved in this browser** for the current tenant when present, so you are not prompted every time; otherwise the key dialog appears, with optional **remember** and a **clear saved key** control (#3132).
 - **Versions** timeline table (**version**, **revision / changelog**, **status**, **created by**, **created**) is **sortable** from the column headers: click to sort ascending, click again to toggle descending (#2983).
 - **Projects** table columns (**name**, **description**, **quality trend**, **status**, **creator**, **created**, **updated**) are **sortable** from the header: click to sort ascending, click again to toggle descending (#2982).
 - Projects list includes a **Show deleted** switch; when on, soft-deleted projects appear with a **Deleted** badge and **Restore** or **permanent delete** in the row menu (#2981).
