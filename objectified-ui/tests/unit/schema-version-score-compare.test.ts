@@ -34,6 +34,18 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
     },
     dependencyMetricsPerClass: [],
     cognitiveComplexityPerClass: [],
+    dependencyGraphComplexity: {
+      edgeCount: 0,
+      deepestChainSteps: 0,
+      circularGroupCount: 0,
+      score: 0,
+      scoreLabel: 'Low',
+      breakdown: [
+        { label: 'Dependency edges', value: 0, weight: 1.2, contribution: 0 },
+        { label: 'Deepest ref chain (steps)', value: 0, weight: 4, contribution: 0 },
+        { label: 'Circular groups (deps)', value: 0, weight: 6, contribution: 0 },
+      ],
+    },
     ...overrides,
   };
 }

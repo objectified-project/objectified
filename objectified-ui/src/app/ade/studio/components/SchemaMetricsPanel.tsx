@@ -86,6 +86,7 @@ export default function SchemaMetricsPanel({
     namingCompliance,
     dependencyMetricsPerClass = [],
     cognitiveComplexityPerClass = [],
+    dependencyGraphComplexity,
   } = metrics;
 
   const docsScoreTier = getNumericScoreTier(documentationCompletionPercentage);
@@ -641,6 +642,99 @@ export default function SchemaMetricsPanel({
                 {circularSampleNames.length > 3 ? '…' : ''}
               </p>
             )}
+          </div>
+
+          {/* #611: Dependency-only graph complexity (score + factor breakdown) */}
+          <div>
+            <Popover.Root>
+              <Popover.Trigger asChild>
+                <button
+                  type="button"
+                  className="w-full rounded-lg bg-gray-50 dark:bg-gray-700/40 dark:border dark:border-gray-600/40 px-2.5 py-2 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600/40 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
+                  aria-label="Dependency graph complexity; click for breakdown"
+                  title="Property references and class composition edges only — click for breakdown"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Network className="w-4 h-4 text-indigo-500 shrink-0" aria-hidden />
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
+                        Dependency graph complexity
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-lg font-bold text-gray-800 dark:text-gray-200 tabular-nums">
+                        {dependencyGraphComplexity.score}
+                      </span>
+                      <span
+                        className={cn(
+                          'text-xs font-medium px-1.5 py-0.5 rounded',
+                          dependencyGraphComplexity.scoreLabel === 'Low' &&
+                            'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+                          dependencyGraphComplexity.scoreLabel === 'Medium' &&
+                            'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+                          dependencyGraphComplexity.scoreLabel === 'High' &&
+                            'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',
+                        )}
+                      >
+                        {dependencyGraphComplexity.scoreLabel}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
+                    {dependencyGraphComplexity.edgeCount} dependency edge
+                    {dependencyGraphComplexity.edgeCount !== 1 ? 's' : ''} · deepest chain{' '}
+                    {dependencyGraphComplexity.deepestChainSteps} step
+                    {dependencyGraphComplexity.deepestChainSteps !== 1 ? 's' : ''} ·{' '}
+                    {dependencyGraphComplexity.circularGroupCount} cycle group
+                    {dependencyGraphComplexity.circularGroupCount !== 1 ? 's' : ''}
+                  </p>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Click for factor breakdown</p>
+                </button>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  className="z-[10000] w-72 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-3 focus:outline-none"
+                  sideOffset={6}
+                  align="start"
+                >
+                  <div className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                    Why this dependency graph score?
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3">
+                    Uses only property references and class-level allOf, anyOf, and oneOf links—the same
+                    dependency edges as the per-class table below. Layout-only canvas edges are excluded.
+                  </p>
+                  <table className="w-full text-[11px] text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-600">
+                        <th className="py-1 pr-2 font-medium text-gray-600 dark:text-gray-400">Factor</th>
+                        <th className="py-1 pr-2 font-medium text-gray-600 dark:text-gray-400 text-right">Value</th>
+                        <th className="py-1 pr-2 font-medium text-gray-600 dark:text-gray-400 text-right">× weight</th>
+                        <th className="py-1 font-medium text-gray-600 dark:text-gray-400 text-right">Points</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dependencyGraphComplexity.breakdown.map((row, i) => (
+                        <tr key={i} className="border-b border-gray-100 dark:border-gray-700/80">
+                          <td className="py-1 pr-2 text-gray-700 dark:text-gray-300">{row.label}</td>
+                          <td className="py-1 pr-2 text-right tabular-nums text-gray-700 dark:text-gray-300">{row.value}</td>
+                          <td className="py-1 pr-2 text-right tabular-nums text-gray-500 dark:text-gray-400">{row.weight}</td>
+                          <td className="py-1 text-right tabular-nums font-medium text-gray-800 dark:text-gray-200">
+                            {row.contribution.toFixed(1)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 flex justify-between text-[11px]">
+                    <span className="text-gray-500 dark:text-gray-400">Raw sum → capped</span>
+                    <span className="font-semibold text-gray-800 dark:text-gray-200 tabular-nums">
+                      {dependencyGraphComplexity.score}/100
+                    </span>
+                  </div>
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
           </div>
 
           {/* #553: Dependency metrics per class (in-degree, out-degree, betweenness) */}

@@ -78,6 +78,7 @@ function addMetricsBody(
       `Average properties per class: ${m.averagePropertiesPerClass.toFixed(1)}`,
       `Relationships: ${m.relationshipCount}`,
       `Schema complexity: ${m.complexityScore}/100 (${m.complexityLabel})`,
+      `Dependency graph complexity (#611): ${m.dependencyGraphComplexity.score}/100 (${m.dependencyGraphComplexity.scoreLabel}) — ${m.dependencyGraphComplexity.edgeCount} dependency-only edges, deepest ref chain ${m.dependencyGraphComplexity.deepestChainSteps} step(s), ${m.dependencyGraphComplexity.circularGroupCount} cycle group(s)`,
       `Documentation coverage: ${m.documentationCompletionPercentage}%`,
       `Naming compliance: ${m.namingCompliance.compliancePercentage}%`,
     ].join('\n')
@@ -159,6 +160,23 @@ function addMetricsBody(
       `Circular dependencies: ${m.circularDependencyCount}${m.circularSampleNames.length ? ` (e.g. ${m.circularSampleNames.slice(0, 5).join(', ')})` : ''}`,
     ].join('\n')
   );
+
+  section(ctx, 'Dependency graph complexity (#611)');
+  const dg = m.dependencyGraphComplexity;
+  paragraph(
+    ctx,
+    [
+      `Score: ${dg.score}/100 (${dg.scoreLabel})`,
+      `Dependency-only edges: ${dg.edgeCount}`,
+      `Deepest ref chain (dependency graph): ${dg.deepestChainSteps} step(s)`,
+      `Cycle groups on dependency graph: ${dg.circularGroupCount}`,
+    ].join('\n')
+  );
+  const dgRows: string[] = ['Factor | Value | Weight | Points'];
+  for (const row of dg.breakdown) {
+    dgRows.push(`${row.label} | ${row.value} | ${row.weight} | ${row.contribution.toFixed(1)}`);
+  }
+  paragraph(ctx, dgRows.join('\n'));
 
   if (m.dependencyMetricsPerClass.length > 0) {
     section(ctx, 'Dependency metrics per class');

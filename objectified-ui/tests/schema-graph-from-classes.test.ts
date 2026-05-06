@@ -44,6 +44,8 @@ describe('schema-graph-from-classes / computeSchemaMetricsFromClasses', () => {
     expect(m.relationshipCount).toBeGreaterThan(0);
     expect(m.complexityScore).toBeGreaterThanOrEqual(0);
     expect(m.complexityScore).toBeLessThanOrEqual(100);
+    expect(m.dependencyGraphComplexity.edgeCount).toBeGreaterThanOrEqual(1);
+    expect(m.dependencyGraphComplexity.deepestChainSteps).toBe(1);
     const byName = Object.fromEntries(m.cognitiveComplexityPerClass.map((c) => [c.className, c]));
     expect(byName.Post?.score).toBe(2);
     expect(byName.User?.score).toBe(0);

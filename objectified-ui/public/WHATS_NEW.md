@@ -30,6 +30,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Projects list includes a **Show deleted** switch; when on, soft-deleted projects appear with a **Deleted** badge and **Restore** or **permanent delete** in the row menu (#2981).
 
 ## Studio
+- **Schema Metrics** adds **dependency graph complexity** (0–100 on property references and class-level allOf/anyOf/oneOf only): headline score with factor breakdown in the panel, **AI metrics digest**, and **PDF score report** (#611).
 - **Schema Metrics** includes **cognitive complexity per class** (props plus weighted outgoing dependency edges; anyOf/oneOf count double) and feeds the same scores into the **AI improvement suggestions** metrics digest (#610).
 - **AI improvement suggestions** supports **bulk apply**: when the model returns structured **apply** targets (empty class or property descriptions), select rows and **Apply selected** to fill documentation on the canvas in one pass (#256).
 - **AI improvement suggestions** shows an optional **estimated overall score impact** (points on the 0–100 Studio composite) per row when the model supplies it; the metrics digest includes the **current overall score** so estimates stay grounded (#255).

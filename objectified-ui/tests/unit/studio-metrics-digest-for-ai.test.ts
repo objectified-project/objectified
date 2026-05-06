@@ -34,6 +34,18 @@ function baseMetrics(over: Partial<SchemaMetricsResult> = {}): SchemaMetricsResu
     cognitiveComplexityPerClass: [
       { classId: '1', className: 'User', score: 7, propertyContribution: 5, referenceContribution: 2 },
     ],
+    dependencyGraphComplexity: {
+      edgeCount: 2,
+      deepestChainSteps: 1,
+      circularGroupCount: 0,
+      score: 6,
+      scoreLabel: 'Low',
+      breakdown: [
+        { label: 'Dependency edges', value: 2, weight: 1.2, contribution: 2.4 },
+        { label: 'Deepest ref chain (steps)', value: 1, weight: 4, contribution: 4 },
+        { label: 'Circular groups (deps)', value: 0, weight: 6, contribution: 0 },
+      ],
+    },
     ...over,
   };
 }
@@ -49,6 +61,8 @@ describe('buildStudioMetricsDigestForAi', () => {
     expect(text).toContain('Hub classes');
     expect(text).toContain('Per-class cognitive complexity');
     expect(text).toContain('User: 7 (props +5, refs +2)');
+    expect(text).toContain('Dependency graph complexity (#611)');
+    expect(text).toContain('6/100');
   });
 
   it('includes overall schema quality score when provided (#255)', () => {
