@@ -21,7 +21,7 @@ import { Textarea } from '../../../components/ui/Textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/ui/Tabs';
 import { toast } from 'sonner';
-import { createProject, updateProject, deleteProject, permanentDeleteProject, restoreProject } from '../../../../../lib/db/helper';
+import { createProject, updateProject, deleteProject, permanentDeleteProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 import ImportDialog from '../../../components/ade/dashboard/ImportDialog';
 import { LLMChatPanel } from '../../../components/ade/dashboard/LLMImportDialog';
@@ -320,13 +320,13 @@ const Projects = () => {
     if (!confirmed) return;
 
     try {
-      const result = await restoreProject(project.id);
-      const response = JSON.parse(result);
-      if (response.success) {
+      const response = await fetch(`/api/projects/${project.id}/restore`, { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
         toast.success('Project restored.');
         await loadProjects();
       } else {
-        await alertDialog({ message: response.error || 'Failed to restore project', variant: 'error' });
+        await alertDialog({ message: data.error || 'Failed to restore project', variant: 'error' });
       }
     } catch (error: any) {
       await alertDialog({ message: error.message || 'An error occurred', variant: 'error' });

@@ -1267,7 +1267,8 @@ class Database:
         """Soft delete a project, ensuring it belongs to the tenant."""
         query = """
             UPDATE odb.projects
-            SET enabled = false, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            SET pre_delete_enabled = enabled, enabled = false,
+                deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
             WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL
         """
         conn = self.connect()
@@ -1281,10 +1282,13 @@ class Database:
             raise e
 
     def restore_project(self, project_id: str, tenant_id: str) -> bool:
-        """Clear soft-delete on a project (re-enable)."""
+        """Clear soft-delete on a project, restoring its pre-delete enabled state."""
         query = """
             UPDATE odb.projects
-            SET deleted_at = NULL, enabled = true, updated_at = CURRENT_TIMESTAMP
+            SET deleted_at = NULL,
+                enabled = COALESCE(pre_delete_enabled, TRUE),
+                pre_delete_enabled = NULL,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = %s AND tenant_id = %s AND deleted_at IS NOT NULL
         """
         conn = self.connect()

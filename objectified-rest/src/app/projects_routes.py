@@ -349,8 +349,8 @@ async def restore_project(
     restored = db.restore_project(project_id, auth_data['tenant_id'])
     if not restored:
         raise HTTPException(
-            status_code=500,
-            detail="Failed to restore project",
+            status_code=409,
+            detail="Project could not be restored (it may have already been restored or permanently deleted)",
         )
 
     project = db.get_project_by_id(project_id, auth_data['tenant_id'])
