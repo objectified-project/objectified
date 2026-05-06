@@ -14,6 +14,7 @@ import { Bot, Loader2, Square } from 'lucide-react';
 import type { PropertyItem } from './StudioSideNav';
 import {
   parseAiPropertySuggestionsResponse,
+  suggestionPublicExplanation,
   type AiPropertySuggestion,
   type AiPropertySuggestionsPayload,
 } from '@lib/ai-property-suggestions';
@@ -382,23 +383,42 @@ export function AiPropertyTypeSuggestionsDialog({
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Type alternatives
               </h3>
-              <ul className="flex flex-wrap gap-2" data-testid="ai-property-type-suggestions-list">
-                {parsed.suggestions.map((s, i) => (
-                  <li key={`${s.summary || s.name}-${i}`}>
-                    <button
-                      type="button"
-                      data-testid={`ai-property-type-suggestions-item-${i}`}
-                      onClick={() => setSelectedIdx(i)}
-                      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                        selectedIdx === i
-                          ? 'border-violet-500 bg-violet-500/15 text-violet-800 dark:text-violet-200'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-violet-500 dark:hover:bg-violet-950/40'
+              <ul
+                data-testid="ai-property-type-suggestions-list"
+                className="max-h-48 space-y-1.5 overflow-y-auto sm:max-w-xl"
+              >
+                {parsed.suggestions.map((s, i) => {
+                  const title = s.summary?.trim() ? s.summary : `Alternative ${i + 1}`;
+                  const explanation = suggestionPublicExplanation(s);
+                  const isSelected = selectedIdx === i;
+                  return (
+                    <li
+                      key={`${s.summary || s.name}-${i}`}
+                      className={`flex items-stretch gap-1 rounded-lg border transition-colors ${
+                        isSelected
+                          ? 'border-violet-500 bg-violet-500/10 ring-2 ring-violet-500/30 dark:border-violet-500 dark:bg-violet-950/30'
+                          : 'border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-900'
                       }`}
                     >
-                      {s.summary?.trim() ? s.summary : `Alternative ${i + 1}`}
-                    </button>
-                  </li>
-                ))}
+                      <button
+                        type="button"
+                        data-testid={`ai-property-type-suggestions-item-${i}`}
+                        onClick={() => setSelectedIdx(i)}
+                        className="min-w-0 flex-1 px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800/80"
+                      >
+                        <span className="font-medium">{title}</span>
+                        {explanation ? (
+                          <span
+                            className="mt-1 block text-xs leading-snug text-slate-600 line-clamp-4 dark:text-slate-400"
+                            data-testid={`ai-property-type-suggestions-item-explanation-${i}`}
+                          >
+                            {explanation}
+                          </span>
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           )}
@@ -409,7 +429,9 @@ export function AiPropertyTypeSuggestionsDialog({
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   Why this type
                 </h3>
-                <p className="text-sm text-slate-700 dark:text-slate-300">{selectedSuggestion.thinking || '—'}</p>
+                <p className="text-sm text-slate-700 dark:text-slate-300">
+                  {suggestionPublicExplanation(selectedSuggestion) || '—'}
+                </p>
               </div>
               <div>
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">

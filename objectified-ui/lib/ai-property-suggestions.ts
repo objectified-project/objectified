@@ -8,6 +8,8 @@ export type AiPropertySuggestion = {
   name: string;
   description?: string;
   schema: Record<string, unknown>;
+  /** Optional user-facing rationale (parsed from `explanation` or `rationale` in JSON). */
+  explanation?: string;
   thinking?: string;
   summary?: string;
 };
@@ -40,6 +42,17 @@ export type ParseAiPropertySuggestionsOptions = {
   /** When set, every suggestion uses this name (fixes model drift for type-only tasks). */
   canonicalPropertyName?: string;
 };
+
+/** Text shown next to each suggestion in the Studio list (dedicated explanation, then model rationale, then description). */
+export function suggestionPublicExplanation(s: AiPropertySuggestion): string | undefined {
+  const e = s.explanation?.trim();
+  if (e) return e;
+  const t = s.thinking?.trim();
+  if (t) return t;
+  const d = s.description?.trim();
+  if (d) return d;
+  return undefined;
+}
 
 /**
  * Returns null if the response does not contain valid structured suggestions.
@@ -85,6 +98,12 @@ export function parseAiPropertySuggestionsResponse(
       typeof item.description === 'string' && item.description.trim()
         ? item.description.trim()
         : undefined;
+    const expl =
+      typeof item.explanation === 'string' && item.explanation.trim()
+        ? item.explanation.trim()
+        : typeof item.rationale === 'string' && item.rationale.trim()
+          ? item.rationale.trim()
+          : undefined;
     const st =
       typeof item.thinking === 'string' && item.thinking.trim() ? item.thinking.trim() : undefined;
     const su =
@@ -94,6 +113,7 @@ export function parseAiPropertySuggestionsResponse(
       name,
       description,
       schema,
+      ...(expl ? { explanation: expl } : {}),
       thinking: st,
       summary: su,
     });

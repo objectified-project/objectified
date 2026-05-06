@@ -15,6 +15,7 @@ import { Bot, Loader2, Square, ListChecks, Ban, Trash2 } from 'lucide-react';
 import type { PropertyItem } from './StudioSideNav';
 import {
   parseAiPropertySuggestionsResponse,
+  suggestionPublicExplanation,
   type AiPropertySuggestion,
   type AiPropertySuggestionsPayload,
 } from '@lib/ai-property-suggestions';
@@ -485,6 +486,7 @@ export function AiPropertySuggestionsDialog({
                 <ul data-testid="ai-property-suggestions-list" className="max-h-48 space-y-1.5 overflow-y-auto sm:max-w-xl">
                   {activeSuggestionRows.map(({ suggestion: s, origIdx }) => {
                     const label = s.summary?.trim() ? s.summary : s.name;
+                    const explanation = suggestionPublicExplanation(s);
                     const isSelected = selectedIdx === origIdx;
                     return (
                       <li
@@ -504,6 +506,14 @@ export function AiPropertySuggestionsDialog({
                           <span className="font-medium">{label}</span>
                           {s.name && s.summary?.trim() ? (
                             <span className="mt-0.5 block font-mono text-xs text-slate-500 dark:text-slate-400">{s.name}</span>
+                          ) : null}
+                          {explanation ? (
+                            <span
+                              className="mt-1 block text-xs leading-snug text-slate-600 line-clamp-4 dark:text-slate-400"
+                              data-testid={`ai-property-suggestions-item-explanation-${origIdx}`}
+                            >
+                              {explanation}
+                            </span>
                           ) : null}
                         </button>
                         <Button
@@ -533,7 +543,7 @@ export function AiPropertySuggestionsDialog({
                   Property thinking
                 </h3>
                 <p className="text-sm text-slate-700 dark:text-slate-300">
-                  {selectedSuggestion.thinking || '—'}
+                  {suggestionPublicExplanation(selectedSuggestion) || '—'}
                 </p>
               </div>
               <div>
