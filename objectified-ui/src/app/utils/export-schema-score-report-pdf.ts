@@ -78,6 +78,7 @@ function addMetricsBody(
       `Average properties per class: ${m.averagePropertiesPerClass.toFixed(1)}`,
       `Relationships: ${m.relationshipCount}`,
       `Schema complexity: ${m.complexityScore}/100 (${m.complexityLabel})`,
+      `Conditional schema cyclomatic (#612): ${m.conditionalSchemaCyclomaticTotal} (aggregate if/then/else decision points across class and property schemas)`,
       `Dependency graph complexity (#611): ${m.dependencyGraphComplexity.score}/100 (${m.dependencyGraphComplexity.scoreLabel}) — ${m.dependencyGraphComplexity.edgeCount} dependency-only edges, deepest ref chain ${m.dependencyGraphComplexity.deepestChainSteps} step(s), ${m.dependencyGraphComplexity.circularGroupCount} cycle group(s)`,
       `Documentation coverage: ${m.documentationCompletionPercentage}%`,
       `Naming compliance: ${m.namingCompliance.compliancePercentage}%`,
@@ -198,12 +199,12 @@ function addMetricsBody(
     section(ctx, 'Cognitive complexity per class (#610)');
     const sorted = [...m.cognitiveComplexityPerClass].sort((a, b) => b.score - a.score || a.className.localeCompare(b.className));
     const cap = Math.min(sorted.length, 60);
-    const hdr = 'Class | Score | Props | Refs';
+    const hdr = 'Class | Score | Props | Refs | If-cyclo';
     const body = sorted
       .slice(0, cap)
       .map(
         (r) =>
-          `${r.className} | ${r.score} | ${r.propertyContribution} | ${r.referenceContribution}`,
+          `${r.className} | ${r.score} | ${r.propertyContribution} | ${r.referenceContribution} | ${r.conditionalSchemaCyclomaticContribution}`,
       );
     paragraph(ctx, [hdr, ...body].join('\n'));
     if (sorted.length > cap) {

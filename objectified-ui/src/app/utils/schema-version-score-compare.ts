@@ -81,6 +81,13 @@ export function buildSchemaScoreCompareRows(
   push('Classes', a.classCount, b.classCount, fmtInt, () => 'neutral');
   push('Relationships', a.relationshipCount, b.relationshipCount, fmtInt, () => 'neutral');
   push('Properties', a.totalProperties, b.totalProperties, fmtInt, () => 'neutral');
+  push(
+    'Conditional schema cyclomatic',
+    a.conditionalSchemaCyclomaticTotal,
+    b.conditionalSchemaCyclomaticTotal,
+    fmtInt,
+    toneLowerIsBetter
+  );
 
   return rows;
 }
