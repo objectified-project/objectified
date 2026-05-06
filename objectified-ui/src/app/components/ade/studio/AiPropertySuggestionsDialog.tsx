@@ -330,28 +330,29 @@ export function AiPropertySuggestionsDialog({
           )}
 
           {parsed && parsed.suggestions.length > 0 && (
-            <section aria-label="Suggested properties">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Suggested properties
-              </h3>
-              <ul className="flex flex-wrap gap-2" data-testid="ai-property-suggestions-list">
+            <section aria-label="Suggested properties" className="space-y-2">
+              <label
+                htmlFor="ai-prop-suggest-pick"
+                className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+              >
+                Suggested property
+              </label>
+              <select
+                id="ai-prop-suggest-pick"
+                data-testid="ai-property-suggestions-list"
+                value={selectedIdx !== null ? String(selectedIdx) : ''}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setSelectedIdx(raw === '' ? null : Number.parseInt(raw, 10));
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:max-w-xl"
+              >
                 {parsed.suggestions.map((s, i) => (
-                  <li key={`${s.name}-${i}`}>
-                    <button
-                      type="button"
-                      data-testid={`ai-property-suggestions-item-${i}`}
-                      onClick={() => setSelectedIdx(i)}
-                      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                        selectedIdx === i
-                          ? 'border-violet-500 bg-violet-500/15 text-violet-800 dark:text-violet-200'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-violet-500 dark:hover:bg-violet-950/40'
-                      }`}
-                    >
-                      {s.summary || s.name}
-                    </button>
-                  </li>
+                  <option key={`${s.name}-${i}`} value={String(i)} data-testid={`ai-property-suggestions-item-${i}`}>
+                    {s.summary?.trim() ? s.summary : s.name}
+                  </option>
                 ))}
-              </ul>
+              </select>
             </section>
           )}
 
