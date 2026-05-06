@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit, TrendingUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit, TrendingUp, Undo2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -152,7 +152,7 @@ const Projects = () => {
   const loadProjects = async () => {
     if (!currentTenantId) return;
     try {
-      const response = await fetch('/api/projects');
+      const response = await fetch('/api/projects?include_deleted=true');
       if (!response.ok) {
         throw new Error(`Failed to fetch projects: ${response.statusText}`);
       }
@@ -304,6 +304,30 @@ const Projects = () => {
       const response = JSON.parse(result);
       if (response.success) await loadProjects();
       else await alertDialog({ message: response.error || 'Failed to delete project', variant: 'error' });
+    } catch (error: any) {
+      await alertDialog({ message: error.message || 'An error occurred', variant: 'error' });
+    }
+  };
+
+  const handleRestore = async (project: Project) => {
+    const confirmed = await confirmDialog({
+      title: 'Restore Project',
+      message: `Restore "${project.name}"? It will be enabled again and visible in all project pickers.`,
+      variant: 'info',
+      confirmLabel: 'Restore',
+      cancelLabel: 'Cancel',
+    });
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}/restore`, { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Project restored.');
+        await loadProjects();
+      } else {
+        await alertDialog({ message: data.error || 'Failed to restore project', variant: 'error' });
+      }
     } catch (error: any) {
       await alertDialog({ message: error.message || 'An error occurred', variant: 'error' });
     }
@@ -524,16 +548,26 @@ const Projects = () => {
               <tbody className={dashboardTbodyClass}>
                 {projects.map((project) => {
                   const domainCategoryLabel = getProjectDomainCategoryLabel(project.metadata?.domainCategory);
+                  const isDeleted = Boolean(project.deleted_at);
                   return (
                   <tr
                     key={project.id}
-                    className={`${dashboardTrHoverClass} cursor-pointer`}
-                    onClick={() =>
+                    className={
+                      isDeleted
+                        ? `${dashboardTrHoverClass} cursor-default opacity-80`
+                        : `${dashboardTrHoverClass} cursor-pointer`
+                    }
+                    onClick={() => {
+                      if (isDeleted) return;
                       router.push(
                         `/ade/dashboard/versions?projectId=${encodeURIComponent(project.id)}`
-                      )
+                      );
+                    }}
+                    title={
+                      isDeleted
+                        ? 'This project is deleted — use actions to restore or permanently delete'
+                        : 'View versions for this project'
                     }
-                    title="View versions for this project"
                   >
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
@@ -672,28 +706,44 @@ const Projects = () => {
                                 right: `${dropdownPosition.right}px`
                               }}>
                               <div className="py-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenProjectDropdown(null);
-                                    handleEditClick(project);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                                >
-                                  <Edit2 className="w-4 h-4 text-indigo-500" />
-                                  Edit Project
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenProjectDropdown(null);
-                                    handleDelete(project.id);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4 text-red-500" />
-                                  Delete Project
-                                </button>
+                                {!project.deleted_at ? (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOpenProjectDropdown(null);
+                                        handleEditClick(project);
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                    >
+                                      <Edit2 className="w-4 h-4 text-indigo-500" />
+                                      Edit Project
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOpenProjectDropdown(null);
+                                        handleDelete(project.id);
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-500" />
+                                      Delete Project
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenProjectDropdown(null);
+                                      handleRestore(project);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                  >
+                                    <Undo2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                    Restore Project
+                                  </button>
+                                )}
                                 <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
                                 <button
                                   onClick={(e) => {
@@ -1027,7 +1077,12 @@ const Projects = () => {
           </div>
           <DialogFooter className="mt-6 shrink-0">
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isLoading}>Cancel</Button>
-            <Button onClick={handleEditSubmit} disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Changes'}</Button>
+            <Button
+              onClick={handleEditSubmit}
+              disabled={isLoading || Boolean(selectedProject?.deleted_at)}
+            >
+              {isLoading ? 'Saving...' : 'Save Changes'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

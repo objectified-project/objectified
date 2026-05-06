@@ -465,7 +465,7 @@ describe('Database Helper - Project Functions', () => {
     expect(parsed.success).toBe(true);
   });
 
-  test('deleteProject should soft delete project', async () => {
+  test('deleteProject should soft delete project and preserve enabled state', async () => {
     const { deleteProject } = await import('../lib/db/helper');
 
     mockQuery.mockResolvedValue({ rows: [] });
@@ -475,9 +475,40 @@ describe('Database Helper - Project Functions', () => {
 
     expect(parsed.success).toBe(true);
     expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE odb.projects'),
+      expect.stringContaining('pre_delete_enabled = enabled'),
       ['proj-1']
     );
+  });
+
+  test('restoreProject should restore pre-delete enabled state', async () => {
+    const { restoreProject } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValue({ rowCount: 1 });
+
+    const result = await restoreProject('proj-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('deleted_at = NULL'),
+      ['proj-1']
+    );
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('COALESCE(pre_delete_enabled, TRUE)'),
+      ['proj-1']
+    );
+  });
+
+  test('restoreProject should error when no deleted row matches', async () => {
+    const { restoreProject } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValue({ rowCount: 0 });
+
+    const result = await restoreProject('proj-missing');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toMatch(/not found|not deleted/i);
   });
 
   test('permanentDeleteProject should delete project and all related data', async () => {

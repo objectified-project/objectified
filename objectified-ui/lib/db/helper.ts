@@ -444,8 +444,23 @@ export async function updateProject(projectId: string, name: string, description
 export async function deleteProject(projectId: string) {
   try {
     await connectionPool.query(
-      `UPDATE odb.projects SET enabled = false, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL`,
+      `UPDATE odb.projects SET pre_delete_enabled = enabled, enabled = false, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL`,
       [projectId]);
+    return successResponse();
+  } catch (error: any) {
+    return errorResponse(error.message);
+  }
+}
+
+export async function restoreProject(projectId: string) {
+  try {
+    const result = await connectionPool.query(
+      `UPDATE odb.projects SET deleted_at = NULL, enabled = COALESCE(pre_delete_enabled, TRUE), pre_delete_enabled = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NOT NULL`,
+      [projectId]
+    );
+    if (!result.rowCount) {
+      return errorResponse('Project not found or not deleted');
+    }
     return successResponse();
   } catch (error: any) {
     return errorResponse(error.message);
