@@ -219,6 +219,7 @@ import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
 import { AiSchemaImprovementSuggestionsDialog } from '../../../components/ade/studio/AiSchemaImprovementSuggestionsDialog';
 import { buildStudioMetricsDigestForAi } from '@lib/studio-metrics-digest-for-ai';
+import { CLASS_NAMES_CAP } from '@lib/ai-schema-improvement-suggestions';
 import SchemaTimelinePanel from '../components/SchemaTimelinePanel';
 import SchemaVersionScoringPanel from '../components/SchemaVersionScoringPanel';
 import {
@@ -953,7 +954,7 @@ const StudioContent = () => {
       .map((n) => String((n.data as { name?: string })?.name ?? '').trim())
       .filter(Boolean);
     const deduped = [...new Set(allNames)].sort();
-    setAiImprovementClassNames(deduped.slice(0, 150));
+    setAiImprovementClassNames(deduped.slice(0, CLASS_NAMES_CAP));
     setAiImprovementDialogOpen(true);
   }, [schemaMetrics, nodes]);
 

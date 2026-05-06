@@ -3,6 +3,9 @@
  * Expects a single ```json ... ``` markdown block from that Ollama task.
  */
 
+/** Maximum number of class names included in an improvement-suggestions request. */
+export const CLASS_NAMES_CAP = 150;
+
 export type AiSchemaImprovementCategory =
   | 'documentation'
   | 'naming'

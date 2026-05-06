@@ -16,6 +16,7 @@ import {
   ollamaSemanticCacheThreshold,
   setCachedOllamaChatResponse,
 } from './query-cache';
+import { CLASS_NAMES_CAP } from '@lib/ai-schema-improvement-suggestions';
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 
@@ -291,8 +292,6 @@ Return **exactly one** markdown fenced JSON block and **nothing outside the fenc
 - It is acceptable to mention **future** API design (pagination, error models, versioning) when metrics imply large graphs, hubs, or wide classes—even if paths are not listed.
 - Prefer distinct suggestions; do not repeat the same idea with different wording.
 - Do not output OpenAPI JSON, full schemas, or code blocks other than the single fenced JSON payload.`;
-
-const CLASS_NAMES_CAP = 150;
 
 function buildSchemaImprovementSuggestionsSystem(options: {
   studioMetricsDigest: string;
