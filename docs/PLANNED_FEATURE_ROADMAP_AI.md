@@ -73,7 +73,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
 | #527   | Implementation of Guardrails for prompts/responses  |
 
 **Actionable Recommendations** 📋 PLANNED
-- ✅ **AI-powered suggestions for improvement** (#253 — Schema Metrics **lightbulb** → Ollama structured list: docs, naming, structure, API, performance):
+- ✅ **AI-powered suggestions for improvement**
     - ✅ "Add descriptions to 12 classes to improve docs score" (pattern; model uses live metrics)
     - ✅ "Rename 5 properties to follow camelCase convention"
     - ✅ "Split 'User' class - it has 28 properties (recommended max: 15)"
@@ -84,7 +84,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                    |
 |--------|----------------------------------------|
-| #253   | AI powered suggestions for improvement ✅ |
 | #254   | Prioritized action items               |
 | #255   | Estimated score impact for each fix    |
 | #256   | Add bulk apply recommendations         |
