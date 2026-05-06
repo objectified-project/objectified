@@ -54,6 +54,8 @@ export interface SchemaMetricsResult {
    * class-level or property-level allOf +1; anyOf/oneOf +2 as disjunctive load).
    */
   cognitiveComplexityPerClass: CognitiveComplexityPerClassEntry[];
+  /** #611: Dependency-only graph complexity (score + drivers). */
+  dependencyGraphComplexity: DependencyGraphComplexityReport;
 }
 
 /** #553: One row of dependency metrics for a class (in-degree, out-degree, betweenness). */
@@ -72,6 +74,24 @@ export interface CognitiveComplexityPerClassEntry {
   score: number;
   propertyContribution: number;
   referenceContribution: number;
+}
+
+/**
+ * #611: Aggregate complexity of the dependency-only subgraph ($ref + class allOf/anyOf/oneOf),
+ * distinct from the full-canvas relationship count used in the main schema complexity score.
+ */
+export interface DependencyGraphComplexityReport {
+  /** Studio dependency edges (property $ref + class composition edges). */
+  edgeCount: number;
+  /** Longest path in the dependency digraph (number of edges). */
+  deepestChainSteps: number;
+  /** Cycle groups (non-trivial SCCs) using only dependency edges. */
+  circularGroupCount: number;
+  /** 0–100 composite from edges, depth, and cycles on that subgraph. */
+  score: number;
+  scoreLabel: 'Low' | 'Medium' | 'High';
+  /** Factor table for Studio popover and PDF export. */
+  breakdown: ComplexityBreakdownItem[];
 }
 
 /** Naming convention counts and compliance percentage (#558) */
@@ -525,6 +545,7 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
   }));
 
   const cognitiveComplexityPerClass = computeCognitiveComplexityPerClass(classNodes, dependencyEdges);
+  const dependencyGraphComplexity = computeDependencyGraphComplexityReport(nodeIds, dependencyEdges);
 
   return {
     classCount,
@@ -548,6 +569,7 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     namingCompliance,
     dependencyMetricsPerClass,
     cognitiveComplexityPerClass,
+    dependencyGraphComplexity,
   };
 }
 
@@ -747,6 +769,58 @@ export function computeComplexityScoreFromAggregates(metrics: AggregateComplexit
   const complexityLabel: 'Low' | 'Medium' | 'High' =
     complexityScore <= 33 ? 'Low' : complexityScore <= 66 ? 'Medium' : 'High';
   return { complexityScore, complexityLabel, complexityBreakdown: breakdown };
+}
+
+/**
+ * #611: Score how tangled the dependency-only graph is (refs + composition), using the same
+ * weight scale as the structural slice of {@link computeComplexityScoreFromAggregates}
+ * (edges × 1.2, deepest chain × 4, cycles × 6), capped to 0–100.
+ */
+export function computeDependencyGraphComplexityReport(
+  nodeIds: Set<string>,
+  dependencyEdges: Edge[]
+): DependencyGraphComplexityReport {
+  const edgeCount = dependencyEdges.length;
+  const depAdj = buildDirectedAdjacency(dependencyEdges);
+  const deepestChainSteps =
+    nodeIds.size === 0 ? 0 : computeDeepestChain(depAdj, nodeIds);
+  const { count: circularGroupCount } = countCircularDependencies(depAdj, nodeIds);
+
+  const wEdge = 1.2;
+  const wDepth = 4;
+  const wCycle = 6;
+  const breakdown: ComplexityBreakdownItem[] = [
+    {
+      label: 'Dependency edges',
+      value: edgeCount,
+      weight: wEdge,
+      contribution: edgeCount * wEdge,
+    },
+    {
+      label: 'Deepest ref chain (steps)',
+      value: deepestChainSteps,
+      weight: wDepth,
+      contribution: deepestChainSteps * wDepth,
+    },
+    {
+      label: 'Circular groups (deps)',
+      value: circularGroupCount,
+      weight: wCycle,
+      contribution: circularGroupCount * wCycle,
+    },
+  ];
+  const raw = breakdown.reduce((sum, b) => sum + b.contribution, 0);
+  const score = Math.min(100, Math.max(0, Math.round(raw)));
+  const scoreLabel: 'Low' | 'Medium' | 'High' =
+    score <= 33 ? 'Low' : score <= 66 ? 'Medium' : 'High';
+  return {
+    edgeCount,
+    deepestChainSteps,
+    circularGroupCount,
+    score,
+    scoreLabel,
+    breakdown,
+  };
 }
 
 /** One class (schema) row for version scoring breakdown (#250). */

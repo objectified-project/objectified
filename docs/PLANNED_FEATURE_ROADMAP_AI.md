@@ -86,14 +86,13 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 **Schema Complexity Analysis** 📋 PLANNED
 - ✅ Cognitive complexity score per class (#610)
-- 📋 Dependency graph complexity
+- ✅ Dependency graph complexity (#611)
 - 📋 Cyclomatic complexity for conditional schemas
 - 📋 Maintainability index
 - 📋 Technical debt metrics
 
 | Ticket | Feature Description                           |
 |--------|-----------------------------------------------|
-| #611   | Dependency Graph Complexity                   |
 | #612   | Cyclomatic Complexity for Conditional Schemas |
 | #613   | Maintainability Index                         |
 | #614   | Technical Debt Metrics                        |

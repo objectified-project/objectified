@@ -258,7 +258,7 @@ function buildPropertyTypeSuggestionsSystem(options: {
 
 const SCHEMA_IMPROVEMENT_SUGGESTIONS_SYSTEM = `You are a senior API and JSON Schema reviewer helping a team improve an OpenAPI 3.1–oriented data model in Objectified Studio.
 
-You receive **measured canvas metrics** (class counts, documentation coverage, naming compliance, aggregate dependency complexity, **per-class cognitive complexity** scores, samples of gaps). Your job is to propose **prioritized, actionable improvements** that a human can follow—similar in tone to:
+You receive **measured canvas metrics** (class counts, documentation coverage, naming compliance, aggregate schema complexity, **dependency graph complexity** on refs/composition, **per-class cognitive complexity** scores, samples of gaps). Your job is to propose **prioritized, actionable improvements** that a human can follow—similar in tone to:
 
 - "Add descriptions to N classes to improve docs score"
 - "Rename M properties to follow camelCase convention"
@@ -295,7 +295,7 @@ Return **exactly one** markdown fenced JSON block and **nothing outside the fenc
 - Emit **6–12** suggestions unless the digest is extremely small (then 3–5 is fine).
 - Every "title" and "detail" must be non-empty strings.
 - "category" must be one of: "documentation", "naming", "structure", "api", "performance", "other". Pick the best fit per row.
-- Every row MUST include **"estimatedOverallScoreDelta"**: an **integer** (typically **0–12**, occasionally higher for broad fixes) estimating how many **points** the Studio **overall schema quality score (0–100)** in the digest would **increase** if that suggestion were **fully applied**. Use **0** only when the effect on the composite would be negligible. When the digest includes the current overall score line, anchor estimates to that baseline and the listed doc %, naming %, complexity, and **per-class cognitive complexity** lines. Do not exceed **25**; use negative values only if a fix could realistically lower the composite (rare).
+- Every row MUST include **"estimatedOverallScoreDelta"**: an **integer** (typically **0–12**, occasionally higher for broad fixes) estimating how many **points** the Studio **overall schema quality score (0–100)** in the digest would **increase** if that suggestion were **fully applied**. Use **0** only when the effect on the composite would be negligible. When the digest includes the current overall score line, anchor estimates to that baseline and the listed doc %, naming %, complexity, **dependency graph complexity (#611)**, and **per-class cognitive complexity** lines. Do not exceed **25**; use negative values only if a fix could realistically lower the composite (rare).
 - Every row MUST include **"effort"**: one of \`"quick_win"\`, \`"moderate"\`, or \`"substantial"\`.
   - **quick_win**: small, localized edits (add missing descriptions, rename a few properties, tighten one validation) that a developer can often finish in minutes to an hour.
   - **moderate**: bounded refactors (split one busy class, normalize a small set of names, add a shared pattern across a few schemas).

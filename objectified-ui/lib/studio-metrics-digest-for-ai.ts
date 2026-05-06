@@ -33,6 +33,10 @@ export function buildStudioMetricsDigestForAi(
   lines.push(`- Naming compliance (PascalCase classes + camelCase props): ${metrics.namingCompliance.compliancePercentage}%`);
   lines.push(`- Circular dependency groups: ${metrics.circularDependencyCount}`);
   lines.push(`- Deepest dependency chain length: ${metrics.deepestChainLength}`);
+  const dg = metrics.dependencyGraphComplexity;
+  lines.push(
+    `- Dependency graph complexity (#611): ${dg.score}/100 (${dg.scoreLabel}) — ${dg.edgeCount} dependency-only edges, deepest chain ${dg.deepestChainSteps} step(s), ${dg.circularGroupCount} cycle group(s) on refs/composition graph`,
+  );
   if (typeof overallQualityScore === 'number' && Number.isFinite(overallQualityScore)) {
     lines.push(
       `- Overall schema quality score (0–100 composite: docs, naming, structural load, layout when available): ${Math.min(100, Math.max(0, Math.round(overallQualityScore)))}`,

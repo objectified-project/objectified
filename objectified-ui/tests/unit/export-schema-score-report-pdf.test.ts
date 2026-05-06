@@ -72,6 +72,18 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
     },
     dependencyMetricsPerClass: [],
     cognitiveComplexityPerClass: [],
+    dependencyGraphComplexity: {
+      edgeCount: 0,
+      deepestChainSteps: 0,
+      circularGroupCount: 0,
+      score: 0,
+      scoreLabel: 'Low',
+      breakdown: [
+        { label: 'Dependency edges', value: 0, weight: 1.2, contribution: 0 },
+        { label: 'Deepest ref chain (steps)', value: 0, weight: 4, contribution: 0 },
+        { label: 'Circular groups (deps)', value: 0, weight: 6, contribution: 0 },
+      ],
+    },
     ...overrides,
   };
 }
@@ -156,6 +168,13 @@ describe('downloadSchemaScoreReportPdf', () => {
     const joined = (mockText.mock.calls as Array<[string, ...unknown[]]>).map((c) => String(c[0])).join('\n');
     expect(joined).toContain('Cognitive complexity per class');
     expect(joined).toContain('Heavy | 15 | 12 | 3');
+  });
+
+  it('includes dependency graph complexity section (#611)', () => {
+    downloadSchemaScoreReportPdf({ metrics: makeMinimalMetrics(), projectName: 'P', versionLabel: 'v1' });
+    const joined = (mockText.mock.calls as Array<[string, ...unknown[]]>).map((c) => String(c[0])).join('\n');
+    expect(joined).toContain('Dependency graph complexity (#611)');
+    expect(joined).toContain('Dependency-only edges: 0');
   });
 
   it('does not throw with dependency metrics and layout quality', () => {
