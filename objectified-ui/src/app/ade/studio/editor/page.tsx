@@ -2418,7 +2418,7 @@ const StudioContent = () => {
   }, [selectedVersionId, projects, versions, getNodes]);
 
   // Helper to update only a single class node without reloading the entire canvas
-  const updateSingleClassNode = useCallback(async (classId: string) => {
+  const updateSingleClassNode = useCallback(async (classId: string, options?: { skipEdgeRebuild?: boolean }) => {
     if (!classId) return;
 
     try {
@@ -2471,8 +2471,10 @@ const StudioContent = () => {
       });
 
       // Update edges that might be affected by property changes (e.g., new $ref properties)
-      // This is needed because adding a property with $ref creates new edges
-      if (selectedVersionId) {
+      // This is needed because adding a property with $ref creates new edges.
+      // Callers that refresh many nodes at once should pass skipEdgeRebuild: true and
+      // perform a single version-wide edge rebuild themselves after the loop.
+      if (!options?.skipEdgeRebuild && selectedVersionId) {
         const allClassesResult = await getClassesWithPropertiesAndTagsWithSession(selectedVersionId);
         if (allClassesResult.success && allClassesResult.classes) {
           const newEdges = createAllEdges(allClassesResult.classes);
@@ -2494,13 +2496,17 @@ const StudioContent = () => {
       let skipped = 0;
       const touched = new Set<string>();
 
+      // Build a name→node map once so each action lookup is O(1) instead of O(nodes).
+      const classNodeByName = new Map<string, typeof nodes[number]>();
+      for (const n of nodes) {
+        if (n.type === 'groupNode') continue;
+        const name = String((n.data as { name?: string })?.name ?? '').trim();
+        if (name) classNodeByName.set(name, n);
+      }
+
       for (const action of actions) {
-        const classNode = nodes.find(
-          (n) =>
-            n.type !== 'groupNode' &&
-            String((n.data as { name?: string })?.name ?? '').trim() === action.className
-        );
-        if (!classNode || classNode.type === 'groupNode') {
+        const classNode = classNodeByName.get(action.className);
+        if (!classNode) {
           skipped++;
           continue;
         }
@@ -2551,38 +2557,55 @@ const StudioContent = () => {
             continue;
           }
         }
-        const response = await fetch(`/api/classes/${classId}/properties/${prop.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: String(prop.name ?? action.propertyName).trim(),
-            description: action.description,
-            data: propData ?? {},
-          }),
-        });
-        let result: { success?: boolean; error?: string } = {};
+        // Wrap the property PUT in try/catch so a network error records a failure
+        // and allows the rest of the actions to continue.
         try {
-          result = (await response.json()) as { success?: boolean; error?: string };
-        } catch {
-          result = {};
-        }
-        if (result.success) {
-          applied++;
-          touched.add(classId);
-        } else {
+          const response = await fetch(`/api/classes/${classId}/properties/${prop.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: String(prop.name ?? action.propertyName).trim(),
+              description: action.description,
+              data: propData ?? {},
+            }),
+          });
+          let result: { success?: boolean; error?: string } = {};
+          try {
+            result = (await response.json()) as { success?: boolean; error?: string };
+          } catch {
+            result = {};
+          }
+          if (result.success) {
+            applied++;
+            touched.add(classId);
+          } else {
+            failures.push(
+              `${action.className}.${action.propertyName}: ${result.error ?? `HTTP ${response.status}`}`
+            );
+          }
+        } catch (err) {
           failures.push(
-            `${action.className}.${action.propertyName}: ${result.error ?? `HTTP ${response.status}`}`
+            `${action.className}.${action.propertyName}: ${err instanceof Error ? err.message : 'network error'}`
           );
         }
       }
 
+      // Refresh each touched node individually (skipping the edge rebuild), then
+      // perform a single version-wide edge rebuild once at the end. This avoids
+      // an O(N) full-graph fetch that would otherwise occur per touched node.
       for (const id of touched) {
-        await updateSingleClassNode(id);
+        await updateSingleClassNode(id, { skipEdgeRebuild: true });
+      }
+      if (touched.size > 0 && selectedVersionId) {
+        const allClassesResult = await getClassesWithPropertiesAndTagsWithSession(selectedVersionId);
+        if (allClassesResult.success && allClassesResult.classes) {
+          setEdges(createAllEdges(allClassesResult.classes));
+        }
       }
 
       return { applied, skipped, failures };
     },
-    [isReadOnly, nodes, updateSingleClassNode]
+    [isReadOnly, nodes, updateSingleClassNode, selectedVersionId, setEdges]
   );
 
 // Helper function to extract inline properties from a property schema
