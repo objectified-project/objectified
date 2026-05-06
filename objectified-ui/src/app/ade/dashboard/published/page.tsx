@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Eye, Lock, Globe, Copy, ExternalLink, Search, FileText, MoreVertical, ChevronLeft } from 'lucide-react';
 import { getPublishedVersionsForTenant, updateVersionVisibility, getApiKeysForTenant } from '../../../../../lib/db/helper';
 import {
@@ -13,6 +13,7 @@ import {
   DialogDescription,
 } from '../../../components/ui/Dialog';
 import { Button } from '../../../components/ui/Button';
+import { Checkbox } from '../../../components/ui/Checkbox';
 import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
 import { Badge } from '../../../components/ui/Badge';
@@ -34,6 +35,11 @@ import {
   dashboardTbodyClass,
   dashboardTrHoverClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
+import {
+  clearStoredPreviewApiKey,
+  getStoredPreviewApiKey,
+  setStoredPreviewApiKey,
+} from '@/app/utils/preview-api-key-storage';
 
 interface PublishedVersion {
   id: string;
@@ -142,51 +148,79 @@ const PublishedVersions = () => {
 
   const [apiKeyDialog, setApiKeyDialog] = useState<{ version: PublishedVersion; action: 'open' | 'arazzo' | 'json' | 'swagger' } | null>(null);
   const [apiKeyInput, setApiKeyInput] = useState('');
+  const [rememberApiKey, setRememberApiKey] = useState(true);
+  /** Bumps when localStorage preview key changes so saved-key UI re-reads storage. */
+  const [previewKeyStorageVersion, setPreviewKeyStorageVersion] = useState(0);
+
+  const hasSavedPreviewApiKey = useMemo(() => {
+    void previewKeyStorageVersion;
+    return Boolean(currentTenantId && getStoredPreviewApiKey(currentTenantId));
+  }, [currentTenantId, previewKeyStorageVersion]);
 
   const openViewWithKey = (version: PublishedVersion, action: 'open' | 'arazzo' | 'json' | 'swagger', apiKey: string | undefined) => {
     const url = action === 'open' ? getFullAccessUrl(version) : action === 'arazzo' ? getArazzoUrl(version) : action === 'json' ? getJsonUrl(version) : getSwaggerUrl(version);
     window.open(withApiKey(url, apiKey), '_blank');
   };
 
+  const openPrivateWithOptionalStoredKey = (version: PublishedVersion, action: 'open' | 'arazzo' | 'json' | 'swagger') => {
+    const stored = getStoredPreviewApiKey(currentTenantId);
+    if (stored) {
+      openViewWithKey(version, action, stored);
+      return;
+    }
+    setApiKeyInput('');
+    setRememberApiKey(true);
+    setApiKeyDialog({ version, action });
+  };
+
   const handleOpenUrl = (version: PublishedVersion) => {
     if (version.visibility === 'private') {
-      setApiKeyInput('');
-      setApiKeyDialog({ version, action: 'open' });
+      openPrivateWithOptionalStoredKey(version, 'open');
       return;
     }
     window.open(getFullAccessUrl(version), '_blank');
   };
   const handleOpenSwagger = (version: PublishedVersion) => {
     if (version.visibility === 'private') {
-      setApiKeyInput('');
-      setApiKeyDialog({ version, action: 'swagger' });
+      openPrivateWithOptionalStoredKey(version, 'swagger');
       return;
     }
     window.open(getSwaggerUrl(version), '_blank');
   };
   const handleOpenArazzo = (version: PublishedVersion) => {
     if (version.visibility === 'private') {
-      setApiKeyInput('');
-      setApiKeyDialog({ version, action: 'arazzo' });
+      openPrivateWithOptionalStoredKey(version, 'arazzo');
       return;
     }
     window.open(getArazzoUrl(version), '_blank');
   };
   const handleOpenJson = (version: PublishedVersion) => {
     if (version.visibility === 'private') {
-      setApiKeyInput('');
-      setApiKeyDialog({ version, action: 'json' });
+      openPrivateWithOptionalStoredKey(version, 'json');
       return;
     }
     window.open(getJsonUrl(version), '_blank');
   };
   const handleApiKeyDialogOpen = () => {
     if (!apiKeyDialog) return;
-    openViewWithKey(apiKeyDialog.version, apiKeyDialog.action, apiKeyInput);
+    const trimmed = apiKeyInput.trim();
+    if (!trimmed) return;
+    openViewWithKey(apiKeyDialog.version, apiKeyDialog.action, trimmed);
+    if (rememberApiKey && currentTenantId) {
+      setStoredPreviewApiKey(currentTenantId, trimmed);
+      setPreviewKeyStorageVersion((n) => n + 1);
+    }
     setApiKeyDialog(null);
     setApiKeyInput('');
     setOpenVersionDropdown(null);
     setOpenViewSubmenu(null);
+  };
+
+  const handleClearSavedPreviewApiKey = () => {
+    if (!currentTenantId) return;
+    clearStoredPreviewApiKey(currentTenantId);
+    setPreviewKeyStorageVersion((n) => n + 1);
+    toast.success('Saved API key removed from this browser.');
   };
 
   const handleToggleVisibility = async (version: PublishedVersion) => {
@@ -565,7 +599,16 @@ const PublishedVersions = () => {
           <DialogHeader>
             <DialogTitle>API key required</DialogTitle>
             <DialogDescription>
-              This version is private. Enter your API key to open with authentication. You can create or copy a key from the API Keys page.
+              This version is private. Enter your tenant API key so the opened URL includes authentication (query{' '}
+              <code className="text-xs">api_key</code>). Create or manage keys on the{' '}
+              <a
+                href="/ade/dashboard/api-keys"
+                className="font-medium text-indigo-600 underline dark:text-indigo-400"
+              >
+                API Keys
+              </a>{' '}
+              page. If you choose &quot;Remember this key&quot; below, private OpenAPI, Swagger UI, Arazzo, and JSON
+              Schema links skip this prompt next time on this device.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -581,12 +624,37 @@ const PublishedVersions = () => {
                 placeholder="sk_..."
               />
             </div>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="remember-tenant-api-key"
+                checked={rememberApiKey}
+                onCheckedChange={(v) => setRememberApiKey(v === true)}
+                className="mt-0.5"
+              />
+              <Label htmlFor="remember-tenant-api-key" className="cursor-pointer text-sm font-normal leading-snug text-gray-700 dark:text-gray-300">
+                Remember this key on this browser for the current tenant (local storage only).
+              </Label>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApiKeyDialog(null)}>Cancel</Button>
-            <Button onClick={handleApiKeyDialogOpen} disabled={!apiKeyInput.trim()}>
-              Open with key
-            </Button>
+          <DialogFooter className="flex flex-col gap-3 sm:flex-col sm:space-x-0">
+            {hasSavedPreviewApiKey ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto self-start border-amber-200 text-amber-900 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-100 dark:hover:bg-amber-950/40"
+                onClick={handleClearSavedPreviewApiKey}
+              >
+                Clear saved key from this browser
+              </Button>
+            ) : null}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setApiKeyDialog(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleApiKeyDialogOpen} disabled={!apiKeyInput.trim()}>
+                Open with key
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
