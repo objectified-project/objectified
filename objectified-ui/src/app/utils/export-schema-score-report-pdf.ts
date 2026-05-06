@@ -81,6 +81,7 @@ function addMetricsBody(
       `Conditional schema cyclomatic (#612): ${m.conditionalSchemaCyclomaticTotal} (aggregate if/then/else decision points across class and property schemas)`,
       `Dependency graph complexity (#611): ${m.dependencyGraphComplexity.score}/100 (${m.dependencyGraphComplexity.scoreLabel}) — ${m.dependencyGraphComplexity.edgeCount} dependency-only edges, deepest ref chain ${m.dependencyGraphComplexity.deepestChainSteps} step(s), ${m.dependencyGraphComplexity.circularGroupCount} cycle group(s)`,
       `Maintainability index (#613): ${m.maintainabilityIndex.score}/100 (${m.maintainabilityIndex.scoreLabel})`,
+      `Technical debt (#614): ${m.technicalDebtMetrics.debtScore}/100 (${m.technicalDebtMetrics.scoreLabel} debt)`,
       `Documentation coverage: ${m.documentationCompletionPercentage}%`,
       `Naming compliance: ${m.namingCompliance.compliancePercentage}%`,
     ].join('\n')
@@ -194,6 +195,21 @@ function addMetricsBody(
     miRows.push(`${row.label} | ${row.value} | ${row.weight} | ${row.contribution.toFixed(1)}`);
   }
   paragraph(ctx, miRows.join('\n'));
+
+  section(ctx, 'Technical debt (#614)');
+  const td = m.technicalDebtMetrics;
+  paragraph(
+    ctx,
+    [
+      `Aggregate debt score: ${td.debtScore}/100 (${td.scoreLabel} debt — higher = more remediation pressure)`,
+      'Weighted blend of documentation and naming gaps, aggregate schema complexity, dependency-graph tangling, conditional schema branching, relationship cycles, chain depth, mean cognitive load per class, structurally isolated classes, and wide-class (avg properties/class) pressure.',
+    ].join('\n')
+  );
+  const tdRows: string[] = ['Factor | Value | Weight | Points'];
+  for (const row of td.breakdown) {
+    tdRows.push(`${row.label} | ${row.value} | ${row.weight} | ${row.contribution.toFixed(1)}`);
+  }
+  paragraph(ctx, tdRows.join('\n'));
 
   if (m.dependencyMetricsPerClass.length > 0) {
     section(ctx, 'Dependency metrics per class');
@@ -314,7 +330,7 @@ export function downloadSchemaTimelineScoreReportPdf(options: SchemaTimelineScor
 
   section(ctx, 'Versions');
   const lines: string[] = [
-    'Version | Date | Classes | Rels | Complexity | Band | Notes',
+    'Version | Date | Classes | Rels | Complexity | Band | Tech debt (#614) | Notes',
   ];
   for (const r of rows) {
     const date =
@@ -322,16 +338,16 @@ export function downloadSchemaTimelineScoreReportPdf(options: SchemaTimelineScor
         ? new Date(r.createdAt).toLocaleDateString()
         : '—';
     if (r.loadError) {
-      lines.push(`${r.versionLabel} | ${date} | — | — | — | — | ${r.loadError}`);
+      lines.push(`${r.versionLabel} | ${date} | — | — | — | — | — | ${r.loadError}`);
       continue;
     }
     if (!r.metrics) {
-      lines.push(`${r.versionLabel} | ${date} | — | — | — | — | No metrics`);
+      lines.push(`${r.versionLabel} | ${date} | — | — | — | — | — | No metrics`);
       continue;
     }
     const m = r.metrics;
     lines.push(
-      `${r.versionLabel} | ${date} | ${m.classCount} | ${m.relationshipCount} | ${m.complexityScore} | ${m.complexityLabel} |`
+      `${r.versionLabel} | ${date} | ${m.classCount} | ${m.relationshipCount} | ${m.complexityScore} | ${m.complexityLabel} | ${m.technicalDebtMetrics.debtScore} |`
     );
   }
   paragraph(ctx, lines.join('\n'));

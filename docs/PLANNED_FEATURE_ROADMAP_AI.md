@@ -89,11 +89,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
 - ✅ Dependency graph complexity (#611)
 - ✅ Cyclomatic complexity for conditional schemas (#612)
 - ✅ Maintainability index (#613)
-- 📋 Technical debt metrics
-
-| Ticket | Feature Description                           |
-|--------|-----------------------------------------------|
-| #614   | Technical Debt Metrics                        |
+- ✅ Technical debt metrics (#614)
 
 **Best Practice Suggestions** 📋 PLANNED
 - 📋 Context-aware tips based on schema type:

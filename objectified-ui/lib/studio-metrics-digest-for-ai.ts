@@ -44,6 +44,10 @@ export function buildStudioMetricsDigestForAi(
   lines.push(
     `- Maintainability index (#613): ${mi.score}/100 (${mi.scoreLabel}) — composite from documentation, naming, inverted schema/dependency complexity, mean cognitive load per class, and class-size pressure`,
   );
+  const td = metrics.technicalDebtMetrics;
+  lines.push(
+    `- Technical debt (#614): ${td.debtScore}/100 (${td.scoreLabel} debt) — weighted documentation/naming gaps, schema and dependency-graph load, conditional branching, cycles, chain depth, mean cognitive load, isolated classes, wide-class pressure`,
+  );
   if (typeof overallQualityScore === 'number' && Number.isFinite(overallQualityScore)) {
     lines.push(
       `- Overall schema quality score (0–100 composite: docs, naming, structural load, layout when available): ${Math.min(100, Math.max(0, Math.round(overallQualityScore)))}`,

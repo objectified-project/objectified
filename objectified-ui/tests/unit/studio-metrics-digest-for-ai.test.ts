@@ -1,5 +1,9 @@
 import { buildStudioMetricsDigestForAi } from '../../lib/studio-metrics-digest-for-ai';
-import { computeMaintainabilityIndexReport, type SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import {
+  computeMaintainabilityIndexReport,
+  computeTechnicalDebtMetricsReport,
+  type SchemaMetricsResult,
+} from '@/app/utils/schema-metrics';
 
 function baseMetrics(over: Partial<SchemaMetricsResult> = {}): SchemaMetricsResult {
   const merged: SchemaMetricsResult = {
@@ -67,6 +71,21 @@ function baseMetrics(over: Partial<SchemaMetricsResult> = {}): SchemaMetricsResu
       averagePropertiesPerClass: merged.averagePropertiesPerClass,
       classCount: merged.classCount,
     });
+  merged.technicalDebtMetrics =
+    over.technicalDebtMetrics ??
+    computeTechnicalDebtMetricsReport({
+      documentationCompletionPercentage: merged.documentationCompletionPercentage,
+      namingCompliancePercentage: merged.namingCompliance.compliancePercentage,
+      complexityScore: merged.complexityScore,
+      dependencyGraphScore: merged.dependencyGraphComplexity.score,
+      conditionalSchemaCyclomaticTotal: merged.conditionalSchemaCyclomaticTotal,
+      circularDependencyCount: merged.circularDependencyCount,
+      deepestChainLength: merged.deepestChainLength,
+      classCount: merged.classCount,
+      isolatedClassCount: merged.isolatedClassIds.length,
+      cognitiveComplexityPerClass: merged.cognitiveComplexityPerClass,
+      averagePropertiesPerClass: merged.averagePropertiesPerClass,
+    });
   return merged;
 }
 
@@ -86,6 +105,8 @@ describe('buildStudioMetricsDigestForAi', () => {
     expect(text).toContain('6/100');
     expect(text).toContain('Maintainability index (#613)');
     expect(text).toMatch(/Maintainability index \(#613\): \d+\/100/);
+    expect(text).toContain('Technical debt (#614)');
+    expect(text).toMatch(/Technical debt \(#614\): \d+\/100/);
   });
 
   it('includes overall schema quality score when provided (#255)', () => {
