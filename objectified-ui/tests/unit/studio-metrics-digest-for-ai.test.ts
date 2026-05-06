@@ -1,8 +1,8 @@
 import { buildStudioMetricsDigestForAi } from '../../lib/studio-metrics-digest-for-ai';
-import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import { computeMaintainabilityIndexReport, type SchemaMetricsResult } from '@/app/utils/schema-metrics';
 
 function baseMetrics(over: Partial<SchemaMetricsResult> = {}): SchemaMetricsResult {
-  return {
+  const merged: SchemaMetricsResult = {
     classCount: 2,
     totalProperties: 5,
     averagePropertiesPerClass: 2.5,
@@ -56,6 +56,18 @@ function baseMetrics(over: Partial<SchemaMetricsResult> = {}): SchemaMetricsResu
     },
     ...over,
   };
+  merged.maintainabilityIndex =
+    over.maintainabilityIndex ??
+    computeMaintainabilityIndexReport({
+      documentationCompletionPercentage: merged.documentationCompletionPercentage,
+      namingCompliancePercentage: merged.namingCompliance.compliancePercentage,
+      complexityScore: merged.complexityScore,
+      dependencyGraphScore: merged.dependencyGraphComplexity.score,
+      cognitiveComplexityPerClass: merged.cognitiveComplexityPerClass,
+      averagePropertiesPerClass: merged.averagePropertiesPerClass,
+      classCount: merged.classCount,
+    });
+  return merged;
 }
 
 describe('buildStudioMetricsDigestForAi', () => {
@@ -72,6 +84,8 @@ describe('buildStudioMetricsDigestForAi', () => {
     expect(text).toContain('Conditional schema cyclomatic (#612): 0');
     expect(text).toContain('Dependency graph complexity (#611)');
     expect(text).toContain('6/100');
+    expect(text).toContain('Maintainability index (#613)');
+    expect(text).toMatch(/Maintainability index \(#613\): \d+\/100/);
   });
 
   it('includes overall schema quality score when provided (#255)', () => {

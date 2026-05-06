@@ -49,5 +49,7 @@ describe('schema-graph-from-classes / computeSchemaMetricsFromClasses', () => {
     const byName = Object.fromEntries(m.cognitiveComplexityPerClass.map((c) => [c.className, c]));
     expect(byName.Post?.score).toBe(2);
     expect(byName.User?.score).toBe(0);
+    expect(m.maintainabilityIndex.score).toBeGreaterThanOrEqual(0);
+    expect(m.maintainabilityIndex.score).toBeLessThanOrEqual(100);
   });
 });

@@ -1,12 +1,12 @@
 import { describe, it, expect } from '@jest/globals';
-import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import { computeMaintainabilityIndexReport, type SchemaMetricsResult } from '@/app/utils/schema-metrics';
 import {
   formatScoreDelta,
   buildSchemaScoreCompareRows,
 } from '@/app/utils/schema-version-score-compare';
 
 function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): SchemaMetricsResult {
-  return {
+  const merged: SchemaMetricsResult = {
     classCount: 3,
     totalProperties: 9,
     averagePropertiesPerClass: 3,
@@ -49,6 +49,18 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
     },
     ...overrides,
   };
+  merged.maintainabilityIndex =
+    overrides.maintainabilityIndex ??
+    computeMaintainabilityIndexReport({
+      documentationCompletionPercentage: merged.documentationCompletionPercentage,
+      namingCompliancePercentage: merged.namingCompliance.compliancePercentage,
+      complexityScore: merged.complexityScore,
+      dependencyGraphScore: merged.dependencyGraphComplexity.score,
+      cognitiveComplexityPerClass: merged.cognitiveComplexityPerClass,
+      averagePropertiesPerClass: merged.averagePropertiesPerClass,
+      classCount: merged.classCount,
+    });
+  return merged;
 }
 
 describe('formatScoreDelta', () => {
@@ -109,6 +121,15 @@ describe('buildSchemaScoreCompareRows', () => {
     const rows = buildSchemaScoreCompareRows(older, newer);
     const row = rows.find((r) => r.label === 'Conditional schema cyclomatic');
     expect(row?.delta).toBe('-3');
+    expect(row?.deltaTone).toBe('positive');
+  });
+
+  it('labels higher maintainability index as positive (#613)', () => {
+    const older = makeMinimalMetrics({ maintainabilityIndex: { score: 40, scoreLabel: 'Medium', breakdown: [] } });
+    const newer = makeMinimalMetrics({ maintainabilityIndex: { score: 55, scoreLabel: 'Medium', breakdown: [] } });
+    const rows = buildSchemaScoreCompareRows(older, newer);
+    const row = rows.find((r) => r.label === 'Maintainability index (#613)');
+    expect(row?.delta).toBe('+15');
     expect(row?.deltaTone).toBe('positive');
   });
 });

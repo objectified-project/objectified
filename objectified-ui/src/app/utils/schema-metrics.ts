@@ -61,6 +61,8 @@ export interface SchemaMetricsResult {
   cognitiveComplexityPerClass: CognitiveComplexityPerClassEntry[];
   /** #611: Dependency-only graph complexity (score + drivers). */
   dependencyGraphComplexity: DependencyGraphComplexityReport;
+  /** #613: Composite maintainability (higher = easier to evolve). */
+  maintainabilityIndex: MaintainabilityIndexReport;
 }
 
 /** #553: One row of dependency metrics for a class (in-degree, out-degree, betweenness). */
@@ -99,6 +101,93 @@ export interface DependencyGraphComplexityReport {
   scoreLabel: 'Low' | 'Medium' | 'High';
   /** Factor table for Studio popover and PDF export. */
   breakdown: ComplexityBreakdownItem[];
+}
+
+/**
+ * #613: Composite maintainability 0–100 (higher = easier to evolve the schema).
+ * Blends documentation and naming with inverted structural complexity (#556, #611), with light
+ * penalties for mean per-class cognitive load (#610) and wide classes (avg properties/class).
+ */
+export interface MaintainabilityIndexReport {
+  score: number;
+  /** Low = harder to maintain; High = easier to maintain. */
+  scoreLabel: 'Low' | 'Medium' | 'High';
+  breakdown: ComplexityBreakdownItem[];
+}
+
+export function computeMaintainabilityIndexReport(input: {
+  documentationCompletionPercentage: number;
+  namingCompliancePercentage: number;
+  complexityScore: number;
+  dependencyGraphScore: number;
+  cognitiveComplexityPerClass: CognitiveComplexityPerClassEntry[];
+  averagePropertiesPerClass: number;
+  classCount: number;
+}): MaintainabilityIndexReport {
+  const wDoc = 0.32;
+  const wNam = 0.28;
+  const wInvC = 0.2;
+  const wInvD = 0.2;
+
+  const docs = Math.min(100, Math.max(0, input.documentationCompletionPercentage));
+  const nam = Math.min(100, Math.max(0, input.namingCompliancePercentage));
+  const invC = Math.min(100, Math.max(0, 100 - input.complexityScore));
+  const invD = Math.min(100, Math.max(0, 100 - input.dependencyGraphScore));
+
+  const breakdown: ComplexityBreakdownItem[] = [
+    { label: 'Documentation', value: docs, weight: wDoc, contribution: docs * wDoc },
+    { label: 'Naming consistency', value: nam, weight: wNam, contribution: nam * wNam },
+    {
+      label: 'Simplicity vs schema complexity',
+      value: invC,
+      weight: wInvC,
+      contribution: invC * wInvC,
+    },
+    {
+      label: 'Simplicity vs dependency graph',
+      value: invD,
+      weight: wInvD,
+      contribution: invD * wInvD,
+    },
+  ];
+
+  let base = breakdown.reduce((sum, b) => sum + b.contribution, 0);
+
+  const meanCog =
+    input.classCount > 0
+      ? input.cognitiveComplexityPerClass.reduce((sum, r) => sum + r.score, 0) / input.classCount
+      : 0;
+  const cognitivePenalty = Math.min(14, meanCog * 0.4);
+  if (cognitivePenalty > 0) {
+    const mc = Math.round(meanCog * 10) / 10;
+    breakdown.push({
+      label: 'Cognitive load penalty (mean per class)',
+      value: mc,
+      weight: 1,
+      contribution: -cognitivePenalty,
+    });
+    base -= cognitivePenalty;
+  }
+
+  const sizeExcess =
+    input.classCount > 0 ? Math.max(0, input.averagePropertiesPerClass - 14) : 0;
+  const sizePenalty = Math.min(10, sizeExcess * 0.55);
+  if (sizePenalty > 0) {
+    const ap = Math.round(input.averagePropertiesPerClass * 10) / 10;
+    breakdown.push({
+      label: 'Class size penalty (avg properties/class > 14)',
+      value: ap,
+      weight: 1,
+      contribution: -sizePenalty,
+    });
+    base -= sizePenalty;
+  }
+
+  const score = Math.min(100, Math.max(0, Math.round(base)));
+  const scoreLabel: 'Low' | 'Medium' | 'High' =
+    score >= 67 ? 'High' : score >= 34 ? 'Medium' : 'Low';
+
+  return { score, scoreLabel, breakdown };
 }
 
 /** Naming convention counts and compliance percentage (#558) */
@@ -627,6 +716,16 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
   const cognitiveComplexityPerClass = computeCognitiveComplexityPerClass(classNodes, dependencyEdges);
   const dependencyGraphComplexity = computeDependencyGraphComplexityReport(nodeIds, dependencyEdges);
 
+  const maintainabilityIndex = computeMaintainabilityIndexReport({
+    documentationCompletionPercentage: docResult.percentage,
+    namingCompliancePercentage: namingCompliance.compliancePercentage,
+    complexityScore,
+    dependencyGraphScore: dependencyGraphComplexity.score,
+    cognitiveComplexityPerClass,
+    averagePropertiesPerClass,
+    classCount,
+  });
+
   return {
     classCount,
     totalProperties,
@@ -651,6 +750,7 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     dependencyMetricsPerClass,
     cognitiveComplexityPerClass,
     dependencyGraphComplexity,
+    maintainabilityIndex,
   };
 }
 

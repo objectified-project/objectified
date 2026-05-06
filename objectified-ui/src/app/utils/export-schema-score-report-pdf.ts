@@ -80,6 +80,7 @@ function addMetricsBody(
       `Schema complexity: ${m.complexityScore}/100 (${m.complexityLabel})`,
       `Conditional schema cyclomatic (#612): ${m.conditionalSchemaCyclomaticTotal} (aggregate if/then/else decision points across class and property schemas)`,
       `Dependency graph complexity (#611): ${m.dependencyGraphComplexity.score}/100 (${m.dependencyGraphComplexity.scoreLabel}) — ${m.dependencyGraphComplexity.edgeCount} dependency-only edges, deepest ref chain ${m.dependencyGraphComplexity.deepestChainSteps} step(s), ${m.dependencyGraphComplexity.circularGroupCount} cycle group(s)`,
+      `Maintainability index (#613): ${m.maintainabilityIndex.score}/100 (${m.maintainabilityIndex.scoreLabel})`,
       `Documentation coverage: ${m.documentationCompletionPercentage}%`,
       `Naming compliance: ${m.namingCompliance.compliancePercentage}%`,
     ].join('\n')
@@ -178,6 +179,21 @@ function addMetricsBody(
     dgRows.push(`${row.label} | ${row.value} | ${row.weight} | ${row.contribution.toFixed(1)}`);
   }
   paragraph(ctx, dgRows.join('\n'));
+
+  section(ctx, 'Maintainability index (#613)');
+  const mi = m.maintainabilityIndex;
+  paragraph(
+    ctx,
+    [
+      `Score: ${mi.score}/100 (${mi.scoreLabel}; higher = easier to evolve)`,
+      'Blend: documentation and naming quality, inverted aggregate schema complexity and dependency-graph tangling, minus mean cognitive load and oversized-class penalties.',
+    ].join('\n')
+  );
+  const miRows: string[] = ['Factor | Value | Weight | Points'];
+  for (const row of mi.breakdown) {
+    miRows.push(`${row.label} | ${row.value} | ${row.weight} | ${row.contribution.toFixed(1)}`);
+  }
+  paragraph(ctx, miRows.join('\n'));
 
   if (m.dependencyMetricsPerClass.length > 0) {
     section(ctx, 'Dependency metrics per class');
