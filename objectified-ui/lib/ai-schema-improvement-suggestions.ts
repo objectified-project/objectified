@@ -14,10 +14,14 @@ export type AiSchemaImprovementCategory =
   | 'performance'
   | 'other';
 
+/** Relative implementation cost; quick wins are surfaced first (#254). */
+export type AiSchemaImprovementEffort = 'quick_win' | 'moderate' | 'substantial';
+
 export type AiSchemaImprovementSuggestion = {
   title: string;
   detail: string;
   category: AiSchemaImprovementCategory;
+  effort: AiSchemaImprovementEffort;
 };
 
 export type AiSchemaImprovementSuggestionsPayload = {
@@ -60,6 +64,27 @@ function normalizeCategory(raw: unknown): AiSchemaImprovementCategory {
   return 'other';
 }
 
+function normalizeEffort(raw: unknown): AiSchemaImprovementEffort {
+  if (typeof raw !== 'string') return 'moderate';
+  const key = raw.trim().toLowerCase().replace(/-/g, '_');
+  if (key === 'quick_win' || key === 'quickwin') return 'quick_win';
+  if (key === 'substantial' || key === 'large' || key === 'major') return 'substantial';
+  if (key === 'moderate' || key === 'medium') return 'moderate';
+  return 'moderate';
+}
+
+/** Sort key for display: lower comes first (quick wins at the top). */
+export function effortSortRank(effort: AiSchemaImprovementEffort): number {
+  switch (effort) {
+    case 'quick_win':
+      return 0;
+    case 'moderate':
+      return 1;
+    case 'substantial':
+      return 2;
+  }
+}
+
 /**
  * Returns null if the response does not contain valid structured suggestions.
  */
@@ -93,10 +118,20 @@ export function parseAiSchemaImprovementSuggestionsResponse(markdown: string): A
       title,
       detail,
       category: normalizeCategory(item.category),
+      effort: normalizeEffort(item.effort),
     });
   }
 
   if (suggestions.length === 0) return null;
 
-  return { thinking, summary, suggestions };
+  const ordered = suggestions
+    .map((s, originalIndex) => ({ s, originalIndex }))
+    .sort((a, b) => {
+      const dr = effortSortRank(a.s.effort) - effortSortRank(b.s.effort);
+      if (dr !== 0) return dr;
+      return a.originalIndex - b.originalIndex;
+    })
+    .map(({ s }) => s);
+
+  return { thinking, summary, suggestions: ordered };
 }

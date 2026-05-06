@@ -2,17 +2,18 @@ import { parseAiSchemaImprovementSuggestionsResponse } from '../../lib/ai-schema
 
 describe('parseAiSchemaImprovementSuggestionsResponse', () => {
   it('parses a valid fenced JSON payload', () => {
-    const md = `intro\n\n\`\`\`json\n{"thinking":"t","summary":"s","suggestions":[{"title":"Add docs","detail":"Fill descriptions","category":"documentation"}]}\n\`\`\``;
+    const md = `intro\n\n\`\`\`json\n{"thinking":"t","summary":"s","suggestions":[{"title":"Add docs","detail":"Fill descriptions","category":"documentation","effort":"quick_win"}]}\n\`\`\``;
     const p = parseAiSchemaImprovementSuggestionsResponse(md);
     expect(p).not.toBeNull();
     expect(p!.suggestions).toHaveLength(1);
     expect(p!.suggestions[0].title).toBe('Add docs');
     expect(p!.suggestions[0].category).toBe('documentation');
+    expect(p!.suggestions[0].effort).toBe('quick_win');
   });
 
   it('uses last json fence when multiple exist', () => {
     const md =
-      '```json\n{"thinking":"","summary":"","suggestions":[{"title":"a","detail":"d","category":"other"}]}\n```\n\n```json\n{"thinking":"","summary":"","suggestions":[{"title":"b","detail":"d2","category":"naming"}]}\n```';
+      '```json\n{"thinking":"","summary":"","suggestions":[{"title":"a","detail":"d","category":"other","effort":"moderate"}]}\n```\n\n```json\n{"thinking":"","summary":"","suggestions":[{"title":"b","detail":"d2","category":"naming","effort":"moderate"}]}\n```';
     const p = parseAiSchemaImprovementSuggestionsResponse(md);
     expect(p?.suggestions[0].title).toBe('b');
   });
@@ -26,7 +27,7 @@ describe('parseAiSchemaImprovementSuggestionsResponse', () => {
     const md =
       "```json\n{\"thinking\":\"\",\"summary\":\"\",\"suggestions\":[{\"title\":\"\",\"detail\":\"x\",\"category\":\"other\"},{\"title\":\"ok\",\"detail\":\"\",\"category\":\"other\"},{\"title\":\"good\",\"detail\":\"body\",\"category\":\"api\"}]}\n```";
     const r = parseAiSchemaImprovementSuggestionsResponse(md);
-    expect(r?.suggestions).toEqual([{ title: 'good', detail: 'body', category: 'api' }]);
+    expect(r?.suggestions).toEqual([{ title: 'good', detail: 'body', category: 'api', effort: 'moderate' }]);
   });
 
   it('normalizes unknown category to other', () => {
@@ -34,6 +35,38 @@ describe('parseAiSchemaImprovementSuggestionsResponse', () => {
       '```json\n{"thinking":"","summary":"","suggestions":[{"title":"x","detail":"y","category":"not-a-real-category"}]}\n```';
     const r = parseAiSchemaImprovementSuggestionsResponse(md);
     expect(r?.suggestions[0].category).toBe('other');
+  });
+
+  it('defaults missing effort to moderate', () => {
+    const md =
+      '```json\n{"thinking":"","summary":"","suggestions":[{"title":"x","detail":"y","category":"documentation"}]}\n```';
+    const r = parseAiSchemaImprovementSuggestionsResponse(md);
+    expect(r?.suggestions[0].effort).toBe('moderate');
+  });
+
+  it('sorts suggestions so quick_win rows come first (stable within tier)', () => {
+    const md = `\`\`\`json
+{"thinking":"","summary":"","suggestions":[
+  {"title":"big","detail":"d","category":"structure","effort":"substantial"},
+  {"title":"fast","detail":"d","category":"documentation","effort":"quick_win"},
+  {"title":"mid","detail":"d","category":"naming","effort":"moderate"},
+  {"title":"also fast","detail":"d","category":"documentation","effort":"quick_win"}
+]}
+\`\`\``;
+    const r = parseAiSchemaImprovementSuggestionsResponse(md);
+    expect(r?.suggestions.map((s) => s.title)).toEqual(['fast', 'also fast', 'mid', 'big']);
+  });
+
+  it('normalizes effort aliases', () => {
+    const md = `\`\`\`json
+{"thinking":"","summary":"","suggestions":[
+  {"title":"a","detail":"d","category":"other","effort":"Quick-Win"},
+  {"title":"b","detail":"d","category":"other","effort":"LARGE"}
+]}
+\`\`\``;
+    const r = parseAiSchemaImprovementSuggestionsResponse(md);
+    expect(r?.suggestions[0].effort).toBe('quick_win');
+    expect(r?.suggestions[1].effort).toBe('substantial');
   });
 
   it('returns null when no json fence', () => {
