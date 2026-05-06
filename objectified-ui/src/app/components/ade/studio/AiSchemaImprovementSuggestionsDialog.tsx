@@ -13,6 +13,7 @@ import { Textarea } from '../../ui/Textarea';
 import { Bot, Copy, Loader2, Square, Sparkles } from 'lucide-react';
 import {
   parseAiSchemaImprovementSuggestionsResponse,
+  type AiSchemaImprovementEffort,
   type AiSchemaImprovementSuggestionsPayload,
 } from '@lib/ai-schema-improvement-suggestions';
 import {
@@ -39,6 +40,19 @@ const CATEGORY_LABEL: Record<string, string> = {
   api: 'API',
   performance: 'Performance',
   other: 'Other',
+};
+
+const EFFORT_LABEL: Record<AiSchemaImprovementEffort, string> = {
+  quick_win: 'Quick win',
+  moderate: 'Standard',
+  substantial: 'Larger effort',
+};
+
+const EFFORT_BADGE_CLASS: Record<AiSchemaImprovementEffort, string> = {
+  quick_win:
+    'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200',
+  moderate: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+  substantial: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
 };
 
 export function AiSchemaImprovementSuggestionsDialog({
@@ -191,8 +205,8 @@ export function AiSchemaImprovementSuggestionsDialog({
     }
   }, [hint, selectedModel, tenantId, projectId, versionId, studioMetricsDigest, existingClassNames]);
 
-  const handleCopyRow = async (idx: number, title: string, detail: string) => {
-    const text = `${title}\n\n${detail}`;
+  const handleCopyRow = async (idx: number, title: string, detail: string, effort: AiSchemaImprovementEffort) => {
+    const text = `${title}\nEffort: ${EFFORT_LABEL[effort]}\n\n${detail}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopyIdx(idx);
@@ -211,7 +225,8 @@ export function AiSchemaImprovementSuggestionsDialog({
             AI improvement suggestions
           </DialogTitle>
           <p className="text-xs text-gray-500 dark:text-gray-400 font-normal pt-1">
-            Uses live Schema Metrics and class names from the canvas. Suggestions are advisory—review before changing your model.
+            Uses live Schema Metrics and class names from the canvas. Quick wins are listed first; each row shows effort alongside category.
+            Suggestions are advisory—review before changing your model.
           </p>
         </DialogHeader>
 
@@ -305,6 +320,12 @@ export function AiSchemaImprovementSuggestionsDialog({
                           <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">
                             {CATEGORY_LABEL[s.category] ?? s.category}
                           </span>
+                          <span
+                            className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${EFFORT_BADGE_CLASS[s.effort]}`}
+                            data-testid={`ai-schema-improvement-effort-${i}`}
+                          >
+                            {EFFORT_LABEL[s.effort]}
+                          </span>
                         </div>
                         <p className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{s.detail}</p>
                       </div>
@@ -314,7 +335,7 @@ export function AiSchemaImprovementSuggestionsDialog({
                         size="sm"
                         className="shrink-0"
                         data-testid={`ai-schema-improvement-copy-${i}`}
-                        onClick={() => void handleCopyRow(i, s.title, s.detail)}
+                        onClick={() => void handleCopyRow(i, s.title, s.detail, s.effort)}
                       >
                         <Copy className="h-3.5 w-3.5 mr-1" />
                         {copyIdx === i ? 'Copied' : 'Copy'}

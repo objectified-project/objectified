@@ -277,7 +277,8 @@ Return **exactly one** markdown fenced JSON block and **nothing outside the fenc
     {
       "title": "Short imperative headline the user can scan (max ~120 chars).",
       "detail": "Concrete explanation: what to change, where to look, and why it helps quality or maintainability.",
-      "category": "documentation"
+      "category": "documentation",
+      "effort": "quick_win"
     }
   ]
 }
@@ -288,6 +289,11 @@ Return **exactly one** markdown fenced JSON block and **nothing outside the fenc
 - Emit **6–12** suggestions unless the digest is extremely small (then 3–5 is fine).
 - Every "title" and "detail" must be non-empty strings.
 - "category" must be one of: "documentation", "naming", "structure", "api", "performance", "other". Pick the best fit per row.
+- Every row MUST include **"effort"**: one of \`"quick_win"\`, \`"moderate"\`, or \`"substantial"\`.
+  - **quick_win**: small, localized edits (add missing descriptions, rename a few properties, tighten one validation) that a developer can often finish in minutes to an hour.
+  - **moderate**: bounded refactors (split one busy class, normalize a small set of names, add a shared pattern across a few schemas).
+  - **substantial**: broader design or cross-cutting work (large decompositions, API-wide pagination strategy, dependency reshaping).
+- Order the **suggestions** array with **all quick_win items first**, then moderate, then substantial—so the JSON list itself reads as a prioritized backlog.
 - Ground suggestions in the **digest numbers and named classes/properties** when present—do not invent entities that contradict the digest.
 - It is acceptable to mention **future** API design (pagination, error models, versioning) when metrics imply large graphs, hubs, or wide classes—even if paths are not listed.
 - Prefer distinct suggestions; do not repeat the same idea with different wording.

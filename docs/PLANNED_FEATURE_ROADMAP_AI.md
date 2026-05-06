@@ -78,13 +78,12 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ "Rename 5 properties to follow camelCase convention"
     - ✅ "Split 'User' class - it has 28 properties (recommended max: 15)"
     - ✅ "Add pagination to 'GET /users' endpoint" (optional user focus + metrics)
-- 📋 Prioritized action items (quick wins first)
+- ✅ Prioritized action items (quick wins first) (#254)
 - 📋 Estimated score impact for each fix
 - 📋 Bulk apply recommendations
 
 | Ticket | Feature Description                    |
 |--------|----------------------------------------|
-| #254   | Prioritized action items               |
 | #255   | Estimated score impact for each fix    |
 | #256   | Add bulk apply recommendations         |
 
