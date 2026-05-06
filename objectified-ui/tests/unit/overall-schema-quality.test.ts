@@ -1,5 +1,9 @@
 import { describe, it, expect } from '@jest/globals';
-import { computeMaintainabilityIndexReport, type SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import {
+  computeMaintainabilityIndexReport,
+  computeTechnicalDebtMetricsReport,
+  type SchemaMetricsResult,
+} from '@/app/utils/schema-metrics';
 import { computeOverallSchemaQualityScore, computeOverallSchemaQualityDetail } from '@/app/utils/overall-schema-quality';
 
 function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): SchemaMetricsResult {
@@ -56,6 +60,21 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
       cognitiveComplexityPerClass: merged.cognitiveComplexityPerClass,
       averagePropertiesPerClass: merged.averagePropertiesPerClass,
       classCount: merged.classCount,
+    });
+  merged.technicalDebtMetrics =
+    overrides.technicalDebtMetrics ??
+    computeTechnicalDebtMetricsReport({
+      documentationCompletionPercentage: merged.documentationCompletionPercentage,
+      namingCompliancePercentage: merged.namingCompliance.compliancePercentage,
+      complexityScore: merged.complexityScore,
+      dependencyGraphScore: merged.dependencyGraphComplexity.score,
+      conditionalSchemaCyclomaticTotal: merged.conditionalSchemaCyclomaticTotal,
+      circularDependencyCount: merged.circularDependencyCount,
+      deepestChainLength: merged.deepestChainLength,
+      classCount: merged.classCount,
+      isolatedClassCount: merged.isolatedClassIds.length,
+      cognitiveComplexityPerClass: merged.cognitiveComplexityPerClass,
+      averagePropertiesPerClass: merged.averagePropertiesPerClass,
     });
   return merged;
 }

@@ -63,6 +63,8 @@ export interface SchemaMetricsResult {
   dependencyGraphComplexity: DependencyGraphComplexityReport;
   /** #613: Composite maintainability (higher = easier to evolve). */
   maintainabilityIndex: MaintainabilityIndexReport;
+  /** #614: Composite technical debt (higher = more remediation pressure). */
+  technicalDebtMetrics: TechnicalDebtMetricsReport;
 }
 
 /** #553: One row of dependency metrics for a class (in-degree, out-degree, betweenness). */
@@ -113,6 +115,133 @@ export interface MaintainabilityIndexReport {
   /** Low = harder to maintain; High = easier to maintain. */
   scoreLabel: 'Low' | 'Medium' | 'High';
   breakdown: ComplexityBreakdownItem[];
+}
+
+/**
+ * #614: Aggregate technical debt 0–100 (higher = more remediation pressure).
+ * Composes documentation/naming gaps, structural and dependency load, conditional branching,
+ * relationship cycles, chain depth, mean cognitive load, structural isolation, and wide-class pressure.
+ */
+export interface TechnicalDebtMetricsReport {
+  /** 0 = little aggregate debt, 100 = very high debt */
+  debtScore: number;
+  /** Low / Medium / High severity of aggregate technical debt */
+  scoreLabel: 'Low' | 'Medium' | 'High';
+  breakdown: ComplexityBreakdownItem[];
+}
+
+export function computeTechnicalDebtMetricsReport(input: {
+  documentationCompletionPercentage: number;
+  namingCompliancePercentage: number;
+  complexityScore: number;
+  dependencyGraphScore: number;
+  conditionalSchemaCyclomaticTotal: number;
+  circularDependencyCount: number;
+  deepestChainLength: number;
+  classCount: number;
+  isolatedClassCount: number;
+  cognitiveComplexityPerClass: CognitiveComplexityPerClassEntry[];
+  averagePropertiesPerClass: number;
+}): TechnicalDebtMetricsReport {
+  const docGap = Math.min(100, Math.max(0, 100 - input.documentationCompletionPercentage));
+  const nameGap = Math.min(100, Math.max(0, 100 - input.namingCompliancePercentage));
+  const schemaLoad = Math.min(100, Math.max(0, input.complexityScore));
+  const depTangle = Math.min(100, Math.max(0, input.dependencyGraphScore));
+  const branchDebt = Math.min(100, Math.max(0, input.conditionalSchemaCyclomaticTotal * 5.5));
+  const cycleDebt = Math.min(100, Math.max(0, input.circularDependencyCount * 28));
+  const deepDebt = Math.min(100, Math.max(0, input.deepestChainLength * 9));
+  const meanCog =
+    input.classCount > 0
+      ? input.cognitiveComplexityPerClass.reduce((s, r) => s + r.score, 0) / input.classCount
+      : 0;
+  const cognitiveDebt = Math.min(100, Math.max(0, meanCog * 2.8));
+  const orphanDebt =
+    input.classCount > 0
+      ? Math.min(100, Math.max(0, (input.isolatedClassCount / input.classCount) * 100))
+      : 0;
+  const sizeExcess = Math.max(0, input.averagePropertiesPerClass - 14);
+  const wideClassDebt = Math.min(100, Math.max(0, sizeExcess * 7));
+
+  const wDoc = 0.17;
+  const wName = 0.15;
+  const wSchema = 0.15;
+  const wDep = 0.13;
+  const wBranch = 0.11;
+  const wCycle = 0.09;
+  const wDeep = 0.07;
+  const wCog = 0.08;
+  const wIso = 0.03;
+  const wWide = 0.02;
+
+  const breakdown: ComplexityBreakdownItem[] = [
+    {
+      label: 'Documentation gap (100 − coverage %)',
+      value: Math.round(docGap * 10) / 10,
+      weight: wDoc,
+      contribution: docGap * wDoc,
+    },
+    {
+      label: 'Naming inconsistency gap (100 − compliance %)',
+      value: Math.round(nameGap * 10) / 10,
+      weight: wName,
+      contribution: nameGap * wName,
+    },
+    {
+      label: 'Aggregate schema complexity load',
+      value: schemaLoad,
+      weight: wSchema,
+      contribution: schemaLoad * wSchema,
+    },
+    {
+      label: 'Dependency graph tangling',
+      value: depTangle,
+      weight: wDep,
+      contribution: depTangle * wDep,
+    },
+    {
+      label: 'Conditional schema branching (cyclomatic, capped)',
+      value: Math.round(branchDebt * 10) / 10,
+      weight: wBranch,
+      contribution: branchDebt * wBranch,
+    },
+    {
+      label: 'Circular dependency groups (relationship graph)',
+      value: input.circularDependencyCount,
+      weight: wCycle,
+      contribution: cycleDebt * wCycle,
+    },
+    {
+      label: 'Deep dependency chains (steps, capped)',
+      value: input.deepestChainLength,
+      weight: wDeep,
+      contribution: deepDebt * wDeep,
+    },
+    {
+      label: 'Mean cognitive load per class (capped)',
+      value: Math.round(meanCog * 10) / 10,
+      weight: wCog,
+      contribution: cognitiveDebt * wCog,
+    },
+    {
+      label: 'Structurally isolated classes (count)',
+      value: input.isolatedClassCount,
+      weight: wIso,
+      contribution: orphanDebt * wIso,
+    },
+    {
+      label: 'Wide-class pressure (avg properties/class)',
+      value: Math.round(input.averagePropertiesPerClass * 10) / 10,
+      weight: wWide,
+      contribution: wideClassDebt * wWide,
+    },
+  ];
+
+  const raw = breakdown.reduce((s, b) => s + b.contribution, 0);
+  const debtScore = Math.min(100, Math.max(0, Math.round(raw)));
+  const scoreLabel: TechnicalDebtMetricsReport['scoreLabel'] =
+    debtScore >= 67 ? 'High' : debtScore >= 34 ? 'Medium' : 'Low';
+
+  return { debtScore, scoreLabel, breakdown };
 }
 
 export function computeMaintainabilityIndexReport(input: {
@@ -726,6 +855,20 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     classCount,
   });
 
+  const technicalDebtMetrics = computeTechnicalDebtMetricsReport({
+    documentationCompletionPercentage: docResult.percentage,
+    namingCompliancePercentage: namingCompliance.compliancePercentage,
+    complexityScore,
+    dependencyGraphScore: dependencyGraphComplexity.score,
+    conditionalSchemaCyclomaticTotal,
+    circularDependencyCount,
+    deepestChainLength,
+    classCount,
+    isolatedClassCount: isolatedClassIds.length,
+    cognitiveComplexityPerClass,
+    averagePropertiesPerClass,
+  });
+
   return {
     classCount,
     totalProperties,
@@ -751,6 +894,7 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     cognitiveComplexityPerClass,
     dependencyGraphComplexity,
     maintainabilityIndex,
+    technicalDebtMetrics,
   };
 }
 

@@ -95,6 +95,13 @@ export function buildSchemaScoreCompareRows(
     fmtInt,
     toneHigherIsBetter
   );
+  push(
+    'Technical debt (#614)',
+    a.technicalDebtMetrics.debtScore,
+    b.technicalDebtMetrics.debtScore,
+    fmtInt,
+    toneLowerIsBetter
+  );
 
   return rows;
 }

@@ -1,5 +1,9 @@
 import { describe, it, expect } from '@jest/globals';
-import { computeMaintainabilityIndexReport, type SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import {
+  computeMaintainabilityIndexReport,
+  computeTechnicalDebtMetricsReport,
+  type SchemaMetricsResult,
+} from '@/app/utils/schema-metrics';
 import {
   formatScoreDelta,
   buildSchemaScoreCompareRows,
@@ -59,6 +63,21 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
       cognitiveComplexityPerClass: merged.cognitiveComplexityPerClass,
       averagePropertiesPerClass: merged.averagePropertiesPerClass,
       classCount: merged.classCount,
+    });
+  merged.technicalDebtMetrics =
+    overrides.technicalDebtMetrics ??
+    computeTechnicalDebtMetricsReport({
+      documentationCompletionPercentage: merged.documentationCompletionPercentage,
+      namingCompliancePercentage: merged.namingCompliance.compliancePercentage,
+      complexityScore: merged.complexityScore,
+      dependencyGraphScore: merged.dependencyGraphComplexity.score,
+      conditionalSchemaCyclomaticTotal: merged.conditionalSchemaCyclomaticTotal,
+      circularDependencyCount: merged.circularDependencyCount,
+      deepestChainLength: merged.deepestChainLength,
+      classCount: merged.classCount,
+      isolatedClassCount: merged.isolatedClassIds.length,
+      cognitiveComplexityPerClass: merged.cognitiveComplexityPerClass,
+      averagePropertiesPerClass: merged.averagePropertiesPerClass,
     });
   return merged;
 }
@@ -130,6 +149,19 @@ describe('buildSchemaScoreCompareRows', () => {
     const rows = buildSchemaScoreCompareRows(older, newer);
     const row = rows.find((r) => r.label === 'Maintainability index (#613)');
     expect(row?.delta).toBe('+15');
+    expect(row?.deltaTone).toBe('positive');
+  });
+
+  it('labels lower technical debt as positive (#614)', () => {
+    const older = makeMinimalMetrics({
+      technicalDebtMetrics: { debtScore: 72, scoreLabel: 'High', breakdown: [] },
+    });
+    const newer = makeMinimalMetrics({
+      technicalDebtMetrics: { debtScore: 48, scoreLabel: 'Medium', breakdown: [] },
+    });
+    const rows = buildSchemaScoreCompareRows(older, newer);
+    const row = rows.find((r) => r.label === 'Technical debt (#614)');
+    expect(row?.delta).toBe('-24');
     expect(row?.deltaTone).toBe('positive');
   });
 });

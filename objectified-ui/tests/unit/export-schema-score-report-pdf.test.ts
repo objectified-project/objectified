@@ -1,5 +1,9 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { computeMaintainabilityIndexReport, type SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import {
+  computeMaintainabilityIndexReport,
+  computeTechnicalDebtMetricsReport,
+  type SchemaMetricsResult,
+} from '@/app/utils/schema-metrics';
 
 // ── jsPDF mock ────────────────────────────────────────────────────────────────
 
@@ -97,6 +101,21 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
       cognitiveComplexityPerClass: merged.cognitiveComplexityPerClass,
       averagePropertiesPerClass: merged.averagePropertiesPerClass,
       classCount: merged.classCount,
+    });
+  merged.technicalDebtMetrics =
+    overrides.technicalDebtMetrics ??
+    computeTechnicalDebtMetricsReport({
+      documentationCompletionPercentage: merged.documentationCompletionPercentage,
+      namingCompliancePercentage: merged.namingCompliance.compliancePercentage,
+      complexityScore: merged.complexityScore,
+      dependencyGraphScore: merged.dependencyGraphComplexity.score,
+      conditionalSchemaCyclomaticTotal: merged.conditionalSchemaCyclomaticTotal,
+      circularDependencyCount: merged.circularDependencyCount,
+      deepestChainLength: merged.deepestChainLength,
+      classCount: merged.classCount,
+      isolatedClassCount: merged.isolatedClassIds.length,
+      cognitiveComplexityPerClass: merged.cognitiveComplexityPerClass,
+      averagePropertiesPerClass: merged.averagePropertiesPerClass,
     });
   return merged;
 }
@@ -215,6 +234,14 @@ describe('downloadSchemaScoreReportPdf', () => {
     expect(joined).toContain('Simplicity vs schema complexity');
   });
 
+  it('includes technical debt section (#614)', () => {
+    downloadSchemaScoreReportPdf({ metrics: makeMinimalMetrics(), projectName: 'P', versionLabel: 'v1' });
+    const joined = (mockText.mock.calls as Array<[string, ...unknown[]]>).map((c) => String(c[0])).join('\n');
+    expect(joined).toContain('Technical debt (#614)');
+    expect(joined).toContain('Aggregate debt score:');
+    expect(joined).toContain('Documentation gap (100');
+  });
+
   it('does not throw with dependency metrics and layout quality', () => {
     const metrics = makeMinimalMetrics({
       dependencyMetricsPerClass: [
@@ -251,9 +278,8 @@ describe('downloadSchemaScoreReportPdf', () => {
     const footerCall = textCalls.find(([t]) => (t as string).includes('Objectified Studio'));
     expect(footerCall).toBeDefined();
     expect(footerCall![2]).toBe(297 - 10); // pageH - 10
-    // addPage should NOT have been called more times than needed for content overflow.
-    // (In this minimal test, content fits easily in one page, so addPage stays at 0.)
-    expect((mockAddPage.mock.calls as unknown[]).length).toBe(addPageCallsBefore);
+    // addPage is only for body overflow (schema report includes many sections; #614 may push minimal fixtures to 2 pages).
+    expect((mockAddPage.mock.calls as unknown[]).length - addPageCallsBefore).toBeLessThanOrEqual(1);
   });
 });
 

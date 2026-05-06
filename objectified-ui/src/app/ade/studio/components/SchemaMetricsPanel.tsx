@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid, Box, Layers, FileText, Type, Network, FileDown, Brain, Sprout } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid, Box, Layers, FileText, Type, Network, FileDown, Brain, Sprout, Hammer } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import * as Popover from '@radix-ui/react-popover';
 import { cn } from '../../../../../lib/utils';
@@ -88,6 +88,7 @@ export default function SchemaMetricsPanel({
     cognitiveComplexityPerClass = [],
     dependencyGraphComplexity,
     maintainabilityIndex,
+    technicalDebtMetrics,
   } = metrics;
 
   const docsScoreTier = getNumericScoreTier(documentationCompletionPercentage);
@@ -824,6 +825,98 @@ export default function SchemaMetricsPanel({
                     <span className="text-gray-500 dark:text-gray-400">Composite → capped 0–100</span>
                     <span className="font-semibold text-gray-800 dark:text-gray-200 tabular-nums">
                       {maintainabilityIndex.score}/100
+                    </span>
+                  </div>
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+          </div>
+
+          {/* #614: Technical debt aggregate (higher = more remediation pressure) */}
+          <div>
+            <Popover.Root>
+              <Popover.Trigger asChild>
+                <button
+                  type="button"
+                  className="w-full rounded-lg bg-gray-50 dark:bg-gray-700/40 dark:border dark:border-gray-600/40 px-2.5 py-2 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600/40 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
+                  aria-label="Technical debt score; click for breakdown"
+                  title="Composite debt from docs, naming, complexity, dependencies, branching, cycles, depth, cognitive load, isolation, and class width"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Hammer className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden />
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
+                        Technical debt
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-lg font-bold text-gray-800 dark:text-gray-200 tabular-nums">
+                        {technicalDebtMetrics.debtScore}
+                      </span>
+                      <span
+                        className={cn(
+                          'text-xs font-medium px-1.5 py-0.5 rounded',
+                          technicalDebtMetrics.scoreLabel === 'Low' &&
+                            'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+                          technicalDebtMetrics.scoreLabel === 'Medium' &&
+                            'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+                          technicalDebtMetrics.scoreLabel === 'High' &&
+                            'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',
+                        )}
+                      >
+                        {technicalDebtMetrics.scoreLabel}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
+                    Higher scores mean more aggregate remediation pressure (inverse of “healthy and simple”).
+                  </p>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Click for factor breakdown</p>
+                </button>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  className="z-[10000] w-72 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-3 focus:outline-none"
+                  sideOffset={6}
+                  align="start"
+                >
+                  <div className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                    Why this technical debt score? (#614)
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3">
+                    Each factor is capped 0–100, then weighted into a 0–100 aggregate. Low debt is better; included in
+                    the schema score PDF export and AI metrics digest.
+                  </p>
+                  <table className="w-full text-[11px] text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-600">
+                        <th className="py-1 pr-2 font-medium text-gray-600 dark:text-gray-400">Factor</th>
+                        <th className="py-1 pr-2 font-medium text-gray-600 dark:text-gray-400 text-right">Value</th>
+                        <th className="py-1 pr-2 font-medium text-gray-600 dark:text-gray-400 text-right">× weight</th>
+                        <th className="py-1 font-medium text-gray-600 dark:text-gray-400 text-right">Points</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {technicalDebtMetrics.breakdown.map((row, i) => (
+                        <tr key={i} className="border-b border-gray-100 dark:border-gray-700/80">
+                          <td className="py-1 pr-2 text-gray-700 dark:text-gray-300">{row.label}</td>
+                          <td className="py-1 pr-2 text-right tabular-nums text-gray-700 dark:text-gray-300">
+                            {row.value}
+                          </td>
+                          <td className="py-1 pr-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
+                            {row.weight}
+                          </td>
+                          <td className="py-1 text-right tabular-nums font-medium text-gray-800 dark:text-gray-200">
+                            {row.contribution.toFixed(1)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 flex justify-between text-[11px]">
+                    <span className="text-gray-500 dark:text-gray-400">Weighted sum → capped 0–100</span>
+                    <span className="font-semibold text-gray-800 dark:text-gray-200 tabular-nums">
+                      {technicalDebtMetrics.debtScore}/100
                     </span>
                   </div>
                 </Popover.Content>
