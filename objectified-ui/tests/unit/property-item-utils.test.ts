@@ -29,6 +29,12 @@ describe('parseJsonSchemaObjectText', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/object/i);
   });
+
+  it('rejects null', () => {
+    const r = parseJsonSchemaObjectText('null');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/object/i);
+  });
 });
 
 describe('buildPropertyItemFromAiSeedForm', () => {
@@ -63,6 +69,18 @@ describe('buildPropertyItemFromAiSeedForm', () => {
       name: 'x',
       description: '  ',
       schemaText: '{"type":"integer"}',
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.item.description).toBeUndefined();
+    }
+  });
+
+  it('blank description overrides description in schema JSON', () => {
+    const r = buildPropertyItemFromAiSeedForm({
+      name: 'y',
+      description: '  ',
+      schemaText: '{"type":"string","description":"from schema"}',
     });
     expect(r.ok).toBe(true);
     if (r.ok) {

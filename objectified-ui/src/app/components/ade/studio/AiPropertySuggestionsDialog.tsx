@@ -283,7 +283,7 @@ export function AiPropertySuggestionsDialog({
       const draft = draftsByIdx[i] ?? aiSuggestionToDraftFields(s);
       const built = buildPropertyItemFromAiSeedForm(draft);
       if (!built.ok) {
-        setAcceptAllError(`Could not accept all: row ${i + 1} (${s.name}) — ${built.error}`);
+        setAcceptAllError(`Could not accept all: "${draft.name || s.name}" — ${built.error}`);
         return;
       }
       seeds.push(built.item);

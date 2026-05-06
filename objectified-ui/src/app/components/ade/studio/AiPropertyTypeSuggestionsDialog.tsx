@@ -418,7 +418,14 @@ export function AiPropertyTypeSuggestionsDialog({
                 <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">
                   Edit the JSON Schema object before applying it to the property form.
                 </p>
+                <label
+                  htmlFor="ai-prop-type-suggest-edit-schema"
+                  className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300"
+                >
+                  Schema (JSON object)
+                </label>
                 <Textarea
+                  id="ai-prop-type-suggest-edit-schema"
                   data-testid="ai-property-type-suggestions-edit-schema"
                   value={selectedSchemaDraft}
                   onChange={(e) => {

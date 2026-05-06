@@ -44,6 +44,9 @@ export function buildPropertyItemFromAiSeedForm(input: {
     id: '__ai_seed__',
     name: nameTrim,
   } as PropertyItem;
+  // Always remove any description carried in from the schema JSON, then
+  // re-apply it only if the user actually provided one in the form field.
+  delete item.description;
   if (descTrim) {
     item.description = descTrim;
   }
