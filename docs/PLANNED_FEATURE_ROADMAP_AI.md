@@ -72,24 +72,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
 |--------|-----------------------------------------------------|
 | #527   | Implementation of Guardrails for prompts/responses  |
 
-**Actionable Recommendations** 📋 PLANNED
-- ✅ **AI-powered suggestions for improvement**
-    - ✅ "Add descriptions to 12 classes to improve docs score" (pattern; model uses live metrics)
-    - ✅ "Rename 5 properties to follow camelCase convention"
-    - ✅ "Split 'User' class - it has 28 properties (recommended max: 15)"
-    - ✅ "Add pagination to 'GET /users' endpoint" (optional user focus + metrics)
-- ✅ Prioritized action items (quick wins first) (#254)
-- ✅ Estimated score impact for each fix (#255)
-- ✅ Bulk apply recommendations (#256): structured class/property description fills from the AI dialog
-
 ### AI Schema Health Insights
-
-**Schema Complexity Analysis** 📋 PLANNED
-- ✅ Cognitive complexity score per class (#610)
-- ✅ Dependency graph complexity (#611)
-- ✅ Cyclomatic complexity for conditional schemas (#612)
-- ✅ Maintainability index (#613)
-- ✅ Technical debt metrics (#614)
 
 **Best Practice Suggestions** 📋 PLANNED
 - 📋 Context-aware tips based on schema type:
@@ -133,9 +116,9 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - 📋 Identify central/hub classes
     - 📋 Recommend hierarchy roots
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-|| #623   | Intelligent Layout Suggestions                  |
+| Ticket | Feature Description            |
+|--------|--------------------------------|
+| #623   | Intelligent Layout Suggestions |
 
 ---
 
@@ -267,3 +250,22 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ "Add all suggested" button (#274)
     - ✅ Explanation for each suggestion (#273)
     - ✅ Trigger conditions for opening the dialog (#275)
+
+### AI Schema Health Insights
+
+**Schema Complexity Analysis** 📋 PLANNED
+- ✅ Cognitive complexity score per class (#610)
+- ✅ Dependency graph complexity (#611)
+- ✅ Cyclomatic complexity for conditional schemas (#612)
+- ✅ Maintainability index (#613)
+- ✅ Technical debt metrics (#614)
+
+**Actionable Recommendations** 📋 PLANNED
+- ✅ **AI-powered suggestions for improvement**
+    - ✅ "Add descriptions to 12 classes to improve docs score" (pattern; model uses live metrics)
+    - ✅ "Rename 5 properties to follow camelCase convention"
+    - ✅ "Split 'User' class - it has 28 properties (recommended max: 15)"
+    - ✅ "Add pagination to 'GET /users' endpoint" (optional user focus + metrics)
+- ✅ Prioritized action items (quick wins first) (#254)
+- ✅ Estimated score impact for each fix (#255)
+- ✅ Bulk apply recommendations (#256): structured class/property description fills from the AI dialog
