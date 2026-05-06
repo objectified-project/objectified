@@ -50,11 +50,26 @@ const DOMAIN_TIP_BY_ID: Readonly<Record<string, string>> = Object.fromEntries(
   }),
 ) as Readonly<Record<string, string>>;
 
-/** Compound names first — e.g. `RefreshToken` has no `\bRefresh\b` match inside the camelCase token. */
-const AUTH_CLASS_SIGNAL =
-  /RefreshToken|AccessToken|IdToken|DeviceCode|BearerToken|\b(Session|Sessions|Token|Tokens|OAuth|Refresh|JWT|Jwt|Mfa|Credential|Credentials|Identity|Login|Auth|Password|Otp|Oidc|Saml)\b/i;
+/**
+ * Split a CamelCase or snake_case class name into its constituent words so that
+ * word-boundary anchors work on compound names.
+ *
+ * Examples:
+ *   OAuthSession      → "OAuthSession O Auth Session"
+ *   OrganizationMember → "OrganizationMember Organization Member"
+ *   refresh_token      → "refresh_token refresh token"
+ */
+function tokenizeClassName(name: string): string {
+  return name
+    .replace(/([a-z\d])([A-Z])/g, '$1 $2')    // fooBar → foo Bar
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2') // XMLParser → XML Parser
+    .replace(/_/g, ' ');
+}
 
-const TENANT_CLASS_SIGNAL = /\b(Tenant|Tenants|Organization|Organizations|Workspace|Workspaces|OrgMembership|TenantId)\b/i;
+const AUTH_CLASS_SIGNAL =
+  /\b(Session|Sessions|Token|Tokens|OAuth|Refresh|JWT|Jwt|Mfa|Credential|Credentials|Identity|Login|Auth|Password|Otp|Oidc|Saml)\b/i;
+
+const TENANT_CLASS_SIGNAL = /\b(Tenant|Tenants|Organization|Organizations|Workspace|Workspaces|OrgMembership)\b/i;
 
 function asBullet(line: string): string {
   const t = line.trim();
@@ -79,7 +94,9 @@ export function collectStudioAiBestPracticeTipLines(signals: StudioAiTipSignalCo
   const rawDomain = signals.domainCategory?.trim() || '';
   const domainId = rawDomain === PROJECT_DOMAIN_CATEGORY_NONE ? '' : rawDomain;
   const classNames = signals.classNames.filter(Boolean);
-  const haystack = classNames.join(' ');
+  const haystack = classNames
+    .map((c) => `${c} ${tokenizeClassName(c)}`)
+    .join(' ');
 
   const lines: string[] = [];
 

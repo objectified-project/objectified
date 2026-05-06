@@ -28,6 +28,22 @@ describe('collectStudioAiBestPracticeTipLines (#615)', () => {
     expect(lines.some((l) => l.toLowerCase().includes('refresh token'))).toBe(true);
   });
 
+  it('detects auth hint from CamelCase compound OAuthSession', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: ['OAuthSession'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('refresh token'))).toBe(true);
+  });
+
+  it('detects tenant hint from CamelCase compound OrganizationMember', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: 'social',
+      classNames: ['OrganizationMember'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('tenant isolation'))).toBe(true);
+  });
+
   it('detects tenant-like class names when domain is not saas', () => {
     const lines = collectStudioAiBestPracticeTipLines({
       domainCategory: 'social',
