@@ -17,6 +17,20 @@ export type AiSchemaImprovementCategory =
 /** Relative implementation cost; quick wins are surfaced first (#254). */
 export type AiSchemaImprovementEffort = 'quick_win' | 'moderate' | 'substantial';
 
+/** Machine-executable documentation fills the Studio may apply in bulk (#256). */
+export type AiSchemaImprovementApplyAction =
+  | { type: 'set_class_description'; className: string; description: string }
+  | { type: 'set_property_description'; className: string; propertyName: string; description: string };
+
+/** Result of applying structured documentation actions in Studio (#256). */
+export type AiSchemaImprovementBulkApplyResult = {
+  applied: number;
+  skipped: number;
+  failures: string[];
+};
+
+const APPLY_DESCRIPTION_MAX_LEN = 8000;
+
 export type AiSchemaImprovementSuggestion = {
   title: string;
   detail: string;
@@ -27,6 +41,8 @@ export type AiSchemaImprovementSuggestion = {
    * Omitted when the model does not provide a usable estimate.
    */
   estimatedOverallScoreDelta?: number;
+  /** Optional structured apply payload when the model names exact canvas targets (#256). */
+  apply?: AiSchemaImprovementApplyAction;
 };
 
 export type AiSchemaImprovementSuggestionsPayload = {
@@ -76,6 +92,36 @@ function normalizeEffort(raw: unknown): AiSchemaImprovementEffort {
   if (key === 'substantial' || key === 'large' || key === 'major') return 'substantial';
   if (key === 'moderate' || key === 'medium') return 'moderate';
   return 'moderate';
+}
+
+function clampApplyDescription(text: string): string {
+  if (text.length <= APPLY_DESCRIPTION_MAX_LEN) return text;
+  return text.slice(0, APPLY_DESCRIPTION_MAX_LEN);
+}
+
+/** Parses and validates a model-supplied `apply` object; returns undefined if unusable. */
+export function normalizeAiSchemaImprovementApplyAction(raw: unknown): AiSchemaImprovementApplyAction | undefined {
+  if (!isPlainObject(raw)) return undefined;
+  const t = typeof raw.type === 'string' ? raw.type.trim() : '';
+  if (t === 'set_class_description') {
+    const className = typeof raw.className === 'string' ? raw.className.trim() : '';
+    const description = typeof raw.description === 'string' ? raw.description.trim() : '';
+    if (!className || !description) return undefined;
+    return { type: 'set_class_description', className, description: clampApplyDescription(description) };
+  }
+  if (t === 'set_property_description') {
+    const className = typeof raw.className === 'string' ? raw.className.trim() : '';
+    const propertyName = typeof raw.propertyName === 'string' ? raw.propertyName.trim() : '';
+    const description = typeof raw.description === 'string' ? raw.description.trim() : '';
+    if (!className || !propertyName || !description) return undefined;
+    return {
+      type: 'set_property_description',
+      className,
+      propertyName,
+      description: clampApplyDescription(description),
+    };
+  }
+  return undefined;
 }
 
 const SCORE_DELTA_MIN = -25;
@@ -141,12 +187,14 @@ export function parseAiSchemaImprovementSuggestionsResponse(markdown: string): A
     const detail = typeof item.detail === 'string' ? item.detail.trim() : '';
     if (!title || !detail) continue;
     const delta = normalizeEstimatedOverallScoreDelta(item.estimatedOverallScoreDelta);
+    const apply = normalizeAiSchemaImprovementApplyAction(item.apply);
     suggestions.push({
       title,
       detail,
       category: normalizeCategory(item.category),
       effort: normalizeEffort(item.effort),
       ...(delta !== undefined ? { estimatedOverallScoreDelta: delta } : {}),
+      ...(apply ? { apply } : {}),
     });
   }
 

@@ -1,4 +1,5 @@
 import {
+  normalizeAiSchemaImprovementApplyAction,
   normalizeEstimatedOverallScoreDelta,
   parseAiSchemaImprovementSuggestionsResponse,
 } from '../../lib/ai-schema-improvement-suggestions';
@@ -108,6 +109,56 @@ describe('parseAiSchemaImprovementSuggestionsResponse', () => {
 \`\`\``;
     const r = parseAiSchemaImprovementSuggestionsResponse(md);
     expect(r?.suggestions.map((s) => s.estimatedOverallScoreDelta)).toEqual([4, 25, -25]);
+  });
+
+  it('parses optional apply set_class_description', () => {
+    const md =
+      '```json\n{"thinking":"","summary":"","suggestions":[{"title":"Doc Order","detail":"Add text","category":"documentation","effort":"quick_win","estimatedOverallScoreDelta":2,"apply":{"type":"set_class_description","className":"Order","description":"Represents a customer order."}}]}\n```';
+    const r = parseAiSchemaImprovementSuggestionsResponse(md);
+    expect(r?.suggestions[0].apply).toEqual({
+      type: 'set_class_description',
+      className: 'Order',
+      description: 'Represents a customer order.',
+    });
+  });
+
+  it('parses optional apply set_property_description', () => {
+    const md =
+      '```json\n{"thinking":"","summary":"","suggestions":[{"title":"Prop","detail":"d","category":"documentation","effort":"quick_win","estimatedOverallScoreDelta":1,"apply":{"type":"set_property_description","className":"User","propertyName":"email","description":"Primary contact email."}}]}\n```';
+    const r = parseAiSchemaImprovementSuggestionsResponse(md);
+    expect(r?.suggestions[0].apply).toEqual({
+      type: 'set_property_description',
+      className: 'User',
+      propertyName: 'email',
+      description: 'Primary contact email.',
+    });
+  });
+
+  it('omits invalid apply payloads', () => {
+    const md =
+      '```json\n{"thinking":"","summary":"","suggestions":[{"title":"x","detail":"y","category":"documentation","effort":"quick_win","estimatedOverallScoreDelta":1,"apply":{"type":"unknown","className":"A","description":"b"}}]}\n```';
+    const r = parseAiSchemaImprovementSuggestionsResponse(md);
+    expect(r?.suggestions[0].apply).toBeUndefined();
+  });
+});
+
+describe('normalizeAiSchemaImprovementApplyAction', () => {
+  it('returns undefined for malformed payloads', () => {
+    expect(normalizeAiSchemaImprovementApplyAction(null)).toBeUndefined();
+    expect(normalizeAiSchemaImprovementApplyAction({ type: 'set_class_description' })).toBeUndefined();
+  });
+
+  it('clamps long descriptions', () => {
+    const long = 'x'.repeat(9000);
+    const a = normalizeAiSchemaImprovementApplyAction({
+      type: 'set_class_description',
+      className: 'Z',
+      description: long,
+    });
+    expect(a?.type).toBe('set_class_description');
+    if (a?.type === 'set_class_description') {
+      expect(a.description.length).toBe(8000);
+    }
   });
 });
 
