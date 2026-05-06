@@ -1561,8 +1561,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         description: formData.description || null,
         data: dataObject,
       });
-
-      onClose();
+      // The parent onSubmit is responsible for closing or advancing the dialog
+      // (e.g. stepping through pendingBulkSeeds). Do not call onClose() here.
     } catch (error) {
       console.error('Error submitting property:', error);
       setPropertyError(error instanceof Error ? error.message : 'An error occurred while saving the property');

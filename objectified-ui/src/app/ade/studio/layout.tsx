@@ -292,9 +292,12 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const handlePropertySubmit = async (propertyData: { name: string; description: string | null; data: any }) => {
     if (!selectedProjectId) throw new Error('No project selected');
 
+    // Capture dialog state synchronously before any awaits to avoid stale closure.
+    const { mode, selectedProperty, pendingBulkSeeds } = propertyDialog;
+
     try {
       let response;
-      if (propertyDialog.mode === 'add') {
+      if (mode === 'add') {
         response = await fetch(`/api/properties/${selectedProjectId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -304,8 +307,8 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
             data: propertyData.data,
           }),
         });
-      } else if (propertyDialog.selectedProperty) {
-        response = await fetch(`/api/properties/${selectedProjectId}/${propertyDialog.selectedProperty.id}`, {
+      } else if (selectedProperty) {
+        response = await fetch(`/api/properties/${selectedProjectId}/${selectedProperty.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -323,7 +326,6 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         throw new Error(result.error || 'Failed to save property');
       }
 
-      const { mode, pendingBulkSeeds } = propertyDialog;
       if (mode === 'add' && pendingBulkSeeds && pendingBulkSeeds.length > 0) {
         const [next, ...rest] = pendingBulkSeeds;
         setPropertyDialog({
