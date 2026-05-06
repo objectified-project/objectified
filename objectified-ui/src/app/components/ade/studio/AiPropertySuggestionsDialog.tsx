@@ -540,7 +540,7 @@ export function AiPropertySuggestionsDialog({
             <section aria-label="Selected suggestion detail" className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-600">
               <div>
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Property thinking
+                  Why this property
                 </h3>
                 <p className="text-sm text-slate-700 dark:text-slate-300">
                   {suggestionPublicExplanation(selectedSuggestion) || '—'}
