@@ -80,11 +80,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - ✅ "Add pagination to 'GET /users' endpoint" (optional user focus + metrics)
 - ✅ Prioritized action items (quick wins first) (#254)
 - ✅ Estimated score impact for each fix (#255)
-- 📋 Bulk apply recommendations
-
-| Ticket | Feature Description                    |
-|--------|----------------------------------------|
-| #256   | Add bulk apply recommendations         |
+- ✅ Bulk apply recommendations (#256): structured class/property description fills from the AI dialog
 
 ### AI Schema Health Insights
 

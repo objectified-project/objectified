@@ -279,7 +279,12 @@ Return **exactly one** markdown fenced JSON block and **nothing outside the fenc
       "detail": "Concrete explanation: what to change, where to look, and why it helps quality or maintainability.",
       "category": "documentation",
       "effort": "quick_win",
-      "estimatedOverallScoreDelta": 3
+      "estimatedOverallScoreDelta": 3,
+      "apply": {
+        "type": "set_class_description",
+        "className": "ExactPascalCaseClassFromDigest",
+        "description": "1–4 sentences; becomes the class description in Studio when the user bulk-applies."
+      }
     }
   ]
 }
@@ -299,6 +304,11 @@ Return **exactly one** markdown fenced JSON block and **nothing outside the fenc
 - Ground suggestions in the **digest numbers and named classes/properties** when present—do not invent entities that contradict the digest.
 - It is acceptable to mention **future** API design (pagination, error models, versioning) when metrics imply large graphs, hubs, or wide classes—even if paths are not listed.
 - Prefer distinct suggestions; do not repeat the same idea with different wording.
+- Optional **apply** per suggestion (#256): include **only** when the row is a **documentation** fix that can be automated as filling a **currently empty** Studio description, and you can copy **exact** \`className\` / \`propertyName\` identifiers from the digest lists of missing documentation (never invent names).
+  - **set_class_description**: \`{"type":"set_class_description","className":"<name>","description":"<text>"}\` — class must appear under classes missing description.
+  - **set_property_description**: \`{"type":"set_property_description","className":"<Class>","propertyName":"<prop>","description":"<text>"}\` — pair must match a \`ClassName.propertyName\` line under properties missing description.
+  - Omit **apply** for naming, structure, API design, or any suggestion that is not a straight empty-description fill.
+  - At most **one** **apply** object per suggestion; descriptions must stay concise (well under 8000 characters).
 - Do not output OpenAPI JSON, full schemas, or code blocks other than the single fenced JSON payload.`;
 
 function buildSchemaImprovementSuggestionsSystem(options: {

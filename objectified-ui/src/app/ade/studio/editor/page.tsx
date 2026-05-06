@@ -147,9 +147,14 @@ import {
 import {
   deleteClassWithSession,
   updateClassCanvasMetadataWithSession,
+  updateClassWithSession,
   getClassesWithPropertiesAndTagsWithSession,
   getClassWithPropertiesAndTagsWithSession
 } from '../../../../../lib/api/rest-client';
+import type {
+  AiSchemaImprovementApplyAction,
+  AiSchemaImprovementBulkApplyResult,
+} from '@lib/ai-schema-improvement-suggestions';
 import ClassNode from '../../../components/ade/studio/ClassNode';
 import EdgeWithWideHit from '../../../components/ade/studio/EdgeWithWideHit';
 import GroupNode, { GROUP_COLORS } from '../../../components/ade/studio/GroupNode';
@@ -2478,6 +2483,107 @@ const StudioContent = () => {
       console.error('Failed to update single class node:', error);
     }
   }, [setNodes, setEdges, selectedVersionId, updateNodeInternals]);
+
+  const handleBulkApplyAiSchemaImprovements = useCallback(
+    async (actions: AiSchemaImprovementApplyAction[]): Promise<AiSchemaImprovementBulkApplyResult> => {
+      const failures: string[] = [];
+      if (isReadOnly) {
+        return { applied: 0, skipped: actions.length, failures };
+      }
+      let applied = 0;
+      let skipped = 0;
+      const touched = new Set<string>();
+
+      for (const action of actions) {
+        const classNode = nodes.find(
+          (n) =>
+            n.type !== 'groupNode' &&
+            String((n.data as { name?: string })?.name ?? '').trim() === action.className
+        );
+        if (!classNode || classNode.type === 'groupNode') {
+          skipped++;
+          continue;
+        }
+        const classId = classNode.id;
+        const data = classNode.data as {
+          name?: string;
+          description?: string;
+          schema?: unknown;
+          properties?: Array<{ id?: string; name?: string; description?: string; data?: unknown }>;
+        };
+
+        if (action.type === 'set_class_description') {
+          if (String(data.description ?? '').trim()) {
+            skipped++;
+            continue;
+          }
+          const res = await updateClassWithSession(
+            classId,
+            String(data.name ?? action.className).trim(),
+            action.description,
+            data.schema ?? {}
+          );
+          if (res.success) {
+            applied++;
+            touched.add(classId);
+          } else {
+            failures.push(`${action.className}: ${res.error ?? 'update failed'}`);
+          }
+          continue;
+        }
+
+        const props = data.properties ?? [];
+        const prop = props.find((p) => String(p?.name ?? '').trim() === action.propertyName);
+        if (!prop?.id) {
+          skipped++;
+          continue;
+        }
+        if (String(prop.description ?? '').trim()) {
+          skipped++;
+          continue;
+        }
+        let propData: unknown = prop.data;
+        if (typeof propData === 'string') {
+          try {
+            propData = JSON.parse(propData);
+          } catch {
+            failures.push(`${action.className}.${action.propertyName}: invalid property JSON`);
+            continue;
+          }
+        }
+        const response = await fetch(`/api/classes/${classId}/properties/${prop.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: String(prop.name ?? action.propertyName).trim(),
+            description: action.description,
+            data: propData ?? {},
+          }),
+        });
+        let result: { success?: boolean; error?: string } = {};
+        try {
+          result = (await response.json()) as { success?: boolean; error?: string };
+        } catch {
+          result = {};
+        }
+        if (result.success) {
+          applied++;
+          touched.add(classId);
+        } else {
+          failures.push(
+            `${action.className}.${action.propertyName}: ${result.error ?? `HTTP ${response.status}`}`
+          );
+        }
+      }
+
+      for (const id of touched) {
+        await updateSingleClassNode(id);
+      }
+
+      return { applied, skipped, failures };
+    },
+    [isReadOnly, nodes, updateSingleClassNode]
+  );
 
 // Helper function to extract inline properties from a property schema
   const extractInlineProperties = (propData: any): { name: string; data: any; description?: string }[] => {
@@ -10617,6 +10723,8 @@ const StudioContent = () => {
             versionId={selectedVersionId || null}
             studioMetricsDigest={aiImprovementDigest}
             existingClassNames={aiImprovementClassNames}
+            readOnly={isReadOnly}
+            onBulkApplyDocumentation={handleBulkApplyAiSchemaImprovements}
           />
           <LayoutRevisionDiffDialog
             open={layoutDiffOpen}

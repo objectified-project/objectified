@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,8 @@ import { Bot, Copy, Loader2, Square, Sparkles } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/Tooltip';
 import {
   parseAiSchemaImprovementSuggestionsResponse,
+  type AiSchemaImprovementApplyAction,
+  type AiSchemaImprovementBulkApplyResult,
   type AiSchemaImprovementEffort,
   type AiSchemaImprovementSuggestionsPayload,
 } from '@lib/ai-schema-improvement-suggestions';
@@ -32,6 +34,13 @@ export interface AiSchemaImprovementSuggestionsDialogProps {
   /** Pre-built digest from Schema Metrics (required when generating). */
   studioMetricsDigest: string;
   existingClassNames: string[];
+  /** When true, bulk apply controls are disabled. */
+  readOnly?: boolean;
+  /**
+   * Applies selected structured documentation actions (#256).
+   * Parent persists via REST and refreshes affected class nodes.
+   */
+  onBulkApplyDocumentation?: (actions: AiSchemaImprovementApplyAction[]) => Promise<AiSchemaImprovementBulkApplyResult>;
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -69,6 +78,8 @@ export function AiSchemaImprovementSuggestionsDialog({
   versionId,
   studioMetricsDigest,
   existingClassNames,
+  readOnly = false,
+  onBulkApplyDocumentation,
 }: AiSchemaImprovementSuggestionsDialogProps) {
   const [hint, setHint] = useState('');
   const [modelNames, setModelNames] = useState<string[]>([]);
@@ -78,6 +89,9 @@ export function AiSchemaImprovementSuggestionsDialog({
   const [parsed, setParsed] = useState<AiSchemaImprovementSuggestionsPayload | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [copyIdx, setCopyIdx] = useState<number | null>(null);
+  const [selectedApplyIndices, setSelectedApplyIndices] = useState<Set<number>>(() => new Set());
+  const [applyBusy, setApplyBusy] = useState(false);
+  const [applyBanner, setApplyBanner] = useState<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -121,11 +135,77 @@ export function AiSchemaImprovementSuggestionsDialog({
       setParsed(null);
       setParseError(null);
       setCopyIdx(null);
+      setSelectedApplyIndices(new Set());
+      setApplyBanner(null);
+      setApplyBusy(false);
       setIsGenerating(false);
       abortRef.current?.abort();
       abortRef.current = null;
     }
   }, [open]);
+
+  useEffect(() => {
+    setSelectedApplyIndices(new Set());
+    setApplyBanner(null);
+  }, [parsed]);
+
+  const actionableIndices = useMemo(() => {
+    if (!parsed) return [];
+    const out: number[] = [];
+    parsed.suggestions.forEach((s, i) => {
+      if (s.apply) out.push(i);
+    });
+    return out;
+  }, [parsed]);
+
+  const selectedApplyCount = useMemo(() => {
+    let n = 0;
+    for (const i of selectedApplyIndices) {
+      if (parsed?.suggestions[i]?.apply) n += 1;
+    }
+    return n;
+  }, [parsed, selectedApplyIndices]);
+
+  const toggleApplySelect = useCallback((idx: number) => {
+    setSelectedApplyIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }, []);
+
+  const selectAllActionable = useCallback(() => {
+    setSelectedApplyIndices(new Set(actionableIndices));
+  }, [actionableIndices]);
+
+  const clearApplySelection = useCallback(() => {
+    setSelectedApplyIndices(new Set());
+  }, []);
+
+  const handleBulkApply = useCallback(async () => {
+    if (!parsed || !onBulkApplyDocumentation || readOnly || applyBusy) return;
+    const ordered = [...selectedApplyIndices].sort((a, b) => a - b);
+    const actions: AiSchemaImprovementApplyAction[] = [];
+    for (const i of ordered) {
+      const a = parsed.suggestions[i]?.apply;
+      if (a) actions.push(a);
+    }
+    if (actions.length === 0) return;
+    setApplyBusy(true);
+    setApplyBanner(null);
+    try {
+      const r = await onBulkApplyDocumentation(actions);
+      const failNote = r.failures.length ? ` ${r.failures.slice(0, 2).join('; ')}` : '';
+      setApplyBanner(
+        `Applied ${r.applied}, skipped ${r.skipped}.${failNote}${r.failures.length > 2 ? ' …' : ''}`.trim(),
+      );
+    } catch (e) {
+      setApplyBanner(e instanceof Error ? e.message : 'Bulk apply failed.');
+    } finally {
+      setApplyBusy(false);
+    }
+  }, [parsed, onBulkApplyDocumentation, readOnly, applyBusy, selectedApplyIndices]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -242,6 +322,7 @@ export function AiSchemaImprovementSuggestionsDialog({
           </DialogTitle>
           <p className="text-xs text-gray-500 dark:text-gray-400 font-normal pt-1">
             Uses live Schema Metrics and class names from the canvas. Quick wins are listed first; each row shows effort, optional estimated impact on the 0–100 overall schema quality score, and category.
+            When the model includes structured apply targets, you can bulk-fill empty class or property descriptions after review.
             Suggestions are advisory—review before changing your model.
           </p>
         </DialogHeader>
@@ -322,6 +403,67 @@ export function AiSchemaImprovementSuggestionsDialog({
                   {parsed.summary}
                 </p>
               ) : null}
+              {onBulkApplyDocumentation && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    data-testid="ai-schema-improvement-select-all-apply"
+                    disabled={
+                      readOnly || isGenerating || applyBusy || actionableIndices.length === 0
+                    }
+                    onClick={selectAllActionable}
+                  >
+                    Select all with Studio actions
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    data-testid="ai-schema-improvement-clear-apply-selection"
+                    disabled={readOnly || isGenerating || applyBusy || selectedApplyCount === 0}
+                    onClick={clearApplySelection}
+                  >
+                    Clear selection
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className="shrink-0"
+                    data-testid="ai-schema-improvement-bulk-apply"
+                    disabled={
+                      readOnly ||
+                      isGenerating ||
+                      applyBusy ||
+                      selectedApplyCount === 0 ||
+                      !onBulkApplyDocumentation
+                    }
+                    onClick={() => void handleBulkApply()}
+                  >
+                    {applyBusy ? 'Applying…' : `Apply selected (${selectedApplyCount})`}
+                  </Button>
+                  {readOnly ? (
+                    <span className="text-amber-700 dark:text-amber-300">Read-only canvas</span>
+                  ) : null}
+                </div>
+              )}
+              {applyBanner ? (
+                <p
+                  className="text-xs text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-600 rounded-md px-2 py-1.5 bg-gray-50 dark:bg-gray-900/30"
+                  data-testid="ai-schema-improvement-apply-banner"
+                >
+                  {applyBanner}
+                </p>
+              ) : null}
+              {onBulkApplyDocumentation && parsed && actionableIndices.length === 0 ? (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  No rows include structured Studio apply targets; use Copy or regenerate with a docs-focused hint.
+                </p>
+              ) : null}
               <ul className="space-y-2" data-testid="ai-schema-improvement-list">
                 {parsed.suggestions.map((s, i) => (
                   <li
@@ -329,7 +471,20 @@ export function AiSchemaImprovementSuggestionsDialog({
                     className="rounded-lg border border-gray-200 dark:border-gray-600 p-3 bg-white dark:bg-gray-900/30"
                     data-testid={`ai-schema-improvement-item-${i}`}
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      {s.apply && onBulkApplyDocumentation ? (
+                        <label className="flex items-start gap-2 pt-0.5 shrink-0 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"
+                            data-testid={`ai-schema-improvement-apply-checkbox-${i}`}
+                            checked={selectedApplyIndices.has(i)}
+                            disabled={readOnly || isGenerating || applyBusy}
+                            onChange={() => toggleApplySelect(i)}
+                            aria-label={`Select apply for ${s.title}`}
+                          />
+                        </label>
+                      ) : null}
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
                           <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{s.title}</span>
@@ -361,6 +516,14 @@ export function AiSchemaImprovementSuggestionsDialog({
                           ) : null}
                         </div>
                         <p className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{s.detail}</p>
+                        {s.apply ? (
+                          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-2 font-mono break-all">
+                            Studio apply:{' '}
+                            {s.apply.type === 'set_class_description'
+                              ? `class ${s.apply.className}`
+                              : `${s.apply.className}.${s.apply.propertyName}`}
+                          </p>
+                        ) : null}
                       </div>
                       <Button
                         type="button"
