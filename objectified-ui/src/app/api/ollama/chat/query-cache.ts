@@ -64,6 +64,8 @@ export type OllamaChatCacheKeyInput = {
   versionId?: string;
   /** Client SHA-256 of full class/property schemas so cache invalidates when OpenAPI state changes (#526). */
   schemaContextFingerprint?: unknown;
+  /** Studio metrics digest for schema_improvement_suggestions (#253). */
+  studioMetricsDigest?: unknown;
   messages: unknown;
 };
 
@@ -76,6 +78,10 @@ export function normalizeSchemaContextFingerprint(value: unknown): string | null
 /** Hash of request fields excluding messages — semantic hits require this to match exactly. */
 export function ollamaChatSemanticContextKey(input: Omit<OllamaChatCacheKeyInput, 'messages'>): string {
   const fp = normalizeSchemaContextFingerprint(input.schemaContextFingerprint);
+  const digest =
+    typeof input.studioMetricsDigest === 'string' && input.studioMetricsDigest.trim()
+      ? input.studioMetricsDigest.trim().slice(0, 64_000)
+      : null;
   const payload = stableStringify({
     model: input.model.trim(),
     task: input.task ?? null,
@@ -85,6 +91,7 @@ export function ollamaChatSemanticContextKey(input: Omit<OllamaChatCacheKeyInput
     currentTableName: input.currentTableName ?? null,
     versionId: input.versionId ?? null,
     schemaContextFingerprint: fp,
+    studioMetricsDigest: digest,
   });
   return createHash('sha256').update(payload, 'utf8').digest('hex');
 }
@@ -112,6 +119,10 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 
 export function ollamaChatCacheKey(input: OllamaChatCacheKeyInput): string {
   const fp = normalizeSchemaContextFingerprint(input.schemaContextFingerprint);
+  const digest =
+    typeof input.studioMetricsDigest === 'string' && input.studioMetricsDigest.trim()
+      ? input.studioMetricsDigest.trim().slice(0, 64_000)
+      : null;
   const payload = stableStringify({
     model: input.model.trim(),
     task: input.task ?? null,
@@ -121,6 +132,7 @@ export function ollamaChatCacheKey(input: OllamaChatCacheKeyInput): string {
     currentTableName: input.currentTableName ?? null,
     versionId: input.versionId ?? null,
     schemaContextFingerprint: fp,
+    studioMetricsDigest: digest,
     messages: input.messages,
   });
   return createHash('sha256').update(payload, 'utf8').digest('hex');

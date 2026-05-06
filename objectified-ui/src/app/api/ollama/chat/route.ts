@@ -255,6 +255,55 @@ function buildPropertyTypeSuggestionsSystem(options: {
   return s;
 }
 
+const SCHEMA_IMPROVEMENT_SUGGESTIONS_SYSTEM = `You are a senior API and JSON Schema reviewer helping a team improve an OpenAPI 3.1–oriented data model in Objectified Studio.
+
+You receive **measured canvas metrics** (class counts, documentation coverage, naming compliance, dependency complexity, samples of gaps). Your job is to propose **prioritized, actionable improvements** that a human can follow—similar in tone to:
+
+- "Add descriptions to N classes to improve docs score"
+- "Rename M properties to follow camelCase convention"
+- "Split 'X' class — it has many properties (recommend decomposition when a class mixes unrelated concerns)"
+- "Add pagination to 'GET /…' list endpoints" (when the user or digest implies large collections / list APIs)
+
+# Output format
+
+Return **exactly one** markdown fenced JSON block and **nothing outside the fence** (no preamble, no trailing commentary):
+
+\`\`\`json
+{
+  "thinking": "2–5 sentences: how you read the metrics and what you prioritized.",
+  "summary": "2–4 sentences: overall themes in your suggestion set.",
+  "suggestions": [
+    {
+      "title": "Short imperative headline the user can scan (max ~120 chars).",
+      "detail": "Concrete explanation: what to change, where to look, and why it helps quality or maintainability.",
+      "category": "documentation"
+    }
+  ]
+}
+\`\`\`
+
+# Rules
+
+- Emit **6–12** suggestions unless the digest is extremely small (then 3–5 is fine).
+- Every "title" and "detail" must be non-empty strings.
+- "category" must be one of: "documentation", "naming", "structure", "api", "performance", "other". Pick the best fit per row.
+- Ground suggestions in the **digest numbers and named classes/properties** when present—do not invent entities that contradict the digest.
+- It is acceptable to mention **future** API design (pagination, error models, versioning) when metrics imply large graphs, hubs, or wide classes—even if paths are not listed.
+- Prefer distinct suggestions; do not repeat the same idea with different wording.
+- Do not output OpenAPI JSON, full schemas, or code blocks other than the single fenced JSON payload.`;
+
+function buildSchemaImprovementSuggestionsSystem(options: {
+  studioMetricsDigest: string;
+  existingClassNames?: string[];
+}): string {
+  let s = SCHEMA_IMPROVEMENT_SUGGESTIONS_SYSTEM;
+  s += `\n\n# Studio metrics digest\n\n${options.studioMetricsDigest.trim()}`;
+  if (options.existingClassNames?.length) {
+    s += `\n\n# Class names on canvas (PascalCase expected)\n${options.existingClassNames.join(', ')}`;
+  }
+  return s;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -267,6 +316,7 @@ export async function POST(request: NextRequest) {
       currentTableName,
       versionId,
       schemaContextFingerprint,
+      studioMetricsDigest,
       targetPropertyName,
       targetClassName,
     } = await request.json();
@@ -282,7 +332,20 @@ export async function POST(request: NextRequest) {
     const isDataQuery = task === 'data_query';
     const isPropertySuggestions = task === 'property_suggestions';
     const isPropertyTypeSuggestions = task === 'property_type_suggestions';
+    const isSchemaImprovementSuggestions = task === 'schema_improvement_suggestions';
     const usesPropertyLibraryContext = isClassSkeleton || isPropertySuggestions || isPropertyTypeSuggestions;
+
+    const digestStr =
+      typeof studioMetricsDigest === 'string' && studioMetricsDigest.trim().length > 0
+        ? studioMetricsDigest.trim().slice(0, 64_000)
+        : '';
+
+    if (isSchemaImprovementSuggestions && !digestStr) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid request: studioMetricsDigest is required for schema_improvement_suggestions' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
 
     // Create a system message to guide the LLM
     const systemContent = isClassSkeleton
@@ -307,6 +370,13 @@ export async function POST(request: NextRequest) {
                 targetPropertyName: typeof targetPropertyName === 'string' ? targetPropertyName : undefined,
                 targetClassName: typeof targetClassName === 'string' ? targetClassName : undefined,
               })
+            : isSchemaImprovementSuggestions
+              ? buildSchemaImprovementSuggestionsSystem({
+                  studioMetricsDigest: digestStr,
+                  existingClassNames: Array.isArray(existingClassNames)
+                    ? existingClassNames.filter((n: unknown): n is string => typeof n === 'string' && n.trim().length > 0)
+                    : undefined,
+                })
             : `You are an expert API designer and OpenAPI specification generator. Your task is to help users create OpenAPI 3.1.0 specifications based on their natural language descriptions.
 
 # Rules
@@ -373,27 +443,32 @@ Do not repeat the full JSON spec outside the code block. Do not add other sectio
     // Prepare messages with system prompt
     const fullMessages = [systemMessage, ...messages];
 
+    const improvementClassNames =
+      isSchemaImprovementSuggestions && Array.isArray(existingClassNames) ? existingClassNames : undefined;
+
     const cacheKey = ollamaChatCacheKey({
       model: typeof model === 'string' ? model : '',
       task: typeof task === 'string' ? task : undefined,
-      existingClassNames: usesPropertyLibraryContext ? existingClassNames : undefined,
+      existingClassNames: usesPropertyLibraryContext ? existingClassNames : improvementClassNames,
       existingProperties: usesPropertyLibraryContext ? existingProperties : undefined,
       tableNames: isDataQuery ? tableNames : undefined,
       currentTableName: isDataQuery ? currentTableName : undefined,
       versionId: typeof versionId === 'string' ? versionId : undefined,
       schemaContextFingerprint,
+      studioMetricsDigest: isSchemaImprovementSuggestions ? digestStr : undefined,
       messages,
     });
 
     const semanticContextKey = ollamaChatSemanticContextKey({
       model: typeof model === 'string' ? model : '',
       task: typeof task === 'string' ? task : undefined,
-      existingClassNames: usesPropertyLibraryContext ? existingClassNames : undefined,
+      existingClassNames: usesPropertyLibraryContext ? existingClassNames : improvementClassNames,
       existingProperties: usesPropertyLibraryContext ? existingProperties : undefined,
       tableNames: isDataQuery ? tableNames : undefined,
       currentTableName: isDataQuery ? currentTableName : undefined,
       versionId: typeof versionId === 'string' ? versionId : undefined,
       schemaContextFingerprint,
+      studioMetricsDigest: isSchemaImprovementSuggestions ? digestStr : undefined,
     });
 
     const cached = getCachedOllamaChatResponse(cacheKey);

@@ -58,6 +58,17 @@ describe('ollamaChatCacheKey', () => {
     expect(k1).not.toBe(k2);
     expect(k1).not.toBe(kNone);
   });
+
+  it('changes when studioMetricsDigest differs (#253)', () => {
+    const base = {
+      model: 'm',
+      task: 'schema_improvement_suggestions',
+      messages: [{ role: 'user', content: 'go' }],
+    };
+    const a = ollamaChatCacheKey({ ...base, studioMetricsDigest: 'digest-a' });
+    const b = ollamaChatCacheKey({ ...base, studioMetricsDigest: 'digest-b' });
+    expect(a).not.toBe(b);
+  });
 });
 
 describe('normalizeSchemaContextFingerprint', () => {
@@ -154,6 +165,13 @@ describe('ollamaChatSemanticContextKey', () => {
     const base = { model: 'm', task: undefined };
     const a = ollamaChatSemanticContextKey({ ...base, schemaContextFingerprint: 'f1' });
     const b = ollamaChatSemanticContextKey({ ...base, schemaContextFingerprint: 'f2' });
+    expect(a).not.toBe(b);
+  });
+
+  it('changes when studioMetricsDigest differs (#253)', () => {
+    const base = { model: 'm', task: 'schema_improvement_suggestions' };
+    const a = ollamaChatSemanticContextKey({ ...base, studioMetricsDigest: 'x' });
+    const b = ollamaChatSemanticContextKey({ ...base, studioMetricsDigest: 'y' });
     expect(a).not.toBe(b);
   });
 });
