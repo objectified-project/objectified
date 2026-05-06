@@ -351,14 +351,14 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
           open: true,
           mode: 'add',
           selectedProperty: next,
-          pendingBulkSeeds: rest.length > 0 ? rest : null,
+          pendingBulkSeeds: rest,
         });
       } else {
         setPropertyDialog({ open: false, mode: 'add', selectedProperty: null, pendingBulkSeeds: null });
       }
       setRefreshKey(prev => prev + 1);
 
-      if (mode === 'add' && (!pendingBulkSeeds || pendingBulkSeeds.length === 0)) {
+      if (mode === 'add' && pendingBulkSeeds === null) {
         const newCount = properties.length + 1;
         if (newCount === 1 || newCount === 3) {
           void handlePropertyAiSuggest();
@@ -711,7 +711,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
               open: true,
               mode: 'add',
               selectedProperty: first,
-              pendingBulkSeeds: rest.length > 0 ? rest : null,
+              pendingBulkSeeds: rest,
             });
           }}
         />
