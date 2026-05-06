@@ -69,6 +69,20 @@ describe('parseAiSchemaImprovementSuggestionsResponse', () => {
     expect(r?.suggestions[1].effort).toBe('substantial');
   });
 
+  it('normalizes spaced effort variants (e.g. "quick win" with a space)', () => {
+    const md = `\`\`\`json
+{"thinking":"","summary":"","suggestions":[
+  {"title":"a","detail":"d","category":"other","effort":"quick win"},
+  {"title":"b","detail":"d","category":"other","effort":"Quick Win"},
+  {"title":"c","detail":"d","category":"other","effort":"QUICK WIN"}
+]}
+\`\`\``;
+    const r = parseAiSchemaImprovementSuggestionsResponse(md);
+    expect(r?.suggestions[0].effort).toBe('quick_win');
+    expect(r?.suggestions[1].effort).toBe('quick_win');
+    expect(r?.suggestions[2].effort).toBe('quick_win');
+  });
+
   it('returns null when no json fence', () => {
     expect(parseAiSchemaImprovementSuggestionsResponse('no fence')).toBeNull();
   });

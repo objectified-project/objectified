@@ -66,7 +66,7 @@ function normalizeCategory(raw: unknown): AiSchemaImprovementCategory {
 
 function normalizeEffort(raw: unknown): AiSchemaImprovementEffort {
   if (typeof raw !== 'string') return 'moderate';
-  const key = raw.trim().toLowerCase().replace(/-/g, '_');
+  const key = raw.trim().toLowerCase().replace(/[\s-]+/g, '_');
   if (key === 'quick_win' || key === 'quickwin') return 'quick_win';
   if (key === 'substantial' || key === 'large' || key === 'major') return 'substantial';
   if (key === 'moderate' || key === 'medium') return 'moderate';
