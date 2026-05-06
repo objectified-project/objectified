@@ -22,6 +22,7 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
     complexityScore: 30,
     complexityLabel: 'Low',
     complexityBreakdown: [{ label: 'Class count', value: 3, weight: 10, contribution: 3 }],
+    conditionalSchemaCyclomaticTotal: 0,
     documentationCompletionPercentage: 80,
     classesMissingDocumentation: [],
     propertiesMissingDocumentation: [],
@@ -100,5 +101,14 @@ describe('buildSchemaScoreCompareRows', () => {
     expect(row?.valueA).toBe('70%');
     expect(row?.valueB).toBe('85%');
     expect(row?.delta).toBe('+15');
+  });
+
+  it('labels lower conditional cyclomatic as positive when newer has fewer (#612)', () => {
+    const older = makeMinimalMetrics({ conditionalSchemaCyclomaticTotal: 5 });
+    const newer = makeMinimalMetrics({ conditionalSchemaCyclomaticTotal: 2 });
+    const rows = buildSchemaScoreCompareRows(older, newer);
+    const row = rows.find((r) => r.label === 'Conditional schema cyclomatic');
+    expect(row?.delta).toBe('-3');
+    expect(row?.deltaTone).toBe('positive');
   });
 });

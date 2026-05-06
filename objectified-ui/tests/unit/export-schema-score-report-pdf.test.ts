@@ -60,6 +60,7 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
     complexityBreakdown: [
       { label: 'Class count', value: 3, weight: 10, contribution: 3 },
     ],
+    conditionalSchemaCyclomaticTotal: 0,
     documentationCompletionPercentage: 100,
     classesMissingDocumentation: [],
     propertiesMissingDocumentation: [],
@@ -161,13 +162,30 @@ describe('downloadSchemaScoreReportPdf', () => {
   it('includes cognitive complexity section when rows are present', () => {
     const metrics = makeMinimalMetrics({
       cognitiveComplexityPerClass: [
-        { classId: 'c1', className: 'Heavy', score: 15, propertyContribution: 12, referenceContribution: 3 },
+        {
+          classId: 'c1',
+          className: 'Heavy',
+          score: 15,
+          propertyContribution: 12,
+          referenceContribution: 3,
+          conditionalSchemaCyclomaticContribution: 0,
+        },
       ],
     });
     downloadSchemaScoreReportPdf({ metrics, projectName: 'P', versionLabel: 'v1' });
     const joined = (mockText.mock.calls as Array<[string, ...unknown[]]>).map((c) => String(c[0])).join('\n');
     expect(joined).toContain('Cognitive complexity per class');
-    expect(joined).toContain('Heavy | 15 | 12 | 3');
+    expect(joined).toContain('Heavy | 15 | 12 | 3 | 0');
+  });
+
+  it('includes conditional schema cyclomatic in summary (#612)', () => {
+    downloadSchemaScoreReportPdf({
+      metrics: makeMinimalMetrics({ conditionalSchemaCyclomaticTotal: 4 }),
+      projectName: 'P',
+      versionLabel: 'v1',
+    });
+    const joined = (mockText.mock.calls as Array<[string, ...unknown[]]>).map((c) => String(c[0])).join('\n');
+    expect(joined).toContain('Conditional schema cyclomatic (#612): 4');
   });
 
   it('includes dependency graph complexity section (#611)', () => {

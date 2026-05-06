@@ -19,6 +19,7 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
     complexityScore: 30,
     complexityLabel: 'Low',
     complexityBreakdown: [{ label: 'Classes', value: 3, weight: 1.5, contribution: 4.5 }],
+    conditionalSchemaCyclomaticTotal: 0,
     documentationCompletionPercentage: 80,
     classesMissingDocumentation: [],
     propertiesMissingDocumentation: [],

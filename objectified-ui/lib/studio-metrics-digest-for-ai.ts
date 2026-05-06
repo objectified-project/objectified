@@ -33,6 +33,9 @@ export function buildStudioMetricsDigestForAi(
   lines.push(`- Naming compliance (PascalCase classes + camelCase props): ${metrics.namingCompliance.compliancePercentage}%`);
   lines.push(`- Circular dependency groups: ${metrics.circularDependencyCount}`);
   lines.push(`- Deepest dependency chain length: ${metrics.deepestChainLength}`);
+  lines.push(
+    `- Conditional schema cyclomatic (#612): ${metrics.conditionalSchemaCyclomaticTotal} (if/then/else decision points summed across classes and property inline schemas)`,
+  );
   const dg = metrics.dependencyGraphComplexity;
   lines.push(
     `- Dependency graph complexity (#611): ${dg.score}/100 (${dg.scoreLabel}) — ${dg.edgeCount} dependency-only edges, deepest chain ${dg.deepestChainSteps} step(s), ${dg.circularGroupCount} cycle group(s) on refs/composition graph`,
@@ -97,10 +100,12 @@ export function buildStudioMetricsDigestForAi(
 
   if (metrics.cognitiveComplexityPerClass?.length) {
     const sorted = [...metrics.cognitiveComplexityPerClass].sort((a, b) => b.score - a.score || a.className.localeCompare(b.className));
-    lines.push('- Per-class cognitive complexity (#610; props + weighted refs; higher = harder to reason about):');
+    lines.push(
+      '- Per-class cognitive complexity (#610 + #612; props + weighted refs + conditional cyclomatic; higher = harder to reason about):',
+    );
     for (const row of take(sorted, MAX_COGNITIVE_ROWS)) {
       lines.push(
-        `  - ${row.className}: ${row.score} (props +${row.propertyContribution}, refs +${row.referenceContribution})`,
+        `  - ${row.className}: ${row.score} (props +${row.propertyContribution}, refs +${row.referenceContribution}, conditionals +${row.conditionalSchemaCyclomaticContribution})`,
       );
     }
     if (sorted.length > MAX_COGNITIVE_ROWS) {

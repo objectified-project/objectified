@@ -38,6 +38,11 @@ export interface SchemaMetricsResult {
   complexityLabel: 'Low' | 'Medium' | 'High';
   /** Per-factor contribution for "why is this score" breakdown */
   complexityBreakdown: ComplexityBreakdownItem[];
+  /**
+   * #612: Sum of cyclomatic-style counts from JSON Schema if/then/else (and nested conditionals)
+   * across all class-level schemas and property inline schemas on the canvas.
+   */
+  conditionalSchemaCyclomaticTotal: number;
   /** Documentation completion 0–100: % of classes and properties with non-empty description (#557) */
   documentationCompletionPercentage: number;
   /** Class names that have no description (for "click to see where coverage is missing") */
@@ -74,6 +79,8 @@ export interface CognitiveComplexityPerClassEntry {
   score: number;
   propertyContribution: number;
   referenceContribution: number;
+  /** #612: Cyclomatic-style load from if/then/else (and nested) in this class and its property schemas */
+  conditionalSchemaCyclomaticContribution: number;
 }
 
 /**
@@ -122,6 +129,71 @@ function getClassNodes(nodes: Node[]): Node[] {
 function getPropertyCount(node: Node): number {
   const props = (node.data as { properties?: unknown[] })?.properties;
   return Array.isArray(props) ? props.length : 0;
+}
+
+function parseJsonIfNeeded(value: unknown): unknown {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+  return value;
+}
+
+/**
+ * #612: Cyclomatic-style count of JSON Schema conditional subschemas (if/then/else).
+ * Adds 1 per object with `if`, plus 1 when `else` is present on the same object; recurses into
+ * nested keywords (allOf items, then/else branches, etc.).
+ */
+export function countConditionalSchemaCyclomaticInJsonSchema(schema: unknown): number {
+  let total = 0;
+  const seen = new WeakSet<object>();
+
+  function walk(node: unknown): void {
+    if (node === null || node === undefined) return;
+    if (Array.isArray(node)) {
+      for (const el of node) walk(el);
+      return;
+    }
+    if (typeof node !== 'object') return;
+    if (seen.has(node)) return;
+    seen.add(node);
+
+    const obj = node as Record<string, unknown>;
+    if ('if' in obj && obj.if !== undefined) {
+      total += 1;
+      if ('else' in obj && obj.else !== undefined) {
+        total += 1;
+      }
+    }
+    for (const key of Object.keys(obj)) {
+      walk(obj[key]);
+    }
+  }
+
+  walk(schema);
+  return total;
+}
+
+function conditionalSchemaCyclomaticFromClassNode(node: Node): number {
+  const data = node.data as { schema?: unknown; properties?: Array<{ data?: unknown }> };
+  let n = 0;
+  const classSchema = parseJsonIfNeeded(data?.schema);
+  if (classSchema !== undefined) {
+    n += countConditionalSchemaCyclomaticInJsonSchema(classSchema);
+  }
+  const props = data?.properties;
+  if (Array.isArray(props)) {
+    for (const p of props) {
+      const pd = parseJsonIfNeeded(p?.data);
+      if (pd !== undefined) {
+        n += countConditionalSchemaCyclomaticInJsonSchema(pd);
+      }
+    }
+  }
+  return n;
 }
 
 function hasDocumentation(value: unknown): boolean {
@@ -240,12 +312,14 @@ function computeCognitiveComplexityPerClass(classNodes: Node[], dependencyEdges:
   return classNodes.map((n) => {
     const propertyContribution = getPropertyCount(n);
     const referenceContribution = refLoadBySource.get(n.id) ?? 0;
+    const conditionalSchemaCyclomaticContribution = conditionalSchemaCyclomaticFromClassNode(n);
     return {
       classId: n.id,
       className: getNodeName(n),
-      score: propertyContribution + referenceContribution,
+      score: propertyContribution + referenceContribution + conditionalSchemaCyclomaticContribution,
       propertyContribution,
       referenceContribution,
+      conditionalSchemaCyclomaticContribution,
     };
   });
 }
@@ -519,6 +593,11 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     .map((n) => getNodeName(n!));
   const circularDependencyNodeIds = circularSccs.flat();
 
+  const conditionalSchemaCyclomaticTotal = classNodes.reduce(
+    (sum, n) => sum + conditionalSchemaCyclomaticFromClassNode(n),
+    0
+  );
+
   const { complexityScore, complexityLabel, complexityBreakdown } = computeComplexityScoreFromAggregates({
     classCount,
     totalProperties,
@@ -526,6 +605,7 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     relationshipCount: edges.length,
     deepestChainLength,
     circularDependencyCount,
+    conditionalSchemaCyclomatic: conditionalSchemaCyclomaticTotal,
   });
 
   const docResult = computeDocumentationCompletion(classNodes);
@@ -563,6 +643,7 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     complexityScore,
     complexityLabel,
     complexityBreakdown,
+    conditionalSchemaCyclomaticTotal,
     documentationCompletionPercentage: docResult.percentage,
     classesMissingDocumentation: docResult.classesMissing,
     propertiesMissingDocumentation: docResult.propertiesMissing,
@@ -736,6 +817,8 @@ export type AggregateComplexityMetrics = {
   relationshipCount: number;
   deepestChainLength: number;
   circularDependencyCount: number;
+  /** #612: Cyclomatic-style aggregate from if/then/else across the measured subgraph */
+  conditionalSchemaCyclomatic: number;
 };
 
 /**
@@ -755,7 +838,9 @@ export function computeComplexityScoreFromAggregates(metrics: AggregateComplexit
     averagePropertiesPerClass: 1.5,
     deepestChainLength: 4,
     circularDependencyCount: 6,
+    conditionalSchemaCyclomatic: 2,
   };
+  const cyclo = metrics.conditionalSchemaCyclomatic;
   const breakdown: ComplexityBreakdownItem[] = [
     { label: 'Classes', value: metrics.classCount, weight: weights.classCount, contribution: metrics.classCount * weights.classCount },
     { label: 'Total properties', value: metrics.totalProperties, weight: weights.totalProperties, contribution: metrics.totalProperties * weights.totalProperties },
@@ -763,6 +848,12 @@ export function computeComplexityScoreFromAggregates(metrics: AggregateComplexit
     { label: 'Avg properties/class', value: metrics.averagePropertiesPerClass, weight: weights.averagePropertiesPerClass, contribution: metrics.averagePropertiesPerClass * weights.averagePropertiesPerClass },
     { label: 'Deepest chain (steps)', value: metrics.deepestChainLength, weight: weights.deepestChainLength, contribution: metrics.deepestChainLength * weights.deepestChainLength },
     { label: 'Circular dependencies', value: metrics.circularDependencyCount, weight: weights.circularDependencyCount, contribution: metrics.circularDependencyCount * weights.circularDependencyCount },
+    {
+      label: 'Conditional schema cyclomatic (#612)',
+      value: cyclo,
+      weight: weights.conditionalSchemaCyclomatic,
+      contribution: cyclo * weights.conditionalSchemaCyclomatic,
+    },
   ];
   const raw = breakdown.reduce((sum, b) => sum + b.contribution, 0);
   const complexityScore = Math.min(100, Math.max(0, Math.round(raw)));
@@ -923,6 +1014,7 @@ export function computePerSchemaScores(nodes: Node[], edges: Edge[]): PerSchemaS
     const props = getPropertyCount(n);
     const degree = degreeMap.get(n.id) ?? 0;
     const chainLen = depthMemo.get(n.id) ?? 0;
+    const conditionalSchemaCyclomatic = conditionalSchemaCyclomaticFromClassNode(n);
     const { complexityScore, complexityLabel } = computeComplexityScoreFromAggregates({
       classCount: 1,
       totalProperties: props,
@@ -930,6 +1022,7 @@ export function computePerSchemaScores(nodes: Node[], edges: Edge[]): PerSchemaS
       relationshipCount: degree,
       deepestChainLength: chainLen,
       circularDependencyCount: inCycle.has(n.id) ? 1 : 0,
+      conditionalSchemaCyclomatic,
     });
     return {
       classId: n.id,

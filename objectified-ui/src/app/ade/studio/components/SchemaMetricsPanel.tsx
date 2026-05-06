@@ -786,7 +786,7 @@ export default function SchemaMetricsPanel({
                 Cognitive complexity per class
               </div>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
-                Props + weighted outgoing refs (anyOf/oneOf count double). Higher scores mean more to hold in mind when reading the model.
+                Props + weighted outgoing refs (anyOf/oneOf count double) + conditional-schema cyclomatic (#612). Higher scores mean more to hold in mind when reading the model.
               </p>
               <div className="rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden max-h-48 overflow-y-auto">
                 <table className="w-full text-[11px] border-collapse">
@@ -796,6 +796,9 @@ export default function SchemaMetricsPanel({
                       <th className="py-1.5 px-2 font-medium text-gray-600 dark:text-gray-400 text-right w-14">Score</th>
                       <th className="py-1.5 px-2 font-medium text-gray-600 dark:text-gray-400 text-right w-12">Props</th>
                       <th className="py-1.5 px-2 font-medium text-gray-600 dark:text-gray-400 text-right w-12">Refs</th>
+                      <th className="py-1.5 px-2 font-medium text-gray-600 dark:text-gray-400 text-right w-10" title="Cyclomatic-style if/then/else load (#612)">
+                        If
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -809,6 +812,7 @@ export default function SchemaMetricsPanel({
                           <td className="py-1 px-2 text-right tabular-nums font-medium text-gray-800 dark:text-gray-200">{row.score}</td>
                           <td className="py-1 px-2 text-right tabular-nums text-gray-600 dark:text-gray-400">{row.propertyContribution}</td>
                           <td className="py-1 px-2 text-right tabular-nums text-gray-600 dark:text-gray-400">{row.referenceContribution}</td>
+                          <td className="py-1 px-2 text-right tabular-nums text-gray-600 dark:text-gray-400">{row.conditionalSchemaCyclomaticContribution}</td>
                         </tr>
                       ))}
                   </tbody>
