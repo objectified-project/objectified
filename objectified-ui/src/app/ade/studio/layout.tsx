@@ -49,6 +49,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     selectedProjectId,
     selectedVersionId,
     selectedProjectName,
+    selectedProjectDomainCategoryId,
     selectedVersionLabel,
     selectedCanvasNodeIds,
     triggerCanvasRefresh,
@@ -529,7 +530,11 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     });
     return {
       project: selectedProjectId
-        ? { id: selectedProjectId, name: selectedProjectName ?? null }
+        ? {
+            id: selectedProjectId,
+            name: selectedProjectName ?? null,
+            domainCategory: selectedProjectDomainCategoryId,
+          }
         : null,
       version: selectedVersionId
         ? { id: selectedVersionId, label: selectedVersionLabel ?? null }
@@ -546,6 +551,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   }, [
     selectedProjectId,
     selectedProjectName,
+    selectedProjectDomainCategoryId,
     selectedVersionId,
     selectedVersionLabel,
     classes,

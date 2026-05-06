@@ -16,9 +16,20 @@
  * exported constants so tests pin the contract.
  */
 
+import {
+  collectStudioAiBestPracticeLinesFromStudio,
+  studioAiBestPracticeDomainHeadingFromStudio,
+} from '@/app/utils/studio-ai-best-practice-tips';
+import {
+  getProjectDomainCategoryLabel,
+  PROJECT_DOMAIN_CATEGORY_NONE,
+} from '@/app/utils/project-domain-categories';
+
 export interface ChatStudioProject {
   id: string;
   name: string | null;
+  /** Project metadata `domainCategory` when set (#243, #615). */
+  domainCategory?: string | null;
 }
 
 export interface ChatStudioVersion {
@@ -117,6 +128,13 @@ export function summarizeChatStudioContext(ctx: ChatStudioContext): string {
   const lines: string[] = [];
   if (ctx.project) {
     lines.push(`- **Project:** ${ctx.project.name ?? ctx.project.id}`);
+    const domainLabel =
+      ctx.project.domainCategory && ctx.project.domainCategory !== PROJECT_DOMAIN_CATEGORY_NONE
+        ? getProjectDomainCategoryLabel(ctx.project.domainCategory)
+        : undefined;
+    if (domainLabel) {
+      lines.push(`- **Project domain:** ${domainLabel}`);
+    }
   }
   if (ctx.version) {
     lines.push(`- **Version:** ${ctx.version.label ?? ctx.version.id}`);
@@ -192,6 +210,20 @@ export function buildChatContextPreamble(ctx: ChatStudioContext): string {
     }
     if (ctx.properties.length > visible.length) {
       sections.push(`- … and ${ctx.properties.length - visible.length} more properties not shown`);
+    }
+  }
+
+  const domainTips = collectStudioAiBestPracticeLinesFromStudio(ctx);
+  if (domainTips.length > 0) {
+    const headingLabel = studioAiBestPracticeDomainHeadingFromStudio(ctx.project);
+    sections.push('');
+    sections.push(
+      headingLabel
+        ? `#### Domain-aware best practices (${headingLabel})`
+        : '#### Domain-aware best practices',
+    );
+    for (const line of domainTips) {
+      sections.push(line.startsWith('-') ? line : `- ${line}`);
     }
   }
 

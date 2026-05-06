@@ -12,6 +12,10 @@ import {
   isChatStudioContextEmpty,
   type ChatStudioContext,
 } from './chat-context';
+import {
+  getProjectDomainCategoryLabel,
+  PROJECT_DOMAIN_CATEGORY_NONE,
+} from '@/app/utils/project-domain-categories';
 
 /**
  * "Sharing context" chip rendered just above the chat composer (#259).
@@ -107,6 +111,16 @@ function ContextDetails({ studioContext }: ContextDetailsProps) {
         label="Project"
         value={studioContext.project?.name ?? studioContext.project?.id ?? null}
       />
+      {studioContext.project?.domainCategory &&
+      studioContext.project.domainCategory !== PROJECT_DOMAIN_CATEGORY_NONE ? (
+        <DetailSection
+          label="Project domain"
+          value={
+            getProjectDomainCategoryLabel(studioContext.project.domainCategory) ??
+            studioContext.project.domainCategory
+          }
+        />
+      ) : null}
       <DetailSection
         label="Version"
         value={studioContext.version?.label ?? studioContext.version?.id ?? null}

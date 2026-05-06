@@ -139,6 +139,24 @@ describe('createDemoChatResponder', () => {
     expect(reply).toMatch(/Cart/);
   });
 
+  it('prepends domain best-practice tips in improvement suggestions when domainCategory is set (#615)', async () => {
+    const ctx: ChatStudioContext = {
+      ...richContext,
+      project: { id: 'proj-1', name: 'Acme Catalog', domainCategory: 'ecommerce' },
+    };
+    const reply = await responder({
+      messages: [],
+      prompt: 'Generate an OpenAPI spec for me',
+      isRegenerate: false,
+      studioContext: ctx,
+    });
+    const idxInventory = reply.toLowerCase().indexOf('inventory tracking');
+    const idxPagination = reply.toLowerCase().indexOf('pagination');
+    expect(idxInventory).toBeGreaterThan(-1);
+    expect(idxPagination).toBeGreaterThan(-1);
+    expect(idxInventory).toBeLessThan(idxPagination);
+  });
+
   it('embeds the project name and reusable properties in the sample OpenAPI spec', async () => {
     const reply = await responder({
       messages: [],

@@ -58,6 +58,18 @@ describe('ChatContextChip', () => {
     expect(chip).toHaveTextContent('1 selected');
   });
 
+  it('shows project domain in the popover when domainCategory is set (#615)', () => {
+    render(
+      <ChatContextChip
+        studioContext={{ ...baseContext, project: { ...baseContext.project!, domainCategory: 'ecommerce' } }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('studio-ai-chat-context-chip'));
+    const popover = screen.getByTestId('studio-ai-chat-context-popover');
+    expect(within(popover).getByText('Project domain')).toBeInTheDocument();
+    expect(within(popover).getByText(/E-commerce/i)).toBeInTheDocument();
+  });
+
   it('opens the popover and surfaces selection, classes, and properties', () => {
     render(<ChatContextChip studioContext={baseContext} />);
     fireEvent.click(screen.getByTestId('studio-ai-chat-context-chip'));

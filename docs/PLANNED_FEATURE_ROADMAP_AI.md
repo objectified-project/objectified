@@ -74,18 +74,18 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 ### AI Schema Health Insights
 
-**Best Practice Suggestions** 📋 PLANNED
-- 📋 Context-aware tips based on schema type:
+**Best Practice Suggestions** 📋 PLANNED (partially delivered)
+- ✅ Context-aware tips from project **domain category** (metadata) and **class-name heuristics** (#615):
     - E-commerce: "Consider adding inventory tracking"
-    - Authentication: "Implement refresh token pattern"
-    - Multi-tenant: "Add tenant isolation fields"
+    - Authentication-style class names (e.g. RefreshToken, Session): "Implement refresh token pattern"
+    - Multi-tenant / SaaS: "Add tenant isolation fields"
+    - One tip per registered **project domain** category (catalog in Studio)
 - 📋 Industry-specific patterns
 - Security hardening suggestions
 - Performance optimization tips
 
 | Ticket | Feature Description            |
 |--------|--------------------------------|
-| #615   | AI Best Practice Suggestions   |
 | #616   | Industry-specific Patterns     |
 | #617   | Security Hardening Suggestions |
 | #618   | Performance Optimization Tips  |

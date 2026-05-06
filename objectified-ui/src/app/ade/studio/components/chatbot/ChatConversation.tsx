@@ -9,6 +9,7 @@ import { ChatComposer } from './ChatComposer';
 import { ChatContextChip } from './ChatContextChip';
 import type { ChatStudioContext } from './chat-context';
 import { isChatStudioContextEmpty } from './chat-context';
+import { collectStudioAiBestPracticeLinesFromStudio } from '@/app/utils/studio-ai-best-practice-tips';
 import { ConversationHistoryPanel } from './ConversationHistoryPanel';
 import {
   buildStoredConversation,
@@ -324,6 +325,11 @@ export function ChatConversation({
   }, [studioContext]);
 
   const hasStudioContext = !!studioContext && !isChatStudioContextEmpty(studioContext);
+
+  const workspaceBestPracticeTips = React.useMemo(
+    () => collectStudioAiBestPracticeLinesFromStudio(studioContext),
+    [studioContext],
+  );
 
   // Restore the most recent conversation when the scope changes.
   React.useEffect(() => {
@@ -748,6 +754,7 @@ export function ChatConversation({
               <EmptyState
                 message={emptyStateMessage}
                 suggestions={PROMPT_SUGGESTIONS}
+                workspaceBestPracticeTips={workspaceBestPracticeTips}
                 onSelect={handleSend}
               />
             ) : (
@@ -1003,6 +1010,8 @@ function ToolbarButton({
 interface EmptyStateProps {
   message?: string;
   suggestions: readonly string[];
+  /** Non-clickable domain / schema heuristics (#615). */
+  workspaceBestPracticeTips?: readonly string[];
   onSelect: (prompt: string) => void;
 }
 
@@ -1028,7 +1037,7 @@ function TokenUsageStrip({ meta }: { meta: ChatStreamAccumulatedMeta }) {
   );
 }
 
-function EmptyState({ message, suggestions, onSelect }: EmptyStateProps) {
+function EmptyState({ message, suggestions, workspaceBestPracticeTips, onSelect }: EmptyStateProps) {
   return (
     <div className="flex h-full flex-col items-center justify-center text-center">
       <span className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-100 to-indigo-100 text-purple-600 dark:from-purple-900/40 dark:to-indigo-900/40 dark:text-purple-300">
@@ -1041,6 +1050,21 @@ function EmptyState({ message, suggestions, onSelect }: EmptyStateProps) {
         {message ??
           'Describe what you want to model and the assistant will draft schemas you can import in one click. The conversation is private to you.'}
       </p>
+      {workspaceBestPracticeTips && workspaceBestPracticeTips.length > 0 ? (
+        <div
+          className="mb-4 w-full max-w-sm rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-left dark:border-emerald-800/80 dark:bg-emerald-950/40"
+          data-testid="studio-ai-chat-best-practice-tips"
+        >
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-900 dark:text-emerald-200">
+            Best practices for this workspace
+          </p>
+          <ul className="list-disc space-y-1 pl-4 text-xs text-emerald-950 dark:text-emerald-100/95">
+            {workspaceBestPracticeTips.map((tip) => (
+              <li key={tip}>{tip.replace(/^\s*-\s*/, '').trim()}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <ul className="grid w-full max-w-sm gap-2 text-left">
         {suggestions.map((suggestion) => (
           <li key={suggestion}>
