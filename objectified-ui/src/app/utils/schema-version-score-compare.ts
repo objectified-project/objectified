@@ -88,6 +88,13 @@ export function buildSchemaScoreCompareRows(
     fmtInt,
     toneLowerIsBetter
   );
+  push(
+    'Maintainability index (#613)',
+    a.maintainabilityIndex.score,
+    b.maintainabilityIndex.score,
+    fmtInt,
+    toneHigherIsBetter
+  );
 
   return rows;
 }

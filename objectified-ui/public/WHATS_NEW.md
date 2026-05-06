@@ -30,6 +30,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Projects list includes a **Show deleted** switch; when on, soft-deleted projects appear with a **Deleted** badge and **Restore** or **permanent delete** in the row menu (#2981).
 
 ## Studio
+- **Schema Metrics** adds a **maintainability index** (0–100, higher = easier to evolve): composite from documentation, naming, inverted schema and dependency-graph complexity, mean cognitive load, and class-size pressure—with a factor breakdown in the panel, **AI metrics digest**, **version score compare**, and **PDF score report** (#613).
 - **Schema Metrics** counts **conditional schema cyclomatic** (#612): if/then/else decision points are summed from class and property JSON Schemas, fed into the **aggregate complexity** breakdown, **per-class cognitive** score (new If column), **AI metrics digest**, **version score compare**, and **PDF score report**.
 - **Schema Metrics** adds **dependency graph complexity** (0–100 on property references and class-level allOf/anyOf/oneOf only): headline score with factor breakdown in the panel, **AI metrics digest**, and **PDF score report** (#611).
 - **Schema Metrics** includes **cognitive complexity per class** (props plus weighted outgoing dependency edges; anyOf/oneOf count double) and feeds the same scores into the **AI improvement suggestions** metrics digest (#610).

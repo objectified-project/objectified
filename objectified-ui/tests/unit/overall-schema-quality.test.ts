@@ -1,9 +1,9 @@
 import { describe, it, expect } from '@jest/globals';
-import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import { computeMaintainabilityIndexReport, type SchemaMetricsResult } from '@/app/utils/schema-metrics';
 import { computeOverallSchemaQualityScore, computeOverallSchemaQualityDetail } from '@/app/utils/overall-schema-quality';
 
 function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): SchemaMetricsResult {
-  return {
+  const merged: SchemaMetricsResult = {
     classCount: 3,
     totalProperties: 9,
     averagePropertiesPerClass: 3,
@@ -46,6 +46,18 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
     },
     ...overrides,
   };
+  merged.maintainabilityIndex =
+    overrides.maintainabilityIndex ??
+    computeMaintainabilityIndexReport({
+      documentationCompletionPercentage: merged.documentationCompletionPercentage,
+      namingCompliancePercentage: merged.namingCompliance.compliancePercentage,
+      complexityScore: merged.complexityScore,
+      dependencyGraphScore: merged.dependencyGraphComplexity.score,
+      cognitiveComplexityPerClass: merged.cognitiveComplexityPerClass,
+      averagePropertiesPerClass: merged.averagePropertiesPerClass,
+      classCount: merged.classCount,
+    });
+  return merged;
 }
 
 describe('computeOverallSchemaQualityScore (#245)', () => {

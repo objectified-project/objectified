@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import { computeMaintainabilityIndexReport, type SchemaMetricsResult } from '@/app/utils/schema-metrics';
 
 // ── jsPDF mock ────────────────────────────────────────────────────────────────
 
@@ -42,7 +42,7 @@ import {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): SchemaMetricsResult {
-  return {
+  const merged: SchemaMetricsResult = {
     classCount: 3,
     totalProperties: 9,
     averagePropertiesPerClass: 3,
@@ -87,6 +87,18 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
     },
     ...overrides,
   };
+  merged.maintainabilityIndex =
+    overrides.maintainabilityIndex ??
+    computeMaintainabilityIndexReport({
+      documentationCompletionPercentage: merged.documentationCompletionPercentage,
+      namingCompliancePercentage: merged.namingCompliance.compliancePercentage,
+      complexityScore: merged.complexityScore,
+      dependencyGraphScore: merged.dependencyGraphComplexity.score,
+      cognitiveComplexityPerClass: merged.cognitiveComplexityPerClass,
+      averagePropertiesPerClass: merged.averagePropertiesPerClass,
+      classCount: merged.classCount,
+    });
+  return merged;
 }
 
 // ── sanitizeFilenameSegment ───────────────────────────────────────────────────
@@ -193,6 +205,14 @@ describe('downloadSchemaScoreReportPdf', () => {
     const joined = (mockText.mock.calls as Array<[string, ...unknown[]]>).map((c) => String(c[0])).join('\n');
     expect(joined).toContain('Dependency graph complexity (#611)');
     expect(joined).toContain('Dependency-only edges: 0');
+  });
+
+  it('includes maintainability index section (#613)', () => {
+    downloadSchemaScoreReportPdf({ metrics: makeMinimalMetrics(), projectName: 'P', versionLabel: 'v1' });
+    const joined = (mockText.mock.calls as Array<[string, ...unknown[]]>).map((c) => String(c[0])).join('\n');
+    expect(joined).toContain('Maintainability index (#613)');
+    expect(joined).toContain('easier to evolve');
+    expect(joined).toContain('Simplicity vs schema complexity');
   });
 
   it('does not throw with dependency metrics and layout quality', () => {

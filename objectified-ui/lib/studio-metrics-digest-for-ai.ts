@@ -40,6 +40,10 @@ export function buildStudioMetricsDigestForAi(
   lines.push(
     `- Dependency graph complexity (#611): ${dg.score}/100 (${dg.scoreLabel}) — ${dg.edgeCount} dependency-only edges, deepest chain ${dg.deepestChainSteps} step(s), ${dg.circularGroupCount} cycle group(s) on refs/composition graph`,
   );
+  const mi = metrics.maintainabilityIndex;
+  lines.push(
+    `- Maintainability index (#613): ${mi.score}/100 (${mi.scoreLabel}) — composite from documentation, naming, inverted schema/dependency complexity, mean cognitive load per class, and class-size pressure`,
+  );
   if (typeof overallQualityScore === 'number' && Number.isFinite(overallQualityScore)) {
     lines.push(
       `- Overall schema quality score (0–100 composite: docs, naming, structural load, layout when available): ${Math.min(100, Math.max(0, Math.round(overallQualityScore)))}`,
