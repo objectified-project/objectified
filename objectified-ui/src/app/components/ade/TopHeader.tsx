@@ -14,8 +14,12 @@ import { getTenantsForUser, getTenantsAdministratedByUser } from '../../../../li
 import packageJson from '../../../../package.json';
 import { isDesignerStudioNavActive, isPathsStudioNavActive } from '../../../../lib/ade-studio-nav';
 
-// Import version from package.json
-const APP_VERSION = `05-2026-v${packageJson.version}`;
+/** Optional CI/build stamp (e.g. `2026.05.05-84a231c`). Otherwise badge uses semver from package.json. */
+const APP_BUILD_LABEL = process.env.NEXT_PUBLIC_APP_BUILD_LABEL?.trim();
+const APP_VERSION_BADGE =
+  APP_BUILD_LABEL && APP_BUILD_LABEL.length > 0
+    ? APP_BUILD_LABEL
+    : `v${packageJson.version}`;
 
 type NavItem = {
   label: string;
@@ -161,7 +165,7 @@ const TopHeader = () => {
           className="cursor-pointer rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium tracking-[0.02em] text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-600 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-indigo-400"
           title="View What's New"
         >
-          v{APP_VERSION}
+          {APP_VERSION_BADGE}
         </button>
       </div>
 

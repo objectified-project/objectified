@@ -2,112 +2,77 @@
 
 ## Quick Start
 
-Run the following command to install the new dependencies:
+Dependencies are already declared in `objectified-ui/package.json`. From the **repository root** (Yarn workspaces):
 
 ```bash
-npm install react-markdown@^9.0.1 remark-gfm@^4.0.0 rehype-raw@^7.0.0 @types/react-markdown@^9.0.0 --save
+yarn install
 ```
 
-Or if you're using a different package manager:
+Or from `objectified-ui/` only:
 
-### Yarn
 ```bash
-yarn add react-markdown@^9.0.1 remark-gfm@^4.0.0 rehype-raw@^7.0.0 @types/react-markdown@^9.0.0
+cd objectified-ui && npm install
 ```
 
-### pnpm
+If you are adding the markdown stack to another project, align with this app’s versions:
+
 ```bash
-pnpm add react-markdown@^9.0.1 remark-gfm@^4.0.0 rehype-raw@^7.0.0 @types/react-markdown@^9.0.0
+npm install react-markdown@^10.1.0 remark-gfm@^4.0.1 rehype-raw@^7.0.0 --save
 ```
 
-### bun
+(`react-markdown` v10 includes its own TypeScript types; a separate `@types/react-markdown` package is not used.)
+
+### Yarn / pnpm / bun (explicit pins)
+
 ```bash
-bun add react-markdown@^9.0.1 remark-gfm@^4.0.0 rehype-raw@^7.0.0 @types/react-markdown@^9.0.0
+yarn add react-markdown@^10.1.0 remark-gfm@^4.0.1 rehype-raw@^7.0.0
+```
+
+```bash
+pnpm add react-markdown@^10.1.0 remark-gfm@^4.0.1 rehype-raw@^7.0.0
+```
+
+```bash
+bun add react-markdown@^10.1.0 remark-gfm@^4.0.1 rehype-raw@^7.0.0
 ```
 
 ## What Was Changed
 
-1. **Added Version Badge**: A clickable version badge now appears next to the Objectified logo
-2. **What's New Dialog**: Clicking the version badge opens a modal with release notes
-3. **Markdown Support**: Release notes are written in Markdown with full GFM support
-4. **Dark Mode**: Fully styled for both light and dark themes
+1. **Version badge**: Clickable label next to the Objectified logo (semver from `package.json`, or optional build label — see below).
+2. **What's New dialog**: Opens release notes from `/WHATS_NEW.md`.
+3. **Markdown**: GFM via `remark-gfm`, raw HTML via `rehype-raw` where configured.
+4. **Dark mode**: Dialog styled for light and dark themes.
 
 ## Files to Review
 
-- `src/app/components/ade/TopHeader.tsx` - Updated header with version badge
-- `src/app/components/ade/WhatsNewDialog.tsx` - New dialog component
-- `public/WHATS_NEW.md` - Release notes content (customizable)
-- `docs/VERSION_WHATS_NEW_FEATURE.md` - Complete feature documentation
+- `src/app/components/ade/TopHeader.tsx` — badge label
+- `src/app/components/ade/WhatsNewDialog.tsx` — dialog
+- `public/WHATS_NEW.md` — release notes
+- `docs/VERSION_WHATS_NEW_FEATURE.md` — full feature notes
 
 ## Testing
 
-After installing dependencies:
-
-1. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-2. Navigate to any page under `/ade` (e.g., Dashboard or Studio)
-
-3. Look for the version badge (e.g., "v0.1.0") next to the logo
-
-4. Click the version badge to see the What's New dialog
-
-5. Try closing it by clicking the X or clicking outside the dialog
+1. `npm run dev` or `yarn workspace objectified-ui dev`
+2. Open any `/ade` route.
+3. Confirm the badge shows `v` + `package.json` version (e.g. `v0.11.60`), unless `NEXT_PUBLIC_APP_BUILD_LABEL` is set.
+4. Click the badge and confirm the What’s New dialog loads.
 
 ## Customizing
 
-### Update Version Number
+### Version / build badge
 
-Edit both files to keep them in sync:
-- `package.json` - Update `"version"` field
-- `src/app/components/ade/TopHeader.tsx` - Update `APP_VERSION` constant
+- **Default**: Badge text is `v{version}` from `objectified-ui/package.json` (`"version"` field).
+- **CI / image builds**: Set `NEXT_PUBLIC_APP_BUILD_LABEL` at **build** time to a single string, e.g. `2026.05.05-84a231c` (date + short git SHA). That value is shown as-is (no extra `v` prefix).
 
-### Update Release Notes
+### Release notes
 
-Edit `public/WHATS_NEW.md` with your content. You can use:
-- Markdown formatting
-- Images (place in `/public` folder)
-- Links (external links open in new tabs)
-- Code blocks
-- Tables and more
-
-Example:
-```markdown
-# What's New in v0.2.0
-
-## New Features
-
-![New Feature](/images/feature-screenshot.png)
-
-We've added amazing new capabilities:
-- Feature 1
-- Feature 2
-
-[Read full documentation](/docs)
-```
+Edit `public/WHATS_NEW.md`. Use normal Markdown, images under `public/`, external links, code blocks, tables, etc.
 
 ## Troubleshooting
 
-If you see TypeScript errors about missing modules, ensure you've installed all dependencies:
-
-```bash
-npm install
-```
-
-If the dialog doesn't render properly, check that:
-- All files were created correctly
-- No compilation errors exist
-- The markdown file exists at `public/WHATS_NEW.md`
+- TypeScript or missing module errors: run `yarn install` from repo root or `npm install` in `objectified-ui/`.
+- Empty dialog: ensure `public/WHATS_NEW.md` exists and the dev server was restarted after adding env vars.
 
 ## Next Steps
 
-Consider enhancing the feature with:
-- Automatic version detection from package.json
-- "New" badge for unread release notes
-- Version history with multiple releases
-- Localization support
-
-See `docs/VERSION_WHATS_NEW_FEATURE.md` for more details.
-
+Ideas for later: unread marker, multi-release history, localization. See `docs/VERSION_WHATS_NEW_FEATURE.md`.

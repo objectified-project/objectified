@@ -5,7 +5,7 @@
 ### ✅ Checklist
 
 - [ ] Update version number in `package.json`
-- [ ] Update `APP_VERSION` constant in `TopHeader.tsx`
+- [ ] (Optional) Set `NEXT_PUBLIC_APP_BUILD_LABEL` at build time if the badge should show a build id instead of `v{version}`
 - [ ] Update `public/WHATS_NEW.md` with new release notes
 - [ ] Test the What's New dialog
 - [ ] Commit all changes
@@ -21,12 +21,9 @@
 }
 ```
 
-### File: `src/app/components/ade/TopHeader.tsx`
-```typescript
-const APP_VERSION = '0.2.0';  ← Change this to match
-```
+### Version badge
 
-**⚠️ Important**: Keep these in sync!
+The header badge reads **`v{version}`** from `package.json` by default. For deploys that need a build stamp (for example `2026.05.05-84a231c`), set **`NEXT_PUBLIC_APP_BUILD_LABEL`** when running `next build`; that string is shown as-is on the badge.
 
 ---
 
@@ -413,7 +410,7 @@ npm install
 ## Summary
 
 **To release a new version:**
-1. Update version in 2 files (package.json, TopHeader.tsx)
+1. Bump `"version"` in `package.json` (and set `NEXT_PUBLIC_APP_BUILD_LABEL` at build time only if you want a custom badge)
 2. Write new release notes in WHATS_NEW.md
 3. Test the feature
 4. Commit changes
