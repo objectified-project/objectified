@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit, TrendingUp, Undo2 } from 'lucide-react';
 import {
   Dialog,
@@ -14,6 +14,7 @@ import {
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
+import { Switch } from '../../../components/ui/Switch';
 import { Alert } from '../../../components/ui/Alert';
 import { LoadingState } from '../../../components/ui/LoadingState';
 import { EmptyState } from '../../../components/ui/EmptyState';
@@ -108,6 +109,7 @@ const Projects = () => {
   const [projectDomainCategoryId, setProjectDomainCategoryId] = useState(PROJECT_DOMAIN_CATEGORY_NONE);
   const [qualityHistoryEpoch, setQualityHistoryEpoch] = useState(0);
   const [qualityTrendProject, setQualityTrendProject] = useState<Project | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const prevImportOpen = useRef(false);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
@@ -116,10 +118,6 @@ const Projects = () => {
     () => getProjectDomainCategory(projectDomainCategoryId),
     [projectDomainCategoryId]
   );
-
-  useEffect(() => {
-    if (currentTenantId) loadProjects();
-  }, [currentTenantId]);
 
   useEffect(() => {
     if (prevImportOpen.current && !showNewImportDialog) {
@@ -149,10 +147,11 @@ const Projects = () => {
     return m;
   }, [projects, qualityHistoryEpoch]);
 
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     if (!currentTenantId) return;
     try {
-      const response = await fetch('/api/projects?include_deleted=true');
+      const qs = showDeleted ? '?include_deleted=true' : '';
+      const response = await fetch(`/api/projects${qs}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch projects: ${response.statusText}`);
       }
@@ -166,7 +165,11 @@ const Projects = () => {
       console.error('Failed to load projects:', error);
       setProjects([]);
     }
-  };
+  }, [currentTenantId, showDeleted]);
+
+  useEffect(() => {
+    if (currentTenantId) void loadProjects();
+  }, [currentTenantId, loadProjects]);
 
   const handleCreateClick = () => {
     setProjectName('');
@@ -472,23 +475,36 @@ const Projects = () => {
                 Manage projects for the current tenant. Click a project to open its versions.
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={() => {
-                  setImportOpenedFromNewProjectAI(false);
-                  setShowNewImportDialog(true);
-                }}
-                variant="secondary"
-                disabled={!currentTenantId}
-                title={!currentTenantId ? 'Please select a tenant first' : 'Import specification'}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Import
-              </Button>
-              <Button onClick={handleCreateClick}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Project
-              </Button>
+            <div className="flex flex-col items-end gap-3 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-600 dark:bg-gray-800/80">
+                <Label htmlFor="projects-show-deleted" className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Show deleted
+                </Label>
+                <Switch
+                  id="projects-show-deleted"
+                  checked={showDeleted}
+                  onCheckedChange={setShowDeleted}
+                  aria-label="Show soft-deleted projects in the list"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={() => {
+                    setImportOpenedFromNewProjectAI(false);
+                    setShowNewImportDialog(true);
+                  }}
+                  variant="secondary"
+                  disabled={!currentTenantId}
+                  title={!currentTenantId ? 'Please select a tenant first' : 'Import specification'}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import
+                </Button>
+                <Button onClick={handleCreateClick}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Project
+                </Button>
+              </div>
             </div>
           </div>
         </div>

@@ -20,7 +20,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## Export
 
 ## Dashboard
-- Projects list can load **soft-deleted** projects (with the list request used by that page), show a **Deleted** status, and offers **Restore** or **permanent delete** from the row actions menu (#2981).
+- Projects list includes a **Show deleted** switch; when on, soft-deleted projects appear with a **Deleted** badge and **Restore** or **permanent delete** in the row menu (#2981).
 
 ## Studio
 - Properties sidebar includes an **AI suggest properties** control (robot): describe what you need, review thinking and summary around the suggestion chips, inspect each proposal, then **Open in Add Property** to create it (#609).
