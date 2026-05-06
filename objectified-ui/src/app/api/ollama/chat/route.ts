@@ -141,7 +141,7 @@ Return exactly one markdown fenced JSON block and nothing else — no preamble, 
       "name": "camelCasePropertyName",
       "description": "Human-readable description for the property library.",
       "schema": { },
-      "thinking": "1–3 sentences: why this property fits the user's ask.",
+      "thinking": "1–3 sentences: user-facing rationale for this row (Studio shows it beside the label in the suggestion list).",
       "summary": "Very short label (e.g. primary email)"
     }
   ]
@@ -158,7 +158,8 @@ Return exactly one markdown fenced JSON block and nothing else — no preamble, 
 - Do not reuse names from **Existing project properties** unless the user explicitly wants a variant — then pick a clearly distinct camelCase name.
 - When the user names a domain (healthcare, finance, IoT, etc.), you may align names and formats with common industry vocabularies (for example FHIR-style elements in healthcare) while still emitting valid JSON Schema the Studio property library can store.
 - Consider archetypal class fields (e.g. User → email, password hash, displayName), standard cross-cutting fields (id, createdAt, updatedAt), and properties that complement **Existing project properties** when the user asks for a coherent set.
-- "thinking" at the root is your overall reasoning; each suggestion's "thinking" is specific to that row.`;
+- "thinking" at the root is your overall reasoning; each suggestion's "thinking" is specific to that row and appears beside that suggestion in the Studio list (keep it concise).
+- You may add "explanation" or "rationale" on a suggestion instead of or in addition to "thinking"; if present, the UI prefers that string as the list subtitle.`;
 
 const PROPERTY_TYPE_SUGGESTIONS_SYSTEM = `You help API designers pick JSON Schema shapes for ONE reusable property in an OpenAPI 3.1 property library.
 
@@ -177,7 +178,7 @@ Return exactly one markdown fenced JSON block and nothing else — no preamble, 
       "name": "sameAsTargetPropertyName",
       "description": "Optional human-readable line for the library.",
       "schema": { },
-      "thinking": "1–3 sentences: why this schema fits.",
+      "thinking": "1–3 sentences: user-facing rationale for this alternative (Studio shows it beside the label in the list).",
       "summary": "Very short label (e.g. UUID string)"
     }
   ]
@@ -193,7 +194,8 @@ Return exactly one markdown fenced JSON block and nothing else — no preamble, 
 - Include at least one "boring but robust" option (e.g. plain string or ISO-8601 date-time) when other options are domain-specific.
 - When the domain suggests it (e.g. healthcare), one alternative may mirror a well-known industry pattern (FHIR logical types) using standard JSON Schema — do not invent non-JSON-Schema keywords.
 - Use **Existing project properties** to propose complementary or related shapes (e.g. foreign-key style refs, parallel timestamp fields) when relevant.
-- "thinking" at the root is your overall reasoning; each suggestion's "thinking" is specific to that row.`;
+- "thinking" at the root is your overall reasoning; each suggestion's "thinking" is specific to that row and appears beside that alternative in the Studio list (keep it concise).
+- You may add "explanation" or "rationale" on a suggestion instead of or in addition to "thinking"; if present, the UI prefers that string as the list subtitle.`;
 
 function buildPropertySuggestionsSystem(options: {
   existingClassNames?: string[];
