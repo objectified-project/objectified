@@ -25,25 +25,7 @@ import {
   persistOllamaModelChoiceForScope,
 } from '@/app/ade/studio/components/chatbot/ollama-model-defaults';
 import { accumulateOllamaSse } from '@lib/ollama-chat-sse';
-
-export function propertyItemToExistingApiShape(p: PropertyItem): {
-  name: string;
-  description: string | null;
-  data: Record<string, unknown>;
-} {
-  const rec = p as unknown as Record<string, unknown>;
-  const name = rec.name;
-  const description = rec.description;
-  const data = { ...rec };
-  delete data.id;
-  delete data.name;
-  delete data.description;
-  return {
-    name: typeof name === 'string' ? name : String(name ?? ''),
-    description: description != null && String(description).trim() ? String(description) : null,
-    data,
-  };
-}
+import { propertyItemToExistingApiShape } from '@lib/property-item-utils';
 
 function suggestionToSeedProperty(s: AiPropertySuggestion): PropertyItem {
   return {

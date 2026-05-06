@@ -25,7 +25,7 @@ import {
   persistOllamaModelChoiceForScope,
 } from '@/app/ade/studio/components/chatbot/ollama-model-defaults';
 import { accumulateOllamaSse } from '@lib/ollama-chat-sse';
-import { propertyItemToExistingApiShape } from './AiPropertySuggestionsDialog';
+import { propertyItemToExistingApiShape } from '@lib/property-item-utils';
 
 export interface AiPropertyTypeSuggestionsDialogProps {
   open: boolean;

@@ -633,10 +633,10 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
             open: true,
             mode: 'add',
             selectedProperty: {
+              ...payload.schema,
               id: '__ai_seed__',
               name: payload.name,
               description: payload.description ?? undefined,
-              ...payload.schema,
             } as PropertyItem,
           });
         }}

@@ -569,6 +569,13 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
 
   const advancedScrollRef = useRef<HTMLDivElement>(null);
 
+  // Reset nested dialog state when the parent PropertyDialog closes.
+  useEffect(() => {
+    if (!open) {
+      setAiTypeSuggestOpen(false);
+    }
+  }, [open]);
+
   // Load property data when dialog opens in edit mode, or when adding with an AI/template seed (#609).
   useEffect(() => {
     if (open && property && (mode === 'edit' || mode === 'add')) {
