@@ -1,14 +1,15 @@
 /**
- * Context-aware Studio AI best-practice tips (#615).
+ * Context-aware Studio AI best-practice tips (#615, #616).
  *
  * Combines the project metadata `domainCategory` (see project-domain-categories)
  * with light heuristics on class names so e-commerce, multi-tenant, and auth-heavy
- * workspaces get targeted guidance without calling a model.
+ * workspaces get targeted guidance without calling a model. Each known domain emits
+ * several industry-specific modeling patterns (not a single generic hint).
  */
 
 import {
-  PROJECT_DOMAIN_CATEGORIES,
   PROJECT_DOMAIN_CATEGORY_NONE,
+  getProjectDomainCategory,
   getProjectDomainCategoryLabel,
 } from '@/app/utils/project-domain-categories';
 
@@ -17,38 +18,76 @@ export type StudioAiTipSignalContext = {
   classNames: readonly string[];
 };
 
-const DOMAIN_TIP_BY_ID: Readonly<Record<string, string>> = Object.fromEntries(
-  PROJECT_DOMAIN_CATEGORIES.map((c) => {
-    switch (c.id) {
-      case 'ecommerce':
-        return [c.id, 'Consider adding inventory tracking'];
-      case 'saas':
-        return [c.id, 'Add tenant isolation fields'];
-      case 'iot':
-        return [c.id, 'Model device identity, firmware revision, and last-seen timestamps alongside telemetry payloads.'];
-      case 'social':
-        return [c.id, 'Separate public profile fields from private account data; model follow/block edges explicitly.'];
-      case 'gaming':
-        return [c.id, 'Persist authoritative server timestamps for match outcomes and anti-cheat audit fields.'];
-      case 'travel':
-        return [c.id, 'Capture cancellations, no-shows, and locale-aware currency on monetary fields.'];
-      case 'media':
-        return [c.id, 'Track rights windows, territory, and entitlement identifiers on catalog entities.'];
-      case 'healthcare':
-        return [c.id, 'Prefer coded values where regulations require them; scope clinical text fields to access-controlled surfaces.'];
-      case 'finance':
-        return [c.id, 'Model immutable ledger movements and avoid mutating posted transactions in place.'];
-      case 'education':
-        return [c.id, 'Version course content separately from enrollments so curriculum updates do not rewrite student history.'];
-      case 'realestate':
-        return [c.id, 'Model offer contingencies and earnest-money deadlines explicitly on transaction objects.'];
-      case 'logistics':
-        return [c.id, 'Track status transitions with who/when metadata for exception handling and SLA proofs.'];
-      default:
-        return [c.id, c.hint];
-    }
-  }),
-) as Readonly<Record<string, string>>;
+/** Several actionable patterns per industry; order is stable for tests and UX. */
+const DOMAIN_INDUSTRY_PATTERNS_BY_ID: Readonly<Record<string, readonly string[]>> = {
+  ecommerce: [
+    'Model inventory tracking with explicit stock levels, reservations, or holds so concurrent checkouts cannot oversell.',
+    'Attach tax jurisdiction and breakdown to orders and refunds, not only to catalog SKUs.',
+    'Require idempotency keys on checkout and capture mutations so network retries cannot double-charge.',
+  ],
+  saas: [
+    'Add tenant isolation fields: carry tenant or workspace identifiers on every tenant-owned entity and enforce them at the API boundary.',
+    'Model subscription lifecycle (trial, active, past_due, canceled) as explicit states with valid transitions.',
+    'Persist metered usage counters or event streams separately from billing invoices for reconciliation.',
+  ],
+  iot: [
+    'Model stable device identity, firmware revision, and last-seen timestamps alongside telemetry payloads.',
+    'Version device configuration separately from telemetry readings so rollbacks do not erase history.',
+    'Prefer UTC timestamps and optional quality flags on sensor samples for downstream aggregation.',
+  ],
+  social: [
+    'Separate public profile fields from private account data; model follow and block relationships explicitly.',
+    'Store moderation decisions and appeal state on content entities for audit and safety workflows.',
+    'Model notification preferences per channel so email, push, and in-app opt-outs stay independent.',
+  ],
+  gaming: [
+    'Persist authoritative server timestamps for match outcomes and anti-cheat audit fields.',
+    'Isolate player economy balances from cosmetic inventory to limit exploit blast radius.',
+    'Record session and match identifiers on progression events for replay and dispute handling.',
+  ],
+  travel: [
+    'Capture cancellations, no-shows, and rebooking lineage on reservations.',
+    'Use locale-aware currency and explicit exchange-rate snapshots on cross-border charges.',
+    'Model guest counts, room types, and special requests as first-class fields on booking objects.',
+  ],
+  media: [
+    'Track rights windows, territory, and entitlement identifiers on catalog entities.',
+    'Distinguish editorial metadata from distribution manifests so syndication cannot drift silently.',
+    'Model series or season grouping explicitly when episodes share contracts or blackout rules.',
+  ],
+  healthcare: [
+    'Prefer coded values (code system + code + display) where interoperability or regulation expects them.',
+    'Scope clinical narrative and PHI-bearing fields to access-controlled surfaces and provenance metadata.',
+    'Reference patients, practitioners, and organizations with stable identifiers suitable for FHIR-style linking.',
+  ],
+  finance: [
+    'Model money movement as append-only ledger entries; correct mistakes with reversing entries, not in-place edits.',
+    'Require idempotency keys on payment instructions and payouts.',
+    'Separate authorized, captured, and settled amounts on card or ACH flows.',
+  ],
+  education: [
+    'Version course content separately from enrollments so curriculum updates do not rewrite student history.',
+    'Record graded artifacts with grader identity and timestamp when outcomes must be auditable.',
+    'Model cohort or section membership apart from the user account for roster and permission boundaries.',
+  ],
+  realestate: [
+    'Model offer contingencies and earnest-money deadlines explicitly on transaction objects.',
+    'Track listing status transitions (active, pending, closed) with effective dates for MLS-style workflows.',
+    'Represent agency relationships and dual-agency disclosure flags where brokerage rules apply.',
+  ],
+  logistics: [
+    'Track shipment status transitions with actor and timestamp metadata for exception handling and SLA evidence.',
+    'Model stops or legs explicitly when one consignment spans multiple carriers or hubs.',
+    'Capture proof-of-delivery signatures or scan events as immutable milestone records.',
+  ],
+};
+
+function industryPatternsForDomain(domainId: string): readonly string[] {
+  const explicit = DOMAIN_INDUSTRY_PATTERNS_BY_ID[domainId];
+  if (explicit?.length) return explicit;
+  const cat = getProjectDomainCategory(domainId);
+  return cat ? [cat.hint] : [];
+}
 
 /**
  * Split a CamelCase or snake_case class name into its constituent words so that
@@ -100,8 +139,10 @@ export function collectStudioAiBestPracticeTipLines(signals: StudioAiTipSignalCo
 
   const lines: string[] = [];
 
-  if (domainId && DOMAIN_TIP_BY_ID[domainId]) {
-    lines.push(asBullet(DOMAIN_TIP_BY_ID[domainId]));
+  if (domainId) {
+    for (const pattern of industryPatternsForDomain(domainId)) {
+      lines.push(asBullet(pattern));
+    }
   }
 
   if (AUTH_CLASS_SIGNAL.test(haystack)) {
