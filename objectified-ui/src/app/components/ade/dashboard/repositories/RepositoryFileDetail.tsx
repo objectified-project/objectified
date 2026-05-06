@@ -1054,6 +1054,24 @@ export function RepositoryFileDetail({
                   </div>
                 </div>
               </dl>
+              {payload &&
+              specMetadata.format !== 'unknown' &&
+              specMetadata.components === 0 &&
+              !specMetadata.parseError ? (
+                <div
+                  className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-950 dark:border-amber-800 dark:bg-amber-900/25 dark:text-amber-100"
+                  data-testid="repository-file-zero-components-warning"
+                >
+                  <p className="font-semibold text-amber-900 dark:text-amber-200">No component definitions detected</p>
+                  <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">
+                    The loaded document has no reusable schemas or other named components in the usual buckets (for
+                    example OpenAPI <span className="font-mono">components</span> or JSON Schema{' '}
+                    <span className="font-mono">$defs</span>). Many importable files are effectively path-only or lightly
+                    structured, so this summary can look sparse even when the file is fine. Import may still succeed and
+                    need not produce a problematic project.
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             <div
