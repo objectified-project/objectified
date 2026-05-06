@@ -24,6 +24,8 @@ interface SchemaMetricsPanelProps {
   versionLabel?: string;
   /** Called when user triggers an action (e.g. apply layout) */
   onSuggestionAction?: (suggestion: CanvasSuggestion) => void;
+  /** Opens AI improvement suggestions from live metrics (#253). */
+  onOpenAiImprovementSuggestions?: () => void;
   onClose?: () => void;
   isMinimized?: boolean;
   onMinimizeToggle?: () => void;
@@ -37,6 +39,7 @@ export default function SchemaMetricsPanel({
   projectName,
   versionLabel,
   onSuggestionAction,
+  onOpenAiImprovementSuggestions,
   onClose,
   isMinimized = false,
   onMinimizeToggle,
@@ -115,6 +118,18 @@ export default function SchemaMetricsPanel({
             <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Schema Metrics</span>
           </div>
           <div className="flex items-center gap-1">
+            {onOpenAiImprovementSuggestions && (
+              <button
+                type="button"
+                onClick={onOpenAiImprovementSuggestions}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-amber-600 dark:text-amber-400"
+                title="AI improvement suggestions from these metrics"
+                aria-label="AI improvement suggestions from these metrics"
+                data-testid="schema-metrics-ai-improvements"
+              >
+                <Lightbulb className="w-4 h-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() =>

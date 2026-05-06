@@ -217,6 +217,9 @@ import { LayoutRevisionDiffDialog } from './components/LayoutRevisionDiffDialog'
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
+import { AiSchemaImprovementSuggestionsDialog } from '../../../components/ade/studio/AiSchemaImprovementSuggestionsDialog';
+import { buildStudioMetricsDigestForAi } from '@lib/studio-metrics-digest-for-ai';
+import { CLASS_NAMES_CAP } from '@lib/ai-schema-improvement-suggestions';
 import SchemaTimelinePanel from '../components/SchemaTimelinePanel';
 import SchemaVersionScoringPanel from '../components/SchemaVersionScoringPanel';
 import {
@@ -875,6 +878,9 @@ const StudioContent = () => {
   const [memoryProfilerMinimized, setMemoryProfilerMinimized] = useState(false);
   const [schemaMetricsOpen, setSchemaMetricsOpen] = useState(false);
   const [schemaMetricsMinimized, setSchemaMetricsMinimized] = useState(false);
+  const [aiImprovementDialogOpen, setAiImprovementDialogOpen] = useState(false);
+  const [aiImprovementDigest, setAiImprovementDigest] = useState('');
+  const [aiImprovementClassNames, setAiImprovementClassNames] = useState<string[]>([]);
   const [schemaTimelineOpen, setSchemaTimelineOpen] = useState(false);
   const [schemaTimelineMinimized, setSchemaTimelineMinimized] = useState(false);
   const [schemaVersionScoringOpen, setSchemaVersionScoringOpen] = useState(false);
@@ -939,6 +945,18 @@ const StudioContent = () => {
     if (classNodes.length === 0) return null;
     return computeSchemaMetrics(nodes, edges);
   }, [nodes, edges]);
+
+  const handleOpenAiImprovementSuggestions = useCallback(() => {
+    if (!schemaMetrics) return;
+    setAiImprovementDigest(buildStudioMetricsDigestForAi(schemaMetrics));
+    const allNames = nodes
+      .filter((n) => n.type !== 'groupNode')
+      .map((n) => String((n.data as { name?: string })?.name ?? '').trim())
+      .filter(Boolean);
+    const deduped = [...new Set(allNames)].sort();
+    setAiImprovementClassNames(deduped.slice(0, CLASS_NAMES_CAP));
+    setAiImprovementDialogOpen(true);
+  }, [schemaMetrics, nodes]);
 
   // #244: Version scoring panel — per-schema rows from the live canvas (same graph as metrics).
   // Only computed when the panel is open to avoid graph-traversal overhead during editing.
@@ -10513,6 +10531,7 @@ const StudioContent = () => {
                   projectName={selectedProject?.name}
                   versionLabel={selectedVersion?.version_id}
                   onSuggestionAction={handleSuggestionAction}
+                  onOpenAiImprovementSuggestions={handleOpenAiImprovementSuggestions}
                   onClose={() => setSchemaMetricsOpen(false)}
                   isMinimized={schemaMetricsMinimized}
                   onMinimizeToggle={() => setSchemaMetricsMinimized(!schemaMetricsMinimized)}
@@ -10586,6 +10605,15 @@ const StudioContent = () => {
             open={quickSnapshotCompareOpen}
             onOpenChange={setQuickSnapshotCompareOpen}
             snapshots={quickLayoutSnapshots}
+          />
+          <AiSchemaImprovementSuggestionsDialog
+            open={aiImprovementDialogOpen}
+            onClose={() => setAiImprovementDialogOpen(false)}
+            tenantId={currentTenantId}
+            projectId={selectedProjectId}
+            versionId={selectedVersionId || null}
+            studioMetricsDigest={aiImprovementDigest}
+            existingClassNames={aiImprovementClassNames}
           />
           <LayoutRevisionDiffDialog
             open={layoutDiffOpen}
