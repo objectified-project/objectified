@@ -948,12 +948,12 @@ const StudioContent = () => {
   const handleOpenAiImprovementSuggestions = useCallback(() => {
     if (!schemaMetrics) return;
     setAiImprovementDigest(buildStudioMetricsDigestForAi(schemaMetrics));
-    setAiImprovementClassNames(
-      nodes
-        .filter((n) => n.type !== 'groupNode')
-        .map((n) => String((n.data as { name?: string })?.name ?? '').trim())
-        .filter(Boolean),
-    );
+    const allNames = nodes
+      .filter((n) => n.type !== 'groupNode')
+      .map((n) => String((n.data as { name?: string })?.name ?? '').trim())
+      .filter(Boolean);
+    const deduped = [...new Set(allNames)].sort();
+    setAiImprovementClassNames(deduped.slice(0, 150));
     setAiImprovementDialogOpen(true);
   }, [schemaMetrics, nodes]);
 

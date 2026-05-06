@@ -187,7 +187,7 @@ export function AiSchemaImprovementSuggestionsDialog({
       }
     } finally {
       setIsGenerating(false);
-      abortRef.current = null;
+      if (abortRef.current === ac) abortRef.current = null;
     }
   }, [hint, selectedModel, tenantId, projectId, versionId, studioMetricsDigest, existingClassNames]);
 

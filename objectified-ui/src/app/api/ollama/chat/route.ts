@@ -292,6 +292,8 @@ Return **exactly one** markdown fenced JSON block and **nothing outside the fenc
 - Prefer distinct suggestions; do not repeat the same idea with different wording.
 - Do not output OpenAPI JSON, full schemas, or code blocks other than the single fenced JSON payload.`;
 
+const CLASS_NAMES_CAP = 150;
+
 function buildSchemaImprovementSuggestionsSystem(options: {
   studioMetricsDigest: string;
   existingClassNames?: string[];
@@ -299,7 +301,11 @@ function buildSchemaImprovementSuggestionsSystem(options: {
   let s = SCHEMA_IMPROVEMENT_SUGGESTIONS_SYSTEM;
   s += `\n\n# Studio metrics digest\n\n${options.studioMetricsDigest.trim()}`;
   if (options.existingClassNames?.length) {
-    s += `\n\n# Class names on canvas (PascalCase expected)\n${options.existingClassNames.join(', ')}`;
+    const deduped = [...new Set(options.existingClassNames)].sort();
+    const capped = deduped.slice(0, CLASS_NAMES_CAP);
+    const overflow = deduped.length - capped.length;
+    const suffix = overflow > 0 ? `, … and ${overflow} more` : '';
+    s += `\n\n# Class names on canvas (PascalCase expected)\n${capped.join(', ')}${suffix}`;
   }
   return s;
 }
