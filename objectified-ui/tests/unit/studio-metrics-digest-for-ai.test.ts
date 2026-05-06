@@ -31,6 +31,9 @@ function baseMetrics(over: Partial<SchemaMetricsResult> = {}): SchemaMetricsResu
     dependencyMetricsPerClass: [
       { classId: '1', className: 'User', inDegree: 0, outDegree: 2, betweenness: 0.1 },
     ],
+    cognitiveComplexityPerClass: [
+      { classId: '1', className: 'User', score: 7, propertyContribution: 5, referenceContribution: 2 },
+    ],
     ...over,
   };
 }
@@ -44,6 +47,8 @@ describe('buildStudioMetricsDigestForAi', () => {
     expect(text).toContain('User.email');
     expect(text).toContain('User_ID');
     expect(text).toContain('Hub classes');
+    expect(text).toContain('Per-class cognitive complexity');
+    expect(text).toContain('User: 7 (props +5, refs +2)');
   });
 
   it('includes overall schema quality score when provided (#255)', () => {

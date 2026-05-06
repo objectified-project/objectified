@@ -33,6 +33,7 @@ function makeMinimalMetrics(overrides: Partial<SchemaMetricsResult> = {}): Schem
       propertiesNonCamel: [],
     },
     dependencyMetricsPerClass: [],
+    cognitiveComplexityPerClass: [],
     ...overrides,
   };
 }

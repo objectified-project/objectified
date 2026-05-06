@@ -176,6 +176,23 @@ function addMetricsBody(
     }
   }
 
+  if (m.cognitiveComplexityPerClass.length > 0) {
+    section(ctx, 'Cognitive complexity per class (#610)');
+    const sorted = [...m.cognitiveComplexityPerClass].sort((a, b) => b.score - a.score || a.className.localeCompare(b.className));
+    const cap = Math.min(sorted.length, 60);
+    const hdr = 'Class | Score | Props | Refs';
+    const body = sorted
+      .slice(0, cap)
+      .map(
+        (r) =>
+          `${r.className} | ${r.score} | ${r.propertyContribution} | ${r.referenceContribution}`,
+      );
+    paragraph(ctx, [hdr, ...body].join('\n'));
+    if (sorted.length > cap) {
+      paragraph(ctx, `+ ${sorted.length - cap} more rows in Studio.`);
+    }
+  }
+
   if (layoutQuality) {
     section(ctx, 'Layout quality');
     paragraph(

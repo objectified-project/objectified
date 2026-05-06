@@ -85,7 +85,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
 ### AI Schema Health Insights
 
 **Schema Complexity Analysis** 📋 PLANNED
-- 📋 Cognitive complexity score per class
+- ✅ Cognitive complexity score per class (#610)
 - 📋 Dependency graph complexity
 - 📋 Cyclomatic complexity for conditional schemas
 - 📋 Maintainability index
@@ -93,7 +93,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 | Ticket | Feature Description                           |
 |--------|-----------------------------------------------|
-| #610   | AI Schema Complexity Analysis                 |
 | #611   | Dependency Graph Complexity                   |
 | #612   | Cyclomatic Complexity for Conditional Schemas |
 | #613   | Maintainability Index                         |

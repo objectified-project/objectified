@@ -48,6 +48,12 @@ export interface SchemaMetricsResult {
   namingCompliance: NamingComplianceResult;
   /** #553: Per-class dependency metrics (in-degree, out-degree, betweenness) on dependency graph */
   dependencyMetricsPerClass: DependencyClassMetricsEntry[];
+  /**
+   * #610: Per-class cognitive complexity for the schema model (AI digest + Studio).
+   * Score = property count + weighted sum of outgoing dependency edges (simple refs +1;
+   * class-level or property-level allOf +1; anyOf/oneOf +2 as disjunctive load).
+   */
+  cognitiveComplexityPerClass: CognitiveComplexityPerClassEntry[];
 }
 
 /** #553: One row of dependency metrics for a class (in-degree, out-degree, betweenness). */
@@ -57,6 +63,15 @@ export interface DependencyClassMetricsEntry {
   inDegree: number;
   outDegree: number;
   betweenness: number;
+}
+
+/** #610: Cognitive-style load for one class (unbounded integer; higher = more to reason about). */
+export interface CognitiveComplexityPerClassEntry {
+  classId: string;
+  className: string;
+  score: number;
+  propertyContribution: number;
+  referenceContribution: number;
 }
 
 /** Naming convention counts and compliance percentage (#558) */
@@ -178,6 +193,41 @@ function getDegreePerNode(nodes: Node[], edges: Edge[]): Map<string, number> {
 function isDependencyEdge(e: Edge): boolean {
   const id = e.id ?? '';
   return /^(prop-|allOf-|anyOf-|oneOf-)/.test(id);
+}
+
+/**
+ * #610: Incremental weight for one outgoing dependency edge toward cognitive complexity.
+ * Matches Studio / metrics graph edge id conventions from {@link buildGraphForSchemaMetrics}.
+ */
+function cognitiveWeightForDependencyEdge(e: Edge): number {
+  const id = e.id ?? '';
+  if (id.startsWith('anyOf-') || id.startsWith('oneOf-')) return 2;
+  if (id.startsWith('allOf-')) return 1;
+  if (/^prop-(anyOf|oneOf)-/.test(id)) return 2;
+  if (/^prop-allOf-/.test(id)) return 1;
+  if (id.startsWith('prop-')) return 1;
+  return 0;
+}
+
+function computeCognitiveComplexityPerClass(classNodes: Node[], dependencyEdges: Edge[]): CognitiveComplexityPerClassEntry[] {
+  const refLoadBySource = new Map<string, number>();
+  for (const e of dependencyEdges) {
+    if (!isDependencyEdge(e)) continue;
+    const w = cognitiveWeightForDependencyEdge(e);
+    if (w <= 0) continue;
+    refLoadBySource.set(e.source, (refLoadBySource.get(e.source) ?? 0) + w);
+  }
+  return classNodes.map((n) => {
+    const propertyContribution = getPropertyCount(n);
+    const referenceContribution = refLoadBySource.get(n.id) ?? 0;
+    return {
+      classId: n.id,
+      className: getNodeName(n),
+      score: propertyContribution + referenceContribution,
+      propertyContribution,
+      referenceContribution,
+    };
+  });
 }
 
 /**
@@ -474,6 +524,8 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     betweenness: betweennessMap.get(n.id) ?? 0,
   }));
 
+  const cognitiveComplexityPerClass = computeCognitiveComplexityPerClass(classNodes, dependencyEdges);
+
   return {
     classCount,
     totalProperties,
@@ -495,6 +547,7 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     propertiesMissingDocumentation: docResult.propertiesMissing,
     namingCompliance,
     dependencyMetricsPerClass,
+    cognitiveComplexityPerClass,
   };
 }
 
