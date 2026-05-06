@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,7 @@ import {
   persistOllamaModelChoiceForScope,
 } from '@/app/ade/studio/components/chatbot/ollama-model-defaults';
 import { accumulateOllamaSse } from '@lib/ollama-chat-sse';
-import { propertyItemToExistingApiShape } from '@lib/property-item-utils';
+import { parseJsonSchemaObjectText, propertyItemToExistingApiShape } from '@lib/property-item-utils';
 
 export interface AiPropertyTypeSuggestionsDialogProps {
   open: boolean;
@@ -64,6 +64,8 @@ export function AiPropertyTypeSuggestionsDialog({
   const [parsed, setParsed] = useState<AiPropertySuggestionsPayload | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [schemaDraftByIdx, setSchemaDraftByIdx] = useState<Record<number, string>>({});
+  const [typeApplyError, setTypeApplyError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -107,6 +109,8 @@ export function AiPropertyTypeSuggestionsDialog({
       setParsed(null);
       setParseError(null);
       setSelectedIdx(null);
+      setSchemaDraftByIdx({});
+      setTypeApplyError(null);
       setIsGenerating(false);
       abortRef.current?.abort();
       abortRef.current = null;
@@ -139,6 +143,8 @@ export function AiPropertyTypeSuggestionsDialog({
     setParsed(null);
     setParseError(null);
     setSelectedIdx(null);
+    setSchemaDraftByIdx({});
+    setTypeApplyError(null);
 
     let schemaContextFingerprint: string | undefined;
     if (studioContext && !isChatStudioContextEmpty(studioContext)) {
@@ -229,6 +235,26 @@ export function AiPropertyTypeSuggestionsDialog({
 
   const selectedSuggestion: AiPropertySuggestion | null =
     parsed && selectedIdx !== null && parsed.suggestions[selectedIdx] ? parsed.suggestions[selectedIdx] : null;
+
+  useLayoutEffect(() => {
+    if (selectedIdx === null || !parsed?.suggestions[selectedIdx]) return;
+    setSchemaDraftByIdx((prev) => {
+      if (prev[selectedIdx] !== undefined) return prev;
+      return {
+        ...prev,
+        [selectedIdx]: JSON.stringify(parsed.suggestions[selectedIdx].schema, null, 2),
+      };
+    });
+  }, [selectedIdx, parsed]);
+
+  useEffect(() => {
+    setTypeApplyError(null);
+  }, [selectedIdx]);
+
+  const selectedSchemaDraft =
+    selectedIdx !== null && selectedSuggestion
+      ? schemaDraftByIdx[selectedIdx] ?? JSON.stringify(selectedSuggestion.schema, null, 2)
+      : '';
 
   const thinkingBody = isGenerating
     ? streamText || '…'
@@ -389,15 +415,51 @@ export function AiPropertyTypeSuggestionsDialog({
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   Schema (JSON)
                 </h3>
-                <pre className="max-h-40 overflow-auto rounded-md bg-slate-950 px-3 py-2 text-xs text-slate-100">
-                  {JSON.stringify(selectedSuggestion.schema, null, 2)}
-                </pre>
+                <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">
+                  Edit the JSON Schema object before applying it to the property form.
+                </p>
+                <label
+                  htmlFor="ai-prop-type-suggest-edit-schema"
+                  className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300"
+                >
+                  Schema (JSON object)
+                </label>
+                <Textarea
+                  id="ai-prop-type-suggest-edit-schema"
+                  data-testid="ai-property-type-suggestions-edit-schema"
+                  value={selectedSchemaDraft}
+                  onChange={(e) => {
+                    if (selectedIdx === null) return;
+                    setSchemaDraftByIdx((prev) => ({ ...prev, [selectedIdx]: e.target.value }));
+                    setTypeApplyError(null);
+                  }}
+                  rows={12}
+                  className="max-h-56 resize-y font-mono text-xs leading-relaxed"
+                  spellCheck={false}
+                />
               </div>
+              {typeApplyError && (
+                <p
+                  className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-100"
+                  data-testid="ai-property-type-suggestions-apply-error"
+                >
+                  {typeApplyError}
+                </p>
+              )}
               <Button
                 type="button"
                 data-testid="ai-property-type-suggestions-apply"
                 onClick={() => {
-                  onApplyTypeSuggestion(selectedSuggestion);
+                  const parsedSchema = parseJsonSchemaObjectText(selectedSchemaDraft);
+                  if (!parsedSchema.ok) {
+                    setTypeApplyError(parsedSchema.error);
+                    return;
+                  }
+                  setTypeApplyError(null);
+                  onApplyTypeSuggestion({
+                    ...selectedSuggestion,
+                    schema: parsedSchema.schema,
+                  });
                   onClose();
                 }}
                 className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 sm:w-auto"

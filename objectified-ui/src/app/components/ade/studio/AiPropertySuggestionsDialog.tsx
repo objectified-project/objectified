@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,7 @@ import {
   DialogFooter,
 } from '../../ui/Dialog';
 import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Input';
 import { Textarea } from '../../ui/Textarea';
 import { Bot, Loader2, Square, ListChecks, Ban, Trash2 } from 'lucide-react';
 import type { PropertyItem } from './StudioSideNav';
@@ -25,15 +26,18 @@ import {
   persistOllamaModelChoiceForScope,
 } from '@/app/ade/studio/components/chatbot/ollama-model-defaults';
 import { accumulateOllamaSse } from '@lib/ollama-chat-sse';
-import { propertyItemToExistingApiShape } from '@lib/property-item-utils';
+import { buildPropertyItemFromAiSeedForm, propertyItemToExistingApiShape } from '@lib/property-item-utils';
 
-function suggestionToSeedProperty(s: AiPropertySuggestion): PropertyItem {
+function aiSuggestionToDraftFields(s: AiPropertySuggestion): {
+  name: string;
+  description: string;
+  schemaText: string;
+} {
   return {
-    ...(s.schema as Record<string, unknown>),
-    id: '__ai_seed__',
     name: s.name,
-    description: s.description,
-  } as PropertyItem;
+    description: s.description ?? '',
+    schemaText: JSON.stringify(s.schema, null, 2),
+  };
 }
 
 export interface AiPropertySuggestionsDialogProps {
@@ -71,6 +75,11 @@ export function AiPropertySuggestionsDialog({
   const [parseError, setParseError] = useState<string | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [rejectedIndices, setRejectedIndices] = useState<Set<number>>(() => new Set());
+  const [draftsByIdx, setDraftsByIdx] = useState<
+    Record<number, { name: string; description: string; schemaText: string }>
+  >({});
+  const [seedEditError, setSeedEditError] = useState<string | null>(null);
+  const [acceptAllError, setAcceptAllError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -115,6 +124,9 @@ export function AiPropertySuggestionsDialog({
       setParseError(null);
       setSelectedIdx(null);
       setRejectedIndices(new Set());
+      setDraftsByIdx({});
+      setSeedEditError(null);
+      setAcceptAllError(null);
       setIsGenerating(false);
       abortRef.current?.abort();
       abortRef.current = null;
@@ -148,6 +160,9 @@ export function AiPropertySuggestionsDialog({
     setParseError(null);
     setSelectedIdx(null);
     setRejectedIndices(new Set());
+    setDraftsByIdx({});
+    setSeedEditError(null);
+    setAcceptAllError(null);
 
     let schemaContextFingerprint: string | undefined;
     if (studioContext && !isChatStudioContextEmpty(studioContext)) {
@@ -224,6 +239,18 @@ export function AiPropertySuggestionsDialog({
     setSelectedIdx(first >= 0 ? first : null);
   }, [rejectedIndices, selectedIdx, parsed]);
 
+  useLayoutEffect(() => {
+    if (selectedIdx === null || !parsed?.suggestions[selectedIdx]) return;
+    setDraftsByIdx((prev) => {
+      if (prev[selectedIdx]) return prev;
+      return { ...prev, [selectedIdx]: aiSuggestionToDraftFields(parsed.suggestions[selectedIdx]) };
+    });
+  }, [selectedIdx, parsed]);
+
+  useEffect(() => {
+    setSeedEditError(null);
+  }, [selectedIdx]);
+
   const activeSuggestionRows = useMemo(() => {
     if (!parsed) return [];
     return parsed.suggestions
@@ -246,11 +273,21 @@ export function AiPropertySuggestionsDialog({
 
   const handleAcceptAll = () => {
     if (!parsed) return;
-    const seeds = parsed.suggestions
+    setAcceptAllError(null);
+    const rows = parsed.suggestions
       .map((s, i) => ({ s, i }))
-      .filter(({ i }) => !rejectedIndices.has(i))
-      .map(({ s }) => suggestionToSeedProperty(s));
-    if (seeds.length === 0) return;
+      .filter(({ i }) => !rejectedIndices.has(i));
+    if (rows.length === 0) return;
+    const seeds: PropertyItem[] = [];
+    for (const { s, i } of rows) {
+      const draft = draftsByIdx[i] ?? aiSuggestionToDraftFields(s);
+      const built = buildPropertyItemFromAiSeedForm(draft);
+      if (!built.ok) {
+        setAcceptAllError(`Could not accept all: "${draft.name || s.name}" — ${built.error}`);
+        return;
+      }
+      seeds.push(built.item);
+    }
     onAcceptAllPropertySuggestions(seeds);
     onClose();
   };
@@ -262,6 +299,24 @@ export function AiPropertySuggestionsDialog({
     parsed.suggestions[selectedIdx]
       ? parsed.suggestions[selectedIdx]
       : null;
+
+  const selectedDraft = useMemo(() => {
+    if (selectedIdx === null || !parsed?.suggestions[selectedIdx]) return null;
+    return draftsByIdx[selectedIdx] ?? aiSuggestionToDraftFields(parsed.suggestions[selectedIdx]);
+  }, [selectedIdx, parsed, draftsByIdx]);
+
+  const updateDraftField = useCallback(
+    (field: 'name' | 'description' | 'schemaText', value: string) => {
+      if (selectedIdx === null || !parsed?.suggestions[selectedIdx]) return;
+      setDraftsByIdx((prev) => {
+        const base = prev[selectedIdx] ?? aiSuggestionToDraftFields(parsed.suggestions[selectedIdx]);
+        return { ...prev, [selectedIdx]: { ...base, [field]: value } };
+      });
+      setSeedEditError(null);
+      setAcceptAllError(null);
+    },
+    [selectedIdx, parsed],
+  );
 
   const thinkingBody = isGenerating
     ? streamText || '…'
@@ -411,6 +466,14 @@ export function AiPropertySuggestionsDialog({
                   </Button>
                 </div>
               </div>
+              {acceptAllError && (
+                <p
+                  className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-100"
+                  data-testid="ai-property-suggestions-accept-all-error"
+                >
+                  {acceptAllError}
+                </p>
+              )}
               {activeSuggestionRows.length === 0 ? (
                 <p
                   data-testid="ai-property-suggestions-list-empty"
@@ -463,7 +526,7 @@ export function AiPropertySuggestionsDialog({
             </section>
           )}
 
-          {selectedSuggestion && (
+          {selectedSuggestion && selectedDraft && (
             <section aria-label="Selected suggestion detail" className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-600">
               <div>
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -475,26 +538,69 @@ export function AiPropertySuggestionsDialog({
               </div>
               <div>
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Name &amp; description
+                  Customize before adding
                 </h3>
-                <p className="font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">{selectedSuggestion.name}</p>
-                {selectedSuggestion.description && (
-                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{selectedSuggestion.description}</p>
-                )}
+                <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">
+                  Adjust the name, description, and JSON Schema, then open Add Property or use Accept all.
+                </p>
+                <label htmlFor="ai-prop-suggest-edit-name" className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Property name
+                </label>
+                <Input
+                  id="ai-prop-suggest-edit-name"
+                  data-testid="ai-property-suggestions-edit-name"
+                  value={selectedDraft.name}
+                  onChange={(e) => updateDraftField('name', e.target.value)}
+                  className="font-mono text-sm"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <label htmlFor="ai-prop-suggest-edit-desc" className="mb-1 mt-2 block text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Description
+                </label>
+                <Textarea
+                  id="ai-prop-suggest-edit-desc"
+                  data-testid="ai-property-suggestions-edit-description"
+                  value={selectedDraft.description}
+                  onChange={(e) => updateDraftField('description', e.target.value)}
+                  rows={2}
+                  className="resize-y text-sm"
+                />
+                <label htmlFor="ai-prop-suggest-edit-schema" className="mb-1 mt-2 block text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Schema (JSON object)
+                </label>
+                <Textarea
+                  id="ai-prop-suggest-edit-schema"
+                  data-testid="ai-property-suggestions-edit-schema"
+                  value={selectedDraft.schemaText}
+                  onChange={(e) => updateDraftField('schemaText', e.target.value)}
+                  rows={10}
+                  className="max-h-56 resize-y font-mono text-xs leading-relaxed"
+                  spellCheck={false}
+                />
               </div>
-              <div>
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Schema (JSON)
-                </h3>
-                <pre className="max-h-40 overflow-auto rounded-md bg-slate-950 px-3 py-2 text-xs text-slate-100">
-                  {JSON.stringify(selectedSuggestion.schema, null, 2)}
-                </pre>
-              </div>
+              {seedEditError && (
+                <p
+                  className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-100"
+                  data-testid="ai-property-suggestions-seed-error"
+                >
+                  {seedEditError}
+                </p>
+              )}
               <Button
                 type="button"
                 data-testid="ai-property-suggestions-open-add"
                 onClick={() => {
-                  onCreatePropertyFromSuggestion(suggestionToSeedProperty(selectedSuggestion));
+                  if (selectedIdx === null || !parsed) return;
+                  const draft =
+                    draftsByIdx[selectedIdx] ?? aiSuggestionToDraftFields(parsed.suggestions[selectedIdx]);
+                  const built = buildPropertyItemFromAiSeedForm(draft);
+                  if (!built.ok) {
+                    setSeedEditError(built.error);
+                    return;
+                  }
+                  setSeedEditError(null);
+                  onCreatePropertyFromSuggestion(built.item);
                   onClose();
                 }}
                 className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 sm:w-auto"
