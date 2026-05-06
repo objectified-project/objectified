@@ -33,7 +33,7 @@ describe('collectStudioAiBestPracticeTipLines (#615, #616)', () => {
       domainCategory: 'saas',
       classNames: [],
     });
-    expect(lines.some((l) => l.toLowerCase().includes('tenant'))).toBe(true);
+    expect(lines.some((l) => l.toLowerCase().includes('tenant isolation'))).toBe(true);
   });
 
   it('detects auth-heavy class names for refresh-token guidance', () => {
