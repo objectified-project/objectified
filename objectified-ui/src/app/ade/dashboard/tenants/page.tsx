@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { getTenantsForUser, getTenantsAdministratedByUser, getTenantUsers, addTenantAdministrator, addTenantUser, removeTenantAdministrator, removeTenantUser, updateTenant } from '../../../../../lib/db/helper';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus, Trash2, Users, Shield, ChevronDown, ChevronUp, X, Building2, Edit2, AlertTriangle, MoreVertical, UserCheck } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import {
@@ -20,6 +20,7 @@ import { Alert } from '../../../components/ui/Alert';
 import { Checkbox } from '../../../components/ui/Checkbox';
 import { Textarea } from '../../../components/ui/Textarea';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { LoadingState } from '../../../components/ui/LoadingState';
 import { useDialog } from '../../../components/providers/DialogProvider';
 import { toast } from 'sonner';
 import {
@@ -62,7 +63,7 @@ interface TenantUser {
 }
 
 const Tenants = () => {
-  const { data: session, update } = useSession();
+  const { data: session, status, update } = useSession();
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [adminTenants, setAdminTenants] = useState<AdminUser[]>([]);
@@ -81,68 +82,58 @@ const Tenants = () => {
   const [tenantSlug, setTenantSlug] = useState('');
   const [tenantDescription, setTenantDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [tenantsDataLoading, setTenantsDataLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
+  const sessionUserId = (session?.user as { user_id?: string } | undefined)?.user_id;
 
-  useEffect(() => {
-    if (session) {
-      const userId: string = (session.user as any)?.user_id;
-
-      getTenantsForUser(userId)
-        .then(x => {
-          setTenants(JSON.parse(x));
-        });
-
-      getTenantsAdministratedByUser(userId)
-        .then(x => {
-          setAdminTenants(JSON.parse(x));
-        });
+  const loadTenantsData = useCallback(async () => {
+    if (status === 'loading') {
+      return;
     }
-  }, [session]);
-
-  useEffect(() => {
-    if (adminTenants.length > 0) {
-      const adminTenantIds = [...new Set(adminTenants.map(admin => admin.tenant_id))];
-
-      adminTenantIds.forEach(tenantId => {
-        getTenantUsers(tenantId).then(x => {
-          const users = JSON.parse(x);
-          setTenantUsers(prev => ({
-            ...prev,
-            [tenantId]: users
-          }));
-        });
-      });
+    if (!sessionUserId) {
+      setTenants([]);
+      setAdminTenants([]);
+      setTenantUsers({});
+      setTenantsDataLoading(false);
+      return;
     }
-  }, [adminTenants]);
-
-  const refreshData = async () => {
-    if (session) {
-      const userId: string = (session.user as any)?.user_id;
-
+    const userId = sessionUserId;
+    setTenantsDataLoading(true);
+    try {
       const [tenantsData, adminTenantsData] = await Promise.all([
         getTenantsForUser(userId),
-        getTenantsAdministratedByUser(userId)
+        getTenantsAdministratedByUser(userId),
       ]);
-
       setTenants(JSON.parse(tenantsData));
-      const admins = JSON.parse(adminTenantsData);
+      const admins = JSON.parse(adminTenantsData) as AdminUser[];
       setAdminTenants(admins);
 
-      const adminTenantIds = [...new Set(admins.map((admin: AdminUser) => admin.tenant_id))];
+      const adminTenantIds = [...new Set(admins.map((admin) => admin.tenant_id))];
       const usersMap: Record<string, TenantUser[]> = {};
 
       await Promise.all(
-        adminTenantIds.map(async (tenantId: any) => {
+        adminTenantIds.map(async (tenantId) => {
           const users = await getTenantUsers(tenantId);
-          usersMap[tenantId] = JSON.parse(users);
-        })
+          usersMap[tenantId] = JSON.parse(users) as TenantUser[];
+        }),
       );
 
       setTenantUsers(usersMap);
+    } catch (e) {
+      console.error(e);
+      setTenants([]);
+      setAdminTenants([]);
+      setTenantUsers({});
+    } finally {
+      setTenantsDataLoading(false);
     }
-  };
+  }, [sessionUserId, status]);
+
+  useEffect(() => {
+    void loadTenantsData();
+  }, [loadTenantsData]);
 
   const handleSelectTenant = async (tenant: Tenant) => {
     await update({
@@ -191,7 +182,7 @@ const Tenants = () => {
       setShowAddMemberModal(false);
       setMemberEmail('');
       setIsAdmin(false);
-      await refreshData();
+      await loadTenantsData();
     } catch (error: any) {
       setErrorMessage(error.message || 'An error occurred');
     } finally {
@@ -242,7 +233,7 @@ const Tenants = () => {
 
       setShowEditMemberModal(false);
       setEditingMember(null);
-      await refreshData();
+      await loadTenantsData();
     } catch (error: any) {
       setErrorMessage(error.message || 'An error occurred');
     } finally {
@@ -284,7 +275,7 @@ const Tenants = () => {
         }
       }
 
-      await refreshData();
+      await loadTenantsData();
     } catch (error: any) {
       await alertDialog({ message: error.message || 'An error occurred', variant: 'error' });
     }
@@ -369,7 +360,7 @@ const Tenants = () => {
 
       setShowEditTenantModal(false);
       setEditingTenant(null);
-      await refreshData();
+      await loadTenantsData();
 
       if (slugChanged && response.slug) {
         toast.success(`Tenant updated successfully. New slug: ${response.slug}`);
@@ -436,6 +427,14 @@ const Tenants = () => {
     return adminTenants.some((admin: AdminUser) => admin.tenant_id === tenantId && admin.user_id === currentUserId);
   };
 
+  if (status === 'loading') {
+    return (
+      <div className="p-6">
+        <LoadingState minHeightClassName="min-h-[220px]" message="Loading tenants…" />
+      </div>
+    );
+  }
+
   return (
     <>
       <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
@@ -454,9 +453,13 @@ const Tenants = () => {
         </div>
       </header>
 
-      <main className={dashboardMainClass}>
+      <main className={dashboardMainClass} aria-busy={tenantsDataLoading}>
         <div className={dashboardContentStackClass}>
-      {tenants.length === 0 ? (
+      {tenantsDataLoading ? (
+        <div className={dashboardTableWrapClass}>
+          <LoadingState minHeightClassName="min-h-[220px]" message="Loading tenants…" />
+        </div>
+      ) : tenants.length === 0 ? (
         <EmptyState
           icon={<Building2 className="h-10 w-10" />}
           title="No Tenants Available"

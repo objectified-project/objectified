@@ -91,6 +91,7 @@ const Projects = () => {
   const [projectSlug, setProjectSlug] = useState('');
   const [projectEnabled, setProjectEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [projectsListLoading, setProjectsListLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   // Dropdown state
   const [openProjectDropdown, setOpenProjectDropdown] = useState<string | null>(null);
@@ -148,7 +149,12 @@ const Projects = () => {
   }, [projects, qualityHistoryEpoch]);
 
   const loadProjects = useCallback(async () => {
-    if (!currentTenantId) return;
+    if (!currentTenantId) {
+      setProjects([]);
+      setProjectsListLoading(false);
+      return;
+    }
+    setProjectsListLoading(true);
     try {
       const qs = showDeleted ? '?include_deleted=true' : '';
       const response = await fetch(`/api/projects${qs}`);
@@ -164,6 +170,8 @@ const Projects = () => {
     } catch (error) {
       console.error('Failed to load projects:', error);
       setProjects([]);
+    } finally {
+      setProjectsListLoading(false);
     }
   }, [currentTenantId, showDeleted]);
 
@@ -511,10 +519,14 @@ const Projects = () => {
         </div>
       </header>
 
-      <main className={dashboardMainClass}>
+      <main className={dashboardMainClass} aria-busy={projectsListLoading}>
         <div className={dashboardContentStackClass}>
       {/* Projects List */}
-      {projects.length === 0 ? (
+      {projectsListLoading ? (
+        <div className={dashboardTableWrapClass}>
+          <LoadingState minHeightClassName="min-h-[220px]" message="Loading projects…" />
+        </div>
+      ) : projects.length === 0 ? (
         <div className={dashboardTableWrapClass}>
           <div className="p-8">
             <EmptyState

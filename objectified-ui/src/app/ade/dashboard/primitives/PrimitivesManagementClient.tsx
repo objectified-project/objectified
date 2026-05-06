@@ -20,6 +20,7 @@ import { Button } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
 import { Alert } from '@/app/components/ui/Alert';
 import { EmptyState } from '@/app/components/ui/EmptyState';
+import { LoadingState } from '@/app/components/ui/LoadingState';
 import { useDialog } from '@/app/components/providers/DialogProvider';
 import PrimitiveEditorDialog from './PrimitiveEditorDialog';
 import PrimitiveImportDialog from './PrimitiveImportDialog';
@@ -78,6 +79,11 @@ export default function PrimitivesManagementClient() {
     [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
   const loadPrimitives = useCallback(async () => {
+    if (!currentTenantId) {
+      setPrimitives([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const response = await fetch('/api/primitives');
@@ -104,7 +110,7 @@ export default function PrimitivesManagementClient() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentTenantId]);
 
   const filterPrimitives = useCallback(() => {
     let filtered = [...primitives];
@@ -258,7 +264,7 @@ export default function PrimitivesManagementClient() {
       </header>
 
       {/* Main Content */}
-      <main className={dashboardMainClass}>
+      <main className={dashboardMainClass} aria-busy={loading}>
         <div className={dashboardContentStackClass}>
           {/* Message Banner */}
           {message && (
@@ -272,6 +278,12 @@ export default function PrimitivesManagementClient() {
             </Alert>
           )}
 
+          {loading ? (
+            <div className={dashboardTableWrapClass}>
+              <LoadingState minHeightClassName="min-h-[220px]" message="Loading primitives…" />
+            </div>
+          ) : (
+            <>
           {/* Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className={`${dashboardPanelClass} p-4`}>
@@ -367,11 +379,7 @@ export default function PrimitivesManagementClient() {
 
           {/* Primitives Table */}
           <div className={dashboardTableWrapClass}>
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <RefreshCw className="w-6 h-6 animate-spin text-indigo-600" />
-              </div>
-            ) : filteredPrimitives.length === 0 ? (
+            {filteredPrimitives.length === 0 ? (
               <div className="p-6">
                 <EmptyState
                   icon={<Database className="h-8 w-8" />}
@@ -491,6 +499,8 @@ export default function PrimitivesManagementClient() {
               </div>
             )}
           </div>
+            </>
+          )}
         </div>
       </main>
 

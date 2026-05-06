@@ -254,7 +254,7 @@ export default function RepositoriesPage() {
         </div>
       </header>
 
-      <main className={dashboardMainClass}>
+      <main className={dashboardMainClass} aria-busy={loading}>
         <div className={dashboardContentStackClass}>
           <div className="border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-800">
             <div className="grid grid-cols-2 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -367,7 +367,12 @@ export default function RepositoriesPage() {
 
           <div className="px-6 pb-8 pt-2">
             {loading ? (
-              <LoadingState message="Loading repositories…" />
+              <div className={dashboardTableWrapClass}>
+                <LoadingState
+                  minHeightClassName="min-h-[220px]"
+                  message="Loading repositories…"
+                />
+              </div>
             ) : filtered.length === 0 ? (
               <EmptyState
                 className="mt-6"
