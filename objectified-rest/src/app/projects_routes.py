@@ -22,6 +22,10 @@ router = APIRouter(prefix="/v1/projects", tags=["projects"])
 @router.get("/{tenant_slug}")
 async def list_projects(
     tenant_slug: str,
+    include_deleted: bool = Query(
+        False,
+        description="When true, include soft-deleted projects (active projects listed first).",
+    ),
     auth_data: Dict[str, Any] = Depends(validate_authentication)
 ) -> List[ProjectSchema]:
     """
@@ -33,12 +37,15 @@ async def list_projects(
 
     Args:
         tenant_slug: The tenant slug
+        include_deleted: Include rows with deleted_at set (for trash / restore flows).
         auth_data: Authentication data (injected by dependency)
 
     Returns:
         List of projects for the tenant
     """
-    projects = db.get_projects_for_tenant(auth_data['tenant_id'])
+    projects = db.get_projects_for_tenant(
+        auth_data['tenant_id'], include_deleted=include_deleted
+    )
 
     return [ProjectSchema(**p) for p in projects]
 
@@ -316,3 +323,40 @@ async def delete_project(
         )
 
     return {"message": f"Project '{existing['name']}' deleted successfully"}
+
+
+@router.post("/{tenant_slug}/{project_id}/restore")
+async def restore_project(
+    tenant_slug: str,
+    project_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> ProjectSchema:
+    """Restore a soft-deleted project (clears deleted_at, sets enabled)."""
+    row = db.get_project_by_id(
+        project_id, auth_data['tenant_id'], include_deleted=True
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Project not found: {project_id}",
+        )
+    if row.get("deleted_at") is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Project is not deleted",
+        )
+
+    restored = db.restore_project(project_id, auth_data['tenant_id'])
+    if not restored:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to restore project",
+        )
+
+    project = db.get_project_by_id(project_id, auth_data['tenant_id'])
+    if not project:
+        raise HTTPException(
+            status_code=500,
+            detail="Project was restored but could not be reloaded",
+        )
+    return ProjectSchema(**project)

@@ -88,7 +88,7 @@ async function handleRestResponse(response: Response, defaultError: string): Pro
  * GET /api/projects
  * List all projects for the current tenant
  */
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -120,8 +120,13 @@ export async function GET(_request: NextRequest) {
 
     const tenantSlug = tenant.slug;
 
+    const includeDeletedParam = request.nextUrl.searchParams.get('include_deleted');
+    const includeDeleted =
+      includeDeletedParam === 'true' || includeDeletedParam === '1';
+    const querySuffix = includeDeleted ? '?include_deleted=true' : '';
+
     // Build REST API URL
-    const url = `${REST_API_BASE_URL}/projects/${tenantSlug}`;
+    const url = `${REST_API_BASE_URL}/projects/${tenantSlug}${querySuffix}`;
 
     // Create auth headers with JWT token from session
     const headers = createAuthHeaders({

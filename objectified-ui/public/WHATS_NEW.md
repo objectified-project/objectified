@@ -19,6 +19,9 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## Export
 
+## Dashboard
+- Projects list can load **soft-deleted** projects (with the list request used by that page), show a **Deleted** status, and offers **Restore** or **permanent delete** from the row actions menu (#2981).
+
 ## Studio
 - Properties sidebar includes an **AI suggest properties** control (robot): describe what you need, review thinking and summary around the suggestion chips, inspect each proposal, then **Open in Add Property** to create it (#609).
 - Studio AI chat schema refinements infer JSON Schema type and common constraints from well-known property names (`email`, `createdAt`, `age`, `price`, `isActive`) when you add a field without specifying a type; the class-skeleton Ollama prompt uses the same conventions (#277).
@@ -53,5 +56,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: May 4, 2026*
+*Last updated: May 5, 2026*
 

@@ -480,6 +480,33 @@ describe('Database Helper - Project Functions', () => {
     );
   });
 
+  test('restoreProject should clear soft delete when a row is updated', async () => {
+    const { restoreProject } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValue({ rowCount: 1 });
+
+    const result = await restoreProject('proj-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('deleted_at = NULL'),
+      ['proj-1']
+    );
+  });
+
+  test('restoreProject should error when no deleted row matches', async () => {
+    const { restoreProject } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValue({ rowCount: 0 });
+
+    const result = await restoreProject('proj-missing');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toMatch(/not found|not deleted/i);
+  });
+
   test('permanentDeleteProject should delete project and all related data', async () => {
     const { permanentDeleteProject } = await import('../lib/db/helper');
     const db = require('../lib/db/db');

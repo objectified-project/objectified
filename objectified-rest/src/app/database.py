@@ -1109,28 +1109,45 @@ class Database:
     # NOTE: queries below select `change_report_template_version_id`, which requires
     # migration 20260414-150000.sql. Ensure that migration is applied before deploying.
 
-    def get_projects_for_tenant(self, tenant_id: str) -> List[Dict[str, Any]]:
-        """Get all projects for a tenant."""
-        query = """
+    def get_projects_for_tenant(
+        self, tenant_id: str, *, include_deleted: bool = False
+    ) -> List[Dict[str, Any]]:
+        """Get all projects for a tenant.
+
+        By default only non-deleted rows are returned. When include_deleted is True,
+        soft-deleted projects are included too (active rows first, then deleted).
+        """
+        deleted_filter = "" if include_deleted else "AND p.deleted_at IS NULL"
+        order_clause = (
+            "ORDER BY (p.deleted_at IS NULL) DESC, p.created_at DESC"
+            if include_deleted
+            else "ORDER BY p.created_at DESC"
+        )
+        query = f"""
             SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
                    p.enabled, p.metadata, p.change_report_template_version_id, p.created_at, p.updated_at,
+                   p.deleted_at,
                    u.name as creator_name, u.email as creator_email
             FROM odb.projects p
             LEFT JOIN odb.users u ON p.creator_id = u.id
-            WHERE p.tenant_id = %s AND p.deleted_at IS NULL
-            ORDER BY p.created_at DESC
+            WHERE p.tenant_id = %s {deleted_filter}
+            {order_clause}
         """
         return self.execute_query(query, (tenant_id,))
 
-    def get_project_by_id(self, project_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+    def get_project_by_id(
+        self, project_id: str, tenant_id: str, *, include_deleted: bool = False
+    ) -> Optional[Dict[str, Any]]:
         """Get a specific project by ID, ensuring it belongs to the tenant."""
-        query = """
+        deleted_clause = "" if include_deleted else "AND p.deleted_at IS NULL"
+        query = f"""
             SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
                    p.enabled, p.metadata, p.change_report_template_version_id, p.created_at, p.updated_at,
+                   p.deleted_at,
                    u.name as creator_name, u.email as creator_email
             FROM odb.projects p
             LEFT JOIN odb.users u ON p.creator_id = u.id
-            WHERE p.id = %s AND p.tenant_id = %s AND p.deleted_at IS NULL
+            WHERE p.id = %s AND p.tenant_id = %s {deleted_clause}
         """
         results = self.execute_query(query, (project_id, tenant_id))
         return results[0] if results else None
@@ -1252,6 +1269,23 @@ class Database:
             UPDATE odb.projects
             SET enabled = false, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
             WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (project_id, tenant_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def restore_project(self, project_id: str, tenant_id: str) -> bool:
+        """Clear soft-delete on a project (re-enable)."""
+        query = """
+            UPDATE odb.projects
+            SET deleted_at = NULL, enabled = true, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s AND tenant_id = %s AND deleted_at IS NOT NULL
         """
         conn = self.connect()
         try:

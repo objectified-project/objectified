@@ -74,6 +74,12 @@ def test_delete_project_requires_auth():
     assert response.status_code == 401
 
 
+def test_restore_project_requires_auth():
+    """Test that restoring a project requires authentication."""
+    response = client.post('/v1/projects/test-tenant/some-id/restore')
+    assert response.status_code == 401
+
+
 def test_jwt_and_api_key_both_provided():
     """Test behavior when both JWT and API key are provided (JWT takes precedence)."""
     response = client.get(
@@ -152,6 +158,10 @@ def test_project_endpoints_return_json():
 
     # Delete project
     response = client.delete('/v1/projects/test-tenant/some-id')
+    assert response.headers.get('content-type', '').startswith('application/json')
+
+    # Restore project
+    response = client.post('/v1/projects/test-tenant/some-id/restore')
     assert response.headers.get('content-type', '').startswith('application/json')
 
 

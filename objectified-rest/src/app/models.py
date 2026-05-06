@@ -174,6 +174,7 @@ class ProjectSchema(BaseModel):
     description: Optional[str] = None
     slug: str
     enabled: bool = True
+    deleted_at: Optional[Union[datetime, str]] = None
     metadata: Optional[Dict[str, Any]] = None
     change_report_template_version_id: Optional[str] = Field(
         None,
