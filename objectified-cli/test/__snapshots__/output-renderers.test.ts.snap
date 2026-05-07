@@ -1,0 +1,95 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`createCliOutput snapshots > banner and hint show when TTY and human mode 1`] = `
+"Title
+Tip
+"
+`;
+
+exports[`createCliOutput snapshots > json is compact when piped or quiet 1`] = `
+{
+  "piped": "{"a":{"nested":true},"z":1}
+",
+  "quiet": "{"a":{"nested":true},"z":1}
+",
+}
+`;
+
+exports[`createCliOutput snapshots > json is pretty with 2-space indent when TTY and not quiet 1`] = `
+"{
+  "a": {
+    "nested": true
+  },
+  "z": 1
+}
+"
+`;
+
+exports[`createCliOutput snapshots > kv writes aligned keys when human 1`] = `
+"muchLongerKey: y
+short:         x
+"
+`;
+
+exports[`createCliOutput snapshots > table as ANSI table when TTY + color + non-ASCII locale border allowed 1`] = `
+{
+  "stderr": "",
+  "stdout": "┌───────┬────┐
+│ Name  │ ID │
+├───────┼────┤
+│ beta  │ 2  │
+├───────┼────┤
+│ alpha │ 1  │
+└───────┴────┘
+",
+}
+`;
+
+exports[`createCliOutput snapshots > table as TSV when stdout is not a TTY 1`] = `
+{
+  "stderr": "",
+  "stdout": "Name	ID
+beta	2
+alpha	1
+",
+}
+`;
+
+exports[`createCliOutput snapshots > table emits stable JSON when json mode 1`] = `
+{
+  "stderr": "",
+  "stdout": "[{"id":2,"name":"beta"},{"id":1,"name":"alpha"}]
+",
+}
+`;
+
+exports[`createCliOutput snapshots > table uses ASCII borders when langAscii 1`] = `
+{
+  "stderr": "",
+  "stdout": "+-------+----+
+| Name  | ID |
++-------+----+
+| beta  | 2  |
++-------+----+
+| alpha | 1  |
++-------+----+
+",
+}
+`;
+
+exports[`createCliOutput snapshots > warn and error go to stderr 1`] = `
+{
+  "stderr": "Warning: one
+Error: two
+",
+  "stdout": "",
+}
+`;
+
+exports[`createCliOutput snapshots > yaml writes sorted stable YAML when human stdout 1`] = `
+"b:
+  - a: 1
+    q: 2
+z: 1
+"
+`;
