@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -33,6 +33,8 @@ import {
 import type { ChatStudioContext } from '@/app/ade/studio/components/chatbot/chat-context';
 import { AiPropertyTypeSuggestionsDialog } from './AiPropertyTypeSuggestionsDialog';
 import type { AiPropertySuggestion } from '@lib/ai-property-suggestions';
+import { draftPropertySchemaFromDialogForm } from '@lib/ai-property-description';
+import { PropertyDescriptionAiButton } from './PropertyDescriptionAiButton';
 import type { PropertyItem as LibraryPropertyItem } from './StudioSideNav';
 import {
   FormSection,
@@ -154,6 +156,7 @@ interface BasicsSectionProps {
   setPrimitiveDialogOpen: (next: boolean) => void;
   addModeAiTypeSuggest?: { onOpen: () => void } | null;
   onOpenAiPropertySuggestions?: () => void;
+  descriptionAiSlot?: React.ReactNode;
   changed?: boolean;
   eyebrow?: string;
 }
@@ -172,6 +175,7 @@ const BasicsSection: React.FC<BasicsSectionProps> = ({
   setPrimitiveDialogOpen,
   addModeAiTypeSuggest,
   onOpenAiPropertySuggestions,
+  descriptionAiSlot,
   changed,
   eyebrow = 'Basics',
 }) => (
@@ -311,6 +315,7 @@ const BasicsSection: React.FC<BasicsSectionProps> = ({
         placeholder="Brief description of this property"
         rows={3}
       />
+      {descriptionAiSlot ? <div className="mt-2">{descriptionAiSlot}</div> : null}
     </FormFieldGroup>
 
     {primitiveAvailable && (
@@ -1678,6 +1683,38 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       ? { onOpen: () => setAiTypeSuggestOpen(true) }
       : null;
 
+  const propertySchemaForAi = useMemo(
+    () =>
+      draftPropertySchemaFromDialogForm({
+        propertyType,
+        propertyIsArray,
+        formData,
+        seedProperty: property,
+      }),
+    [propertyType, propertyIsArray, formData, property],
+  );
+
+  const applyAiDescription = useCallback((text: string) => {
+    setFormData((prev) => ({ ...prev, description: text }));
+  }, []);
+
+  const descriptionAiSlot =
+    open && propertyAiContext ? (
+      <PropertyDescriptionAiButton
+        tenantId={propertyAiContext.tenantId}
+        projectId={propertyAiContext.projectId}
+        versionId={propertyAiContext.versionId}
+        propertyName={propertyName}
+        propertySchema={propertySchemaForAi}
+        contextClassName={propertyAiContext.contextClassName}
+        existingClasses={propertyAiContext.existingClasses}
+        existingProperties={propertyAiContext.existingProperties}
+        studioContext={propertyAiContext.studioContext}
+        onGenerated={applyAiDescription}
+        disabled={!propertyName.trim()}
+      />
+    ) : null;
+
   const handleApplyAiTypeSuggestion = (s: AiPropertySuggestion) => {
     if (!onApplyAiTypeSchema) return;
     onApplyAiTypeSchema({
@@ -1759,6 +1796,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                         setPrimitiveDialogOpen={setPrimitiveDialogOpen}
                         addModeAiTypeSuggest={addModeAiTypeSuggest}
                         onOpenAiPropertySuggestions={onOpenAiPropertySuggestions}
+                        descriptionAiSlot={descriptionAiSlot}
                         changed={changedBasics}
                         eyebrow="Step 1 of 5"
                       />
@@ -1840,6 +1878,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                       setPrimitiveDialogOpen={setPrimitiveDialogOpen}
                       addModeAiTypeSuggest={addModeAiTypeSuggest}
                       onOpenAiPropertySuggestions={onOpenAiPropertySuggestions}
+                      descriptionAiSlot={descriptionAiSlot}
                       changed={changedBasics}
                     />
                     <FlagsSection formData={formData} setFormData={setFormData} changed={changedFlags} />

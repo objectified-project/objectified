@@ -45,6 +45,9 @@ import {
   type FormSectionNavItem,
   type FormWizardStep,
 } from './form';
+import type { PropertyDialogAiContext } from './PropertyDialog';
+import { PropertyDescriptionAiButton } from './PropertyDescriptionAiButton';
+import { summarizeStoredPropertyData } from '@lib/ai-property-description';
 
 interface Props {
   open: boolean;
@@ -65,6 +68,8 @@ interface Props {
   existingClassNames?: string[];
   // Available classes for reference selection (id, name pairs)
   availableClasses?: Array<{ id: string; name: string }>;
+  /** Ollama-backed description generation (#619); same shape as Property dialog AI context. */
+  propertyAiContext?: PropertyDialogAiContext;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -82,6 +87,7 @@ interface BasicsSectionProps {
   hasRef: boolean;
   propertyType: string;
   primitiveAvailable: boolean;
+  descriptionAiSlot?: React.ReactNode;
   changed?: boolean;
   eyebrow?: string;
 }
@@ -95,6 +101,7 @@ const BasicsSection: React.FC<BasicsSectionProps> = ({
   hasRef,
   propertyType,
   primitiveAvailable,
+  descriptionAiSlot,
   changed,
   eyebrow = 'Basics',
 }) => (
@@ -148,6 +155,7 @@ const BasicsSection: React.FC<BasicsSectionProps> = ({
         placeholder="Brief description of this property"
         rows={3}
       />
+      {descriptionAiSlot ? <div className="mt-2">{descriptionAiSlot}</div> : null}
     </FormFieldGroup>
 
     {primitiveAvailable && (
@@ -655,7 +663,16 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({
   );
 };
 
-export default function ClassPropertyEditDialog({ open, onClose, editingClassProperty, onSaved, allClassProperties, existingClassNames = [], availableClasses = [] }: Props) {
+export default function ClassPropertyEditDialog({
+  open,
+  onClose,
+  editingClassProperty,
+  onSaved,
+  allClassProperties,
+  existingClassNames = [],
+  availableClasses = [],
+  propertyAiContext,
+}: Props) {
   const [editPropName, setEditPropName] = useState('');
   const [editPropertyError, setEditPropertyError] = useState('');
   const [extractDialogOpen, setExtractDialogOpen] = useState(false);
@@ -1650,6 +1667,36 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
     setCurrentStepIndex((i) => Math.max(i - 1, 0));
   };
 
+  const propertySchemaForAiDescription = useMemo(() => {
+    if (!editingClassProperty?.data) return {};
+    try {
+      const raw =
+        typeof editingClassProperty.data === 'string'
+          ? JSON.parse(editingClassProperty.data)
+          : editingClassProperty.data;
+      return summarizeStoredPropertyData(raw);
+    } catch {
+      return {};
+    }
+  }, [editingClassProperty?.data]);
+
+  const classMemberDescriptionAiSlot =
+    open && propertyAiContext && editingClassProperty ? (
+      <PropertyDescriptionAiButton
+        tenantId={propertyAiContext.tenantId}
+        projectId={propertyAiContext.projectId}
+        versionId={propertyAiContext.versionId}
+        propertyName={editPropName}
+        propertySchema={propertySchemaForAiDescription}
+        contextClassName={propertyAiContext.contextClassName}
+        existingClasses={propertyAiContext.existingClasses}
+        existingProperties={propertyAiContext.existingProperties}
+        studioContext={propertyAiContext.studioContext}
+        onGenerated={(text) => setFormData((prev) => ({ ...prev, description: text }))}
+        disabled={!editPropName.trim()}
+      />
+    ) : null;
+
   const guidedSection = (id: string) => {
     switch (id) {
       case 'basics':
@@ -1663,6 +1710,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
             hasRef={!!typeInfo.hasRef}
             propertyType={baseType}
             primitiveAvailable={primitiveAvailable}
+            descriptionAiSlot={classMemberDescriptionAiSlot}
             changed={changedBasics}
             eyebrow="Step 1 · Basics"
           />
@@ -1726,6 +1774,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         hasRef={!!typeInfo.hasRef}
         propertyType={baseType}
         primitiveAvailable={primitiveAvailable}
+        descriptionAiSlot={classMemberDescriptionAiSlot}
         changed={changedBasics}
       />
       <FlagsSection formData={formData} setFormData={setFormData} changed={changedFlags} />

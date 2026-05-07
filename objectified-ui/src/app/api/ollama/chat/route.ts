@@ -222,6 +222,53 @@ function buildPropertySuggestionsSystem(options: {
   return PROPERTY_SUGGESTIONS_SYSTEM + extra;
 }
 
+const PROPERTY_DESCRIPTION_SYSTEM = `You write concise API documentation for JSON Schema properties used in OpenAPI 3.1.
+
+# Task
+Return **plain prose only**: one or two sentences describing what the property holds or represents for API consumers.
+
+# Rules
+- No markdown, no bullet lists, no JSON, no code fences — output readable sentences only.
+- Infer intent from the property name (typically camelCase), the schema type/format/constraints, and optional class context.
+- Avoid redundant openers like "This property is" unless it reads most natural that way.
+- Prefer staying under 400 characters; use more only when enums, formats, or references need explicit explanation.
+- When the schema uses a component reference (\`$ref\`), say briefly that the field relates to or embeds that referenced model.
+- Use **Existing classes** / **Existing project properties** only to disambiguate names — do not invent domain facts unsupported by the schema.`;
+
+function buildPropertyDescriptionSystem(options: {
+  existingClassNames?: string[];
+  existingProperties?: Array<{ name: string; description?: string | null; data?: Record<string, unknown> }>;
+  targetPropertyName?: string;
+  targetClassName?: string;
+}): string {
+  let s = PROPERTY_DESCRIPTION_SYSTEM;
+  const tp = typeof options.targetPropertyName === 'string' ? options.targetPropertyName.trim() : '';
+  if (tp) {
+    s += `\n\n# Target property name\n${tp}\n`;
+  }
+  const tc = typeof options.targetClassName === 'string' ? options.targetClassName.trim() : '';
+  if (tc) {
+    s += `\n\n# Containing class\n${tc}\n`;
+  }
+  if (options.existingClassNames?.length) {
+    s += `\n\n# Existing classes\n${options.existingClassNames.join(', ')}`;
+  }
+  if (options.existingProperties?.length) {
+    s += `\n\n# Existing project properties\n`;
+    options.existingProperties.forEach((p) => {
+      const d = p.data;
+      const typeStr =
+        typeof d?.type === 'string'
+          ? d.type
+          : d && typeof d === 'object' && '$ref' in d && d.$ref
+            ? '$ref'
+            : 'object';
+      s += `- ${p.name}: ${typeStr}${p.description ? ` — ${String(p.description).slice(0, 80)}` : ''}\n`;
+    });
+  }
+  return s;
+}
+
 function buildPropertyTypeSuggestionsSystem(options: {
   existingClassNames?: string[];
   existingProperties?: Array<{ name: string; description?: string | null; data?: Record<string, unknown> }>;
@@ -355,8 +402,10 @@ export async function POST(request: NextRequest) {
     const isDataQuery = task === 'data_query';
     const isPropertySuggestions = task === 'property_suggestions';
     const isPropertyTypeSuggestions = task === 'property_type_suggestions';
+    const isPropertyDescription = task === 'property_description';
     const isSchemaImprovementSuggestions = task === 'schema_improvement_suggestions';
-    const usesPropertyLibraryContext = isClassSkeleton || isPropertySuggestions || isPropertyTypeSuggestions;
+    const usesPropertyLibraryContext =
+      isClassSkeleton || isPropertySuggestions || isPropertyTypeSuggestions || isPropertyDescription;
 
     const digestStr =
       typeof studioMetricsDigest === 'string' && studioMetricsDigest.trim().length > 0
@@ -393,6 +442,13 @@ export async function POST(request: NextRequest) {
                 targetPropertyName: typeof targetPropertyName === 'string' ? targetPropertyName : undefined,
                 targetClassName: typeof targetClassName === 'string' ? targetClassName : undefined,
               })
+            : isPropertyDescription
+              ? buildPropertyDescriptionSystem({
+                  existingClassNames: Array.isArray(existingClassNames) ? existingClassNames : undefined,
+                  existingProperties: Array.isArray(existingProperties) ? existingProperties : undefined,
+                  targetPropertyName: typeof targetPropertyName === 'string' ? targetPropertyName : undefined,
+                  targetClassName: typeof targetClassName === 'string' ? targetClassName : undefined,
+                })
             : isSchemaImprovementSuggestions
               ? buildSchemaImprovementSuggestionsSystem({
                   studioMetricsDigest: digestStr,
