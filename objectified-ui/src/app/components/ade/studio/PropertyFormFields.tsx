@@ -554,6 +554,9 @@ export interface PropertyFormFieldsProps {
 
   // Available class names for schema references
   availableClasses?: string[];
+
+  /** Ollama-backed example generation (#622); rendered beside schema-based example control. */
+  examplesAiSlot?: React.ReactNode;
 }
 
 // OpenAPI 3.1 format options by type
@@ -604,6 +607,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                                                         size = 'medium',
                                                                         nestedProperties,
                                                                         availableClasses = [],
+                                                                        examplesAiSlot,
                                                                       }) => {
   const isDark = useDarkMode();
 
@@ -1000,7 +1004,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           />
 
           <Box sx={{ gridColumn: showTitle ? 'auto' : '1 / -1' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 1 }}>
               <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#334155' }}>
                 Examples
               </Typography>
@@ -1020,6 +1024,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   <AutoAwesomeIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
+              {examplesAiSlot ? <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>{examplesAiSlot}</Box> : null}
             </Box>
 
             <TextField

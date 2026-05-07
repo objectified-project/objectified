@@ -4,6 +4,7 @@ import {
   draftPropertySchemaFromDialogForm,
   buildClassDescriptionAiPayload,
   parseGeneratedOperationDocs,
+  parseGeneratedPropertyExample,
 } from '../../lib/ai-property-description';
 import type { PropertyFormData } from '../../src/app/components/ade/studio/PropertyFormFields';
 
@@ -134,5 +135,16 @@ describe('ai-property-description (#619)', () => {
         '```JSON\n{"summary":"Update record","description":"Updates the record."}\n```',
       ),
     ).toEqual({ summary: 'Update record', description: 'Updates the record.' });
+  });
+
+  it('parseGeneratedPropertyExample reads fenced JSON (#622)', () => {
+    expect(parseGeneratedPropertyExample('')).toBeNull();
+    expect(
+      parseGeneratedPropertyExample('```json\n{"example":"user@example.com"}\n```'),
+    ).toEqual({ value: 'user@example.com' });
+    expect(parseGeneratedPropertyExample('{"example":42}')).toEqual({ value: 42 });
+    expect(parseGeneratedPropertyExample('{"example":null}')).toEqual({ value: null });
+    expect(parseGeneratedPropertyExample('not json')).toBeNull();
+    expect(parseGeneratedPropertyExample('{"wrong":1}')).toBeNull();
   });
 });

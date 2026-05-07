@@ -47,6 +47,7 @@ import {
 } from './form';
 import type { PropertyDialogAiContext } from './PropertyDialog';
 import { PropertyDescriptionAiButton } from './PropertyDescriptionAiButton';
+import { PropertyExampleAiButton } from './PropertyExampleAiButton';
 import { summarizeStoredPropertyData } from '@lib/ai-property-description';
 
 interface Props {
@@ -324,6 +325,7 @@ interface ConstraintsSectionProps {
   setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
   nestedProperties?: Array<{ id: string; name: string; data: any; description?: string; parent_id?: string | null }>;
   availableClasses: string[];
+  examplesAiSlot?: React.ReactNode;
   eyebrow?: string;
 }
 
@@ -334,6 +336,7 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
   setFormData,
   nestedProperties,
   availableClasses,
+  examplesAiSlot,
   eyebrow = 'Advanced Constraints',
 }) => (
   <FormSection
@@ -360,6 +363,7 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
       size="small"
       nestedProperties={nestedProperties}
       availableClasses={availableClasses}
+      examplesAiSlot={examplesAiSlot}
     />
   </FormSection>
 );
@@ -1680,6 +1684,16 @@ export default function ClassPropertyEditDialog({
     }
   }, [editingClassProperty?.data]);
 
+  const nestedMembersForExampleAi = useMemo(() => {
+    if (!editingClassProperty?.id || baseType !== 'object') return undefined;
+    return (allClassProperties || [])
+      .filter((p) => p.parent_id === editingClassProperty.id)
+      .map((p) => ({
+        name: p.name,
+        description: p.description ?? null,
+      }));
+  }, [allClassProperties, editingClassProperty?.id, baseType]);
+
   const classMemberDescriptionAiSlot =
     open && propertyAiContext && editingClassProperty ? (
       <PropertyDescriptionAiButton
@@ -1693,6 +1707,30 @@ export default function ClassPropertyEditDialog({
         existingProperties={propertyAiContext.existingProperties}
         studioContext={propertyAiContext.studioContext}
         onGenerated={(text) => setFormData((prev) => ({ ...prev, description: text }))}
+        disabled={!editPropName.trim()}
+      />
+    ) : null;
+
+  const classMemberExampleAiSlot =
+    open && propertyAiContext && editingClassProperty ? (
+      <PropertyExampleAiButton
+        tenantId={propertyAiContext.tenantId}
+        projectId={propertyAiContext.projectId}
+        versionId={propertyAiContext.versionId}
+        propertyName={editPropName}
+        propertySchema={propertySchemaForAiDescription}
+        propertyDescription={formData.description}
+        nestedMembers={nestedMembersForExampleAi}
+        contextClassName={propertyAiContext.contextClassName}
+        existingClasses={propertyAiContext.existingClasses}
+        existingProperties={propertyAiContext.existingProperties}
+        studioContext={propertyAiContext.studioContext}
+        onGenerated={(jsonLine) =>
+          setFormData((prev) => ({
+            ...prev,
+            examples: [...(prev.examples || []), jsonLine],
+          }))
+        }
         disabled={!editPropName.trim()}
       />
     ) : null;
@@ -1746,6 +1784,7 @@ export default function ClassPropertyEditDialog({
                 : undefined
             }
             availableClasses={existingClassNames}
+            examplesAiSlot={classMemberExampleAiSlot}
             eyebrow="Step 4 · Constraints"
           />
         );
@@ -1790,6 +1829,7 @@ export default function ClassPropertyEditDialog({
             : undefined
         }
         availableClasses={existingClassNames}
+        examplesAiSlot={classMemberExampleAiSlot}
       />
       <DocsSection formData={formData} setFormData={setFormData} changed={changedDocs} />
     </>

@@ -269,6 +269,59 @@ function buildPropertyDescriptionSystem(options: {
   return s;
 }
 
+const PROPERTY_EXAMPLE_SYSTEM = `You produce one realistic JSON example value for a JSON Schema property used in OpenAPI 3.1 documentation.
+
+# Task
+Return **exactly one** markdown fenced JSON block and **nothing outside the fence** (no preamble, no trailing commentary):
+
+\`\`\`json
+{ "example": <any JSON value> }
+\`\`\`
+
+# Rules
+- The value after \`"example"\` must be valid JSON (object, array, string, number, boolean, or null).
+- Ground the value in the **property name**, optional **property documentation description**, optional **nested member** hints, and the **JSON Schema snapshot** from the user message.
+- Respect **enum** (pick one listed value), **string formats** (email, uuid, date-time, uri, etc.), numeric **minimum** / **maximum**, and **pattern** when you can produce a matching string.
+- For **$ref** properties, emit a small plausible stub object using clearly fictional data (for example ids like \`"550e8400-e29b-41d4-a716-446655440000"\`, names like \`"Sample Customer"\`). Do not use real people, organizations, or live URLs implied to be production systems.
+- Avoid realistic secrets: no live API keys, tokens, or passwords — use obvious placeholders only when the field clearly expects a secret.
+- When the schema describes an **array** at the root, \`example\` should be a JSON array (often one representative element).
+- Prefer one concise representative value over large fixtures.
+- Use **Existing classes** / **Existing project properties** only to disambiguate references — do not contradict the supplied schema.`;
+
+function buildPropertyExampleSystem(options: {
+  existingClassNames?: string[];
+  existingProperties?: Array<{ name: string; description?: string | null; data?: Record<string, unknown> }>;
+  targetPropertyName?: string;
+  targetClassName?: string;
+}): string {
+  let s = PROPERTY_EXAMPLE_SYSTEM;
+  const tp = typeof options.targetPropertyName === 'string' ? options.targetPropertyName.trim() : '';
+  if (tp) {
+    s += `\n\n# Target property name\n${tp}\n`;
+  }
+  const tc = typeof options.targetClassName === 'string' ? options.targetClassName.trim() : '';
+  if (tc) {
+    s += `\n\n# Containing class\n${tc}\n`;
+  }
+  if (options.existingClassNames?.length) {
+    s += `\n\n# Existing classes\n${options.existingClassNames.join(', ')}`;
+  }
+  if (options.existingProperties?.length) {
+    s += `\n\n# Existing project properties\n`;
+    options.existingProperties.forEach((p) => {
+      const d = p.data;
+      const typeStr =
+        typeof d?.type === 'string'
+          ? d.type
+          : d && typeof d === 'object' && '$ref' in d && d.$ref
+            ? '$ref'
+            : 'object';
+      s += `- ${p.name}: ${typeStr}${p.description ? ` — ${String(p.description).slice(0, 80)}` : ''}\n`;
+    });
+  }
+  return s;
+}
+
 const CLASS_DESCRIPTION_SYSTEM = `You write concise API documentation for JSON Schema object classes used in OpenAPI 3.1 component schemas.
 
 # Task
@@ -464,6 +517,7 @@ export async function POST(request: NextRequest) {
     const isPropertySuggestions = task === 'property_suggestions';
     const isPropertyTypeSuggestions = task === 'property_type_suggestions';
     const isPropertyDescription = task === 'property_description';
+    const isPropertyExample = task === 'property_example';
     const isClassDescription = task === 'class_description';
     const isOperationDescription = task === 'operation_description';
     const isSchemaImprovementSuggestions = task === 'schema_improvement_suggestions';
@@ -472,6 +526,7 @@ export async function POST(request: NextRequest) {
       isPropertySuggestions ||
       isPropertyTypeSuggestions ||
       isPropertyDescription ||
+      isPropertyExample ||
       isClassDescription;
 
     const digestStr =
@@ -516,6 +571,13 @@ export async function POST(request: NextRequest) {
                   targetPropertyName: typeof targetPropertyName === 'string' ? targetPropertyName : undefined,
                   targetClassName: typeof targetClassName === 'string' ? targetClassName : undefined,
                 })
+              : isPropertyExample
+                ? buildPropertyExampleSystem({
+                    existingClassNames: Array.isArray(existingClassNames) ? existingClassNames : undefined,
+                    existingProperties: Array.isArray(existingProperties) ? existingProperties : undefined,
+                    targetPropertyName: typeof targetPropertyName === 'string' ? targetPropertyName : undefined,
+                    targetClassName: typeof targetClassName === 'string' ? targetClassName : undefined,
+                  })
               : isClassDescription
                 ? buildClassDescriptionSystem({
                     existingClassNames: Array.isArray(existingClassNames) ? existingClassNames : undefined,

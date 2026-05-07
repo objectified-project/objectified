@@ -35,6 +35,7 @@ import { AiPropertyTypeSuggestionsDialog } from './AiPropertyTypeSuggestionsDial
 import type { AiPropertySuggestion } from '@lib/ai-property-suggestions';
 import { draftPropertySchemaFromDialogForm } from '@lib/ai-property-description';
 import { PropertyDescriptionAiButton } from './PropertyDescriptionAiButton';
+import { PropertyExampleAiButton } from './PropertyExampleAiButton';
 import type { PropertyItem as LibraryPropertyItem } from './StudioSideNav';
 import {
   FormSection,
@@ -492,6 +493,7 @@ interface ConstraintsSectionProps {
   formData: PropertyFormData;
   setFormData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
   availableClasses: string[];
+  examplesAiSlot?: React.ReactNode;
   eyebrow?: string;
 }
 
@@ -501,6 +503,7 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
   formData,
   setFormData,
   availableClasses,
+  examplesAiSlot,
   eyebrow = 'Advanced Constraints',
 }) => (
   <FormSection
@@ -526,6 +529,7 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
       showHint={false}
       size="small"
       availableClasses={availableClasses}
+      examplesAiSlot={examplesAiSlot}
     />
   </FormSection>
 );
@@ -1698,6 +1702,13 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
     setFormData((prev) => ({ ...prev, description: text }));
   }, []);
 
+  const applyAiExample = useCallback((jsonLine: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      examples: [...(prev.examples || []), jsonLine],
+    }));
+  }, []);
+
   const descriptionAiSlot =
     open && propertyAiContext ? (
       <PropertyDescriptionAiButton
@@ -1711,6 +1722,24 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         existingProperties={propertyAiContext.existingProperties}
         studioContext={propertyAiContext.studioContext}
         onGenerated={applyAiDescription}
+        disabled={!propertyName.trim()}
+      />
+    ) : null;
+
+  const exampleAiSlot =
+    open && propertyAiContext ? (
+      <PropertyExampleAiButton
+        tenantId={propertyAiContext.tenantId}
+        projectId={propertyAiContext.projectId}
+        versionId={propertyAiContext.versionId}
+        propertyName={propertyName}
+        propertySchema={propertySchemaForAi}
+        propertyDescription={formData.description}
+        contextClassName={propertyAiContext.contextClassName}
+        existingClasses={propertyAiContext.existingClasses}
+        existingProperties={propertyAiContext.existingProperties}
+        studioContext={propertyAiContext.studioContext}
+        onGenerated={applyAiExample}
         disabled={!propertyName.trim()}
       />
     ) : null;
@@ -1824,6 +1853,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                         formData={formData}
                         setFormData={setFormData}
                         availableClasses={availableClasses}
+                        examplesAiSlot={exampleAiSlot}
                         eyebrow="Step 4 of 5"
                       />
                     )}
@@ -1889,6 +1919,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                       formData={formData}
                       setFormData={setFormData}
                       availableClasses={availableClasses}
+                      examplesAiSlot={exampleAiSlot}
                     />
                     <DocsSection formData={formData} setFormData={setFormData} changed={changedDocs} />
                   </div>

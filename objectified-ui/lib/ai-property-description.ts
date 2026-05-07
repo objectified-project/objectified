@@ -42,6 +42,29 @@ export function parseGeneratedOperationDocs(raw: string): { summary: string; des
   };
 }
 
+/**
+ * Parses LLM output for a single JSON Schema example value (#622).
+ * Expects a JSON object (optionally inside a markdown fence) with an `example` key holding any JSON-serializable value.
+ * Returns null only when parsing fails; use `.value` which may be null when the model emits `"example": null`.
+ */
+export function parseGeneratedPropertyExample(raw: string): { value: unknown } | null {
+  let t = raw.trim();
+  if (!t) return null;
+  const fenced = extractLastJsonCodeBlock(t);
+  if (fenced) t = fenced;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(t);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const o = parsed as Record<string, unknown>;
+  if (!Object.prototype.hasOwnProperty.call(o, 'example')) return null;
+  return { value: o.example };
+}
+
 export function normalizeGeneratedPropertyDescription(raw: string): string {
   let t = raw.trim();
   if (!t) return '';
