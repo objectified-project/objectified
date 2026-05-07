@@ -83,7 +83,7 @@ Print a single config value by dotted key
 
 ```
 USAGE
-  $ objectified config get KEY [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified config get KEY [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 ARGUMENTS
@@ -100,10 +100,10 @@ EXAMPLES
   $ objectified --json config get profile.staging.tenant_slug
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -112,7 +112,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified config set
@@ -126,7 +126,7 @@ Print the entire config file (stable JSON with --json, otherwise TOML)
 
 ```
 USAGE
-  $ objectified config list [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified config list [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
@@ -140,10 +140,10 @@ EXAMPLES
   $ objectified config list > backup.toml
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -152,7 +152,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified config path
@@ -166,7 +166,7 @@ Print the resolved config.toml path
 
 ```
 USAGE
-  $ objectified config path [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified config path [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
@@ -180,10 +180,10 @@ EXAMPLES
   $ objectified config path | pbcopy
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -192,7 +192,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified config get
@@ -206,7 +206,7 @@ Set a config value by dotted key and persist config.toml
 
 ```
 USAGE
-  $ objectified config set KEY VALUE [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json]
+  $ objectified config set KEY VALUE [--api-key <value>] [--base-url <value>] [--config <value>] [--json]
     [--color] [--profile <value>] [-q] [--verbose]
 
 ARGUMENTS
@@ -224,10 +224,10 @@ EXAMPLES
   $ objectified --json config set profile.prod.tenant_slug acme-corp
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -236,7 +236,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified config get
@@ -250,7 +250,7 @@ List documentation topics (`objectified docs`) or open one with `objectified doc
 
 ```
 USAGE
-  $ objectified docs [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified docs [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
@@ -264,10 +264,10 @@ EXAMPLES
   $ objectified --json docs
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -276,7 +276,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified docs errors
@@ -292,7 +292,7 @@ Shell completions roadmap and interim guidance
 
 ```
 USAGE
-  $ objectified docs completions [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified docs completions [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
@@ -306,10 +306,10 @@ EXAMPLES
   $ objectified docs completions --json
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -318,7 +318,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified docs
@@ -332,7 +332,7 @@ Exit codes, hints, and error-handling reference
 
 ```
 USAGE
-  $ objectified docs errors [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified docs errors [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
@@ -346,10 +346,10 @@ EXAMPLES
   $ objectified projects list --json
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -358,7 +358,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified docs
@@ -374,7 +374,7 @@ TTY vs JSON output, quiet mode, verbose logs, and color
 
 ```
 USAGE
-  $ objectified docs output [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified docs output [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
@@ -388,10 +388,10 @@ EXAMPLES
   $ objectified docs output > ./output-notes.txt
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -400,7 +400,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified docs
@@ -416,7 +416,7 @@ Future oclif plugin extensibility for Objectified
 
 ```
 USAGE
-  $ objectified docs plugins [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified docs plugins [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
@@ -430,10 +430,10 @@ EXAMPLES
   $ objectified docs telemetry
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -442,7 +442,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified docs
@@ -456,7 +456,7 @@ config.toml profiles, defaults, and precedence rules
 
 ```
 USAGE
-  $ objectified docs profiles [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified docs profiles [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
@@ -470,10 +470,10 @@ EXAMPLES
   $ objectified docs profiles | sed -n '1,12p'
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -482,7 +482,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified docs
@@ -498,7 +498,7 @@ Telemetry posture and safe verbose debugging
 
 ```
 USAGE
-  $ objectified docs telemetry [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified docs telemetry [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
@@ -513,10 +513,10 @@ EXAMPLES
   $ objectified docs telemetry > notes.txt
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -525,7 +525,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified docs errors
@@ -539,7 +539,7 @@ Smoke-test greeting for the Objectified CLI
 
 ```
 USAGE
-  $ objectified hello [NAME] [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified hello [NAME] [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 ARGUMENTS
@@ -556,10 +556,10 @@ EXAMPLES
   $ objectified --json hello
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -568,7 +568,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified docs output
@@ -602,7 +602,7 @@ List Objectified projects
 
 ```
 USAGE
-  $ objectified projects list [--apiKey <value>] [--baseUrl <value>] [--config <value>] [--json] [--color]
+  $ objectified projects list [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
@@ -616,10 +616,10 @@ EXAMPLES
   $ objectified --profile staging projects list
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
-                     config path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -628,7 +628,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified config path

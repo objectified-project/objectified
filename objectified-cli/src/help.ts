@@ -1,4 +1,5 @@
 import { Command, CommandHelp, Help, type HelpSectionRenderer } from "@oclif/core";
+import supportsColor from "supports-color";
 
 type HelpGenCtx = Parameters<HelpSectionRenderer>[0];
 type HelpGenHeader = Parameters<HelpSectionRenderer>[1];
@@ -35,17 +36,46 @@ function compactSections<T>(xs: (T | undefined)[]): T[] {
   return xs.filter((x): x is T => Boolean(x));
 }
 
-function argvRequestsNoColor(argv: string[]): boolean {
-  return argv.some((a) => a === "--no-color" || a.startsWith("--no-color="));
+function parseBooleanArg(value: string): boolean | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "1" || normalized === "true" || normalized === "yes") return true;
+  if (normalized === "0" || normalized === "false" || normalized === "no") return false;
+  return undefined;
+}
+
+function argvColorFlag(argv: string[]): boolean | undefined {
+  let out: boolean | undefined;
+  for (const arg of argv) {
+    if (arg === "--color") {
+      out = true;
+      continue;
+    }
+    if (arg.startsWith("--color=")) {
+      const parsed = parseBooleanArg(arg.slice("--color=".length));
+      if (parsed !== undefined) out = parsed;
+      continue;
+    }
+    if (arg === "--no-color") {
+      out = false;
+      continue;
+    }
+    if (arg.startsWith("--no-color=")) {
+      const parsed = parseBooleanArg(arg.slice("--no-color=".length));
+      if (parsed !== undefined) out = !parsed;
+      else out = false;
+    }
+  }
+  return out;
 }
 
 function helpShouldStripAnsi(optsStrip: boolean | undefined, argv: string[]): boolean {
   if (optsStrip === true) return true;
   if (optsStrip === false) return false;
-  if (!process.stdout.isTTY) return true;
+  const colorFlag = argvColorFlag(argv);
+  if (colorFlag === false) return true;
+  if (colorFlag === true) return false;
   if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") return true;
-  if (argvRequestsNoColor(argv)) return true;
-  return false;
+  return !(typeof supportsColor.stdout === "object" && process.stdout.isTTY);
 }
 
 type CommandWithSeeAlso = Command.Loadable & { seeAlso?: string[] };

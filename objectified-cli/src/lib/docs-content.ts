@@ -4,7 +4,7 @@ export const docsTopicOutput = `
 OUTPUT FORMATTING
 
 Human vs machine
-  When stdout is a terminal, commands print tables, hints, and optional color (unless NO_COLOR or --no-color applies). When stdout is not a TTY, JSON mode is chosen automatically unless you pass --json=false.
+  When stdout is a terminal, commands print tables, hints, and optional color (unless NO_COLOR or --no-color applies). When stdout is not a TTY, JSON mode is chosen automatically unless you pass --no-json.
 
 Stable JSON
   With --json (or non-TTY stdout), emitted JSON is sorted by key where applicable and avoids decorative fields. Pipe output to jq or similar tools.

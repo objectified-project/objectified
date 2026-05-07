@@ -28,13 +28,11 @@ import { createCliOutput, localePrefersAsciiTable, type CliOutput } from "./lib/
 
 export abstract class BaseCommand extends Command {
   static baseFlags = {
-    apiKey: Flags.string({
-      name: "api-key",
+    "api-key": Flags.string({
       description: "API key for direct authentication (bypasses login token).",
       helpGroup: "Auth",
     }),
-    baseUrl: Flags.string({
-      name: "base-url",
+    "base-url": Flags.string({
       description: "Root REST API URL.",
       helpGroup: "Common",
     }),
@@ -117,7 +115,18 @@ export abstract class BaseCommand extends Command {
     await super.init();
     const Cmd = this.constructor as typeof Command;
     const parsed = await this.parse(Cmd);
-    const globalPart = parsed.flags as GlobalCliFlags;
+    const parsedFlags = parsed.flags as Record<string, unknown>;
+    const globalPart: GlobalCliFlags = {
+      apiKey: (parsedFlags["api-key"] as string | undefined) ?? (parsedFlags.apiKey as string | undefined),
+      baseUrl:
+        (parsedFlags["base-url"] as string | undefined) ?? (parsedFlags.baseUrl as string | undefined),
+      config: parsedFlags.config as string | undefined,
+      json: parsedFlags.json as boolean | undefined,
+      color: parsedFlags.color as boolean | undefined,
+      profile: parsedFlags.profile as string | undefined,
+      quiet: parsedFlags.quiet as boolean | undefined,
+      verbose: parsedFlags.verbose as boolean | undefined,
+    };
     this.parsedGlobalFlags = globalPart;
     this.commandArgs = parsed.args as Record<string, unknown>;
 

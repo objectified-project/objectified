@@ -16,8 +16,9 @@ function escapeMan(text) {
   return text
     .split("\n")
     .map((line) => {
-      if (line.startsWith(".") || line.startsWith("'")) return `\\&${line}`;
-      return line;
+      const escaped = line.replace(/\\/g, "\\\\");
+      if (escaped.startsWith(".") || escaped.startsWith("'")) return `\\&${escaped}`;
+      return escaped;
     })
     .join("\n");
 }
@@ -54,6 +55,11 @@ async function main() {
 
   const HelpClass = await loadHelpClass(config);
   const help = new HelpClass(config, { stripAnsi: true, maxWidth: 78 });
+  const renderTemplate = (value) => {
+    if (!value) return undefined;
+    const rendered = help.render(value);
+    return rendered.replace(/<%[\s\S]*?%>/g, "").trim();
+  };
 
   const topicSep = config.topicSeparator ?? " ";
 
@@ -70,8 +76,8 @@ async function main() {
     const cmd = { ...c, aliases: c.aliases ? [...c.aliases] : c.aliases };
     const displayId = cmd.id.replace(/:/g, topicSep);
     const summaryLine =
-      (cmd.summary && cmd.summary.split("\n")[0]) ||
-      (cmd.description && cmd.description.split("\n")[0]) ||
+      (renderTemplate(cmd.summary)?.split("\n")[0]) ||
+      (renderTemplate(cmd.description)?.split("\n")[0]) ||
       displayId;
     const body = help.formatCommand(cmd);
     const base = manFileBase(cmd.id, topicSep);

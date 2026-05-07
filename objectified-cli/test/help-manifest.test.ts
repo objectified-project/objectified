@@ -41,6 +41,12 @@ describe("CLI manifest help metadata", () => {
     expect(pkg.man?.includes("./man/man1/objectified-help.1")).toBe(true);
     expect(pkg.man?.includes("./man/man1/objectified-version.1")).toBe(true);
 
+    const rootManBody = readFileSync(path.join(pkgRoot, "man", "man1", "objectified.1"), "utf8");
+    expect(rootManBody).toContain("%APPDATA%\\\\Objectified");
+
+    const helpManBody = readFileSync(path.join(pkgRoot, "man", "man1", "objectified-help.1"), "utf8");
+    expect(helpManBody).not.toContain("<%= ");
+
     for (const id of coreIds) {
       const slug = `objectified-${id.replace(/:/g, "-")}.1`;
       expect(pkg.man?.includes(`./man/man1/${slug}`), `missing man entry for ${id}`).toBe(true);

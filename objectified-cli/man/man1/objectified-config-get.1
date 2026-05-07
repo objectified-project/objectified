@@ -4,8 +4,9 @@ objectified config get \- Print a single config value by dotted key
 .SH DESCRIPTION
 .nf
 USAGE
-  $ objectified config get KEY [--apiKey <value>] [--baseUrl <value>]
-    [--config <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
+  $ objectified config get KEY [--api-key <value>] [--base-url
+    <value>] [--config <value>] [--json] [--color] [--profile <value>] [-q]
+    [--verbose]
 
 ARGUMENTS
   KEY  Dotted path (e.g. default_profile, profile.prod.base_url)
@@ -21,12 +22,12 @@ EXAMPLES
   $ objectified --json config get profile.staging.tenant_slug
 
 COMMON
-  --baseUrl=<value>  Root REST API URL.
-  --config=<value>   Path to config file (default: XDG config dir /
-                     Objectified AppData on Windows — see `objectified config
-                     path`).
-  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls
-                     back to default_profile in config.
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir /
+                      Objectified AppData on Windows — see `objectified config
+                      path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls
+                      back to default_profile in config.
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR;
@@ -37,7 +38,7 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --apiKey=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
   objectified config set
