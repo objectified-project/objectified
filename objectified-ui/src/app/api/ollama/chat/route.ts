@@ -311,6 +311,25 @@ function buildClassDescriptionSystem(options: {
   return s;
 }
 
+const OPERATION_DESCRIPTION_SYSTEM = `You draft OpenAPI-style documentation for a single HTTP operation in an API spec.
+
+# Task
+Return **exactly one** markdown fenced JSON block and **nothing outside the fence** (no preamble, no trailing commentary):
+
+\`\`\`json
+{
+  "summary": "Short phrase for the operation summary field.",
+  "description": "Markdown-friendly explanation for API consumers."
+}
+\`\`\`
+
+# Rules
+- Infer typical REST semantics from the **HTTP method** (GET fetch/list, POST create, PUT replace, PATCH partial update, DELETE remove, HEAD/OPTIONS as appropriate) and from the **path template** (collection vs single resource, nested resources, \`{parameter}\` placeholders).
+- **summary**: single line, plain text (no Markdown), imperative or concise noun phrase; prefer staying under 120 characters and omit a trailing period unless it aids clarity.
+- **description**: one to three short paragraphs and/or a small Markdown bullet list; explain what the operation does, how path parameters map to the resource, and mention idempotency or side effects only when strongly implied by the method and path. Stay factual—do not invent domain-specific business rules not suggested by the path.
+- When the path lists template parameters, name them generically (e.g. "resource identifier") unless the segment name clearly implies a role (e.g. \`userId\`).
+- Both **summary** and **description** must be non-empty strings.`;
+
 function buildPropertyTypeSuggestionsSystem(options: {
   existingClassNames?: string[];
   existingProperties?: Array<{ name: string; description?: string | null; data?: Record<string, unknown> }>;
@@ -446,6 +465,7 @@ export async function POST(request: NextRequest) {
     const isPropertyTypeSuggestions = task === 'property_type_suggestions';
     const isPropertyDescription = task === 'property_description';
     const isClassDescription = task === 'class_description';
+    const isOperationDescription = task === 'operation_description';
     const isSchemaImprovementSuggestions = task === 'schema_improvement_suggestions';
     const usesPropertyLibraryContext =
       isClassSkeleton ||
@@ -502,6 +522,8 @@ export async function POST(request: NextRequest) {
                     existingProperties: Array.isArray(existingProperties) ? existingProperties : undefined,
                     targetClassName: typeof targetClassName === 'string' ? targetClassName : undefined,
                   })
+                : isOperationDescription
+                  ? OPERATION_DESCRIPTION_SYSTEM
             : isSchemaImprovementSuggestions
               ? buildSchemaImprovementSuggestionsSystem({
                   studioMetricsDigest: digestStr,

@@ -3,6 +3,7 @@ import {
   summarizeStoredPropertyData,
   draftPropertySchemaFromDialogForm,
   buildClassDescriptionAiPayload,
+  parseGeneratedOperationDocs,
 } from '../../lib/ai-property-description';
 import type { PropertyFormData } from '../../src/app/components/ade/studio/PropertyFormFields';
 
@@ -83,5 +84,19 @@ describe('ai-property-description (#619)', () => {
     const email = payload.properties as Record<string, { memberDescription?: string; schema: Record<string, unknown> }>;
     expect(email.email.memberDescription).toBe('Primary contact');
     expect(email.email.schema.format).toBe('email');
+  });
+
+  it('parseGeneratedOperationDocs reads fenced JSON (#621)', () => {
+    expect(parseGeneratedOperationDocs('')).toBeNull();
+    expect(
+      parseGeneratedOperationDocs(
+        '```json\n{"summary":"List users","description":"Returns **users**."}\n```',
+      ),
+    ).toEqual({ summary: 'List users', description: 'Returns **users**.' });
+    expect(parseGeneratedOperationDocs('{"summary":"x","description":"y"}')).toEqual({
+      summary: 'x',
+      description: 'y',
+    });
+    expect(parseGeneratedOperationDocs('not json')).toBeNull();
   });
 });

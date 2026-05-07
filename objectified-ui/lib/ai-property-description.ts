@@ -3,6 +3,35 @@ import type { PropertyFormData } from '@/app/components/ade/studio/PropertyFormF
 /**
  * Normalizes LLM output into a single plain-text property description (#619).
  */
+const OPERATION_DOCS_JSON_FENCE = /^```(?:json)?\s*\n?([\s\S]*?)\n?```$/;
+
+/**
+ * Parses LLM output for OpenAPI operation summary + description (#621).
+ * Expects a single JSON object (optionally inside a markdown fence) with string fields `summary` and `description`.
+ */
+export function parseGeneratedOperationDocs(raw: string): { summary: string; description: string } | null {
+  let t = raw.trim();
+  if (!t) return null;
+  const fenced = t.match(OPERATION_DOCS_JSON_FENCE);
+  if (fenced) t = fenced[1].trim();
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(t);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const o = parsed as Record<string, unknown>;
+  const summaryRaw = typeof o.summary === 'string' ? o.summary.trim().replace(/\s+/g, ' ') : '';
+  const descriptionRaw = typeof o.description === 'string' ? o.description.trim() : '';
+  if (!summaryRaw && !descriptionRaw) return null;
+  return {
+    summary: summaryRaw.slice(0, 400),
+    description: descriptionRaw.slice(0, 16_000),
+  };
+}
+
 export function normalizeGeneratedPropertyDescription(raw: string): string {
   let t = raw.trim();
   if (!t) return '';
