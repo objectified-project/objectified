@@ -146,6 +146,7 @@ describe("splitDottedKey (#3188)", () => {
 describe("assertWritableConfigKey (#3188)", () => {
   const shouldBlock = [
     "api_key",
+    "api-key",
     "apiKey",
     "apikey",
     "profile.staging.api_key",
