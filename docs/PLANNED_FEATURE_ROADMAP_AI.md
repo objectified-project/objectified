@@ -72,28 +72,16 @@ This outlines the planned features for integrating AI capabilities into Objectif
 |--------|-----------------------------------------------------|
 | #527   | Implementation of Guardrails for prompts/responses  |
 
-### AI Documentation Generation
-
-**Auto-Generate Descriptions** 📋 PLANNED
-- ✅ Generate property descriptions from names and types (#619 — Studio **Generate with AI** on property description fields; Ollama `property_description` task)
-- ✅ Generate class descriptions from properties (#620 — Studio **Generate with AI** on class description field; Ollama `class_description` task)
-- ✅ Generate operation summaries from path and method (#621 — Paths operation **Docs** tab **Generate summary & description**; Ollama `operation_description` task)
-- ✅ Generate example values that make sense (#622 — property **Examples** **Generate example with AI** next to schema-based generate; Ollama `property_example` task)
-- Support multiple languages (i18n)
-
 ### AI Layout Suggestions
 
-**Intelligent Layout Suggestions** 📋 PLANNED
-- AI-powered layout recommendations:
-    - 📋 Analyze schema structure and suggest best layout type
-    - 📋 Detect strongly connected components
-    - 📋 Suggest groupings based on relationships
-    - 📋 Identify central/hub classes
-    - 📋 Recommend hierarchy roots
-
-| Ticket | Feature Description            |
-|--------|--------------------------------|
-| #623   | Intelligent Layout Suggestions |
+**Intelligent Layout Suggestions** ✅ (#623)
+- ✅ AI-powered layout recommendations:
+    - ✅ Analyze schema structure and suggest best layout type (TB vs LR heuristic + schema depth)
+    - ✅ Detect strongly connected components on the canvas graph
+    - ✅ Suggest groupings based on relationships (weak components, SCC cycles — surfaced in metrics + suggestions)
+    - ✅ Identify central/hub classes (degree on collapsed layout graph)
+    - ✅ Recommend hierarchy roots (no incoming directed edges)
+    - ✅ Optional Ollama narrative (`task: canvas_layout_recommendations`)
 
 ---
 
@@ -255,3 +243,12 @@ This outlines the planned features for integrating AI capabilities into Objectif
 - ✅ Industry-specific patterns (#616): multiple actionable patterns per domain (e.g. inventory/idempotency for e-commerce, ledger/idempotency for finance, FHIR-friendly identifiers for healthcare).
 - ✅ Security hardening suggestions (#617): domain-based payment/PHI guidance, auth rate-limit hints, vault/logging guidance for secret-like properties, password-hash modeling, and webhook signature verification for webhook-style class names.
 - ✅ Performance optimization suggestions (#618): cache namespacing/TTL, background job idempotency and retries, cursor/keyset pagination, search projections vs canonical entities, chunked bulk I/O, separating heavy binary metadata, and fan-out/timeline modeling when cache, queue, paging, search, export, media, or feed-style names appear on classes or reusable properties.
+
+### AI Documentation Generation
+
+**Auto-Generate Descriptions** 📋 PLANNED
+- ✅ Generate property descriptions from names and types (#619 — Studio **Generate with AI** on property description fields; Ollama `property_description` task)
+- ✅ Generate class descriptions from properties (#620 — Studio **Generate with AI** on class description field; Ollama `class_description` task)
+- ✅ Generate operation summaries from path and method (#621 — Paths operation **Docs** tab **Generate summary & description**; Ollama `operation_description` task)
+- ✅ Generate example values that make sense (#622 — property **Examples** **Generate example with AI** next to schema-based generate; Ollama `property_example` task)
+- Support multiple languages (i18n)

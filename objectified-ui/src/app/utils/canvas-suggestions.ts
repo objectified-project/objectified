@@ -6,8 +6,14 @@
 import type { Node, Edge } from '@xyflow/react';
 import type { LayoutQualityResult } from '@/app/utils/layout-quality';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import { analyzeCanvasLayoutGraph } from '@/app/utils/canvas-layout-graph-analysis';
 
 export type CanvasSuggestionKind =
+  | 'recommended_layout_direction'
+  | 'strongly_connected_canvas'
+  | 'canvas_hub_layout'
+  | 'hierarchy_roots_layout'
+  | 'weakly_disconnected_canvas'
   | 'reduce_edge_crossings'
   | 'group_related'
   | 'isolated_class'
@@ -128,15 +134,95 @@ export function computeCanvasSuggestions(input: ComputeSuggestionsInput): Canvas
   const adj = buildUndirectedAdjacency(edges);
   const components = getConnectedComponents(nodeIds, adj);
 
+  const layoutAnalysis = analyzeCanvasLayoutGraph(nodes, edges, {
+    deepestDependencyChainLength: metrics?.deepestChainLength ?? null,
+  });
+
+  if (layoutAnalysis && layoutAnalysis.classCount >= 2) {
+    const dir = layoutAnalysis.recommendedDirection;
+    const dirLabel = dir === 'TB' ? 'Top → Bottom' : 'Left → Right';
+    suggestions.push({
+      id: 'suggest-layout-direction-analysis',
+      kind: 'recommended_layout_direction',
+      title: `Recommended auto-layout: ${dirLabel}`,
+      description: layoutAnalysis.recommendationReason,
+      detail: `Pseudo depth ${layoutAnalysis.pseudoLayerDepth}, max width ${layoutAnalysis.pseudoLayerMaxWidth}${
+        layoutAnalysis.nonTrivialSccCount ? ` · ${layoutAnalysis.nonTrivialSccCount} cyclic SCC(s)` : ''
+      }`,
+      action: { type: 'apply_hierarchical_layout', direction: dir },
+    });
+
+    const cyclicComponents = layoutAnalysis.stronglyConnectedComponents.filter((s) => s.memberIds.length > 1);
+    for (let i = 0; i < Math.min(3, cyclicComponents.length); i++) {
+      const scc = cyclicComponents[i];
+      const preview = scc.memberNames.slice(0, 6).join(', ');
+      const extra = scc.memberNames.length > 6 ? ` +${scc.memberNames.length - 6} more` : '';
+      suggestions.push({
+        id: `suggest-scc-${scc.memberIds.slice().sort().join('-').slice(0, 48)}`,
+        kind: 'strongly_connected_canvas',
+        title: `Directed cycle cluster (${scc.memberIds.length} classes)`,
+        description:
+          'These classes reach each other along directed canvas edges — a tightly coupled subgraph. Consider grouping them or emphasizing them near the layout anchor.',
+        detail: `${preview}${extra}`,
+      });
+    }
+
+    const topHub = layoutAnalysis.hubClasses[0];
+    if (topHub && topHub.totalDegree >= 4 && layoutAnalysis.vertexCount >= 3) {
+      const others = layoutAnalysis.hubClasses
+        .slice(1, 4)
+        .map((h) => h.name)
+        .filter(Boolean);
+      suggestions.push({
+        id: `suggest-canvas-hub-${topHub.id}`,
+        kind: 'canvas_hub_layout',
+        title: `${topHub.name} is a canvas hub`,
+        description:
+          'High in + out degree on the canvas graph — place it centrally or use it as a backbone when you run auto-layout.',
+        detail: others.length ? `Also busy: ${others.join(', ')}` : `${topHub.inDegree} in · ${topHub.outDegree} out`,
+      });
+    }
+
+    if (layoutAnalysis.hierarchyRoots.length > 0 && edges.length > 0) {
+      const roots = layoutAnalysis.hierarchyRoots;
+      const names = roots.slice(0, 10).map((r) => r.name);
+      suggestions.push({
+        id: 'suggest-hierarchy-roots',
+        kind: 'hierarchy_roots_layout',
+        title:
+          roots.length === 1
+            ? `${roots[0].name} is a hierarchy root`
+            : `${roots.length} hierarchy roots on the canvas`,
+        description:
+          'No incoming canvas edges — good anchors at the top (TB) or left (LR) when running hierarchical layout.',
+        detail: names.join(', ') + (roots.length > 10 ? ` +${roots.length - 10} more` : ''),
+        action: { type: 'apply_hierarchical_layout', direction: layoutAnalysis.recommendedDirection },
+      });
+    }
+
+    if (layoutAnalysis.weaklyConnectedComponentCount > 1 && edges.length > 0) {
+      suggestions.push({
+        id: 'suggest-weak-components',
+        kind: 'weakly_disconnected_canvas',
+        title: `${layoutAnalysis.weaklyConnectedComponentCount} disconnected subgraphs`,
+        description:
+          'Relationship islands detected — arrange clusters separately or run auto-layout per island for clearer structure.',
+        detail: 'Uses undirected canvas edges between classes/groups.',
+        action: { type: 'apply_hierarchical_layout', direction: layoutAnalysis.recommendedDirection },
+      });
+    }
+  }
+
   // 1. Reduce edge crossings by switching layout
   if (layoutQuality && layoutQuality.edgeCrossingCount >= EDGE_CROSSING_THRESHOLD) {
+    const crossingDir = layoutAnalysis?.recommendedDirection ?? 'TB';
     suggestions.push({
       id: 'suggest-reduce-edge-crossings',
       kind: 'reduce_edge_crossings',
       title: 'Reduce edge crossings',
       description: 'Try a different layout direction (e.g. Top↔Bottom or Left↔Right) or use Auto-organize to improve readability.',
       detail: `${layoutQuality.edgeCrossingCount} crossing${layoutQuality.edgeCrossingCount !== 1 ? 's' : ''} detected.`,
-      action: { type: 'apply_hierarchical_layout', direction: 'TB' },
+      action: { type: 'apply_hierarchical_layout', direction: crossingDir },
     });
   }
 

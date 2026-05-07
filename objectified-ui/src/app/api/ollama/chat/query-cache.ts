@@ -66,6 +66,8 @@ export type OllamaChatCacheKeyInput = {
   schemaContextFingerprint?: unknown;
   /** Studio metrics digest for schema_improvement_suggestions (#253). */
   studioMetricsDigest?: unknown;
+  /** Serialized canvas layout analysis for canvas_layout_recommendations (#623). */
+  canvasLayoutDigest?: unknown;
   messages: unknown;
 };
 
@@ -82,6 +84,10 @@ export function ollamaChatSemanticContextKey(input: Omit<OllamaChatCacheKeyInput
     typeof input.studioMetricsDigest === 'string' && input.studioMetricsDigest.trim()
       ? input.studioMetricsDigest.trim().slice(0, 64_000)
       : null;
+  const layoutDigest =
+    typeof input.canvasLayoutDigest === 'string' && input.canvasLayoutDigest.trim()
+      ? input.canvasLayoutDigest.trim().slice(0, 64_000)
+      : null;
   const payload = stableStringify({
     model: input.model.trim(),
     task: input.task ?? null,
@@ -92,6 +98,7 @@ export function ollamaChatSemanticContextKey(input: Omit<OllamaChatCacheKeyInput
     versionId: input.versionId ?? null,
     schemaContextFingerprint: fp,
     studioMetricsDigest: digest,
+    canvasLayoutDigest: layoutDigest,
   });
   return createHash('sha256').update(payload, 'utf8').digest('hex');
 }
@@ -123,6 +130,10 @@ export function ollamaChatCacheKey(input: OllamaChatCacheKeyInput): string {
     typeof input.studioMetricsDigest === 'string' && input.studioMetricsDigest.trim()
       ? input.studioMetricsDigest.trim().slice(0, 64_000)
       : null;
+  const layoutDigest =
+    typeof input.canvasLayoutDigest === 'string' && input.canvasLayoutDigest.trim()
+      ? input.canvasLayoutDigest.trim().slice(0, 64_000)
+      : null;
   const payload = stableStringify({
     model: input.model.trim(),
     task: input.task ?? null,
@@ -133,6 +144,7 @@ export function ollamaChatCacheKey(input: OllamaChatCacheKeyInput): string {
     versionId: input.versionId ?? null,
     schemaContextFingerprint: fp,
     studioMetricsDigest: digest,
+    canvasLayoutDigest: layoutDigest,
     messages: input.messages,
   });
   return createHash('sha256').update(payload, 'utf8').digest('hex');

@@ -30,6 +30,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Projects list includes a **Show deleted** switch; when on, soft-deleted projects appear with a **Deleted** badge and **Restore** or **permanent delete** in the row menu (#2981).
 
 ## Studio
+- **Schema Metrics** includes **Canvas layout intelligence**: analyzes the live ReactFlow graph (strongly connected components, hubs, hierarchy roots, weakly connected islands), recommends **Top→Bottom** vs **Left→Right** auto-layout, adds matching **Suggestions**, and optional **AI narrative** via Ollama (`canvas_layout_recommendations`) (#623).
 - Property **Examples** (Advanced Constraints) supports **Generate example with AI** (Ollama): adds a realistic JSON example from the property name, optional description, schema snapshot, and nested member hints on class properties (#622).
 - **Paths** operation **Docs** tab supports **Generate summary & description** (Ollama): drafts OpenAPI **summary** and Markdown **description** from the HTTP method, path template, path parameters, and optional operationId (#621).
 - **Class description** in **Edit class** supports **Generate with AI** (Ollama): drafts short documentation from the class name, linked member properties (names, types, optional member descriptions), and composition (allOf / anyOf / oneOf) (#620).
