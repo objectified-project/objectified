@@ -196,18 +196,13 @@ export function assertWritableConfigKey(dottedKey: string): void {
     .toLowerCase()
     .split(".")
     .map((s) => s.replace(/[-_]/g, ""));
-  const secretKeywords = [
-    "apikey",
-    "accesstoken",
-    "refreshtoken",
-    "token",
-    "secret",
-    "password",
-    "credential",
-    "privatekey",
-  ];
-  const isSecret = normalizedSegments.some((seg) =>
-    secretKeywords.some((kw) => seg.includes(kw)),
+  // Compound keywords are specific enough to use as substrings safely.
+  const substringKeywords = ["apikey", "accesstoken", "refreshtoken", "privatekey"];
+  // Short/generic keywords use exact segment matching to avoid false positives
+  // (e.g. "notification" should not be blocked even though "notif-i-c-a-t-i-o-n" ≠ "token").
+  const exactKeywords = new Set(["token", "secret", "password", "credential"]);
+  const isSecret = normalizedSegments.some(
+    (seg) => exactKeywords.has(seg) || substringKeywords.some((kw) => seg.includes(kw)),
   );
   if (isSecret) {
     throw new CliError(
