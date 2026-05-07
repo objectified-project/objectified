@@ -76,7 +76,7 @@ export async function runCliPkceLogin(opts: RunCliPkceLoginOpts): Promise<RunCli
     } else {
       const waitForCode = lb?.waitForCode;
       if (!waitForCode) {
-        throw new Error("internal error: loopback server was not started");
+        throw new Error("internal error: browser auth flow expected a loopback server, but none was started");
       }
       opts.stdoutLine(`Opening ${opts.webLoginUrl.replace(/\?.*$/, "")} in your browser…`);
       opts.stderrLine("Waiting for browser… (Ctrl+C to cancel)");
