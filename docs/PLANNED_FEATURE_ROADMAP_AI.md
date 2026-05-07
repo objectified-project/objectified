@@ -76,17 +76,15 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 **Best Practice Suggestions** 📋 PLANNED (partially delivered)
 - ✅ Context-aware tips from project **domain category** (metadata) and **class-name heuristics** (#615):
-    - E-commerce: "Consider adding inventory tracking"
     - Authentication-style class names (e.g. RefreshToken, Session): "Implement refresh token pattern"
-    - Multi-tenant / SaaS: "Add tenant isolation fields"
-    - One tip per registered **project domain** category (catalog in Studio)
-- 📋 Industry-specific patterns
+    - Multi-tenant / SaaS (when domain is not already SaaS): "Add tenant isolation fields"
+    - Several modeling-pattern bullets per registered **project domain** category (catalog in Studio; **#616** expanded from one short line per domain)
+- ✅ Industry-specific patterns (#616): multiple actionable patterns per domain (e.g. inventory/idempotency for e-commerce, ledger/idempotency for finance, FHIR-friendly identifiers for healthcare).
 - Security hardening suggestions
 - Performance optimization tips
 
 | Ticket | Feature Description            |
 |--------|--------------------------------|
-| #616   | Industry-specific Patterns     |
 | #617   | Security Hardening Suggestions |
 | #618   | Performance Optimization Tips  |
 
