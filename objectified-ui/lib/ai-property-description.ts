@@ -91,6 +91,53 @@ type SeedPropertyLike = {
   type?: string | string[];
 } | null;
 
+/** Canvas / API class member row shape for AI class descriptions (#620). */
+export type ClassMemberLike = {
+  name?: string;
+  description?: string | null;
+  data?: unknown;
+};
+
+/**
+ * Builds a compact JSON payload from class members and composition for `class_description` prompts (#620).
+ */
+export function buildClassDescriptionAiPayload(input: {
+  members: ClassMemberLike[];
+  composition?: { allOf?: string[]; anyOf?: string[]; oneOf?: string[] };
+}): Record<string, unknown> {
+  const properties: Record<string, unknown> = {};
+  for (const m of input.members) {
+    if (!m || typeof m !== 'object') continue;
+    const name = typeof m.name === 'string' ? m.name.trim() : '';
+    if (!name) continue;
+    let data: Record<string, unknown> = {};
+    if (typeof m.data === 'string') {
+      try {
+        data = JSON.parse(m.data) as Record<string, unknown>;
+      } catch {
+        data = {};
+      }
+    } else if (m.data !== null && typeof m.data === 'object' && !Array.isArray(m.data)) {
+      data = { ...(m.data as Record<string, unknown>) };
+    }
+    const schema = summarizeStoredPropertyData(data);
+    const md = m.description;
+    const memberDesc =
+      md != null && String(md).trim() ? String(md).trim().slice(0, 2000) : undefined;
+    properties[name] = memberDesc ? { memberDescription: memberDesc, schema } : { schema };
+  }
+  const out: Record<string, unknown> = { properties };
+  const c = input.composition;
+  if (c) {
+    const comp: Record<string, unknown> = {};
+    if (c.allOf?.length) comp.allOf = c.allOf;
+    if (c.anyOf?.length) comp.anyOf = c.anyOf;
+    if (c.oneOf?.length) comp.oneOf = c.oneOf;
+    if (Object.keys(comp).length > 0) out.composition = comp;
+  }
+  return out;
+}
+
 /**
  * Builds a compact JSON Schema snapshot from the property dialog form for AI description (#619).
  */

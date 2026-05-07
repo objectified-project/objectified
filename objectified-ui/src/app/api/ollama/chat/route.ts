@@ -269,6 +269,48 @@ function buildPropertyDescriptionSystem(options: {
   return s;
 }
 
+const CLASS_DESCRIPTION_SYSTEM = `You write concise API documentation for JSON Schema object classes used in OpenAPI 3.1 component schemas.
+
+# Task
+Return **plain prose only**: one to three sentences describing what the class represents as a whole for API consumers.
+
+# Rules
+- No markdown, no bullet lists, no JSON, no code fences — output readable sentences only.
+- Ground the summary in the provided **Summarized class shape**: member property names, optional member descriptions, summarized per-property schemas, and optional composition (allOf / anyOf / oneOf class names).
+- Synthesize the entity the class models; do not paste a bullet list of fields.
+- Avoid redundant openers like "This class is" unless it reads most natural that way.
+- Prefer staying under 600 characters; use more only when composition or many references need explicit explanation.
+- Use **Existing classes** / **Existing project properties** only to disambiguate references — do not invent domain facts unsupported by the supplied shape.`;
+
+function buildClassDescriptionSystem(options: {
+  existingClassNames?: string[];
+  existingProperties?: Array<{ name: string; description?: string | null; data?: Record<string, unknown> }>;
+  targetClassName?: string;
+}): string {
+  let s = CLASS_DESCRIPTION_SYSTEM;
+  const tc = typeof options.targetClassName === 'string' ? options.targetClassName.trim() : '';
+  if (tc) {
+    s += `\n\n# Target class name\n${tc}\n`;
+  }
+  if (options.existingClassNames?.length) {
+    s += `\n\n# Existing classes\n${options.existingClassNames.join(', ')}`;
+  }
+  if (options.existingProperties?.length) {
+    s += `\n\n# Existing project properties\n`;
+    options.existingProperties.forEach((p) => {
+      const d = p.data;
+      const typeStr =
+        typeof d?.type === 'string'
+          ? d.type
+          : d && typeof d === 'object' && '$ref' in d && d.$ref
+            ? '$ref'
+            : 'object';
+      s += `- ${p.name}: ${typeStr}${p.description ? ` — ${String(p.description).slice(0, 80)}` : ''}\n`;
+    });
+  }
+  return s;
+}
+
 function buildPropertyTypeSuggestionsSystem(options: {
   existingClassNames?: string[];
   existingProperties?: Array<{ name: string; description?: string | null; data?: Record<string, unknown> }>;
@@ -403,9 +445,14 @@ export async function POST(request: NextRequest) {
     const isPropertySuggestions = task === 'property_suggestions';
     const isPropertyTypeSuggestions = task === 'property_type_suggestions';
     const isPropertyDescription = task === 'property_description';
+    const isClassDescription = task === 'class_description';
     const isSchemaImprovementSuggestions = task === 'schema_improvement_suggestions';
     const usesPropertyLibraryContext =
-      isClassSkeleton || isPropertySuggestions || isPropertyTypeSuggestions || isPropertyDescription;
+      isClassSkeleton ||
+      isPropertySuggestions ||
+      isPropertyTypeSuggestions ||
+      isPropertyDescription ||
+      isClassDescription;
 
     const digestStr =
       typeof studioMetricsDigest === 'string' && studioMetricsDigest.trim().length > 0
@@ -449,6 +496,12 @@ export async function POST(request: NextRequest) {
                   targetPropertyName: typeof targetPropertyName === 'string' ? targetPropertyName : undefined,
                   targetClassName: typeof targetClassName === 'string' ? targetClassName : undefined,
                 })
+              : isClassDescription
+                ? buildClassDescriptionSystem({
+                    existingClassNames: Array.isArray(existingClassNames) ? existingClassNames : undefined,
+                    existingProperties: Array.isArray(existingProperties) ? existingProperties : undefined,
+                    targetClassName: typeof targetClassName === 'string' ? targetClassName : undefined,
+                  })
             : isSchemaImprovementSuggestions
               ? buildSchemaImprovementSuggestionsSystem({
                   studioMetricsDigest: digestStr,

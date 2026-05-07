@@ -2,6 +2,7 @@ import {
   normalizeGeneratedPropertyDescription,
   summarizeStoredPropertyData,
   draftPropertySchemaFromDialogForm,
+  buildClassDescriptionAiPayload,
 } from '../../lib/ai-property-description';
 import type { PropertyFormData } from '../../src/app/components/ade/studio/PropertyFormFields';
 
@@ -65,5 +66,22 @@ describe('ai-property-description (#619)', () => {
     });
     expect(arr.type).toBe('array');
     expect((arr.items as { $ref?: string }).$ref).toBe('#/components/schemas/LineItem');
+  });
+
+  it('buildClassDescriptionAiPayload summarizes members and composition (#620)', () => {
+    const payload = buildClassDescriptionAiPayload({
+      members: [
+        {
+          name: 'email',
+          description: 'Primary contact',
+          data: JSON.stringify({ type: 'string', format: 'email' }),
+        },
+      ],
+      composition: { allOf: ['Auditable'] },
+    });
+    expect(payload.composition).toEqual({ allOf: ['Auditable'] });
+    const email = payload.properties as Record<string, { memberDescription?: string; schema: Record<string, unknown> }>;
+    expect(email.email.memberDescription).toBe('Primary contact');
+    expect(email.email.schema.format).toBe('email');
   });
 });

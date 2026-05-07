@@ -12,7 +12,7 @@ import { GROUP_COLORS } from '@/app/components/ade/studio/GroupNode';
 import { resolveGroupFrameHex } from '@/app/utils/group-frame-colors';
 
 import StudioSideNav, { ClassItem, PropertyItem, StudioSideNavCallbacks } from '@/app/components/ade/studio/StudioSideNav';
-import PropertyDialog from '@/app/components/ade/studio/PropertyDialog';
+import PropertyDialog, { type PropertyDialogAiContext } from '@/app/components/ade/studio/PropertyDialog';
 import ClassEditDialog from '@/app/components/ade/studio/ClassEditDialog';
 import ClassImportDialog from '@/app/components/ade/studio/ClassImportDialog';
 import PropertyTemplateBrowserDialog from '@/app/components/ade/studio/PropertyTemplateBrowserDialog';
@@ -559,6 +559,27 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     selectedCanvasNodeIds,
   ]);
 
+  const layoutClassDescriptionAiContext = React.useMemo((): PropertyDialogAiContext | undefined => {
+    if (!currentTenantId || !selectedProjectId) return undefined;
+    return {
+      tenantId: currentTenantId,
+      projectId: selectedProjectId,
+      versionId: selectedVersionId || undefined,
+      existingClasses: classes.map((c) => c.name).filter(Boolean),
+      existingProperties: properties,
+      studioContext: chatbotStudioContext,
+      contextClassName: selectedClassNameForPropertyAi,
+    };
+  }, [
+    currentTenantId,
+    selectedProjectId,
+    selectedVersionId,
+    classes,
+    properties,
+    chatbotStudioContext,
+    selectedClassNameForPropertyAi,
+  ]);
+
   // Convert classes to nodes format expected by ClassEditDialog
   const classNodes = React.useMemo(() => {
     return classes.map(cls => ({
@@ -644,6 +665,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         projectId={selectedProjectId || ''}
         versionId={selectedVersionId || ''}
         projectTags={projectTags}
+        classDescriptionAiContext={layoutClassDescriptionAiContext}
       />
 
       {/* Class Import Dialog */}
