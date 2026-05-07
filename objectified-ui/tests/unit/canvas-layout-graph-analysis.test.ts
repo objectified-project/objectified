@@ -77,6 +77,29 @@ describe('analyzeCanvasLayoutGraph', () => {
     expect(a!.recommendedDirection).toBe('TB');
   });
 
+  it('propagates deeper revisits through descendants for pseudo layering', () => {
+    const nodes = [
+      classNode('a', 'A'),
+      classNode('b', 'B'),
+      classNode('c', 'C'),
+      classNode('d', 'D'),
+      classNode('e', 'E'),
+      classNode('f', 'F'),
+    ];
+    const edges: Edge[] = [
+      { id: 'e1', source: 'a', target: 'b' },
+      { id: 'e2', source: 'a', target: 'c' },
+      { id: 'e3', source: 'b', target: 'd' },
+      { id: 'e4', source: 'c', target: 'e' },
+      { id: 'e5', source: 'e', target: 'd' },
+      { id: 'e6', source: 'd', target: 'f' },
+    ];
+    const a = analyzeCanvasLayoutGraph(nodes, edges);
+    expect(a).not.toBeNull();
+    expect(a!.pseudoLayerDepth).toBe(5);
+    expect(a!.pseudoLayerMaxWidth).toBe(2);
+  });
+
   it('ranks hubs by total degree', () => {
     const nodes = [
       classNode('hub', 'Hub'),

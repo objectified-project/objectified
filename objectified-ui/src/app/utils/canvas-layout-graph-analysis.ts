@@ -40,13 +40,25 @@ export interface CanvasLayoutGraphAnalysis {
   pseudoLayerMaxWidth: number;
 }
 
-function getVertexLabel(nodes: Node[], id: string): string {
-  const n = nodes.find((x) => x.id === id);
-  if (!n) return id;
-  const d = n.data as { name?: string; label?: string } | undefined;
-  const label = typeof d?.label === 'string' ? d.label.trim() : '';
-  const name = typeof d?.name === 'string' ? d.name.trim() : '';
-  return name || label || id;
+function compareLabels(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+function buildVertexLabelMap(nodes: Node[]): Map<string, string> {
+  const labels = new Map<string, string>();
+  for (const n of nodes) {
+    const d = n.data as { name?: string; label?: string } | undefined;
+    const label = typeof d?.label === 'string' ? d.label.trim() : '';
+    const name = typeof d?.name === 'string' ? d.name.trim() : '';
+    labels.set(n.id, name || label || n.id);
+  }
+  return labels;
+}
+
+function getVertexLabel(vertexLabels: Map<string, string>, id: string): string {
+  return vertexLabels.get(id) ?? id;
 }
 
 function buildAdjacencyMaps(edges: Array<{ source: string; target: string }>): {
@@ -72,7 +84,7 @@ function assignPseudoLayers(
   adj: { outgoing: Map<string, string[]>; incoming: Map<string, string[]> }
 ): Map<string, number> {
   const layers = new Map<string, number>();
-  const visited = new Set<string>();
+  const maxLayer = Math.max(0, vertexIds.length - 1);
 
   const rootNodes = vertexIds.filter((id) => (adj.incoming.get(id) ?? []).length === 0);
 
@@ -91,18 +103,18 @@ function assignPseudoLayers(
   }
 
   const queue: { id: string; layer: number }[] = seeds.map((id) => ({ id, layer: 0 }));
+  let queueIndex = 0;
 
-  while (queue.length > 0) {
-    const { id, layer } = queue.shift()!;
-    if (visited.has(id)) {
-      const existing = layers.get(id) ?? 0;
-      if (layer > existing) layers.set(id, layer);
-      continue;
-    }
-    visited.add(id);
-    layers.set(id, layer);
+  while (queueIndex < queue.length) {
+    const { id, layer } = queue[queueIndex++];
+    const boundedLayer = Math.min(layer, maxLayer);
+    const existing = layers.get(id);
+    if (existing !== undefined && boundedLayer <= existing) continue;
+    layers.set(id, boundedLayer);
+
+    const nextLayer = Math.min(boundedLayer + 1, maxLayer);
     for (const targetId of adj.outgoing.get(id) ?? []) {
-      queue.push({ id: targetId, layer: layer + 1 });
+      queue.push({ id: targetId, layer: nextLayer });
     }
   }
 
@@ -253,6 +265,7 @@ export function analyzeCanvasLayoutGraph(
 
   const { vertexIds, directedEdges } = remapStudioCanvasLayoutVertices(nodes, edges);
   if (vertexIds.length === 0) return null;
+  const vertexLabels = buildVertexLabelMap(nodes);
 
   const adjacency = buildAdjacencyMaps(directedEdges);
   const adjacencyMap = new Map<string, string[]>();
@@ -273,25 +286,25 @@ export function analyzeCanvasLayoutGraph(
       const out = outDeg.get(id) ?? 0;
       return {
         id,
-        name: getVertexLabel(nodes, id),
+        name: getVertexLabel(vertexLabels, id),
         inDegree: inc,
         outDegree: out,
         totalDegree: inc + out,
       };
     })
-    .sort((a, b) => b.totalDegree - a.totalDegree || a.name.localeCompare(b.name))
+    .sort((a, b) => b.totalDegree - a.totalDegree || compareLabels(a.name, b.name))
     .slice(0, 12);
 
   const roots: CanvasLayoutRootEntry[] = vertexIds
     .filter((id) => (inDeg.get(id) ?? 0) === 0)
-    .map((id) => ({ id, name: getVertexLabel(nodes, id) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .map((id) => ({ id, name: getVertexLabel(vertexLabels, id) }))
+    .sort((a, b) => compareLabels(a.name, b.name));
 
   const rawSccs = tarjanStronglyConnectedComponents(vertexIds, adjacencyMap);
   const sccEntries: CanvasLayoutSccEntry[] = rawSccs
     .map((memberIds) => ({
       memberIds: [...memberIds].sort(),
-      memberNames: [...memberIds].map((id) => getVertexLabel(nodes, id)).sort(),
+      memberNames: [...memberIds].map((id) => getVertexLabel(vertexLabels, id)).sort(compareLabels),
     }))
     .sort((a, b) => b.memberIds.length - a.memberIds.length);
 

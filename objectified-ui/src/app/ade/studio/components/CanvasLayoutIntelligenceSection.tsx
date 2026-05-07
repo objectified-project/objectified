@@ -36,6 +36,7 @@ export function CanvasLayoutIntelligenceSection({
   const [aiText, setAiText] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
+  const requestIdRef = React.useRef(0);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -69,6 +70,7 @@ export function CanvasLayoutIntelligenceSection({
   }, [tenantId, pid]);
 
   const stop = React.useCallback(() => {
+    requestIdRef.current += 1;
     abortRef.current?.abort();
     abortRef.current = null;
     setBusy(false);
@@ -91,6 +93,9 @@ export function CanvasLayoutIntelligenceSection({
       modelName: selectedModel,
       storage: typeof window !== 'undefined' ? window.localStorage : null,
     });
+
+    requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
 
     abortRef.current?.abort();
     const ac = new AbortController();
@@ -125,17 +130,30 @@ export function CanvasLayoutIntelligenceSection({
         throw new Error(t || `Request failed (${response.status})`);
       }
 
-      const full = await accumulateOllamaSse(response, ac.signal, (acc) => setAiText(acc));
-      if (!ac.signal.aborted) setAiText(full);
+      const full = await accumulateOllamaSse(response, ac.signal, (acc) => {
+        if (ac.signal.aborted || requestId !== requestIdRef.current) return;
+        setAiText(acc);
+      });
+      if (ac.signal.aborted || requestId !== requestIdRef.current) return;
+      setAiText(full);
     } catch (e) {
-      if (!ac.signal.aborted) {
-        setError(e instanceof Error ? e.message : 'AI request failed.');
-      }
+      if (ac.signal.aborted || requestId !== requestIdRef.current) return;
+      setError(e instanceof Error ? e.message : 'AI request failed.');
     } finally {
+      if (requestId !== requestIdRef.current) return;
       if (!ac.signal.aborted) setBusy(false);
-      abortRef.current = null;
+      if (abortRef.current === ac) abortRef.current = null;
     }
   }, [analysis, pid, selectedModel, tenantId, versionId]);
+
+  React.useEffect(
+    () => () => {
+      requestIdRef.current += 1;
+      abortRef.current?.abort();
+      abortRef.current = null;
+    },
+    [],
+  );
 
   const dirLabel = analysis.recommendedDirection === 'TB' ? 'Top → Bottom' : 'Left → Right';
   const topScc = analysis.stronglyConnectedComponents.find((s) => s.memberIds.length > 1);
