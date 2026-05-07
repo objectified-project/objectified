@@ -1,0 +1,57 @@
+{
+  "name": "objectified-cli",
+  "version": "0.1.0",
+  "description": "Objectified command-line interface",
+  "author": "Objectified",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "objectified": "./bin/run.js"
+  },
+  "oclif": {
+    "bin": "objectified",
+    "commands": "./dist/commands",
+    "dirname": "objectified",
+    "topicSeparator": " ",
+    "plugins": [
+      "@oclif/plugin-help",
+      "@oclif/plugin-version"
+    ]
+  },
+  "files": [
+    "/bin",
+    "/dist",
+    "/oclif.manifest.json"
+  ],
+  "scripts": {
+    "build": "shx rm -rf dist && tsc && oclif manifest",
+    "dev": "node bin/dev.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "yarn build && vitest run",
+    "prepack": "yarn build",
+    "postpack": "shx rm -f oclif.manifest.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@oclif/core": "^4.11.0",
+    "@oclif/plugin-help": "^6.2.46",
+    "@oclif/plugin-version": "^2.2.43"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.1",
+    "oclif": "^4.23.0",
+    "prettier": "^3.6.2",
+    "shx": "^0.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^3.2.4"
+  }
+}
