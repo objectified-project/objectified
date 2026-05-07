@@ -1,16 +1,22 @@
 import os from "node:os";
 
 import { Command, Flags } from "@oclif/core";
+import type { CommandError } from "@oclif/core/interfaces";
 import supportsColor from "supports-color";
 
 import { createApiClient } from "./lib/client.js";
 import {
   buildObjectifiedContext,
-  resolveConfigPath,
   type GlobalCliFlags,
   type ObjectifiedContext,
 } from "./lib/cli-context.js";
-import { loadTomlConfigFile } from "./lib/config.js";
+import {
+  ensureDefaultConfigFile,
+  loadTomlConfigFile,
+  resolveConfigFilePath,
+  type ParsedTomlConfig,
+} from "./lib/config.js";
+import { CliError } from "./lib/errors.js";
 
 export abstract class BaseCommand extends Command {
   static baseFlags = {
@@ -25,7 +31,8 @@ export abstract class BaseCommand extends Command {
       helpGroup: "GLOBAL",
     }),
     config: Flags.string({
-      description: `Path to config file (default: ~/.config/objectified/config.toml).`,
+      description:
+        "Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified config path`).",
       helpGroup: "GLOBAL",
     }),
     json: Flags.boolean({
@@ -41,7 +48,8 @@ export abstract class BaseCommand extends Command {
       helpGroup: "GLOBAL",
     }),
     profile: Flags.string({
-      description: "Named credentials profile (OBJECTIFIED_PROFILE).",
+      description:
+        "Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.",
       helpGroup: "GLOBAL",
     }),
     quiet: Flags.boolean({
@@ -58,8 +66,11 @@ export abstract class BaseCommand extends Command {
   /** Parsed flags including globals and command-specific options. */
   declare flags: GlobalCliFlags & Record<string, unknown>;
 
-  /** Resolved API/client context (flag > env > config profile > [default] > built-ins). */
+  /** Resolved API/client context (flag > env > profile config > [default] > built-ins). */
   context!: ObjectifiedContext;
+
+  /** Parsed config document after loading `config.toml`. */
+  protected configDoc!: ParsedTomlConfig;
 
   /** True when --verbose or OBJECTIFIED_VERBOSE=1. */
   protected verboseEffective!: boolean;
@@ -79,15 +90,16 @@ export abstract class BaseCommand extends Command {
     const globalPart = parsed.flags as GlobalCliFlags;
     this.commandArgs = parsed.args as Record<string, unknown>;
 
-    this.resolvedConfigPath = resolveConfigPath(globalPart.config, process.env, os.homedir);
-    const configDoc = loadTomlConfigFile(this.resolvedConfigPath);
+    this.resolvedConfigPath = resolveConfigFilePath(globalPart.config, process.env, os.homedir);
+    await ensureDefaultConfigFile(this.resolvedConfigPath);
+    this.configDoc = loadTomlConfigFile(this.resolvedConfigPath);
 
     const built = buildObjectifiedContext({
       flags: globalPart,
       env: process.env,
       stdoutIsTTY: process.stdout.isTTY,
       supportsColorStdout: typeof supportsColor.stdout === "object",
-      configDoc,
+      configDoc: this.configDoc,
       configPath: this.resolvedConfigPath,
     });
 
@@ -98,5 +110,13 @@ export abstract class BaseCommand extends Command {
       verboseEffective: built.verboseEffective,
     } as BaseCommand["flags"];
     this.api = createApiClient(this.context.baseUrl);
+  }
+
+  protected override async catch(err: CommandError): Promise<void> {
+    if (err instanceof CliError) {
+      this.error(err.message, { exit: err.exitCode });
+      return;
+    }
+    await super.catch(err);
   }
 }

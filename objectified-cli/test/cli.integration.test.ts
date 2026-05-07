@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
 import { performance } from "node:perf_hooks";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,11 +10,26 @@ import { describe, expect, it } from "vitest";
 const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function run(args: string[], extraEnv: Record<string, string> = {}): string {
+  const env = { ...process.env, FORCE_COLOR: "0", ...extraEnv };
+  delete env.NODE_OPTIONS;
   return execFileSync("node", [path.join(pkgRoot, "bin/run.js"), ...args], {
     cwd: pkgRoot,
     encoding: "utf8",
-    env: { ...process.env, FORCE_COLOR: "0", ...extraEnv },
+    env,
   });
+}
+
+function runExpectFailure(args: string[], extraEnv: Record<string, string> = {}): string {
+  try {
+    run(args, extraEnv);
+    throw new Error(`Expected command to fail: ${args.join(" ")}`);
+  } catch (err: unknown) {
+    if (err && typeof err === "object" && "stderr" in err) {
+      const se = (err as { stderr: Buffer | string }).stderr;
+      return typeof se === "string" ? se : se.toString("utf8");
+    }
+    throw err;
+  }
 }
 
 describe("objectified CLI", () => {
@@ -26,7 +43,7 @@ describe("objectified CLI", () => {
     expect(out).toContain("VERSION");
     expect(out).toContain("COMMANDS");
     expect(out).toContain("GLOBAL FLAGS");
-    expect(out).toContain("Resolution order");
+    expect(out).toContain("Resolution order for base URL");
     expect(out).toContain("--base-url");
   });
 
@@ -51,6 +68,59 @@ describe("objectified CLI", () => {
   it("outputs JSON for projects list with global flags before subcommand", () => {
     const out = run(["--json", "projects", "list"]);
     expect(JSON.parse(out.trim())).toEqual({ projects: [] });
+  });
+
+  it("config path respects OBJECTIFIED_CONFIG", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-int-"));
+    const cfg = path.join(dir, "objectified.toml");
+    const out = run(["--no-json", "config", "path"], { OBJECTIFIED_CONFIG: cfg }).trim();
+    expect(out).toBe(cfg);
+    expect(fs.existsSync(cfg)).toBe(true);
+  });
+
+  it("config get reads default_profile after auto-create", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-int-"));
+    const cfg = path.join(dir, "c.toml");
+    const out = run(["--no-json", "config", "get", "default_profile"], {
+      OBJECTIFIED_CONFIG: cfg,
+    }).trim();
+    expect(out).toBe("default");
+  });
+
+  it("--profile staging uses [profile.staging] when present", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-prof-"));
+    const cfg = path.join(dir, "config.toml");
+    fs.writeFileSync(
+      cfg,
+      `
+default_profile = "prod"
+
+[profile.prod]
+base_url = "https://api.prod.example"
+
+[profile.staging]
+base_url = "https://api.staging.example"
+`,
+      "utf8",
+    );
+    const out = run(["--json", "--profile", "staging", "--config", cfg, "projects", "list"]).trim();
+    expect(JSON.parse(out)).toEqual({ projects: [] });
+  });
+
+  it("missing profile prints a friendly error", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-miss-"));
+    const cfg = path.join(dir, "config.toml");
+    fs.writeFileSync(
+      cfg,
+      `
+[profile.prod]
+base_url = "https://api.prod.example"
+`,
+      "utf8",
+    );
+    const err = runExpectFailure(["--profile", "staging", "--config", cfg, "projects", "list"]);
+    expect(err).toMatch(/Profile 'staging' not found/);
+    expect(err).toMatch(/Available:/);
   });
 
   it("suppresses hello stdout with --quiet", () => {

@@ -1,8 +1,6 @@
-import path from "node:path";
-
+import { CliError } from "./errors.js";
 import type { ParsedTomlConfig } from "./config.js";
-
-export const DEFAULT_BASE_URL = "https://api.objectified.dev";
+import { DEFAULT_BASE_URL } from "./constants.js";
 
 /** Parsed global flags (oclif uses camelCase keys). */
 export type GlobalCliFlags = {
@@ -22,6 +20,7 @@ export type ObjectifiedContext = {
   baseUrl: string;
   profile: string;
   apiKey: string | undefined;
+  tenantSlug: string | undefined;
   json: boolean;
   color: boolean;
 };
@@ -38,33 +37,41 @@ function envTruthy(env: NodeJS.ProcessEnv, key: string): boolean {
   return v === "1" || v === "true" || v === "yes";
 }
 
-/** Profile-specific values overlay [default] (issue #3187 resolution order for config). */
+export function listAvailableProfileNames(doc: ParsedTomlConfig): string[] {
+  const names = new Set<string>(["default"]);
+  for (const k of Object.keys(doc.profiles)) names.add(k);
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+export function assertProfileExists(doc: ParsedTomlConfig, profileName: string): void {
+  if (profileName === "default") return;
+  if (doc.profiles[profileName] !== undefined) return;
+  const available = listAvailableProfileNames(doc);
+  throw new CliError(
+    `Profile '${profileName}' not found. Available: ${available.join(", ")}. Run \`objectified config set …\` to add one.`,
+    11,
+  );
+}
+
+/** Flag → env → `default_profile` in file → literal `"default"`. */
+export function resolveEffectiveProfile(
+  flag: string | undefined,
+  env: NodeJS.ProcessEnv,
+  doc: ParsedTomlConfig,
+): string {
+  return firstNonEmpty(flag, env.OBJECTIFIED_PROFILE, doc.defaultProfile) ?? "default";
+}
+
+/** Profile-specific values overlay `[default]` (issue #3187 / #3188). */
 export function configLayerForProfile(
   doc: ParsedTomlConfig,
   profileName: string,
-): { baseUrl?: string; apiKey?: string } {
+): { baseUrl?: string; tenantSlug?: string } {
   const prof = doc.profiles[profileName];
   return {
     baseUrl: firstNonEmpty(prof?.baseUrl, doc.default.baseUrl),
-    apiKey: firstNonEmpty(prof?.apiKey, doc.default.apiKey),
+    tenantSlug: firstNonEmpty(prof?.tenantSlug, doc.default.tenantSlug),
   };
-}
-
-export function resolveConfigPath(
-  flagConfig: string | undefined,
-  env: NodeJS.ProcessEnv,
-  homedir: () => string,
-): string {
-  const fromFlag = flagConfig;
-  const fromEnv = env.OBJECTIFIED_CONFIG;
-  const raw = firstNonEmpty(fromFlag, fromEnv);
-  if (raw === undefined) return path.join(homedir(), ".config/objectified/config.toml");
-  if (raw.startsWith("~/")) return path.join(homedir(), raw.slice(2));
-  return raw;
-}
-
-export function resolveProfile(flag: string | undefined, env: NodeJS.ProcessEnv): string {
-  return firstNonEmpty(flag, env.OBJECTIFIED_PROFILE) ?? "default";
 }
 
 export function resolveBaseUrl(
@@ -75,12 +82,20 @@ export function resolveBaseUrl(
   return firstNonEmpty(flag, env.OBJECTIFIED_BASE_URL, cfg.baseUrl) ?? DEFAULT_BASE_URL;
 }
 
+/** API keys never come from config.toml (#3188); flag and env only until keychain lands. */
 export function resolveApiKey(
   flag: string | undefined,
   env: NodeJS.ProcessEnv,
-  cfg: { apiKey?: string },
 ): string | undefined {
-  return firstNonEmpty(flag, env.OBJECTIFIED_API_KEY, cfg.apiKey);
+  return firstNonEmpty(flag, env.OBJECTIFIED_API_KEY);
+}
+
+export function resolveTenantSlug(
+  flag: string | undefined,
+  env: NodeJS.ProcessEnv,
+  cfg: { tenantSlug?: string },
+): string | undefined {
+  return firstNonEmpty(flag, env.OBJECTIFIED_TENANT, cfg.tenantSlug);
 }
 
 export function resolveJson(
@@ -120,11 +135,14 @@ export function buildObjectifiedContext(opts: {
   configDoc: ParsedTomlConfig;
   configPath: string;
 }): { context: ObjectifiedContext; verboseEffective: boolean; configPath: string } {
-  const profile = resolveProfile(opts.flags.profile, opts.env);
+  const profile = resolveEffectiveProfile(opts.flags.profile, opts.env, opts.configDoc);
+  assertProfileExists(opts.configDoc, profile);
+
   const cfgLayer = configLayerForProfile(opts.configDoc, profile);
 
   const baseUrl = resolveBaseUrl(opts.flags.baseUrl, opts.env, cfgLayer);
-  const apiKey = resolveApiKey(opts.flags.apiKey, opts.env, cfgLayer);
+  const apiKey = resolveApiKey(opts.flags.apiKey, opts.env);
+  const tenantSlug = resolveTenantSlug(undefined, opts.env, cfgLayer);
 
   const json = resolveJson(opts.flags.json, opts.env, opts.stdoutIsTTY);
   const color = resolveAllowColor(
@@ -141,6 +159,7 @@ export function buildObjectifiedContext(opts: {
       baseUrl,
       profile,
       apiKey,
+      tenantSlug,
       json,
       color,
     },
