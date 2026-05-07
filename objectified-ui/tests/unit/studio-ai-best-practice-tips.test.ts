@@ -124,6 +124,17 @@ describe('collectStudioAiBestPracticeTipLines (#615, #616)', () => {
       propertyNames: ['password_hash'],
     });
     expect(lines.some((l) => l.toLowerCase().includes('cleartext passwords'))).toBe(true);
+    expect(lines.some((l) => l.toLowerCase().includes('vault'))).toBe(false);
+  });
+
+  it('keeps vault guidance scoped to config secrets, not PAN/CVV/SSN fields (#617)', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: [],
+      propertyNames: ['card_pan', 'cvv', 'ssn'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('vault'))).toBe(false);
+    expect(lines.some((l) => l.toLowerCase().includes('logs'))).toBe(true);
   });
 
   it('adds auth endpoint rate-limit guidance when auth class names match (#617)', () => {

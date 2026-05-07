@@ -117,12 +117,13 @@ const TENANT_CLASS_SIGNAL = /\b(Tenant|Tenants|Organization|Organizations|Worksp
 const PASSWORD_FIELD_SIGNAL =
   /\b(password|passwd|pwd)\b|password[_-]?hash|passwd[_-]?hash|\bpassword\s+hash\b/i;
 
-/**
- * API keys, tokens, signing material, payment verification fields, national IDs —
- * matched on tokenized names (e.g. api_key → "api key").
- */
-const SECRET_FIELD_SIGNAL =
-  /\b(password|passwd|pwd|secret|secrets|apikey|api[_-]?key|api\s+key|privatekey|private[_-]?key|private\s+key|clientsecret|client[_-]?secret|client\s+secret|signingkey|signing[_-]?key|signing\s+key|accesstoken|access[_-]?token|access\s+token|refreshtoken|refresh[_-]?token|refresh\s+token|bearertoken|bearer[_-]?token|bearer\s+token|webhooksecret|webhook[_-]?secret|webhook\s+secret|cvv|cvc|\bpan\b|ssn|social[_-]?security|social\s+security)\b/i;
+/** Config-secret style names that should suggest vault / secret-manager handling. */
+const CONFIG_SECRET_FIELD_SIGNAL =
+  /\b(secret|secrets|apikey|api[_-]?key|api\s+key|privatekey|private[_-]?key|private\s+key|clientsecret|client[_-]?secret|client\s+secret|signingkey|signing[_-]?key|signing\s+key|accesstoken|access[_-]?token|access\s+token|refreshtoken|refresh[_-]?token|refresh\s+token|bearertoken|bearer[_-]?token|bearer\s+token|webhooksecret|webhook[_-]?secret|webhook\s+secret)\b/i;
+
+/** Sensitive identifiers that should be redacted from logs/exports but not loaded from a vault. */
+const SENSITIVE_DATA_FIELD_SIGNAL =
+  /\b(cvv|cvc|\bpan\b|ssn|social[_-]?security|social\s+security)\b/i;
 
 const SENSITIVE_CLASS_NAME_SIGNAL =
   /\b(ApiKey|ApiSecret|ClientSecret|PrivateKey|SigningKey|WebhookSecret|HmacSecret)\b/;
@@ -161,10 +162,13 @@ function collectSecurityHardeningTipLines(signals: StudioAiTipSignalContext): st
 
   const lines: string[] = [];
 
-  const secretLikePropsOrClasses =
-    SECRET_FIELD_SIGNAL.test(propHaystack) ||
-    SECRET_FIELD_SIGNAL.test(classHaystack) ||
+  const configSecretLikePropsOrClasses =
+    CONFIG_SECRET_FIELD_SIGNAL.test(propHaystack) ||
+    CONFIG_SECRET_FIELD_SIGNAL.test(classHaystack) ||
     SENSITIVE_CLASS_NAME_SIGNAL.test(classHaystack);
+  const sensitiveDataLikePropsOrClasses =
+    SENSITIVE_DATA_FIELD_SIGNAL.test(propHaystack) ||
+    SENSITIVE_DATA_FIELD_SIGNAL.test(classHaystack);
 
   if (PASSWORD_FIELD_SIGNAL.test(combinedHaystack)) {
     lines.push(
@@ -182,12 +186,15 @@ function collectSecurityHardeningTipLines(signals: StudioAiTipSignalContext): st
     );
   }
 
-  if (secretLikePropsOrClasses) {
+  if (configSecretLikePropsOrClasses) {
     lines.push(
       asBullet(
         'Load secrets from a vault or secret manager in production; avoid embedding real values in schemas, examples, or defaults.',
       ),
     );
+  }
+
+  if (configSecretLikePropsOrClasses || sensitiveDataLikePropsOrClasses) {
     lines.push(
       asBullet(
         'Exclude secret-bearing fields from structured logs, error payloads, and analytics exports.',
