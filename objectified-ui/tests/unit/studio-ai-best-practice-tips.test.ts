@@ -173,6 +173,15 @@ describe('collectStudioAiBestPracticeTipLines performance hints (#618)', () => {
     expect(lines.some((l) => l.toLowerCase().includes('namespace cache'))).toBe(true);
   });
 
+  it('adds cache guidance for tokenized snake_case ETag properties', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: [],
+      propertyNames: ['etag', 'e_tag'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('namespace cache'))).toBe(true);
+  });
+
   it('adds queue and job guidance when worker-style names appear', () => {
     const lines = collectStudioAiBestPracticeTipLines({
       domainCategory: '',
@@ -186,6 +195,15 @@ describe('collectStudioAiBestPracticeTipLines performance hints (#618)', () => {
     const lines = collectStudioAiBestPracticeTipLines({
       domainCategory: '',
       classNames: ['UserBackgroundTask'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('idempotent'))).toBe(true);
+  });
+
+  it('adds queue guidance for tokenized snake_case worker properties', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: [],
+      propertyNames: ['background_task'],
     });
     expect(lines.some((l) => l.toLowerCase().includes('idempotent'))).toBe(true);
   });
@@ -227,6 +245,15 @@ describe('collectStudioAiBestPracticeTipLines performance hints (#618)', () => {
     const lines = collectStudioAiBestPracticeTipLines({
       domainCategory: '',
       classNames: ['OrderBinaryPayload'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('binary'))).toBe(true);
+  });
+
+  it('adds media guidance for tokenized snake_case payload properties', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: [],
+      propertyNames: ['binary_payload'],
     });
     expect(lines.some((l) => l.toLowerCase().includes('binary'))).toBe(true);
   });
