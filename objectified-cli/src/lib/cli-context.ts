@@ -5,6 +5,7 @@ import { DEFAULT_BASE_URL } from "./constants.js";
 /** Parsed global flags (oclif uses camelCase keys). */
 export type GlobalCliFlags = {
   apiKey?: string;
+  apiKeyFile?: string;
   baseUrl?: string;
   config?: string;
   json?: boolean;

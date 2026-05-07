@@ -31,6 +31,14 @@ Request-Id: 7f2c…cafe
 Exit code:  1"
 `;
 
+exports[`handleError snapshots by category > invalid credentials (401 with auth headers) 1`] = `
+"✖ Invalid credentials
+Reason: Invalid API key
+Hint:   Verify your API key or OAuth token, or run \`objectified auth login\`.
+Request-Id: rid-401b
+Exit code:  4"
+`;
+
 exports[`handleError snapshots by category > misuse (oclif unknown flag) 1`] = `
 "✖ Invalid usage
 Reason: Unexpected flag --frobnitz
@@ -49,7 +57,7 @@ Exit code:  9"
 exports[`handleError snapshots by category > not authenticated 1`] = `
 "✖ Not authenticated
 Reason: Missing bearer token
-Hint:   Run \`objectified auth login\` or set OBJECTIFIED_API_KEY.
+Hint:   Run \`objectified auth login\`, set OBJECTIFIED_API_KEY, or use --api-key / --api-key-file.
 Request-Id: rid-401
 Exit code:  3"
 `;

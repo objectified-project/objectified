@@ -9,11 +9,8 @@ afterEach(() => {
 describe("CLI credential store", () => {
   it("stores only oauth tokens in the memory backend", async () => {
     process.env.OBJECTIFIED_CLI_CREDENTIAL_BACKEND = "memory";
-    const {
-      loadCliOAuthCredentials,
-      resetMemoryCredentialBackend,
-      saveCliOAuthCredentials,
-    } = await import("../src/lib/credentials/store.js");
+    const { loadCliOAuthCredentials, resetMemoryCredentialBackend, saveCliOAuthCredentials } =
+      await import("../src/lib/credentials/store.js");
 
     resetMemoryCredentialBackend();
     const bundleWithDisplayEmail: Parameters<typeof saveCliOAuthCredentials>[1] & {
@@ -23,14 +20,25 @@ describe("CLI credential store", () => {
       refreshToken: "refresh",
       displayEmail: "user@example.com",
     };
-    await saveCliOAuthCredentials(
-      "default",
-      bundleWithDisplayEmail,
-    );
+    await saveCliOAuthCredentials("default", bundleWithDisplayEmail);
 
     await expect(loadCliOAuthCredentials("default")).resolves.toEqual({
       accessToken: "access",
       refreshToken: "refresh",
+    });
+  });
+
+  it("stores API keys in the memory backend (#3195)", async () => {
+    process.env.OBJECTIFIED_CLI_CREDENTIAL_BACKEND = "memory";
+    const { loadCliStoredAuth, resetMemoryCredentialBackend, saveCliApiKeyCredentials } =
+      await import("../src/lib/credentials/store.js");
+
+    resetMemoryCredentialBackend();
+    await saveCliApiKeyCredentials("default", "sk_live_unit_test_12345");
+
+    await expect(loadCliStoredAuth("default")).resolves.toEqual({
+      kind: "api_key",
+      apiKey: "sk_live_unit_test_12345",
     });
   });
 

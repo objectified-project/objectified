@@ -26,6 +26,8 @@ export default class ProjectsList extends BaseCommand {
       });
     }
 
+    this.ensureAuthenticated();
+
     const projects = await this.api.listProjects(tenant);
     const payload = { projects };
 

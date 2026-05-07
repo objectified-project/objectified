@@ -24,17 +24,33 @@ export type ExitCodeRow = {
 
 export const EXIT_CODE_TABLE: ExitCodeRow[] = [
   { code: 0, label: "success", hint: "Command completed normally." },
-  { code: 1, label: "generic failure", hint: "Unexpected error; see message and retry with OBJECTIFIED_DEBUG=1." },
+  {
+    code: 1,
+    label: "generic failure",
+    hint: "Unexpected error; see message and retry with OBJECTIFIED_DEBUG=1.",
+  },
   { code: 2, label: "misuse", hint: "Fix flags or arguments; try --help on the command." },
   {
     code: 3,
     label: "not authenticated",
     hint: "Run `objectified auth login` or set OBJECTIFIED_API_KEY / bearer token.",
   },
-  { code: 4, label: "forbidden", hint: "Switch tenant or API key; check permissions for this resource." },
-  { code: 5, label: "not found", hint: "Check spelling of slugs and IDs; see suggestions when available." },
+  {
+    code: 4,
+    label: "forbidden / invalid credentials",
+    hint: "Invalid API key or OAuth token (401 with credentials), or insufficient permissions (403).",
+  },
+  {
+    code: 5,
+    label: "not found",
+    hint: "Check spelling of slugs and IDs; see suggestions when available.",
+  },
   { code: 6, label: "conflict", hint: "Pull remote changes or fork before retrying." },
-  { code: 7, label: "validation", hint: "Fix request payload; use --dry-run where supported to preview changes." },
+  {
+    code: 7,
+    label: "validation",
+    hint: "Fix request payload; use --dry-run where supported to preview changes.",
+  },
   {
     code: 8,
     label: "server error",
@@ -50,7 +66,11 @@ export const EXIT_CODE_TABLE: ExitCodeRow[] = [
     label: "rate limited",
     hint: "Wait for Retry-After (shown when present), then retry with backoff.",
   },
-  { code: 11, label: "config error", hint: "Run `objectified config path` and fix config.toml / profile entries." },
+  {
+    code: 11,
+    label: "config error",
+    hint: "Run `objectified config path` and fix config.toml / profile entries.",
+  },
 ];
 
 export function formatExitCodeDocs(): string {

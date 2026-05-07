@@ -1,21 +1,28 @@
 import { Flags } from "@oclif/core";
 
 import { BaseCommand } from "../../base-command.js";
+import { readApiKeyInteractively } from "../../lib/auth/read-secret-api-key.js";
 import { runCliPkceLogin } from "../../lib/auth/cli-login-flow.js";
-import { DEFAULT_CLI_WEB_LOGIN_URL } from "../../lib/constants.js";
-import { saveCliOAuthCredentials } from "../../lib/credentials/store.js";
+import { API_KEY_PROMPT_SENTINEL, DEFAULT_CLI_WEB_LOGIN_URL } from "../../lib/constants.js";
+import { saveCliApiKeyCredentials, saveCliOAuthCredentials } from "../../lib/credentials/store.js";
+import { ObjectifiedCliError } from "../../lib/errors.js";
+import { EXIT_CODES } from "../../lib/exit-codes.js";
+import { authLoginIntendsApiKeyStore } from "../../lib/normalize-argv.js";
 
 export default class AuthLogin extends BaseCommand {
-  static description = "Sign in via PKCE browser flow (stores tokens in the OS keychain).";
+  static description =
+    "Sign in via PKCE browser flow or store an API key in the OS keychain (`--api-key`).";
 
   static examples = [
     "<%= config.bin %> <%= command.id %>",
     "<%= config.bin %> --profile staging <%= command.id %>",
     "<%= config.bin %> <%= command.id %> --no-browser",
+    "<%= config.bin %> <%= command.id %> --api-key",
+    "<%= config.bin %> <%= command.id %> --api-key sk_live_…",
     "<%= config.bin %> --json <%= command.id %>",
   ];
 
-  static seeAlso = ["auth logout", "docs profiles"];
+  static seeAlso = ["auth logout", "auth status", "docs profiles"];
 
   static flags = {
     ...BaseCommand.baseFlags,
@@ -36,6 +43,47 @@ export default class AuthLogin extends BaseCommand {
       else process.stderr.write(`${line}\n`);
     };
 
+    const storeApiKey = authLoginIntendsApiKeyStore(this.normalizedArgv);
+
+    if (storeApiKey) {
+      let rawKey = this.flags["api-key"] as string | undefined;
+      if (rawKey === API_KEY_PROMPT_SENTINEL) {
+        rawKey = await readApiKeyInteractively();
+      }
+      const trimmed = rawKey?.trim();
+      if (trimmed === undefined || trimmed === "") {
+        throw new ObjectifiedCliError({
+          message: "API key is required.",
+          exitCode: EXIT_CODES.MISUSE,
+          title: "Invalid usage",
+          hint: "Pass `--api-key <key>`, pipe stdin for non-TTY sessions, or omit the value for an interactive prompt.",
+        });
+      }
+
+      await saveCliApiKeyCredentials(this.context.profile, trimmed);
+      this.apiAuth.apiKey = trimmed;
+      this.apiAuth.bearer = undefined;
+      this.activeCredential = {
+        kind: "api_key_keychain",
+        authenticated: true,
+      };
+
+      if (this.context.json) {
+        this.output.json({
+          ok: true,
+          profile: this.context.profile,
+          credential: "api_key",
+        });
+        return;
+      }
+
+      this.output.success(`API key stored for profile '${this.context.profile}'`);
+      this.output.hint(
+        "Per-invocation keys (`OBJECTIFIED_API_KEY`) still override the stored key.",
+      );
+      return;
+    }
+
     const bundle = await runCliPkceLogin({
       apiBaseUrl: this.context.baseUrl,
       webLoginUrl: DEFAULT_CLI_WEB_LOGIN_URL,
@@ -49,6 +97,7 @@ export default class AuthLogin extends BaseCommand {
       accessToken: bundle.accessToken,
       refreshToken: bundle.refreshToken,
     });
+    this.apiAuth.apiKey = undefined;
     this.apiAuth.bearer = bundle.accessToken;
 
     const tenant = this.context.tenantSlug;
@@ -60,6 +109,7 @@ export default class AuthLogin extends BaseCommand {
         profile: this.context.profile,
         email: bundle.displayEmail ?? null,
         tenant_slug: tenant ?? null,
+        credential: "oauth",
       });
       return;
     }

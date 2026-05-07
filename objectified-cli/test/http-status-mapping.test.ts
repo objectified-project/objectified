@@ -12,6 +12,9 @@ describe("httpStatusToCliError", () => {
 
   it("maps representative statuses", () => {
     expect(httpStatusToCliError(401, "nope", ctx).exitCode).toBe(EXIT_CODES.NOT_AUTHENTICATED);
+    expect(httpStatusToCliError(401, "nope", { ...ctx, credentialsWereSent: true }).exitCode).toBe(
+      EXIT_CODES.FORBIDDEN,
+    );
     expect(httpStatusToCliError(403, "nope", ctx).exitCode).toBe(EXIT_CODES.FORBIDDEN);
     expect(httpStatusToCliError(404, "nope", ctx).exitCode).toBe(EXIT_CODES.NOT_FOUND);
     expect(httpStatusToCliError(409, "nope", ctx).exitCode).toBe(EXIT_CODES.CONFLICT);

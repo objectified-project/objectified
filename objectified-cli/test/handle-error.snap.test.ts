@@ -2,7 +2,11 @@ import { CLIError } from "@oclif/core/errors";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EXIT_CODES } from "../src/lib/exit-codes.js";
-import { httpStatusToCliError, networkErrnoToCliError, ObjectifiedCliError } from "../src/lib/errors.js";
+import {
+  httpStatusToCliError,
+  networkErrnoToCliError,
+  ObjectifiedCliError,
+} from "../src/lib/errors.js";
 import {
   formatAndReportCliFailure,
   handleError,
@@ -45,7 +49,22 @@ describe("handleError snapshots by category", () => {
 
   it("not authenticated", () => {
     expect(
-      handleError(httpStatusToCliError(401, "Missing bearer token", { requestId: "rid-401" }), noColor),
+      handleError(
+        httpStatusToCliError(401, "Missing bearer token", { requestId: "rid-401" }),
+        noColor,
+      ),
+    ).toMatchSnapshot();
+  });
+
+  it("invalid credentials (401 with auth headers)", () => {
+    expect(
+      handleError(
+        httpStatusToCliError(401, "Invalid API key", {
+          requestId: "rid-401b",
+          credentialsWereSent: true,
+        }),
+        noColor,
+      ),
     ).toMatchSnapshot();
   });
 
@@ -63,7 +82,10 @@ describe("handleError snapshots by category", () => {
 
   it("conflict", () => {
     expect(
-      handleError(httpStatusToCliError(409, "Version already exists", { requestId: "rid-409" }), noColor),
+      handleError(
+        httpStatusToCliError(409, "Version already exists", { requestId: "rid-409" }),
+        noColor,
+      ),
     ).toMatchSnapshot();
   });
 

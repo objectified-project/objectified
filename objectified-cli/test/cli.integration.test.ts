@@ -1,5 +1,6 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import { performance } from "node:perf_hooks";
 import path from "node:path";
@@ -10,7 +11,12 @@ import { describe, expect, it } from "vitest";
 const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function run(args: string[], extraEnv: Record<string, string> = {}): string {
-  const env = { ...process.env, FORCE_COLOR: "0", ...extraEnv };
+  const env = {
+    ...process.env,
+    FORCE_COLOR: "0",
+    OBJECTIFIED_CLI_CREDENTIAL_BACKEND: "memory",
+    ...extraEnv,
+  };
   delete env.NODE_OPTIONS;
   return execFileSync("node", [path.join(pkgRoot, "bin/run.js"), ...args], {
     cwd: pkgRoot,
@@ -32,8 +38,74 @@ function runExpectFailure(args: string[], extraEnv: Record<string, string> = {})
   }
 }
 
+function runExitAsync(
+  args: string[],
+  extraEnv: Record<string, string> = {},
+  timeoutMs = 20_000,
+): Promise<number> {
+  const env = {
+    ...process.env,
+    FORCE_COLOR: "0",
+    OBJECTIFIED_CLI_CREDENTIAL_BACKEND: "memory",
+    ...extraEnv,
+  };
+  delete env.NODE_OPTIONS;
+
+  return new Promise((resolve, reject) => {
+    const child = spawn("node", [path.join(pkgRoot, "bin/run.js"), ...args], {
+      cwd: pkgRoot,
+      env,
+      stdio: "inherit",
+    });
+
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill("SIGKILL");
+      reject(new Error(`CLI subprocess timed out after ${String(timeoutMs)}ms: ${args.join(" ")}`));
+    }, timeoutMs);
+
+    child.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    child.on("exit", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(code ?? 1);
+    });
+  });
+}
+
+function runExit(args: string[], extraEnv: Record<string, string> = {}): number {
+  const env = {
+    ...process.env,
+    FORCE_COLOR: "0",
+    OBJECTIFIED_CLI_CREDENTIAL_BACKEND: "memory",
+    ...extraEnv,
+  };
+  delete env.NODE_OPTIONS;
+  const r = spawnSync("node", [path.join(pkgRoot, "bin/run.js"), ...args], {
+    cwd: pkgRoot,
+    encoding: "utf8",
+    env,
+  });
+  if (r.error) throw r.error;
+  return r.status ?? 1;
+}
+
 function runStdin(args: string[], stdin: string, extraEnv: Record<string, string> = {}): string {
-  const env = { ...process.env, FORCE_COLOR: "0", ...extraEnv };
+  const env = {
+    ...process.env,
+    FORCE_COLOR: "0",
+    OBJECTIFIED_CLI_CREDENTIAL_BACKEND: "memory",
+    ...extraEnv,
+  };
   delete env.NODE_OPTIONS;
   return execFileSync("node", [path.join(pkgRoot, "bin/run.js"), ...args], {
     cwd: pkgRoot,
@@ -125,6 +197,161 @@ describe("objectified CLI", () => {
     const out = run(["auth", "login", "--help"]);
     expect(out).toMatch(/PKCE/i);
     expect(out).toMatch(/--no-browser/);
+    expect(out).toMatch(/--api-key/);
+  });
+
+  it("auth status exits 3 without credentials", () => {
+    expect(runExit(["--no-json", "auth", "status"])).toBe(3);
+  });
+
+  it("auth status exits 0 with OBJECTIFIED_API_KEY", () => {
+    expect(runExit(["--no-json", "auth", "status"], { OBJECTIFIED_API_KEY: "sk_live_test" })).toBe(
+      0,
+    );
+  });
+
+  it("projects list exits 3 when tenant is set but credentials are missing", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-auth-"));
+    const cfg = path.join(dir, "config.toml");
+    fs.writeFileSync(
+      cfg,
+      `
+[default]
+tenant_slug = "acme"
+`,
+      "utf8",
+    );
+    expect(runExit(["--no-json", "--config", cfg, "projects", "list"])).toBe(3);
+  });
+
+  it("projects list sends X-API-Key to a mock API (#3195)", async () => {
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (!req.url?.startsWith("/v1/projects/acme")) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      if (req.headers["x-api-key"] !== "good-key") {
+        res.statusCode = 401;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ detail: "Authentication required" }));
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify([
+          { id: "p1", tenant_id: "t1", name: "Payments", slug: "payments", enabled: true },
+        ]),
+      );
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const code = await runExitAsync(
+        [
+          "--base-url",
+          `http://127.0.0.1:${addr.port}`,
+          "--api-key",
+          "good-key",
+          "--no-json",
+          "projects",
+          "list",
+        ],
+        { OBJECTIFIED_TENANT: "acme" },
+      );
+      expect(code).toBe(0);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
+  it("projects list exits 4 when the API rejects the API key", async () => {
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      res.statusCode = 401;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ detail: "Invalid API key" }));
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const code = await runExitAsync(
+        [
+          "--base-url",
+          `http://127.0.0.1:${addr.port}`,
+          "--api-key",
+          "bad-key",
+          "--no-json",
+          "projects",
+          "list",
+        ],
+        { OBJECTIFIED_TENANT: "acme" },
+      );
+      expect(code).toBe(4);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
+  it("projects list reads API key from --api-key-file", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-keyfile-"));
+    const keyPath = path.join(dir, "apikey.txt");
+    fs.writeFileSync(keyPath, "good-key\n", "utf8");
+
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (!req.url?.startsWith("/v1/projects/acme")) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      if (req.headers["x-api-key"] !== "good-key") {
+        res.statusCode = 401;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ detail: "no" }));
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify([]));
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const code = await runExitAsync(
+        [
+          "--base-url",
+          `http://127.0.0.1:${addr.port}`,
+          "--api-key-file",
+          keyPath,
+          "--no-json",
+          "projects",
+          "list",
+        ],
+        { OBJECTIFIED_TENANT: "acme" },
+      );
+      expect(code).toBe(0);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
   });
 
   it("unknown command suggests typo fix when close match", () => {

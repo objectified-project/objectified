@@ -13,11 +13,8 @@ import {
 } from "../generated/operations.js";
 
 import { EXIT_CODES } from "./exit-codes.js";
-import {
-  httpStatusToCliError,
-  networkErrnoToCliError,
-  ObjectifiedCliError,
-} from "./errors.js";
+import { httpStatusToCliError, networkErrnoToCliError, ObjectifiedCliError } from "./errors.js";
+import { redactApiKeyForLogs } from "./redact-api-key.js";
 
 /** Mutable auth fields read on every request (supports 401 refresh hook). */
 export type ApiAuthSnapshot = {
@@ -34,6 +31,8 @@ export type CreateApiClientOptions = {
   /** Invoked once after a 401 before retrying the same request. */
   onUnauthorized?: () => Promise<void>;
 };
+
+type RequestAuthMeta = { hadCredentials: boolean };
 
 export type ObjectifiedApi = {
   readonly lastRequestId: string | undefined;
@@ -57,10 +56,14 @@ function trimTrailingSlash(url: string): string {
 
 function mergeAuthHeaders(request: Request, auth: ApiAuthSnapshot): Request {
   const headers = new Headers(request.headers);
-  if (auth.apiKey) headers.set("X-API-Key", auth.apiKey);
-  else headers.delete("X-API-Key");
-  if (auth.bearer) headers.set("Authorization", `Bearer ${auth.bearer}`);
-  else headers.delete("Authorization");
+  if (auth.apiKey) {
+    headers.set("X-API-Key", auth.apiKey);
+    headers.delete("Authorization");
+  } else {
+    headers.delete("X-API-Key");
+    if (auth.bearer) headers.set("Authorization", `Bearer ${auth.bearer}`);
+    else headers.delete("Authorization");
+  }
   return new Request(request, { headers });
 }
 
@@ -156,11 +159,7 @@ function parseProjectsPayload(data: unknown): ProjectSchema[] {
         hint: "Required project fields were missing or mistyped.",
       });
     }
-    if (
-      p.enabled !== undefined &&
-      p.enabled !== null &&
-      typeof p.enabled !== "boolean"
-    ) {
+    if (p.enabled !== undefined && p.enabled !== null && typeof p.enabled !== "boolean") {
       throw new ObjectifiedCliError({
         message: "Invalid project fields in response.",
         exitCode: EXIT_CODES.VALIDATION,
@@ -180,6 +179,7 @@ function unwrapSdkGet(
   rawUnknown: unknown,
   lastRequestId: string | undefined,
   lastRetriesAttempted: number,
+  requestMeta: RequestAuthMeta,
 ): unknown {
   const rawBundle =
     rawUnknown && typeof rawUnknown === "object"
@@ -208,6 +208,7 @@ function unwrapSdkGet(
     throw httpStatusToCliError(status, formatApiError(rawBundle.error), {
       requestId: hdrId ?? lastRequestId,
       retriesAttempted: lastRetriesAttempted,
+      credentialsWereSent: requestMeta.hadCredentials,
     });
   }
 
@@ -320,11 +321,13 @@ function createInstrumentedFetch(opts: {
   stderrWrite?: (line: string) => void;
   onUnauthorized?: () => Promise<void>;
   onRetryStats?: (count: number) => void;
+  requestMeta: RequestAuthMeta;
 }): typeof fetch {
   const log = opts.stderrWrite ?? ((line: string) => process.stderr.write(`${line}\n`));
 
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const baseReq = input instanceof Request ? input : new Request(input, init);
+    opts.requestMeta.hadCredentials = Boolean(opts.auth.apiKey || opts.auth.bearer);
     let req = mergeAuthHeaders(baseReq, opts.auth);
     let transientRetries = 0;
     let didReauth = false;
@@ -340,6 +343,14 @@ function createInstrumentedFetch(opts: {
       const response = await opts.inner(req);
       const rid = response.headers.get("x-request-id") ?? response.headers.get("X-Request-Id");
       if (opts.verbose && rid !== null && rid !== "") log(`objectified: request-id=${rid}`);
+      if (opts.verbose) {
+        const mode = opts.auth.apiKey
+          ? `api-key=${redactApiKeyForLogs(opts.auth.apiKey)}`
+          : opts.auth.bearer
+            ? "bearer=***"
+            : "none";
+        log(`objectified: auth=${mode}`);
+      }
 
       if (response.status === 401 && opts.onUnauthorized !== undefined && !didReauth) {
         didReauth = true;
@@ -351,10 +362,7 @@ function createInstrumentedFetch(opts: {
       const idem = methodIsIdempotent(req.method);
       const attemptNumber = transientRetries + 1;
 
-      if (
-        attemptNumber < MAX_TRANSIENT_ATTEMPTS &&
-        shouldRetryStatus(response.status, idem)
-      ) {
+      if (attemptNumber < MAX_TRANSIENT_ATTEMPTS && shouldRetryStatus(response.status, idem)) {
         if (!idem && response.status !== 429) {
           return response;
         }
@@ -382,6 +390,7 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
   const innerFetch = globalThis.fetch.bind(globalThis);
   let lastRequestId: string | undefined;
   let lastRetriesAttempted = 0;
+  const requestMeta: RequestAuthMeta = { hadCredentials: false };
 
   const instrumented = createInstrumentedFetch({
     inner: async (input, init) => {
@@ -401,6 +410,7 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
     verbose: options.verbose,
     stderrWrite: options.stderrWrite,
     onUnauthorized: options.onUnauthorized,
+    requestMeta,
     onRetryStats: (n) => {
       lastRetriesAttempted = n;
     },
@@ -435,7 +445,9 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
         throw e;
       }
 
-      return parseProjectsPayload(unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted));
+      return parseProjectsPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
     },
 
     async listVersions(tenantSlug: string, projectId: string): Promise<VersionSchema[]> {
@@ -453,7 +465,9 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
         }
         throw e;
       }
-      return parseVersionsPayload(unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted));
+      return parseVersionsPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
     },
 
     async listClasses(tenantSlug: string, versionId?: string): Promise<ClassSchema[]> {
@@ -472,7 +486,9 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
         }
         throw e;
       }
-      return parseClassesPayload(unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted));
+      return parseClassesPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
     },
 
     async listPrimitives(tenantSlug: string): Promise<PrimitiveSchema[]> {
@@ -490,7 +506,9 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
         }
         throw e;
       }
-      return parsePrimitivesPayload(unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted));
+      return parsePrimitivesPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
     },
   };
 }

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "../src/lib/client.js";
+import { redactApiKeyForLogs } from "../src/lib/redact-api-key.js";
 
 describe("createApiClient + generated SDK", () => {
   const originalFetch = globalThis.fetch;
@@ -9,6 +10,53 @@ describe("createApiClient + generated SDK", () => {
     vi.useRealTimers();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
+  });
+
+  it("does not send Authorization when an API key is set (API key wins)", async () => {
+    const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const request = input instanceof Request ? input : new Request(input);
+      expect(request.headers.get("x-api-key")).toBe("sk_live_abc");
+      expect(request.headers.get("authorization")).toBeNull();
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const auth: { apiKey?: string; bearer?: string } = {
+      apiKey: "sk_live_abc",
+      bearer: "should-not-send",
+    };
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:9",
+      auth,
+    });
+
+    await expect(api.listProjects("acme-corp")).resolves.toEqual([]);
+  });
+
+  it("verbose logs redact API keys (#3195)", async () => {
+    const lines: string[] = [];
+    const mockFetch = vi.fn(async () => {
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "x-request-id": "r1" },
+      });
+    });
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:9",
+      auth: { apiKey: "sk_live_secret_suffix" },
+      verbose: true,
+      stderrWrite: (line) => lines.push(line),
+    });
+
+    await api.listProjects("acme-corp");
+    const joined = lines.join("\n");
+    expect(joined).not.toContain("secret_suffix");
+    expect(joined).toContain(`api-key=${redactApiKeyForLogs("sk_live_secret_suffix")}`);
   });
 
   it("listProjects performs GET /v1/projects/{tenant_slug}", async () => {

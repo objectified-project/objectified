@@ -6,7 +6,7 @@ objectified \- Objectified command-line interface
 Objectified command-line interface
 
 VERSION
-  objectified-cli/0.1.8 linux-x64 node-v24.14.1
+  objectified-cli/0.1.9 linux-x64 node-v24.14.1
 
 USAGE
   $ objectified [COMMAND]
@@ -15,7 +15,9 @@ GLOBAL FLAGS
   Global flags apply to every command:
 
   --api-key       OBJECTIFIED_API_KEY       Direct API-key auth (not read from
-  config.toml)
+  config.toml; never persisted unless auth login --api-key)
+  --api-key-file                            Read API key from a file (single
+  line)
   --base-url      OBJECTIFIED_BASE_URL      Root REST endpoint (built-in
   default: https://api.objectified.dev)
   --config        OBJECTIFIED_CONFIG        config.toml (default: XDG config
@@ -36,8 +38,9 @@ GLOBAL FLAGS
   4. Config [default]              (base_url=…)
   5. Built-in default              (https://api.objectified.dev)
 
-  Resolution order for API key: --api-key, then OBJECTIFIED_API_KEY (never
-  from config file; see #3188).
+  Resolution order for API key: --api-key, then OBJECTIFIED_API_KEY, then
+  --api-key-file (never from config file; see #3188). Stored keys follow
+  explicit auth login --api-key (#3195).
   Resolution order for tenant slug: OBJECTIFIED_TENANT, then config profile /
   [default] (tenant_slug).
 .fi

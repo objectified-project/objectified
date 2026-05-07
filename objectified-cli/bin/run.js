@@ -4,13 +4,10 @@ import { flush } from "@oclif/core/flush";
 import { ExitError } from "@oclif/core/errors";
 import { run } from "@oclif/core/run";
 
-import { promoteLeadingGlobalFlags } from "../dist/lib/normalize-argv.js";
-import {
-  formatAndReportCliFailure,
-  resolveDebugStacks,
-} from "../dist/lib/handle-error.js";
+import { normalizeCliArgv } from "../dist/lib/normalize-argv.js";
+import { formatAndReportCliFailure, resolveDebugStacks } from "../dist/lib/handle-error.js";
 
-const argv = promoteLeadingGlobalFlags(process.argv.slice(2));
+const argv = normalizeCliArgv(process.argv.slice(2));
 
 try {
   await run(argv, import.meta.url);
