@@ -10,7 +10,7 @@ export type GlobalCliFlags = {
   baseUrl?: string;
   config?: string;
   json?: boolean;
-  noColor?: boolean;
+  color?: boolean;
   profile?: string;
   quiet?: boolean;
   verbose?: boolean;
@@ -101,13 +101,13 @@ export function resolveVerbose(flag: boolean | undefined, env: NodeJS.ProcessEnv
 }
 
 export function resolveAllowColor(
-  noColorFlag: boolean | undefined,
+  colorFlag: boolean | undefined,
   env: NodeJS.ProcessEnv,
   stdoutIsTTY: boolean,
   supportsStdout: boolean,
 ): boolean {
-  if (noColorFlag === true) return false;
-  if (noColorFlag === false) return supportsStdout && stdoutIsTTY;
+  if (colorFlag === false) return false;
+  if (colorFlag === true) return true;
   if (env.NO_COLOR !== undefined && env.NO_COLOR !== "") return false;
   return supportsStdout && stdoutIsTTY;
 }
@@ -118,10 +118,9 @@ export function buildObjectifiedContext(opts: {
   stdoutIsTTY: boolean;
   supportsColorStdout: boolean;
   configDoc: ParsedTomlConfig;
-  homedir: () => string;
+  configPath: string;
 }): { context: ObjectifiedContext; verboseEffective: boolean; configPath: string } {
   const profile = resolveProfile(opts.flags.profile, opts.env);
-  const configPath = resolveConfigPath(opts.flags.config, opts.env, opts.homedir);
   const cfgLayer = configLayerForProfile(opts.configDoc, profile);
 
   const baseUrl = resolveBaseUrl(opts.flags.baseUrl, opts.env, cfgLayer);
@@ -129,7 +128,7 @@ export function buildObjectifiedContext(opts: {
 
   const json = resolveJson(opts.flags.json, opts.env, opts.stdoutIsTTY);
   const color = resolveAllowColor(
-    opts.flags.noColor,
+    opts.flags.color,
     opts.env,
     opts.stdoutIsTTY,
     opts.supportsColorStdout,
@@ -146,6 +145,6 @@ export function buildObjectifiedContext(opts: {
       color,
     },
     verboseEffective,
-    configPath,
+    configPath: opts.configPath,
   };
 }

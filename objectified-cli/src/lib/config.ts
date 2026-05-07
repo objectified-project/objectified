@@ -34,10 +34,10 @@ export function parseTomlConfig(content: string): ParsedTomlConfig {
   return { default: def, profiles };
 }
 
-export function loadTomlConfigFile(path: string): ParsedTomlConfig {
+export function loadTomlConfigFile(configFilePath: string): ParsedTomlConfig {
+  let content: string;
   try {
-    const content = fs.readFileSync(path, "utf8");
-    return parseTomlConfig(content);
+    content = fs.readFileSync(configFilePath, "utf8");
   } catch (err: unknown) {
     const code =
       typeof err === "object" && err && "code" in err
@@ -45,5 +45,13 @@ export function loadTomlConfigFile(path: string): ParsedTomlConfig {
         : undefined;
     if (code === "ENOENT") return { default: {}, profiles: {} };
     throw err;
+  }
+  try {
+    return parseTomlConfig(content);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Failed to parse config file "${configFilePath}": ${msg}\nHint: Use --config or OBJECTIFIED_CONFIG to point to a valid TOML file.`,
+    );
   }
 }

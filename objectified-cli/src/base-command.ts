@@ -34,9 +34,9 @@ export abstract class BaseCommand extends Command {
       allowNo: true,
       helpGroup: "GLOBAL",
     }),
-    noColor: Flags.boolean({
-      name: "no-color",
-      description: "Disable ANSI colors (NO_COLOR=1; colors are off when stdout is not a TTY).",
+    color: Flags.boolean({
+      description:
+        "Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).",
       allowNo: true,
       helpGroup: "GLOBAL",
     }),
@@ -88,7 +88,7 @@ export abstract class BaseCommand extends Command {
       stdoutIsTTY: process.stdout.isTTY,
       supportsColorStdout: typeof supportsColor.stdout === "object",
       configDoc,
-      homedir: os.homedir,
+      configPath: this.resolvedConfigPath,
     });
 
     this.context = built.context;

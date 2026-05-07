@@ -11,6 +11,9 @@ const BOOL_GLOBALS = new Set([
   "--quiet",
   "-q",
   "--verbose",
+  "--help",
+  "-h",
+  "--version",
 ]);
 
 const VALUE_GLOBALS = new Set(["--api-key", "--base-url", "--config", "--profile"]);

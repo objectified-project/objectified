@@ -36,7 +36,7 @@ describe("cli-context resolution", () => {
         stdoutIsTTY: tty,
         supportsColorStdout: true,
         configDoc: doc,
-        homedir: () => "/tmp/fake",
+        configPath: "/tmp/fake/objectified/config.toml",
       }).context.baseUrl,
     ).toBe("https://flag.example");
 
@@ -47,7 +47,7 @@ describe("cli-context resolution", () => {
         stdoutIsTTY: tty,
         supportsColorStdout: true,
         configDoc: doc,
-        homedir: () => "/tmp/fake",
+        configPath: "/tmp/fake/objectified/config.toml",
       }).context.baseUrl,
     ).toBe("https://env.example");
 
@@ -58,7 +58,7 @@ describe("cli-context resolution", () => {
         stdoutIsTTY: tty,
         supportsColorStdout: true,
         configDoc: doc,
-        homedir: () => "/tmp/fake",
+        configPath: "/tmp/fake/objectified/config.toml",
       }).context.baseUrl,
     ).toBe("https://cfg-prod.example");
 
@@ -69,7 +69,7 @@ describe("cli-context resolution", () => {
         stdoutIsTTY: tty,
         supportsColorStdout: true,
         configDoc: doc,
-        homedir: () => "/tmp/fake",
+        configPath: "/tmp/fake/objectified/config.toml",
       }).context.baseUrl,
     ).toBe("https://cfg-default.example");
 
@@ -80,7 +80,7 @@ describe("cli-context resolution", () => {
         stdoutIsTTY: tty,
         supportsColorStdout: true,
         configDoc: { default: {}, profiles: {} },
-        homedir: () => "/tmp/fake",
+        configPath: "/tmp/fake/objectified/config.toml",
       }).context.baseUrl,
     ).toBe(DEFAULT_BASE_URL);
   });
@@ -108,7 +108,7 @@ api_key = "cfg-prod-key"
         stdoutIsTTY: true,
         supportsColorStdout: true,
         configDoc: doc,
-        homedir: () => "/tmp/fake",
+        configPath: "/tmp/fake/objectified/config.toml",
       }).context.apiKey,
     ).toBe("cfg-prod-key");
 
@@ -119,7 +119,7 @@ api_key = "cfg-prod-key"
         stdoutIsTTY: true,
         supportsColorStdout: true,
         configDoc: doc,
-        homedir: () => "/tmp/fake",
+        configPath: "/tmp/fake/objectified/config.toml",
       }).context.apiKey,
     ).toBe("cfg-default-key");
   });
@@ -139,11 +139,18 @@ api_key = "cfg-prod-key"
     expect(resolveVerbose(undefined, {})).toBe(false);
   });
 
-  it("disables color for --no-color, NO_COLOR, or non-TTY", () => {
-    expect(resolveAllowColor(true, {}, true, true)).toBe(false);
+  it("disables color for --no-color, NO_COLOR, or non-TTY; enables with --color", () => {
+    // --no-color explicitly disables (color flag = false)
+    expect(resolveAllowColor(false, {}, true, true)).toBe(false);
+    // --color explicitly enables even without TTY
+    expect(resolveAllowColor(true, {}, false, false)).toBe(true);
+    // NO_COLOR env var disables
     expect(resolveAllowColor(undefined, { NO_COLOR: "1" }, true, true)).toBe(false);
+    // non-TTY disables when not explicitly set
     expect(resolveAllowColor(undefined, {}, false, true)).toBe(false);
+    // no color support disables
     expect(resolveAllowColor(undefined, {}, true, false)).toBe(false);
+    // TTY + color support with no flag → enabled
     expect(resolveAllowColor(undefined, {}, true, true)).toBe(true);
   });
 
@@ -154,7 +161,7 @@ api_key = "cfg-prod-key"
       stdoutIsTTY: true,
       supportsColorStdout: true,
       configDoc: { default: {}, profiles: {} },
-      homedir: () => "/tmp/fake",
+      configPath: "/tmp/fake/objectified/config.toml",
     });
     expect(r.verboseEffective).toBe(true);
   });
