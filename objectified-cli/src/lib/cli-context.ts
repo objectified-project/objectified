@@ -20,6 +20,8 @@ export type ObjectifiedContext = {
   baseUrl: string;
   profile: string;
   apiKey: string | undefined;
+  /** Bearer token when set (env-only until login stores credentials elsewhere). */
+  accessToken: string | undefined;
   tenantSlug: string | undefined;
   json: boolean;
   color: boolean;
@@ -90,6 +92,10 @@ export function resolveApiKey(
   return firstNonEmpty(flag, env.OBJECTIFIED_API_KEY);
 }
 
+export function resolveAccessToken(env: NodeJS.ProcessEnv): string | undefined {
+  return firstNonEmpty(env.OBJECTIFIED_ACCESS_TOKEN);
+}
+
 export function resolveTenantSlug(
   flag: string | undefined,
   env: NodeJS.ProcessEnv,
@@ -142,6 +148,7 @@ export function buildObjectifiedContext(opts: {
 
   const baseUrl = resolveBaseUrl(opts.flags.baseUrl, opts.env, cfgLayer);
   const apiKey = resolveApiKey(opts.flags.apiKey, opts.env);
+  const accessToken = resolveAccessToken(opts.env);
   const tenantSlug = resolveTenantSlug(undefined, opts.env, cfgLayer);
 
   const json = resolveJson(opts.flags.json, opts.env, opts.stdoutIsTTY);
@@ -159,6 +166,7 @@ export function buildObjectifiedContext(opts: {
       baseUrl,
       profile,
       apiKey,
+      accessToken,
       tenantSlug,
       json,
       color,

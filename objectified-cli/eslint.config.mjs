@@ -5,7 +5,15 @@ import { fileURLToPath } from "node:url";
 
 export default tseslint.config(
   {
-    ignores: ["eslint.config.mjs", "dist/**", "coverage/**", "bin/**", "**/oclif.manifest.json"],
+    ignores: [
+      "eslint.config.mjs",
+      "dist/**",
+      "coverage/**",
+      "bin/**",
+      "scripts/**",
+      "**/oclif.manifest.json",
+      "src/generated/**",
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
@@ -21,5 +29,23 @@ export default tseslint.config(
   {
     files: ["test/**/*.ts", "vitest.config.ts"],
     ...tseslint.configs.disableTypeChecked,
+  },
+  {
+    files: ["src/**/*.ts"],
+    ignores: ["src/lib/client.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "\\.\\./generated/|/generated/",
+              message:
+                "Import OpenAPI types and operations only through src/lib/client.ts (generated client is an implementation detail).",
+            },
+          ],
+        },
+      ],
+    },
   },
 );

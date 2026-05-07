@@ -8,6 +8,7 @@ We continue to improve the platform based on your feedback with improvements and
 - MCP service is now live
 
 ## CLI
+- **`objectified-cli`**: OpenAPI codegen (`yarn codegen` → `src/generated/`), typed `@hey-api/client-fetch` SDK, `lib/client.ts` wrapper (retries, `Retry-After`, 401 hook, request IDs), ESLint single-import guard, `codegen:check` in tests, and `projects list` backed by the generated client (#3190).
 - New **`objectified-cli`** package (oclif v4) adds the `objectified` binary scaffold with `hello`, `--version`, and `--help` (#3186).
 - **`objectified-cli`**: shared global flags on `BaseCommand` (`--base-url`, `--profile`, `--api-key`, `--config`, `--json`, `--no-color`, `--quiet`, `--verbose`), TOML profile resolution, root help text for precedence rules, argv normalization for globals-before-subcommand, and stub `projects list` (#3187).
 - **`objectified-cli`**: TOML config with XDG / Windows paths, `default_profile`, `objectified config path|get|set|list`, auto-created `config.toml` (`0600` on Unix), strict profile validation, env-based API keys only, and tenant slug from config/env (#3188).

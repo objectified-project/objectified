@@ -106,7 +106,6 @@ Total: **12 epics**, **88 sub-tickets** (open roadmap items; completed work is d
 
 | #         | Title                                                              | Description                                                                  | Labels                                          | MVP | Parallel |
 |-----------|--------------------------------------------------------------------|------------------------------------------------------------------------------|-------------------------------------------------|-----|----------|
-| 1.5 (#3190) | Generated REST client from `openapi.yaml`                        | Codegen step, typed SDK, retry/refresh wrapper, single import path           | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `typescript`, `openapi` | Yes | Yes      |
 | 1.6 (#3191) | Error handling, exit codes, retries, hints                       | `ObjectifiedCliError` hierarchy, sysexits-style exit codes, did-you-mean     | `enhancement`, `mvp`, `cli`, `roadmap-cli`     | Yes | Yes      |
 | 1.7 (#3192) | Help system, examples, man pages, `objectified docs`             | Rich help, ≥2 examples per command, generated man pages, `docs <topic>`     | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `documentation` | Yes | Yes      |
 | 1.8 (#3193) | Shell completions (bash/zsh/fish/PowerShell)                     | Static completions + dynamic (tenant/project/version slugs)                  | `enhancement`, `cli`, `roadmap-cli`            | No  | Yes      |
@@ -182,36 +181,11 @@ Part of Epic: CLI Foundation & DevEx (#3174)
 
 ---
 
-#### 1.5 (#3190) — Generated REST client from `openapi.yaml`
+#### 1.5 (#3190) — Generated REST client from `openapi.yaml` (**done**)
 
-Build-time codegen consumes `objectified-rest/openapi.yaml` and emits a typed client into `src/generated/`. A wrapper `lib/client.ts` adds: retries with exponential backoff, request-id capture, 401 → re-auth hook, 429 → `Retry-After` honored.
+Landed: `yarn codegen` in `objectified-cli/` runs `@hey-api/openapi-ts` (`@hey-api/client-fetch`) on `objectified-rest/openapi.yaml`, fixes relative imports for `moduleResolution: NodeNext`, and writes stable barrels `src/generated/client.ts`, `models.ts`, and `operations.ts`. `src/lib/client.ts` wraps the SDK with mutable API-key/bearer injection, exponential backoff on 5xx, honoring `Retry-After` on 429, a one-shot optional `onUnauthorized` hook after 401, and verbose `x-request-id` capture. ESLint allows imports from `src/generated/` only from `lib/client.ts`. `yarn test` runs `codegen:check` (regenerate + `git diff src/generated`) so stale generated output fails with instructions. `projects list` uses the generated operation and requires `OBJECTIFIED_TENANT` or profile `tenant_slug`; Vitest covers the wiring with a stubbed global `fetch` (real subprocess integration avoids binding an HTTP listener where sandboxes block listen).
 
-```
-                ┌──────────────────────────────────────────┐
-                │  objectified-rest/openapi.yaml           │
-                └──────────────────┬───────────────────────┘
-                                   │  npm run codegen
-                                   ▼
-              ┌────────────────────────────────────────┐
-              │  objectified-cli/src/generated/        │
-              │   ├── client.ts                        │
-              │   ├── models.ts                        │
-              │   └── operations.ts                    │
-              └─────────────────┬──────────────────────┘
-                                │
-                                ▼
-            ┌──────────────────────────────────────────┐
-            │  src/lib/client.ts (auth + base-url      │
-            │   wrapper around generated client)       │
-            └─────────────────┬────────────────────────┘
-                              │
-                              ▼
-                  every command in src/commands/
-```
-
-**Acceptance Criteria:** CI guard fails build when `openapi.yaml` changes without regenerated client; only `lib/client.ts` may import generated code (lint rule).
-
-**Parallelism / Dependencies:** Depends on 1.1, 1.2, 1.3. Blocks all functional commands.
+**Parallelism / Dependencies:** Depended on 1.1, 1.2, 1.3. Blocks all functional commands.
 
 Part of Epic: CLI Foundation & DevEx (#3174)
 
@@ -805,11 +779,11 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ## MVP Release — Ticket Bundle
 
-The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **23 open sub-tickets** across 6 epics (plus completed foundation items such as #3186, #3187, #3188, and #3189).
+The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **22 open sub-tickets** across 6 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, and #3190).
 
 | Epic     | Tickets                                                                                                   | Count |
 |----------|-----------------------------------------------------------------------------------------------------------|-------|
-| 1 (#3174) | #3190, #3191, #3192                                                                                        | 3     |
+| 1 (#3174) | #3191, #3192                                                                                               | 2     |
 | 2 (#3175) | #3194, #3195, #3196, #3197, #3198, #3199                                                                  | 6     |
 | 3 (#3176) | #3202, #3203, #3204                                                                                        | 3     |
 | 4 (#3177) | #3208, #3209, #3210, #3212                                                                                | 4     |
@@ -897,7 +871,7 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 
 The tickets were created in the order below — that is also the recommended **execution** order. Earlier epics provide primitives that later epics rely on.
 
-1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, and #3189 landed; then #3190 → #3193). Without the scaffold, no other command can exist.
+1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, #3189, and #3190 landed; then #3191 → #3193). Without the scaffold, no other command can exist.
 2. **Epic 2 — Auth & Tenants** (#3175 then #3194 → #3201). Required for any tenant-scoped command.
 3. **Epic 3 — Projects** (#3176 then #3202 → #3207). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3208 → #3216). The publish flow that makes the CLI valuable in CI.

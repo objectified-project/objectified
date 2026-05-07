@@ -4,7 +4,7 @@ import { Command, Flags } from "@oclif/core";
 import type { CommandError } from "@oclif/core/interfaces";
 import supportsColor from "supports-color";
 
-import { createApiClient } from "./lib/client.js";
+import { createApiClient, type ApiAuthSnapshot, type ObjectifiedApi } from "./lib/client.js";
 import {
   buildObjectifiedContext,
   type GlobalCliFlags,
@@ -99,7 +99,10 @@ export abstract class BaseCommand extends Command {
   /** Command arguments after parse (subcommands read typed fields from here). */
   protected commandArgs!: Record<string, unknown>;
 
-  protected api!: ReturnType<typeof createApiClient>;
+  /** Mutable snapshot passed to the REST wrapper (401 hook may refresh credentials). */
+  protected readonly apiAuth: ApiAuthSnapshot = {};
+
+  protected api!: ObjectifiedApi;
 
   async init(): Promise<void> {
     await super.init();
@@ -127,7 +130,14 @@ export abstract class BaseCommand extends Command {
       ...parsed.flags,
       verboseEffective: built.verboseEffective,
     } as BaseCommand["flags"];
-    this.api = createApiClient(this.context.baseUrl);
+    this.apiAuth.apiKey = this.context.apiKey;
+    this.apiAuth.bearer = this.context.accessToken;
+    this.api = createApiClient({
+      baseUrl: this.context.baseUrl,
+      auth: this.apiAuth,
+      verbose: this.verboseEffective,
+      stderrWrite: (line) => process.stderr.write(`${line}\n`),
+    });
   }
 
   protected override async catch(err: CommandError): Promise<void> {

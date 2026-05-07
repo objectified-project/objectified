@@ -65,9 +65,9 @@ describe("objectified CLI", () => {
     });
   });
 
-  it("outputs JSON for projects list with global flags before subcommand", () => {
-    const out = run(["--json", "projects", "list"]);
-    expect(JSON.parse(out.trim())).toEqual({ projects: [] });
+  it("projects list requires tenant slug (no network)", () => {
+    const err = runExpectFailure(["--json", "projects", "list"]);
+    expect(err).toMatch(/Tenant slug is required/i);
   });
 
   it("config path respects OBJECTIFIED_CONFIG", () => {
@@ -103,8 +103,20 @@ base_url = "https://api.staging.example"
 `,
       "utf8",
     );
-    const out = run(["--json", "--profile", "staging", "--config", cfg, "projects", "list"]).trim();
-    expect(JSON.parse(out)).toEqual({ projects: [] });
+    const out = run([
+      "--json",
+      "--profile",
+      "staging",
+      "--config",
+      cfg,
+      "config",
+      "get",
+      "profile.staging.base_url",
+    ]).trim();
+    expect(JSON.parse(out)).toEqual({
+      key: "profile.staging.base_url",
+      value: "https://api.staging.example",
+    });
   });
 
   it("missing profile prints a friendly error", () => {
