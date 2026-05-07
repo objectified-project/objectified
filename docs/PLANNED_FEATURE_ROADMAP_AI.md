@@ -72,17 +72,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 |--------|-----------------------------------------------------|
 | #527   | Implementation of Guardrails for prompts/responses  |
 
-### AI Schema Health Insights
-
-**Best Practice Suggestions** 📋 PLANNED (partially delivered)
-- ✅ Context-aware tips from project **domain category** (metadata) and **class-name heuristics** (#615):
-    - Authentication-style class names (e.g. RefreshToken, Session): "Implement refresh token pattern"
-    - Multi-tenant / SaaS (when domain is not already SaaS): "Add tenant isolation fields"
-    - Several modeling-pattern bullets per registered **project domain** category (catalog in Studio; **#616** expanded from one short line per domain)
-- ✅ Industry-specific patterns (#616): multiple actionable patterns per domain (e.g. inventory/idempotency for e-commerce, ledger/idempotency for finance, FHIR-friendly identifiers for healthcare).
-- ✅ Security hardening suggestions (#617): domain-based payment/PHI guidance, auth rate-limit hints, vault/logging guidance for secret-like properties, password-hash modeling, and webhook signature verification for webhook-style class names.
-- ✅ Performance optimization suggestions (#618): cache namespacing/TTL, background job idempotency and retries, cursor/keyset pagination, search projections vs canonical entities, chunked bulk I/O, separating heavy binary metadata, and fan-out/timeline modeling when cache, queue, paging, search, export, media, or feed-style names appear on classes or reusable properties.
-
 ### AI Documentation Generation
 
 **Auto-Generate Descriptions** 📋 PLANNED
@@ -262,3 +251,14 @@ This outlines the planned features for integrating AI capabilities into Objectif
 - ✅ Prioritized action items (quick wins first) (#254)
 - ✅ Estimated score impact for each fix (#255)
 - ✅ Bulk apply recommendations (#256): structured class/property description fills from the AI dialog
+
+### AI Schema Health Insights
+
+**Best Practice Suggestions** 📋 PLANNED (partially delivered)
+- ✅ Context-aware tips from project **domain category** (metadata) and **class-name heuristics** (#615):
+    - Authentication-style class names (e.g. RefreshToken, Session): "Implement refresh token pattern"
+    - Multi-tenant / SaaS (when domain is not already SaaS): "Add tenant isolation fields"
+    - Several modeling-pattern bullets per registered **project domain** category (catalog in Studio; **#616** expanded from one short line per domain)
+- ✅ Industry-specific patterns (#616): multiple actionable patterns per domain (e.g. inventory/idempotency for e-commerce, ledger/idempotency for finance, FHIR-friendly identifiers for healthcare).
+- ✅ Security hardening suggestions (#617): domain-based payment/PHI guidance, auth rate-limit hints, vault/logging guidance for secret-like properties, password-hash modeling, and webhook signature verification for webhook-style class names.
+- ✅ Performance optimization suggestions (#618): cache namespacing/TTL, background job idempotency and retries, cursor/keyset pagination, search projections vs canonical entities, chunked bulk I/O, separating heavy binary metadata, and fan-out/timeline modeling when cache, queue, paging, search, export, media, or feed-style names appear on classes or reusable properties.
