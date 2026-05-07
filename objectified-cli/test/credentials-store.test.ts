@@ -16,13 +16,16 @@ describe("CLI credential store", () => {
     } = await import("../src/lib/credentials/store.js");
 
     resetMemoryCredentialBackend();
+    const bundleWithDisplayEmail: Parameters<typeof saveCliOAuthCredentials>[1] & {
+      displayEmail: string;
+    } = {
+      accessToken: "access",
+      refreshToken: "refresh",
+      displayEmail: "user@example.com",
+    };
     await saveCliOAuthCredentials(
       "default",
-      {
-        accessToken: "access",
-        refreshToken: "refresh",
-        displayEmail: "user@example.com",
-      } as unknown as Parameters<typeof saveCliOAuthCredentials>[1],
+      bundleWithDisplayEmail,
     );
 
     await expect(loadCliOAuthCredentials("default")).resolves.toEqual({

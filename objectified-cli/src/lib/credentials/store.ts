@@ -2,6 +2,11 @@ import { ObjectifiedCliError } from "../errors.js";
 import { EXIT_CODES } from "../exit-codes.js";
 
 const SERVICE_NAME = "objectified-cli";
+type KeytarModule = {
+  setPassword: (service: string, account: string, password: string) => Promise<void>;
+  getPassword: (service: string, account: string) => Promise<string | null>;
+  deletePassword: (service: string, account: string) => Promise<boolean>;
+};
 
 export type CliOAuthBundle = {
   accessToken: string;
@@ -9,11 +14,7 @@ export type CliOAuthBundle = {
 };
 
 const memoryBackends = new Map<string, CliOAuthBundle>();
-let keytarPromise: Promise<{
-  setPassword: (service: string, account: string, password: string) => Promise<void>;
-  getPassword: (service: string, account: string) => Promise<string | null>;
-  deletePassword: (service: string, account: string) => Promise<boolean>;
-}> | null = null;
+let keytarPromise: Promise<KeytarModule> | null = null;
 
 function useMemoryBackend(): boolean {
   return process.env.OBJECTIFIED_CLI_CREDENTIAL_BACKEND === "memory";

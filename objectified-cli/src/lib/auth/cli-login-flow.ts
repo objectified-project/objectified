@@ -37,6 +37,14 @@ export type RunCliPkceLoginResult = CliOAuthBundle & {
   displayEmail?: string;
 };
 
+function shouldUseLoopbackBrowserFlow(opts: RunCliPkceLoginOpts): boolean {
+  return (
+    opts.testAuthorizationCode === undefined &&
+    opts.openBrowser &&
+    (opts.openUrl !== undefined || shouldOpenBrowser(opts.noBrowserFlag))
+  );
+}
+
 /**
  * PKCE login: loopback redirect_uri, optional browser launch, token exchange.
  * Headless / `--no-browser`: prints URL and reads the authorization code from stdin.
@@ -47,10 +55,7 @@ export async function runCliPkceLogin(opts: RunCliPkceLoginOpts): Promise<RunCli
     throw new Error("internal error: code verifier too short");
   }
   const challenge = codeChallengeS256(verifier);
-  const wantOpen =
-    opts.testAuthorizationCode === undefined &&
-    opts.openBrowser &&
-    (opts.openUrl !== undefined || shouldOpenBrowser(opts.noBrowserFlag));
+  const wantOpen = shouldUseLoopbackBrowserFlow(opts);
   const lb = wantOpen ? await startLoopbackOAuthServer() : undefined;
   const redirectUri = lb?.redirectUri ?? (await reserveLoopbackRedirectUri());
   const loginUrl = buildWebLoginUrl({
