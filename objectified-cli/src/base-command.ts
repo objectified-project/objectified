@@ -165,8 +165,8 @@ export abstract class BaseCommand extends Command {
       resolveAllowColor(
         this.parsedGlobalFlags?.color,
         process.env,
-        process.stdout.isTTY,
-        typeof supportsColor.stdout === "object",
+        process.stderr.isTTY,
+        typeof supportsColor.stderr === "object",
       );
     const code = formatAndReportCliFailure(err, { debugStacks, color });
     return Promise.reject(new ExitError(code));
