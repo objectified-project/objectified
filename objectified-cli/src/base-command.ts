@@ -6,6 +6,7 @@ import type { CommandError } from "@oclif/core/interfaces";
 import supportsColor from "supports-color";
 
 import { createApiClient, type ApiAuthSnapshot, type ObjectifiedApi } from "./lib/client.js";
+import { loadCliOAuthCredentials } from "./lib/credentials/store.js";
 import {
   buildObjectifiedContext,
   type GlobalCliFlags,
@@ -152,6 +153,17 @@ export abstract class BaseCommand extends Command {
     } as BaseCommand["flags"];
     this.apiAuth.apiKey = this.context.apiKey;
     this.apiAuth.bearer = this.context.accessToken;
+    if (!this.apiAuth.apiKey && !this.apiAuth.bearer) {
+      try {
+        const oauth = await loadCliOAuthCredentials(this.context.profile);
+        if (oauth?.accessToken) this.apiAuth.bearer = oauth.accessToken;
+      } catch (err: unknown) {
+        if (this.verboseEffective) {
+          const msg = err instanceof Error ? err.message : String(err);
+          process.stderr.write(`objectified: could not read CLI credentials: ${msg}\n`);
+        }
+      }
+    }
     this.api = createApiClient({
       baseUrl: this.context.baseUrl,
       auth: this.apiAuth,

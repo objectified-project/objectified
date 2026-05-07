@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.7 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.8 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -61,6 +61,8 @@ USAGE
 # Commands
 
 <!-- commands -->
+* [`objectified auth login`](#objectified-auth-login)
+* [`objectified auth logout`](#objectified-auth-logout)
 * [`objectified completion`](#objectified-completion)
 * [`objectified completion install [SHELL]`](#objectified-completion-install-shell)
 * [`objectified completion show [SHELL]`](#objectified-completion-show-shell)
@@ -80,6 +82,96 @@ USAGE
 * [`objectified help [COMMAND]`](#objectified-help-command)
 * [`objectified projects list`](#objectified-projects-list)
 * [`objectified version`](#objectified-version)
+
+## `objectified auth login`
+
+Sign in via PKCE browser flow (stores tokens in the OS keychain).
+
+```
+USAGE
+  $ objectified auth login [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
+    [--profile <value>] [-q] [--verbose] [--no-browser]
+
+DESCRIPTION
+  Sign in via PKCE browser flow (stores tokens in the OS keychain).
+
+EXAMPLES
+  $ objectified auth login
+
+  $ objectified --profile staging auth login
+
+  $ objectified auth login --no-browser
+
+  $ objectified --json auth login
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>  API key for direct authentication (bypasses login token).
+
+OTHER
+  --no-browser  Do not launch a browser; print the login URL and read the authorization code from stdin.
+
+SEE ALSO
+  objectified auth logout
+
+  objectified docs profiles
+```
+
+## `objectified auth logout`
+
+Revoke CLI refresh token at the API and remove OAuth credentials from the OS keychain.
+
+```
+USAGE
+  $ objectified auth logout [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
+    [--profile <value>] [-q] [--verbose] [--all-profiles]
+
+DESCRIPTION
+  Revoke CLI refresh token at the API and remove OAuth credentials from the OS keychain.
+
+EXAMPLES
+  $ objectified auth logout
+
+  $ objectified --profile staging auth logout
+
+  $ objectified auth logout --all-profiles
+
+  $ objectified --json auth logout
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>  API key for direct authentication (bypasses login token).
+
+OTHER
+  --all-profiles  Revoke and clear stored OAuth credentials for every profile in config.
+
+SEE ALSO
+  objectified auth login
+
+  objectified docs profiles
+```
 
 ## `objectified completion`
 

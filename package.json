@@ -16,6 +16,8 @@
   ],
   "packageManager": "yarn@4.12.0",
   "resolutions": {
+    "semver@npm:6.3.1": "npm:semver@7.7.4",
+    "semver": "^7.6.3",
     "@testing-library/dom/pretty-format": "30.3.0",
     "ansi-regex": "5.0.1",
     "string-width": "4.2.3",
