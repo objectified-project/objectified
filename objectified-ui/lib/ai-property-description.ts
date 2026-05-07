@@ -52,7 +52,9 @@ function truncateDeep(value: unknown, depth: number): unknown {
   if (value === null || value === undefined) return value;
   if (typeof value === 'string') {
     const cap = 320;
-    return value.length > cap ? `${value.slice(0, cap - 1)}…` : value;
+    const ellipsis = '…';
+    const contentCap = cap - ellipsis.length;
+    return value.length > cap ? `${value.slice(0, contentCap)}${ellipsis}` : value;
   }
   if (typeof value !== 'object') return value;
   if (Array.isArray(value)) {

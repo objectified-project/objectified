@@ -85,10 +85,8 @@ export function PropertyDescriptionAiButton({
   }, [tenantId, projectId]);
 
   const stop = useCallback(() => {
-    requestIdRef.current += 1;
     abortRef.current?.abort();
     abortRef.current = null;
-    setBusy(false);
   }, []);
 
   const generate = useCallback(async () => {
@@ -159,7 +157,6 @@ export function PropertyDescriptionAiButton({
 
       const normalized = normalizeGeneratedPropertyDescription(full);
       if (!normalized) {
-        if (requestId !== requestIdRef.current) return;
         setError('The model returned an empty description. Try again or pick another model.');
         return;
       }
