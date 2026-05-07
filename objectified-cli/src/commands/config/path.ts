@@ -3,7 +3,13 @@ import { BaseCommand } from "../../base-command.js";
 export default class ConfigPath extends BaseCommand {
   static description = "Print the resolved config.toml path";
 
-  static examples = ["<%= config.bin %> <%= command.id %>"];
+  static examples = [
+    "<%= config.bin %> <%= command.id %>",
+    "<%= config.bin %> --json <%= command.id %>",
+    "<%= config.bin %> <%= command.id %> | pbcopy",
+  ];
+
+  static seeAlso = ["config get", "config list"];
 
   run(): Promise<void> {
     if (this.context.json) {

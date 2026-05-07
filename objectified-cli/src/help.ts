@@ -1,4 +1,7 @@
-import { Help } from "@oclif/core";
+import { Command, CommandHelp, Help, type HelpSectionRenderer } from "@oclif/core";
+
+type HelpGenCtx = Parameters<HelpSectionRenderer>[0];
+type HelpGenHeader = Parameters<HelpSectionRenderer>[1];
 
 /** Same value as `src/lib/constants.ts` — inlined so oclif’s dynamic help import does not pull extra modules. */
 const DEFAULT_BASE_URL = "https://api.objectified.dev";
@@ -26,8 +29,158 @@ const GLOBAL_FLAGS_BODY = [
   "Resolution order for tenant slug: OBJECTIFIED_TENANT, then config profile / [default] (tenant_slug).",
 ].join("\n");
 
+const FLAG_GROUP_ORDER = ["Required", "Common", "Output", "Auth", "Other"] as const;
+
+function compactSections<T>(xs: (T | undefined)[]): T[] {
+  return xs.filter((x): x is T => Boolean(x));
+}
+
+function argvRequestsNoColor(argv: string[]): boolean {
+  return argv.some((a) => a === "--no-color" || a.startsWith("--no-color="));
+}
+
+function helpShouldStripAnsi(optsStrip: boolean | undefined, argv: string[]): boolean {
+  if (optsStrip === true) return true;
+  if (optsStrip === false) return false;
+  if (!process.stdout.isTTY) return true;
+  if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") return true;
+  if (argvRequestsNoColor(argv)) return true;
+  return false;
+}
+
+type CommandWithSeeAlso = Command.Loadable & { seeAlso?: string[] };
+
+class ObjectifiedCommandHelp extends CommandHelp {
+  private flagHelpSections(
+    flags: Command.Flag.Any[],
+  ): { header: string; body: [string, string | undefined][] }[] {
+    const buckets = new Map<string, Command.Flag.Any[]>();
+
+    for (const flag of flags) {
+      const raw = flag.helpGroup?.trim();
+      const bucket = raw && raw.length > 0 ? raw : "Other";
+      const arr = buckets.get(bucket);
+      if (arr) arr.push(flag);
+      else buckets.set(bucket, [flag]);
+    }
+
+    const sortFlags = (fs: Command.Flag.Any[]) =>
+      [...fs].sort((a, b) => {
+        return a.name.localeCompare(b.name);
+      });
+
+    const out: { header: string; body: [string, string | undefined][] }[] = [];
+
+    for (const name of FLAG_GROUP_ORDER) {
+      const fs = buckets.get(name);
+      if (!fs?.length) continue;
+      const body = this.flags(sortFlags(fs));
+      if (body) out.push({ header: name.toUpperCase(), body });
+      buckets.delete(name);
+    }
+
+    const remaining = [...buckets.keys()].sort((a, b) => a.localeCompare(b));
+    for (const name of remaining) {
+      const fs = buckets.get(name);
+      if (!fs?.length) continue;
+      const body = this.flags(sortFlags(fs));
+      if (body) out.push({ header: name.toUpperCase(), body });
+    }
+
+    return out;
+  }
+
+  private seeAlsoBody(cmd: Command.Loadable): string | undefined {
+    const ids = (cmd as CommandWithSeeAlso).seeAlso;
+    if (!ids?.length) return undefined;
+    const lines = ids.map(
+      (id: string) => `${this.config.bin} ${id.replace(/:/g, this.config.topicSeparator)}`,
+    );
+    return this.wrap(lines.join("\n\n"));
+  }
+
+  public override sections() {
+    const usageHeader = this.opts.usageHeader || "USAGE";
+    const sections = [
+      {
+        generate: (_ctx: HelpGenCtx, header: HelpGenHeader) => {
+          void _ctx;
+          void header;
+          return this.usage();
+        },
+        header: usageHeader,
+      },
+      {
+        generate: ({ args }: HelpGenCtx, header: HelpGenHeader) => [
+          { body: this.args(args), header },
+        ],
+        header: "ARGUMENTS",
+      },
+      {
+        generate: (_ctx: HelpGenCtx, header: HelpGenHeader) => {
+          void _ctx;
+          void header;
+          return this.description();
+        },
+        header: "DESCRIPTION",
+      },
+      {
+        generate: ({ cmd }: HelpGenCtx, header: HelpGenHeader) => {
+          void header;
+          return this.examples(cmd.examples as Command.Example[] | string | undefined);
+        },
+        header: "EXAMPLES",
+      },
+      {
+        generate: ({ flags }: HelpGenCtx, header: HelpGenHeader) => {
+          void header;
+          return compactSections(
+            this.flagHelpSections(flags).map((s) => ({ body: s.body, header: s.header })),
+          );
+        },
+        header: "FLAGS",
+      },
+      {
+        generate: ({ cmd }: HelpGenCtx, header: HelpGenHeader) => {
+          void header;
+          return this.seeAlsoBody(cmd);
+        },
+        header: "SEE ALSO",
+      },
+      {
+        generate: ({ cmd }: HelpGenCtx, header: HelpGenHeader) => {
+          void header;
+          return this.aliases(cmd.aliases);
+        },
+        header: "ALIASES",
+      },
+      {
+        generate: ({ flags }: HelpGenCtx, header: HelpGenHeader) => {
+          void header;
+          return this.flagsDescriptions(flags);
+        },
+        header: "FLAG DESCRIPTIONS",
+      },
+    ];
+
+    const allowed = this.opts.sections?.map((s) => s.toLowerCase());
+    return sections.filter(({ header }) => !allowed || allowed.includes(header.toLowerCase()));
+  }
+}
+
 export default class ObjectifiedHelp extends Help {
-  formatRoot(): string {
+  public CommandHelpClass = ObjectifiedCommandHelp;
+
+  public constructor(
+    config: ConstructorParameters<typeof Help>[0],
+    opts: ConstructorParameters<typeof Help>[1] = {},
+  ) {
+    const argv = process.argv.slice(2);
+    const stripAnsi = helpShouldStripAnsi(opts.stripAnsi, argv);
+    super(config, { ...opts, stripAnsi });
+  }
+
+  public formatRoot(): string {
     return `${super.formatRoot()}\n\n${this.section("GLOBAL FLAGS", this.wrap(GLOBAL_FLAGS_BODY))}`;
   }
 }

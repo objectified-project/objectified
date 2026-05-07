@@ -20,7 +20,11 @@ export default class ConfigSet extends BaseCommand {
 
   static examples = [
     "<%= config.bin %> <%= command.id %> profile.staging.base_url https://api.staging.example",
+    "<%= config.bin %> <%= command.id %> default_profile staging",
+    "<%= config.bin %> --json <%= command.id %> profile.prod.tenant_slug acme-corp",
   ];
+
+  static seeAlso = ["config get", "docs profiles"];
 
   static args = {
     key: Args.string({

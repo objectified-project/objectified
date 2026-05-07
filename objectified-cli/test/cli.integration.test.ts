@@ -77,6 +77,32 @@ describe("objectified CLI", () => {
     expect(out).toMatch(/OBJECTIFIED_DEBUG/);
   });
 
+  it("docs lists available topics", () => {
+    const out = run(["docs", "--no-json"]);
+    expect(out).toMatch(/Topic/);
+    expect(out).toMatch(/\berrors\b/);
+    expect(out).toMatch(/\boutput\b/);
+    expect(out).toMatch(/\bprofiles\b/);
+    expect(out).toMatch(/\bcompletions\b/);
+    expect(out).toMatch(/\bplugins\b/);
+    expect(out).toMatch(/\btelemetry\b/);
+  });
+
+  it("docs output prints long-form prose", () => {
+    const out = run(["docs", "output", "--no-json"]);
+    expect(out).toMatch(/OUTPUT FORMATTING/);
+    expect(out).toMatch(/Stable JSON/);
+  });
+
+  it("command help includes EXAMPLES and SEE ALSO", () => {
+    const out = run(["hello", "--help"]);
+    expect(out).toMatch(/^EXAMPLES/m);
+    expect(out).toMatch(/^SEE ALSO/m);
+    expect(out).toMatch(/\bCOMMON\b/);
+    expect(out).toMatch(/\bOUTPUT\b/);
+    expect(out).toMatch(/\bAUTH\b/);
+  });
+
   it("unknown command suggests typo fix when close match", () => {
     const err = runExpectFailure(["helol"]);
     expect(err).toMatch(/Unknown command/);

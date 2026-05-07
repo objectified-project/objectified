@@ -8,6 +8,7 @@ We continue to improve the platform based on your feedback with improvements and
 - MCP service is now live
 
 ## CLI
+- **`objectified-cli`**: rich `--help` (≥2 examples per command, flag groups **COMMON** / **OUTPUT** / **AUTH**, **SEE ALSO** links), `objectified docs` topic browser + prose topics, troff **man** pages under `man/man1/`, `oclif readme`-synced **README.md**, and CI guard for generated artifacts (#3192).
 - **`objectified-cli`**: shared error layer (`ObjectifiedCliError`, documented exit codes via `objectified docs errors`, stderr template with hints + request-id, `--verbose` / `OBJECTIFIED_DEBUG=1` stacks only), Levenshtein did-you-mean for unknown commands, HTTP status → exit-code mapping, and fetch retries per idempotent vs non-idempotent verbs (#3191).
 - **`objectified-cli`**: OpenAPI codegen (`yarn codegen` → `src/generated/`), typed `@hey-api/client-fetch` SDK, `lib/client.ts` wrapper (retries, `Retry-After`, 401 hook, request IDs), ESLint single-import guard, `codegen:check` in tests, and `projects list` backed by the generated client (#3190).
 - New **`objectified-cli`** package (oclif v4) adds the `objectified` binary scaffold with `hello`, `--version`, and `--help` (#3186).

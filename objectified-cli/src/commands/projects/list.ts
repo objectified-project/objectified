@@ -6,7 +6,13 @@ import { chalkForContext } from "../../lib/output.js";
 export default class ProjectsList extends BaseCommand {
   static description = "List Objectified projects";
 
-  static examples = ["<%= config.bin %> <%= command.id %>"];
+  static examples = [
+    "<%= config.bin %> <%= command.id %>",
+    "<%= config.bin %> --json <%= command.id %>",
+    "<%= config.bin %> --profile staging <%= command.id %>",
+  ];
+
+  static seeAlso = ["config path", "docs errors", "hello"];
 
   async run(): Promise<void> {
     const tenant = this.context.tenantSlug;

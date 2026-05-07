@@ -1,0 +1,43 @@
+.TH OBJECTIFIED\-DOCS\-PLUGINS 1 "" "" "User Commands"
+.SH NAME
+objectified docs plugins \- Future oclif plugin extensibility for Objectified
+.SH DESCRIPTION
+.nf
+USAGE
+  $ objectified docs plugins [--apiKey <value>] [--baseUrl <value>]
+    [--config <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
+
+DESCRIPTION
+  Future oclif plugin extensibility for Objectified
+
+EXAMPLES
+  $ objectified docs plugins
+
+  $ objectified docs plugins --json
+
+  $ objectified docs telemetry
+
+COMMON
+  --baseUrl=<value>  Root REST API URL.
+  --config=<value>   Path to config file (default: XDG config dir /
+                     Objectified AppData on Windows — see `objectified config
+                     path`).
+  --profile=<value>  Named credentials profile (OBJECTIFIED_PROFILE); falls
+                     back to default_profile in config.
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR;
+                    colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1;
+                    auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --apiKey=<value>  API key for direct authentication (bypasses login token).
+
+SEE ALSO
+  objectified docs
+
+  objectified docs telemetry
+.fi

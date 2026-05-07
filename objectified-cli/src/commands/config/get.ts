@@ -12,7 +12,13 @@ import { CliError } from "../../lib/errors.js";
 export default class ConfigGet extends BaseCommand {
   static description = "Print a single config value by dotted key";
 
-  static examples = ["<%= config.bin %> <%= command.id %> profile.prod.base_url"];
+  static examples = [
+    "<%= config.bin %> <%= command.id %> default_profile",
+    "<%= config.bin %> <%= command.id %> profile.prod.base_url",
+    "<%= config.bin %> --json <%= command.id %> profile.staging.tenant_slug",
+  ];
+
+  static seeAlso = ["config set", "config path"];
 
   static args = {
     key: Args.string({

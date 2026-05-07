@@ -31,43 +31,43 @@ export abstract class BaseCommand extends Command {
     apiKey: Flags.string({
       name: "api-key",
       description: "API key for direct authentication (bypasses login token).",
-      helpGroup: "GLOBAL",
+      helpGroup: "Auth",
     }),
     baseUrl: Flags.string({
       name: "base-url",
       description: "Root REST API URL.",
-      helpGroup: "GLOBAL",
+      helpGroup: "Common",
     }),
     config: Flags.string({
       description:
         "Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified config path`).",
-      helpGroup: "GLOBAL",
+      helpGroup: "Common",
     }),
     json: Flags.boolean({
       description:
         "Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).",
       allowNo: true,
-      helpGroup: "GLOBAL",
+      helpGroup: "Output",
     }),
     color: Flags.boolean({
       description:
         "Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).",
       allowNo: true,
-      helpGroup: "GLOBAL",
+      helpGroup: "Output",
     }),
     profile: Flags.string({
       description:
         "Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.",
-      helpGroup: "GLOBAL",
+      helpGroup: "Common",
     }),
     quiet: Flags.boolean({
       char: "q",
       description: "Suppress non-error stdout (spinners, banners, tips).",
-      helpGroup: "GLOBAL",
+      helpGroup: "Output",
     }),
     verbose: Flags.boolean({
       description: "Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).",
-      helpGroup: "GLOBAL",
+      helpGroup: "Output",
     }),
   };
 

@@ -1,0 +1,31 @@
+name: objectified-cli
+
+on:
+  push:
+    paths:
+      - "objectified-cli/**"
+      - ".github/workflows/objectified-cli.yml"
+      - "yarn.lock"
+      - "package.json"
+  pull_request:
+    paths:
+      - "objectified-cli/**"
+      - ".github/workflows/objectified-cli.yml"
+      - "yarn.lock"
+      - "package.json"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: yarn
+          cache-dependency-path: yarn.lock
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn workspace objectified-cli test
+      - name: Generated README, manifest, man pages must match git
+        run: git diff --exit-code
