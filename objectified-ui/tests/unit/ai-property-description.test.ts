@@ -99,4 +99,40 @@ describe('ai-property-description (#619)', () => {
     });
     expect(parseGeneratedOperationDocs('not json')).toBeNull();
   });
+
+  it('parseGeneratedOperationDocs requires both summary and description to be non-empty (#621)', () => {
+    // missing summary key
+    expect(parseGeneratedOperationDocs('{"description":"Some description."}')).toBeNull();
+    // missing description key
+    expect(parseGeneratedOperationDocs('{"summary":"Some summary."}')).toBeNull();
+    // empty summary string
+    expect(parseGeneratedOperationDocs('{"summary":"","description":"Some description."}')).toBeNull();
+    // empty description string (whitespace only)
+    expect(parseGeneratedOperationDocs('{"summary":"Some summary.","description":"   "}')).toBeNull();
+    // both non-empty — must succeed
+    expect(
+      parseGeneratedOperationDocs('{"summary":"Get user","description":"Returns a user by ID."}'),
+    ).toEqual({ summary: 'Get user', description: 'Returns a user by ID.' });
+  });
+
+  it('parseGeneratedOperationDocs tolerates preamble/trailing text and uppercase JSON fence tag (#621)', () => {
+    // preamble before the fence
+    expect(
+      parseGeneratedOperationDocs(
+        'Here is the result:\n```json\n{"summary":"Create order","description":"Creates a new order."}\n```',
+      ),
+    ).toEqual({ summary: 'Create order', description: 'Creates a new order.' });
+    // trailing text after the fence
+    expect(
+      parseGeneratedOperationDocs(
+        '```json\n{"summary":"Delete item","description":"Removes the item."}\n```\nLet me know if you need changes.',
+      ),
+    ).toEqual({ summary: 'Delete item', description: 'Removes the item.' });
+    // uppercase JSON fence tag
+    expect(
+      parseGeneratedOperationDocs(
+        '```JSON\n{"summary":"Update record","description":"Updates the record."}\n```',
+      ),
+    ).toEqual({ summary: 'Update record', description: 'Updates the record.' });
+  });
 });
