@@ -140,8 +140,7 @@ export function CanvasLayoutIntelligenceSection({
       if (ac.signal.aborted || requestId !== requestIdRef.current) return;
       setError(e instanceof Error ? e.message : 'AI request failed.');
     } finally {
-      if (requestId !== requestIdRef.current) return;
-      if (!ac.signal.aborted) setBusy(false);
+      if (requestId === requestIdRef.current && !ac.signal.aborted) setBusy(false);
       if (abortRef.current === ac) abortRef.current = null;
     }
   }, [analysis, pid, selectedModel, tenantId, versionId]);

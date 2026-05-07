@@ -84,7 +84,8 @@ function assignPseudoLayers(
   adj: { outgoing: Map<string, string[]>; incoming: Map<string, string[]> }
 ): Map<string, number> {
   const layers = new Map<string, number>();
-  const maxLayer = Math.max(0, vertexIds.length - 1);
+  const unreachable = Number.NEGATIVE_INFINITY;
+  for (const id of vertexIds) layers.set(id, unreachable);
 
   const rootNodes = vertexIds.filter((id) => (adj.incoming.get(id) ?? []).length === 0);
 
@@ -102,24 +103,28 @@ function assignPseudoLayers(
     seeds = [minNode];
   }
 
-  const queue: { id: string; layer: number }[] = seeds.map((id) => ({ id, layer: 0 }));
-  let queueIndex = 0;
+  for (const id of seeds) layers.set(id, 0);
 
-  while (queueIndex < queue.length) {
-    const { id, layer } = queue[queueIndex++];
-    const boundedLayer = Math.min(layer, maxLayer);
-    const existing = layers.get(id);
-    if (existing !== undefined && boundedLayer <= existing) continue;
-    layers.set(id, boundedLayer);
-
-    const nextLayer = Math.min(boundedLayer + 1, maxLayer);
-    for (const targetId of adj.outgoing.get(id) ?? []) {
-      queue.push({ id: targetId, layer: nextLayer });
+  // Iterative longest-path relaxation from chosen seeds.
+  for (let i = 0; i < vertexIds.length - 1; i += 1) {
+    let changed = false;
+    for (const sourceId of vertexIds) {
+      const sourceLayer = layers.get(sourceId) ?? unreachable;
+      if (!Number.isFinite(sourceLayer)) continue;
+      const nextLayer = sourceLayer + 1;
+      for (const targetId of adj.outgoing.get(sourceId) ?? []) {
+        const targetLayer = layers.get(targetId) ?? unreachable;
+        if (nextLayer > targetLayer) {
+          layers.set(targetId, nextLayer);
+          changed = true;
+        }
+      }
     }
+    if (!changed) break;
   }
 
   for (const id of vertexIds) {
-    if (!layers.has(id)) layers.set(id, 0);
+    if (!Number.isFinite(layers.get(id) ?? unreachable)) layers.set(id, 0);
   }
 
   return layers;
