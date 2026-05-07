@@ -30,4 +30,45 @@ describe("completion rc markers", () => {
     expect(stripped).not.toContain(COMPLETION_BEGIN);
     expect(stripped).not.toContain("mid");
   });
+
+  it("stripMarkedCompletionBlock removes all marked regions", () => {
+    const withBlocks = [
+      "before",
+      COMPLETION_BEGIN,
+      "one",
+      COMPLETION_END,
+      "between",
+      COMPLETION_BEGIN,
+      "two",
+      COMPLETION_END,
+      "after",
+      "",
+    ].join("\n");
+    const stripped = stripMarkedCompletionBlock(withBlocks);
+    expect(stripped).toBe("before\nbetween\nafter");
+    expect(stripped).not.toContain(COMPLETION_BEGIN);
+    expect(stripped).not.toContain("one");
+    expect(stripped).not.toContain("two");
+  });
+
+  it("upsertMarkedCompletionBlock replaces all marked regions with a single block", () => {
+    const withBlocks = [
+      "before",
+      COMPLETION_BEGIN,
+      "one",
+      COMPLETION_END,
+      "between",
+      COMPLETION_BEGIN,
+      "two",
+      COMPLETION_END,
+      "",
+    ].join("\n");
+    const next = upsertMarkedCompletionBlock(withBlocks, "new");
+    expect(next.match(new RegExp(COMPLETION_BEGIN, "g"))?.length).toBe(1);
+    expect(next).toContain("before");
+    expect(next).toContain("between");
+    expect(next).toContain("new");
+    expect(next).not.toContain("one");
+    expect(next).not.toContain("two");
+  });
 });

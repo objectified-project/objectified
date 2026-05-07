@@ -8,7 +8,7 @@ function escapeRegExp(s: string): string {
 
 const BLOCK_RE = new RegExp(
   `${escapeRegExp(COMPLETION_BEGIN)}\\s*\\n([\\s\\S]*?)\\n${escapeRegExp(COMPLETION_END)}\\s*\\n?`,
-  "m",
+  "gm",
 );
 
 export function upsertMarkedCompletionBlock(existing: string, innerBody: string): string {
@@ -17,7 +17,8 @@ export function upsertMarkedCompletionBlock(existing: string, innerBody: string)
   if (!trimmed.includes(COMPLETION_BEGIN)) {
     return trimmed === "" ? wrapped : `${trimmed}\n\n${wrapped}`;
   }
-  return trimmed.replace(BLOCK_RE, wrapped);
+  const withoutBlocks = trimmed.replace(BLOCK_RE, "").replace(/\n{3,}/g, "\n\n").trimEnd();
+  return withoutBlocks === "" ? wrapped : `${withoutBlocks}\n\n${wrapped}`;
 }
 
 export function stripMarkedCompletionBlock(existing: string): string {

@@ -214,6 +214,11 @@ base_url = "https://api.prod.example"
     expect(out).toContain("completion candidates");
   });
 
+  it("completion show zsh passes zero-based cword", () => {
+    const out = run(["completion", "show", "zsh", "--no-json"]);
+    expect(out).toContain('--cword "$((CURRENT-1))"');
+  });
+
   it("completion candidates lists next static segment offline", () => {
     const stdin = ["objectified", "projects", ""].join("\n");
     const out = runStdin(

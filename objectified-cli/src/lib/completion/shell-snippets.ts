@@ -24,7 +24,7 @@ export function zshCompletionBody(bin: string): string {
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     lines+=("$line")
-  done < <(printf '%s\\n' "\${words[@]}" | command ${bin} --no-json completion candidates --shell zsh --cword "$CURRENT" 2>/dev/null)
+  done < <(printf '%s\\n' "\${words[@]}" | command ${bin} --no-json completion candidates --shell zsh --cword "$((CURRENT-1))" 2>/dev/null)
   compadd -a lines
 }
 compdef _${bin} ${bin}
