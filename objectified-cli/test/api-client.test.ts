@@ -131,7 +131,6 @@ describe("createApiClient + generated SDK", () => {
 
   it("retries transient 5xx with exponential backoff", async () => {
     vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0);
 
     let calls = 0;
     const mockFetch = vi.fn(async () => {

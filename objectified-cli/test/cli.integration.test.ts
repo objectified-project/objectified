@@ -70,6 +70,20 @@ describe("objectified CLI", () => {
     expect(err).toMatch(/Tenant slug is required/i);
   });
 
+  it("docs errors prints exit code reference", () => {
+    const out = run(["docs", "errors", "--no-json"]);
+    expect(out).toMatch(/Exit codes/);
+    expect(out).toMatch(/not authenticated/);
+    expect(out).toMatch(/OBJECTIFIED_DEBUG/);
+  });
+
+  it("unknown command suggests typo fix when close match", () => {
+    const err = runExpectFailure(["helol"]);
+    expect(err).toMatch(/Unknown command/);
+    expect(err).toMatch(/Did you mean/);
+    expect(err).toMatch(/hello/);
+  });
+
   it("config path respects OBJECTIFIED_CONFIG", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-int-"));
     const cfg = path.join(dir, "objectified.toml");
@@ -142,6 +156,11 @@ base_url = "https://api.prod.example"
   it("does not emit ANSI escapes when NO_COLOR is set", () => {
     const out = run(["hello"], { NO_COLOR: "1" });
     expect(out.includes("\u001B[")).toBe(false);
+  });
+
+  it("does not emit ANSI escapes for errors when --no-color is set", () => {
+    const err = runExpectFailure(["--no-color", "helol"]);
+    expect(err.includes("\u001B[")).toBe(false);
   });
 
   it("cold-starts --version within 200 ms on developer machines", () => {

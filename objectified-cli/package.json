@@ -1,6 +1,6 @@
 {
   "name": "objectified-cli",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Objectified command-line interface",
   "author": "Objectified",
   "type": "module",
@@ -48,6 +48,7 @@
     "cli-table3": "^0.6.5",
     "env-paths": "^4.0.0",
     "fs-extra": "^11.3.5",
+    "leven": "^4.0.0",
     "ora": "^9.4.0",
     "supports-color": "^10.2.2",
     "yaml": "^2.8.4"

@@ -12125,6 +12125,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"leven@npm:^4.0.0":
+  version: 4.1.0
+  resolution: "leven@npm:4.1.0"
+  checksum: 10c0/de45316555624d7616c562055ce4773ad44dff7486a1696be300b040eb85472a429c2f18fd0f6352101b1fb01b336405b893f048d88d30f6fb7f8a2a2999a0c0
+  languageName: node
+  linkType: hard
+
 "levn@npm:^0.4.1":
   version: 0.4.1
   resolution: "levn@npm:0.4.1"
@@ -13777,6 +13784,7 @@ __metadata:
     eslint: "npm:^9.39.4"
     eslint-config-prettier: "npm:^10.1.1"
     fs-extra: "npm:^11.3.5"
+    leven: "npm:^4.0.0"
     oclif: "npm:^4.23.0"
     ora: "npm:^9.4.0"
     prettier: "npm:^3.6.2"
