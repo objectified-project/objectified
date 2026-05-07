@@ -495,7 +495,7 @@ AUTH
   --api-key=<value>  API key for direct authentication (bypasses login token).
 
 SEE ALSO
-  objectified docs
+  objectified completion install
 
   objectified docs output
 ```
