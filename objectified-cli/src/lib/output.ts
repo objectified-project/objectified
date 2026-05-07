@@ -1,6 +1,24 @@
-import type { Command } from "@oclif/core";
+import chalk, { Chalk, type ChalkInstance } from "chalk";
 
-/** Normal informational line (TTY-aware formatting comes with output modes in #3189). */
-export function logInfo(cmd: Command, message: string): void {
-  cmd.log(message);
+export type OutputCapableCommand = {
+  flags: { quiet?: boolean };
+  context: { json: boolean; color: boolean };
+  log: (msg?: string, ...args: unknown[]) => void;
+};
+
+function chalkIf(color: boolean): ChalkInstance {
+  return color ? chalk : new Chalk({ level: 0 });
+}
+
+/** Normal informational line (respects --quiet and JSON mode). */
+export function logInfo(cmd: OutputCapableCommand, message: string): void {
+  if (cmd.flags.quiet) return;
+  if (cmd.context.json) return;
+  cmd.log(chalkIf(cmd.context.color).bold(message));
+}
+
+/** Structured stdout for JSON mode (single JSON object per invocation). */
+export function writeJsonLine(cmd: Pick<OutputCapableCommand, "context">, payload: unknown): void {
+  if (!cmd.context.json) return;
+  process.stdout.write(`${JSON.stringify(payload)}\n`);
 }

@@ -12,12 +12,12 @@ export default tseslint.config(
   eslintConfigPrettier,
   {
     languageOptions: {
-        parserOptions: {
-          projectService: true,
-          tsconfigRootDir: fileURLToPath(new URL(".", import.meta.url)),
-        },
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: fileURLToPath(new URL(".", import.meta.url)),
       },
     },
+  },
   {
     files: ["test/**/*.ts", "vitest.config.ts"],
     ...tseslint.configs.disableTypeChecked,
