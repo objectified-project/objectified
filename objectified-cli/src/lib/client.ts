@@ -2,7 +2,12 @@ import { createClient, type Client } from "../generated/client.js";
 import type { ProjectSchema } from "../generated/models.js";
 import { listProjectsV1ProjectsTenantSlugGet } from "../generated/operations.js";
 
-import { CliError } from "./errors.js";
+import { EXIT_CODES } from "./exit-codes.js";
+import {
+  httpStatusToCliError,
+  networkErrnoToCliError,
+  ObjectifiedCliError,
+} from "./errors.js";
 
 /** Mutable auth fields read on every request (supports 401 refresh hook). */
 export type ApiAuthSnapshot = {
@@ -22,11 +27,16 @@ export type CreateApiClientOptions = {
 
 export type ObjectifiedApi = {
   readonly lastRequestId: string | undefined;
+  /** Transient HTTP retries consumed on the last instrumented request (429 / 5xx policy). */
+  readonly lastRetriesAttempted: number;
   listProjects(tenantSlug: string): Promise<ProjectSchema[]>;
 };
 
 const MAX_RETRY_AFTER_MS = 120_000;
-const MAX_TRANSIENT_ATTEMPTS = 4;
+export const MAX_TRANSIENT_ATTEMPTS = 4;
+
+const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "PUT", "DELETE"]);
+const BACKOFF_MS = [250, 500, 1000, 2000];
 
 function trimTrailingSlash(url: string): string {
   return url.replace(/\/+$/, "");
@@ -58,12 +68,10 @@ export function parseRetryAfterMs(headerValue: string | null): number | undefine
   return undefined;
 }
 
+/** Delay before retry `attemptIndex` (0-based), capped at 2s (#3191). */
 export function exponentialBackoffMs(attemptIndex: number): number {
-  const base = 250;
-  const cap = 8000;
-  const raw = Math.min(base * 2 ** attemptIndex, cap);
-  const jitter = Math.floor(Math.random() * 120);
-  return raw + jitter;
+  const idx = Math.min(Math.max(attemptIndex, 0), BACKOFF_MS.length - 1);
+  return BACKOFF_MS[idx] ?? 2000;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -91,19 +99,35 @@ function formatApiError(error: unknown): string {
   }
 }
 
-function isTransientHttpStatus(status: number): boolean {
-  return status === 502 || status === 503 || status === 504;
+function methodIsIdempotent(method: string): boolean {
+  return IDEMPOTENT_METHODS.has(method.toUpperCase());
+}
+
+function shouldRetryStatus(status: number, idempotent: boolean): boolean {
+  if (status === 429) return true;
+  if (idempotent && status >= 500 && status <= 599) return true;
+  return false;
 }
 
 /** Validates the list endpoint payload enough for CLI rendering (required OpenAPI fields). */
 function parseProjectsPayload(data: unknown): ProjectSchema[] {
   if (!Array.isArray(data)) {
-    throw new CliError("API error: unexpected response shape for projects list.", 1);
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for projects list.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "The API returned an unexpected JSON shape; try again or upgrade the CLI.",
+    });
   }
   const projects: ProjectSchema[] = [];
   for (const raw of data) {
     if (!raw || typeof raw !== "object") {
-      throw new CliError("API error: invalid project entry in response.", 1);
+      throw new ObjectifiedCliError({
+        message: "Invalid project entry in response.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "The API returned invalid project rows; include request-id when reporting.",
+      });
     }
     const p = raw as Record<string, unknown>;
     if (
@@ -112,14 +136,24 @@ function parseProjectsPayload(data: unknown): ProjectSchema[] {
       typeof p.name !== "string" ||
       typeof p.slug !== "string"
     ) {
-      throw new CliError("API error: invalid project fields in response.", 1);
+      throw new ObjectifiedCliError({
+        message: "Invalid project fields in response.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "Required project fields were missing or mistyped.",
+      });
     }
     if (
       p.enabled !== undefined &&
       p.enabled !== null &&
       typeof p.enabled !== "boolean"
     ) {
-      throw new CliError("API error: invalid project fields in response.", 1);
+      throw new ObjectifiedCliError({
+        message: "Invalid project fields in response.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "`enabled` must be boolean when present.",
+      });
     }
     projects.push({
       ...(raw as ProjectSchema),
@@ -135,14 +169,22 @@ function createInstrumentedFetch(opts: {
   verbose?: boolean;
   stderrWrite?: (line: string) => void;
   onUnauthorized?: () => Promise<void>;
+  onRetryStats?: (count: number) => void;
 }): typeof fetch {
   const log = opts.stderrWrite ?? ((line: string) => process.stderr.write(`${line}\n`));
 
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const baseReq = input instanceof Request ? input : new Request(input, init);
     let req = mergeAuthHeaders(baseReq, opts.auth);
-    let transientAttempt = 0;
+    let transientRetries = 0;
     let didReauth = false;
+
+    opts.onRetryStats?.(0);
+
+    const bumpRetry = (): void => {
+      transientRetries++;
+      opts.onRetryStats?.(transientRetries);
+    };
 
     for (;;) {
       const response = await opts.inner(req);
@@ -156,19 +198,27 @@ function createInstrumentedFetch(opts: {
         continue;
       }
 
-      if (response.status === 429 && transientAttempt < MAX_TRANSIENT_ATTEMPTS - 1) {
-        const wait = parseRetryAfterMs(response.headers.get("retry-after"));
-        if (wait !== undefined) {
-          transientAttempt++;
-          await sleep(wait);
-          req = mergeAuthHeaders(baseReq, opts.auth);
-          continue;
-        }
-      }
+      const idem = methodIsIdempotent(req.method);
+      const attemptNumber = transientRetries + 1;
 
-      if (isTransientHttpStatus(response.status) && transientAttempt < MAX_TRANSIENT_ATTEMPTS - 1) {
-        transientAttempt++;
-        await sleep(exponentialBackoffMs(transientAttempt - 1));
+      if (
+        attemptNumber < MAX_TRANSIENT_ATTEMPTS &&
+        shouldRetryStatus(response.status, idem)
+      ) {
+        if (!idem && response.status !== 429) {
+          return response;
+        }
+
+        let waitMs: number;
+        if (response.status === 429) {
+          const ra = parseRetryAfterMs(response.headers.get("retry-after"));
+          waitMs = ra ?? exponentialBackoffMs(transientRetries);
+        } else {
+          waitMs = exponentialBackoffMs(transientRetries);
+        }
+
+        bumpRetry();
+        await sleep(waitMs);
         req = mergeAuthHeaders(baseReq, opts.auth);
         continue;
       }
@@ -181,18 +231,29 @@ function createInstrumentedFetch(opts: {
 export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi {
   const innerFetch = globalThis.fetch.bind(globalThis);
   let lastRequestId: string | undefined;
+  let lastRetriesAttempted = 0;
 
   const instrumented = createInstrumentedFetch({
     inner: async (input, init) => {
-      const res = await innerFetch(input, init);
-      const rid = res.headers.get("x-request-id") ?? res.headers.get("X-Request-Id") ?? undefined;
-      if (rid !== undefined) lastRequestId = rid;
-      return res;
+      try {
+        const res = await innerFetch(input, init);
+        const rid = res.headers.get("x-request-id") ?? res.headers.get("X-Request-Id") ?? undefined;
+        if (rid !== undefined) lastRequestId = rid;
+        return res;
+      } catch (e) {
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
     },
     auth: options.auth,
     verbose: options.verbose,
     stderrWrite: options.stderrWrite,
     onUnauthorized: options.onUnauthorized,
+    onRetryStats: (n) => {
+      lastRetriesAttempted = n;
+    },
   });
 
   const hey: Client = createClient({
@@ -204,13 +265,25 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
     get lastRequestId() {
       return lastRequestId;
     },
+    get lastRetriesAttempted() {
+      return lastRetriesAttempted;
+    },
 
     async listProjects(tenantSlug: string): Promise<ProjectSchema[]> {
-      const rawUnknown: unknown = await listProjectsV1ProjectsTenantSlugGet({
-        client: hey,
-        path: { tenant_slug: tenantSlug },
-        throwOnError: false,
-      });
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await listProjectsV1ProjectsTenantSlugGet({
+          client: hey,
+          path: { tenant_slug: tenantSlug },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
 
       const rawBundle =
         rawUnknown && typeof rawUnknown === "object"
@@ -222,12 +295,24 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
           : undefined;
 
       if (rawBundle === undefined) {
-        throw new CliError("API error: empty SDK response.", 1);
+        throw new ObjectifiedCliError({
+          message: "Empty SDK response from the API client.",
+          exitCode: EXIT_CODES.GENERIC,
+          title: "API error",
+          hint: "Retry the command; set OBJECTIFIED_DEBUG=1 if you need a stack trace.",
+        });
       }
 
       if (rawBundle.error !== undefined && rawBundle.error !== null && rawBundle.error !== "") {
-        const status = rawBundle.response?.status ?? "?";
-        throw new CliError(`API error (${String(status)}): ${formatApiError(rawBundle.error)}`, 1);
+        const status = rawBundle.response?.status ?? 0;
+        const hdrId =
+          rawBundle.response?.headers.get("x-request-id") ??
+          rawBundle.response?.headers.get("X-Request-Id") ??
+          undefined;
+        throw httpStatusToCliError(status, formatApiError(rawBundle.error), {
+          requestId: hdrId ?? lastRequestId,
+          retriesAttempted: lastRetriesAttempted,
+        });
       }
 
       return parseProjectsPayload(rawBundle.data);

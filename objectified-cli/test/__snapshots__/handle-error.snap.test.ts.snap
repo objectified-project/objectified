@@ -1,0 +1,94 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`handleError snapshots by category > config error 1`] = `
+"✖ Configuration error
+Reason: Invalid TOML in config.
+Hint:   Run \`objectified config path\` and repair the file.
+Exit code:  11"
+`;
+
+exports[`handleError snapshots by category > conflict 1`] = `
+"✖ Conflict
+Reason: Version already exists
+Hint:   Pull remote changes or fork before retrying.
+Request-Id: rid-409
+Exit code:  6"
+`;
+
+exports[`handleError snapshots by category > forbidden 1`] = `
+"✖ Forbidden
+Reason: Tenant mismatch
+Hint:   Switch tenant or API key; verify you have access to this resource.
+Request-Id: rid-403
+Exit code:  4"
+`;
+
+exports[`handleError snapshots by category > generic ObjectifiedCliError 1`] = `
+"✖ Unexpected failure
+Reason: Something unexpected happened.
+Hint:   Retry later or contact support with the request-id.
+Request-Id: 7f2c…cafe
+Exit code:  1"
+`;
+
+exports[`handleError snapshots by category > misuse (oclif unknown flag) 1`] = `
+"✖ Invalid usage
+Reason: Unexpected flag --frobnitz
+See more help with --help
+Hint:   Run the command with \`--help\`, or fix flags and arguments.
+Exit code:  2"
+`;
+
+exports[`handleError snapshots by category > network / errno 1`] = `
+"✖ Network error
+Reason: Connection refused — nothing is listening at this host/port or a firewall blocked it.
+Hint:   Check VPN / firewall / DNS; verify \`--base-url\` or OBJECTIFIED_BASE_URL reaches the API. (errno ECONNREFUSED)
+Exit code:  9"
+`;
+
+exports[`handleError snapshots by category > not authenticated 1`] = `
+"✖ Not authenticated
+Reason: Missing bearer token
+Hint:   Run \`objectified auth login\` or set OBJECTIFIED_API_KEY.
+Request-Id: rid-401
+Exit code:  3"
+`;
+
+exports[`handleError snapshots by category > not found 1`] = `
+"✖ Not found
+Reason: Project unknown
+Hint:   Check slugs, IDs, and tenant scope.
+Request-Id: rid-404
+Exit code:  5"
+`;
+
+exports[`handleError snapshots by category > rate limited 1`] = `
+"✖ Rate limited
+Reason: Slow down
+Hint:   Wait for Retry-After (shown in verbose logs), then retry.
+Request-Id: rid-429
+Exit code:  10"
+`;
+
+exports[`handleError snapshots by category > server error 1`] = `
+"✖ Server error
+Reason: Upstream unavailable
+Hint:   API returned an error; retry later. Retried 3 time(s); include request-id in support tickets when available.
+Request-Id: rid-503
+Exit code:  8"
+`;
+
+exports[`handleError snapshots by category > unknown command with did-you-mean 1`] = `
+"✖ Unknown command "helol".
+Reason: command helol not found
+Hint:   Did you mean \`objectified hello\`?
+Exit code:  2"
+`;
+
+exports[`handleError snapshots by category > validation 1`] = `
+"✖ Validation error
+Reason: Invalid payload
+Hint:   Fix the request; use --dry-run where supported.
+Request-Id: rid-422
+Exit code:  7"
+`;

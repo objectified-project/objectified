@@ -1,5 +1,6 @@
 import { BaseCommand } from "../../base-command.js";
-import { CliError } from "../../lib/errors.js";
+import { EXIT_CODES } from "../../lib/exit-codes.js";
+import { ObjectifiedCliError } from "../../lib/errors.js";
 import { chalkForContext } from "../../lib/output.js";
 
 export default class ProjectsList extends BaseCommand {
@@ -10,10 +11,13 @@ export default class ProjectsList extends BaseCommand {
   async run(): Promise<void> {
     const tenant = this.context.tenantSlug;
     if (tenant === undefined || tenant === "") {
-      throw new CliError(
-        "Tenant slug is required for this command. Set OBJECTIFIED_TENANT or `tenant_slug` in your profile (config.toml).",
-        11,
-      );
+      throw new ObjectifiedCliError({
+        message:
+          "Tenant slug is required for this command. Set OBJECTIFIED_TENANT or `tenant_slug` in your profile (config.toml).",
+        exitCode: EXIT_CODES.CONFIG,
+        title: "Configuration error",
+        hint: "Run `objectified config path` to locate config.toml, then set tenant_slug for your profile.",
+      });
     }
 
     const projects = await this.api.listProjects(tenant);

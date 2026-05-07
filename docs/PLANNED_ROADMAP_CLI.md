@@ -106,7 +106,6 @@ Total: **12 epics**, **88 sub-tickets** (open roadmap items; completed work is d
 
 | #         | Title                                                              | Description                                                                  | Labels                                          | MVP | Parallel |
 |-----------|--------------------------------------------------------------------|------------------------------------------------------------------------------|-------------------------------------------------|-----|----------|
-| 1.6 (#3191) | Error handling, exit codes, retries, hints                       | `ObjectifiedCliError` hierarchy, sysexits-style exit codes, did-you-mean     | `enhancement`, `mvp`, `cli`, `roadmap-cli`     | Yes | Yes      |
 | 1.7 (#3192) | Help system, examples, man pages, `objectified docs`             | Rich help, ≥2 examples per command, generated man pages, `docs <topic>`     | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `documentation` | Yes | Yes      |
 | 1.8 (#3193) | Shell completions (bash/zsh/fish/PowerShell)                     | Static completions + dynamic (tenant/project/version slugs)                  | `enhancement`, `cli`, `roadmap-cli`            | No  | Yes      |
 
@@ -191,7 +190,9 @@ Part of Epic: CLI Foundation & DevEx (#3174)
 
 ---
 
-#### 1.6 (#3191) — Error handling, exit codes, retries
+#### 1.6 (#3191) — Error handling, exit codes, retries (**done**)
+
+Landed: `ObjectifiedCliError` + `httpStatusToCliError` (all 4xx/5xx), `formatAndReportCliFailure` / `handleError` template (Reason, Hint, Request-Id, Exit code), top-level `run`+`handle` replacement in `bin/run.js` / `dev.js` (stacks only with `--verbose` or `OBJECTIFIED_DEBUG=1`), `leven` did-you-mean for unknown commands, network errno hints, client retries (idempotent: 429+5xx with 250/500/1s/2s, max 4 attempts; `POST`/`PATCH`: 429 only), `objectified docs errors`, Vitest HTTP mapping + `handleError` snapshots, integration coverage.
 
 Documented BSD/sysexits-inspired exit codes:
 
@@ -779,11 +780,11 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ## MVP Release — Ticket Bundle
 
-The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **22 open sub-tickets** across 6 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, and #3190).
+The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **21 open sub-tickets** across 6 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, and #3191).
 
 | Epic     | Tickets                                                                                                   | Count |
 |----------|-----------------------------------------------------------------------------------------------------------|-------|
-| 1 (#3174) | #3191, #3192                                                                                               | 2     |
+| 1 (#3174) | #3192                                                                                                      | 1     |
 | 2 (#3175) | #3194, #3195, #3196, #3197, #3198, #3199                                                                  | 6     |
 | 3 (#3176) | #3202, #3203, #3204                                                                                        | 3     |
 | 4 (#3177) | #3208, #3209, #3210, #3212                                                                                | 4     |
@@ -871,7 +872,7 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 
 The tickets were created in the order below — that is also the recommended **execution** order. Earlier epics provide primitives that later epics rely on.
 
-1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, #3189, and #3190 landed; then #3191 → #3193). Without the scaffold, no other command can exist.
+1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, #3189, #3190, and #3191 landed; then #3192 → #3193). Without the scaffold, no other command can exist.
 2. **Epic 2 — Auth & Tenants** (#3175 then #3194 → #3201). Required for any tenant-scoped command.
 3. **Epic 3 — Projects** (#3176 then #3202 → #3207). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3208 → #3216). The publish flow that makes the CLI valuable in CI.

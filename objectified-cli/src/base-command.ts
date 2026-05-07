@@ -1,6 +1,7 @@
 import os from "node:os";
 
 import { Command, Flags } from "@oclif/core";
+import { ExitError } from "@oclif/core/errors";
 import type { CommandError } from "@oclif/core/interfaces";
 import supportsColor from "supports-color";
 
@@ -16,7 +17,12 @@ import {
   resolveConfigFilePath,
   type ParsedTomlConfig,
 } from "./lib/config.js";
-import { CliError } from "./lib/errors.js";
+import {
+  cliFailureJsonEnvelope,
+  formatAndReportCliFailure,
+  resolveDebugStacks,
+  resolveEffectiveExitCode,
+} from "./lib/handle-error.js";
 import { createCliOutput, localePrefersAsciiTable, type CliOutput } from "./lib/output.js";
 
 export abstract class BaseCommand extends Command {
@@ -140,11 +146,20 @@ export abstract class BaseCommand extends Command {
     });
   }
 
-  protected override async catch(err: CommandError): Promise<void> {
-    if (err instanceof CliError) {
-      this.error(err.message, { exit: err.exitCode });
-      return;
+  protected override catch(err: CommandError): Promise<void> {
+    if (this.jsonEnabled()) {
+      // `api` is assigned late in `init()`; failures before `createApiClient` must not crash JSON rendering.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- optional when init aborted early
+      this.logJson(cliFailureJsonEnvelope(err, this.api?.lastRequestId));
+      return Promise.reject(new ExitError(resolveEffectiveExitCode(err)));
     }
-    await super.catch(err);
+
+    const debugStacks = resolveDebugStacks(process.argv, process.env);
+    const color =
+      process.env.NO_COLOR === undefined || process.env.NO_COLOR === ""
+        ? typeof supportsColor.stderr === "object"
+        : false;
+    const code = formatAndReportCliFailure(err, { debugStacks, color });
+    return Promise.reject(new ExitError(code));
   }
 }
