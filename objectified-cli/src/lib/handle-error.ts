@@ -20,7 +20,26 @@ export type HandleCliErrorOptions = {
 
 let cachedCommandIds: string[] | undefined;
 
+/** When set (tests only), skip manifest read and use this command-id list. */
+let registeredCommandIdsOverride: string[] | undefined;
+
+/** Clears manifest-derived command ids and any test override. */
+export function resetRegisteredCommandIdsCache(): void {
+  cachedCommandIds = undefined;
+  registeredCommandIdsOverride = undefined;
+}
+
+/**
+ * Pin command ids for deterministic unit tests (did-you-mean / manifest-free CI).
+ * Production code must not call this.
+ */
+export function setRegisteredCommandIdsOverride(ids: string[] | undefined): void {
+  registeredCommandIdsOverride = ids;
+  cachedCommandIds = undefined;
+}
+
 function loadRegisteredCommandIds(): string[] {
+  if (registeredCommandIdsOverride !== undefined) return registeredCommandIdsOverride;
   if (cachedCommandIds !== undefined) return cachedCommandIds;
   try {
     const here = dirname(fileURLToPath(import.meta.url));

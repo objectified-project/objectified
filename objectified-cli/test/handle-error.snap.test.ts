@@ -1,14 +1,24 @@
 import { CLIError } from "@oclif/core/errors";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EXIT_CODES } from "../src/lib/exit-codes.js";
 import { httpStatusToCliError, networkErrnoToCliError, ObjectifiedCliError } from "../src/lib/errors.js";
-import { formatAndReportCliFailure, handleError } from "../src/lib/handle-error.js";
+import {
+  formatAndReportCliFailure,
+  handleError,
+  resetRegisteredCommandIdsCache,
+  setRegisteredCommandIdsOverride,
+} from "../src/lib/handle-error.js";
 
 const noColor = { debugStacks: false, color: false };
 
+beforeEach(() => {
+  resetRegisteredCommandIdsCache();
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
+  resetRegisteredCommandIdsCache();
 });
 
 describe("handleError snapshots by category", () => {
@@ -103,6 +113,7 @@ describe("handleError snapshots by category", () => {
   });
 
   it("unknown command with did-you-mean", () => {
+    setRegisteredCommandIdsOverride(["hello"]);
     expect(handleError(new CLIError("command helol not found"), noColor)).toMatchSnapshot();
   });
 

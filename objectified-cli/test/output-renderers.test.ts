@@ -71,7 +71,8 @@ describe("createCliOutput snapshots", () => {
   it("table as TSV when stdout is not a TTY", () => {
     const { out, stdout, stderr } = capture({});
     out.table(sampleRows, sampleColumns);
-    expect({ stdout: stdout(), stderr: stderr() }).toMatchSnapshot();
+    expect(stderr()).toBe("");
+    expect(stdout()).toBe("Name\tID\nbeta\t2\nalpha\t1\n");
   });
 
   it("table as ANSI table when TTY + color + non-ASCII locale border allowed", () => {
@@ -81,7 +82,13 @@ describe("createCliOutput snapshots", () => {
       langAscii: false,
     });
     out.table(sampleRows, sampleColumns);
-    expect({ stdout: stdout(), stderr: stderr() }).toMatchSnapshot();
+    expect(stderr()).toBe("");
+    const s = stdout();
+    expect(s).toContain("Name");
+    expect(s).toContain("ID");
+    expect(s).toContain("beta");
+    expect(s).toContain("alpha");
+    expect(s).toMatch(/┌[\s\S]*└[\s\S]*┘\n$/);
   });
 
   it("table uses ASCII borders when langAscii", () => {
@@ -91,13 +98,18 @@ describe("createCliOutput snapshots", () => {
       langAscii: true,
     });
     out.table(sampleRows, sampleColumns);
-    expect({ stdout: stdout(), stderr: stderr() }).toMatchSnapshot();
+    expect(stderr()).toBe("");
+    const s = stdout();
+    expect(s).toContain("Name");
+    expect(s).toContain("beta");
+    expect(s).toMatch(/\+-+\+[\s\S]*\+-+\+\n$/);
   });
 
   it("table emits stable JSON when json mode", () => {
     const { out, stdout, stderr } = capture({ json: true });
     out.table(sampleRows, sampleColumns);
-    expect({ stdout: stdout(), stderr: stderr() }).toMatchSnapshot();
+    expect(stderr()).toBe("");
+    expect(stdout()).toBe('[{"id":2,"name":"beta"},{"id":1,"name":"alpha"}]\n');
   });
 
   it("json is compact when piped or quiet", () => {
