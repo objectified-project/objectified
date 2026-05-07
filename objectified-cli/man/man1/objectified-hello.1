@@ -1,0 +1,47 @@
+.TH OBJECTIFIED\-HELLO 1 "" "" "User Commands"
+.SH NAME
+objectified hello \- Smoke-test greeting for the Objectified CLI
+.SH DESCRIPTION
+.nf
+USAGE
+  $ objectified hello [NAME] [--api-key <value>] [--base-url
+    <value>] [--config <value>] [--json] [--color] [--profile <value>] [-q]
+    [--verbose]
+
+ARGUMENTS
+  [NAME]  Who to greet
+
+DESCRIPTION
+  Smoke-test greeting for the Objectified CLI
+
+EXAMPLES
+  $ objectified hello
+
+  $ objectified hello Ada
+
+  $ objectified --json hello
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir /
+                      Objectified AppData on Windows — see `objectified config
+                      path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls
+                      back to default_profile in config.
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR;
+                    colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1;
+                    auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>  API key for direct authentication (bypasses login token).
+
+SEE ALSO
+  objectified docs output
+
+  objectified config path
+.fi

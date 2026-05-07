@@ -28,46 +28,44 @@ import { createCliOutput, localePrefersAsciiTable, type CliOutput } from "./lib/
 
 export abstract class BaseCommand extends Command {
   static baseFlags = {
-    apiKey: Flags.string({
-      name: "api-key",
+    "api-key": Flags.string({
       description: "API key for direct authentication (bypasses login token).",
-      helpGroup: "GLOBAL",
+      helpGroup: "Auth",
     }),
-    baseUrl: Flags.string({
-      name: "base-url",
+    "base-url": Flags.string({
       description: "Root REST API URL.",
-      helpGroup: "GLOBAL",
+      helpGroup: "Common",
     }),
     config: Flags.string({
       description:
         "Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified config path`).",
-      helpGroup: "GLOBAL",
+      helpGroup: "Common",
     }),
     json: Flags.boolean({
       description:
         "Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).",
       allowNo: true,
-      helpGroup: "GLOBAL",
+      helpGroup: "Output",
     }),
     color: Flags.boolean({
       description:
         "Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).",
       allowNo: true,
-      helpGroup: "GLOBAL",
+      helpGroup: "Output",
     }),
     profile: Flags.string({
       description:
         "Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.",
-      helpGroup: "GLOBAL",
+      helpGroup: "Common",
     }),
     quiet: Flags.boolean({
       char: "q",
       description: "Suppress non-error stdout (spinners, banners, tips).",
-      helpGroup: "GLOBAL",
+      helpGroup: "Output",
     }),
     verbose: Flags.boolean({
       description: "Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).",
-      helpGroup: "GLOBAL",
+      helpGroup: "Output",
     }),
   };
 
@@ -117,7 +115,19 @@ export abstract class BaseCommand extends Command {
     await super.init();
     const Cmd = this.constructor as typeof Command;
     const parsed = await this.parse(Cmd);
-    const globalPart = parsed.flags as GlobalCliFlags;
+    const parsedFlags = parsed.flags as Record<string, unknown>;
+    // Keep camelCase fallback for compatibility while normalize-argv continues accepting legacy aliases.
+    const globalPart: GlobalCliFlags = {
+      apiKey: (parsedFlags["api-key"] as string | undefined) ?? (parsedFlags.apiKey as string | undefined),
+      baseUrl:
+        (parsedFlags["base-url"] as string | undefined) ?? (parsedFlags.baseUrl as string | undefined),
+      config: parsedFlags.config as string | undefined,
+      json: parsedFlags.json as boolean | undefined,
+      color: parsedFlags.color as boolean | undefined,
+      profile: parsedFlags.profile as string | undefined,
+      quiet: parsedFlags.quiet as boolean | undefined,
+      verbose: parsedFlags.verbose as boolean | undefined,
+    };
     this.parsedGlobalFlags = globalPart;
     this.commandArgs = parsed.args as Record<string, unknown>;
 

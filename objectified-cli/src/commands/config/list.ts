@@ -6,7 +6,13 @@ import { loadRawTomlDocument } from "../../lib/config.js";
 export default class ConfigList extends BaseCommand {
   static description = "Print the entire config file (stable JSON with --json, otherwise TOML)";
 
-  static examples = ["<%= config.bin %> <%= command.id %>"];
+  static examples = [
+    "<%= config.bin %> <%= command.id %>",
+    "<%= config.bin %> --json <%= command.id %>",
+    "<%= config.bin %> <%= command.id %> > backup.toml",
+  ];
+
+  static seeAlso = ["config path", "config get"];
 
   run(): Promise<void> {
     const raw = loadRawTomlDocument(this.resolvedConfigPath);

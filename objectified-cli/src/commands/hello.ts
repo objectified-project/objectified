@@ -9,7 +9,10 @@ export default class Hello extends BaseCommand {
   static examples = [
     "<%= config.bin %> <%= command.id %>",
     "<%= config.bin %> <%= command.id %> Ada",
+    "<%= config.bin %> --json <%= command.id %>",
   ];
+
+  static seeAlso = ["docs output", "config path"];
 
   static args = {
     name: Args.string({

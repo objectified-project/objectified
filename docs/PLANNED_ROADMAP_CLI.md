@@ -106,7 +106,6 @@ Total: **12 epics**, **88 sub-tickets** (open roadmap items; completed work is d
 
 | #         | Title                                                              | Description                                                                  | Labels                                          | MVP | Parallel |
 |-----------|--------------------------------------------------------------------|------------------------------------------------------------------------------|-------------------------------------------------|-----|----------|
-| 1.7 (#3192) | Help system, examples, man pages, `objectified docs`             | Rich help, ≥2 examples per command, generated man pages, `docs <topic>`     | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `documentation` | Yes | Yes      |
 | 1.8 (#3193) | Shell completions (bash/zsh/fish/PowerShell)                     | Static completions + dynamic (tenant/project/version slugs)                  | `enhancement`, `cli`, `roadmap-cli`            | No  | Yes      |
 
 ### Detailed Issue Descriptions
@@ -223,13 +222,11 @@ Part of Epic: CLI Foundation & DevEx (#3174)
 
 ---
 
-#### 1.7 (#3192) — Help system, examples, man pages, `objectified docs`
+#### 1.7 (#3192) — Help system, examples, man pages, `objectified docs` (**done**)
 
-Custom oclif help renderer with ≥2 examples per command, grouped flag sections (`Required`/`Common`/`Output`/`Auth`), `See also`, and a topic-level `objectified docs <topic>` browser. Man pages generated at build time, shipped under `man/man1/`.
+Landed: custom `CommandHelp` (grouped **COMMON** / **OUTPUT** / **AUTH** / **OTHER**, **EXAMPLES** before flag groups, **SEE ALSO** from `static seeAlso`), ≥2 `examples` per command enforced in tests, `objectified docs` topic index plus prose topics (`errors`, `output`, `profiles`, `completions`, `plugins`, `telemetry`), `oclif readme` + `scripts/generate-man.mjs` writing `man/man1/*.1` and `package.json` `man`, CI workflow guards `git diff` after `yarn workspace objectified-cli test`, help honors **NO_COLOR**, non-TTY stdout, and `--no-color` via `stripAnsi`.
 
-**Acceptance Criteria:** every command has ≥2 examples; `man objectified` works after global install; README auto-generated and CI-guarded.
-
-**Parallelism / Dependencies:** Depends on 1.1, 1.2.
+**Parallelism / Dependencies:** Depended on 1.1, 1.2.
 
 Part of Epic: CLI Foundation & DevEx (#3174)
 
@@ -780,11 +777,10 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ## MVP Release — Ticket Bundle
 
-The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **21 open sub-tickets** across 6 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, and #3191).
+The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **20 open sub-tickets** across 5 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, and #3192).
 
 | Epic     | Tickets                                                                                                   | Count |
 |----------|-----------------------------------------------------------------------------------------------------------|-------|
-| 1 (#3174) | #3192                                                                                                      | 1     |
 | 2 (#3175) | #3194, #3195, #3196, #3197, #3198, #3199                                                                  | 6     |
 | 3 (#3176) | #3202, #3203, #3204                                                                                        | 3     |
 | 4 (#3177) | #3208, #3209, #3210, #3212                                                                                | 4     |
@@ -872,7 +868,7 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 
 The tickets were created in the order below — that is also the recommended **execution** order. Earlier epics provide primitives that later epics rely on.
 
-1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, #3189, #3190, and #3191 landed; then #3192 → #3193). Without the scaffold, no other command can exist.
+1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, #3189, #3190, #3191, and #3192 landed; next #3193). Without the scaffold, no other command can exist.
 2. **Epic 2 — Auth & Tenants** (#3175 then #3194 → #3201). Required for any tenant-scoped command.
 3. **Epic 3 — Projects** (#3176 then #3202 → #3207). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3208 → #3216). The publish flow that makes the CLI valuable in CI.
