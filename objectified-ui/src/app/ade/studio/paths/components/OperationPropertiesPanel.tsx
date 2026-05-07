@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Save, Plus, Trash2, ArrowLeft, Lock, Unlock, ExternalLink, ListChecks, Zap, X } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import PropertiesPanelShell from './PropertiesPanelShell';
@@ -43,6 +43,7 @@ import { extractPathParameters } from '../../../../../../lib/utils/path-params';
 import { validateOpenApiParameterName } from '../../../../../../lib/utils/openapi-parameter-name';
 import ResponseSection from './ResponseSection';
 import RequestBodySection from './RequestBodySection';
+import { OperationDocsAiButton } from './OperationDocsAiButton';
 import ReuseSearchCombobox from './ReuseSearchCombobox';
 import { getHttpStatusDescription } from '../../../../../../lib/utils/http-status-codes';
 import type { SecurityRequirement } from '../../../../../../lib/utils/openapi-paths-generator';
@@ -79,7 +80,7 @@ export default function OperationPropertiesPanel({
   onRefresh,
   refreshKey,
 }: OperationPropertiesPanelProps) {
-  const { selectedVersionId } = useStudio();
+  const { selectedVersionId, selectedProjectId } = useStudio();
   const isDark = useDarkMode();
   const { alert: alertDialog, confirm: confirmDialog } = useDialog();
 
@@ -148,6 +149,11 @@ export default function OperationPropertiesPanel({
 
   // Custom x-* extensions (OpenAPI extension properties)
   const [extensions, setExtensions] = useState<Record<string, unknown>>({});
+
+  const handleOperationDocsAiGenerated = useCallback((docs: { summary: string; description: string }) => {
+    setSummary(docs.summary);
+    setDescription(docs.description);
+  }, []);
 
   /** Reuse library (#2652): attach existing shared parameter / response */
   const [paramAttachMode, setParamAttachMode] = useState<'create' | 'reuse'>('create');
@@ -1530,6 +1536,17 @@ export default function OperationPropertiesPanel({
               </TabsContent>
 
               <TabsContent value="docs" className="mt-0 flex flex-col gap-4 outline-none">
+                <OperationDocsAiButton
+                  tenantId={null}
+                  projectId={selectedProjectId}
+                  versionId={selectedVersionId}
+                  pathname={pathname}
+                  httpMethod={operation}
+                  operationIdHint={operationIdName}
+                  pathParameterNames={availablePathParams}
+                  onGenerated={handleOperationDocsAiGenerated}
+                  disabled={!operationId}
+                />
                 <div>
                   <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                     summary

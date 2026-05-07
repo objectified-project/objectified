@@ -1,8 +1,47 @@
 import type { PropertyFormData } from '@/app/components/ade/studio/PropertyFormFields';
 
 /**
- * Normalizes LLM output into a single plain-text property description (#619).
+ * Extracts the last ```json ... ``` (or ``` ... ```) code block from LLM output (#621).
+ * Case-insensitive and tolerates preamble/trailing text, matching the pattern used in other AI parsers.
  */
+function extractLastJsonCodeBlock(text: string): string | null {
+  const re = /```(?:json)?\s*([\s\S]*?)```/gi;
+  let last: string | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    last = m[1].trim();
+  }
+  return last;
+}
+
+/**
+ * Parses LLM output for OpenAPI operation summary + description (#621).
+ * Expects a JSON object (optionally inside a markdown fence) with non-empty string fields
+ * `summary` and `description`. Returns null unless both fields are present and non-empty.
+ */
+export function parseGeneratedOperationDocs(raw: string): { summary: string; description: string } | null {
+  let t = raw.trim();
+  if (!t) return null;
+  const fenced = extractLastJsonCodeBlock(t);
+  if (fenced) t = fenced;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(t);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const o = parsed as Record<string, unknown>;
+  const summaryRaw = typeof o.summary === 'string' ? o.summary.trim().replace(/\s+/g, ' ') : '';
+  const descriptionRaw = typeof o.description === 'string' ? o.description.trim() : '';
+  if (!summaryRaw || !descriptionRaw) return null;
+  return {
+    summary: summaryRaw.slice(0, 400),
+    description: descriptionRaw.slice(0, 16_000),
+  };
+}
+
 export function normalizeGeneratedPropertyDescription(raw: string): string {
   let t = raw.trim();
   if (!t) return '';
