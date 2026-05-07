@@ -70,8 +70,9 @@ export function loadTomlConfigFile(configFilePath: string): ParsedTomlConfig {
     return parseTomlConfig(content);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(
+    throw new CliError(
       `Failed to parse config file "${configFilePath}": ${msg}\nHint: Use --config or OBJECTIFIED_CONFIG to point to a valid TOML file.`,
+      11,
     );
   }
 }
@@ -127,8 +128,16 @@ function chmodConfigFile(configPath: string): void {
 
 /** Creates parent dirs and a default `config.toml` when missing (permissions `0600` on Unix). */
 export async function ensureDefaultConfigFile(configPath: string): Promise<void> {
-  const exists = await fse.pathExists(configPath);
-  if (exists) return;
+  if (await fse.pathExists(configPath)) {
+    const stat = await fse.stat(configPath);
+    if (!stat.isFile()) {
+      throw new CliError(
+        `Config path "${configPath}" exists but is not a regular file; remove it or set a different path via --config or OBJECTIFIED_CONFIG.`,
+        11,
+      );
+    }
+    return;
+  }
   await fse.ensureDir(path.dirname(configPath));
   await fse.writeFile(configPath, defaultConfigToml(), { encoding: "utf8", mode: 0o600 });
   chmodConfigFile(configPath);
@@ -170,15 +179,37 @@ export function saveRawTomlDocument(configPath: string, doc: RawTomlDoc): void {
 export function splitDottedKey(key: string): string[] {
   const trimmed = key.trim();
   if (trimmed === "") throw new CliError("Config key must not be empty.", 11);
-  return trimmed
-    .split(".")
-    .map((p) => p.trim())
-    .filter(Boolean);
+  const parts = trimmed.split(".").map((p) => p.trim());
+  if (parts.some((p) => p === "")) {
+    throw new CliError(
+      `Config key "${key}" contains an empty segment; use dotted.key notation with no consecutive or trailing dots.`,
+      11,
+    );
+  }
+  return parts;
 }
 
 export function assertWritableConfigKey(dottedKey: string): void {
-  const lower = dottedKey.toLowerCase();
-  if (lower.includes("api_key") || lower.includes("refresh_token")) {
+  // Normalize each segment: lowercase + strip underscores/hyphens to catch
+  // camelCase and snake_case variants (e.g. apiKey, api-key, api_key → apikey).
+  const normalizedSegments = dottedKey
+    .toLowerCase()
+    .split(".")
+    .map((s) => s.replace(/[-_]/g, ""));
+  const secretKeywords = [
+    "apikey",
+    "accesstoken",
+    "refreshtoken",
+    "token",
+    "secret",
+    "password",
+    "credential",
+    "privatekey",
+  ];
+  const isSecret = normalizedSegments.some((seg) =>
+    secretKeywords.some((kw) => seg.includes(kw)),
+  );
+  if (isSecret) {
     throw new CliError(
       "Secrets are not stored in config.toml; use the OS keychain when implemented (see roadmap).",
       11,
