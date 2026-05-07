@@ -134,11 +134,11 @@ const WEBHOOK_CLASS_SIGNAL = /Webhook/i;
 
 /** Response caches, edge caches, and explicit revalidation hooks. */
 const CACHE_LAYER_SIGNAL =
-  /\b(Cache|Caching|Cached|Redis|Etag|Memcached|CDN)\b/i;
+  /\b(Cache|Caching|Cached|Redis|Memcached|CDN)\b|ETag|\bE\s+Tag\b/i;
 
 /** Background workers, queues, and outbox-style durability. */
 const QUEUE_WORKER_SIGNAL =
-  /\b(Queue|Job|Worker|BackgroundTask|AsyncJob|Outbox|DeadLetter)\b/i;
+  /\b(Queue|Job|Worker|Outbox)\b|BackgroundTask|AsyncJob|DeadLetter|\bBackground\s+Task\b|\bAsync\s+Job\b|\bDead\s+Letter\b/i;
 
 /** List endpoints and stable paging primitives (includes tokenized `page_token` → "page token"). */
 const PAGINATION_SIGNAL =
@@ -154,7 +154,7 @@ const BULK_IO_SIGNAL =
 
 /** Large binary or media payloads. */
 const MEDIA_PAYLOAD_SIGNAL =
-  /\b(Attachment|Blob|MediaAsset|VideoAsset|ImageUpload|FileUpload|BinaryPayload)\b/i;
+  /\b(Attachment|Blob)\b|MediaAsset|VideoAsset|ImageUpload|FileUpload|BinaryPayload|\bMedia\s+Asset\b|\bVideo\s+Asset\b|\bImage\s+Upload\b|\bFile\s+Upload\b|\bBinary\s+Payload\b/i;
 
 /** Hot read paths such as feeds and timelines (`Timeline` often appears inside CamelCase names). */
 const FEED_TIMELINE_SIGNAL =

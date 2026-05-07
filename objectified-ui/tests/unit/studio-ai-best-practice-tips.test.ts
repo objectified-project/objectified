@@ -165,6 +165,14 @@ describe('collectStudioAiBestPracticeTipLines performance hints (#618)', () => {
     expect(lines.some((l) => l.toLowerCase().includes('ttl'))).toBe(true);
   });
 
+  it('adds cache guidance for tokenized ETag CamelCase compounds', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: ['OrderETag'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('namespace cache'))).toBe(true);
+  });
+
   it('adds queue and job guidance when worker-style names appear', () => {
     const lines = collectStudioAiBestPracticeTipLines({
       domainCategory: '',
@@ -172,6 +180,14 @@ describe('collectStudioAiBestPracticeTipLines performance hints (#618)', () => {
     });
     expect(lines.some((l) => l.toLowerCase().includes('idempotent'))).toBe(true);
     expect(lines.some((l) => l.toLowerCase().includes('retry'))).toBe(true);
+  });
+
+  it('adds queue guidance for tokenized CamelCase worker compounds', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: ['UserBackgroundTask'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('idempotent'))).toBe(true);
   });
 
   it('adds pagination guidance when paging primitives appear', () => {
@@ -203,6 +219,14 @@ describe('collectStudioAiBestPracticeTipLines performance hints (#618)', () => {
     const lines = collectStudioAiBestPracticeTipLines({
       domainCategory: '',
       classNames: ['InvoicePdfAttachment'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('binary'))).toBe(true);
+  });
+
+  it('adds media guidance for tokenized CamelCase payload compounds', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: ['OrderBinaryPayload'],
     });
     expect(lines.some((l) => l.toLowerCase().includes('binary'))).toBe(true);
   });
