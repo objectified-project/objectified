@@ -165,6 +165,7 @@ import { mapProjectTagToGroupOption, normalizeStoredGroupTags } from '@/app/util
 import { computeTagGroupPlan } from '@/app/utils/group-classes-by-tag-name';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
+import { analyzeCanvasLayoutGraph } from '@/app/utils/canvas-layout-graph-analysis';
 import { getVisibleNodeIdsForIsolateSelection } from '@/app/utils/canvas-node-visibility';
 import {
   hasActiveCanvasVisibilityRestrictions,
@@ -1141,6 +1142,14 @@ const StudioContent = () => {
       groupMemberIds,
     });
   }, [nodes, edges, schemaMetrics, layoutQuality, groupMemberIds]);
+
+  const canvasLayoutAnalysis = useMemo(
+    () =>
+      analyzeCanvasLayoutGraph(nodes, edges, {
+        deepestDependencyChainLength: schemaMetrics?.deepestChainLength ?? null,
+      }),
+    [nodes, edges, schemaMetrics?.deepestChainLength],
+  );
 
   // #559: Sync per-node relationship count from edges into class node data (for badges)
   useEffect(() => {
@@ -10740,6 +10749,11 @@ const StudioContent = () => {
                   layoutQuality={layoutQuality}
                   overallSchemaQualityDetail={overallSchemaQualityDetail}
                   suggestions={canvasSuggestions}
+                  canvasLayoutAnalysis={canvasLayoutAnalysis}
+                  tenantId={currentTenantId}
+                  projectId={selectedProjectId}
+                  versionId={selectedVersionId}
+                  onPreviewLayoutDirection={handlePreviewLayout}
                   projectName={selectedProject?.name}
                   versionLabel={selectedVersion?.version_id}
                   onSuggestionAction={handleSuggestionAction}

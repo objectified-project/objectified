@@ -8,7 +8,9 @@ import { cn } from '../../../../../lib/utils';
 import type { LayoutQualityResult } from '@/app/utils/layout-quality';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
 import type { CanvasSuggestion } from '@/app/utils/canvas-suggestions';
+import type { CanvasLayoutGraphAnalysis } from '@/app/utils/canvas-layout-graph-analysis';
 import { downloadSchemaScoreReportPdf } from '@/app/utils/export-schema-score-report-pdf';
+import { CanvasLayoutIntelligenceSection } from './CanvasLayoutIntelligenceSection';
 import { getNumericScoreTier, NUMERIC_SCORE_TIER_LEGEND } from '@/app/utils/numeric-score-tier';
 import { OVERALL_SCHEMA_QUALITY_WEIGHTS, type OverallSchemaQualityDetail } from '@/app/utils/overall-schema-quality';
 
@@ -19,6 +21,12 @@ interface SchemaMetricsPanelProps {
   overallSchemaQualityDetail?: OverallSchemaQualityDetail | null;
   /** Canvas improvement suggestions (#474) */
   suggestions?: CanvasSuggestion[];
+  /** Deterministic ReactFlow layout analysis (#623) */
+  canvasLayoutAnalysis?: CanvasLayoutGraphAnalysis | null;
+  tenantId?: string | null;
+  projectId?: string | null;
+  versionId?: string | null;
+  onPreviewLayoutDirection?: (direction: 'TB' | 'LR') => void;
   /** Shown on exported PDF cover (#252) */
   projectName?: string;
   versionLabel?: string;
@@ -36,6 +44,11 @@ export default function SchemaMetricsPanel({
   layoutQuality,
   overallSchemaQualityDetail = null,
   suggestions = [],
+  canvasLayoutAnalysis = null,
+  tenantId,
+  projectId,
+  versionId,
+  onPreviewLayoutDirection,
   projectName,
   versionLabel,
   onSuggestionAction,
@@ -1091,6 +1104,16 @@ export default function SchemaMetricsPanel({
                 </div>
               </div>
             </>
+          )}
+
+          {canvasLayoutAnalysis && canvasLayoutAnalysis.classCount >= 2 && onPreviewLayoutDirection && (
+            <CanvasLayoutIntelligenceSection
+              analysis={canvasLayoutAnalysis}
+              tenantId={tenantId}
+              projectId={projectId}
+              versionId={versionId}
+              onPreviewLayoutDirection={onPreviewLayoutDirection}
+            />
           )}
 
           {/* Suggestions (#474) */}

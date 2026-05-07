@@ -488,6 +488,29 @@ function buildSchemaImprovementSuggestionsSystem(options: {
   return s;
 }
 
+const CANVAS_LAYOUT_RECOMMENDATIONS_SYSTEM = `You help Objectified Studio users arrange **ReactFlow** class diagrams.
+
+The **Canvas layout analysis** JSON below was computed deterministically from the live canvas (classes, optional groups, and edges). It includes:
+- recommendedDirection ("TB" or "LR") with rationale text
+- stronglyConnectedComponents (directed cycles / tight clusters on the layout graph)
+- hubClasses (high total degree after collapsing grouped classes into group nodes)
+- hierarchyRoots (vertices with no incoming directed edges)
+- weaklyConnectedComponentCount (relationship islands using undirected edges)
+
+Respond in **markdown** with:
+1. One short paragraph that agrees with or gently refines the TB vs LR recommendation for this graph.
+2. A bullet list of 3–6 concrete steps for arranging or grouping nodes on the canvas (anchors, cycles, hubs, disconnected islands).
+3. One sentence naming the main pitfall to avoid.
+
+Rules:
+- Reference only class or group labels that appear in the JSON.
+- Stay under 350 words.
+- Do not output JSON or fenced code blocks.`;
+
+function buildCanvasLayoutRecommendationsSystem(layoutDigest: string): string {
+  return `${CANVAS_LAYOUT_RECOMMENDATIONS_SYSTEM}\n\n# Canvas layout analysis JSON\n\n${layoutDigest}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -501,6 +524,7 @@ export async function POST(request: NextRequest) {
       versionId,
       schemaContextFingerprint,
       studioMetricsDigest,
+      canvasLayoutDigest,
       targetPropertyName,
       targetClassName,
     } = await request.json();
@@ -521,6 +545,7 @@ export async function POST(request: NextRequest) {
     const isClassDescription = task === 'class_description';
     const isOperationDescription = task === 'operation_description';
     const isSchemaImprovementSuggestions = task === 'schema_improvement_suggestions';
+    const isCanvasLayoutRecommendations = task === 'canvas_layout_recommendations';
     const usesPropertyLibraryContext =
       isClassSkeleton ||
       isPropertySuggestions ||
@@ -534,9 +559,21 @@ export async function POST(request: NextRequest) {
         ? studioMetricsDigest.trim().slice(0, 64_000)
         : '';
 
+    const canvasLayoutDigestStr =
+      typeof canvasLayoutDigest === 'string' && canvasLayoutDigest.trim().length > 0
+        ? canvasLayoutDigest.trim().slice(0, 64_000)
+        : '';
+
     if (isSchemaImprovementSuggestions && !digestStr) {
       return new Response(
         JSON.stringify({ error: 'Invalid request: studioMetricsDigest is required for schema_improvement_suggestions' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+
+    if (isCanvasLayoutRecommendations && !canvasLayoutDigestStr) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid request: canvasLayoutDigest is required for canvas_layout_recommendations' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } },
       );
     }
@@ -593,6 +630,8 @@ export async function POST(request: NextRequest) {
                     ? existingClassNames.filter((n: unknown): n is string => typeof n === 'string' && n.trim().length > 0)
                     : undefined,
                 })
+              : isCanvasLayoutRecommendations
+                ? buildCanvasLayoutRecommendationsSystem(canvasLayoutDigestStr)
             : `You are an expert API designer and OpenAPI specification generator. Your task is to help users create OpenAPI 3.1.0 specifications based on their natural language descriptions.
 
 # Rules
@@ -672,6 +711,7 @@ Do not repeat the full JSON spec outside the code block. Do not add other sectio
       versionId: typeof versionId === 'string' ? versionId : undefined,
       schemaContextFingerprint,
       studioMetricsDigest: isSchemaImprovementSuggestions ? digestStr : undefined,
+      canvasLayoutDigest: isCanvasLayoutRecommendations ? canvasLayoutDigestStr : undefined,
       messages,
     });
 
@@ -685,6 +725,7 @@ Do not repeat the full JSON spec outside the code block. Do not add other sectio
       versionId: typeof versionId === 'string' ? versionId : undefined,
       schemaContextFingerprint,
       studioMetricsDigest: isSchemaImprovementSuggestions ? digestStr : undefined,
+      canvasLayoutDigest: isCanvasLayoutRecommendations ? canvasLayoutDigestStr : undefined,
     });
 
     const cached = getCachedOllamaChatResponse(cacheKey);
