@@ -30,6 +30,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Projects list includes a **Show deleted** switch; when on, soft-deleted projects appear with a **Deleted** badge and **Restore** or **permanent delete** in the row menu (#2981).
 
 ## Studio
+- **Class description** in **Edit class** supports **Generate with AI** (Ollama): drafts short documentation from the class name, linked member properties (names, types, optional member descriptions), and composition (allOf / anyOf / oneOf) (#620).
 - **Property description** fields support **Generate with AI** (Ollama): drafts short documentation from the property name and JSON Schema type — in **Add/Edit Property** (sidebar library) and **Edit class property** on the canvas (#619).
 - Studio AI **best-practice tips** now include **performance** hints (caching, queues, pagination, search projections, bulk I/O, media payloads, feeds/timelines) when matching names appear on classes or reusable properties (#618).
 - **Studio AI chat** surfaces **domain-aware best-practice tips** from the project’s **domain category** (set on the project in the dashboard) and from **auth / multi-tenant style class names**; tips appear in the chat empty state, the **Sharing context** popover, the prompt preamble sent to the model, and the offline demo’s **Improvement suggestions** (#615).

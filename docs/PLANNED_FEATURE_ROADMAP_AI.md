@@ -76,14 +76,13 @@ This outlines the planned features for integrating AI capabilities into Objectif
 
 **Auto-Generate Descriptions** 📋 PLANNED
 - ✅ Generate property descriptions from names and types (#619 — Studio **Generate with AI** on property description fields; Ollama `property_description` task)
-- 📋 Generate class descriptions from properties
+- ✅ Generate class descriptions from properties (#620 — Studio **Generate with AI** on class description field; Ollama `class_description` task)
 - 📋 Generate operation summaries from path and method
 - 📋 Generate example values that make sense
 - Support multiple languages (i18n)
 
 | Ticket | Feature Description                                        |
 |--------|------------------------------------------------------------|
-| #620   | Auto-Generate descriptions for classes                     |
 | #621   | Operations summaries and descriptions from path and method |
 | #622   | Generate example values that make sense                    |
 

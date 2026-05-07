@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -49,6 +49,9 @@ import {
 } from './form';
 import { AiClassCreatePreviewDialog } from '@/app/ade/studio/components/chatbot/AiClassCreatePreviewDialog';
 import { parseClassDefinitionFromAssistantMarkdown } from '@/app/ade/studio/components/chatbot/assistant-action-detection';
+import type { PropertyDialogAiContext } from './PropertyDialog';
+import { ClassDescriptionAiButton } from './ClassDescriptionAiButton';
+import { buildClassDescriptionAiPayload } from '@lib/ai-property-description';
 
 // Custom hook for dark mode detection - prioritizes localStorage, then system preference
 const useDarkMode = () => {
@@ -240,6 +243,8 @@ interface ClassEditDialogProps {
   onAiAssistantSeedConsumed?: () => void;
   /** Fires once per Add Class session when the class name reaches 2+ characters (#275). */
   onClassNameEnteredForPropertySuggestions?: () => void;
+  /** When set, class **Description** supports **Generate with AI** (#620). */
+  classDescriptionAiContext?: PropertyDialogAiContext;
 }
 
 const ClassEditDialog = ({
@@ -256,6 +261,7 @@ const ClassEditDialog = ({
   aiAssistantSeedMarkdown = null,
   onAiAssistantSeedConsumed,
   onClassNameEnteredForPropertySuggestions,
+  classDescriptionAiContext,
 }: ClassEditDialogProps) => {
   const isDark = useDarkMode();
 
@@ -386,6 +392,38 @@ const ClassEditDialog = ({
       extensions: Object.keys(d.extensions).length > 0,
     };
   }, [formData]);
+
+  const classDescriptionAiPayload = useMemo(() => {
+    const members = Array.isArray(editingClassData?.properties) ? editingClassData.properties : [];
+    return buildClassDescriptionAiPayload({
+      members,
+      composition: {
+        allOf: formData.allOf,
+        anyOf: formData.anyOf,
+        oneOf: formData.oneOf,
+      },
+    });
+  }, [editingClassData?.properties, formData.allOf, formData.anyOf, formData.oneOf]);
+
+  const handleClassDescriptionAiGenerated = useCallback((text: string) => {
+    setFormData((prev) => ({ ...prev, description: text }));
+  }, []);
+
+  const classDescriptionAiSlot =
+    open && classDescriptionAiContext && projectId.trim() ? (
+      <ClassDescriptionAiButton
+        tenantId={classDescriptionAiContext.tenantId}
+        projectId={classDescriptionAiContext.projectId}
+        versionId={classDescriptionAiContext.versionId}
+        studioClassName={formData.name}
+        classShape={classDescriptionAiPayload}
+        existingClasses={classDescriptionAiContext.existingClasses}
+        existingProperties={classDescriptionAiContext.existingProperties}
+        studioContext={classDescriptionAiContext.studioContext}
+        onGenerated={handleClassDescriptionAiGenerated}
+        disabled={isReadOnly || !formData.name.trim()}
+      />
+    ) : null;
 
   // Reset view and form when dialog opens
   useEffect(() => {
@@ -1897,6 +1935,7 @@ const ClassEditDialog = ({
                       disabled={isReadOnly}
                       rows={2}
                     />
+                    {classDescriptionAiSlot ? <div className="mt-2">{classDescriptionAiSlot}</div> : null}
                   </FormFieldGroup>
                 </FormGrid>
 
