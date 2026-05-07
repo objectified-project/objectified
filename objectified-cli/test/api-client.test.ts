@@ -1,0 +1,163 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { createApiClient } from "../src/lib/client.js";
+
+describe("createApiClient + generated SDK", () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    vi.useRealTimers();
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("listProjects performs GET /v1/projects/{tenant_slug}", async () => {
+    const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string" ? input : input instanceof Request ? input.url : input.href;
+      expect(url).toContain("/v1/projects/acme-corp");
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "x-request-id": "unit-test-req",
+        },
+      });
+    });
+
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const auth = {};
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:9",
+      auth,
+    });
+
+    await expect(api.listProjects("acme-corp")).resolves.toEqual([]);
+    expect(mockFetch).toHaveBeenCalled();
+    expect(api.lastRequestId).toBe("unit-test-req");
+  });
+
+  it("accepts projects payloads where enabled is omitted or null", async () => {
+    const mockFetch = vi.fn(async () => {
+      return new Response(
+        JSON.stringify([
+          { id: "p1", tenant_id: "t1", name: "Alpha", slug: "alpha" },
+          { id: "p2", tenant_id: "t1", name: "Beta", slug: "beta", enabled: null },
+        ]),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    });
+
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:9",
+      auth: {},
+    });
+
+    await expect(api.listProjects("acme-corp")).resolves.toEqual([
+      { id: "p1", tenant_id: "t1", name: "Alpha", slug: "alpha", enabled: true },
+      { id: "p2", tenant_id: "t1", name: "Beta", slug: "beta", enabled: true },
+    ]);
+  });
+
+  it("retries once on 401 after onUnauthorized refresh", async () => {
+    const auth: { apiKey?: string } = { apiKey: "old-key" };
+    const seenKeys: Array<string | null> = [];
+    let calls = 0;
+    const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const request = input instanceof Request ? input : new Request(input);
+      seenKeys.push(request.headers.get("x-api-key"));
+      calls++;
+      if (calls === 1) return new Response("unauthorized", { status: 401 });
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const onUnauthorized = vi.fn(async () => {
+      auth.apiKey = "new-key";
+    });
+
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:9",
+      auth,
+      onUnauthorized,
+    });
+
+    await expect(api.listProjects("acme-corp")).resolves.toEqual([]);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(seenKeys).toEqual(["old-key", "new-key"]);
+  });
+
+  it("retries 429 using Retry-After delay", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const mockFetch = vi.fn(async () => {
+      calls++;
+      if (calls === 1) {
+        return new Response("rate limited", {
+          status: 429,
+          headers: { "Retry-After": "1" },
+        });
+      }
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:9",
+      auth: {},
+    });
+
+    const pending = api.listProjects("acme-corp");
+    await vi.runAllTicks();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(pending).resolves.toEqual([]);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries transient 5xx with exponential backoff", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    let calls = 0;
+    const mockFetch = vi.fn(async () => {
+      calls++;
+      if (calls < 3) return new Response("upstream unavailable", { status: 503 });
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const api = createApiClient({
+      baseUrl: "http://127.0.0.1:9",
+      auth: {},
+    });
+
+    const pending = api.listProjects("acme-corp");
+    await vi.runAllTicks();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(pending).resolves.toEqual([]);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+});
