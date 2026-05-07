@@ -58,7 +58,7 @@ async function main() {
   const renderTemplate = (value) => {
     if (!value) return undefined;
     const rendered = help.render(value);
-    return rendered.replace(/<%[\s\S]*?%>/g, "").trim();
+    return rendered.replace(/<%[^%]*%>/g, "").trim();
   };
 
   const topicSep = config.topicSeparator ?? " ";
