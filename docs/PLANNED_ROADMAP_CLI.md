@@ -106,7 +106,6 @@ Total: **12 epics**, **88 sub-tickets** (open roadmap items; completed work is d
 
 | #         | Title                                                              | Description                                                                  | Labels                                          | MVP | Parallel |
 |-----------|--------------------------------------------------------------------|------------------------------------------------------------------------------|-------------------------------------------------|-----|----------|
-| 1.4 (#3189) | Output renderers (text/table/JSON/YAML)                          | `output.table/json/yaml/spinner`, NO_COLOR + TTY aware                       | `enhancement`, `mvp`, `cli`, `roadmap-cli`     | Yes | Yes      |
 | 1.5 (#3190) | Generated REST client from `openapi.yaml`                        | Codegen step, typed SDK, retry/refresh wrapper, single import path           | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `typescript`, `openapi` | Yes | Yes      |
 | 1.6 (#3191) | Error handling, exit codes, retries, hints                       | `ObjectifiedCliError` hierarchy, sysexits-style exit codes, did-you-mean     | `enhancement`, `mvp`, `cli`, `roadmap-cli`     | Yes | Yes      |
 | 1.7 (#3192) | Help system, examples, man pages, `objectified docs`             | Rich help, ≥2 examples per command, generated man pages, `docs <topic>`     | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `documentation` | Yes | Yes      |
@@ -164,9 +163,9 @@ Part of Epic: CLI Foundation & DevEx (#3174)
 
 ---
 
-#### 1.4 (#3189) — Output renderers
+#### 1.4 (#3189) — Output renderers (**done**)
 
-Single `lib/output.ts` module shared by every command:
+Landed: `src/lib/output.ts` exposes `createCliOutput()` with `table` (TTY → styled table / pipe → TSV / `--json` → stable sorted JSON array), `json` (pretty on TTY, compact when piped or `--quiet`), `yaml`, `text`, `kv`, `spinner` (ora on stderr; silent when non-TTY, `--json`, or `--quiet`), `success`, `warn`, `error` (stderr), plus `banner` / `hint`. `BaseCommand` exposes `this.output` wired to globals (`supports-color`, `LANG`/`LC_ALL` for ASCII borders when `LANG=C` or `--no-color`). Snapshot tests cover TTY vs pipe vs `--json`. Legacy helpers `logInfo` / `writeJsonLine` remain for narrow call sites.
 
 ```
             stdout TTY    stdout pipe   --json    --quiet
@@ -177,11 +176,7 @@ banner      shown         hidden       hidden    hidden
 errors      stderr+color  stderr       stderr    stderr (kept)
 ```
 
-`--json` overrides any default. JSON output is **stable** (sorted keys), errors always on stderr.
-
-**Acceptance Criteria:** snapshot tests cover TTY + non-TTY; `--json` valid for `jq`; tables ASCII-safe under `LANG=C`.
-
-**Parallelism / Dependencies:** Depends on 1.1, 1.2. Parallel with 1.3, 1.5, 1.6, 1.7.
+**Parallelism / Dependencies:** Depended on 1.1, 1.2. Parallel with 1.3, 1.5, 1.6, 1.7.
 
 Part of Epic: CLI Foundation & DevEx (#3174)
 
@@ -810,11 +805,11 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ## MVP Release — Ticket Bundle
 
-The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **24 open sub-tickets** across 6 epics (plus completed foundation items such as #3186, #3187, and #3188).
+The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **23 open sub-tickets** across 6 epics (plus completed foundation items such as #3186, #3187, #3188, and #3189).
 
 | Epic     | Tickets                                                                                                   | Count |
 |----------|-----------------------------------------------------------------------------------------------------------|-------|
-| 1 (#3174) | #3189, #3190, #3191, #3192                                                                                 | 4     |
+| 1 (#3174) | #3190, #3191, #3192                                                                                        | 3     |
 | 2 (#3175) | #3194, #3195, #3196, #3197, #3198, #3199                                                                  | 6     |
 | 3 (#3176) | #3202, #3203, #3204                                                                                        | 3     |
 | 4 (#3177) | #3208, #3209, #3210, #3212                                                                                | 4     |
@@ -902,7 +897,7 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 
 The tickets were created in the order below — that is also the recommended **execution** order. Earlier epics provide primitives that later epics rely on.
 
-1. **Epic 1 — Foundation** (#3174: #3186, #3187, and #3188 landed; then #3189 → #3193). Without the scaffold, no other command can exist.
+1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, and #3189 landed; then #3190 → #3193). Without the scaffold, no other command can exist.
 2. **Epic 2 — Auth & Tenants** (#3175 then #3194 → #3201). Required for any tenant-scoped command.
 3. **Epic 3 — Projects** (#3176 then #3202 → #3207). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3208 → #3216). The publish flow that makes the CLI valuable in CI.

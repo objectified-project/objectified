@@ -17,6 +17,7 @@ import {
   type ParsedTomlConfig,
 } from "./lib/config.js";
 import { CliError } from "./lib/errors.js";
+import { createCliOutput, localePrefersAsciiTable, type CliOutput } from "./lib/output.js";
 
 export abstract class BaseCommand extends Command {
   static baseFlags = {
@@ -65,6 +66,23 @@ export abstract class BaseCommand extends Command {
 
   /** Parsed flags including globals and command-specific options. */
   declare flags: GlobalCliFlags & Record<string, unknown>;
+
+  private cliOutput?: CliOutput;
+
+  /** Shared renderers: tables, JSON/YAML, spinners, stderr warnings (TTY / --json / --quiet aware). */
+  protected get output(): CliOutput {
+    this.cliOutput ??= createCliOutput({
+      json: this.context.json,
+      color: this.context.color,
+      quiet: Boolean(this.flags.quiet),
+      stdoutIsTTY: process.stdout.isTTY,
+      stderrIsTTY: process.stderr.isTTY,
+      langAscii: localePrefersAsciiTable(process.env),
+      stdoutWrite: (chunk) => process.stdout.write(chunk),
+      stderrWrite: (chunk) => process.stderr.write(chunk),
+    });
+    return this.cliOutput;
+  }
 
   /** Resolved API/client context (flag > env > profile config > [default] > built-ins). */
   context!: ObjectifiedContext;

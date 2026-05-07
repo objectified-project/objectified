@@ -1,7 +1,7 @@
 import { Args } from "@oclif/core";
 
 import { BaseCommand } from "../base-command.js";
-import { logInfo, writeJsonLine } from "../lib/output.js";
+import { chalkForContext } from "../lib/output.js";
 
 export default class Hello extends BaseCommand {
   static description = "Smoke-test greeting for the Objectified CLI";
@@ -22,8 +22,11 @@ export default class Hello extends BaseCommand {
     const rawName = this.commandArgs.name;
     const who = typeof rawName === "string" ? rawName : "world";
     const message = `Hello ${who} from Objectified CLI`;
-    writeJsonLine(this, { message });
-    logInfo(this, message);
+    if (this.context.json) {
+      this.output.json({ message });
+    } else {
+      this.output.text(chalkForContext(this.context.color).bold(message));
+    }
     return Promise.resolve();
   }
 }
