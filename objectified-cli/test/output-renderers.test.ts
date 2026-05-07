@@ -44,6 +44,12 @@ const sampleRows = [
   { id: 1, name: "alpha" },
 ];
 
+/** cli-table3 applies chalk styles when color is on; strip for stable shape assertions. */
+function stripAnsi(text: string): string {
+  const esc = String.fromCharCode(27);
+  return text.replace(new RegExp(`${esc}\\[[\\d;]*m`, "g"), "");
+}
+
 describe("localePrefersAsciiTable", () => {
   it("detects C/POSIX locales", () => {
     expect(localePrefersAsciiTable({ LANG: "C" })).toBe(true);
@@ -88,7 +94,7 @@ describe("createCliOutput snapshots", () => {
     expect(s).toContain("ID");
     expect(s).toContain("beta");
     expect(s).toContain("alpha");
-    expect(s).toMatch(/┌[\s\S]*└[\s\S]*┘\n$/);
+    expect(stripAnsi(s)).toMatch(/┌[\s\S]*└[\s\S]*┘\n$/);
   });
 
   it("table uses ASCII borders when langAscii", () => {
@@ -102,7 +108,7 @@ describe("createCliOutput snapshots", () => {
     const s = stdout();
     expect(s).toContain("Name");
     expect(s).toContain("beta");
-    expect(s).toMatch(/\+-+\+[\s\S]*\+-+\+\n$/);
+    expect(stripAnsi(s)).toMatch(/\+-+\+[\s\S]*\+-+\+\n$/);
   });
 
   it("table emits stable JSON when json mode", () => {
