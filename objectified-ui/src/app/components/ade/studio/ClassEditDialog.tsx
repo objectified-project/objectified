@@ -410,7 +410,7 @@ const ClassEditDialog = ({
   }, []);
 
   const classDescriptionAiSlot =
-    open && classDescriptionAiContext && projectId.trim() ? (
+    open && classDescriptionAiContext && classDescriptionAiContext.projectId.trim() ? (
       <ClassDescriptionAiButton
         tenantId={classDescriptionAiContext.tenantId}
         projectId={classDescriptionAiContext.projectId}

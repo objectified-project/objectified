@@ -91,9 +91,6 @@ type SeedPropertyLike = {
   type?: string | string[];
 } | null;
 
-/**
- * Builds a compact JSON Schema snapshot from the property dialog form for AI description (#619).
- */
 /** Canvas / API class member row shape for AI class descriptions (#620). */
 export type ClassMemberLike = {
   name?: string;
@@ -141,6 +138,9 @@ export function buildClassDescriptionAiPayload(input: {
   return out;
 }
 
+/**
+ * Builds a compact JSON Schema snapshot from the property dialog form for AI description (#619).
+ */
 export function draftPropertySchemaFromDialogForm(input: {
   propertyType: string;
   propertyIsArray: boolean;
