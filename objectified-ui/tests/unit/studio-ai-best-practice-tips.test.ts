@@ -155,6 +155,76 @@ describe('collectStudioAiBestPracticeTipLines (#615, #616)', () => {
   });
 });
 
+describe('collectStudioAiBestPracticeTipLines performance hints (#618)', () => {
+  it('adds cache guidance when cache- or Redis-like names appear', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: ['ProductCatalogCache'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('namespace cache'))).toBe(true);
+    expect(lines.some((l) => l.toLowerCase().includes('ttl'))).toBe(true);
+  });
+
+  it('adds queue and job guidance when worker-style names appear', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: ['EmailOutbox'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('idempotent'))).toBe(true);
+    expect(lines.some((l) => l.toLowerCase().includes('retry'))).toBe(true);
+  });
+
+  it('adds pagination guidance when paging primitives appear', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: ['CursorToken'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('cursor'))).toBe(true);
+    expect(lines.some((l) => l.toLowerCase().includes('offset'))).toBe(true);
+  });
+
+  it('adds search-index guidance when search projection names appear', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: ['ListingSearchIndex'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('search documents'))).toBe(true);
+  });
+
+  it('adds bulk I/O guidance when export or migration names appear', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: ['CsvExportJob'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('chunk'))).toBe(true);
+  });
+
+  it('adds media payload guidance when blob or attachment names appear', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: ['InvoicePdfAttachment'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('binary'))).toBe(true);
+  });
+
+  it('adds feed and timeline guidance when hot-read path names appear', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: ['HomeTimeline'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('fan-out'))).toBe(true);
+  });
+
+  it('detects performance signals on reusable property names (#618)', () => {
+    const lines = collectStudioAiBestPracticeTipLines({
+      domainCategory: '',
+      classNames: [],
+      propertyNames: ['redis_cache_key'],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('namespace cache'))).toBe(true);
+  });
+});
+
 describe('collectStudioAiBestPracticeLinesFromStudio (#615)', () => {
   it('reads domain from project metadata shape', () => {
     const lines = collectStudioAiBestPracticeLinesFromStudio({
@@ -171,5 +241,14 @@ describe('collectStudioAiBestPracticeLinesFromStudio (#615)', () => {
       properties: [{ name: 'client_secret' }],
     });
     expect(lines.some((l) => l.toLowerCase().includes('vault'))).toBe(true);
+  });
+
+  it('passes property names for performance heuristics (#618)', () => {
+    const lines = collectStudioAiBestPracticeLinesFromStudio({
+      project: null,
+      classes: [{ name: 'ReportRow' }],
+      properties: [{ name: 'next_page_token' }],
+    });
+    expect(lines.some((l) => l.toLowerCase().includes('cursor'))).toBe(true);
   });
 });

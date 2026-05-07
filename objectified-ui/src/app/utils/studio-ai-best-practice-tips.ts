@@ -1,11 +1,12 @@
 /**
- * Context-aware Studio AI best-practice tips (#615, #616, #617).
+ * Context-aware Studio AI best-practice tips (#615, #616, #617, #618).
  *
  * Combines the project metadata `domainCategory` (see project-domain-categories)
  * with light heuristics on class and property names so e-commerce, multi-tenant,
- * auth-heavy, and secret-bearing workspaces get targeted guidance without calling
- * a model. Each known domain emits several industry-specific modeling patterns
- * (not a single generic hint), plus security-hardening hints when signals match.
+ * auth-heavy, secret-bearing, and performance-sensitive workspaces get targeted
+ * guidance without calling a model. Each known domain emits several
+ * industry-specific modeling patterns (not a single generic hint), plus
+ * security-hardening and performance hints when signals match.
  */
 
 import {
@@ -17,7 +18,7 @@ import {
 export type StudioAiTipSignalContext = {
   domainCategory?: string | null;
   classNames: readonly string[];
-  /** Reusable property definition names — used for secret / credential heuristics (#617). */
+  /** Reusable property definition names — secret / credential (#617) and performance (#618) heuristics. */
   propertyNames?: readonly string[];
 };
 
@@ -131,6 +132,34 @@ const SENSITIVE_CLASS_NAME_SIGNAL =
 /** Compound names like `StripeWebhookEndpoint` must match without assuming token boundaries. */
 const WEBHOOK_CLASS_SIGNAL = /Webhook/i;
 
+/** Response caches, edge caches, and explicit revalidation hooks. */
+const CACHE_LAYER_SIGNAL =
+  /\b(Cache|Caching|Cached|Redis|Etag|Memcached|CDN)\b/i;
+
+/** Background workers, queues, and outbox-style durability. */
+const QUEUE_WORKER_SIGNAL =
+  /\b(Queue|Job|Worker|BackgroundTask|AsyncJob|Outbox|DeadLetter)\b/i;
+
+/** List endpoints and stable paging primitives (includes tokenized `page_token` → "page token"). */
+const PAGINATION_SIGNAL =
+  /\b(Pagination|PageToken|CursorToken|Keyset|InfiniteScroll|OffsetPage)\b|\bpage\s+token\b|\bcursor\s+token\b/i;
+
+/** Search indexes and autocomplete projections (`SearchIndex` often appears inside CamelCase names). */
+const SEARCH_INDEX_SIGNAL =
+  /SearchIndex|Elasticsearch|OpenSearch|FullText|AutocompleteIndex|\bsearch\s+index\b/i;
+
+/** Large imports, exports, or migrations (`CsvExport` often appears inside CamelCase names). */
+const BULK_IO_SIGNAL =
+  /BulkImport|BulkExport|CsvExport|ExportJob|ImportBatch|DataMigration|\bcsv\s+export\b|\bexport\s+job\b/i;
+
+/** Large binary or media payloads. */
+const MEDIA_PAYLOAD_SIGNAL =
+  /\b(Attachment|Blob|MediaAsset|VideoAsset|ImageUpload|FileUpload|BinaryPayload)\b/i;
+
+/** Hot read paths such as feeds and timelines (`Timeline` often appears inside CamelCase names). */
+const FEED_TIMELINE_SIGNAL =
+  /Timeline|ActivityStream|NotificationFeed|Fanout|\bfeed\b/i;
+
 function asBullet(line: string): string {
   const t = line.trim();
   if (t.startsWith('-')) return t;
@@ -229,6 +258,75 @@ function collectSecurityHardeningTipLines(signals: StudioAiTipSignalContext): st
   return lines;
 }
 
+function collectPerformanceOptimizationTipLines(signals: StudioAiTipSignalContext): string[] {
+  const classNames = signals.classNames.filter(Boolean);
+  const propertyNames = signals.propertyNames?.filter(Boolean) ?? [];
+
+  const classHaystack = classNames.map((c) => `${c} ${tokenizeClassName(c)}`).join(' ');
+  const propHaystack = propertyNames.map((p) => `${p} ${tokenizeClassName(p)}`).join(' ');
+  const combinedHaystack = `${classHaystack} ${propHaystack}`.trim();
+
+  const lines: string[] = [];
+
+  if (CACHE_LAYER_SIGNAL.test(combinedHaystack)) {
+    lines.push(
+      asBullet(
+        'Namespace cache entries per tenant or bounded context; record TTL or stale-after semantics so callers know when refreshed reads are required.',
+      ),
+    );
+  }
+
+  if (QUEUE_WORKER_SIGNAL.test(combinedHaystack)) {
+    lines.push(
+      asBullet(
+        'Make background jobs idempotent with dedupe keys where retries are possible; model retry counts and terminal failure states for safe backoff under load.',
+      ),
+    );
+  }
+
+  if (PAGINATION_SIGNAL.test(combinedHaystack)) {
+    lines.push(
+      asBullet(
+        'Prefer opaque cursors or keyset pagination fields on large lists over unbounded offset scans as data grows.',
+      ),
+    );
+  }
+
+  if (SEARCH_INDEX_SIGNAL.test(combinedHaystack)) {
+    lines.push(
+      asBullet(
+        'Treat search documents as projections of canonical entities; model index lag or sequence tokens when read-after-write consistency matters.',
+      ),
+    );
+  }
+
+  if (BULK_IO_SIGNAL.test(combinedHaystack)) {
+    lines.push(
+      asBullet(
+        'Stream or chunk large imports and exports; avoid schemas that require loading unbounded collections into one aggregate.',
+      ),
+    );
+  }
+
+  if (MEDIA_PAYLOAD_SIGNAL.test(combinedHaystack)) {
+    lines.push(
+      asBullet(
+        'Keep heavy binary metadata separate from core transactional rows; reference storage keys, checksums, and content types instead of inlining large payloads.',
+      ),
+    );
+  }
+
+  if (FEED_TIMELINE_SIGNAL.test(combinedHaystack)) {
+    lines.push(
+      asBullet(
+        'Model fan-out or materialized timelines explicitly; denormalize read models when hot paths must stay predictable at scale.',
+      ),
+    );
+  }
+
+  return lines;
+}
+
 export function collectStudioAiBestPracticeTipLines(signals: StudioAiTipSignalContext): string[] {
   const rawDomain = signals.domainCategory?.trim() || '';
   const domainId = rawDomain === PROJECT_DOMAIN_CATEGORY_NONE ? '' : rawDomain;
@@ -254,6 +352,10 @@ export function collectStudioAiBestPracticeTipLines(signals: StudioAiTipSignalCo
   }
 
   for (const line of collectSecurityHardeningTipLines(signals)) {
+    lines.push(line);
+  }
+
+  for (const line of collectPerformanceOptimizationTipLines(signals)) {
     lines.push(line);
   }
 
