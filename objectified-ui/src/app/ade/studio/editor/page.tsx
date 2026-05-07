@@ -247,6 +247,9 @@ import { Switch } from '@/app/components/ui/Switch';
 // Import extracted components
 import { useExportFunctions } from './components';
 import type { Project, Version, ViewMode } from './components/types';
+import type { PropertyDialogAiContext } from '@/app/components/ade/studio/PropertyDialog';
+import type { PropertyItem } from '@/app/components/ade/studio/StudioSideNav';
+import type { ChatStudioContext } from '@/app/ade/studio/components/chatbot/chat-context';
 
 // Dynamically import Monaco Editor with SSR disabled
 const PRESENTATION_SAVE_DEBOUNCE_MS = 500;
@@ -677,6 +680,83 @@ const StudioContent = () => {
   const [classEditDialogOpen, setClassEditDialogOpen] = useState(false);
   const [editingClassData, setEditingClassData] = useState<any>(null);
   // Note: dialog-specific form state moved to ClassPropertyEditDialog component
+
+  const canvasPropertyAiContext = useMemo((): PropertyDialogAiContext | undefined => {
+    if (!currentTenantId || !selectedProjectId) return undefined;
+
+    const readNodeData = (raw: unknown) =>
+      raw !== null && typeof raw === 'object'
+        ? (raw as { name?: string; description?: unknown; properties?: unknown })
+        : undefined;
+
+    const existingClasses = nodes
+      .map((n) => String(readNodeData(n.data)?.name ?? '').trim())
+      .filter(Boolean);
+    const byName = new Map<string, PropertyItem>();
+    for (const n of nodes) {
+      const rawProps = readNodeData(n.data)?.properties;
+      const props = Array.isArray(rawProps) ? rawProps : [];
+      for (const entry of props) {
+        if (!entry || typeof entry !== 'object') continue;
+        const p = entry as {
+          id?: string;
+          property_id?: string;
+          name?: string;
+          description?: string | null;
+          data?: unknown;
+        };
+        if (!p.name || byName.has(String(p.name))) continue;
+        const dataObj =
+          typeof p.data === 'string'
+            ? (() => {
+                try {
+                  return JSON.parse(p.data) as Record<string, unknown>;
+                } catch {
+                  return {};
+                }
+              })()
+            : p.data !== null && typeof p.data === 'object'
+              ? { ...(p.data as Record<string, unknown>) }
+              : {};
+        const item = {
+          ...dataObj,
+          id: String(p.id ?? p.property_id ?? p.name),
+          name: String(p.name),
+        } as PropertyItem;
+        if (p.description != null) item.description = p.description;
+        byName.set(String(p.name), item);
+      }
+    }
+    const selectedProject = projects.find((pr) => String(pr.id) === String(selectedProjectId));
+    const selectedVersion = versions.find((v) => String(v.id) === String(selectedVersionId));
+    const studioContext: ChatStudioContext = {
+      project: selectedProjectId ? { id: selectedProjectId, name: selectedProject?.name ?? null } : null,
+      version: selectedVersionId ? { id: selectedVersionId, label: selectedVersion?.version_id ?? null } : null,
+      classes: nodes.map((n) => {
+        const d = readNodeData(n.data);
+        const desc = d?.description;
+        return {
+          id: n.id,
+          name: String(d?.name ?? ''),
+          description: typeof desc === 'string' || desc === null ? desc : null,
+        };
+      }),
+      properties: [],
+      selectedClassIds: [],
+    };
+    const editingClassName = editingClassId
+      ? String(readNodeData(nodes.find((node) => node.id === editingClassId)?.data)?.name ?? '').trim()
+      : '';
+    return {
+      tenantId: currentTenantId,
+      projectId: selectedProjectId,
+      versionId: selectedVersionId || undefined,
+      existingClasses,
+      existingProperties: [...byName.values()],
+      studioContext,
+      contextClassName: editingClassName || null,
+    };
+  }, [currentTenantId, selectedProjectId, selectedVersionId, nodes, projects, versions, editingClassId]);
 
   // Reference dialog state
   const [referenceDialogOpen, setReferenceDialogOpen] = useState(false);
@@ -11085,6 +11165,7 @@ const StudioContent = () => {
           id: n.id,
           name: (n.data as any).name
         })).filter(c => c.name)}
+        propertyAiContext={canvasPropertyAiContext}
       />
 
       {/* Reference Dialog */}
