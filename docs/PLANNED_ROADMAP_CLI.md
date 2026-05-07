@@ -251,7 +251,6 @@ Part of Epic: CLI Foundation & DevEx (#3174)
 
 | #         | Title                                                  | Description                                                       | Labels                                                  | MVP | Parallel |
 |-----------|--------------------------------------------------------|-------------------------------------------------------------------|---------------------------------------------------------|-----|----------|
-| 2.1 (#3194) | `auth login` (PKCE browser) + `auth logout`         | Loopback PKCE flow, token to keychain                             | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`     | Yes | Yes (with 2.2) |
 | 2.2 (#3195) | API-key auth (`--api-key`, env, file)                | Headless / CI-friendly auth                                       | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`, `api-keys` | Yes | Yes (with 2.1) |
 | 2.3 (#3196) | `auth status` (whoami)                               | Show profile, base-url, tenant, user, expiry, plan                | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`     | Yes | Yes      |
 | 2.4 (#3197) | Secure credential storage (keytar + encrypted fallback) | OS keychain primary, AES-GCM file fallback for headless           | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`, `security` | Yes | No       |
@@ -262,7 +261,7 @@ Part of Epic: CLI Foundation & DevEx (#3174)
 
 ### Detailed Issue Descriptions
 
-#### 2.1 (#3194) — `objectified auth login` (PKCE browser flow) + `auth logout`
+#### 2.1 (#3194) — `objectified auth login` (PKCE browser flow) + `auth logout` — **COMPLETE**
 
 Standard PKCE-on-loopback pattern (same as `gh auth login` and `heroku login`):
 
@@ -773,11 +772,11 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ## MVP Release — Ticket Bundle
 
-The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **20 open sub-tickets** across 5 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, and #3192).
+The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **19 open sub-tickets** across 5 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, and #3194).
 
 | Epic     | Tickets                                                                                                   | Count |
 |----------|-----------------------------------------------------------------------------------------------------------|-------|
-| 2 (#3175) | #3194, #3195, #3196, #3197, #3198, #3199                                                                  | 6     |
+| 2 (#3175) | #3195, #3196, #3197, #3198, #3199                                                                         | 5     |
 | 3 (#3176) | #3202, #3203, #3204                                                                                        | 3     |
 | 4 (#3177) | #3208, #3209, #3210, #3212                                                                                | 4     |
 | 9 (#3182) | #3244, #3245, #3246, #3247, #3248                                                                          | 5     |
@@ -865,7 +864,7 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 The tickets were created in the order below — that is also the recommended **execution** order. Earlier epics provide primitives that later epics rely on.
 
 1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, #3189, #3190, #3191, #3192, and #3193 landed). Without the scaffold, no other command can exist.
-2. **Epic 2 — Auth & Tenants** (#3175 then #3194 → #3201). Required for any tenant-scoped command.
+2. **Epic 2 — Auth & Tenants** (#3175; #3194 shipped — continue #3195 → #3201). Required for any tenant-scoped command.
 3. **Epic 3 — Projects** (#3176 then #3202 → #3207). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3208 → #3216). The publish flow that makes the CLI valuable in CI.
 5. **Epic 9 — Browse & Schema Export** (#3182 then #3244 → #3252). The most-used consumer surface; lands early because it works without auth.

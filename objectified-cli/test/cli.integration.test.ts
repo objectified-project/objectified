@@ -121,6 +121,12 @@ describe("objectified CLI", () => {
     expect(out).toMatch(/\bAUTH\b/);
   });
 
+  it("auth login help lists PKCE login and --no-browser", () => {
+    const out = run(["auth", "login", "--help"]);
+    expect(out).toMatch(/PKCE/i);
+    expect(out).toMatch(/--no-browser/);
+  });
+
   it("unknown command suggests typo fix when close match", () => {
     const err = runExpectFailure(["helol"]);
     expect(err).toMatch(/Unknown command/);

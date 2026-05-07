@@ -1,6 +1,6 @@
 {
   "name": "objectified-cli",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Objectified command-line interface",
   "author": "Objectified",
   "type": "module",
@@ -49,7 +49,9 @@
     "cli-table3": "^0.6.5",
     "env-paths": "^4.0.0",
     "fs-extra": "^11.3.5",
+    "keytar": "^7.9.0",
     "leven": "^4.0.0",
+    "open": "^11.0.0",
     "ora": "^9.4.0",
     "supports-color": "^10.2.2",
     "yaml": "^2.8.4"
@@ -71,6 +73,8 @@
     "vitest": "^3.2.4"
   },
   "man": [
+    "./man/man1/objectified-auth-login.1",
+    "./man/man1/objectified-auth-logout.1",
     "./man/man1/objectified-completion-install.1",
     "./man/man1/objectified-completion-show.1",
     "./man/man1/objectified-completion-uninstall.1",

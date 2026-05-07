@@ -84,6 +84,12 @@ export function resolveBaseUrl(
   return firstNonEmpty(flag, env.OBJECTIFIED_BASE_URL, cfg.baseUrl) ?? DEFAULT_BASE_URL;
 }
 
+/** Profile-layer base URL from config only (no env); used for auth revoke across profiles. */
+export function resolveProfileConfigBaseUrl(doc: ParsedTomlConfig, profileName: string): string {
+  const layer = configLayerForProfile(doc, profileName);
+  return layer.baseUrl ?? DEFAULT_BASE_URL;
+}
+
 /** API keys never come from config.toml (#3188); flag and env only until keychain lands. */
 export function resolveApiKey(
   flag: string | undefined,
