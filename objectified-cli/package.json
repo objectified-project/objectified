@@ -1,6 +1,6 @@
 {
   "name": "objectified-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Objectified command-line interface",
   "author": "Objectified",
   "type": "module",
@@ -13,6 +13,7 @@
     "commands": "./dist/commands",
     "dirname": "objectified",
     "topicSeparator": " ",
+    "helpClass": "./dist/help.js",
     "plugins": [
       "@oclif/plugin-help",
       "@oclif/plugin-version"
@@ -37,13 +38,17 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@iarna/toml": "^2.2.5",
     "@oclif/core": "^4.11.0",
     "@oclif/plugin-help": "^6.2.46",
-    "@oclif/plugin-version": "^2.2.43"
+    "@oclif/plugin-version": "^2.2.43",
+    "chalk": "^5.6.2",
+    "supports-color": "^10.2.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@types/node": "^22.10.0",
+    "@types/supports-color": "^10.0.0",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.1",
     "oclif": "^4.23.0",

@@ -9,6 +9,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## CLI
 - New **`objectified-cli`** package (oclif v4) adds the `objectified` binary scaffold with `hello`, `--version`, and `--help` (#3186).
+- **`objectified-cli`**: shared global flags on `BaseCommand` (`--base-url`, `--profile`, `--api-key`, `--config`, `--json`, `--no-color`, `--quiet`, `--verbose`), TOML profile resolution, root help text for precedence rules, argv normalization for globals-before-subcommand, and stub `projects list` (#3187).
 
 ## Import
 - Race condition fixed in 3.0.1 specification imports

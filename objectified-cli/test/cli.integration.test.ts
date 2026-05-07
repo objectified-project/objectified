@@ -7,11 +7,11 @@ import { describe, expect, it } from "vitest";
 
 const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-function run(args: string[]): string {
+function run(args: string[], extraEnv: Record<string, string> = {}): string {
   return execFileSync("node", [path.join(pkgRoot, "bin/run.js"), ...args], {
     cwd: pkgRoot,
     encoding: "utf8",
-    env: { ...process.env, FORCE_COLOR: "0" },
+    env: { ...process.env, FORCE_COLOR: "0", ...extraEnv },
   });
 }
 
@@ -25,6 +25,9 @@ describe("objectified CLI", () => {
     const out = run(["--help"]);
     expect(out).toContain("VERSION");
     expect(out).toContain("COMMANDS");
+    expect(out).toContain("GLOBAL FLAGS");
+    expect(out).toContain("Resolution order");
+    expect(out).toContain("--base-url");
   });
 
   it("runs hello smoke command", () => {
@@ -35,6 +38,28 @@ describe("objectified CLI", () => {
   it("runs hello with a name argument", () => {
     const out = run(["hello", "Ada"]);
     expect(out).toContain("Hello Ada from Objectified CLI");
+  });
+
+  it("outputs JSON for hello when --json", () => {
+    const out = run(["--json", "hello"]);
+    expect(() => JSON.parse(out.trim())).not.toThrow();
+    expect(JSON.parse(out.trim())).toMatchObject({
+      message: "Hello world from Objectified CLI",
+    });
+  });
+
+  it("outputs JSON for projects list with global flags before subcommand", () => {
+    const out = run(["--json", "projects", "list"]);
+    expect(JSON.parse(out.trim())).toEqual({ projects: [] });
+  });
+
+  it("suppresses hello stdout with --quiet", () => {
+    expect(run(["hello", "--quiet", "--no-json"]).trim()).toBe("");
+  });
+
+  it("does not emit ANSI escapes when NO_COLOR is set", () => {
+    const out = run(["hello"], { NO_COLOR: "1" });
+    expect(out.includes("\u001B[")).toBe(false);
   });
 
   it("cold-starts --version within 200 ms on developer machines", () => {

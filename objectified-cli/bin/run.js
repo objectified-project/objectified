@@ -2,4 +2,9 @@
 
 import { execute } from "@oclif/core";
 
-await execute({ dir: import.meta.url });
+import { promoteLeadingGlobalFlags } from "../dist/lib/normalize-argv.js";
+
+await execute({
+  dir: import.meta.url,
+  args: promoteLeadingGlobalFlags(process.argv.slice(2)),
+});
