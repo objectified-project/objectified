@@ -1,6 +1,7 @@
 import eslint from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
 import tseslint from "typescript-eslint";
+import { fileURLToPath } from "node:url";
 
 export default tseslint.config(
   {
@@ -11,12 +12,12 @@ export default tseslint.config(
   eslintConfigPrettier,
   {
     languageOptions: {
-      parserOptions: {
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
+        parserOptions: {
+          projectService: true,
+          tsconfigRootDir: fileURLToPath(new URL(".", import.meta.url)),
+        },
       },
     },
-  },
   {
     files: ["test/**/*.ts", "vitest.config.ts"],
     ...tseslint.configs.disableTypeChecked,
