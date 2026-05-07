@@ -9,6 +9,7 @@ import {
   generateCodeVerifier,
   codeChallengeS256,
   readAuthorizationCodeFromStdin,
+  reserveLoopbackRedirectUri,
   shouldOpenBrowser,
   startLoopbackOAuthServer,
   withTimeout,
@@ -38,7 +39,7 @@ export type RunCliPkceLoginResult = CliOAuthBundle & {
 
 /**
  * PKCE login: loopback redirect_uri, optional browser launch, token exchange.
- * Headless / `--no-browser`: prints URL and reads the authorization code from stdin (loopback closed).
+ * Headless / `--no-browser`: prints URL and reads the authorization code from stdin.
  */
 export async function runCliPkceLogin(opts: RunCliPkceLoginOpts): Promise<RunCliPkceLoginResult> {
   const verifier = generateCodeVerifier();
@@ -46,9 +47,12 @@ export async function runCliPkceLogin(opts: RunCliPkceLoginOpts): Promise<RunCli
     throw new Error("internal error: code verifier too short");
   }
   const challenge = codeChallengeS256(verifier);
-
-  const lb = await startLoopbackOAuthServer();
-  const redirectUri = lb.redirectUri;
+  const wantOpen =
+    opts.testAuthorizationCode === undefined &&
+    opts.openBrowser &&
+    (opts.openUrl !== undefined || shouldOpenBrowser(opts.noBrowserFlag));
+  const lb = wantOpen ? await startLoopbackOAuthServer() : undefined;
+  const redirectUri = lb?.redirectUri ?? (await reserveLoopbackRedirectUri());
   const loginUrl = buildWebLoginUrl({
     webLoginUrl: opts.webLoginUrl,
     codeChallenge: challenge,
@@ -58,8 +62,6 @@ export async function runCliPkceLogin(opts: RunCliPkceLoginOpts): Promise<RunCli
   let code: string;
 
   try {
-    const wantOpen = opts.openBrowser && shouldOpenBrowser(opts.noBrowserFlag);
-
     if (opts.testAuthorizationCode !== undefined) {
       code = opts.testAuthorizationCode;
     } else if (!wantOpen) {
@@ -67,22 +69,28 @@ export async function runCliPkceLogin(opts: RunCliPkceLoginOpts): Promise<RunCli
       opts.stderrLine("Waiting for authorization code on stdin… (Ctrl+C to cancel)");
       code = await readAuthorizationCodeFromStdin();
     } else {
+      const waitForCode = lb?.waitForCode;
+      if (!waitForCode) {
+        throw new Error("internal error: loopback server was not started");
+      }
       opts.stdoutLine(`Opening ${opts.webLoginUrl.replace(/\?.*$/, "")} in your browser…`);
       opts.stderrLine("Waiting for browser… (Ctrl+C to cancel)");
       const opener = opts.openUrl ?? ((url: string) => open(url));
       await opener(loginUrl);
       code = await withTimeout(
-        lb.waitForCode,
+        waitForCode,
         CLI_LOGIN_BROWSER_TIMEOUT_MS,
         "Waiting for browser login",
         opts.signal,
       );
     }
   } finally {
-    try {
-      await lb.close();
-    } catch {
-      /* ignore double-close */
+    if (lb) {
+      try {
+        await lb.close();
+      } catch {
+        /* ignore double-close */
+      }
     }
   }
 

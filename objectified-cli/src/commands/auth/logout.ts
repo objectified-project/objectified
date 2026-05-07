@@ -44,7 +44,9 @@ export default class AuthLogout extends BaseCommand {
     const revokeFailures: string[] = [];
 
     for (const profile of targets) {
-      const baseUrl = resolveProfileConfigBaseUrl(this.configDoc, profile);
+      const baseUrl = allProfiles
+        ? resolveProfileConfigBaseUrl(this.configDoc, profile)
+        : this.context.baseUrl;
       const bundle = await loadCliOAuthCredentials(profile);
       if (bundle?.refreshToken) {
         try {

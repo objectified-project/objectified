@@ -45,7 +45,10 @@ export default class AuthLogin extends BaseCommand {
       stderrLine: (line) => process.stderr.write(`${line}\n`),
     });
 
-    await saveCliOAuthCredentials(this.context.profile, bundle);
+    await saveCliOAuthCredentials(this.context.profile, {
+      accessToken: bundle.accessToken,
+      refreshToken: bundle.refreshToken,
+    });
     this.apiAuth.bearer = bundle.accessToken;
 
     const tenant = this.context.tenantSlug;

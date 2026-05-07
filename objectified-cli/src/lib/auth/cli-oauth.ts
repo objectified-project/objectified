@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import readline from "node:readline";
+import type { Readable, Writable } from "node:stream";
 import { URL } from "node:url";
 
 import { CliError, ObjectifiedCliError } from "../errors.js";
@@ -51,11 +52,18 @@ export function shouldOpenBrowser(noBrowserFlag: boolean): boolean {
   return true;
 }
 
-export async function readAuthorizationCodeFromStdin(): Promise<string> {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+export async function readAuthorizationCodeFromStdin(opts: {
+  input?: Readable;
+  output?: Writable;
+  prompt?: string;
+} = {}): Promise<string> {
+  const rl = readline.createInterface({
+    input: opts.input ?? process.stdin,
+    output: opts.output ?? process.stderr,
+  });
   try {
     const line: string = await new Promise((resolve, reject) => {
-      rl.question("Paste authorization code: ", (answer) => {
+      rl.question(opts.prompt ?? "Paste authorization code: ", (answer) => {
         resolve(answer);
       });
       rl.on("SIGINT", () => {
@@ -80,6 +88,30 @@ export type LoopbackServer = {
   waitForCode: Promise<string>;
   close: () => Promise<void>;
 };
+
+/** Reserves an ephemeral loopback redirect URI without keeping a listener open. */
+export async function reserveLoopbackRedirectUri(): Promise<string> {
+  const server = createServer();
+  await new Promise<void>((resolveListen, rejectListen) => {
+    server.once("error", rejectListen);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", rejectListen);
+      resolveListen();
+    });
+  });
+
+  try {
+    const addr = server.address() as AddressInfo;
+    return `http://127.0.0.1:${String(addr.port)}/`;
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((e) => {
+        if (e) reject(e);
+        else resolve();
+      });
+    });
+  }
+}
 
 /** Loopback listener on 127.0.0.1 only; OS-assigned port. */
 export async function startLoopbackOAuthServer(): Promise<LoopbackServer> {

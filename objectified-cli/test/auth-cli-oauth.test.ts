@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,6 +9,8 @@ import {
   codeChallengeS256,
   exchangeCliAuthorizationCode,
   generateCodeVerifier,
+  readAuthorizationCodeFromStdin,
+  reserveLoopbackRedirectUri,
   revokeCliRefreshToken,
 } from "../src/lib/auth/cli-oauth.js";
 import { runCliPkceLogin } from "../src/lib/auth/cli-login-flow.js";
@@ -108,6 +111,25 @@ describe("CLI OAuth / PKCE helpers", () => {
     } finally {
       await close();
     }
+  });
+
+  it("reads the authorization code while prompting on stderr", async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const written: Buffer[] = [];
+    output.on("data", (chunk: Buffer | string) => {
+      written.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+
+    input.end("  from-stdin  \n");
+
+    await expect(readAuthorizationCodeFromStdin({ input, output })).resolves.toBe("from-stdin");
+    expect(Buffer.concat(written).toString("utf8")).toContain("Paste authorization code: ");
+  });
+
+  it("reserves a manual redirect URI without keeping the loopback port open", async () => {
+    const redirectUri = await reserveLoopbackRedirectUri();
+    await expect(fetch(redirectUri)).rejects.toThrow();
   });
 
   it("runCliPkceLogin completes E2E against mock token URL (no browser)", async () => {
