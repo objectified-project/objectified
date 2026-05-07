@@ -1,6 +1,6 @@
 import fs from "node:fs";
 
-import { stdin as input, stdout as stderr } from "node:process";
+import { stdin as input, stderr } from "node:process";
 
 import { ObjectifiedCliError } from "../errors.js";
 import { EXIT_CODES } from "../exit-codes.js";
