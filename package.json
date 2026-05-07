@@ -4,9 +4,10 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "test": "yarn workspace objectified-mcp test && yarn workspace objectified-ui test && yarn workspace objectified-web test"
+    "test": "yarn workspace objectified-cli test && yarn workspace objectified-mcp test && yarn workspace objectified-ui test && yarn workspace objectified-web test"
   },
   "workspaces": [
+    "objectified-cli",
     "objectified-mcp",
     "objectified-ui",
     "objectified-browse",
@@ -15,7 +16,10 @@
   ],
   "packageManager": "yarn@4.12.0",
   "resolutions": {
-    "@testing-library/dom/pretty-format": "30.3.0"
+    "@testing-library/dom/pretty-format": "30.3.0",
+    "ansi-regex": "5.0.1",
+    "string-width": "4.2.3",
+    "strip-ansi": "6.0.1"
   },
   "devDependencies": {
     "turbo": "^2.9.6"

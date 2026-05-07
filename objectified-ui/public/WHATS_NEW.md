@@ -7,6 +7,9 @@ We continue to improve the platform based on your feedback with improvements and
 ## MCP
 - MCP service is now live
 
+## CLI
+- New **`objectified-cli`** package (oclif v4) adds the `objectified` binary scaffold with `hello`, `--version`, and `--help` (#3186).
+
 ## Import
 - Race condition fixed in 3.0.1 specification imports
 - Import supports Swagger 2.0 format
