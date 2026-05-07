@@ -280,15 +280,5 @@ export function formatAndReportCliFailure(err: unknown, opts: HandleCliErrorOpti
     console.error(text);
   }
 
-  if (opts.debugStacks && err instanceof Error && !(err instanceof ObjectifiedCliError)) {
-    const skip =
-      err instanceof CLIError ||
-      err.constructor.name === "CLIParseError" ||
-      /^command .+ not found$/i.test(err.message.trim());
-    if (!skip && err.stack !== undefined && err.stack.trim() !== "") {
-      console.error(`\n${err.stack}`);
-    }
-  }
-
   return effectiveExit;
 }

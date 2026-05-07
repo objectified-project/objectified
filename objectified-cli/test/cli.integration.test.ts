@@ -158,6 +158,11 @@ base_url = "https://api.prod.example"
     expect(out.includes("\u001B[")).toBe(false);
   });
 
+  it("does not emit ANSI escapes for errors when --no-color is set", () => {
+    const err = runExpectFailure(["--no-color", "helol"]);
+    expect(err.includes("\u001B[")).toBe(false);
+  });
+
   it("cold-starts --version within 200 ms on developer machines", () => {
     const iterations = process.env.CI ? 2 : 5;
     let fastest = Number.POSITIVE_INFINITY;

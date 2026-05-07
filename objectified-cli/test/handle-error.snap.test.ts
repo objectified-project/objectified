@@ -1,11 +1,15 @@
 import { CLIError } from "@oclif/core/errors";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EXIT_CODES } from "../src/lib/exit-codes.js";
 import { httpStatusToCliError, networkErrnoToCliError, ObjectifiedCliError } from "../src/lib/errors.js";
-import { handleError } from "../src/lib/handle-error.js";
+import { formatAndReportCliFailure, handleError } from "../src/lib/handle-error.js";
 
 const noColor = { debugStacks: false, color: false };
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("handleError snapshots by category", () => {
   it("generic ObjectifiedCliError", () => {
@@ -100,5 +104,18 @@ describe("handleError snapshots by category", () => {
 
   it("unknown command with did-you-mean", () => {
     expect(handleError(new CLIError("command helol not found"), noColor)).toMatchSnapshot();
+  });
+
+  it("prints generic error stack once when debug stacks are enabled", () => {
+    const err = new Error("boom");
+    err.stack = "Error: boom\n  at test";
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const exit = formatAndReportCliFailure(err, { debugStacks: true, color: false });
+
+    expect(exit).toBe(EXIT_CODES.GENERIC);
+    expect(stderrSpy).toHaveBeenCalledTimes(1);
+    const rendered = String(stderrSpy.mock.calls[0]?.[0] ?? "");
+    expect(rendered.match(/Error: boom/g)?.length ?? 0).toBe(1);
   });
 });

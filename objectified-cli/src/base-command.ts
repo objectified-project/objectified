@@ -10,6 +10,7 @@ import {
   buildObjectifiedContext,
   type GlobalCliFlags,
   type ObjectifiedContext,
+  resolveAllowColor,
 } from "./lib/cli-context.js";
 import {
   ensureDefaultConfigFile,
@@ -105,6 +106,8 @@ export abstract class BaseCommand extends Command {
   /** Command arguments after parse (subcommands read typed fields from here). */
   protected commandArgs!: Record<string, unknown>;
 
+  protected parsedGlobalFlags?: GlobalCliFlags;
+
   /** Mutable snapshot passed to the REST wrapper (401 hook may refresh credentials). */
   protected readonly apiAuth: ApiAuthSnapshot = {};
 
@@ -115,6 +118,7 @@ export abstract class BaseCommand extends Command {
     const Cmd = this.constructor as typeof Command;
     const parsed = await this.parse(Cmd);
     const globalPart = parsed.flags as GlobalCliFlags;
+    this.parsedGlobalFlags = globalPart;
     this.commandArgs = parsed.args as Record<string, unknown>;
 
     this.resolvedConfigPath = resolveConfigFilePath(globalPart.config, process.env, os.homedir);
@@ -155,10 +159,15 @@ export abstract class BaseCommand extends Command {
     }
 
     const debugStacks = resolveDebugStacks(process.argv, process.env);
+    const colorFromContext = (this as { context?: ObjectifiedContext }).context?.color;
     const color =
-      process.env.NO_COLOR === undefined || process.env.NO_COLOR === ""
-        ? typeof supportsColor.stderr === "object"
-        : false;
+      colorFromContext ??
+      resolveAllowColor(
+        this.parsedGlobalFlags?.color,
+        process.env,
+        process.stdout.isTTY,
+        typeof supportsColor.stdout === "object",
+      );
     const code = formatAndReportCliFailure(err, { debugStacks, color });
     return Promise.reject(new ExitError(code));
   }
