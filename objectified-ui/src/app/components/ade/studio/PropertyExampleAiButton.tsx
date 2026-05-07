@@ -116,39 +116,39 @@ export function PropertyExampleAiButton({
     setBusy(true);
     setError(null);
 
-    let schemaContextFingerprint: string | undefined;
-    if (studioContext && !isChatStudioContextEmpty(studioContext)) {
-      try {
-        schemaContextFingerprint = await computeStudioSchemaFingerprint(studioContext);
-      } catch {
-        /* optional */
-      }
-    }
-    if (ac.signal.aborted || requestId !== requestIdRef.current) return;
-
-    const existingPropsPayload = existingProperties.map(propertyItemToExistingApiShape);
-
-    const desc = typeof propertyDescription === 'string' ? propertyDescription.trim() : '';
-    const nestedPayload =
-      nestedMembers?.filter((m) => m?.name?.trim()).map((m) => ({
-        name: m.name.trim(),
-        ...(m.description != null && String(m.description).trim()
-          ? { description: String(m.description).trim().slice(0, 500) }
-          : {}),
-      })) ?? [];
-
-    const userLines = [
-      `Generate one realistic example JSON value for this schema property (for OpenAPI / Studio documentation examples).`,
-      `Property name: ${name}`,
-      contextClassName?.trim() ? `Containing class: ${contextClassName.trim()}` : null,
-      desc ? `Property documentation description: ${desc}` : null,
-      nestedPayload.length > 0
-        ? `Nested object members (when shaping objects): ${JSON.stringify(nestedPayload)}`
-        : null,
-      `JSON Schema for the property (library/canvas data): ${JSON.stringify(propertySchema)}`,
-    ].filter(Boolean);
-
     try {
+      let schemaContextFingerprint: string | undefined;
+      if (studioContext && !isChatStudioContextEmpty(studioContext)) {
+        try {
+          schemaContextFingerprint = await computeStudioSchemaFingerprint(studioContext);
+        } catch {
+          /* optional */
+        }
+      }
+      if (ac.signal.aborted || requestId !== requestIdRef.current) return;
+
+      const existingPropsPayload = existingProperties.map(propertyItemToExistingApiShape);
+
+      const desc = typeof propertyDescription === 'string' ? propertyDescription.trim() : '';
+      const nestedPayload =
+        nestedMembers?.filter((m) => m?.name?.trim()).map((m) => ({
+          name: m.name.trim(),
+          ...(m.description != null && String(m.description).trim()
+            ? { description: String(m.description).trim().slice(0, 500) }
+            : {}),
+        })) ?? [];
+
+      const userLines = [
+        `Generate one realistic example JSON value for this schema property (for OpenAPI / Studio documentation examples).`,
+        `Property name: ${name}`,
+        contextClassName?.trim() ? `Containing class: ${contextClassName.trim()}` : null,
+        desc ? `Property documentation description: ${desc}` : null,
+        nestedPayload.length > 0
+          ? `Nested object members (when shaping objects): ${JSON.stringify(nestedPayload)}`
+          : null,
+        `JSON Schema for the property (library/canvas data): ${JSON.stringify(propertySchema)}`,
+      ].filter(Boolean);
+
       const response = await fetch('/api/ollama/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
