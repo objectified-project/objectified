@@ -62,7 +62,6 @@ function argvColorFlag(argv: string[]): boolean | undefined {
     if (arg.startsWith("--no-color=")) {
       const parsed = parseBooleanArg(arg.slice("--no-color=".length));
       if (parsed !== undefined) out = !parsed;
-      else out = false;
     }
   }
   return out;
