@@ -72,17 +72,6 @@ This outlines the planned features for integrating AI capabilities into Objectif
 |--------|-----------------------------------------------------|
 | #527   | Implementation of Guardrails for prompts/responses  |
 
-### AI Layout Suggestions
-
-**Intelligent Layout Suggestions** ✅ (#623)
-- ✅ AI-powered layout recommendations:
-    - ✅ Analyze schema structure and suggest best layout type (TB vs LR heuristic + schema depth)
-    - ✅ Detect strongly connected components on the canvas graph
-    - ✅ Suggest groupings based on relationships (weak components, SCC cycles — surfaced in metrics + suggestions)
-    - ✅ Identify central/hub classes (degree on collapsed layout graph)
-    - ✅ Recommend hierarchy roots (no incoming directed edges)
-    - ✅ Optional Ollama narrative (`task: canvas_layout_recommendations`)
-
 ---
 
 ## Complete
@@ -252,3 +241,14 @@ This outlines the planned features for integrating AI capabilities into Objectif
 - ✅ Generate operation summaries from path and method (#621 — Paths operation **Docs** tab **Generate summary & description**; Ollama `operation_description` task)
 - ✅ Generate example values that make sense (#622 — property **Examples** **Generate example with AI** next to schema-based generate; Ollama `property_example` task)
 - Support multiple languages (i18n)
+
+### AI Layout Suggestions
+
+**Intelligent Layout Suggestions** ✅ (#623)
+- ✅ AI-powered layout recommendations:
+    - ✅ Analyze schema structure and suggest best layout type (TB vs LR heuristic + schema depth)
+    - ✅ Detect strongly connected components on the canvas graph
+    - ✅ Suggest groupings based on relationships (weak components, SCC cycles — surfaced in metrics + suggestions)
+    - ✅ Identify central/hub classes (degree on collapsed layout graph)
+    - ✅ Recommend hierarchy roots (no incoming directed edges)
+    - ✅ Optional Ollama narrative (`task: canvas_layout_recommendations`)
