@@ -81,11 +81,7 @@ This outlines the planned features for integrating AI capabilities into Objectif
     - Several modeling-pattern bullets per registered **project domain** category (catalog in Studio; **#616** expanded from one short line per domain)
 - ✅ Industry-specific patterns (#616): multiple actionable patterns per domain (e.g. inventory/idempotency for e-commerce, ledger/idempotency for finance, FHIR-friendly identifiers for healthcare).
 - ✅ Security hardening suggestions (#617): domain-based payment/PHI guidance, auth rate-limit hints, vault/logging guidance for secret-like properties, password-hash modeling, and webhook signature verification for webhook-style class names.
-- Performance optimization tips
-
-| Ticket | Feature Description            |
-|--------|--------------------------------|
-| #618   | Performance Optimization Tips  |
+- ✅ Performance optimization suggestions (#618): cache namespacing/TTL, background job idempotency and retries, cursor/keyset pagination, search projections vs canonical entities, chunked bulk I/O, separating heavy binary metadata, and fan-out/timeline modeling when cache, queue, paging, search, export, media, or feed-style names appear on classes or reusable properties.
 
 ### AI Documentation Generation
 
