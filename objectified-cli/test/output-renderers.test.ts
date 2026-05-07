@@ -176,6 +176,7 @@ describe("createCliOutput snapshots", () => {
       { json: true, stdoutIsTTY: true, stderrIsTTY: true },
       { quiet: true, stdoutIsTTY: true, stderrIsTTY: true },
       { stdoutIsTTY: false, stderrIsTTY: true },
+      { stdoutIsTTY: true, stderrIsTTY: false },
     ] as const) {
       const { out } = capture({ stderrIsTTY: true, ...overrides });
       const spin = out.spinner("Working…");

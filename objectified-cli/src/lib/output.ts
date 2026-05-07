@@ -11,11 +11,17 @@ export function localePrefersAsciiTable(env: NodeJS.ProcessEnv): boolean {
 }
 
 /** Recursively sort object keys for stable JSON/YAML output. */
+function compareCodepoint(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
 export function stableDeepSort(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableDeepSort);
   if (value && typeof value === "object") {
     const o = value as Record<string, unknown>;
-    const sortedKeys = Object.keys(o).sort((a, b) => a.localeCompare(b));
+    const sortedKeys = Object.keys(o).sort(compareCodepoint);
     const out: Record<string, unknown> = {};
     for (const k of sortedKeys) out[k] = stableDeepSort(o[k]);
     return out;
@@ -52,11 +58,11 @@ export type CliOutput = {
 
 const ASCII_TABLE_CHARS = {
   top: "-",
-  "top-mid": "-",
+  "top-mid": "+",
   "top-left": "+",
   "top-right": "+",
   bottom: "-",
-  "bottom-mid": "-",
+  "bottom-mid": "+",
   "bottom-left": "+",
   "bottom-right": "+",
   left: "|",
@@ -163,7 +169,7 @@ export function createCliOutput(opts: CliOutputOptions): CliOutput {
       if (suppressHumanStdout(opts)) return;
       const sorted = stableDeepSort(value);
       const doc = stringifyYaml(sorted, {
-        sortMapEntries: (a, b) => String(a.key).localeCompare(String(b.key)),
+        sortMapEntries: (a, b) => compareCodepoint(String(a.key), String(b.key)),
         lineWidth: 0,
       });
       writeStdout(doc.endsWith("\n") ? doc : `${doc}\n`);
@@ -176,7 +182,7 @@ export function createCliOutput(opts: CliOutputOptions): CliOutput {
 
     kv(entries: Record<string, unknown>): void {
       if (suppressHumanStdout(opts)) return;
-      const keys = Object.keys(entries).sort((a, b) => a.localeCompare(b));
+      const keys = Object.keys(entries).sort(compareCodepoint);
       const labelWidth = keys.reduce((m, k) => Math.max(m, k.length), 0);
       for (const key of keys) {
         const pad = " ".repeat(Math.max(1, labelWidth - key.length + 1));
@@ -185,7 +191,7 @@ export function createCliOutput(opts: CliOutputOptions): CliOutput {
     },
 
     spinner(text: string): Ora {
-      const allow = opts.stdoutIsTTY && !opts.json && !opts.quiet;
+      const allow = opts.stdoutIsTTY && opts.stderrIsTTY && !opts.json && !opts.quiet;
       return ora({
         text,
         color: opts.color ? "cyan" : undefined,
