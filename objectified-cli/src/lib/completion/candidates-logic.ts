@@ -12,6 +12,7 @@ import { extractProfileFromWords, matchesPrefix, splitCommandTokens } from "./pa
 
 const GLOBAL_FLAG_TOKENS = [
   "--api-key",
+  "--api-key-file",
   "--base-url",
   "--config",
   "--json",
@@ -111,10 +112,14 @@ async function loadProjectSlugIdRows(
   profileCacheKey: string,
   tenantSlug: string,
 ): Promise<Array<{ slug: string; id: string }>> {
-  const rows = await withCompletionCache(profileCacheKey, ["projects-map", tenantSlug], async () => {
-    const list = await api.listProjects(tenantSlug);
-    return list.map((p) => `${p.slug}\t${p.id}`);
-  });
+  const rows = await withCompletionCache(
+    profileCacheKey,
+    ["projects-map", tenantSlug],
+    async () => {
+      const list = await api.listProjects(tenantSlug);
+      return list.map((p) => `${p.slug}\t${p.id}`);
+    },
+  );
   const out: Array<{ slug: string; id: string }> = [];
   for (const row of rows) {
     const tab = row.indexOf("\t");
@@ -154,18 +159,12 @@ async function tryDynamicCandidates(opts: {
 
   if (cmdParts[0] === "projects" && cmdParts[1] === "show" && cmdParts.length === 2) {
     const rows = await loadProjectSlugIdRows(api, profileCacheKey, tenantSlug);
-    return filterByPrefix(
-      uniqSorted(rows.map((r) => r.slug)),
-      current,
-    );
+    return filterByPrefix(uniqSorted(rows.map((r) => r.slug)), current);
   }
 
   if (cmdParts[0] === "versions" && cmdParts[1] === "list" && cmdParts.length === 2) {
     const rows = await loadProjectSlugIdRows(api, profileCacheKey, tenantSlug);
-    return filterByPrefix(
-      uniqSorted(rows.map((r) => r.slug)),
-      current,
-    );
+    return filterByPrefix(uniqSorted(rows.map((r) => r.slug)), current);
   }
 
   if (cmdParts[0] === "versions" && cmdParts[1] === "list" && cmdParts.length === 3) {
@@ -187,10 +186,7 @@ async function tryDynamicCandidates(opts: {
 
   if (cmdParts[0] === "versions" && cmdParts[1] === "show" && cmdParts.length === 2) {
     const rows = await loadProjectSlugIdRows(api, profileCacheKey, tenantSlug);
-    return filterByPrefix(
-      uniqSorted(rows.map((r) => r.slug)),
-      current,
-    );
+    return filterByPrefix(uniqSorted(rows.map((r) => r.slug)), current);
   }
 
   if (cmdParts[0] === "versions" && cmdParts[1] === "show" && cmdParts.length === 3) {
@@ -219,10 +215,14 @@ async function tryDynamicCandidates(opts: {
   }
 
   if (cmdParts[0] === "primitives" && cmdParts[1] === "show" && cmdParts.length === 2) {
-    const values = await withCompletionCache(profileCacheKey, ["primitives", tenantSlug], async () => {
-      const rows = await api.listPrimitives(tenantSlug);
-      return uniqSorted(rows.map((p) => p.name));
-    });
+    const values = await withCompletionCache(
+      profileCacheKey,
+      ["primitives", tenantSlug],
+      async () => {
+        const rows = await api.listPrimitives(tenantSlug);
+        return uniqSorted(rows.map((p) => p.name));
+      },
+    );
     return filterByPrefix(values, current);
   }
 

@@ -1,22 +1,23 @@
-.TH OBJECTIFIED\-DOCS\-PROFILES 1 "" "" "User Commands"
+.TH OBJECTIFIED\-AUTH\-STATUS 1 "" "" "User Commands"
 .SH NAME
-objectified docs profiles \- config.toml profiles, defaults, and precedence rules
+objectified auth status \- Show the active profile, base URL, and whether you are using an API key or OAuth token.
 .SH DESCRIPTION
 .nf
 USAGE
-  $ objectified docs profiles [--api-key <value>] [--api-key-file
+  $ objectified auth status [--api-key <value>] [--api-key-file
     <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
-  config.toml profiles, defaults, and precedence rules
+  Show the active profile, base URL, and whether you are using an API key or
+  OAuth token.
 
 EXAMPLES
-  $ objectified docs profiles
+  $ objectified auth status
 
-  $ objectified --profile staging config path
+  $ objectified --profile staging auth status
 
-  $ objectified docs profiles | sed -n '1,12p'
+  $ objectified --json auth status
 
 COMMON
   --base-url=<value>  Root REST API URL.
@@ -42,9 +43,9 @@ AUTH
                           history).
 
 SEE ALSO
-  objectified docs
+  objectified auth login
 
-  objectified config path
+  objectified auth logout
 
-  objectified config get
+  objectified docs profiles
 .fi

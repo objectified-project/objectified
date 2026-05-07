@@ -1,15 +1,16 @@
 .TH OBJECTIFIED\-AUTH\-LOGIN 1 "" "" "User Commands"
 .SH NAME
-objectified auth login \- Sign in via PKCE browser flow (stores tokens in the OS keychain).
+objectified auth login \- Sign in via PKCE browser flow or store an API key in the OS keychain (`--api-key`).
 .SH DESCRIPTION
 .nf
 USAGE
-  $ objectified auth login [--api-key <value>] [--base-url <value>]
-    [--config <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
-    [--no-browser]
+  $ objectified auth login [--api-key <value>] [--api-key-file
+    <value>] [--base-url <value>] [--config <value>] [--json] [--color]
+    [--profile <value>] [-q] [--verbose] [--no-browser]
 
 DESCRIPTION
-  Sign in via PKCE browser flow (stores tokens in the OS keychain).
+  Sign in via PKCE browser flow or store an API key in the OS keychain
+  (`--api-key`).
 
 EXAMPLES
   $ objectified auth login
@@ -17,6 +18,10 @@ EXAMPLES
   $ objectified --profile staging auth login
 
   $ objectified auth login --no-browser
+
+  $ objectified auth login --api-key
+
+  $ objectified auth login --api-key sk_live_…
 
   $ objectified --json auth login
 
@@ -37,7 +42,11 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct
+                          authentication (OBJECTIFIED_API_KEY). Not persisted
+                          unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell
+                          history).
 
 OTHER
   --no-browser  Do not launch a browser; print the login URL and read the
@@ -45,6 +54,8 @@ OTHER
 
 SEE ALSO
   objectified auth logout
+
+  objectified auth status
 
   objectified docs profiles
 .fi

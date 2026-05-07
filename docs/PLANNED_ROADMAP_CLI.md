@@ -251,7 +251,6 @@ Part of Epic: CLI Foundation & DevEx (#3174)
 
 | #         | Title                                                  | Description                                                       | Labels                                                  | MVP | Parallel |
 |-----------|--------------------------------------------------------|-------------------------------------------------------------------|---------------------------------------------------------|-----|----------|
-| 2.2 (#3195) | API-key auth (`--api-key`, env, file)                | Headless / CI-friendly auth                                       | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`, `api-keys` | Yes | Yes (with 2.1) |
 | 2.3 (#3196) | `auth status` (whoami)                               | Show profile, base-url, tenant, user, expiry, plan                | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`     | Yes | Yes      |
 | 2.4 (#3197) | Secure credential storage (keytar + encrypted fallback) | OS keychain primary, AES-GCM file fallback for headless           | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`, `security` | Yes | No       |
 | 2.5 (#3198) | `tenants list` / `tenants info`                      | Enumerate user's tenants and inspect one                          | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `tenancy`  | Yes | Yes      |
@@ -285,9 +284,9 @@ Part of Epic: Authentication & Tenant Context (#3175)
 
 ---
 
-#### 2.2 (#3195) — API-key auth
+#### 2.2 (#3195) — API-key auth — **COMPLETE**
 
-Three input methods: `--api-key <key>`, `OBJECTIFIED_API_KEY` env, `--api-key-file <path>`. Optional `auth login --api-key` persists into keychain. API key wins over OAuth token when both present (matches AWS / GitHub CLI).
+Landed: global `--api-key` / `OBJECTIFIED_API_KEY` (oclif `env`) / `--api-key-file`; API key wins over bearer when both are available; `objectified auth login --api-key` stores keys in the OS keychain per profile (memory backend in tests); `objectified auth status` reports credential kind; verbose logs redact keys as `sk_***`; HTTP 401 after sending credentials maps to exit **4**, missing credentials to exit **3**; integration tests exercise `X-API-Key` against a loopback stub.
 
 **Acceptance Criteria:** key never echoed in logs (redacted as `sk_***`); never persisted unless explicit `auth login --api-key`; `auth status` indicates auth type.
 
@@ -772,11 +771,11 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ## MVP Release — Ticket Bundle
 
-The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **19 open sub-tickets** across 5 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, and #3194).
+The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **18 open sub-tickets** across 5 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, #3194, and #3195).
 
 | Epic     | Tickets                                                                                                   | Count |
 |----------|-----------------------------------------------------------------------------------------------------------|-------|
-| 2 (#3175) | #3195, #3196, #3197, #3198, #3199                                                                         | 5     |
+| 2 (#3175) | #3196, #3197, #3198, #3199                                                                                | 4     |
 | 3 (#3176) | #3202, #3203, #3204                                                                                        | 3     |
 | 4 (#3177) | #3208, #3209, #3210, #3212                                                                                | 4     |
 | 9 (#3182) | #3244, #3245, #3246, #3247, #3248                                                                          | 5     |
@@ -864,7 +863,7 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 The tickets were created in the order below — that is also the recommended **execution** order. Earlier epics provide primitives that later epics rely on.
 
 1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, #3189, #3190, #3191, #3192, and #3193 landed). Without the scaffold, no other command can exist.
-2. **Epic 2 — Auth & Tenants** (#3175; #3194 shipped — continue #3195 → #3201). Required for any tenant-scoped command.
+2. **Epic 2 — Auth & Tenants** (#3175; #3194 and #3195 shipped — continue #3196 → #3201). Required for any tenant-scoped command.
 3. **Epic 3 — Projects** (#3176 then #3202 → #3207). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3208 → #3216). The publish flow that makes the CLI valuable in CI.
 5. **Epic 9 — Browse & Schema Export** (#3182 then #3244 → #3252). The most-used consumer surface; lands early because it works without auth.

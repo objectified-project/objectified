@@ -5,14 +5,18 @@ import { ExitError } from "@oclif/core/errors";
 import type { CommandError } from "@oclif/core/interfaces";
 import supportsColor from "supports-color";
 
+import { describeActiveCredential, type ActiveCredential } from "./lib/active-credential.js";
+import { readApiKeyFromFile } from "./lib/api-key-file.js";
 import { createApiClient, type ApiAuthSnapshot, type ObjectifiedApi } from "./lib/client.js";
-import { loadCliOAuthCredentials } from "./lib/credentials/store.js";
 import {
   buildObjectifiedContext,
   type GlobalCliFlags,
   type ObjectifiedContext,
   resolveAllowColor,
 } from "./lib/cli-context.js";
+import { loadCliStoredAuth } from "./lib/credentials/store.js";
+import { ObjectifiedCliError } from "./lib/errors.js";
+import { EXIT_CODES } from "./lib/exit-codes.js";
 import {
   ensureDefaultConfigFile,
   loadTomlConfigFile,
@@ -26,11 +30,18 @@ import {
   resolveEffectiveExitCode,
 } from "./lib/handle-error.js";
 import { createCliOutput, localePrefersAsciiTable, type CliOutput } from "./lib/output.js";
+import { normalizeCliArgv } from "./lib/normalize-argv.js";
 
 export abstract class BaseCommand extends Command {
   static baseFlags = {
     "api-key": Flags.string({
-      description: "API key for direct authentication (bypasses login token).",
+      description:
+        "API key for direct authentication (OBJECTIFIED_API_KEY). Not persisted unless you run `auth login --api-key`.",
+      helpGroup: "Auth",
+      env: "OBJECTIFIED_API_KEY",
+    }),
+    "api-key-file": Flags.string({
+      description: "Read API key from a file (single line; avoids shell history).",
       helpGroup: "Auth",
     }),
     "base-url": Flags.string({
@@ -93,6 +104,15 @@ export abstract class BaseCommand extends Command {
   /** Resolved API/client context (flag > env > profile config > [default] > built-ins). */
   context!: ObjectifiedContext;
 
+  /** argv after global promotion + auth login sentinel normalization (matches oclif input). */
+  protected normalizedArgv!: string[];
+
+  /** API key from flags/env/file only (before OS keychain merge). */
+  protected transientApiKey!: string | undefined;
+
+  /** Effective credential classification for `auth status` and UX. */
+  protected activeCredential!: ActiveCredential;
+
   /** Parsed config document after loading `config.toml`. */
   protected configDoc!: ParsedTomlConfig;
 
@@ -118,10 +138,27 @@ export abstract class BaseCommand extends Command {
     const parsed = await this.parse(Cmd);
     const parsedFlags = parsed.flags as Record<string, unknown>;
     // Keep camelCase fallback for compatibility while normalize-argv continues accepting legacy aliases.
+    const apiKeyFlag =
+      (parsedFlags["api-key"] as string | undefined) ?? (parsedFlags.apiKey as string | undefined);
+    const apiKeyFileFlag =
+      (parsedFlags["api-key-file"] as string | undefined) ??
+      (parsedFlags.apiKeyFile as string | undefined);
+
+    let apiKey = apiKeyFlag;
+    if (
+      (apiKey === undefined || apiKey === "") &&
+      apiKeyFileFlag !== undefined &&
+      apiKeyFileFlag.trim() !== ""
+    ) {
+      apiKey = readApiKeyFromFile(apiKeyFileFlag.trim());
+    }
+
     const globalPart: GlobalCliFlags = {
-      apiKey: (parsedFlags["api-key"] as string | undefined) ?? (parsedFlags.apiKey as string | undefined),
+      apiKey,
+      apiKeyFile: apiKeyFileFlag,
       baseUrl:
-        (parsedFlags["base-url"] as string | undefined) ?? (parsedFlags.baseUrl as string | undefined),
+        (parsedFlags["base-url"] as string | undefined) ??
+        (parsedFlags.baseUrl as string | undefined),
       config: parsedFlags.config as string | undefined,
       json: parsedFlags.json as boolean | undefined,
       color: parsedFlags.color as boolean | undefined,
@@ -131,6 +168,7 @@ export abstract class BaseCommand extends Command {
     };
     this.parsedGlobalFlags = globalPart;
     this.commandArgs = parsed.args as Record<string, unknown>;
+    this.normalizedArgv = normalizeCliArgv(process.argv.slice(2));
 
     this.resolvedConfigPath = resolveConfigFilePath(globalPart.config, process.env, os.homedir);
     await ensureDefaultConfigFile(this.resolvedConfigPath);
@@ -151,25 +189,51 @@ export abstract class BaseCommand extends Command {
       ...parsed.flags,
       verboseEffective: built.verboseEffective,
     } as BaseCommand["flags"];
-    this.apiAuth.apiKey = this.context.apiKey;
-    this.apiAuth.bearer = this.context.accessToken;
-    if (!this.apiAuth.apiKey && !this.apiAuth.bearer) {
-      try {
-        const oauth = await loadCliOAuthCredentials(this.context.profile);
-        if (oauth?.accessToken) this.apiAuth.bearer = oauth.accessToken;
-      } catch (err: unknown) {
-        if (this.verboseEffective) {
-          const msg = err instanceof Error ? err.message : String(err);
-          process.stderr.write(`objectified: could not read CLI credentials: ${msg}\n`);
-        }
+    this.transientApiKey = this.context.apiKey;
+
+    let storedApiKey: string | undefined;
+    let storedBearer: string | undefined;
+    try {
+      const stored = await loadCliStoredAuth(this.context.profile);
+      if (stored?.kind === "api_key") storedApiKey = stored.apiKey;
+      else if (stored?.kind === "oauth") storedBearer = stored.accessToken;
+    } catch (err: unknown) {
+      if (this.verboseEffective) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`objectified: could not read CLI credentials: ${msg}\n`);
       }
     }
+
+    this.apiAuth.apiKey = this.context.apiKey ?? storedApiKey;
+    this.apiAuth.bearer = this.context.accessToken ?? storedBearer;
+    if (this.apiAuth.apiKey) this.apiAuth.bearer = undefined;
+
+    this.activeCredential = describeActiveCredential({
+      argv: this.normalizedArgv,
+      env: process.env,
+      transientApiKey: this.transientApiKey,
+      effectiveApiKey: this.apiAuth.apiKey,
+      effectiveBearer: this.apiAuth.bearer,
+    });
+
     this.api = createApiClient({
       baseUrl: this.context.baseUrl,
       auth: this.apiAuth,
       verbose: this.verboseEffective,
       stderrWrite: (line) => process.stderr.write(`${line}\n`),
     });
+  }
+
+  /** Throws exit code 3 when no API key or bearer is available (#3195). */
+  protected ensureAuthenticated(): void {
+    if (!this.apiAuth.apiKey && !this.apiAuth.bearer) {
+      throw new ObjectifiedCliError({
+        message: "No API key or OAuth token available for this command.",
+        exitCode: EXIT_CODES.NOT_AUTHENTICATED,
+        title: "Not authenticated",
+        hint: "Run `objectified auth login`, set OBJECTIFIED_API_KEY, or pass --api-key / --api-key-file.",
+      });
+    }
   }
 
   protected override catch(err: CommandError): Promise<void> {

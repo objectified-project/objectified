@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { promoteLeadingGlobalFlags } from "../src/lib/normalize-argv.js";
+import {
+  authLoginIntendsApiKeyStore,
+  normalizeAuthLoginApiKeyPrompt,
+  normalizeCliArgv,
+  promoteLeadingGlobalFlags,
+} from "../src/lib/normalize-argv.js";
+import { API_KEY_PROMPT_SENTINEL } from "../src/lib/constants.js";
 
 describe("promoteLeadingGlobalFlags", () => {
   it("moves leading globals after the command", () => {
@@ -42,5 +48,43 @@ describe("promoteLeadingGlobalFlags", () => {
 
   it("stops at unknown leading flags", () => {
     expect(promoteLeadingGlobalFlags(["--unknown", "hello"])).toEqual(["--unknown", "hello"]);
+  });
+});
+
+describe("normalizeAuthLoginApiKeyPrompt", () => {
+  it("inserts a sentinel when auth login --api-key has no value", () => {
+    expect(normalizeAuthLoginApiKeyPrompt(["auth", "login", "--api-key"])).toEqual([
+      "auth",
+      "login",
+      "--api-key",
+      API_KEY_PROMPT_SENTINEL,
+    ]);
+  });
+
+  it("does not insert when a value follows --api-key", () => {
+    const argv = ["auth", "login", "--api-key", "sk_test_123"];
+    expect(normalizeAuthLoginApiKeyPrompt(argv)).toEqual(argv);
+  });
+});
+
+describe("authLoginIntendsApiKeyStore", () => {
+  it("is true when --api-key follows auth login", () => {
+    expect(authLoginIntendsApiKeyStore(["auth", "login", "--api-key"])).toBe(true);
+  });
+
+  it("is false when --api-key appears only before auth login", () => {
+    expect(authLoginIntendsApiKeyStore(["--api-key", "x", "auth", "login"])).toBe(false);
+  });
+});
+
+describe("normalizeCliArgv", () => {
+  it("composes promotion and auth login prompt fix", () => {
+    expect(normalizeCliArgv(["--json", "auth", "login", "--api-key"])).toEqual([
+      "auth",
+      "login",
+      "--api-key",
+      API_KEY_PROMPT_SENTINEL,
+      "--json",
+    ]);
   });
 });

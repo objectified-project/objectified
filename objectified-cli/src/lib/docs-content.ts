@@ -29,7 +29,7 @@ default_profile
   default_profile selects which profile is active when --profile is omitted. Use objectified config get default_profile or objectified config set default_profile staging.
 
 Resolution order
-  Base URL and tenant slug resolve per profile: explicit flags and env vars override profile values, which override [default]. API keys are never read from the file (#3188); use --api-key or OBJECTIFIED_API_KEY.
+  Base URL and tenant slug resolve per profile: explicit flags and env vars override profile values, which override [default]. API keys are never read from config.toml (#3188); use --api-key, OBJECTIFIED_API_KEY, --api-key-file, or store one with objectified auth login --api-key (#3195).
 
 Switching profiles
   Pass --profile <name> for a single invocation or change default_profile for every command.

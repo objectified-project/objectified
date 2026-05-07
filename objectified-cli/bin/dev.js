@@ -5,16 +5,13 @@ import { ExitError } from "@oclif/core/errors";
 import { run } from "@oclif/core/run";
 import { settings } from "@oclif/core/settings";
 
-import { promoteLeadingGlobalFlags } from "../src/lib/normalize-argv.js";
-import {
-  formatAndReportCliFailure,
-  resolveDebugStacks,
-} from "../src/lib/handle-error.js";
+import { normalizeCliArgv } from "../src/lib/normalize-argv.js";
+import { formatAndReportCliFailure, resolveDebugStacks } from "../src/lib/handle-error.js";
 
 process.env.NODE_ENV = "development";
 settings.debug = true;
 
-const argv = promoteLeadingGlobalFlags(process.argv.slice(2));
+const argv = normalizeCliArgv(process.argv.slice(2));
 
 try {
   await run(argv, import.meta.url);

@@ -39,6 +39,8 @@ export class CliError extends ObjectifiedCliError {
 export type HttpErrorContext = {
   requestId?: string;
   retriesAttempted?: number;
+  /** True when the CLI attached X-API-Key or Authorization on the failing request (#3195). */
+  credentialsWereSent?: boolean;
 };
 
 function retryHint(ctx: HttpErrorContext): string | undefined {
@@ -62,11 +64,27 @@ export function httpStatusToCliError(
   const rHint = retryHint(ctx);
 
   if (status === 401) {
+    if (ctx.credentialsWereSent) {
+      return new ObjectifiedCliError({
+        message: base,
+        exitCode: EXIT_CODES.FORBIDDEN,
+        title: "Invalid credentials",
+        hint: mergeHints(
+          "Verify your API key or OAuth token, or run `objectified auth login`.",
+          rHint,
+        ),
+        requestId: ctx.requestId,
+        retriesAttempted: ctx.retriesAttempted,
+      });
+    }
     return new ObjectifiedCliError({
       message: base,
       exitCode: EXIT_CODES.NOT_AUTHENTICATED,
       title: "Not authenticated",
-      hint: mergeHints("Run `objectified auth login` or set OBJECTIFIED_API_KEY.", rHint),
+      hint: mergeHints(
+        "Run `objectified auth login`, set OBJECTIFIED_API_KEY, or use --api-key / --api-key-file.",
+        rHint,
+      ),
       requestId: ctx.requestId,
       retriesAttempted: ctx.retriesAttempted,
     });
@@ -156,8 +174,7 @@ export function httpStatusToCliError(
   }
 
   if (status >= 500 && status <= 599) {
-    const exit =
-      status === 504 ? EXIT_CODES.NETWORK : EXIT_CODES.SERVER_ERROR;
+    const exit = status === 504 ? EXIT_CODES.NETWORK : EXIT_CODES.SERVER_ERROR;
     const title = status === 504 ? "Gateway timeout" : "Server error";
     return new ObjectifiedCliError({
       message: base,
@@ -212,13 +229,15 @@ export function networkErrnoToCliError(err: NodeJS.ErrnoException): ObjectifiedC
   const baseHint =
     "Check VPN / firewall / DNS; verify `--base-url` or OBJECTIFIED_BASE_URL reaches the API.";
   const specifics: Record<string, string> = {
-    ECONNREFUSED: "Connection refused — nothing is listening at this host/port or a firewall blocked it.",
+    ECONNREFUSED:
+      "Connection refused — nothing is listening at this host/port or a firewall blocked it.",
     ENOTFOUND: "DNS lookup failed — check the hostname in `--base-url`.",
     EAI_AGAIN: "Temporary DNS failure — retry or check resolver / VPN.",
     ETIMEDOUT: "Connection timed out — host may be down or blocked.",
     EPIPE: "Connection closed unexpectedly — retry or verify `--base-url`.",
     CERT_HAS_EXPIRED: "TLS certificate expired — update server or trust store.",
-    UNABLE_TO_VERIFY_LEAF_SIGNATURE: "TLS verification failed — check corporate proxy or `--base-url`.",
+    UNABLE_TO_VERIFY_LEAF_SIGNATURE:
+      "TLS verification failed — check corporate proxy or `--base-url`.",
   };
   const detail = specifics[code];
   return new ObjectifiedCliError({

@@ -2,18 +2,12 @@ import { Flags } from "@oclif/core";
 
 import { BaseCommand } from "../../base-command.js";
 import { revokeCliRefreshToken } from "../../lib/auth/cli-oauth.js";
-import {
-  deleteCliOAuthCredentials,
-  loadCliOAuthCredentials,
-} from "../../lib/credentials/store.js";
-import {
-  listAvailableProfileNames,
-  resolveProfileConfigBaseUrl,
-} from "../../lib/cli-context.js";
+import { deleteCliOAuthCredentials, loadCliStoredAuth } from "../../lib/credentials/store.js";
+import { listAvailableProfileNames, resolveProfileConfigBaseUrl } from "../../lib/cli-context.js";
 
 export default class AuthLogout extends BaseCommand {
   static description =
-    "Revoke CLI refresh token at the API and remove OAuth credentials from the OS keychain.";
+    "Revoke CLI refresh token at the API (OAuth profiles) and remove stored credentials from the OS keychain.";
 
   static examples = [
     "<%= config.bin %> <%= command.id %>",
@@ -22,7 +16,7 @@ export default class AuthLogout extends BaseCommand {
     "<%= config.bin %> --json <%= command.id %>",
   ];
 
-  static seeAlso = ["auth login", "docs profiles"];
+  static seeAlso = ["auth login", "auth status", "docs profiles"];
 
   static flags = {
     ...BaseCommand.baseFlags,
@@ -47,12 +41,12 @@ export default class AuthLogout extends BaseCommand {
       const baseUrl = allProfiles
         ? resolveProfileConfigBaseUrl(this.configDoc, profile)
         : this.context.baseUrl;
-      const bundle = await loadCliOAuthCredentials(profile);
-      if (bundle?.refreshToken) {
+      const stored = await loadCliStoredAuth(profile);
+      if (stored?.kind === "oauth") {
         try {
           await revokeCliRefreshToken({
             apiBaseUrl: baseUrl,
-            refreshToken: bundle.refreshToken,
+            refreshToken: stored.refreshToken,
           });
         } catch {
           revokeFailures.push(profile);

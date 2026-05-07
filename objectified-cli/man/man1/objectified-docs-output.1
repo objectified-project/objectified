@@ -4,8 +4,9 @@ objectified docs output \- TTY vs JSON output, quiet mode, verbose logs, and col
 .SH DESCRIPTION
 .nf
 USAGE
-  $ objectified docs output [--api-key <value>] [--base-url <value>]
-    [--config <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
+  $ objectified docs output [--api-key <value>] [--api-key-file
+    <value>] [--base-url <value>] [--config <value>] [--json] [--color]
+    [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   TTY vs JSON output, quiet mode, verbose logs, and color
@@ -34,7 +35,11 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct
+                          authentication (OBJECTIFIED_API_KEY). Not persisted
+                          unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell
+                          history).
 
 SEE ALSO
   objectified docs

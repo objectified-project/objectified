@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.8 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.9 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -63,6 +63,7 @@ USAGE
 <!-- commands -->
 * [`objectified auth login`](#objectified-auth-login)
 * [`objectified auth logout`](#objectified-auth-logout)
+* [`objectified auth status`](#objectified-auth-status)
 * [`objectified completion`](#objectified-completion)
 * [`objectified completion install [SHELL]`](#objectified-completion-install-shell)
 * [`objectified completion show [SHELL]`](#objectified-completion-show-shell)
@@ -85,15 +86,15 @@ USAGE
 
 ## `objectified auth login`
 
-Sign in via PKCE browser flow (stores tokens in the OS keychain).
+Sign in via PKCE browser flow or store an API key in the OS keychain (`--api-key`).
 
 ```
 USAGE
-  $ objectified auth login [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose] [--no-browser]
+  $ objectified auth login [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose] [--no-browser]
 
 DESCRIPTION
-  Sign in via PKCE browser flow (stores tokens in the OS keychain).
+  Sign in via PKCE browser flow or store an API key in the OS keychain (`--api-key`).
 
 EXAMPLES
   $ objectified auth login
@@ -101,6 +102,10 @@ EXAMPLES
   $ objectified --profile staging auth login
 
   $ objectified auth login --no-browser
+
+  $ objectified auth login --api-key
+
+  $ objectified auth login --api-key sk_live_…
 
   $ objectified --json auth login
 
@@ -117,7 +122,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 OTHER
   --no-browser  Do not launch a browser; print the login URL and read the authorization code from stdin.
@@ -125,20 +132,22 @@ OTHER
 SEE ALSO
   objectified auth logout
 
+  objectified auth status
+
   objectified docs profiles
 ```
 
 ## `objectified auth logout`
 
-Revoke CLI refresh token at the API and remove OAuth credentials from the OS keychain.
+Revoke CLI refresh token at the API (OAuth profiles) and remove stored credentials from the OS keychain.
 
 ```
 USAGE
-  $ objectified auth logout [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose] [--all-profiles]
+  $ objectified auth logout [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose] [--all-profiles]
 
 DESCRIPTION
-  Revoke CLI refresh token at the API and remove OAuth credentials from the OS keychain.
+  Revoke CLI refresh token at the API (OAuth profiles) and remove stored credentials from the OS keychain.
 
 EXAMPLES
   $ objectified auth logout
@@ -162,13 +171,61 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 OTHER
   --all-profiles  Revoke and clear stored OAuth credentials for every profile in config.
 
 SEE ALSO
   objectified auth login
+
+  objectified auth status
+
+  objectified docs profiles
+```
+
+## `objectified auth status`
+
+Show the active profile, base URL, and whether you are using an API key or OAuth token.
+
+```
+USAGE
+  $ objectified auth status [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
+
+DESCRIPTION
+  Show the active profile, base URL, and whether you are using an API key or OAuth token.
+
+EXAMPLES
+  $ objectified auth status
+
+  $ objectified --profile staging auth status
+
+  $ objectified --json auth status
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+SEE ALSO
+  objectified auth login
+
+  objectified auth logout
 
   objectified docs profiles
 ```
@@ -179,8 +236,8 @@ Install or print shell completion scripts for bash, zsh, fish, or PowerShell.
 
 ```
 USAGE
-  $ objectified completion [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified completion [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   Install or print shell completion scripts for bash, zsh, fish, or PowerShell.
@@ -207,7 +264,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified docs completions
@@ -223,8 +282,8 @@ Append shell completion glue to the right startup file for your shell.
 
 ```
 USAGE
-  $ objectified completion install [SHELL] [--api-key <value>] [--base-url <value>] [--config <value>] [--json]
-    [--color] [--profile <value>] [-q] [--verbose]
+  $ objectified completion install [SHELL] [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 ARGUMENTS
   [SHELL]  (bash|zsh|fish|powershell) Shell to install for (default: inferred from $SHELL / OS)
@@ -252,7 +311,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified completion show
@@ -268,8 +329,8 @@ Print shell completion glue (with marker comments) to stdout.
 
 ```
 USAGE
-  $ objectified completion show [SHELL] [--api-key <value>] [--base-url <value>] [--config <value>] [--json]
-    [--color] [--profile <value>] [-q] [--verbose]
+  $ objectified completion show [SHELL] [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 ARGUMENTS
   [SHELL]  (bash|zsh|fish|powershell) Shell to generate
@@ -297,7 +358,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified completion install
@@ -311,8 +374,8 @@ Remove Objectified completion blocks added by `completion install`.
 
 ```
 USAGE
-  $ objectified completion uninstall [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified completion uninstall [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   Remove Objectified completion blocks added by `completion install`.
@@ -335,7 +398,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified completion install
@@ -349,8 +414,8 @@ Print a single config value by dotted key
 
 ```
 USAGE
-  $ objectified config get KEY [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified config get KEY [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 ARGUMENTS
   KEY  Dotted path (e.g. default_profile, profile.prod.base_url)
@@ -378,7 +443,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified config set
@@ -392,8 +459,8 @@ Print the entire config file (stable JSON with --json, otherwise TOML)
 
 ```
 USAGE
-  $ objectified config list [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified config list [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   Print the entire config file (stable JSON with --json, otherwise TOML)
@@ -418,7 +485,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified config path
@@ -432,8 +501,8 @@ Print the resolved config.toml path
 
 ```
 USAGE
-  $ objectified config path [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified config path [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   Print the resolved config.toml path
@@ -458,7 +527,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified config get
@@ -472,8 +543,8 @@ Set a config value by dotted key and persist config.toml
 
 ```
 USAGE
-  $ objectified config set KEY VALUE [--api-key <value>] [--base-url <value>] [--config <value>] [--json]
-    [--color] [--profile <value>] [-q] [--verbose]
+  $ objectified config set KEY VALUE [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 ARGUMENTS
   KEY    Dotted path (e.g. default_profile, profile.prod.tenant_slug)
@@ -502,7 +573,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified config get
@@ -516,8 +589,8 @@ List documentation topics (`objectified docs`) or open one with `objectified doc
 
 ```
 USAGE
-  $ objectified docs [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified docs [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   List documentation topics (`objectified docs`) or open one with `objectified docs <topic>`.
@@ -542,7 +615,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified docs errors
@@ -558,8 +633,8 @@ Shell completions (install/show/uninstall, static manifest + cached REST suggest
 
 ```
 USAGE
-  $ objectified docs completions [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified docs completions [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   Shell completions (install/show/uninstall, static manifest + cached REST suggestions)
@@ -584,7 +659,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified completion install
@@ -598,8 +675,8 @@ Exit codes, hints, and error-handling reference
 
 ```
 USAGE
-  $ objectified docs errors [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified docs errors [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   Exit codes, hints, and error-handling reference
@@ -624,7 +701,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified docs
@@ -640,8 +719,8 @@ TTY vs JSON output, quiet mode, verbose logs, and color
 
 ```
 USAGE
-  $ objectified docs output [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified docs output [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   TTY vs JSON output, quiet mode, verbose logs, and color
@@ -666,7 +745,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified docs
@@ -682,8 +763,8 @@ Future oclif plugin extensibility for Objectified
 
 ```
 USAGE
-  $ objectified docs plugins [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified docs plugins [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   Future oclif plugin extensibility for Objectified
@@ -708,7 +789,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified docs
@@ -722,8 +805,8 @@ config.toml profiles, defaults, and precedence rules
 
 ```
 USAGE
-  $ objectified docs profiles [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified docs profiles [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   config.toml profiles, defaults, and precedence rules
@@ -748,7 +831,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified docs
@@ -764,8 +849,8 @@ Telemetry posture and safe verbose debugging
 
 ```
 USAGE
-  $ objectified docs telemetry [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified docs telemetry [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   Telemetry posture and safe verbose debugging
@@ -791,7 +876,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified docs errors
@@ -805,8 +892,8 @@ Smoke-test greeting for the Objectified CLI
 
 ```
 USAGE
-  $ objectified hello [NAME] [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified hello [NAME] [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 ARGUMENTS
   [NAME]  Who to greet
@@ -834,7 +921,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified docs output
@@ -868,8 +957,8 @@ List Objectified projects
 
 ```
 USAGE
-  $ objectified projects list [--api-key <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+  $ objectified projects list [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
   List Objectified projects
@@ -894,7 +983,9 @@ OUTPUT
       --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
 
 AUTH
-  --api-key=<value>  API key for direct authentication (bypasses login token).
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
   objectified config path

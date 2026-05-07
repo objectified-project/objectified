@@ -1,6 +1,9 @@
 /** Split CLI words (from the shell driver) into profile override and command tokens. */
 
-export function extractProfileFromWords(words: string[], uptoInclusive: number): string | undefined {
+export function extractProfileFromWords(
+  words: string[],
+  uptoInclusive: number,
+): string | undefined {
   const hi = Math.min(uptoInclusive, words.length - 1);
   for (let i = 1; i <= hi; i++) {
     const w = words[i];
@@ -45,6 +48,11 @@ export function splitCommandTokens(words: string[], cword: number): SplitWordsRe
       }
       if (w === "--api-key" || w.startsWith("--api-key=")) {
         if (w === "--api-key") i += 2;
+        else i += 1;
+        continue;
+      }
+      if (w === "--api-key-file" || w.startsWith("--api-key-file=")) {
+        if (w === "--api-key-file") i += 2;
         else i += 1;
         continue;
       }
