@@ -51,6 +51,7 @@ export function PropertyDescriptionAiButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,8 +85,10 @@ export function PropertyDescriptionAiButton({
   }, [tenantId, projectId]);
 
   const stop = useCallback(() => {
+    requestIdRef.current += 1;
     abortRef.current?.abort();
     abortRef.current = null;
+    setBusy(false);
   }, []);
 
   const generate = useCallback(async () => {
@@ -99,7 +102,10 @@ export function PropertyDescriptionAiButton({
       storage: typeof window !== 'undefined' ? window.localStorage : null,
     });
 
-    stop();
+    requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
+
+    abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
 
@@ -114,6 +120,7 @@ export function PropertyDescriptionAiButton({
         /* optional */
       }
     }
+    if (ac.signal.aborted || requestId !== requestIdRef.current) return;
 
     const existingPropsPayload = existingProperties.map(propertyItemToExistingApiShape);
 
@@ -148,18 +155,20 @@ export function PropertyDescriptionAiButton({
       }
 
       const full = await accumulateOllamaSse(response, ac.signal);
-      if (ac.signal.aborted) return;
+      if (ac.signal.aborted || requestId !== requestIdRef.current) return;
 
       const normalized = normalizeGeneratedPropertyDescription(full);
       if (!normalized) {
+        if (requestId !== requestIdRef.current) return;
         setError('The model returned an empty description. Try again or pick another model.');
         return;
       }
       onGenerated(normalized);
     } catch (e) {
-      if (ac.signal.aborted) return;
+      if (ac.signal.aborted || requestId !== requestIdRef.current) return;
       setError(e instanceof Error ? e.message : 'Something went wrong.');
     } finally {
+      if (requestId !== requestIdRef.current) return;
       setBusy(false);
       if (abortRef.current === ac) abortRef.current = null;
     }
@@ -175,10 +184,16 @@ export function PropertyDescriptionAiButton({
     existingProperties,
     studioContext,
     onGenerated,
-    stop,
   ]);
 
-  useEffect(() => () => stop(), [stop]);
+  useEffect(
+    () => () => {
+      requestIdRef.current += 1;
+      abortRef.current?.abort();
+      abortRef.current = null;
+    },
+    [],
+  );
 
   const canRun = Boolean(propertyName.trim() && selectedModel.trim() && !disabled);
 

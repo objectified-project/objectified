@@ -50,6 +50,10 @@ const DESCRIPTION_SCHEMA_KEYS = [
 function truncateDeep(value: unknown, depth: number): unknown {
   if (depth <= 0) return '[…]';
   if (value === null || value === undefined) return value;
+  if (typeof value === 'string') {
+    const cap = 320;
+    return value.length > cap ? `${value.slice(0, cap - 1)}…` : value;
+  }
   if (typeof value !== 'object') return value;
   if (Array.isArray(value)) {
     const cap = 12;
@@ -95,6 +99,8 @@ export function draftPropertySchemaFromDialogForm(input: {
   seedProperty: SeedPropertyLike;
 }): Record<string, unknown> {
   const { propertyType, propertyIsArray, formData, seedProperty } = input;
+  const nullable = Boolean(formData.nullable);
+  const arrayType: string | string[] = nullable ? ['array', 'null'] : 'array';
 
   const valueHints = (): Record<string, unknown> => {
     const o: Record<string, unknown> = {};
@@ -151,7 +157,7 @@ export function draftPropertySchemaFromDialogForm(input: {
       '';
     if (propertyIsArray) {
       return {
-        type: 'array',
+        type: arrayType,
         items: ref ? { $ref: ref, ...valueHints() } : { type: 'object', ...valueHints() },
         ...arrayHints(),
       };
@@ -159,22 +165,21 @@ export function draftPropertySchemaFromDialogForm(input: {
     return ref ? { $ref: ref, ...valueHints() } : { type: 'object', ...valueHints() };
   }
 
-  const nullable = Boolean(formData.nullable);
   const itemType = propertyType || 'string';
 
-  const elementSchema = (): Record<string, unknown> => {
+  const elementSchema = (includeNullable: boolean): Record<string, unknown> => {
     const base = valueHints();
-    if (nullable) return { type: [itemType, 'null'], ...base };
+    if (includeNullable) return { type: [itemType, 'null'], ...base };
     return { type: itemType, ...base };
   };
 
   if (propertyIsArray) {
     return {
-      type: 'array',
-      items: elementSchema(),
+      type: arrayType,
+      items: elementSchema(false),
       ...arrayHints(),
     };
   }
 
-  return elementSchema();
+  return elementSchema(nullable);
 }

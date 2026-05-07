@@ -25,7 +25,7 @@ describe('ai-property-description (#619)', () => {
     });
     expect(s.type).toBe('string');
     expect(s.format).toBe('email');
-    expect(s.description).toBeDefined();
+    expect(s.description).toHaveLength(320);
   });
 
   it('draftPropertySchemaFromDialogForm reflects array and nullable', () => {
@@ -41,8 +41,8 @@ describe('ai-property-description (#619)', () => {
       formData,
       seedProperty: null,
     });
-    expect(doc.type).toBe('array');
-    expect(doc.items).toEqual({ type: ['string', 'null'], format: 'uuid' });
+    expect(doc.type).toEqual(['array', 'null']);
+    expect(doc.items).toEqual({ type: 'string', format: 'uuid' });
     expect(doc.minItems).toBe(1);
     expect(doc.maxItems).toBe(10);
   });
