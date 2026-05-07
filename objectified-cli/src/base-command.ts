@@ -116,6 +116,7 @@ export abstract class BaseCommand extends Command {
     const Cmd = this.constructor as typeof Command;
     const parsed = await this.parse(Cmd);
     const parsedFlags = parsed.flags as Record<string, unknown>;
+    // Keep camelCase fallback for compatibility with argv normalization/tests that still accept legacy forms.
     const globalPart: GlobalCliFlags = {
       apiKey: (parsedFlags["api-key"] as string | undefined) ?? (parsedFlags.apiKey as string | undefined),
       baseUrl:

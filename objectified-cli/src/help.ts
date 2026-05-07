@@ -75,7 +75,7 @@ function helpShouldStripAnsi(optsStrip: boolean | undefined, argv: string[]): bo
   if (colorFlag === false) return true;
   if (colorFlag === true) return false;
   if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") return true;
-  return !(typeof supportsColor.stdout === "object" && process.stdout.isTTY);
+  return typeof supportsColor.stdout !== "object" || !process.stdout.isTTY;
 }
 
 type CommandWithSeeAlso = Command.Loadable & { seeAlso?: string[] };
