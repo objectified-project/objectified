@@ -110,12 +110,21 @@ function parseProjectsPayload(data: unknown): ProjectSchema[] {
       typeof p.id !== "string" ||
       typeof p.tenant_id !== "string" ||
       typeof p.name !== "string" ||
-      typeof p.slug !== "string" ||
+      typeof p.slug !== "string"
+    ) {
+      throw new CliError("API error: invalid project fields in response.", 1);
+    }
+    if (
+      p.enabled !== undefined &&
+      p.enabled !== null &&
       typeof p.enabled !== "boolean"
     ) {
       throw new CliError("API error: invalid project fields in response.", 1);
     }
-    projects.push(raw as ProjectSchema);
+    projects.push({
+      ...(raw as ProjectSchema),
+      enabled: typeof p.enabled === "boolean" ? p.enabled : true,
+    });
   }
   return projects;
 }
