@@ -1947,3 +1947,30 @@ class TenantInfoResponse(BaseModel):
     published_versions_count: int = 0
     storage_used_bytes: Optional[int] = None
     storage_quota_bytes: Optional[int] = None
+
+
+class BrowseDirectoryStats(BaseModel):
+    """Aggregate counts for published public specs (browse directory home)."""
+
+    tenant_count: int
+    project_count: int
+    version_count: int
+
+
+class BrowsePublicTenantRow(BaseModel):
+    """One tenant row in the public browse directory."""
+
+    slug: str
+    name: str
+    project_count: int
+    published_versions: int
+    latest_version: Optional[str] = None
+    latest_activity_at: Optional[datetime] = None
+
+
+class BrowsePublicTenantsResponse(BaseModel):
+    """Public tenant directory for CLI and integrations (no authentication)."""
+
+    directory_stats: BrowseDirectoryStats
+    tenants: List[BrowsePublicTenantRow]
+    filtered_count: int

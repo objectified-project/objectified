@@ -275,4 +275,43 @@ describe("createApiClient + generated SDK", () => {
     await expect(api.verifyTenantAccess("acme-corp")).resolves.toBeUndefined();
     expect(mockFetch).toHaveBeenCalled();
   });
+
+  it("listPublicBrowseTenants performs GET /v1/browse/tenants without requiring credentials", async () => {
+    const body = {
+      directory_stats: { tenant_count: 1, project_count: 2, version_count: 5 },
+      tenants: [
+        {
+          slug: "demo",
+          name: "Demo",
+          project_count: 2,
+          published_versions: 5,
+          latest_version: "1.0.0",
+          latest_activity_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      filtered_count: 1,
+    };
+    const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const request = input instanceof Request ? input : new Request(input);
+      expect(request.method).toBe("GET");
+      const u = new URL(request.url);
+      expect(u.pathname.endsWith("/v1/browse/tenants")).toBe(true);
+      expect(u.searchParams.get("sort")).toBe("latest");
+      expect(u.searchParams.get("search")).toBe("demo");
+      expect(request.headers.get("authorization")).toBeNull();
+      expect(request.headers.get("x-api-key")).toBeNull();
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const api = createApiClient({ baseUrl: "http://127.0.0.1:9", auth: {} });
+    const out = await api.listPublicBrowseTenants({ search: "demo", sort: "latest" });
+    expect(out.directory_stats.tenant_count).toBe(1);
+    expect(out.tenants).toHaveLength(1);
+    expect(out.tenants[0]?.slug).toBe("demo");
+    expect(out.filtered_count).toBe(1);
+  });
 });

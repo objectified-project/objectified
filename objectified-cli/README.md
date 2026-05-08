@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.20 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.21 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -64,6 +64,7 @@ USAGE
 * [`objectified auth login`](#objectified-auth-login)
 * [`objectified auth logout`](#objectified-auth-logout)
 * [`objectified auth status`](#objectified-auth-status)
+* [`objectified browse tenants`](#objectified-browse-tenants)
 * [`objectified completion`](#objectified-completion)
 * [`objectified completion install [SHELL]`](#objectified-completion-install-shell)
 * [`objectified completion show [SHELL]`](#objectified-completion-show-shell)
@@ -250,6 +251,62 @@ SEE ALSO
 
 ALIASES
   $ objectified whoami
+```
+
+## `objectified browse tenants`
+
+List tenants with published public specs (GET /v1/browse/tenants; no authentication required)
+
+```
+USAGE
+  $ objectified browse tenants [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--search <value>] [--sort
+    latest|name|projects] [--limit <value>] [--all]
+
+DESCRIPTION
+  List tenants with published public specs (GET /v1/browse/tenants; no authentication required)
+
+EXAMPLES
+  $ objectified browse tenants
+
+  $ objectified --json browse tenants
+
+  $ objectified browse tenants --search acme --sort latest
+
+  $ objectified browse tenants --all
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --all             Print every tenant returned by the API after sort/filter (no --limit cap).
+  --limit=<value>   [default: 50] Maximum rows to display (1–500; default 50). Ignored with --all.
+  --search=<value>  Filter tenant names and slugs (substring; applied on the server).
+  --sort=<option>   [default: name] Sort order: name (default), latest (most recent activity first), or projects (desc).
+                    <options: latest|name|projects>
+
+SEE ALSO
+  objectified tenants list
+
+  objectified auth status
+
+  objectified docs errors
 ```
 
 ## `objectified completion`
