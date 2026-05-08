@@ -569,14 +569,14 @@ objectified browse
         └── versions <tenant>/<project> # published versions (optional auth expands visibility)
 
 objectified schema
-        └── fetch <tenant>/<project>/<version>   # published OpenAPI bundle or single class (GET /v1/schema/…)
+        ├── fetch <tenant>/<project>/<version>   # published OpenAPI bundle or single class (GET /v1/schema/…)
+        └── swagger <tenant>/<project>/<version>  # Swagger UI in browser (default on TTY) or bundle via GET /v1/schema/…
 ```
 
 ### Summary Table
 
 | #         | Title                                                  | Description                                                | Labels                                              | MVP | Parallel |
 |-----------|--------------------------------------------------------|------------------------------------------------------------|-----------------------------------------------------|-----|----------|
-| 9.5 (#3248) | `schema swagger`                                     | Download Swagger UI bundle or open in browser              | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `export`, `browser` | Yes | Yes |
 | 9.6 (#3249) | `schema arazzo`                                      | Arazzo workflow bundle (default `--format yaml`)           | `enhancement`, `cli`, `roadmap-cli`, `export`, `browser` | No  | Yes |
 | 9.7 (#3250) | `schema json`                                        | JSON Schema bundle or per-class                            | `enhancement`, `cli`, `roadmap-cli`, `export`, `browser` | No  | Yes |
 | 9.8 (#3251) | `schema diff <v1> <v2>`                              | Summary / unified / SARIF / JSON diff                      | `enhancement`, `cli`, `roadmap-cli`, `browser`, `export` | No | Yes |
@@ -743,13 +743,13 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ## MVP Release — Ticket Bundle
 
-The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **7 open sub-tickets** across 4 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, #3194, #3195, #3202, #3203, #3204, #3208, #3209, #3210, #3212, #3244, #3245, #3246, and #3247).
+The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **6 open sub-tickets** across 4 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, #3194, #3195, #3202, #3203, #3204, #3208, #3209, #3210, #3212, #3244, #3245, #3246, #3247, and #3248).
 
 | Epic     | Tickets                                                                                                   | Count |
 |----------|-----------------------------------------------------------------------------------------------------------|-------|
 | 2 (#3175) | #3196, #3197, #3198, #3199                                                                                | 4     |
 | 4 (#3177) | _(none — #3212 shipped)_                                                                                    | 0     |
-| 9 (#3182) | #3248                                                                                                    | 1     |
+| 9 (#3182) | _(none — #3248 shipped)_                                                                                    | 0     |
 | 12 (#3185) | #3267, #3268                                                                                               | 2     |
 
 **MVP Demo Story:**
@@ -761,8 +761,9 @@ The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for 
 6. `objectified versions create payments-api --version 2.2.0-rc.1 --notes 'New refund flow'`
 7. `objectified versions publish payments-api 2.2.0-rc.1`
 8. `objectified schema fetch acme-corp/payments-api/2.2.0-rc.1 --format yaml > payments.openapi.yaml`
-9. (CI) `objectified --json projects list | jq` works in any pipeline
-10. (Public) `objectified browse tenants` and `objectified browse projects <tenant>` work without authentication (credentials optional for private projects)
+9. `objectified schema swagger acme-corp/payments-api/2.2.0-rc.1` opens Swagger UI (TTY default), or `--output ./swagger.json` / pipe-friendly JSON when stdout is not a TTY
+10. (CI) `objectified --json projects list | jq` works in any pipeline
+11. (Public) `objectified browse tenants` and `objectified browse projects <tenant>` work without authentication (credentials optional for private projects)
 
 ---
 
@@ -837,7 +838,7 @@ The tickets were created in the order below — that is also the recommended **e
 2. **Epic 2 — Auth & Tenants** (#3175; #3194–#3197 shipped — continue #3198 → #3201). Required for any tenant-scoped command.
 3. **Epic 3 — Projects** (#3176 then #3205 → #3207; #3203 and #3204 shipped). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3211 → #3216; #3208 `versions list`, #3209 `versions show`, and #3210 `versions create` shipped). The publish flow that makes the CLI valuable in CI.
-5. **Epic 9 — Browse & Schema Export** (#3182 then #3248 → #3252; #3244 `browse tenants`, #3245 `browse projects`, #3246 `browse versions`, and #3247 `schema fetch` shipped). The most-used consumer surface; lands early because it works without auth.
+5. **Epic 9 — Browse & Schema Export** (#3182 then #3249 → #3252; #3244 `browse tenants`, #3245 `browse projects`, #3246 `browse versions`, #3247 `schema fetch`, and #3248 `schema swagger` shipped). The most-used consumer surface; lands early because it works without auth.
 6. **Epic 12 — Distribution (CI + NPM publish only)** (#3185 then #3267, #3268). Ship MVP — `npm i -g objectified-cli` works.
 7. **Epic 5 — Primitives** (#3178 then #3217 → #3222). v2 schema-modeling surface starts here.
 8. **Epic 6 — Properties** (#3179 then #3223 → #3228). Builds on primitives.
