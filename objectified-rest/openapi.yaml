@@ -49,6 +49,83 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/browse/tenants/{tenant_slug}/projects:
+    get:
+      tags:
+      - browse
+      summary: List Public Browse Projects For Tenant
+      description: 'Published-public projects for anonymous callers (browse parity). When Authorization
+        or X-API-Key proves tenant membership, private projects are included and counts reflect all
+        published versions.'
+      operationId: list_public_browse_projects_v1_browse_tenants__tenant_slug__projects_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Case-insensitive substring filter on project slug and name.
+          title: Search
+        description: Case-insensitive substring filter on project slug and name.
+      - name: domain
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by project metadata domain or domainCategory (case-insensitive).
+          title: Domain
+        description: Filter by project metadata domain or domainCategory (case-insensitive).
+      - name: has_published
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Only include projects with at least one published version (visibility rules
+            apply).
+          default: false
+          title: Has Published
+        description: Only include projects with at least one published version (visibility rules apply).
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrowsePublicProjectsResponse'
+        '404':
+          description: Tenant not found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/data/{tenant_slug}:
     get:
       tags:
@@ -8528,6 +8605,64 @@ components:
       - filtered_count
       title: BrowsePublicTenantsResponse
       description: Public tenant directory for CLI and integrations (no authentication).
+    BrowsePublicProjectRow:
+      properties:
+        slug:
+          type: string
+          title: Slug
+        name:
+          type: string
+          title: Name
+        domain:
+          type: string
+          title: Domain
+        published_versions:
+          type: integer
+          title: Published Versions
+        latest_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Latest Version
+        latest_published_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Latest Published At
+      type: object
+      required:
+      - slug
+      - name
+      - domain
+      - published_versions
+      title: BrowsePublicProjectRow
+      description: One project row for public browse (per tenant).
+    BrowsePublicProjectsResponse:
+      properties:
+        tenant_slug:
+          type: string
+          title: Tenant Slug
+        tenant_name:
+          type: string
+          title: Tenant Name
+        projects:
+          items:
+            $ref: '#/components/schemas/BrowsePublicProjectRow'
+          type: array
+          title: Projects
+        filtered_count:
+          type: integer
+          title: Filtered Count
+      type: object
+      required:
+      - tenant_slug
+      - tenant_name
+      - projects
+      - filtered_count
+      title: BrowsePublicProjectsResponse
+      description: Published-public projects for a tenant (anonymous), or full tenant project list for
+        members.
     ChangeReportModel:
       properties:
         schemaVersion:

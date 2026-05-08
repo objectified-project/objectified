@@ -314,4 +314,48 @@ describe("createApiClient + generated SDK", () => {
     expect(out.tenants[0]?.slug).toBe("demo");
     expect(out.filtered_count).toBe(1);
   });
+
+  it("listPublicBrowseProjects performs GET /v1/browse/tenants/{slug}/projects", async () => {
+    const body = {
+      tenant_slug: "acme-corp",
+      tenant_name: "Acme",
+      projects: [
+        {
+          slug: "payments-api",
+          name: "Payments API",
+          domain: "finance",
+          published_versions: 2,
+          latest_version: "1.0.0",
+          latest_published_at: null,
+        },
+      ],
+      filtered_count: 1,
+    };
+    const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const request = input instanceof Request ? input : new Request(input);
+      expect(request.method).toBe("GET");
+      const u = new URL(request.url);
+      expect(u.pathname.endsWith("/v1/browse/tenants/acme-corp/projects")).toBe(true);
+      expect(u.searchParams.get("search")).toBe("pay");
+      expect(u.searchParams.get("domain")).toBe("finance");
+      expect(u.searchParams.get("has_published")).toBe("true");
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const api = createApiClient({ baseUrl: "http://127.0.0.1:9", auth: { apiKey: "k" } });
+    const out = await api.listPublicBrowseProjects({
+      tenantSlug: "acme-corp",
+      search: "pay",
+      domain: "finance",
+      hasPublished: true,
+    });
+    expect(out.tenant_slug).toBe("acme-corp");
+    expect(out.projects).toHaveLength(1);
+    expect(out.projects[0]?.slug).toBe("payments-api");
+    expect(out.filtered_count).toBe(1);
+  });
 });

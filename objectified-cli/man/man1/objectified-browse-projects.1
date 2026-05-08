@@ -1,0 +1,75 @@
+.TH OBJECTIFIED\-BROWSE\-PROJECTS 1 "" "" "User Commands"
+.SH NAME
+objectified browse projects \- List projects for a tenant from GET /v1/browse/tenants/{tenant}/projects (public directory without auth; optional credentials include private projects)
+.SH DESCRIPTION
+.nf
+USAGE
+  $ objectified browse projects TENANT [--api-key <value>] [--api-key-file
+    <value>] [--base-url <value>] [--config <value>] [--json] [--color]
+    [--profile <value>] [--tenant <value>] [-q] [--verbose] [--domain <value>]
+    [--has-published] [--search <value>] [--limit <value>] [--all]
+
+ARGUMENTS
+  TENANT  Tenant slug (for example acme-corp).
+
+DESCRIPTION
+  List projects for a tenant from GET /v1/browse/tenants/{tenant}/projects
+  (public directory without auth; optional credentials include private
+  projects)
+
+EXAMPLES
+  $ objectified browse projects acme-corp
+
+  $ objectified --json browse projects acme-corp
+
+  $ objectified browse projects acme-corp --search payment --domain finance
+
+  $ objectified browse projects acme-corp --has-published --all
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir /
+                      Objectified AppData on Windows — see `objectified config
+                      path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls
+                      back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only
+                      (overrides OBJECTIFIED_TENANT and config tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR;
+                    colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1;
+                    auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct
+                          authentication (OBJECTIFIED_API_KEY). Not persisted
+                          unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell
+                          history).
+
+OTHER
+  --all             Print every project returned by the API after filters (no
+                    --limit cap).
+  --domain=<value>  Filter by project metadata domain or domainCategory
+                    (case-insensitive; server-side).
+  --has-published   Only projects with at least one published version (any
+                    visibility for members; public publishes only when
+                    unauthenticated).
+  --limit=<value>   [default: 50] Maximum rows to display (1–500; default 50).
+                    Ignored with --all.
+  --search=<value>  Filter project slug and name (substring; applied on the
+                    server).
+
+SEE ALSO
+  objectified browse tenants
+
+  objectified projects list
+
+  objectified auth status
+
+  objectified docs errors
+.fi

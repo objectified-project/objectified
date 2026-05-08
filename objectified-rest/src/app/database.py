@@ -6841,6 +6841,183 @@ class Database:
         """
         return self.execute_query(query, params)
 
+    _BROWSE_PROJECT_DOMAIN_COMPARE_SQL = """
+        LOWER(TRIM(COALESCE(
+            NULLIF(TRIM(COALESCE(p.metadata->>'domain', '')), ''),
+            CASE
+                WHEN LOWER(TRIM(COALESCE(p.metadata->>'domainCategory', ''))) IN ('', 'none')
+                THEN NULL
+                ELSE TRIM(COALESCE(p.metadata->>'domainCategory', ''))
+            END,
+            ''
+        )))
+        """
+
+    def list_public_browse_projects_for_tenant(
+        self,
+        tenant_id: str,
+        *,
+        search: Optional[str] = None,
+        domain: Optional[str] = None,
+        require_published: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """
+        Projects with at least one published **public** version (browse-app parity).
+
+        Optional ``search`` filters slug/name (substring, case-insensitive).
+        Optional ``domain`` filters metadata ``domain`` / ``domainCategory`` (case-insensitive).
+        ``require_published`` retained for API symmetry; this listing already implies ≥1 public publish.
+        """
+        dom_sql = self._BROWSE_PROJECT_DOMAIN_COMPARE_SQL.strip()
+        term = search.strip() if search and search.strip() else ""
+        search_clause = ""
+        params: List[Any] = [tenant_id]
+        if term:
+            search_clause = " AND (p.slug ILIKE %s OR p.name ILIKE %s)"
+            pat = f"%{term}%"
+            params.extend([pat, pat])
+        domain_clause = ""
+        domain_term = domain.strip() if domain and domain.strip() else ""
+        if domain_term:
+            domain_clause = f" AND ({dom_sql}) = LOWER(TRIM(%s))"
+            params.append(domain_term)
+        published_outer = ""
+        if require_published:
+            published_outer = " AND a.published_versions >= 1"
+
+        query = f"""
+            WITH eligible AS (
+                SELECT
+                    p.id AS project_id,
+                    p.slug,
+                    p.name,
+                    p.metadata,
+                    v.id AS version_id,
+                    v.version_id AS version_slug,
+                    COALESCE(v.published_at, v.updated_at, v.created_at) AS activity_ts
+                FROM odb.projects p
+                INNER JOIN odb.tenants t ON p.tenant_id = t.id
+                INNER JOIN odb.versions v ON p.id = v.project_id
+                WHERE t.id = %s
+                  AND v.published IS TRUE
+                  AND v.visibility = 'public'
+                  AND t.deleted_at IS NULL
+                  AND p.deleted_at IS NULL
+                  AND v.deleted_at IS NULL
+                  {search_clause}
+                  {domain_clause}
+            ),
+            agg AS (
+                SELECT
+                    e.project_id,
+                    e.slug,
+                    e.name,
+                    e.metadata,
+                    COUNT(DISTINCT e.version_id)::int AS published_versions,
+                    MAX(e.activity_ts) AS latest_activity_ts
+                FROM eligible e
+                GROUP BY e.project_id, e.slug, e.name, e.metadata
+            ),
+            latest_ver AS (
+                SELECT DISTINCT ON (e.project_id)
+                    e.project_id,
+                    e.version_slug AS latest_version,
+                    e.activity_ts AS latest_published_at
+                FROM eligible e
+                ORDER BY e.project_id, e.activity_ts DESC NULLS LAST, e.version_slug DESC
+            )
+            SELECT
+                a.slug,
+                a.name,
+                a.metadata,
+                a.published_versions,
+                lv.latest_version,
+                lv.latest_published_at
+            FROM agg a
+            LEFT JOIN latest_ver lv ON lv.project_id = a.project_id
+            WHERE 1 = 1
+              {published_outer}
+            ORDER BY a.slug ASC
+        """
+        return self.execute_query(query, tuple(params))
+
+    def list_member_browse_projects_for_tenant(
+        self,
+        tenant_id: str,
+        *,
+        search: Optional[str] = None,
+        domain: Optional[str] = None,
+        require_published: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """
+        All non-deleted projects for a tenant member (JWT/API key scoped to tenant).
+
+        Counts and ``latest_*`` consider any published version (any visibility).
+        """
+        dom_sql = self._BROWSE_PROJECT_DOMAIN_COMPARE_SQL.strip()
+        term = search.strip() if search and search.strip() else ""
+        search_clause = ""
+        params: List[Any] = [tenant_id]
+        if term:
+            search_clause = " AND (p.slug ILIKE %s OR p.name ILIKE %s)"
+            pat = f"%{term}%"
+            params.extend([pat, pat])
+        domain_clause = ""
+        domain_term = domain.strip() if domain and domain.strip() else ""
+        if domain_term:
+            domain_clause = f" AND ({dom_sql}) = LOWER(TRIM(%s))"
+            params.append(domain_term)
+        published_clause = ""
+        if require_published:
+            published_clause = """
+              AND EXISTS (
+                SELECT 1 FROM odb.versions vpub
+                WHERE vpub.project_id = p.id
+                  AND vpub.deleted_at IS NULL
+                  AND vpub.published IS TRUE
+              )
+            """
+
+        query = f"""
+            SELECT
+                p.slug,
+                p.name,
+                p.metadata,
+                (
+                    SELECT COUNT(*)::int FROM odb.versions v
+                    WHERE v.project_id = p.id
+                      AND v.deleted_at IS NULL
+                      AND v.published IS TRUE
+                ) AS published_versions,
+                (
+                    SELECT v2.version_id FROM odb.versions v2
+                    WHERE v2.project_id = p.id
+                      AND v2.deleted_at IS NULL
+                      AND v2.published IS TRUE
+                    ORDER BY COALESCE(v2.published_at, v2.updated_at, v2.created_at) DESC NULLS LAST,
+                             v2.version_id DESC
+                    LIMIT 1
+                ) AS latest_version,
+                (
+                    SELECT COALESCE(v2.published_at, v2.updated_at, v2.created_at)
+                    FROM odb.versions v2
+                    WHERE v2.project_id = p.id
+                      AND v2.deleted_at IS NULL
+                      AND v2.published IS TRUE
+                    ORDER BY COALESCE(v2.published_at, v2.updated_at, v2.created_at) DESC NULLS LAST,
+                             v2.version_id DESC
+                    LIMIT 1
+                ) AS latest_published_at
+            FROM odb.projects p
+            WHERE p.tenant_id = %s
+              AND p.deleted_at IS NULL
+              {search_clause}
+              {domain_clause}
+              {published_clause}
+            ORDER BY p.slug ASC
+        """
+        return self.execute_query(query, tuple(params))
+
 
 # Global database instance
 db = Database()

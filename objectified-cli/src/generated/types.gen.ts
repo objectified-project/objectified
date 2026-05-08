@@ -67,6 +67,60 @@ export type BrowsePublicTenantsResponse = {
 };
 
 /**
+ * BrowsePublicProjectRow
+ * One project row for public browse (per tenant).
+ */
+export type BrowsePublicProjectRow = {
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Domain
+     */
+    domain: string;
+    /**
+     * Published Versions
+     */
+    published_versions: number;
+    /**
+     * Latest Version
+     */
+    latest_version?: string | null;
+    /**
+     * Latest Published At
+     */
+    latest_published_at?: string | null;
+};
+
+/**
+ * BrowsePublicProjectsResponse
+ * Published-public projects for a tenant (anonymous), or full tenant project list for members.
+ */
+export type BrowsePublicProjectsResponse = {
+    /**
+     * Tenant Slug
+     */
+    tenant_slug: string;
+    /**
+     * Tenant Name
+     */
+    tenant_name: string;
+    /**
+     * Projects
+     */
+    projects: Array<BrowsePublicProjectRow>;
+    /**
+     * Filtered Count
+     */
+    filtered_count: number;
+};
+
+/**
  * ChangeReportModel
  * Versioned semantic diff between two resolved OpenAPI documents.
  * ``schemaVersion`` bumps when this JSON shape changes incompatibly.
@@ -3264,6 +3318,66 @@ export type ListPublicBrowseTenantsV1BrowseTenantsGetResponses = {
 };
 
 export type ListPublicBrowseTenantsV1BrowseTenantsGetResponse = ListPublicBrowseTenantsV1BrowseTenantsGetResponses[keyof ListPublicBrowseTenantsV1BrowseTenantsGetResponses];
+
+export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+        /**
+         * X-Api-Key
+         */
+        'X-API-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Tenant Slug
+         */
+        tenant_slug: string;
+    };
+    query?: {
+        /**
+         * Search
+         * Case-insensitive substring filter on project slug and name.
+         */
+        search?: string | null;
+        /**
+         * Domain
+         * Filter by project metadata domain or domainCategory (case-insensitive).
+         */
+        domain?: string | null;
+        /**
+         * Has Published
+         * Only include projects with at least one published version (visibility rules apply).
+         */
+        has_published?: boolean;
+    };
+    url: '/v1/browse/tenants/{tenant_slug}/projects';
+};
+
+export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetErrors = {
+    /**
+     * Tenant not found
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetError = ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetErrors[keyof ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetErrors];
+
+export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: BrowsePublicProjectsResponse;
+};
+
+export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetResponse = ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetResponses[keyof ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetResponses];
 
 export type DataApiInfoV1DataTenantSlugGetData = {
     body?: never;
