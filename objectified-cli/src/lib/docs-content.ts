@@ -10,7 +10,7 @@ Stable JSON
   With --json (or non-TTY stdout), emitted JSON is sorted by key where applicable and avoids decorative fields. Pipe output to jq or similar tools.
 
 auth status --json (stable schema, #3196)
-  Keys: base_url (string), profile (string), tenant ({ slug, name } | null), user ({ id, email }), plan (string | null), auth ({ type: "oauth" | "api_key", expires_at?: string | null }). expires_at is access-token expiry as ISO 8601 UTC when type is oauth (from GET /v1/auth/cli/whoami, or JWT exp fallback). Omitted for api_key auth. Human-facing status uses one GET /v1/auth/cli/whoami round trip; OAuth may silently refresh via POST /v1/auth/cli/token first when the access token is rejected.
+  Keys: base_url (string), profile (string), tenant ({ slug, name } | null, where name may be null), user ({ id: string | null, email: string | null }), plan (string | null), auth ({ type: "oauth" | "api_key", expires_at?: string | null }). expires_at is access-token expiry as ISO 8601 UTC when type is oauth (from GET /v1/auth/cli/whoami, or JWT exp fallback). Omitted for api_key auth. Human-facing status fetches GET /v1/auth/cli/whoami, and for stored OAuth may silently perform POST /v1/auth/cli/token then retry whoami once after a 401.
 
 Quiet and verbose
   --quiet (-q) hides non-error stdout such as banners and spinners while keeping errors on stderr. --verbose adds diagnostic detail on stderr without changing stdout payloads.

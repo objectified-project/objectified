@@ -202,8 +202,6 @@ DESCRIPTION
 EXAMPLES
   $ objectified auth status
 
-  $ objectified whoami
-
   $ objectified --profile staging auth status
 
   $ objectified --json auth status
@@ -1036,8 +1034,6 @@ DESCRIPTION
   Show active profile, API base URL, tenant, user, auth type, token expiry, and plan (GET /v1/auth/cli/whoami).
 
 EXAMPLES
-  $ objectified whoami
-
   $ objectified whoami
 
   $ objectified --profile staging whoami

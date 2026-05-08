@@ -14,7 +14,6 @@ export default class AuthStatus extends BaseCommand {
 
   static examples = [
     "<%= config.bin %> <%= command.id %>",
-    "<%= config.bin %> whoami",
     "<%= config.bin %> --profile staging <%= command.id %>",
     "<%= config.bin %> --json <%= command.id %>",
   ];
@@ -33,7 +32,10 @@ export default class AuthStatus extends BaseCommand {
       });
     }
 
-    const stored = await loadCliStoredAuth(this.context.profile);
+    const stored =
+      this.activeCredential.kind === "oauth_keychain"
+        ? await loadCliStoredAuth(this.context.profile)
+        : undefined;
     const oauthRefresh =
       stored?.kind === "oauth" && this.activeCredential.kind === "oauth_keychain"
         ? {

@@ -76,7 +76,7 @@ function runExitAsync(
       reject(err);
     });
 
-    child.on("exit", (code) => {
+    child.on("close", (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);

@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import { CLI_TOKEN_PATH, CLI_WHOAMI_PATH } from "../src/lib/auth/cli-oauth.js";
 import { fetchCliWhoami } from "../src/lib/auth/cli-whoami.js";
+import { ObjectifiedCliError } from "../src/lib/errors.js";
+import { EXIT_CODES } from "../src/lib/exit-codes.js";
 
 async function mockApiServer(
   handler: (req: import("node:http").IncomingMessage) => Promise<{
@@ -79,6 +81,34 @@ describe("fetchCliWhoami", () => {
       expect(auth.bearer).toBe("fresh-access");
       expect(rotated).toEqual(["fresh-access", "fresh-refresh"]);
       expect(model.tenant?.slug).toBe("acme");
+    } finally {
+      await close();
+    }
+  });
+
+  it("maps 401 with sent credentials to invalid credentials semantics", async () => {
+    const { baseUrl, close } = await mockApiServer(async (req) => {
+      const url = req.url ?? "";
+      if (url.startsWith(CLI_WHOAMI_PATH) && req.method === "GET") {
+        return { status: 401, body: JSON.stringify({ detail: "Invalid API key" }) };
+      }
+      return { status: 404, body: "not found", contentType: "text/plain" };
+    });
+
+    try {
+      let thrown: unknown;
+      try {
+        await fetchCliWhoami({
+          baseUrl,
+          auth: { apiKey: "bad-key" },
+          activeCredentialKind: "api_key_env",
+        });
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toBeInstanceOf(ObjectifiedCliError);
+      expect((thrown as ObjectifiedCliError).exitCode).toBe(EXIT_CODES.FORBIDDEN);
+      expect((thrown as ObjectifiedCliError).title).toBe("Invalid credentials");
     } finally {
       await close();
     }

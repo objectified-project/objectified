@@ -60,4 +60,23 @@ describe("auth status snapshots (#3196)", () => {
     });
     expect(doc.auth).toEqual({ type: "api_key" });
   });
+
+  it("does not show refresh-valid note when API reports refresh_valid=false", () => {
+    const lines = formatAuthStatusHumanLines({
+      profile: "default",
+      baseUrl: "https://api.objectified.dev",
+      profileTenantSlug: undefined,
+      model: {
+        ...sampleModel,
+        auth: {
+          ...sampleModel.auth,
+          refresh_valid: false,
+        },
+      },
+      activeCredentialKind: "oauth_keychain",
+      bearer: "unused",
+      now: new Date("2026-05-07T12:00:00.000Z"),
+    });
+    expect(lines.find((line) => line.startsWith("  Expires:"))).not.toContain("refresh token valid");
+  });
 });

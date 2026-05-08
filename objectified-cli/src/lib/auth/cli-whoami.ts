@@ -266,9 +266,11 @@ export function formatAuthStatusHumanLines(opts: FormatAuthStatusHumanOpts): str
     const expLine =
       expiresIso !== null && expiresIso !== "" ? formatRelativeExpiry(expiresIso, now) : "unknown";
     const refreshNote =
-      opts.activeCredentialKind === "oauth_keychain" || opts.model.auth.refresh_valid === true
+      opts.model.auth.refresh_valid === true
         ? " (refresh token valid)"
-        : "";
+        : opts.model.auth.refresh_valid === null && opts.activeCredentialKind === "oauth_keychain"
+          ? " (refresh token valid)"
+          : "";
     lines.push(padLine("Expires", `${expLine}${refreshNote}`));
   } else {
     lines.push(padLine("Expires", "-"));
@@ -322,16 +324,6 @@ export async function fetchCliWhoami(opts: FetchCliWhoamiOptions): Promise<CliWh
 
   const rid = res.headers.get("x-request-id") ?? res.headers.get("X-Request-Id") ?? undefined;
   const text = await res.text();
-
-  if (res.status === 401) {
-    throw new ObjectifiedCliError({
-      message: "Session expired or credentials are no longer valid.",
-      exitCode: EXIT_CODES.NOT_AUTHENTICATED,
-      title: "Not authenticated",
-      hint: "Run `objectified auth login` again.",
-      requestId: rid,
-    });
-  }
 
   if (!res.ok) {
     throw httpStatusToCliError(res.status, text.slice(0, 800), {
