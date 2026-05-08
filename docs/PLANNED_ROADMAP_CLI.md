@@ -407,7 +407,6 @@ Part of Epic: Authentication & Tenant Context (#3175)
 
 | #         | Title                                | Description                                          | Labels                                | MVP | Parallel |
 |-----------|--------------------------------------|------------------------------------------------------|---------------------------------------|-----|----------|
-| 3.3 (#3204) | `projects create`                  | Interactive + non-interactive + `--from-file`         | `enhancement`, `mvp`, `cli`, `roadmap-cli` | Yes | Yes      |
 | 3.4 (#3205) | `projects update`                  | Partial update with diff renderer + concurrency check | `enhancement`, `cli`, `roadmap-cli`   | No  | Yes      |
 | 3.5 (#3206) | `projects delete`                  | Typed confirmation, refuses on published versions     | `enhancement`, `cli`, `roadmap-cli`   | No  | Yes      |
 | 3.6 (#3207) | `projects export`                  | Deterministic full project dump (JSON or YAML)        | `enhancement`, `cli`, `roadmap-cli`, `export` | No  | Yes      |
@@ -762,12 +761,11 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ## MVP Release — Ticket Bundle
 
-The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **16 open sub-tickets** across 5 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, #3194, #3195, #3202, and #3203).
+The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **15 open sub-tickets** across 4 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, #3194, #3195, #3202, #3203, and #3204).
 
 | Epic     | Tickets                                                                                                   | Count |
 |----------|-----------------------------------------------------------------------------------------------------------|-------|
 | 2 (#3175) | #3196, #3197, #3198, #3199                                                                                | 4     |
-| 3 (#3176) | #3204                                                                                                      | 1     |
 | 4 (#3177) | #3208, #3209, #3210, #3212                                                                                | 4     |
 | 9 (#3182) | #3244, #3245, #3246, #3247, #3248                                                                          | 5     |
 | 12 (#3185) | #3267, #3268                                                                                               | 2     |
@@ -855,7 +853,7 @@ The tickets were created in the order below — that is also the recommended **e
 
 1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, #3189, #3190, #3191, #3192, and #3193 landed). Without the scaffold, no other command can exist.
 2. **Epic 2 — Auth & Tenants** (#3175; #3194–#3197 shipped — continue #3198 → #3201). Required for any tenant-scoped command.
-3. **Epic 3 — Projects** (#3176 then #3204 → #3207; #3203 shipped). The first useful read/write surface.
+3. **Epic 3 — Projects** (#3176 then #3205 → #3207; #3203 and #3204 shipped). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3208 → #3216). The publish flow that makes the CLI valuable in CI.
 5. **Epic 9 — Browse & Schema Export** (#3182 then #3244 → #3252). The most-used consumer surface; lands early because it works without auth.
 6. **Epic 12 — Distribution (CI + NPM publish only)** (#3185 then #3267, #3268). Ship MVP — `npm i -g objectified-cli` works.

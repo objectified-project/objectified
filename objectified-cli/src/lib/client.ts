@@ -2,6 +2,7 @@ import { createClient, type Client } from "../generated/client.js";
 import type {
   ClassSchema,
   PrimitiveSchema,
+  ProjectCreateRequest,
   ProjectSchema,
   TenantInfoResponse,
   TenantsMeResponse,
@@ -10,6 +11,7 @@ import type {
   WorkflowAuditPageResponse,
 } from "../generated/models.js";
 import {
+  createProjectV1ProjectsTenantSlugPost,
   getProjectBySlugV1ProjectsTenantSlugBySlugProjectSlugGet,
   getProjectV1ProjectsTenantSlugProjectIdGet,
   getTenantInfoV1TenantsTenantSlugGet,
@@ -23,11 +25,15 @@ import {
   verifyTenantAccessV1TenantsTenantSlugHead,
 } from "../generated/operations.js";
 
+import { PROJECT_DOMAIN_FALLBACK_IDS } from "./projects/domain-categories.js";
+import { normalizeProjectDomainsApiPayload } from "./projects/domains-payload.js";
+
 import { EXIT_CODES } from "./exit-codes.js";
 import { httpStatusToCliError, networkErrnoToCliError, ObjectifiedCliError } from "./errors.js";
 import { redactApiKeyForLogs } from "./redact-api-key.js";
 
 export type {
+  ProjectCreateRequest,
   ProjectSchema,
   VersionSchema,
   VersionTagSchema,
@@ -63,6 +69,12 @@ export type ObjectifiedApi = {
   /** Transient HTTP retries consumed on the last instrumented request (429 / 5xx policy). */
   readonly lastRetriesAttempted: number;
   listProjects(tenantSlug: string, options?: ListProjectsOptions): Promise<ProjectSchema[]>;
+  /**
+   * Domain ids allowed for project metadata (`domainCategory`), from GET …/domains when deployed,
+   * else cached fallback ids (#3204).
+   */
+  fetchProjectDomainsAllowlist(tenantSlug: string): Promise<string[]>;
+  createProject(tenantSlug: string, body: ProjectCreateRequest): Promise<ProjectSchema>;
   getProject(tenantSlug: string, projectId: string): Promise<ProjectSchema>;
   getProjectBySlug(tenantSlug: string, projectSlug: string): Promise<ProjectSchema>;
   listVersions(tenantSlug: string, projectId: string): Promise<VersionSchema[]>;
@@ -82,6 +94,8 @@ export type ObjectifiedApi = {
 
 const MAX_RETRY_AFTER_MS = 120_000;
 export const MAX_TRANSIENT_ATTEMPTS = 4;
+
+const PROJECT_DOMAINS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "PUT", "DELETE"]);
 const BACKOFF_MS = [250, 500, 1000, 2000];
@@ -635,8 +649,11 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
     },
   });
 
+  const baseUrlNorm = trimTrailingSlash(options.baseUrl);
+  const domainsAllowlistCache = new Map<string, { ids: string[]; expiresAt: number }>();
+
   const hey: Client = createClient({
-    baseUrl: trimTrailingSlash(options.baseUrl),
+    baseUrl: baseUrlNorm,
     fetch: instrumented,
   });
 
@@ -646,6 +663,99 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
     },
     get lastRetriesAttempted() {
       return lastRetriesAttempted;
+    },
+
+    async fetchProjectDomainsAllowlist(tenantSlug: string): Promise<string[]> {
+      const cacheKey = `${baseUrlNorm}|${tenantSlug}`;
+      const now = Date.now();
+      const hit = domainsAllowlistCache.get(cacheKey);
+      if (hit !== undefined && hit.expiresAt > now) {
+        return hit.ids;
+      }
+
+      const tryUrls = [
+        `${baseUrlNorm}/v1/projects/${encodeURIComponent(tenantSlug)}/domains`,
+        `${baseUrlNorm}/v1/projects/domains`,
+      ];
+
+      for (const url of tryUrls) {
+        const res = await instrumented(
+          new Request(url, { method: "GET", headers: { Accept: "application/json" } }),
+        );
+        if (res.status === 404) continue;
+
+        const text = await res.text();
+        const hdrId =
+          res.headers.get("x-request-id") ?? res.headers.get("X-Request-Id") ?? undefined;
+
+        if (!res.ok) {
+          let apiMessage = text.slice(0, 800);
+          try {
+            apiMessage = formatApiError(JSON.parse(text) as unknown);
+          } catch {
+            /* keep truncated body */
+          }
+          throw httpStatusToCliError(res.status, apiMessage, {
+            requestId: hdrId ?? lastRequestId,
+            retriesAttempted: lastRetriesAttempted,
+            credentialsWereSent: requestMeta.hadCredentials,
+          });
+        }
+
+        let parsed: unknown = null;
+        if (text.trim() !== "") {
+          try {
+            parsed = JSON.parse(text) as unknown;
+          } catch {
+            throw new ObjectifiedCliError({
+              message: "Project domains response was not valid JSON.",
+              exitCode: EXIT_CODES.VALIDATION,
+              title: "Validation failed",
+              hint: "Expected JSON from GET /v1/projects/{tenant}/domains (or /v1/projects/domains).",
+              requestId: hdrId ?? lastRequestId,
+              retriesAttempted: lastRetriesAttempted,
+            });
+          }
+        }
+
+        const ids = normalizeProjectDomainsApiPayload(parsed);
+        if (ids.length > 0) {
+          domainsAllowlistCache.set(cacheKey, {
+            ids,
+            expiresAt: now + PROJECT_DOMAINS_CACHE_TTL_MS,
+          });
+          return ids;
+        }
+      }
+
+      const fallback = [...PROJECT_DOMAIN_FALLBACK_IDS];
+      domainsAllowlistCache.set(cacheKey, {
+        ids: fallback,
+        expiresAt: now + PROJECT_DOMAINS_CACHE_TTL_MS,
+      });
+      return fallback;
+    },
+
+    async createProject(tenantSlug: string, body: ProjectCreateRequest): Promise<ProjectSchema> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await createProjectV1ProjectsTenantSlugPost({
+          client: hey,
+          path: { tenant_slug: tenantSlug },
+          body,
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+
+      return parseProjectPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
     },
 
     async listProjects(
