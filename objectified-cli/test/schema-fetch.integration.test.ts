@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { parse as parseYaml } from "yaml";
 import { describe, expect, it } from "vitest";
+import { EXIT_CODES } from "../src/lib/exit-codes.js";
 
 const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -73,7 +74,7 @@ describe("schema fetch CLI (#3247)", () => {
 
   it("rejects refs that are not exactly tenant/project/version", async () => {
     const out = await runCliCaptureAsync(["schema", "fetch", "acme/payments-api/2.1.0/extra"]);
-    expect(out.code).toBe(2);
+    expect(out.code).toBe(EXIT_CODES.MISUSE);
   });
 
   it("downloads OpenAPI JSON for tenant/project/version", async () => {

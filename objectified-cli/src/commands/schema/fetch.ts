@@ -161,12 +161,6 @@ export default class SchemaFetch extends BaseCommand {
     const hasher = createHash("sha256");
     const writer = outPath !== "" ? await open(outPath, "w") : undefined;
 
-    const writeStdout = async (chunk: Buffer): Promise<void> => {
-      if (!process.stdout.write(chunk)) {
-        await once(process.stdout, "drain");
-      }
-    };
-
     try {
       if (res.body === null) {
         const chunk = Buffer.from(await res.arrayBuffer());
@@ -174,7 +168,9 @@ export default class SchemaFetch extends BaseCommand {
         if (writer !== undefined) {
           await writer.write(chunk);
         } else {
-          await writeStdout(chunk);
+          if (!process.stdout.write(chunk)) {
+            await once(process.stdout, "drain");
+          }
         }
       } else {
         const reader = res.body.getReader();
@@ -186,7 +182,9 @@ export default class SchemaFetch extends BaseCommand {
           if (writer !== undefined) {
             await writer.write(chunk);
           } else {
-            await writeStdout(chunk);
+            if (!process.stdout.write(chunk)) {
+              await once(process.stdout, "drain");
+            }
           }
         }
       }
