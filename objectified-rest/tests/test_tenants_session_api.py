@@ -107,3 +107,26 @@ def test_list_my_tenants_api_key_single_tenant():
             "auth_method": "jwt",
             "user_id": _USER_ID,
         }
+
+
+def test_list_my_tenants_api_key_offset_past_end():
+    app.dependency_overrides[validate_session_credentials] = lambda: {
+        "auth_method": "api_key",
+        "tenant_id": _TENANT_ID,
+        "tenant_slug": "acme",
+        "tenant_name": "Acme",
+    }
+    try:
+        with patch("app.tenants_session_routes.db"):
+            r = client.get("/v1/tenants/me?limit=50&offset=50")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total"] == 1
+        assert body["offset"] == 50
+        assert body["limit"] == 50
+        assert body["items"] == []
+    finally:
+        app.dependency_overrides[validate_session_credentials] = lambda: {
+            "auth_method": "jwt",
+            "user_id": _USER_ID,
+        }

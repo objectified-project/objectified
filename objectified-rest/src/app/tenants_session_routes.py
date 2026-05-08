@@ -51,8 +51,9 @@ async def list_my_tenants(
         name = session.get("tenant_name") or ""
         if not isinstance(slug, str) or slug.strip() == "":
             raise HTTPException(status_code=500, detail="API key session missing tenant slug")
-        items = [TenantMembershipSchema(slug=slug, name=str(name), role="member")]
-        return TenantsMeResponse(items=items, total=len(items), limit=limit, offset=0)
+        all_items = [TenantMembershipSchema(slug=slug, name=str(name), role="member")]
+        items = all_items[offset : offset + limit]
+        return TenantsMeResponse(items=items, total=len(all_items), limit=limit, offset=offset)
 
     user_id = session.get("user_id")
     if not user_id:
@@ -124,4 +125,3 @@ async def get_tenant_info(
         storage_used_bytes=None,
         storage_quota_bytes=None,
     )
-
