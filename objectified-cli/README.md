@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.22 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.23 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -66,6 +66,7 @@ USAGE
 * [`objectified auth status`](#objectified-auth-status)
 * [`objectified browse projects TENANT`](#objectified-browse-projects-tenant)
 * [`objectified browse tenants`](#objectified-browse-tenants)
+* [`objectified browse versions REF`](#objectified-browse-versions-ref)
 * [`objectified completion`](#objectified-completion)
 * [`objectified completion install [SHELL]`](#objectified-completion-install-shell)
 * [`objectified completion show [SHELL]`](#objectified-completion-show-shell)
@@ -369,6 +370,66 @@ SEE ALSO
   objectified tenants list
 
   objectified auth status
+
+  objectified docs errors
+```
+
+## `objectified browse versions REF`
+
+List published versions for a project from GET /v1/browse/tenants/{tenant}/projects/{project}/versions (public directory; optional credentials include non-public published versions)
+
+```
+USAGE
+  $ objectified browse versions REF [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--since <value>] [--limit
+    <value>] [--all]
+
+ARGUMENTS
+  REF  Tenant and project slugs as tenant/project (for example acme-corp/payments-api).
+
+DESCRIPTION
+  List published versions for a project from GET /v1/browse/tenants/{tenant}/projects/{project}/versions (public
+  directory; optional credentials include non-public published versions)
+
+EXAMPLES
+  $ objectified browse versions acme-corp/payments-api
+
+  $ objectified --json browse versions acme-corp/payments-api
+
+  $ objectified browse versions acme-corp/payments-api --since 2026-01-01
+
+  $ objectified browse versions acme-corp/payments-api --all
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --all            Print every version returned by the API after filters (no --limit cap).
+  --limit=<value>  [default: 50] Maximum rows to display (1–500; default 50). Ignored with --all.
+  --since=<value>  Include only versions published on or after this instant (ISO 8601, forwarded to the API as `since`).
+
+SEE ALSO
+  objectified browse projects
+
+  objectified browse tenants
+
+  objectified versions list
 
   objectified docs errors
 ```

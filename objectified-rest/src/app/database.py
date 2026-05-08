@@ -7025,6 +7025,121 @@ class Database:
         """
         return self.execute_query(query, tuple(params))
 
+    def project_has_public_published_version(self, tenant_id: str, project_slug: str) -> bool:
+        """True when the project has at least one published version visible on the public browse surface."""
+        q = """
+            SELECT 1
+            FROM odb.projects p
+            INNER JOIN odb.versions v ON v.project_id = p.id
+            WHERE p.tenant_id = %s
+              AND p.slug = %s
+              AND p.deleted_at IS NULL
+              AND v.deleted_at IS NULL
+              AND v.published IS TRUE
+              AND v.visibility = 'public'
+            LIMIT 1
+        """
+        rows = self.execute_query(q, (tenant_id, project_slug))
+        return bool(rows)
+
+    def list_public_browse_versions_for_project(
+        self,
+        tenant_id: str,
+        project_slug: str,
+        *,
+        since: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Published **public** versions for anonymous browse (parity with objectified-browse).
+
+        ``since`` filters on ``published_at`` (inclusive); rows with null ``published_at`` are excluded when
+        ``since`` is set.
+        """
+        params: List[Any] = [tenant_id, project_slug]
+        since_clause = ""
+        if since is not None:
+            since_clause = " AND v.published_at IS NOT NULL AND v.published_at >= %s"
+            params.append(since)
+
+        query = f"""
+            SELECT
+                v.id::text AS id,
+                v.version_id AS version_id,
+                v.published_at,
+                v.description,
+                v.change_log,
+                cr.change_model_json,
+                COALESCE(
+                    (
+                        SELECT array_agg(t.name ORDER BY t.name)
+                        FROM odb.version_tags t
+                        WHERE t.project_id = p.id
+                          AND t.version_id = v.id
+                    ),
+                    ARRAY[]::text[]
+                ) AS tags
+            FROM odb.versions v
+            INNER JOIN odb.projects p ON v.project_id = p.id
+            LEFT JOIN odb.change_reports cr
+              ON cr.published_revision_id = v.id
+             AND cr.tenant_id = p.tenant_id
+             AND cr.project_id = p.id
+            WHERE p.tenant_id = %s
+              AND p.slug = %s
+              AND p.deleted_at IS NULL
+              AND v.deleted_at IS NULL
+              AND v.published IS TRUE
+              AND v.visibility = 'public'
+              {since_clause}
+        """
+        return self.execute_query(query, tuple(params))
+
+    def list_member_browse_versions_for_project(
+        self,
+        tenant_id: str,
+        project_slug: str,
+        *,
+        since: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        """Published versions for any visibility (tenant member directory)."""
+        params: List[Any] = [tenant_id, project_slug]
+        since_clause = ""
+        if since is not None:
+            since_clause = " AND v.published_at IS NOT NULL AND v.published_at >= %s"
+            params.append(since)
+
+        query = f"""
+            SELECT
+                v.id::text AS id,
+                v.version_id AS version_id,
+                v.published_at,
+                v.description,
+                v.change_log,
+                cr.change_model_json,
+                COALESCE(
+                    (
+                        SELECT array_agg(t.name ORDER BY t.name)
+                        FROM odb.version_tags t
+                        WHERE t.project_id = p.id
+                          AND t.version_id = v.id
+                    ),
+                    ARRAY[]::text[]
+                ) AS tags
+            FROM odb.versions v
+            INNER JOIN odb.projects p ON v.project_id = p.id
+            LEFT JOIN odb.change_reports cr
+              ON cr.published_revision_id = v.id
+             AND cr.tenant_id = p.tenant_id
+             AND cr.project_id = p.id
+            WHERE p.tenant_id = %s
+              AND p.slug = %s
+              AND p.deleted_at IS NULL
+              AND v.deleted_at IS NULL
+              AND v.published IS TRUE
+              {since_clause}
+        """
+        return self.execute_query(query, tuple(params))
+
 
 # Global database instance
 db = Database()

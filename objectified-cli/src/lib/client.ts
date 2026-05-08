@@ -2,6 +2,7 @@ import { createClient, type Client } from "../generated/client.js";
 import type {
   BrowsePublicProjectsResponse,
   BrowsePublicTenantsResponse,
+  BrowsePublicVersionsResponse,
   ClassSchema,
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
@@ -38,6 +39,7 @@ import {
   listProjectsV1ProjectsTenantSlugGet,
   listPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGet,
   listPublicBrowseTenantsV1BrowseTenantsGet,
+  listPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGet,
   listVersionTagsV1VersionTagsTenantSlugProjectIdGet,
   listVersionsV1VersionsTenantSlugProjectIdGet,
   listWorkflowAuditV1VersionsTenantSlugWorkflowAuditGet,
@@ -57,6 +59,7 @@ import { redactApiKeyForLogs } from "./redact-api-key.js";
 export type {
   BrowsePublicProjectsResponse,
   BrowsePublicTenantsResponse,
+  BrowsePublicVersionsResponse,
   ClassSchema,
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
@@ -180,6 +183,11 @@ export type ObjectifiedApi = {
     domain?: string;
     hasPublished?: boolean;
   }): Promise<BrowsePublicProjectsResponse>;
+  listPublicBrowseVersions(opts: {
+    tenantSlug: string;
+    projectSlug: string;
+    since?: string;
+  }): Promise<BrowsePublicVersionsResponse>;
 };
 
 const MAX_RETRY_AFTER_MS = 120_000;
@@ -839,6 +847,109 @@ function parseBrowsePublicProjectsPayload(data: unknown): BrowsePublicProjectsRe
     tenant_slug: o.tenant_slug,
     tenant_name: o.tenant_name,
     projects: projectsOut,
+    filtered_count: fc,
+  };
+}
+
+function parseBrowsePublicVersionsPayload(data: unknown): BrowsePublicVersionsResponse {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for public browse versions.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "The API returned an unexpected JSON shape; try again or upgrade the CLI.",
+    });
+  }
+  const o = data as Record<string, unknown>;
+  if (
+    typeof o.tenant_slug !== "string" ||
+    typeof o.tenant_name !== "string" ||
+    typeof o.project_slug !== "string" ||
+    typeof o.project_name !== "string"
+  ) {
+    throw new ObjectifiedCliError({
+      message: "Invalid browse versions response.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected tenant and project fields from GET /v1/browse/tenants/{tenant}/projects/{project}/versions.",
+    });
+  }
+  if (!Array.isArray(o.versions)) {
+    throw new ObjectifiedCliError({
+      message: "Missing versions array in browse versions response.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected `versions` from the browse versions endpoint.",
+    });
+  }
+  const versionsOut: BrowsePublicVersionsResponse["versions"] = [];
+  for (const raw of o.versions) {
+    if (!raw || typeof raw !== "object") {
+      throw new ObjectifiedCliError({
+        message: "Invalid version row in browse versions response.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "Each version row must be an object.",
+      });
+    }
+    const v = raw as Record<string, unknown>;
+    if (typeof v.id !== "string" || typeof v.version_id !== "string") {
+      throw new ObjectifiedCliError({
+        message: "Invalid browse version fields.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "Each row needs id and version_id.",
+      });
+    }
+    if (!Array.isArray(v.tags)) {
+      throw new ObjectifiedCliError({
+        message: "Invalid browse version tags.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "Each row needs a string array `tags`.",
+      });
+    }
+    const tags: string[] = [];
+    for (const t of v.tags) {
+      if (typeof t !== "string") {
+        throw new ObjectifiedCliError({
+          message: "Invalid browse version tag entry.",
+          exitCode: EXIT_CODES.VALIDATION,
+          title: "Validation failed",
+          hint: "Tags must be strings.",
+        });
+      }
+      tags.push(t);
+    }
+    const pub = v.published_at;
+    const cs = v.changes_summary;
+    const desc = v.description;
+    const clog = v.change_log;
+    versionsOut.push({
+      id: v.id,
+      version_id: v.version_id,
+      published_at: typeof pub === "string" || pub === null ? pub : undefined,
+      tags,
+      changes_summary: typeof cs === "string" || cs === null ? cs : undefined,
+      description: typeof desc === "string" || desc === null ? desc : undefined,
+      change_log: typeof clog === "string" || clog === null ? clog : undefined,
+    });
+  }
+  const fc = o.filtered_count;
+  if (typeof fc !== "number" || !Number.isFinite(fc)) {
+    throw new ObjectifiedCliError({
+      message: "Invalid filtered_count in browse versions response.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected numeric filtered_count from GET /v1/browse/tenants/{tenant}/projects/{project}/versions.",
+    });
+  }
+  return {
+    tenant_slug: o.tenant_slug,
+    tenant_name: o.tenant_name,
+    project_slug: o.project_slug,
+    project_name: o.project_name,
+    versions: versionsOut,
     filtered_count: fc,
   };
 }
@@ -1713,6 +1824,33 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
         throw e;
       }
       return parseBrowsePublicProjectsPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
+    async listPublicBrowseVersions(opts: {
+      tenantSlug: string;
+      projectSlug: string;
+      since?: string;
+    }): Promise<BrowsePublicVersionsResponse> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await listPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGet({
+          client: hey,
+          path: { tenant_slug: opts.tenantSlug, project_slug: opts.projectSlug },
+          query: {
+            since: opts.since ?? undefined,
+          },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseBrowsePublicVersionsPayload(
         unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
       );
     },
