@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.19 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.20 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -90,6 +90,7 @@ USAGE
 * [`objectified version`](#objectified-version)
 * [`objectified versions create PROJECT`](#objectified-versions-create-project)
 * [`objectified versions list PROJECT`](#objectified-versions-list-project)
+* [`objectified versions publish PROJECT VERSION`](#objectified-versions-publish-project-version)
 * [`objectified versions show PROJECT VERSION`](#objectified-versions-show-project-version)
 * [`objectified whoami`](#objectified-whoami)
 
@@ -1416,6 +1417,8 @@ SEE ALSO
 
   objectified versions show
 
+  objectified versions publish
+
   objectified projects show
 
   objectified docs errors
@@ -1480,6 +1483,73 @@ SEE ALSO
   objectified projects list
 
   objectified tenants use
+
+  objectified docs errors
+```
+
+## `objectified versions publish PROJECT VERSION`
+
+Publish a draft schema revision (POST …/{record_id}/publish); runs pre-publish checks unless skipped (#3212).
+
+```
+USAGE
+  $ objectified versions publish PROJECT VERSION [--api-key <value>] [--api-key-file <value>] [--base-url <value>]
+    [--config <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--allow-breaking]
+    [--skip-checks] [--update-tag <value>] [-m <value>] [--yes]
+
+ARGUMENTS
+  PROJECT  Project slug or UUID (uuid-shaped refs resolve as id first)
+  VERSION  Draft semver (`v` optional), revision UUID, or tag resolving to a draft
+
+DESCRIPTION
+  Publish a draft schema revision (POST …/{record_id}/publish); runs pre-publish checks unless skipped (#3212).
+
+EXAMPLES
+  $ objectified versions publish payments-api v2.1.0
+
+  $ objectified --json versions publish payments-api 2.1.0
+
+  $ objectified versions publish payments-api v2.1.0 --allow-breaking
+
+  $ objectified versions publish payments-api v2.1.0 --update-tag latest --message 'Ship refunds'
+
+  $ objectified versions publish payments-api v2.1.0 --skip-checks --yes
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --allow-breaking      Allow publish when POST …/compatibility reports breaking changes versus the published
+                            baseline.
+  -m, --message=<value>     Publish short message stored as revision note (maps to shortMessage on publish).
+      --skip-checks         Bypass client-side pre-publish checks and send skipPublishChecks to the API (emergency
+                            only).
+      --update-tag=<value>  After a successful publish, move this tag name to the published revision (create if
+                            missing).
+      --yes                 Acknowledge destructive/skip-checks flows non-interactively (required with --skip-checks).
+
+SEE ALSO
+  objectified versions create
+
+  objectified versions list
+
+  objectified versions show
 
   objectified docs errors
 ```

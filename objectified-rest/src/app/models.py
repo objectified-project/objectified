@@ -809,6 +809,16 @@ class VersionPublishRequest(BaseModel):
         validation_alias=AliasChoices("changeReportBaselineRevisionId", "change_report_baseline_revision_id"),
         description="Required when changeReportBaselineMode is manual: published revision to diff from.",
     )
+    allow_breaking: Optional[bool] = Field(
+        default=False,
+        validation_alias=AliasChoices("allowBreaking", "allow_breaking"),
+        description="Allow publishing when backward-compatibility vs the baseline is breaking (#3212).",
+    )
+    skip_publish_checks: Optional[bool] = Field(
+        default=False,
+        validation_alias=AliasChoices("skipPublishChecks", "skip_publish_checks"),
+        description="Bypass OpenAPI build, documentation, and compatibility gates (emergency only; prefer CLI flags).",
+    )
 
     @model_validator(mode="after")
     def _validate_change_report_manual_baseline(self) -> "VersionPublishRequest":

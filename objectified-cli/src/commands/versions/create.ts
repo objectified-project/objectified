@@ -93,7 +93,7 @@ export default class VersionsCreate extends BaseCommand {
     "<%= config.bin %> <%= command.id %> payments-api --from-file ./version-create.json",
   ];
 
-  static seeAlso = ["versions list", "versions show", "projects show", "docs errors"];
+  static seeAlso = ["versions list", "versions show", "versions publish", "projects show", "docs errors"];
 
   static args = {
     project: Args.string({
