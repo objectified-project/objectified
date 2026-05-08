@@ -1,0 +1,67 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`versions show human snapshots (#3209) > revision UUID resolution path 1`] = `
+"
+  Payments API v2.1.0  ★ stable, latest
+  ──────────────────────────────────────────────────────────────
+  State:          published
+  Published:      2026-05-04 12:42 by kenji@objectified.dev
+  Frozen:         no
+  Forked from:    v2.0.0
+  Notes:          Adds /refunds endpoint; removes deprecated /v1/charges/legacy.
+
+  Classes:        24    (3 added, 1 removed, 5 modified vs v2.0.0)
+  Paths:          (2 added, 0 removed, 4 modified vs v2.0.0)
+  Compatibility:  safe (0 finding(s) vs v2.0.0)
+
+  Specs:
+    OpenAPI 3.1   →  https://api.objectified.dev/v1/schema/acme/payments-api/2.1.0
+    Swagger UI    →  https://api.objectified.dev/v1/swagger/acme/payments-api/2.1.0
+    Arazzo        →  https://api.objectified.dev/v1/arazzo/acme/payments-api/2.1.0
+    JSON Schema   →  https://api.objectified.dev/v1/json/acme/payments-api/2.1.0
+"
+`;
+
+exports[`versions show human snapshots (#3209) > semver resolution path 1`] = `
+"
+  Payments API v2.1.0  ★ stable, latest
+  ──────────────────────────────────────────────────────────────
+  State:          published
+  Published:      2026-05-04 12:42 by kenji@objectified.dev
+  Frozen:         no
+  Forked from:    v2.0.0
+  Notes:          Adds /refunds endpoint; removes deprecated /v1/charges/legacy.
+
+  Classes:        24    (3 added, 1 removed, 5 modified vs v2.0.0)
+  Paths:          (2 added, 0 removed, 4 modified vs v2.0.0)
+  Compatibility:  safe (0 finding(s) vs v2.0.0)
+
+  Specs:
+    OpenAPI 3.1   →  https://api.objectified.dev/v1/schema/acme/payments-api/2.1.0
+    Swagger UI    →  https://api.objectified.dev/v1/swagger/acme/payments-api/2.1.0
+    Arazzo        →  https://api.objectified.dev/v1/arazzo/acme/payments-api/2.1.0
+    JSON Schema   →  https://api.objectified.dev/v1/json/acme/payments-api/2.1.0
+"
+`;
+
+exports[`versions show human snapshots (#3209) > tag-name resolution path (prints underlying semver) 1`] = `
+"
+  Payments API v2.1.0  ★ stable, latest  (tag stable → v2.1.0)
+  ──────────────────────────────────────────────────────────────
+  State:          published
+  Published:      2026-05-04 12:42 by kenji@objectified.dev
+  Frozen:         no
+  Forked from:    v2.0.0
+  Notes:          Adds /refunds endpoint; removes deprecated /v1/charges/legacy.
+
+  Classes:        24    (3 added, 1 removed, 5 modified vs v2.0.0)
+  Paths:          (2 added, 0 removed, 4 modified vs v2.0.0)
+  Compatibility:  safe (0 finding(s) vs v2.0.0)
+
+  Specs:
+    OpenAPI 3.1   →  https://api.objectified.dev/v1/schema/acme/payments-api/2.1.0
+    Swagger UI    →  https://api.objectified.dev/v1/swagger/acme/payments-api/2.1.0
+    Arazzo        →  https://api.objectified.dev/v1/arazzo/acme/payments-api/2.1.0
+    JSON Schema   →  https://api.objectified.dev/v1/json/acme/payments-api/2.1.0
+"
+`;

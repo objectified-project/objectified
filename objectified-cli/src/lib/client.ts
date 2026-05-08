@@ -1,20 +1,27 @@
 import { createClient, type Client } from "../generated/client.js";
 import type {
   ClassSchema,
+  CompatibilityCheckRequest,
+  CompatibilityCheckResponse,
   PrimitiveSchema,
   ProjectCreateRequest,
   ProjectSchema,
   TenantInfoResponse,
   TenantsMeResponse,
+  VersionChangeReportOut,
   VersionSchema,
   VersionTagSchema,
   WorkflowAuditPageResponse,
 } from "../generated/models.js";
 import {
+  checkRevisionCompatibilityV1VersionsTenantSlugProjectIdCompatibilityPost,
   createProjectV1ProjectsTenantSlugPost,
   getProjectBySlugV1ProjectsTenantSlugBySlugProjectSlugGet,
   getProjectV1ProjectsTenantSlugProjectIdGet,
   getTenantInfoV1TenantsTenantSlugGet,
+  getVersionByVersionIdV1VersionsTenantSlugProjectIdByVersionVersionIdGet,
+  getVersionChangeReportV1VersionsTenantSlugProjectIdVersionRecordIdChangeReportGet,
+  getVersionV1VersionsTenantSlugProjectIdVersionRecordIdGet,
   listClassesV1ClassesTenantSlugGet,
   listMyTenantsV1TenantsMeGet,
   listPrimitivesV1PrimitivesTenantSlugGet,
@@ -33,8 +40,12 @@ import { httpStatusToCliError, networkErrnoToCliError, ObjectifiedCliError } fro
 import { redactApiKeyForLogs } from "./redact-api-key.js";
 
 export type {
+  ClassSchema,
+  CompatibilityCheckRequest,
+  CompatibilityCheckResponse,
   ProjectCreateRequest,
   ProjectSchema,
+  VersionChangeReportOut,
   VersionSchema,
   VersionTagSchema,
   WorkflowAuditEntryOut,
@@ -78,6 +89,26 @@ export type ObjectifiedApi = {
   getProject(tenantSlug: string, projectId: string): Promise<ProjectSchema>;
   getProjectBySlug(tenantSlug: string, projectSlug: string): Promise<ProjectSchema>;
   listVersions(tenantSlug: string, projectId: string): Promise<VersionSchema[]>;
+  getVersion(
+    tenantSlug: string,
+    projectId: string,
+    versionRecordId: string,
+  ): Promise<VersionSchema>;
+  getVersionByVersionId(
+    tenantSlug: string,
+    projectId: string,
+    versionId: string,
+  ): Promise<VersionSchema>;
+  checkRevisionCompatibility(
+    tenantSlug: string,
+    projectId: string,
+    body: CompatibilityCheckRequest,
+  ): Promise<CompatibilityCheckResponse>;
+  tryGetVersionChangeReport(
+    tenantSlug: string,
+    projectId: string,
+    versionRecordId: string,
+  ): Promise<VersionChangeReportOut | null>;
   listVersionTags(tenantSlug: string, projectId: string): Promise<VersionTagSchema[]>;
   listWorkflowAudit(opts: {
     tenantSlug: string;
@@ -376,6 +407,88 @@ function parseVersionsPayload(data: unknown): VersionSchema[] {
     versions.push(raw as VersionSchema);
   }
   return versions;
+}
+
+function parseVersionSinglePayload(data: unknown, ctx: string): VersionSchema {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: `Unexpected response shape for ${ctx}.`,
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "The API returned an unexpected JSON shape; include request-id when reporting.",
+    });
+  }
+  const v = data as Record<string, unknown>;
+  if (typeof v.version_id !== "string" || typeof v.id !== "string") {
+    throw new ObjectifiedCliError({
+      message: "Invalid version fields in response.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Required version fields were missing or mistyped.",
+    });
+  }
+  return data as VersionSchema;
+}
+
+function parseCompatibilityPayload(data: unknown): CompatibilityCheckResponse {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for compatibility check.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "The API returned an unexpected JSON shape for POST …/compatibility.",
+    });
+  }
+  const o = data as Record<string, unknown>;
+  if (
+    typeof o.overall !== "string" ||
+    typeof o.baseRevisionId !== "string" ||
+    typeof o.headRevisionId !== "string" ||
+    typeof o.reportFingerprint !== "string"
+  ) {
+    throw new ObjectifiedCliError({
+      message: "Invalid compatibility response fields.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected overall, baseRevisionId, headRevisionId, and reportFingerprint strings.",
+    });
+  }
+  if (!Array.isArray(o.findings)) {
+    throw new ObjectifiedCliError({
+      message: "Invalid compatibility findings array.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected `findings` array from POST …/compatibility.",
+    });
+  }
+  return data as CompatibilityCheckResponse;
+}
+
+function parseChangeReportPayload(data: unknown): VersionChangeReportOut {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for version change report.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "The API returned an unexpected JSON shape for GET …/change-report.",
+    });
+  }
+  const o = data as Record<string, unknown>;
+  if (
+    typeof o.id !== "string" ||
+    typeof o.publishedRevisionId !== "string" ||
+    o.changeModelJson === undefined ||
+    o.changeModelJson === null ||
+    typeof o.changeModelJson !== "object"
+  ) {
+    throw new ObjectifiedCliError({
+      message: "Invalid change report fields.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected id, publishedRevisionId, and changeModelJson from GET …/change-report.",
+    });
+  }
+  return data as VersionChangeReportOut;
 }
 
 function parseClassesPayload(data: unknown): ClassSchema[] {
@@ -841,6 +954,129 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
       return parseVersionsPayload(
         unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
       );
+    },
+
+    async getVersion(
+      tenantSlug: string,
+      projectId: string,
+      versionRecordId: string,
+    ): Promise<VersionSchema> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await getVersionV1VersionsTenantSlugProjectIdVersionRecordIdGet({
+          client: hey,
+          path: {
+            tenant_slug: tenantSlug,
+            project_id: projectId,
+            version_record_id: versionRecordId,
+          },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseVersionSinglePayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+        "version get",
+      );
+    },
+
+    async getVersionByVersionId(
+      tenantSlug: string,
+      projectId: string,
+      versionId: string,
+    ): Promise<VersionSchema> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await getVersionByVersionIdV1VersionsTenantSlugProjectIdByVersionVersionIdGet({
+          client: hey,
+          path: {
+            tenant_slug: tenantSlug,
+            project_id: projectId,
+            version_id: versionId,
+          },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseVersionSinglePayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+        "version get by semver",
+      );
+    },
+
+    async checkRevisionCompatibility(
+      tenantSlug: string,
+      projectId: string,
+      body: CompatibilityCheckRequest,
+    ): Promise<CompatibilityCheckResponse> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await checkRevisionCompatibilityV1VersionsTenantSlugProjectIdCompatibilityPost(
+          {
+            client: hey,
+            path: { tenant_slug: tenantSlug, project_id: projectId },
+            body,
+            throwOnError: false,
+          },
+        );
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseCompatibilityPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
+    async tryGetVersionChangeReport(
+      tenantSlug: string,
+      projectId: string,
+      versionRecordId: string,
+    ): Promise<VersionChangeReportOut | null> {
+      try {
+        let rawUnknown: unknown;
+        try {
+          rawUnknown =
+            await getVersionChangeReportV1VersionsTenantSlugProjectIdVersionRecordIdChangeReportGet(
+              {
+                client: hey,
+                path: {
+                  tenant_slug: tenantSlug,
+                  project_id: projectId,
+                  version_record_id: versionRecordId,
+                },
+                throwOnError: false,
+              },
+            );
+        } catch (e) {
+          if (e instanceof ObjectifiedCliError) throw e;
+          if (e !== null && typeof e === "object" && "code" in e) {
+            throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+          }
+          throw e;
+        }
+        return parseChangeReportPayload(
+          unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+        );
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError && e.exitCode === EXIT_CODES.NOT_FOUND) {
+          return null;
+        }
+        throw e;
+      }
     },
 
     async listVersionTags(tenantSlug: string, projectId: string): Promise<VersionTagSchema[]> {

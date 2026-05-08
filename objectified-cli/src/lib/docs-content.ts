@@ -56,6 +56,7 @@ Static vs dynamic
 Examples
   objectified projects show pay<TAB> completes project slugs for the active tenant profile.
   objectified versions list my-api v<TAB> completes version_id / revision ids after the project slug.
+  objectified versions show my-api v<TAB> completes semver / revision ids / tag names after the project slug.
 
 Linting
   Generated bash/zsh/fish snippets are written for portability; run shellcheck or fish --no-execute in CI when available.

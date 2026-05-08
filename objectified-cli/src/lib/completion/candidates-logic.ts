@@ -217,9 +217,13 @@ async function tryDynamicCandidates(opts: {
       profileCacheKey,
       ["versions", tenantSlug, projectId],
       async () => {
-        const rows = await api.listVersions(tenantSlug, projectId);
+        const [rows, tagRows] = await Promise.all([
+          api.listVersions(tenantSlug, projectId),
+          api.listVersionTags(tenantSlug, projectId),
+        ]);
         const ids = rows.flatMap((v) => [v.version_id, v.id]);
-        return uniqSorted(ids);
+        const tagNames = tagRows.map((t) => t.name.trim()).filter((n) => n !== "");
+        return uniqSorted([...ids, ...tagNames]);
       },
     );
     return filterByPrefix(values, current);
