@@ -1974,3 +1974,23 @@ class BrowsePublicTenantsResponse(BaseModel):
     directory_stats: BrowseDirectoryStats
     tenants: List[BrowsePublicTenantRow]
     filtered_count: int
+
+
+class BrowsePublicProjectRow(BaseModel):
+    """One project row for public browse (per tenant)."""
+
+    slug: str
+    name: str
+    domain: str
+    published_versions: int
+    latest_version: Optional[str] = None
+    latest_published_at: Optional[datetime] = None
+
+
+class BrowsePublicProjectsResponse(BaseModel):
+    """Published-public projects for a tenant (anonymous), or full tenant project list for members."""
+
+    tenant_slug: str
+    tenant_name: str
+    projects: List[BrowsePublicProjectRow]
+    filtered_count: int

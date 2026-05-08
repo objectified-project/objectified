@@ -275,3 +275,60 @@ def validate_session_credentials(
         ),
         headers={"WWW-Authenticate": "Bearer, API-Key"},
     )
+
+
+def resolve_optional_tenant_member_auth(
+    tenant_slug: str,
+    *,
+    authorization: Optional[str],
+    x_api_key: Optional[str],
+) -> bool:
+    """
+    Return True when JWT or API key proves membership in ``tenant_slug``.
+
+    When no credentials are supplied, returns False so callers can serve the public directory slice.
+
+    When credentials are supplied but invalid or not authorized for this tenant, raises
+    ``HTTPException`` (401/403).
+    """
+    auth_header = (authorization or "").strip()
+    key_header = (x_api_key or "").strip()
+    if not auth_header and not key_header:
+        return False
+
+    if auth_header:
+        jwt_payload = decode_jwt(auth_header)
+        if not jwt_payload:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired JWT token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        user_id = jwt_payload.get("user_id") or jwt_payload.get("sub")
+        if not user_id:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid JWT token: missing user identifier",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        tenant_data = validate_user_tenant_access(user_id, tenant_slug)
+        if not tenant_data:
+            raise HTTPException(
+                status_code=403,
+                detail=f"User does not have access to tenant: {tenant_slug}",
+            )
+        return True
+
+    api_key_data = db.validate_api_key(key_header)
+    if not api_key_data:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired API key",
+            headers={"WWW-Authenticate": "API-Key"},
+        )
+    if api_key_data.get("tenant_slug") != tenant_slug:
+        raise HTTPException(
+            status_code=403,
+            detail="API key does not have access to this tenant",
+        )
+    return True
