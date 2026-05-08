@@ -217,7 +217,7 @@ api_key = "ignored"
     ).toBe("envk");
   });
 
-  it("resolves tenant slug: env > profile overlay > default section", () => {
+  it("resolves tenant slug: flag > env > profile overlay > default section", () => {
     const doc = parseTomlConfig(`
 [default]
 tenant_slug = "tenant-default"
@@ -235,6 +235,13 @@ tenant_slug = "tenant-prod"
         configLayerForProfile(doc, "prod"),
       ),
     ).toBe("env-tenant");
+    expect(
+      resolveTenantSlug(
+        "flag-tenant",
+        { OBJECTIFIED_TENANT: "env-tenant" },
+        configLayerForProfile(doc, "prod"),
+      ),
+    ).toBe("flag-tenant");
   });
 
   it("resolves JSON: flag > OBJECTIFIED_JSON > auto when stdout is not a TTY", () => {

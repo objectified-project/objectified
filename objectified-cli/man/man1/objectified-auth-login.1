@@ -6,7 +6,7 @@ objectified auth login \- Sign in via PKCE browser flow or store an API key in t
 USAGE
   $ objectified auth login [--api-key <value>] [--api-key-file
     <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose] [--no-browser]
+    [--profile <value>] [--tenant <value>] [-q] [--verbose] [--no-browser]
 
 DESCRIPTION
   Sign in via PKCE browser flow or store an API key in the OS keychain
@@ -32,6 +32,8 @@ COMMON
                       path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls
                       back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only
+                      (overrides OBJECTIFIED_TENANT and config tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR;

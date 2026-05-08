@@ -69,7 +69,7 @@ export const EXIT_CODE_TABLE: ExitCodeRow[] = [
   {
     code: 11,
     label: "config error",
-    hint: "Run `objectified config path` and fix config.toml / profile entries.",
+    hint: "Run `objectified tenants use <slug>` for a default tenant, or `objectified config path` to edit config.toml.",
   },
 ];
 

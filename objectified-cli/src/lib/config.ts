@@ -238,6 +238,24 @@ export function setNestedValue(doc: RawTomlDoc, parts: string[], value: string):
   cur[leaf] = value;
 }
 
+/** Remove a leaf key if present. Returns whether a key was deleted. */
+export function deleteNestedValue(doc: RawTomlDoc, parts: string[]): boolean {
+  if (parts.length === 0) return false;
+  const leaf = parts[parts.length - 1];
+  if (leaf === undefined) return false;
+
+  let cur: unknown = doc;
+  for (const segment of parts.slice(0, -1)) {
+    if (!cur || typeof cur !== "object" || Array.isArray(cur)) return false;
+    cur = (cur as RawTomlDoc)[segment];
+  }
+  if (!cur || typeof cur !== "object" || Array.isArray(cur)) return false;
+  const parent = cur as RawTomlDoc;
+  if (!(leaf in parent)) return false;
+  Reflect.deleteProperty(parent, leaf);
+  return true;
+}
+
 export function formatConfigScalar(value: unknown): string {
   if (value === undefined || value === null) return "";
   if (typeof value === "string") return value;

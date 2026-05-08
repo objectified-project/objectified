@@ -80,6 +80,7 @@ const VALUE_GLOBALS = new Set([
   "--base-url",
   "--config",
   "--profile",
+  "--tenant",
 ]);
 
 function valueFlagName(token: string): string | undefined {

@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.12 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.13 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -84,6 +84,7 @@ USAGE
 * [`objectified projects list`](#objectified-projects-list)
 * [`objectified tenants info SLUG`](#objectified-tenants-info-slug)
 * [`objectified tenants list`](#objectified-tenants-list)
+* [`objectified tenants use [SLUG]`](#objectified-tenants-use-slug)
 * [`objectified version`](#objectified-version)
 * [`objectified whoami`](#objectified-whoami)
 
@@ -94,7 +95,7 @@ Sign in via PKCE browser flow or store an API key in the OS keychain (`--api-key
 ```
 USAGE
   $ objectified auth login [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose] [--no-browser]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--no-browser]
 
 DESCRIPTION
   Sign in via PKCE browser flow or store an API key in the OS keychain (`--api-key`).
@@ -117,6 +118,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -147,7 +150,7 @@ Revoke CLI refresh token at the API (OAuth profiles) and remove stored credentia
 ```
 USAGE
   $ objectified auth logout [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose] [--all-profiles]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--all-profiles]
 
 DESCRIPTION
   Revoke CLI refresh token at the API (OAuth profiles) and remove stored credentials from the OS keychain and any
@@ -167,6 +170,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -197,7 +202,7 @@ Show active profile, API base URL, tenant, user, auth type, token expiry, and pl
 ```
 USAGE
   $ objectified auth status [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   Show active profile, API base URL, tenant, user, auth type, token expiry, and plan (GET /v1/auth/cli/whoami).
@@ -214,6 +219,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -246,7 +253,7 @@ Install or print shell completion scripts for bash, zsh, fish, or PowerShell.
 ```
 USAGE
   $ objectified completion [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   Install or print shell completion scripts for bash, zsh, fish, or PowerShell.
@@ -265,6 +272,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -292,7 +301,7 @@ Append shell completion glue to the right startup file for your shell.
 ```
 USAGE
   $ objectified completion install [SHELL] [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
-    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 ARGUMENTS
   [SHELL]  (bash|zsh|fish|powershell) Shell to install for (default: inferred from $SHELL / OS)
@@ -312,6 +321,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -339,7 +350,7 @@ Print shell completion glue (with marker comments) to stdout.
 ```
 USAGE
   $ objectified completion show [SHELL] [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
-    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 ARGUMENTS
   [SHELL]  (bash|zsh|fish|powershell) Shell to generate
@@ -359,6 +370,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -384,7 +397,7 @@ Remove Objectified completion blocks added by `completion install`.
 ```
 USAGE
   $ objectified completion uninstall [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   Remove Objectified completion blocks added by `completion install`.
@@ -399,6 +412,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -424,7 +439,7 @@ Print a single config value by dotted key
 ```
 USAGE
   $ objectified config get KEY [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
-    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 ARGUMENTS
   KEY  Dotted path (e.g. default_profile, profile.prod.base_url)
@@ -444,6 +459,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -469,7 +486,7 @@ Print the entire config file (stable JSON with --json, otherwise TOML)
 ```
 USAGE
   $ objectified config list [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   Print the entire config file (stable JSON with --json, otherwise TOML)
@@ -486,6 +503,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -511,7 +530,7 @@ Print the resolved config.toml path
 ```
 USAGE
   $ objectified config path [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   Print the resolved config.toml path
@@ -528,6 +547,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -553,7 +574,7 @@ Set a config value by dotted key and persist config.toml
 ```
 USAGE
   $ objectified config set KEY VALUE [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
-    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 ARGUMENTS
   KEY    Dotted path (e.g. default_profile, profile.prod.tenant_slug)
@@ -574,6 +595,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -599,7 +622,7 @@ List documentation topics (`objectified docs`) or open one with `objectified doc
 ```
 USAGE
   $ objectified docs [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   List documentation topics (`objectified docs`) or open one with `objectified docs <topic>`.
@@ -616,6 +639,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -643,7 +668,7 @@ Shell completions (install/show/uninstall, static manifest + cached REST suggest
 ```
 USAGE
   $ objectified docs completions [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   Shell completions (install/show/uninstall, static manifest + cached REST suggestions)
@@ -660,6 +685,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -685,7 +712,7 @@ Exit codes, hints, and error-handling reference
 ```
 USAGE
   $ objectified docs errors [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   Exit codes, hints, and error-handling reference
@@ -702,6 +729,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -729,7 +758,7 @@ TTY vs JSON output, quiet mode, verbose logs, and color
 ```
 USAGE
   $ objectified docs output [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   TTY vs JSON output, quiet mode, verbose logs, and color
@@ -746,6 +775,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -773,7 +804,7 @@ Future oclif plugin extensibility for Objectified
 ```
 USAGE
   $ objectified docs plugins [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   Future oclif plugin extensibility for Objectified
@@ -790,6 +821,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -815,7 +848,7 @@ config.toml profiles, defaults, and precedence rules
 ```
 USAGE
   $ objectified docs profiles [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   config.toml profiles, defaults, and precedence rules
@@ -832,6 +865,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -859,7 +894,7 @@ Telemetry posture and safe verbose debugging
 ```
 USAGE
   $ objectified docs telemetry [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   Telemetry posture and safe verbose debugging
@@ -877,6 +912,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -902,7 +939,7 @@ Smoke-test greeting for the Objectified CLI
 ```
 USAGE
   $ objectified hello [NAME] [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
-    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 ARGUMENTS
   [NAME]  Who to greet
@@ -922,6 +959,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -967,7 +1006,7 @@ List Objectified projects
 ```
 USAGE
   $ objectified projects list [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   List Objectified projects
@@ -984,6 +1023,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -997,11 +1038,11 @@ AUTH
   --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 SEE ALSO
+  objectified tenants use
+
   objectified config path
 
   objectified docs errors
-
-  objectified hello
 ```
 
 ## `objectified tenants info SLUG`
@@ -1011,7 +1052,7 @@ Show tenant details when you have access (GET /v1/tenants/{slug})
 ```
 USAGE
   $ objectified tenants info SLUG [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
-    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 ARGUMENTS
   SLUG  Tenant slug
@@ -1029,6 +1070,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -1044,6 +1087,8 @@ AUTH
 SEE ALSO
   objectified tenants list
 
+  objectified tenants use
+
   objectified auth status
 
   objectified config path
@@ -1056,7 +1101,7 @@ List tenants you can access (GET /v1/tenants/me)
 ```
 USAGE
   $ objectified tenants list [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose] [--limit <value>] [--offset <value>]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--limit <value>] [--offset <value>]
 
 DESCRIPTION
   List tenants you can access (GET /v1/tenants/me)
@@ -1073,6 +1118,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
@@ -1092,9 +1139,66 @@ OTHER
 SEE ALSO
   objectified tenants info
 
+  objectified tenants use
+
   objectified auth status
 
   objectified config path
+```
+
+## `objectified tenants use [SLUG]`
+
+Set or clear the default tenant slug for the active profile (writes tenant_slug in config.toml; validates via HEAD /v1/tenants/{slug})
+
+```
+USAGE
+  $ objectified tenants use [SLUG] [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--clear]
+
+ARGUMENTS
+  [SLUG]  Tenant slug to use as the profile default
+
+DESCRIPTION
+  Set or clear the default tenant slug for the active profile (writes tenant_slug in config.toml; validates via HEAD
+  /v1/tenants/{slug})
+
+EXAMPLES
+  $ objectified tenants use acme-corp
+
+  $ objectified tenants use --profile staging acme-staging
+
+  $ objectified --json tenants use acme-corp
+
+  $ objectified tenants use --clear
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --clear  Remove tenant_slug from this profile so each command needs --tenant or OBJECTIFIED_TENANT.
+
+SEE ALSO
+  objectified tenants list
+
+  objectified config path
+
+  objectified docs profiles
 ```
 
 ## `objectified version`
@@ -1124,7 +1228,7 @@ Show active profile, API base URL, tenant, user, auth type, token expiry, and pl
 ```
 USAGE
   $ objectified whoami [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   Show active profile, API base URL, tenant, user, auth type, token expiry, and plan (GET /v1/auth/cli/whoami).
@@ -1141,6 +1245,8 @@ COMMON
   --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
                       config path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).

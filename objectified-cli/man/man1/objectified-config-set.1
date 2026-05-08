@@ -6,7 +6,7 @@ objectified config set \- Set a config value by dotted key and persist config.to
 USAGE
   $ objectified config set KEY VALUE [--api-key <value>]
     [--api-key-file <value>] [--base-url <value>] [--config <value>] [--json]
-    [--color] [--profile <value>] [-q] [--verbose]
+    [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 ARGUMENTS
   KEY    Dotted path (e.g. default_profile, profile.prod.tenant_slug)
@@ -29,6 +29,8 @@ COMMON
                       path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls
                       back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only
+                      (overrides OBJECTIFIED_TENANT and config tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR;

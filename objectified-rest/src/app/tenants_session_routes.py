@@ -2,6 +2,7 @@
 Session-scoped tenant discovery for the CLI (#3198).
 
 ``GET /v1/tenants/me`` lists tenants for the authenticated principal.
+``HEAD /v1/tenants/{slug}`` verifies access without a response body (#3199).
 ``GET /v1/tenants/{slug}`` returns aggregate tenant details when the caller has access.
 """
 
@@ -10,7 +11,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from .auth import validate_session_credentials
 from .database import db
@@ -20,6 +21,45 @@ router = APIRouter(prefix="/v1/tenants", tags=["tenants"])
 
 _MAX_PAGE = 100
 _DEFAULT_LIMIT = 50
+
+
+def _authorize_tenant_access_row(tenant_slug: str, session: Dict[str, Any]) -> Dict[str, Any]:
+    """Return tenant row when ``tenant_slug`` exists and ``session`` may access it."""
+    if tenant_slug == "me":
+        raise HTTPException(status_code=404, detail="Not found")
+
+    row = db.get_tenant_row_by_slug(tenant_slug)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Tenant not found: {tenant_slug}")
+
+    tenant_id = str(row["id"])
+
+    if session.get("auth_method") == "api_key":
+        key_tid = session.get("tenant_id")
+        if key_tid is None or str(key_tid) != tenant_id:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No access to tenant: {tenant_slug}",
+            )
+    else:
+        user_id = session.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Missing user identifier")
+        access = db.execute_query(
+            """
+            SELECT 1 FROM odb.tenant_users
+            WHERE user_id = %s AND tenant_id = %s
+            LIMIT 1
+            """,
+            (str(user_id), tenant_id),
+        )
+        if not access:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No access to tenant: {tenant_slug}",
+            )
+
+    return row
 
 
 def _format_created(value: Any) -> Optional[str]:
@@ -72,45 +112,24 @@ async def list_my_tenants(
     return TenantsMeResponse(items=items, total=total, limit=limit, offset=offset)
 
 
+@router.head("/{tenant_slug}")
+async def verify_tenant_access(
+    tenant_slug: str,
+    session: Dict[str, Any] = Depends(validate_session_credentials),
+) -> Response:
+    """Lightweight access check for CLI default-tenant selection (#3199)."""
+    _authorize_tenant_access_row(tenant_slug, session)
+    return Response(status_code=200)
+
+
 @router.get("/{tenant_slug}", response_model=TenantInfoResponse)
 async def get_tenant_info(
     tenant_slug: str,
     session: Dict[str, Any] = Depends(validate_session_credentials),
 ) -> TenantInfoResponse:
     """Tenant summary including usage counts; 403 when the caller cannot access the tenant."""
-    if tenant_slug == "me":
-        raise HTTPException(status_code=404, detail="Not found")
-
-    row = db.get_tenant_row_by_slug(tenant_slug)
-    if not row:
-        raise HTTPException(status_code=404, detail=f"Tenant not found: {tenant_slug}")
-
+    row = _authorize_tenant_access_row(tenant_slug, session)
     tenant_id = str(row["id"])
-
-    if session.get("auth_method") == "api_key":
-        key_tid = session.get("tenant_id")
-        if key_tid is None or str(key_tid) != tenant_id:
-            raise HTTPException(
-                status_code=403,
-                detail=f"No access to tenant: {tenant_slug}",
-            )
-    else:
-        user_id = session.get("user_id")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Missing user identifier")
-        access = db.execute_query(
-            """
-            SELECT 1 FROM odb.tenant_users
-            WHERE user_id = %s AND tenant_id = %s
-            LIMIT 1
-            """,
-            (str(user_id), tenant_id),
-        )
-        if not access:
-            raise HTTPException(
-                status_code=403,
-                detail=f"No access to tenant: {tenant_slug}",
-            )
 
     stats = db.get_tenant_usage_stats(tenant_id)
     return TenantInfoResponse(

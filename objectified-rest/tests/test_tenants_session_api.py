@@ -1,4 +1,4 @@
-"""Tests for GET /v1/tenants/me and GET /v1/tenants/{slug} (#3198)."""
+"""Tests for GET /v1/tenants/me, HEAD /v1/tenants/{slug}, and GET /v1/tenants/{slug}."""
 
 from unittest.mock import patch
 
@@ -51,6 +51,37 @@ def test_list_my_tenants_pagination_query():
     assert args[0] == _USER_ID
     assert args[1] == 50
     assert args[2] == 50
+
+
+def test_head_tenant_access_ok():
+    tenant_row = {
+        "id": _TENANT_ID,
+        "slug": "acme",
+        "name": "Acme Co",
+        "created_at": "2024-08-12T00:00:00+00:00",
+    }
+    with patch("app.tenants_session_routes.db") as m:
+        m.get_tenant_row_by_slug.return_value = tenant_row
+        m.execute_query.return_value = [{"?column?": 1}]
+        r = client.head("/v1/tenants/acme")
+    assert r.status_code == 200
+    assert (r.text or "") == ""
+
+
+def test_head_tenant_access_not_found():
+    with patch("app.tenants_session_routes.db") as m:
+        m.get_tenant_row_by_slug.return_value = None
+        r = client.head("/v1/tenants/missing")
+    assert r.status_code == 404
+
+
+def test_head_tenant_access_forbidden():
+    tenant_row = {"id": _TENANT_ID, "slug": "other", "name": "Other", "created_at": None}
+    with patch("app.tenants_session_routes.db") as m:
+        m.get_tenant_row_by_slug.return_value = tenant_row
+        m.execute_query.return_value = []
+        r = client.head("/v1/tenants/other")
+    assert r.status_code == 403
 
 
 def test_get_tenant_info_ok():

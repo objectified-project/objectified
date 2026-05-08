@@ -14,6 +14,7 @@ import {
   listPrimitivesV1PrimitivesTenantSlugGet,
   listProjectsV1ProjectsTenantSlugGet,
   listVersionsV1VersionsTenantSlugProjectIdGet,
+  verifyTenantAccessV1TenantsTenantSlugHead,
 } from "../generated/operations.js";
 
 import { EXIT_CODES } from "./exit-codes.js";
@@ -48,6 +49,7 @@ export type ObjectifiedApi = {
   listPrimitives(tenantSlug: string): Promise<PrimitiveSchema[]>;
   listMyTenantsPage(limit: number, offset: number): Promise<TenantsMeResponse>;
   getTenantInfo(tenantSlug: string): Promise<TenantInfoResponse>;
+  verifyTenantAccess(tenantSlug: string): Promise<void>;
 };
 
 const MAX_RETRY_AFTER_MS = 120_000;
@@ -657,6 +659,24 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
       return parseTenantInfoPayload(
         unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
       );
+    },
+
+    async verifyTenantAccess(tenantSlug: string): Promise<void> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await verifyTenantAccessV1TenantsTenantSlugHead({
+          client: hey,
+          path: { tenant_slug: tenantSlug },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta);
     },
   };
 }

@@ -6,7 +6,7 @@ objectified projects list \- List Objectified projects
 USAGE
   $ objectified projects list [--api-key <value>] [--api-key-file
     <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+    [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   List Objectified projects
@@ -25,6 +25,8 @@ COMMON
                       path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls
                       back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only
+                      (overrides OBJECTIFIED_TENANT and config tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR;
@@ -42,9 +44,9 @@ AUTH
                           history).
 
 SEE ALSO
+  objectified tenants use
+
   objectified config path
 
   objectified docs errors
-
-  objectified hello
 .fi
