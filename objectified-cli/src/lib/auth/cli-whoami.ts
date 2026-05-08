@@ -265,12 +265,15 @@ export function formatAuthStatusHumanLines(opts: FormatAuthStatusHumanOpts): str
   if (jsonKind === "oauth") {
     const expLine =
       expiresIso !== null && expiresIso !== "" ? formatRelativeExpiry(expiresIso, now) : "unknown";
-    const refreshNote =
-      opts.model.auth.refresh_valid === true
-        ? " (refresh token valid)"
-        : opts.model.auth.refresh_valid === null && opts.activeCredentialKind === "oauth_keychain"
-          ? " (refresh token valid)"
-          : "";
+    let refreshNote = "";
+    if (opts.model.auth.refresh_valid === true) {
+      refreshNote = " (refresh token valid)";
+    } else if (
+      opts.model.auth.refresh_valid === null &&
+      opts.activeCredentialKind === "oauth_keychain"
+    ) {
+      refreshNote = " (refresh token valid)";
+    }
     lines.push(padLine("Expires", `${expLine}${refreshNote}`));
   } else {
     lines.push(padLine("Expires", "-"));
