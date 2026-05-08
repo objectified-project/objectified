@@ -567,35 +567,20 @@ objectified browse
         ├── tenants                      # public directory (no auth)
         ├── projects <tenant>            # public projects (optional auth expands to members)
         └── versions <tenant>/<project> # published versions (optional auth expands visibility)
+
+objectified schema
+        └── fetch <tenant>/<project>/<version>   # published OpenAPI bundle or single class (GET /v1/schema/…)
 ```
 
 ### Summary Table
 
 | #         | Title                                                  | Description                                                | Labels                                              | MVP | Parallel |
 |-----------|--------------------------------------------------------|------------------------------------------------------------|-----------------------------------------------------|-----|----------|
-| 9.4 (#3247) | `schema fetch <tenant>/<project>/<version>`          | OpenAPI 3.1 bundle or single class                          | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `export`, `browser` | Yes | Yes |
 | 9.5 (#3248) | `schema swagger`                                     | Download Swagger UI bundle or open in browser              | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `export`, `browser` | Yes | Yes |
 | 9.6 (#3249) | `schema arazzo`                                      | Arazzo workflow bundle (default `--format yaml`)           | `enhancement`, `cli`, `roadmap-cli`, `export`, `browser` | No  | Yes |
 | 9.7 (#3250) | `schema json`                                        | JSON Schema bundle or per-class                            | `enhancement`, `cli`, `roadmap-cli`, `export`, `browser` | No  | Yes |
 | 9.8 (#3251) | `schema diff <v1> <v2>`                              | Summary / unified / SARIF / JSON diff                      | `enhancement`, `cli`, `roadmap-cli`, `browser`, `export` | No | Yes |
 | 9.9 (#3252) | `browse open`                                        | Open the browse URL in the default browser                 | `enhancement`, `cli`, `roadmap-cli`, `browser`     | No  | Yes      |
-
-### Notable Detail — 9.4 (#3247) `schema fetch`
-
-The single most important consumer command in the whole CLI:
-
-```
-# Full bundle as YAML
-$ objectified schema fetch acme-corp/payments-api/v2.1.0 --format yaml > payments.openapi.yaml
-
-# Single class as JSON
-$ objectified schema fetch acme-corp/payments-api/v2.1.0 --class Charge --format json | jq
-
-# Verify against expected SHA
-$ objectified schema fetch acme-corp/payments-api/v2.1.0 --output payments.json --expect-sha256 7f2c…a041
-```
-
-Streamed straight from REST → stdout/file, no parsing in the middle. `--latest`, `--accept tag:stable`, `--expect-sha256` give CI everything it needs to pin a spec and fail loudly when it changes.
 
 ---
 
@@ -758,13 +743,13 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ## MVP Release — Ticket Bundle
 
-The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **8 open sub-tickets** across 4 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, #3194, #3195, #3202, #3203, #3204, #3208, #3209, #3210, #3212, #3244, #3245, and #3246).
+The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **7 open sub-tickets** across 4 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, #3194, #3195, #3202, #3203, #3204, #3208, #3209, #3210, #3212, #3244, #3245, #3246, and #3247).
 
 | Epic     | Tickets                                                                                                   | Count |
 |----------|-----------------------------------------------------------------------------------------------------------|-------|
 | 2 (#3175) | #3196, #3197, #3198, #3199                                                                                | 4     |
 | 4 (#3177) | _(none — #3212 shipped)_                                                                                    | 0     |
-| 9 (#3182) | #3247, #3248                                                                                             | 2     |
+| 9 (#3182) | #3248                                                                                                    | 1     |
 | 12 (#3185) | #3267, #3268                                                                                               | 2     |
 
 **MVP Demo Story:**
@@ -852,7 +837,7 @@ The tickets were created in the order below — that is also the recommended **e
 2. **Epic 2 — Auth & Tenants** (#3175; #3194–#3197 shipped — continue #3198 → #3201). Required for any tenant-scoped command.
 3. **Epic 3 — Projects** (#3176 then #3205 → #3207; #3203 and #3204 shipped). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3211 → #3216; #3208 `versions list`, #3209 `versions show`, and #3210 `versions create` shipped). The publish flow that makes the CLI valuable in CI.
-5. **Epic 9 — Browse & Schema Export** (#3182 then #3247 → #3252; #3244 `browse tenants`, #3245 `browse projects`, and #3246 `browse versions` shipped). The most-used consumer surface; lands early because it works without auth.
+5. **Epic 9 — Browse & Schema Export** (#3182 then #3248 → #3252; #3244 `browse tenants`, #3245 `browse projects`, #3246 `browse versions`, and #3247 `schema fetch` shipped). The most-used consumer surface; lands early because it works without auth.
 6. **Epic 12 — Distribution (CI + NPM publish only)** (#3185 then #3267, #3268). Ship MVP — `npm i -g objectified-cli` works.
 7. **Epic 5 — Primitives** (#3178 then #3217 → #3222). v2 schema-modeling surface starts here.
 8. **Epic 6 — Properties** (#3179 then #3223 → #3228). Builds on primitives.

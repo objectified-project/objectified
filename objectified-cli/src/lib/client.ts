@@ -188,6 +188,14 @@ export type ObjectifiedApi = {
     projectSlug: string;
     since?: string;
   }): Promise<BrowsePublicVersionsResponse>;
+  /** Raw GET /v1/schema/… for streaming or hashing (published OpenAPI bundle or single class). */
+  fetchOpenApiPublishedSchema(opts: {
+    tenantSlug: string;
+    projectSlug: string;
+    versionSlug: string;
+    className?: string;
+    acceptHeader?: string;
+  }): Promise<Response>;
 };
 
 const MAX_RETRY_AFTER_MS = 120_000;
@@ -242,7 +250,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function formatApiError(error: unknown): string {
+export function formatApiError(error: unknown): string {
   if (typeof error === "string") return error;
   if (error && typeof error === "object") {
     const o = error as Record<string, unknown>;
@@ -1853,6 +1861,37 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
       return parseBrowsePublicVersionsPayload(
         unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
       );
+    },
+
+    async fetchOpenApiPublishedSchema(opts: {
+      tenantSlug: string;
+      projectSlug: string;
+      versionSlug: string;
+      className?: string;
+      acceptHeader?: string;
+    }): Promise<Response> {
+      const t = encodeURIComponent(opts.tenantSlug);
+      const p = encodeURIComponent(opts.projectSlug);
+      const v = encodeURIComponent(opts.versionSlug);
+      const path =
+        opts.className !== undefined && opts.className !== ""
+          ? `/v1/schema/${t}/${p}/${v}/${encodeURIComponent(opts.className)}`
+          : `/v1/schema/${t}/${p}/${v}`;
+      const url = `${baseUrlNorm}${path}`;
+      const headers = new Headers();
+      const accept = opts.acceptHeader?.trim();
+      if (accept !== undefined && accept !== "") {
+        headers.set("Accept", accept);
+      }
+      try {
+        return await instrumented(new Request(url, { method: "GET", headers }));
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
     },
   };
 }
