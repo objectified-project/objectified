@@ -8,6 +8,7 @@ import {
   CLI_TOKEN_PATH,
   codeChallengeS256,
   exchangeCliAuthorizationCode,
+  exchangeCliRefreshToken,
   generateCodeVerifier,
   readAuthorizationCodeFromStdin,
   reserveLoopbackRedirectUri,
@@ -16,11 +17,13 @@ import {
 import { runCliPkceLogin } from "../src/lib/auth/cli-login-flow.js";
 import { DEFAULT_CLI_WEB_LOGIN_URL } from "../src/lib/constants.js";
 
-async function mockApiServer(handler: (req: import("node:http").IncomingMessage) => Promise<{
-  status: number;
-  body?: string;
-  contentType?: string;
-}>): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+async function mockApiServer(
+  handler: (req: import("node:http").IncomingMessage) => Promise<{
+    status: number;
+    body?: string;
+    contentType?: string;
+  }>,
+): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server = createServer((req, res) => {
     void (async () => {
       const out = await handler(req);
@@ -90,6 +93,41 @@ describe("CLI OAuth / PKCE helpers", () => {
     }
   });
 
+  it("refreshes access token via POST /v1/auth/cli/token (grant_type refresh_token)", async () => {
+    const { baseUrl, close } = await mockApiServer(async (req) => {
+      if (req.url?.startsWith(CLI_TOKEN_PATH) && req.method === "POST") {
+        const chunks: Buffer[] = [];
+        await new Promise<void>((resolve, reject) => {
+          req.on("data", (c: Buffer) => chunks.push(c));
+          req.on("end", () => resolve());
+          req.on("error", reject);
+        });
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+        expect(body.grant_type).toBe("refresh_token");
+        expect(body.refresh_token).toBe("old-refresh");
+        return {
+          status: 200,
+          body: JSON.stringify({
+            access_token: "access-refreshed",
+            refresh_token: "rotated-refresh",
+          }),
+        };
+      }
+      return { status: 404, body: "not found", contentType: "text/plain" };
+    });
+
+    try {
+      const tokens = await exchangeCliRefreshToken({
+        apiBaseUrl: baseUrl,
+        refreshToken: "old-refresh",
+      });
+      expect(tokens.access_token).toBe("access-refreshed");
+      expect(tokens.refresh_token).toBe("rotated-refresh");
+    } finally {
+      await close();
+    }
+  });
+
   it("revokes refresh token via POST /v1/auth/cli/revoke (mock server)", async () => {
     const { baseUrl, close } = await mockApiServer(async (req) => {
       if (req.url?.startsWith(CLI_REVOKE_PATH) && req.method === "POST") {
@@ -148,8 +186,7 @@ describe("CLI OAuth / PKCE helpers", () => {
         return {
           status: 200,
           body: JSON.stringify({
-            access_token:
-              "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20ifQ.signature",
+            access_token: "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20ifQ.signature",
             refresh_token: "r",
           }),
         };

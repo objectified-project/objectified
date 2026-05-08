@@ -1,10 +1,10 @@
-.TH OBJECTIFIED\-AUTH\-STATUS 1 "" "" "User Commands"
+.TH OBJECTIFIED\-WHOAMI 1 "" "" "User Commands"
 .SH NAME
-objectified auth status \- Show active profile, API base URL, tenant, user, auth type, token expiry, and plan (GET /v1/auth/cli/whoami).
+objectified whoami \- Show active profile, API base URL, tenant, user, auth type, token expiry, and plan (GET /v1/auth/cli/whoami).
 .SH DESCRIPTION
 .nf
 USAGE
-  $ objectified auth status [--api-key <value>] [--api-key-file
+  $ objectified whoami [--api-key <value>] [--api-key-file
     <value>] [--base-url <value>] [--config <value>] [--json] [--color]
     [--profile <value>] [-q] [--verbose]
 
@@ -13,11 +13,11 @@ DESCRIPTION
   and plan (GET /v1/auth/cli/whoami).
 
 EXAMPLES
-  $ objectified auth status
+  $ objectified whoami
 
-  $ objectified --profile staging auth status
+  $ objectified --profile staging whoami
 
-  $ objectified --json auth status
+  $ objectified --json whoami
 
 COMMON
   --base-url=<value>  Root REST API URL.
