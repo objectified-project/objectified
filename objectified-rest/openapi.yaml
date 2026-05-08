@@ -118,6 +118,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BrowsePublicProjectsResponse'
+        '401':
+          description: Unauthorized — missing or invalid credentials
+        '403':
+          description: Forbidden — caller lacks access to this tenant
         '404':
           description: Tenant not found
         '422':

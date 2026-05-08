@@ -6969,56 +6969,62 @@ class Database:
             params.append(domain_term)
         published_clause = ""
         if require_published:
-            published_clause = """
-              AND EXISTS (
-                SELECT 1 FROM odb.versions vpub
-                WHERE vpub.project_id = p.id
-                  AND vpub.deleted_at IS NULL
-                  AND vpub.published IS TRUE
-              )
-            """
+            published_clause = " AND COALESCE(va.published_versions, 0) >= 1"
 
         query = f"""
+            WITH project_base AS (
+                SELECT
+                    p.id AS project_id,
+                    p.slug,
+                    p.name,
+                    p.metadata
+                FROM odb.projects p
+                WHERE p.tenant_id = %s
+                  AND p.deleted_at IS NULL
+                  {search_clause}
+                  {domain_clause}
+            ),
+            version_agg AS (
+                SELECT
+                    v.project_id,
+                    COUNT(*)::int AS published_versions,
+                    MAX(COALESCE(v.published_at, v.updated_at, v.created_at)) AS latest_activity_ts
+                FROM odb.versions v
+                INNER JOIN project_base pb ON pb.project_id = v.project_id
+                WHERE v.deleted_at IS NULL
+                  AND v.published IS TRUE
+                GROUP BY v.project_id
+            ),
+            latest_ver AS (
+                SELECT DISTINCT ON (v.project_id)
+                    v.project_id,
+                    v.version_id AS latest_version,
+                    COALESCE(v.published_at, v.updated_at, v.created_at) AS latest_published_at
+                FROM odb.versions v
+                INNER JOIN project_base pb ON pb.project_id = v.project_id
+                WHERE v.deleted_at IS NULL
+                  AND v.published IS TRUE
+                ORDER BY
+                    v.project_id,
+                    COALESCE(v.published_at, v.updated_at, v.created_at) DESC NULLS LAST,
+                    v.version_id DESC
+            )
             SELECT
-                p.slug,
-                p.name,
-                p.metadata,
-                (
-                    SELECT COUNT(*)::int FROM odb.versions v
-                    WHERE v.project_id = p.id
-                      AND v.deleted_at IS NULL
-                      AND v.published IS TRUE
-                ) AS published_versions,
-                (
-                    SELECT v2.version_id FROM odb.versions v2
-                    WHERE v2.project_id = p.id
-                      AND v2.deleted_at IS NULL
-                      AND v2.published IS TRUE
-                    ORDER BY COALESCE(v2.published_at, v2.updated_at, v2.created_at) DESC NULLS LAST,
-                             v2.version_id DESC
-                    LIMIT 1
-                ) AS latest_version,
-                (
-                    SELECT COALESCE(v2.published_at, v2.updated_at, v2.created_at)
-                    FROM odb.versions v2
-                    WHERE v2.project_id = p.id
-                      AND v2.deleted_at IS NULL
-                      AND v2.published IS TRUE
-                    ORDER BY COALESCE(v2.published_at, v2.updated_at, v2.created_at) DESC NULLS LAST,
-                             v2.version_id DESC
-                    LIMIT 1
-                ) AS latest_published_at
-            FROM odb.projects p
-            WHERE p.tenant_id = %s
-              AND p.deleted_at IS NULL
-              {search_clause}
-              {domain_clause}
+                pb.slug,
+                pb.name,
+                pb.metadata,
+                COALESCE(va.published_versions, 0) AS published_versions,
+                lv.latest_version,
+                lv.latest_published_at
+            FROM project_base pb
+            LEFT JOIN version_agg va ON va.project_id = pb.project_id
+            LEFT JOIN latest_ver lv ON lv.project_id = pb.project_id
+            WHERE 1 = 1
               {published_clause}
-            ORDER BY p.slug ASC
+            ORDER BY pb.slug ASC
         """
         return self.execute_query(query, tuple(params))
 
 
 # Global database instance
 db = Database()
-

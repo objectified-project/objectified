@@ -103,15 +103,18 @@ def test_browse_projects_anonymous_ok_and_passes_query_params():
     assert ca.kwargs["require_published"] is True
 
 
-def test_browse_projects_member_invokes_member_list():
+def test_browse_projects_x_api_key_member_invokes_member_list():
     tenant = {"id": "tid-1", "slug": "acme-corp", "name": "Acme Corp"}
     with patch("app.browse_public_routes.db") as m, patch(
-        "app.browse_public_routes.resolve_optional_tenant_member_auth",
-        return_value=True,
+        "app.auth.db.validate_api_key",
+        return_value={"tenant_slug": "acme-corp"},
     ):
         m.get_tenant_row_by_slug.return_value = tenant
         m.list_member_browse_projects_for_tenant.return_value = []
-        r = client.get("/v1/browse/tenants/acme-corp/projects")
+        r = client.get(
+            "/v1/browse/tenants/acme-corp/projects",
+            headers={"X-API-Key": "member-key"},
+        )
     assert r.status_code == 200
     m.list_member_browse_projects_for_tenant.assert_called_once()
     m.list_public_browse_projects_for_tenant.assert_not_called()
@@ -126,3 +129,19 @@ def test_browse_projects_invalid_jwt_when_header_present():
             headers={"Authorization": "Bearer invalid"},
         )
     assert r.status_code == 401
+
+
+def test_browse_projects_x_api_key_for_other_tenant_is_403():
+    tenant = {"id": "tid-1", "slug": "acme-corp", "name": "Acme Corp"}
+    with patch("app.browse_public_routes.db") as m, patch(
+        "app.auth.db.validate_api_key",
+        return_value={"tenant_slug": "other-tenant"},
+    ):
+        m.get_tenant_row_by_slug.return_value = tenant
+        r = client.get(
+            "/v1/browse/tenants/acme-corp/projects",
+            headers={"X-API-Key": "other-tenant-key"},
+        )
+    assert r.status_code == 403
+    m.list_member_browse_projects_for_tenant.assert_not_called()
+    m.list_public_browse_projects_for_tenant.assert_not_called()
