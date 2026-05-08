@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.13 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.14 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -1001,22 +1001,27 @@ _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.46
 
 ## `objectified projects list`
 
-List Objectified projects
+List Objectified projects for the active tenant (GET /v1/projects/{tenant_slug})
 
 ```
 USAGE
   $ objectified projects list [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
-    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--limit <value>] [--all] [--sort
+    <value>] [--filter <value>...] [--search <value>] [--columns <value>] [--include-deleted]
 
 DESCRIPTION
-  List Objectified projects
+  List Objectified projects for the active tenant (GET /v1/projects/{tenant_slug})
 
 EXAMPLES
   $ objectified projects list
 
   $ objectified --json projects list
 
-  $ objectified --profile staging projects list
+  $ objectified projects list --sort name --limit 25
+
+  $ objectified projects list --filter domain=finance --search payment
+
+  $ objectified --profile staging projects list --all
 
 COMMON
   --base-url=<value>  Root REST API URL.
@@ -1036,6 +1041,17 @@ AUTH
   --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
                           persisted unless you run `auth login --api-key`.
   --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --all                List every matching row after sort/filter (no --limit cap).
+  --columns=<value>    Comma-separated columns: slug, name, domain, versions, latest, latest_published_at, description,
+                       id, updated_at, enabled, creator_email, creator_name, published_at.
+  --filter=<value>...  Keep rows where a field equals a value (case-insensitive). Example: --filter domain=finance
+  --include-deleted    Include soft-deleted projects from the API.
+  --limit=<value>      [default: 50] Maximum rows after sort/filter (1–500; default 50). Ignored with --all.
+  --search=<value>     Case-insensitive substring match across slug, name, and description.
+  --sort=<value>       Sort by field; prefix with '-' for descending. Fields: name, slug, updated_at, published_at
+                       (default: slug).
 
 SEE ALSO
   objectified tenants use

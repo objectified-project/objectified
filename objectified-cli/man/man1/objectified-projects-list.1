@@ -1,22 +1,29 @@
 .TH OBJECTIFIED\-PROJECTS\-LIST 1 "" "" "User Commands"
 .SH NAME
-objectified projects list \- List Objectified projects
+objectified projects list \- List Objectified projects for the active tenant (GET /v1/projects/{tenant_slug})
 .SH DESCRIPTION
 .nf
 USAGE
   $ objectified projects list [--api-key <value>] [--api-key-file
     <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [--tenant <value>] [-q] [--verbose]
+    [--profile <value>] [--tenant <value>] [-q] [--verbose] [--limit <value>]
+    [--all] [--sort <value>] [--filter <value>...] [--search <value>]
+    [--columns <value>] [--include-deleted]
 
 DESCRIPTION
-  List Objectified projects
+  List Objectified projects for the active tenant (GET
+  /v1/projects/{tenant_slug})
 
 EXAMPLES
   $ objectified projects list
 
   $ objectified --json projects list
 
-  $ objectified --profile staging projects list
+  $ objectified projects list --sort name --limit 25
+
+  $ objectified projects list --filter domain=finance --search payment
+
+  $ objectified --profile staging projects list --all
 
 COMMON
   --base-url=<value>  Root REST API URL.
@@ -42,6 +49,23 @@ AUTH
                           unless you run `auth login --api-key`.
   --api-key-file=<value>  Read API key from a file (single line; avoids shell
                           history).
+
+OTHER
+  --all                List every matching row after sort/filter (no --limit
+                       cap).
+  --columns=<value>    Comma-separated columns: slug, name, domain, versions,
+                       latest, latest_published_at, description, id,
+                       updated_at, enabled, creator_email, creator_name,
+                       published_at.
+  --filter=<value>...  Keep rows where a field equals a value
+                       (case-insensitive). Example: --filter domain=finance
+  --include-deleted    Include soft-deleted projects from the API.
+  --limit=<value>      [default: 50] Maximum rows after sort/filter (1–500;
+                       default 50). Ignored with --all.
+  --search=<value>     Case-insensitive substring match across slug, name, and
+                       description.
+  --sort=<value>       Sort by field; prefix with '-' for descending. Fields:
+                       name, slug, updated_at, published_at (default: slug).
 
 SEE ALSO
   objectified tenants use

@@ -507,7 +507,10 @@ tenant_slug = "acme"
       "utf8",
     );
 
-    const firstCode = await runExitAsync(["--no-json", "--config", cfg, "tenants", "use", "--clear"], {});
+    const firstCode = await runExitAsync(
+      ["--no-json", "--config", cfg, "tenants", "use", "--clear"],
+      {},
+    );
     expect(firstCode).toBe(0);
     const afterFirstClear = fs.readFileSync(cfg, "utf8");
     expect(afterFirstClear).not.toContain("tenant_slug");
@@ -725,6 +728,172 @@ tenant_slug = "acme"
     }
   });
 
+  it("projects list --json emits a top-level array (#3202)", async () => {
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (!req.url?.startsWith("/v1/projects/acme")) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      if (req.headers["x-api-key"] !== "good-key") {
+        res.statusCode = 401;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ detail: "Authentication required" }));
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify([
+          { id: "p1", tenant_id: "t1", name: "Payments", slug: "payments", enabled: true },
+        ]),
+      );
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const { code, stdout } = await spawnCliCaptureAsync(
+        [
+          "--base-url",
+          `http://127.0.0.1:${String(addr.port)}`,
+          "--api-key",
+          "good-key",
+          "--json",
+          "projects",
+          "list",
+        ],
+        { OBJECTIFIED_TENANT: "acme" },
+      );
+      expect(code).toBe(0);
+      const parsed: unknown = JSON.parse(stdout.trim());
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed).toHaveLength(1);
+      expect((parsed as { slug?: string }[])[0]?.slug).toBe("payments");
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
+  it("projects list prints create hint when tenant has no projects (#3202)", async () => {
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (!req.url?.startsWith("/v1/projects/acme")) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      if (req.headers["x-api-key"] !== "good-key") {
+        res.statusCode = 401;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ detail: "Authentication required" }));
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify([]));
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const { code, stdout } = await spawnCliCaptureAsync(
+        [
+          "--base-url",
+          `http://127.0.0.1:${String(addr.port)}`,
+          "--api-key",
+          "good-key",
+          "--no-json",
+          "projects",
+          "list",
+        ],
+        { OBJECTIFIED_TENANT: "acme" },
+      );
+      expect(code).toBe(0);
+      expect(stdout).toMatch(/projects create/);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
+  it("projects list rejects --all with --limit before calling the API (#3202)", async () => {
+    const { code, stderr } = await spawnCliCaptureAsync(
+      [
+        "--no-json",
+        "--base-url",
+        "http://127.0.0.1:9",
+        "projects",
+        "list",
+        "--all",
+        "--limit",
+        "10",
+      ],
+      { OBJECTIFIED_TENANT: "acme" },
+    );
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/Cannot use --all/);
+  });
+
+  it("projects list passes include_deleted to the API (#3202)", async () => {
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (!req.url?.startsWith("/v1/projects/acme")) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      const u = new URL(req.url ?? "/", "http://127.0.0.1");
+      if (u.searchParams.get("include_deleted") !== "true") {
+        res.statusCode = 400;
+        res.end();
+        return;
+      }
+      if (req.headers["x-api-key"] !== "good-key") {
+        res.statusCode = 401;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ detail: "no" }));
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify([]));
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const code = await runExitAsync(
+        [
+          "--base-url",
+          `http://127.0.0.1:${String(addr.port)}`,
+          "--api-key",
+          "good-key",
+          "--no-json",
+          "projects",
+          "list",
+          "--include-deleted",
+        ],
+        { OBJECTIFIED_TENANT: "acme" },
+      );
+      expect(code).toBe(0);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
   it("unknown command suggests typo fix when close match", () => {
     const err = runExpectFailure(["helol"]);
     expect(err).toMatch(/Unknown command/);
@@ -862,7 +1031,15 @@ base_url = "https://api.prod.example"
     if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
     try {
       const { code, stdout } = await spawnCliCaptureAsync(
-        ["--json", "--base-url", `http://127.0.0.1:${addr.port}`, "--api-key", "k", "tenants", "list"],
+        [
+          "--json",
+          "--base-url",
+          `http://127.0.0.1:${addr.port}`,
+          "--api-key",
+          "k",
+          "tenants",
+          "list",
+        ],
         {},
       );
       expect(code).toBe(0);
