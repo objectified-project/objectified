@@ -251,7 +251,7 @@ Part of Epic: CLI Foundation & DevEx (#3174)
 
 | #         | Title                                                  | Description                                                       | Labels                                                  | MVP | Parallel |
 |-----------|--------------------------------------------------------|-------------------------------------------------------------------|---------------------------------------------------------|-----|----------|
-| 2.3 (#3196) | `auth status` (whoami)                               | Show profile, base-url, tenant, user, expiry, plan                | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`     | Yes | Yes      |
+| 2.3 (#3196) | `auth status` / `whoami` — **COMPLETE** | Show profile, base-url, tenant, user, expiry, plan via `GET /v1/auth/cli/whoami`; OAuth silent refresh on 401 | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`     | Yes | Yes      |
 | 2.4 (#3197) | Secure credential storage (keytar + encrypted fallback) | OS keychain primary, AES-GCM file fallback for headless           | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`, `security` | Yes | No       |
 | 2.5 (#3198) | `tenants list` / `tenants info`                      | Enumerate user's tenants and inspect one                          | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `tenancy`  | Yes | Yes      |
 | 2.6 (#3199) | `tenants use <slug>`                                 | Set default tenant per profile                                    | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `tenancy`  | Yes | No       |
@@ -296,22 +296,11 @@ Part of Epic: Authentication & Tenant Context (#3175)
 
 ---
 
-#### 2.3 (#3196) — `objectified auth status`
+#### 2.3 (#3196) — `objectified auth status` / `whoami` — **COMPLETE**
 
-```
-$ objectified auth status
-  Profile:    default
-  Base URL:   https://api.objectified.dev
-  Tenant:     acme-corp (Acme Corporation)
-  User:       kenji@objectified.dev
-  Auth type:  OAuth (PKCE)
-  Expires:    in 6h 12m
-  Plan:       Enterprise
-```
+Landed: one `GET /v1/auth/cli/whoami` per invocation; `objectified whoami` alias; human columns for profile, base URL, tenant, user, auth type, relative expiry (+ refresh hint for stored OAuth), and plan; `--json` with stable sorted keys (`profile`, `base_url`, `tenant`, `user`, `auth`, `plan`); OAuth access-token rejected with stored refresh → silent `POST /v1/auth/cli/token` (`grant_type: refresh_token`) then retry whoami; exit **3** when unauthenticated or refresh/session is dead.
 
-`--json` for scripts (stable schema). Exit 0 if authenticated, 3 otherwise.
-
-**Acceptance Criteria:** works for OAuth + API key + env-only; one round trip; ISO 8601 UTC in JSON, local TZ in human view.
+**Acceptance Criteria:** works for OAuth + API key + env bearer; exit 0 / 3; ISO UTC in JSON for `expires_at`; snapshot tests for human + JSON.
 
 **Parallelism / Dependencies:** Depends on 2.1 or 2.2, 2.4.
 
@@ -863,7 +852,7 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 The tickets were created in the order below — that is also the recommended **execution** order. Earlier epics provide primitives that later epics rely on.
 
 1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, #3189, #3190, #3191, #3192, and #3193 landed). Without the scaffold, no other command can exist.
-2. **Epic 2 — Auth & Tenants** (#3175; #3194 and #3195 shipped — continue #3196 → #3201). Required for any tenant-scoped command.
+2. **Epic 2 — Auth & Tenants** (#3175; #3194, #3195, and #3196 shipped — continue #3197 → #3201). Required for any tenant-scoped command.
 3. **Epic 3 — Projects** (#3176 then #3202 → #3207). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3208 → #3216). The publish flow that makes the CLI valuable in CI.
 5. **Epic 9 — Browse & Schema Export** (#3182 then #3244 → #3252). The most-used consumer surface; lands early because it works without auth.

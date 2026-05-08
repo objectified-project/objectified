@@ -10,16 +10,14 @@ import { EXIT_CODES } from "../exit-codes.js";
 
 export const CLI_TOKEN_PATH = "/v1/auth/cli/token";
 export const CLI_REVOKE_PATH = "/v1/auth/cli/revoke";
+/** `GET` — returns tenant, user, plan, and token metadata for the active session (#3196). */
+export const CLI_WHOAMI_PATH = "/v1/auth/cli/whoami";
 
 /** Default wait for user to complete browser login (ms). */
 export const CLI_LOGIN_BROWSER_TIMEOUT_MS = 120_000;
 
 function base64UrlEncode(buf: Buffer): string {
-  return buf
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 /** RFC 7636 code verifier (≥ 43 chars); uses 64 random octets → ~86 URL-safe chars. */
@@ -52,11 +50,13 @@ export function shouldOpenBrowser(noBrowserFlag: boolean): boolean {
   return true;
 }
 
-export async function readAuthorizationCodeFromStdin(opts: {
-  input?: Readable;
-  output?: Writable;
-  prompt?: string;
-} = {}): Promise<string> {
+export async function readAuthorizationCodeFromStdin(
+  opts: {
+    input?: Readable;
+    output?: Writable;
+    prompt?: string;
+  } = {},
+): Promise<string> {
   const rl = readline.createInterface({
     input: opts.input ?? process.stdin,
     output: opts.output ?? process.stderr,
@@ -126,8 +126,7 @@ export async function startLoopbackOAuthServer(): Promise<LoopbackServer> {
   const server = createServer((req, res) => {
     try {
       const remote = req.socket.remoteAddress ?? "";
-      const loopback =
-        remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
+      const loopback = remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
       if (!loopback) {
         res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
         res.end("Forbidden");
@@ -300,6 +299,62 @@ export async function exchangeCliAuthorizationCode(opts: {
   }
 
   return body as TokenExchangeResponse;
+}
+
+/** Rotate access token using a stored refresh token (`grant_type: refresh_token`). */
+export async function exchangeCliRefreshToken(opts: {
+  apiBaseUrl: string;
+  refreshToken: string;
+  fetchImpl?: typeof fetch;
+}): Promise<TokenExchangeResponse> {
+  const tokenUrl = new URL(CLI_TOKEN_PATH, opts.apiBaseUrl).toString();
+  const fetchFn = opts.fetchImpl ?? globalThis.fetch;
+  const res = await fetchFn(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      grant_type: "refresh_token",
+      refresh_token: opts.refreshToken,
+    }),
+  });
+
+  const rawText = await res.text();
+  if (!res.ok) {
+    throw new ObjectifiedCliError({
+      message: `Token refresh failed (${String(res.status)}): ${rawText.slice(0, 800)}`,
+      exitCode: EXIT_CODES.NOT_AUTHENTICATED,
+      hint: "Run `objectified auth login` again.",
+    });
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(rawText) as unknown;
+  } catch {
+    throw new CliError("Token refresh returned invalid JSON.");
+  }
+
+  if (!body || typeof body !== "object") {
+    throw new CliError("Token refresh response was empty.");
+  }
+  const rec = body as Record<string, unknown>;
+  if (typeof rec.access_token !== "string") {
+    throw new CliError("Token refresh response missing access_token.");
+  }
+  const refresh_token =
+    typeof rec.refresh_token === "string" ? rec.refresh_token : opts.refreshToken;
+  const expires_in =
+    typeof rec.expires_in === "number" && Number.isFinite(rec.expires_in)
+      ? rec.expires_in
+      : undefined;
+  return {
+    access_token: rec.access_token,
+    refresh_token,
+    expires_in,
+  };
 }
 
 export async function revokeCliRefreshToken(opts: {

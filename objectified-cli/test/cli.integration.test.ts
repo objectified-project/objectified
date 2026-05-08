@@ -55,8 +55,11 @@ function runExitAsync(
     const child = spawn("node", [path.join(pkgRoot, "bin/run.js"), ...args], {
       cwd: pkgRoot,
       env,
-      stdio: "inherit",
+      stdio: ["ignore", "pipe", "pipe"],
     });
+
+    child.stdout?.on("data", () => {});
+    child.stderr?.on("data", () => {});
 
     let settled = false;
     const timer = setTimeout(() => {
@@ -78,6 +81,64 @@ function runExitAsync(
       settled = true;
       clearTimeout(timer);
       resolve(code ?? 1);
+    });
+  });
+}
+
+/** Same as {@link runExitAsync} but captures stdout (for JSON) without blocking the event loop. */
+function spawnCliCaptureAsync(
+  args: string[],
+  extraEnv: Record<string, string> = {},
+  timeoutMs = 20_000,
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  const env = {
+    ...process.env,
+    FORCE_COLOR: "0",
+    OBJECTIFIED_CLI_CREDENTIAL_BACKEND: "memory",
+    ...extraEnv,
+  };
+  delete env.NODE_OPTIONS;
+
+  return new Promise((resolve, reject) => {
+    const child = spawn("node", [path.join(pkgRoot, "bin/run.js"), ...args], {
+      cwd: pkgRoot,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const outChunks: Buffer[] = [];
+    const errChunks: Buffer[] = [];
+    child.stdout?.on("data", (c: Buffer | string) => {
+      outChunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
+    });
+    child.stderr?.on("data", (c: Buffer | string) => {
+      errChunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
+    });
+
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill("SIGKILL");
+      reject(new Error(`CLI subprocess timed out after ${String(timeoutMs)}ms: ${args.join(" ")}`));
+    }, timeoutMs);
+
+    child.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    child.on("exit", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({
+        code: code ?? 1,
+        stdout: Buffer.concat(outChunks).toString("utf8"),
+        stderr: Buffer.concat(errChunks).toString("utf8"),
+      });
     });
   });
 }
@@ -204,10 +265,95 @@ describe("objectified CLI", () => {
     expect(runExit(["--no-json", "auth", "status"])).toBe(3);
   });
 
-  it("auth status exits 0 with OBJECTIFIED_API_KEY", () => {
-    expect(runExit(["--no-json", "auth", "status"], { OBJECTIFIED_API_KEY: "sk_live_test" })).toBe(
-      0,
-    );
+  it("auth status calls GET /v1/auth/cli/whoami and exits 0 with OBJECTIFIED_API_KEY", async () => {
+    const body = {
+      tenant: { slug: "acme-corp", name: "Acme Corporation" },
+      user: { id: "u_1", email: "kenji@example.com" },
+      plan: "enterprise",
+      auth: {
+        type: "api_key",
+        expires_at: null as string | null,
+        refresh_valid: null as boolean | null,
+      },
+    };
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (!req.url?.startsWith("/v1/auth/cli/whoami")) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      if (req.method !== "GET") {
+        res.statusCode = 405;
+        res.end();
+        return;
+      }
+      if (req.headers["x-api-key"] !== "sk_live_test") {
+        res.statusCode = 401;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ detail: "Authentication required" }));
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(body));
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const code = await runExitAsync(
+        ["--base-url", `http://127.0.0.1:${addr.port}`, "--no-json", "auth", "status"],
+        { OBJECTIFIED_API_KEY: "sk_live_test" },
+      );
+      expect(code).toBe(0);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
+  it("whoami alias hits whoami and prints JSON", async () => {
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (!req.url?.startsWith("/v1/auth/cli/whoami")) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          tenant: { slug: "t1", name: null },
+          user: { id: null, email: "e@e.com" },
+          plan: "pro",
+          auth: { type: "api_key" },
+        }),
+      );
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const { code, stdout } = await spawnCliCaptureAsync(
+        ["--json", "--base-url", `http://127.0.0.1:${addr.port}`, "whoami"],
+        { OBJECTIFIED_API_KEY: "k" },
+      );
+      expect(code).toBe(0);
+      const j = JSON.parse(stdout.trim()) as Record<string, unknown>;
+      expect(j.profile).toBe("default");
+      expect(j.user).toEqual({ email: "e@e.com", id: null });
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
   });
 
   it("projects list exits 3 when tenant is set but credentials are missing", () => {

@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.9 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.10 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -83,6 +83,7 @@ USAGE
 * [`objectified help [COMMAND]`](#objectified-help-command)
 * [`objectified projects list`](#objectified-projects-list)
 * [`objectified version`](#objectified-version)
+* [`objectified whoami`](#objectified-whoami)
 
 ## `objectified auth login`
 
@@ -188,7 +189,7 @@ SEE ALSO
 
 ## `objectified auth status`
 
-Show the active profile, base URL, and whether you are using an API key or OAuth token.
+Show active profile, API base URL, tenant, user, auth type, token expiry, and plan (GET /v1/auth/cli/whoami).
 
 ```
 USAGE
@@ -196,10 +197,12 @@ USAGE
     [--json] [--color] [--profile <value>] [-q] [--verbose]
 
 DESCRIPTION
-  Show the active profile, base URL, and whether you are using an API key or OAuth token.
+  Show active profile, API base URL, tenant, user, auth type, token expiry, and plan (GET /v1/auth/cli/whoami).
 
 EXAMPLES
   $ objectified auth status
+
+  $ objectified whoami
 
   $ objectified --profile staging auth status
 
@@ -227,7 +230,12 @@ SEE ALSO
 
   objectified auth logout
 
+  objectified docs output
+
   objectified docs profiles
+
+ALIASES
+  $ objectified whoami
 ```
 
 ## `objectified completion`
@@ -1014,6 +1022,57 @@ FLAG DESCRIPTIONS
 ```
 
 _See code: [@oclif/plugin-version](https://github.com/oclif/plugin-version/blob/2.2.43/src/commands/version.ts)_
+
+## `objectified whoami`
+
+Show active profile, API base URL, tenant, user, auth type, token expiry, and plan (GET /v1/auth/cli/whoami).
+
+```
+USAGE
+  $ objectified whoami [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose]
+
+DESCRIPTION
+  Show active profile, API base URL, tenant, user, auth type, token expiry, and plan (GET /v1/auth/cli/whoami).
+
+EXAMPLES
+  $ objectified whoami
+
+  $ objectified whoami
+
+  $ objectified --profile staging whoami
+
+  $ objectified --json whoami
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+SEE ALSO
+  objectified auth login
+
+  objectified auth logout
+
+  objectified docs output
+
+  objectified docs profiles
+
+ALIASES
+  $ objectified whoami
+```
 <!-- commandsstop -->
 
 Global flags apply to every command (see **`objectified --help`**): `--api-key`, `--base-url`, `--config`, `--json`, `--no-color`, `--profile`, `--quiet`/`-q`, `--verbose`, plus env vars `OBJECTIFIED_*` and `NO_COLOR`. Effective API URL and optional API key resolve in order: **CLI flag → environment → `[profile.NAME]` in config → `[default]` in config → built-in default** (`https://api.objectified.dev` for the URL). Config file default path: `~/.config/objectified/config.toml`.

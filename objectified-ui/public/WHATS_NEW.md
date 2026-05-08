@@ -8,6 +8,7 @@ We continue to improve the platform based on your feedback with improvements and
 - MCP service is now live
 
 ## CLI
+- **`objectified-cli`**: `objectified auth status` / `whoami` calls `GET /v1/auth/cli/whoami` for tenant, user, plan, and token metadata; stable `--json` schema; stored OAuth silently refreshes on 401 before retrying whoami (#3196).
 - **`objectified-cli`**: API-key auth (`--api-key`, `OBJECTIFIED_API_KEY`, `--api-key-file`), keychain storage via `auth login --api-key`, `auth status`, API-key precedence over OAuth, redacted verbose logging, and exit **4** for rejected credentials on authenticated requests (#3195).
 - **`objectified-cli`**: `objectified auth login` (PKCE loopback + browser or `--no-browser` / headless stdin code) and `objectified auth logout` (`--all-profiles`); tokens stored per profile in the OS keychain via `keytar`, bearer hydration for API calls (#3194).
 - **`objectified-cli`**: `objectified completion install|show|uninstall` for bash, zsh, fish, and PowerShell; manifest-backed static completions plus REST-backed suggestions cached five minutes under `~/.cache/objectified/completion/` (#3193).
