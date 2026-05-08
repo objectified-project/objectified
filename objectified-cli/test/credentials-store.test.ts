@@ -1,7 +1,14 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 afterEach(() => {
   delete process.env.OBJECTIFIED_CLI_CREDENTIAL_BACKEND;
+  delete process.env.OBJECTIFIED_CLI_CREDENTIAL_VAULT_DIR;
+  delete process.env.OBJECTIFIED_CLI_CREDENTIAL_DISABLE_FILE_FALLBACK;
+  delete process.env.OBJECTIFIED_CLI_CREDENTIAL_VAULT_RESET;
   vi.resetModules();
   vi.doUnmock("keytar");
 });
@@ -42,7 +49,8 @@ describe("CLI credential store", () => {
     });
   });
 
-  it("wraps keytar load failures with an actionable error", async () => {
+  it("wraps keytar load failures with an actionable error when file fallback is disabled", async () => {
+    process.env.OBJECTIFIED_CLI_CREDENTIAL_DISABLE_FILE_FALLBACK = "1";
     vi.doMock("keytar", () => {
       throw new Error("libsecret missing");
     });
@@ -57,7 +65,60 @@ describe("CLI credential store", () => {
     ).rejects.toMatchObject({
       name: "ObjectifiedCliError",
       message: expect.stringContaining("OS keychain is unavailable for CLI credentials"),
-      hint: expect.stringContaining("OBJECTIFIED_CLI_CREDENTIAL_BACKEND=memory"),
+      hint: expect.stringMatching(/libsecret|memory|FILE_FALLBACK/),
+    });
+  });
+
+  it("persists OAuth in encrypted file vault when keytar is unavailable (#3197)", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-vault-"));
+    process.env.OBJECTIFIED_CLI_CREDENTIAL_VAULT_DIR = dir;
+    vi.doMock("keytar", () => {
+      throw new Error("no native keychain");
+    });
+
+    const {
+      deleteCliOAuthCredentials,
+      loadCliStoredAuth,
+      resetFileBackendWarningForTests,
+      saveCliOAuthCredentials,
+    } = await import("../src/lib/credentials/store.js");
+    resetFileBackendWarningForTests();
+
+    await saveCliOAuthCredentials("default", {
+      accessToken: "access-one",
+      refreshToken: "refresh-one",
+      tenantSlug: "acme",
+    });
+    await expect(loadCliStoredAuth("default")).resolves.toEqual({
+      kind: "oauth",
+      accessToken: "access-one",
+      refreshToken: "refresh-one",
+    });
+
+    const enc = path.join(dir, "credentials.enc");
+    expect(fs.existsSync(enc)).toBe(true);
+    if (process.platform !== "win32") {
+      expect(fs.statSync(enc).mode & 0o777).toBe(0o600);
+      const passPath = path.join(dir, ".cli-credential-passphrase");
+      expect(fs.existsSync(passPath)).toBe(true);
+      expect(fs.statSync(passPath).mode & 0o777).toBe(0o600);
+    }
+
+    await saveCliOAuthCredentials("staging", {
+      accessToken: "access-two",
+      refreshToken: "refresh-two",
+    });
+    await expect(loadCliStoredAuth("default")).resolves.toMatchObject({
+      accessToken: "access-one",
+    });
+    await expect(loadCliStoredAuth("staging")).resolves.toMatchObject({
+      accessToken: "access-two",
+    });
+
+    await deleteCliOAuthCredentials("default");
+    await expect(loadCliStoredAuth("default")).resolves.toBeNull();
+    await expect(loadCliStoredAuth("staging")).resolves.toMatchObject({
+      accessToken: "access-two",
     });
   });
 });

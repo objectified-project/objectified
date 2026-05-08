@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.10 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.11 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -140,7 +140,7 @@ SEE ALSO
 
 ## `objectified auth logout`
 
-Revoke CLI refresh token at the API (OAuth profiles) and remove stored credentials from the OS keychain.
+Revoke CLI refresh token at the API (OAuth profiles) and remove stored credentials from the OS keychain and any encrypted file fallback.
 
 ```
 USAGE
@@ -148,7 +148,8 @@ USAGE
     [--json] [--color] [--profile <value>] [-q] [--verbose] [--all-profiles]
 
 DESCRIPTION
-  Revoke CLI refresh token at the API (OAuth profiles) and remove stored credentials from the OS keychain.
+  Revoke CLI refresh token at the API (OAuth profiles) and remove stored credentials from the OS keychain and any
+  encrypted file fallback.
 
 EXAMPLES
   $ objectified auth logout

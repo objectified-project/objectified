@@ -7,7 +7,7 @@ import { listAvailableProfileNames, resolveProfileConfigBaseUrl } from "../../li
 
 export default class AuthLogout extends BaseCommand {
   static description =
-    "Revoke CLI refresh token at the API (OAuth profiles) and remove stored credentials from the OS keychain.";
+    "Revoke CLI refresh token at the API (OAuth profiles) and remove stored credentials from the OS keychain and any encrypted file fallback.";
 
   static examples = [
     "<%= config.bin %> <%= command.id %>",

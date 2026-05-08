@@ -8,6 +8,7 @@ We continue to improve the platform based on your feedback with improvements and
 - MCP service is now live
 
 ## CLI
+- **`objectified-cli`**: secure credential storage — `keytar` OS keychain first, AES-256-GCM encrypted file fallback (`credentials.enc`) when libsecret/keychain is missing; profile-scoped vault merge/delete; `auth logout` clears both stores; optional `expires_at` / `tenant_slug` on stored OAuth; documented threat model in `objectified-cli/docs/cli-security.md`; CI builds `keytar` on Linux, macOS, and Windows (#3197).
 - **`objectified-cli`**: `objectified auth status` / `whoami` calls `GET /v1/auth/cli/whoami` for tenant, user, plan, and token metadata; stable `--json` schema; stored OAuth silently refreshes on 401 before retrying whoami (#3196).
 - **`objectified-cli`**: API-key auth (`--api-key`, `OBJECTIFIED_API_KEY`, `--api-key-file`), keychain storage via `auth login --api-key`, `auth status`, API-key precedence over OAuth, redacted verbose logging, and exit **4** for rejected credentials on authenticated requests (#3195).
 - **`objectified-cli`**: `objectified auth login` (PKCE loopback + browser or `--no-browser` / headless stdin code) and `objectified auth logout` (`--all-profiles`); tokens stored per profile in the OS keychain via `keytar`, bearer hydration for API calls (#3194).

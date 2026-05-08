@@ -40,10 +40,12 @@ export default class AuthStatus extends BaseCommand {
       stored?.kind === "oauth" && this.activeCredential.kind === "oauth_keychain"
         ? {
             refreshToken: stored.refreshToken,
-            onRotated: async (accessToken: string, refreshToken: string) => {
+            onRotated: async (accessToken: string, refreshToken: string, expiresAt?: string) => {
               await saveCliOAuthCredentials(this.context.profile, {
                 accessToken,
                 refreshToken,
+                expiresAt,
+                tenantSlug: this.context.tenantSlug ?? undefined,
               });
             },
           }

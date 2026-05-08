@@ -252,7 +252,7 @@ Part of Epic: CLI Foundation & DevEx (#3174)
 | #         | Title                                                  | Description                                                       | Labels                                                  | MVP | Parallel |
 |-----------|--------------------------------------------------------|-------------------------------------------------------------------|---------------------------------------------------------|-----|----------|
 | 2.3 (#3196) | `auth status` / `whoami` — **COMPLETE** | Show profile, base-url, tenant, user, expiry, plan via `GET /v1/auth/cli/whoami`; OAuth silent refresh on 401 | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`     | Yes | Yes      |
-| 2.4 (#3197) | Secure credential storage (keytar + encrypted fallback) | OS keychain primary, AES-GCM file fallback for headless           | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`, `security` | Yes | No       |
+| 2.4 (#3197) | Secure credential storage (keytar + encrypted fallback) — **COMPLETE** | OS keychain primary, AES-GCM file fallback for headless           | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`, `security` | Yes | No       |
 | 2.5 (#3198) | `tenants list` / `tenants info`                      | Enumerate user's tenants and inspect one                          | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `tenancy`  | Yes | Yes      |
 | 2.6 (#3199) | `tenants use <slug>`                                 | Set default tenant per profile                                    | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `tenancy`  | Yes | No       |
 | 2.7 (#3200) | Multi-profile management                             | `auth profiles list/add/remove/set-default`                       | `enhancement`, `cli`, `roadmap-cli`, `auth`            | No  | Yes      |
@@ -308,9 +308,9 @@ Part of Epic: Authentication & Tenant Context (#3175)
 
 ---
 
-#### 2.4 (#3197) — Secure credential storage
+#### 2.4 (#3197) — Secure credential storage — **COMPLETE**
 
-`keytar` (Keychain / libsecret / Credential Vault). Encrypted file fallback at `~/.config/objectified/credentials.enc` (AES-256-GCM) for headless Linux containers.
+Landed: `keytar` primary (Keychain / libsecret / Windows Credential Vault); AES-256-GCM encrypted vault at `credentials.enc` with machine-bound PBKDF2 + one-time passphrase file when the keychain is unavailable; stderr warning when fallback is used (suppressed when `VITEST` is set); per-profile merge and delete; `auth logout` clears keychain and vault entries; OAuth wire format includes `type`, `access_token`, `refresh_token`, optional `expires_at` / `tenant_slug`; resolution order flag → env → keychain → file; `docs/cli-security.md` threat model; CI matrix ubuntu / macOS / Windows for native `keytar` builds.
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -852,7 +852,7 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 The tickets were created in the order below — that is also the recommended **execution** order. Earlier epics provide primitives that later epics rely on.
 
 1. **Epic 1 — Foundation** (#3174: #3186, #3187, #3188, #3189, #3190, #3191, #3192, and #3193 landed). Without the scaffold, no other command can exist.
-2. **Epic 2 — Auth & Tenants** (#3175; #3194, #3195, and #3196 shipped — continue #3197 → #3201). Required for any tenant-scoped command.
+2. **Epic 2 — Auth & Tenants** (#3175; #3194–#3197 shipped — continue #3198 → #3201). Required for any tenant-scoped command.
 3. **Epic 3 — Projects** (#3176 then #3202 → #3207). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3208 → #3216). The publish flow that makes the CLI valuable in CI.
 5. **Epic 9 — Browse & Schema Export** (#3182 then #3244 → #3252). The most-used consumer surface; lands early because it works without auth.

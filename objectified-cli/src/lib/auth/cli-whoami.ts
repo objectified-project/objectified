@@ -290,7 +290,7 @@ export type FetchCliWhoamiOptions = {
   activeCredentialKind: ActiveCredentialKind;
   oauthRefresh?: {
     refreshToken: string;
-    onRotated: (accessToken: string, refreshToken: string) => Promise<void>;
+    onRotated: (accessToken: string, refreshToken: string, expiresAt?: string) => Promise<void>;
   };
   fetchImpl?: typeof fetch;
 };
@@ -319,7 +319,11 @@ export async function fetchCliWhoami(opts: FetchCliWhoamiOptions): Promise<CliWh
     });
     opts.auth.apiKey = undefined;
     opts.auth.bearer = tokens.access_token;
-    await opts.oauthRefresh.onRotated(tokens.access_token, tokens.refresh_token);
+    const rotatedExpires =
+      typeof tokens.expires_in === "number" && Number.isFinite(tokens.expires_in)
+        ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+        : undefined;
+    await opts.oauthRefresh.onRotated(tokens.access_token, tokens.refresh_token, rotatedExpires);
     res = await getOnce();
   }
 
