@@ -64,7 +64,7 @@ describe("schema swagger helpers (#3248)", () => {
     ).toEqual({ openBrowser: false, writeBundle: true });
   });
 
-  it("forces browser when --open is passed even without TTY", () => {
+  it("opens browser AND writes bundle when --open is passed on non-TTY (additive)", () => {
     expect(
       resolveSchemaSwaggerModes({
         stdoutIsTTY: false,
@@ -73,7 +73,31 @@ describe("schema swagger helpers (#3248)", () => {
         outputPath: "",
         formatProvided: false,
       }),
+    ).toEqual({ openBrowser: true, writeBundle: true });
+  });
+
+  it("opens browser only (no bundle) when --open is passed on an interactive TTY", () => {
+    expect(
+      resolveSchemaSwaggerModes({
+        stdoutIsTTY: true,
+        machineOutput: false,
+        openFlag: true,
+        outputPath: "",
+        formatProvided: false,
+      }),
     ).toEqual({ openBrowser: true, writeBundle: false });
+  });
+
+  it("opens browser AND writes bundle when --open is passed with machineOutput on TTY (additive)", () => {
+    expect(
+      resolveSchemaSwaggerModes({
+        stdoutIsTTY: true,
+        machineOutput: true,
+        openFlag: true,
+        outputPath: "",
+        formatProvided: false,
+      }),
+    ).toEqual({ openBrowser: true, writeBundle: true });
   });
 
   it("allows browser plus bundle when --open and --format are both set", () => {

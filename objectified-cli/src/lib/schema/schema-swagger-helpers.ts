@@ -17,6 +17,9 @@ export function resolveSchemaSwaggerModes(opts: {
   const conversationalDefault =
     opts.stdoutIsTTY && !opts.machineOutput && !hasOutput && !opts.formatProvided;
   const openBrowser = opts.openFlag || conversationalDefault;
-  const writeBundle = hasOutput || opts.formatProvided || !openBrowser;
+  // Treat --open as additive: skip the bundle only in the pure interactive default
+  // (TTY, no machine output, no --output, no --format). When --open is explicit on a
+  // non-TTY or with machine output, the browser opens *and* the bundle is still emitted.
+  const writeBundle = hasOutput || opts.formatProvided || !conversationalDefault;
   return { openBrowser, writeBundle };
 }
