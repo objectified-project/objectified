@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.15 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.16 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -81,6 +81,7 @@ USAGE
 * [`objectified docs telemetry`](#objectified-docs-telemetry)
 * [`objectified hello [NAME]`](#objectified-hello-name)
 * [`objectified help [COMMAND]`](#objectified-help-command)
+* [`objectified projects create`](#objectified-projects-create)
 * [`objectified projects list`](#objectified-projects-list)
 * [`objectified projects show REF`](#objectified-projects-show-ref)
 * [`objectified tenants info SLUG`](#objectified-tenants-info-slug)
@@ -999,6 +1000,68 @@ OTHER
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.46/src/commands/help.ts)_
+
+## `objectified projects create`
+
+Create a project for the active tenant (POST /v1/projects/{tenant_slug}); interactive or CI flags.
+
+```
+USAGE
+  $ objectified projects create [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--name <value>] [--slug <value>]
+    [--description <value>] [--domain <value>] [--visibility private|public] [--from-file <value>] [--yes] [--dry-run]
+
+DESCRIPTION
+  Create a project for the active tenant (POST /v1/projects/{tenant_slug}); interactive or CI flags.
+
+EXAMPLES
+  $ objectified projects create
+
+  $ objectified projects create --name 'Payments API' --slug payments-api --yes
+
+  $ objectified projects create --from-file ./project.yaml --yes
+
+  $ objectified projects create --dry-run --name 'Payments API' --slug payments-api
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --description=<value>  Optional description.
+  --domain=<value>       Domain category id (metadata domainCategory). Validated against GET …/domains when available.
+  --dry-run              Print the POST JSON body and exit without calling the API.
+  --from-file=<value>    Load fields from JSON or YAML (validated JSON Schema).
+  --name=<value>         Project display name.
+  --slug=<value>         URL-safe slug (^[a-z][a-z0-9-]{1,62}$).
+  --visibility=<option>  Stored in project metadata: private or public.
+                         <options: private|public>
+  --yes                  Skip confirmation prompts (CI guard).
+
+SEE ALSO
+  objectified projects list
+
+  objectified projects show
+
+  objectified tenants use
+
+  objectified docs errors
+```
 
 ## `objectified projects list`
 

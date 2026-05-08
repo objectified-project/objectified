@@ -96,6 +96,8 @@ export function latestColumnDisplay(p: ProjectSchema, nowMs: number): string {
 export function domainDisplay(p: ProjectSchema): string {
   const meta = readMetaString(p.metadata, "domain");
   if (meta !== undefined && meta !== "") return meta;
+  const category = readMetaString(p.metadata, "domainCategory");
+  if (category !== undefined && category !== "" && category !== "none") return category;
   const top = (p as Record<string, unknown>).domain;
   return typeof top === "string" && top !== "" ? top : "—";
 }
@@ -139,6 +141,7 @@ function cellForColumn(key: string, p: ProjectSchema, nowMs: number): string {
       const iso = latestPublishedIso(p);
       return iso !== undefined ? iso.slice(0, 19) : ""; // YYYY-MM-DDTHH:MM:SS
     }
+    case "description":
       return p.description ?? "";
     case "id":
       return p.id;
