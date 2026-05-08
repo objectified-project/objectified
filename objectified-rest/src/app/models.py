@@ -1994,3 +1994,26 @@ class BrowsePublicProjectsResponse(BaseModel):
     tenant_name: str
     projects: List[BrowsePublicProjectRow]
     filtered_count: int
+
+
+class BrowsePublicVersionRow(BaseModel):
+    """One published version row for public browse (per project)."""
+
+    id: str
+    version_id: str
+    published_at: Optional[datetime] = None
+    tags: List[str]
+    changes_summary: Optional[str] = None
+    description: Optional[str] = None
+    change_log: Optional[str] = None
+
+
+class BrowsePublicVersionsResponse(BaseModel):
+    """Published versions for browse parity (anonymous public slice or member-authenticated view)."""
+
+    tenant_slug: str
+    tenant_name: str
+    project_slug: str
+    project_name: str
+    versions: List[BrowsePublicVersionRow]
+    filtered_count: int

@@ -121,6 +121,72 @@ export type BrowsePublicProjectsResponse = {
 };
 
 /**
+ * BrowsePublicVersionRow
+ * One published version row for public browse (per project).
+ */
+export type BrowsePublicVersionRow = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Version Id
+     */
+    version_id: string;
+    /**
+     * Published At
+     */
+    published_at?: string | null;
+    /**
+     * Tags
+     */
+    tags: Array<string>;
+    /**
+     * Changes Summary
+     */
+    changes_summary?: string | null;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Change Log
+     */
+    change_log?: string | null;
+};
+
+/**
+ * BrowsePublicVersionsResponse
+ * Published versions for browse parity (anonymous public slice or member-authenticated view).
+ */
+export type BrowsePublicVersionsResponse = {
+    /**
+     * Tenant Slug
+     */
+    tenant_slug: string;
+    /**
+     * Tenant Name
+     */
+    tenant_name: string;
+    /**
+     * Project Slug
+     */
+    project_slug: string;
+    /**
+     * Project Name
+     */
+    project_name: string;
+    /**
+     * Versions
+     */
+    versions: Array<BrowsePublicVersionRow>;
+    /**
+     * Filtered Count
+     */
+    filtered_count: number;
+};
+
+/**
  * ChangeReportModel
  * Versioned semantic diff between two resolved OpenAPI documents.
  * ``schemaVersion`` bumps when this JSON shape changes incompatibly.
@@ -3359,6 +3425,14 @@ export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetData = {
 
 export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetErrors = {
     /**
+     * Unauthorized — missing or invalid credentials
+     */
+    401: unknown;
+    /**
+     * Forbidden — caller lacks access to this tenant
+     */
+    403: unknown;
+    /**
      * Tenant not found
      */
     404: unknown;
@@ -3378,6 +3452,68 @@ export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetResponse
 };
 
 export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetResponse = ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetResponses[keyof ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetResponses];
+
+export type ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+        /**
+         * X-Api-Key
+         */
+        'X-API-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Tenant Slug
+         */
+        tenant_slug: string;
+        /**
+         * Project Slug
+         */
+        project_slug: string;
+    };
+    query?: {
+        /**
+         * Since
+         * Include only versions whose published_at is at or after this timestamp (ISO 8601).
+         */
+        since?: string | null;
+    };
+    url: '/v1/browse/tenants/{tenant_slug}/projects/{project_slug}/versions';
+};
+
+export type ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGetErrors = {
+    /**
+     * Unauthorized — missing or invalid credentials
+     */
+    401: unknown;
+    /**
+     * Forbidden — caller lacks access to this tenant
+     */
+    403: unknown;
+    /**
+     * Tenant or project not found
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGetError = ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGetErrors[keyof ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGetErrors];
+
+export type ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: BrowsePublicVersionsResponse;
+};
+
+export type ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGetResponse = ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGetResponses[keyof ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGetResponses];
 
 export type DataApiInfoV1DataTenantSlugGetData = {
     body?: never;

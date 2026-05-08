@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Objectified REST API
   description: REST API for serving OpenAPI specifications from the Objectified database
-  version: 1.0.46
+  version: 1.0.60
 paths:
   /v1/browse/tenants:
     get:
@@ -124,6 +124,74 @@ paths:
           description: Forbidden — caller lacks access to this tenant
         '404':
           description: Tenant not found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/browse/tenants/{tenant_slug}/projects/{project_slug}/versions:
+    get:
+      tags:
+      - browse
+      summary: List Public Browse Versions For Project
+      description: Published versions for anonymous callers (public visibility only). When Authorization
+        or X-API-Key proves tenant membership, all published versions for the project are listed. Sorted
+        by semantic version descending. Optional filters apply after the slice is resolved.
+      operationId: list_public_browse_versions_v1_browse_tenants__tenant_slug__projects__project_slug__versions_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: project_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Project Slug
+      - name: since
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Include only versions whose published_at is at or after this timestamp (ISO 8601).
+          title: Since
+        description: Include only versions whose published_at is at or after this timestamp (ISO 8601).
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrowsePublicVersionsResponse'
+        '401':
+          description: Unauthorized — missing or invalid credentials
+        '403':
+          description: Forbidden — caller lacks access to this tenant
+        '404':
+          description: Tenant or project not found
         '422':
           description: Validation Error
           content:
@@ -8667,6 +8735,79 @@ components:
       title: BrowsePublicProjectsResponse
       description: Published-public projects for a tenant (anonymous), or full tenant project list for
         members.
+    BrowsePublicVersionRow:
+      properties:
+        id:
+          type: string
+          title: Id
+        version_id:
+          type: string
+          title: Version Id
+        published_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Published At
+        tags:
+          items:
+            type: string
+          type: array
+          title: Tags
+        changes_summary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Changes Summary
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        change_log:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Change Log
+      type: object
+      required:
+      - id
+      - version_id
+      - tags
+      title: BrowsePublicVersionRow
+      description: One published version row for public browse (per project).
+    BrowsePublicVersionsResponse:
+      properties:
+        tenant_slug:
+          type: string
+          title: Tenant Slug
+        tenant_name:
+          type: string
+          title: Tenant Name
+        project_slug:
+          type: string
+          title: Project Slug
+        project_name:
+          type: string
+          title: Project Name
+        versions:
+          items:
+            $ref: '#/components/schemas/BrowsePublicVersionRow'
+          type: array
+          title: Versions
+        filtered_count:
+          type: integer
+          title: Filtered Count
+      type: object
+      required:
+      - tenant_slug
+      - tenant_name
+      - project_slug
+      - project_name
+      - versions
+      - filtered_count
+      title: BrowsePublicVersionsResponse
+      description: Published versions for browse parity (anonymous public slice or member-authenticated view).
     ChangeReportModel:
       properties:
         schemaVersion:
