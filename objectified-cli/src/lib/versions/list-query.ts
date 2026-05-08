@@ -130,7 +130,8 @@ function sortComparator(
         cmp = 0;
     }
     if (cmp !== 0) return descending ? -cmp : cmp;
-    return compareSemverVersionIdsAsc(x.version_id, y.version_id);
+    const tie = compareSemverVersionIdsAsc(x.version_id, y.version_id);
+    return descending ? -tie : tie;
   };
 }
 

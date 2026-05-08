@@ -94,4 +94,32 @@ describe("versions list human table snapshots (#3208)", () => {
     });
     expect(lines.join("\n")).toMatchSnapshot();
   });
+
+  it("keeps columns stable when frozen glyph is ANSI-colored", () => {
+    const revPubFrozen = "33333333-3333-3333-3333-333333333333";
+    const versions: VersionSchema[] = [
+      V({
+        id: revPubFrozen,
+        project_id: "p1",
+        version_id: "2.0.0",
+        published: true,
+        publishedImmutable: true,
+        published_at: "2026-02-18T08:00:00.000Z",
+        author: "morgan@example.com",
+      }),
+    ];
+    const lines = formatVersionsListHumanLines({
+      versions,
+      tagsByRevisionId: new Map(),
+      projectLabel: "payments-api",
+      truncated: false,
+      totalAfterPipeline: 1,
+      useGlyphForFrozen: true,
+      freezeGlyph: "\u001b[36m❄\u001b[39m",
+      freezeBracket: " [frozen]",
+    });
+
+    expect(lines[1]).toContain("\u001b[36m❄\u001b[39m");
+    expect(lines[1]).toContain("morgan@example.com");
+  });
 });

@@ -8,8 +8,8 @@ const versionW = 14;
 /** Fits `published [frozen]` (ASCII) or `published ❄` (glyph). */
 const stateW = 18;
 const tagsW = 14;
-const publishedW = 11;
-const authorW = 19;
+const publishedW = 10;
+const authorW = 18;
 
 export function formatVersionLabel(versionId: string): string {
   const raw = versionId.trim();
@@ -73,7 +73,7 @@ export function formatVersionsListHumanLines(opts: VersionsListFormatOpts): stri
       const w = widths[i] ?? 0;
       return ellipsizeEnd(h, w).padEnd(w);
     })
-    .join(" ")}`.slice(0, 80);
+    .join(" ")}`;
 
   const lines: string[] = [headerLine];
 
@@ -85,7 +85,7 @@ export function formatVersionsListHumanLines(opts: VersionsListFormatOpts): stri
     if (frozen) {
       stateText =
         opts.useGlyphForFrozen && opts.freezeGlyph !== ""
-          ? `${stateText} ${opts.freezeGlyph}`
+          ? `${stateText} ❄`
           : `${stateText}${opts.freezeBracket}`;
     }
     const stateCell = ellipsizeEnd(stateText, stateW).padEnd(stateW);
@@ -94,16 +94,22 @@ export function formatVersionsListHumanLines(opts: VersionsListFormatOpts): stri
     const tagsCell = ellipsizeEnd(tagsRaw, tagsW).padEnd(tagsW);
     const pubCell = ellipsizeEnd(publishedDateDisplay(v), publishedW).padEnd(publishedW);
     const authCell = ellipsizeEnd(authorDisplay(v), authorW).padEnd(authorW);
-    lines.push(`  ${verCell.padEnd(versionW)} ${stateCell} ${tagsCell} ${pubCell} ${authCell}`.slice(0, 80));
+    let row = `  ${verCell.padEnd(versionW)} ${stateCell} ${tagsCell} ${pubCell} ${authCell}`;
+    if (frozen && opts.useGlyphForFrozen && opts.freezeGlyph !== "") {
+      row = row.replace("❄", opts.freezeGlyph);
+    }
+    lines.push(row);
   }
 
   lines.push("");
   const total = opts.totalAfterPipeline;
   const showing = opts.versions.length;
   const noun = total === 1 ? "version" : "versions";
-  let summary = `${String(total)} ${noun} in '${opts.projectLabel}'.`;
+  let summary = `${String(total)} ${noun} in '${opts.projectLabel}'`;
   if (opts.truncated && total > showing) {
     summary += ` (showing latest ${String(showing)} of ${String(total)}). Use --all to list all.`;
+  } else {
+    summary += ".";
   }
   lines.push(summary);
 

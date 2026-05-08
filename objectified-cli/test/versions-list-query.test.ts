@@ -137,4 +137,37 @@ describe("versions list sort fields (#3208)", () => {
     });
     expect(out.map((x) => x.version_id)).toEqual(["2.0.0", "1.0.0"]);
   });
+
+  it("applies tie-breaker direction with the primary sort", () => {
+    const rows = [
+      V({
+        id: "a",
+        project_id: "p",
+        version_id: "1.0.0",
+        published: true,
+        published_at: "2026-05-04T00:00:00Z",
+      }),
+      V({
+        id: "b",
+        project_id: "p",
+        version_id: "2.0.0",
+        published: true,
+        published_at: "2026-05-04T00:00:00Z",
+      }),
+    ];
+
+    const outDesc = applyVersionsListPipeline(rows, {
+      stateFilter: undefined,
+      sortField: "published_at",
+      reverse: false,
+    });
+    expect(outDesc.map((x) => x.version_id)).toEqual(["2.0.0", "1.0.0"]);
+
+    const outAsc = applyVersionsListPipeline(rows, {
+      stateFilter: undefined,
+      sortField: "published_at",
+      reverse: true,
+    });
+    expect(outAsc.map((x) => x.version_id)).toEqual(["1.0.0", "2.0.0"]);
+  });
 });

@@ -86,7 +86,7 @@ Every command lives in one of three connection modes:
 | 1   | [CLI Foundation & DevEx](https://github.com/KenSuenobu/objectified-commercial/issues/3174)                 | #3174   | 8           | All 8        |
 | 2   | [Authentication & Tenant Context](https://github.com/KenSuenobu/objectified-commercial/issues/3175)        | #3175   | 8           | 6 of 8       |
 | 3   | [Projects (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3176)                         | #3176   | 6           | 3 of 6       |
-| 4   | [Versions (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3177)                         | #3177   | 9           | 3 of 9       |
+| 4   | [Versions (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3177)                         | #3177   | 9           | 4 of 9       |
 | 5   | [Primitives (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3178)                       | #3178   | 6           | 0 (v2)       |
 | 6   | [Properties (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3179)                       | #3179   | 6           | 0 (v2)       |
 | 7   | [Classes (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3180)                          | #3180   | 8           | 0 (v2)       |
