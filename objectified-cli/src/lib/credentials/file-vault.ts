@@ -265,7 +265,7 @@ export async function writeVaultDocument(doc: VaultPlainV1, deps: VaultDeps): Pr
   await removeVaultFilesIfResetRequested(deps);
   const enc = credentialEncPath(deps);
   await fse.ensureDir(path.dirname(enc));
-  const tmp = `${enc}.tmp.${String(process.pid)}.${deps.randomBytes(6).toString("hex")}`;
+  const tmp = `${enc}.tmp.${String(process.pid)}.${deps.randomBytes(16).toString("hex")}`;
   const payload = await encryptVaultJson(doc, deps);
   let moved = false;
   try {
