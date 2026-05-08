@@ -498,6 +498,32 @@ tenant_slug = "acme"
     }
   });
 
+  it("tenants use --clear removes tenant_slug and is a no-op when repeated (#3199)", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-tuse-clear-"));
+    const cfg = path.join(dir, "config.toml");
+    fs.writeFileSync(
+      cfg,
+      `default_profile = "default"\n\n[profile.default]\nbase_url = "https://api.example.test"\ntenant_slug = "acme-staging"\n`,
+      "utf8",
+    );
+
+    const firstCode = await runExitAsync(["--no-json", "--config", cfg, "tenants", "use", "--clear"], {});
+    expect(firstCode).toBe(0);
+    const afterFirstClear = fs.readFileSync(cfg, "utf8");
+    expect(afterFirstClear).not.toContain("tenant_slug");
+
+    const mtimeAfterFirst = fs.statSync(cfg).mtimeMs;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    const secondCode = await runExitAsync(
+      ["--no-json", "--config", cfg, "tenants", "use", "--clear"],
+      {},
+    );
+    expect(secondCode).toBe(0);
+    expect(fs.readFileSync(cfg, "utf8")).toBe(afterFirstClear);
+    expect(fs.statSync(cfg).mtimeMs).toBe(mtimeAfterFirst);
+  });
+
   it("tenants use exit 5 suggests similar slug after HEAD 404 (#3199)", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-tuse404-"));
     const cfg = path.join(dir, "config.toml");

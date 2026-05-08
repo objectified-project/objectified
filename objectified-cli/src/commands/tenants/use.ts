@@ -93,14 +93,16 @@ export default class TenantsUse extends BaseCommand {
 
     if (clear) {
       const removed = deleteNestedValue(raw, splitDottedKey(dottedProfileTenant));
-      saveRawTomlDocument(this.resolvedConfigPath, raw);
-      try {
-        parseTomlConfig(fs.readFileSync(this.resolvedConfigPath, "utf8"));
-      } catch (e) {
-        throw new CliError(
-          `Updated config failed validation: ${e instanceof Error ? e.message : String(e)}`,
-          11,
-        );
+      if (removed) {
+        saveRawTomlDocument(this.resolvedConfigPath, raw);
+        try {
+          parseTomlConfig(fs.readFileSync(this.resolvedConfigPath, "utf8"));
+        } catch (e) {
+          throw new CliError(
+            `Updated config failed validation: ${e instanceof Error ? e.message : String(e)}`,
+            11,
+          );
+        }
       }
 
       if (this.context.json) {
