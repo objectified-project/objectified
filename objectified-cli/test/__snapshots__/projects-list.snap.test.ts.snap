@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`projects list human table snapshots (#3202) > default columns match issue-style layout (80 cols) 1`] = `
+"  SLUG             NAME                 DOMAIN     VERSIONS  LATEST PUBLISHED 
+  payments-api     Payments API         finance    8         v2.1.0  · 2d ago 
+  catalog-api      Catalog API          saas       3         v1.0.0  · 36d ago
+  webhooks         Webhooks             saas       —         (no published ...
+
+3 projects in tenant 'acme-corp'."
+`;
+
+exports[`projects list human table snapshots (#3202) > truncation footer when capped by --limit 1`] = `
+"  SLUG             NAME                 DOMAIN     VERSIONS  LATEST PUBLISHED 
+  a                A                    x          —         (no published ...
+
+50 projects in tenant 'acme-corp'.
+Showing 1 of 50; use --all to list all."
+`;

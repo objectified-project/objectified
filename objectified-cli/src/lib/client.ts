@@ -21,6 +21,8 @@ import { EXIT_CODES } from "./exit-codes.js";
 import { httpStatusToCliError, networkErrnoToCliError, ObjectifiedCliError } from "./errors.js";
 import { redactApiKeyForLogs } from "./redact-api-key.js";
 
+export type { ProjectSchema };
+
 /** Mutable auth fields read on every request (supports 401 refresh hook). */
 export type ApiAuthSnapshot = {
   apiKey?: string;
@@ -39,11 +41,16 @@ export type CreateApiClientOptions = {
 
 type RequestAuthMeta = { hadCredentials: boolean };
 
+export type ListProjectsOptions = {
+  /** When true, request soft-deleted projects from the API (listed after active rows). */
+  include_deleted?: boolean;
+};
+
 export type ObjectifiedApi = {
   readonly lastRequestId: string | undefined;
   /** Transient HTTP retries consumed on the last instrumented request (429 / 5xx policy). */
   readonly lastRetriesAttempted: number;
-  listProjects(tenantSlug: string): Promise<ProjectSchema[]>;
+  listProjects(tenantSlug: string, options?: ListProjectsOptions): Promise<ProjectSchema[]>;
   listVersions(tenantSlug: string, projectId: string): Promise<VersionSchema[]>;
   listClasses(tenantSlug: string, versionId?: string): Promise<ClassSchema[]>;
   listPrimitives(tenantSlug: string): Promise<PrimitiveSchema[]>;
@@ -393,7 +400,8 @@ function parseTenantInfoPayload(data: unknown): TenantInfoResponse {
       hint: "Expected slug and name from GET /v1/tenants/{slug}.",
     });
   }
-  const plan = t.plan === null || t.plan === undefined ? null : typeof t.plan === "string" ? t.plan : null;
+  const plan =
+    t.plan === null || t.plan === undefined ? null : typeof t.plan === "string" ? t.plan : null;
   const created_at =
     t.created_at === null || t.created_at === undefined
       ? null
@@ -539,12 +547,19 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
       return lastRetriesAttempted;
     },
 
-    async listProjects(tenantSlug: string): Promise<ProjectSchema[]> {
+    async listProjects(
+      tenantSlug: string,
+      options?: ListProjectsOptions,
+    ): Promise<ProjectSchema[]> {
       let rawUnknown: unknown;
       try {
         rawUnknown = await listProjectsV1ProjectsTenantSlugGet({
           client: hey,
           path: { tenant_slug: tenantSlug },
+          query:
+            options?.include_deleted === undefined
+              ? {}
+              : { include_deleted: options.include_deleted },
           throwOnError: false,
         });
       } catch (e) {
