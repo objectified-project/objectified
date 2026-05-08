@@ -137,11 +137,11 @@ function cellForColumn(key: string, p: ProjectSchema, nowMs: number): string {
       return versionsCountDisplay(p);
     case "latest":
       return latestColumnDisplay(p, nowMs);
-    case "latest_published_at":
-      {
-        const iso = latestPublishedIso(p);
-        return iso !== undefined ? iso.slice(0, 19) : ""; // YYYY-MM-DDTHH:MM:SS
-      }
+    case "latest_published_at": {
+      const iso = latestPublishedIso(p);
+      return iso !== undefined ? iso.slice(0, 19) : ""; // YYYY-MM-DDTHH:MM:SS
+    }
+    case "description":
       return p.description ?? "";
     case "id":
       return p.id;

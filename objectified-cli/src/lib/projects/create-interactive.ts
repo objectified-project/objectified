@@ -58,12 +58,20 @@ export async function promptProjectCreateInteractive(opts: {
   }
 
   if (opts.promptDomain && out.domainCategory.trim() === "") {
+    const knownIds = new Set(PROJECT_DOMAIN_CHOICES.map((c) => c.id));
+    // Any ids returned by the API that are not in the static catalog are shown
+    // using just the id as the label — they have no local descriptive text.
+    const extraChoices = Array.from(opts.domainAllowlist)
+      .filter((id) => !knownIds.has(id))
+      .sort()
+      .map((id) => ({ value: id, name: id }));
     const choices = [
       { value: PROJECT_DOMAIN_CATEGORY_NONE, name: "(none)" },
       ...PROJECT_DOMAIN_CHOICES.filter((c) => opts.domainAllowlist.has(c.id)).map((c) => ({
         value: c.id,
         name: `${c.id} — ${c.label}`,
       })),
+      ...extraChoices,
     ];
     const picked = await select({
       message: "Domain:",

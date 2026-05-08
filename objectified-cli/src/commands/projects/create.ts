@@ -32,7 +32,17 @@ function loadStructuredFile(filePath: string): unknown {
   const raw = fs.readFileSync(abs, "utf8");
   const lower = abs.toLowerCase();
   if (lower.endsWith(".yaml") || lower.endsWith(".yml")) {
-    return YAML.parse(raw) as unknown;
+    try {
+      return YAML.parse(raw) as unknown;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new ObjectifiedCliError({
+        message: `Invalid YAML in project file: ${msg}`,
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "Fix the file syntax or use .json for JSON.",
+      });
+    }
   }
   try {
     return JSON.parse(raw) as unknown;
@@ -123,7 +133,18 @@ export default class ProjectsCreate extends BaseCommand {
 
     if (fromFileRaw !== "") {
       const rawFile = loadStructuredFile(fromFileRaw);
-      const validated = validateProjectCreateFileJson(rawFile);
+      let validated: ReturnType<typeof validateProjectCreateFileJson>;
+      try {
+        validated = validateProjectCreateFileJson(rawFile);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new ObjectifiedCliError({
+          message: msg,
+          exitCode: EXIT_CODES.VALIDATION,
+          title: "Validation failed",
+          hint: "Fix the project file fields and retry.",
+        });
+      }
       name = validated.name;
       slug = validated.slug;
       description = validated.description ?? "";
