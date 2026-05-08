@@ -3,9 +3,77 @@
   "info": {
     "title": "Objectified REST API",
     "description": "REST API for serving OpenAPI specifications from the Objectified database",
-    "version": "1.0.45"
+    "version": "1.0.46"
   },
   "paths": {
+    "/v1/browse/tenants": {
+      "get": {
+        "tags": [
+          "browse"
+        ],
+        "summary": "List Public Browse Tenants",
+        "operationId": "list_public_browse_tenants_v1_browse_tenants_get",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive substring filter on tenant name and slug.",
+              "title": "Search"
+            },
+            "description": "Case-insensitive substring filter on tenant name and slug."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "latest",
+                "name",
+                "projects"
+              ],
+              "type": "string",
+              "description": "Sort order: name (default), projects (desc), or latest activity (desc).",
+              "default": "name",
+              "title": "Sort"
+            },
+            "description": "Sort order: name (default), projects (desc), or latest activity (desc)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowsePublicTenantsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/data/{tenant_slug}": {
       "get": {
         "tags": [
@@ -11829,6 +11897,77 @@
       }
     },
     "/v1/tenants/{tenant_slug}": {
+      "head": {
+        "tags": [
+          "tenants"
+        ],
+        "summary": "Verify Tenant Access",
+        "description": "Lightweight access check for CLI default-tenant selection (#3199).",
+        "operationId": "verify_tenant_access_v1_tenants__tenant_slug__head",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": [
           "tenants"
@@ -13260,6 +13399,108 @@
   },
   "components": {
     "schemas": {
+      "BrowseDirectoryStats": {
+        "properties": {
+          "tenant_count": {
+            "type": "integer",
+            "title": "Tenant Count"
+          },
+          "project_count": {
+            "type": "integer",
+            "title": "Project Count"
+          },
+          "version_count": {
+            "type": "integer",
+            "title": "Version Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_count",
+          "project_count",
+          "version_count"
+        ],
+        "title": "BrowseDirectoryStats",
+        "description": "Aggregate counts for published public specs (browse directory home)."
+      },
+      "BrowsePublicTenantRow": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "project_count": {
+            "type": "integer",
+            "title": "Project Count"
+          },
+          "published_versions": {
+            "type": "integer",
+            "title": "Published Versions"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "latest_activity_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Activity At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "project_count",
+          "published_versions"
+        ],
+        "title": "BrowsePublicTenantRow",
+        "description": "One tenant row in the public browse directory."
+      },
+      "BrowsePublicTenantsResponse": {
+        "properties": {
+          "directory_stats": {
+            "$ref": "#/components/schemas/BrowseDirectoryStats"
+          },
+          "tenants": {
+            "items": {
+              "$ref": "#/components/schemas/BrowsePublicTenantRow"
+            },
+            "type": "array",
+            "title": "Tenants"
+          },
+          "filtered_count": {
+            "type": "integer",
+            "title": "Filtered Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "directory_stats",
+          "tenants",
+          "filtered_count"
+        ],
+        "title": "BrowsePublicTenantsResponse",
+        "description": "Public tenant directory for CLI and integrations (no authentication)."
+      },
       "ChangeReportModel": {
         "properties": {
           "schemaVersion": {
@@ -18243,6 +18484,32 @@
             ],
             "title": "Changereportbaselinerevisionid",
             "description": "Required when changeReportBaselineMode is manual: published revision to diff from."
+          },
+          "allowBreaking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowbreaking",
+            "description": "Allow publishing when backward-compatibility vs the baseline is breaking (#3212).",
+            "default": false
+          },
+          "skipPublishChecks": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skippublishchecks",
+            "description": "Bypass OpenAPI build, documentation, and compatibility gates (emergency only; prefer CLI flags).",
+            "default": false
           }
         },
         "type": "object",

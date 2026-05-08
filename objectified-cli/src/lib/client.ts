@@ -1,5 +1,6 @@
 import { createClient, type Client } from "../generated/client.js";
 import type {
+  BrowsePublicTenantsResponse,
   ClassSchema,
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
@@ -34,6 +35,7 @@ import {
   listMyTenantsV1TenantsMeGet,
   listPrimitivesV1PrimitivesTenantSlugGet,
   listProjectsV1ProjectsTenantSlugGet,
+  listPublicBrowseTenantsV1BrowseTenantsGet,
   listVersionTagsV1VersionTagsTenantSlugProjectIdGet,
   listVersionsV1VersionsTenantSlugProjectIdGet,
   listWorkflowAuditV1VersionsTenantSlugWorkflowAuditGet,
@@ -51,6 +53,7 @@ import { httpStatusToCliError, networkErrnoToCliError, ObjectifiedCliError } fro
 import { redactApiKeyForLogs } from "./redact-api-key.js";
 
 export type {
+  BrowsePublicTenantsResponse,
   ClassSchema,
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
@@ -164,6 +167,10 @@ export type ObjectifiedApi = {
   listMyTenantsPage(limit: number, offset: number): Promise<TenantsMeResponse>;
   getTenantInfo(tenantSlug: string): Promise<TenantInfoResponse>;
   verifyTenantAccess(tenantSlug: string): Promise<void>;
+  listPublicBrowseTenants(opts?: {
+    search?: string;
+    sort?: "latest" | "name" | "projects";
+  }): Promise<BrowsePublicTenantsResponse>;
 };
 
 const MAX_RETRY_AFTER_MS = 120_000;
@@ -650,6 +657,103 @@ function parsePrimitivesPayload(data: unknown): PrimitiveSchema[] {
     primitives.push(raw as PrimitiveSchema);
   }
   return primitives;
+}
+
+function parseBrowsePublicTenantsPayload(data: unknown): BrowsePublicTenantsResponse {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for public browse tenants.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "The API returned an unexpected JSON shape; try again or upgrade the CLI.",
+    });
+  }
+  const o = data as Record<string, unknown>;
+  const ds = o.directory_stats;
+  if (!ds || typeof ds !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Missing directory_stats in browse tenants response.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected directory_stats from GET /v1/browse/tenants.",
+    });
+  }
+  const stats = ds as Record<string, unknown>;
+  const tc = stats.tenant_count;
+  const pc = stats.project_count;
+  const vc = stats.version_count;
+  if (
+    typeof tc !== "number" ||
+    typeof pc !== "number" ||
+    typeof vc !== "number" ||
+    !Number.isFinite(tc) ||
+    !Number.isFinite(pc) ||
+    !Number.isFinite(vc)
+  ) {
+    throw new ObjectifiedCliError({
+      message: "Invalid directory_stats in browse tenants response.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "directory_stats must include numeric tenant, project, and version counts.",
+    });
+  }
+  if (!Array.isArray(o.tenants)) {
+    throw new ObjectifiedCliError({
+      message: "Missing tenants array in browse tenants response.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected `tenants` from GET /v1/browse/tenants.",
+    });
+  }
+  const tenantsOut: BrowsePublicTenantsResponse["tenants"] = [];
+  for (const raw of o.tenants) {
+    if (!raw || typeof raw !== "object") {
+      throw new ObjectifiedCliError({
+        message: "Invalid tenant row in browse directory response.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "Each tenant row must be an object.",
+      });
+    }
+    const t = raw as Record<string, unknown>;
+    if (
+      typeof t.slug !== "string" ||
+      typeof t.name !== "string" ||
+      typeof t.project_count !== "number" ||
+      typeof t.published_versions !== "number"
+    ) {
+      throw new ObjectifiedCliError({
+        message: "Invalid browse tenant fields.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "Each row needs slug, name, project_count, and published_versions.",
+      });
+    }
+    const lv = t.latest_version;
+    const la = t.latest_activity_at;
+    tenantsOut.push({
+      slug: t.slug,
+      name: t.name,
+      project_count: t.project_count,
+      published_versions: t.published_versions,
+      latest_version: typeof lv === "string" || lv === null ? lv : undefined,
+      latest_activity_at: typeof la === "string" ? la : la === null ? null : undefined,
+    });
+  }
+  const fc = o.filtered_count;
+  if (typeof fc !== "number" || !Number.isFinite(fc)) {
+    throw new ObjectifiedCliError({
+      message: "Invalid filtered_count in browse tenants response.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected numeric filtered_count from GET /v1/browse/tenants.",
+    });
+  }
+  return {
+    directory_stats: { tenant_count: tc, project_count: pc, version_count: vc },
+    tenants: tenantsOut,
+    filtered_count: fc,
+  };
 }
 
 function parseTenantsMePayload(data: unknown): TenantsMeResponse {
@@ -1468,6 +1572,32 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
         throw e;
       }
       unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta);
+    },
+
+    async listPublicBrowseTenants(opts?: {
+      search?: string;
+      sort?: "latest" | "name" | "projects";
+    }): Promise<BrowsePublicTenantsResponse> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await listPublicBrowseTenantsV1BrowseTenantsGet({
+          client: hey,
+          query: {
+            search: opts?.search ?? undefined,
+            sort: opts?.sort ?? undefined,
+          },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseBrowsePublicTenantsPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
     },
   };
 }

@@ -6740,6 +6740,107 @@ class Database:
             conn.rollback()
             raise e
 
+    def get_public_browse_directory_stats(self) -> Dict[str, int]:
+        """Counts for tenants/projects/versions with published public revisions (browse directory)."""
+        query = """
+            SELECT
+                COUNT(DISTINCT t.id)::int AS tenant_count,
+                COUNT(DISTINCT p.id)::int AS project_count,
+                COUNT(DISTINCT v.id)::int AS version_count
+            FROM odb.tenants t
+            JOIN odb.projects p ON t.id = p.tenant_id
+            JOIN odb.versions v ON p.id = v.project_id
+            WHERE v.published = true
+              AND v.visibility = 'public'
+              AND t.deleted_at IS NULL
+              AND p.deleted_at IS NULL
+              AND v.deleted_at IS NULL
+        """
+        rows = self.execute_query(query)
+        row = rows[0] if rows else {}
+        return {
+            "tenant_count": int(row.get("tenant_count") or 0),
+            "project_count": int(row.get("project_count") or 0),
+            "version_count": int(row.get("version_count") or 0),
+        }
+
+    def list_public_browse_tenants(
+        self,
+        *,
+        search: Optional[str] = None,
+        sort: str = "name",
+    ) -> List[Dict[str, Any]]:
+        """
+        Tenants that have at least one published public version, with aggregates.
+        Optional ``search`` filters by tenant name or slug (substring, case-insensitive).
+        ``sort`` is one of: name, projects, latest.
+        """
+        sort_key = sort if sort in ("name", "projects", "latest") else "name"
+        order_clause = {
+            "name": "a.name ASC, a.slug ASC",
+            "projects": "a.project_count DESC, a.name ASC, a.slug ASC",
+            "latest": "a.latest_activity_at DESC NULLS LAST, a.name ASC, a.slug ASC",
+        }[sort_key]
+
+        search_clause = ""
+        params: Tuple[Any, ...] = ()
+        term = search.strip() if search and search.strip() else ""
+        if term:
+            search_clause = "AND (t.name ILIKE %s OR t.slug ILIKE %s)"
+            pat = f"%{term}%"
+            params = (pat, pat)
+
+        query = f"""
+            WITH eligible AS (
+                SELECT
+                    t.id AS tenant_id,
+                    t.slug,
+                    t.name,
+                    p.id AS project_id,
+                    v.id AS version_id,
+                    v.version_id AS version_slug,
+                    COALESCE(v.published_at, v.updated_at, v.created_at) AS activity_ts
+                FROM odb.tenants t
+                INNER JOIN odb.projects p ON t.id = p.tenant_id
+                INNER JOIN odb.versions v ON p.id = v.project_id
+                WHERE v.published = true
+                  AND v.visibility = 'public'
+                  AND t.deleted_at IS NULL
+                  AND p.deleted_at IS NULL
+                  AND v.deleted_at IS NULL
+                  {search_clause}
+            ),
+            agg AS (
+                SELECT
+                    tenant_id,
+                    slug,
+                    name,
+                    COUNT(DISTINCT project_id)::int AS project_count,
+                    COUNT(DISTINCT version_id)::int AS published_versions,
+                    MAX(activity_ts) AS latest_activity_at
+                FROM eligible
+                GROUP BY tenant_id, slug, name
+            ),
+            latest_ver AS (
+                SELECT DISTINCT ON (e.tenant_id)
+                    e.tenant_id,
+                    e.version_slug AS latest_version
+                FROM eligible e
+                ORDER BY e.tenant_id, e.activity_ts DESC NULLS LAST, e.version_slug DESC
+            )
+            SELECT
+                a.slug,
+                a.name,
+                a.project_count,
+                a.published_versions,
+                lv.latest_version,
+                a.latest_activity_at
+            FROM agg a
+            LEFT JOIN latest_ver lv ON lv.tenant_id = a.tenant_id
+            ORDER BY {order_clause}
+        """
+        return self.execute_query(query, params)
+
 
 # Global database instance
 db = Database()

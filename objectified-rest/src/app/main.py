@@ -34,6 +34,7 @@ from .version_change_report_routes import router as version_change_report_router
 from .change_report_template_routes import router as change_report_template_router
 from .tenant_repositories_routes import router as tenant_repositories_router
 from .tenants_session_routes import router as tenants_session_router
+from .browse_public_routes import router as browse_public_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -88,7 +89,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers (data_router first so /v1/data/* is matched before any generic patterns)
+# Include routers (browse_public_router first for unauthenticated /v1/browse/* routes;
+# data_router next so /v1/data/* is matched before any generic patterns)
+app.include_router(browse_public_router)
 app.include_router(data_router)
 app.include_router(primitives_router)
 app.include_router(classes_router)

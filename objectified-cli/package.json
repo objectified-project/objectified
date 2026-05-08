@@ -1,6 +1,6 @@
 {
   "name": "objectified-cli",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "description": "Objectified command-line interface",
   "author": "Objectified",
   "type": "module",
@@ -80,6 +80,7 @@
     "./man/man1/objectified-auth-login.1",
     "./man/man1/objectified-auth-logout.1",
     "./man/man1/objectified-auth-status.1",
+    "./man/man1/objectified-browse-tenants.1",
     "./man/man1/objectified-completion-install.1",
     "./man/man1/objectified-completion-show.1",
     "./man/man1/objectified-completion-uninstall.1",
