@@ -20,35 +20,35 @@ When user invokes **implement** with issue number (for example `/implement 124`)
 
 ## Phase 1: Fetch issue
 
-1. Identify current repository from workspace context.
-2. Fetch full issue **title, body, labels, and any linked/previous discussion** for scope:
+- Identify current repository from workspace context.
+- Fetch full issue **title, body, labels, and any linked/previous discussion** for scope:
 
 ```
 gh issue view <number> --repo <owner>/<repo>
 ```
 
-3. Summarize issue clearly in conversation so full intent in context.
-4. **NEVER invent requirements.**  If issue **ambiguous, underspecified, or contradicts the codebase**, SWITCH TO PLAN MODE and clarify.
+- Summarize issue clearly in conversation so full intent in context.
+- **NEVER invent requirements.**  If issue **ambiguous, underspecified, or contradicts the codebase**, SWITCH TO PLAN MODE and clarify.
 
 ## Phase 2: Branch setup
 
-1. Fetch and checkout latest default branch:
+- Fetch and checkout latest default branch:
 
 ```bash
 git com
 git pom
 ```
 
-2. Create and switch to `ticket-<number>`:
+- Create and switch to `ticket-<number>`:
 
 ```bash
 git cob ticket-<number>
 ```
 
-3. If branch already exists, report it and ask whether to reset or reuse.
-4. All implementation commits for ticket belong on this branch.
+- If branch already exists, report it and ask whether to reset or reuse.
+- All implementation commits for ticket belong on this branch.
 
-## Phase 3 - Implementation
+## Phase 3: Implementation
 
 - Implement behavior **as specified in issue**.
 - If change **large or risky**, SWITCH TO PLAN MODE, outline a short plan in chat.
@@ -56,7 +56,7 @@ git cob ticket-<number>
 - Keep implementation **simple** - keep code easy to read and understand.
 - Create **comprehensive test cases** for all new and changed functionality.
 
-## Phase 4 - Internal Audit
+## Phase 4: Internal Audit
 
 After coding changes are made, perform internal audit before moving on:
 
@@ -66,19 +66,19 @@ After coding changes are made, perform internal audit before moving on:
 - Check for code reuse; extract repeated logic into separate modules.
 - Tests must **be thorough**, have **no warnings, no errors, and no suppressions** of any kind.
 
-## Phase 5 - Verify and Test
+## Phase 5: Verify and Test
 
 From **repository root**, run project's standard checks:
 
-1. Build project:
+- Build project:
 
 ```bash
 yarn build
 ```
 
-Also run package-specific builds required by workspace rules (e.g. `objectified-ui` per **CLAUDE.md**)
+Also run package-specific builds required by workspace rules.
 
-2. Run tests:
+- Run tests:
 
 ```bash
 yarn test
@@ -86,16 +86,16 @@ yarn test
 
 Also run package-specific tests the issue touches, per READMEs.
 
-3. Fix **any failures you introduced that block the ticket** before proceeding.
-4. Repeat Phase 5 if either step fails.  If steps 1 and 2 are successful, continue to Phase 6.
-5. Check code to see if improvements can be made before issuing a Pull Request.
+- Fix **any failures you introduced that block the ticket** before proceeding.
+- Repeat Phase 5 if either step fails.  If steps 1 and 2 are successful, continue to Phase 6.
+- Check code to see if improvements can be made before issuing a Pull Request.
 
 ## Phase 6: Note Work
 
-1. Mark ticket complete in **ROADMAP** and REMOVE ITS ENTRY FROM THE ISSUES TABLE matching the issue number.
-2. Add one-line summary of work performed to **public/WHATS_NEW.md**.
-3. Bump patch version of application in **objectified-ui/package.json** when change is made in **objectified-ui**.
-4. Bump patch version of pyproject.toml in **objectified-rest** when change is made there.
+- Mark ticket complete in **ROADMAP** and REMOVE ITS ENTRY FROM THE ISSUES TABLE matching the issue number.
+- Add one-line summary of work performed to **public/WHATS_NEW.md**.
+- Bump patch version of application in **objectified-ui/package.json** when change is made in **objectified-ui**.
+- Bump patch version of pyproject.toml in **objectified-rest** when change is made there.
 
 ## Phase 7: Commit, Push, Pull Request
 
@@ -135,12 +135,12 @@ gh pr create \
 
 Comment "Work completed as directed" on GitHub issue.
 
-## Phase 9: Explain How to Test
+## Phase 8: Explain How to Test
 
 - Note how to test what was done.
 - Include steps with each important piece boldfaced (e.g. "**click button X**" or "**browse to Y**")
 - Note example data to put into forms to test.
 
-## Phase 10: Remain on Branch
+## Phase 9: Remain on Branch
 
 Do not switch back to `main`.
