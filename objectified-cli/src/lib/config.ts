@@ -207,7 +207,7 @@ export function assertWritableConfigKey(dottedKey: string): void {
   );
   if (isSecret) {
     throw new CliError(
-      "Secrets are not stored in config.toml; use `objectified auth login` to store credentials in the OS keychain or the encrypted file fallback (see `docs/cli-security.md`).",
+      "Secrets are not stored in config.toml; use `objectified auth login` to store credentials in the OS keychain or the encrypted file fallback (see `objectified docs profiles`).",
       11,
     );
   }

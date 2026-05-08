@@ -265,12 +265,18 @@ export async function writeVaultDocument(doc: VaultPlainV1, deps: VaultDeps): Pr
   await removeVaultFilesIfResetRequested(deps);
   const enc = credentialEncPath(deps);
   await fse.ensureDir(path.dirname(enc));
-  const tmp = `${enc}.tmp.${String(process.pid)}`;
+  const tmp = `${enc}.tmp.${String(process.pid)}.${deps.randomBytes(6).toString("hex")}`;
   const payload = await encryptVaultJson(doc, deps);
-  await fse.writeFile(tmp, payload, { mode: 0o600 });
-  chmod600(tmp);
-  await fse.move(tmp, enc, { overwrite: true });
-  chmod600(enc);
+  let moved = false;
+  try {
+    await fse.writeFile(tmp, payload, { mode: 0o600 });
+    chmod600(tmp);
+    await fse.move(tmp, enc, { overwrite: true });
+    moved = true;
+    chmod600(enc);
+  } finally {
+    if (!moved) await fse.remove(tmp).catch(() => undefined);
+  }
 }
 
 export async function mergeProfileIntoVault(
@@ -318,6 +324,7 @@ export async function removeProfileFromVault(profile: string, deps: VaultDeps): 
   doc.profiles = nextProfiles;
   if (Object.keys(doc.profiles).length === 0) {
     await fse.remove(enc).catch(() => undefined);
+    await fse.remove(credentialPassphrasePath(deps)).catch(() => undefined);
     return;
   }
   await writeVaultDocument(doc, deps);

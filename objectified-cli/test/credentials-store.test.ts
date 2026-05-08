@@ -120,5 +120,34 @@ describe("CLI credential store", () => {
     await expect(loadCliStoredAuth("staging")).resolves.toMatchObject({
       accessToken: "access-two",
     });
+
+    await deleteCliOAuthCredentials("staging");
+    expect(fs.existsSync(enc)).toBe(false);
+    expect(fs.existsSync(path.join(dir, ".cli-credential-passphrase"))).toBe(false);
+  });
+
+  it("cleans file-vault credentials on logout even when fallback is disabled", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-vault-"));
+    process.env.OBJECTIFIED_CLI_CREDENTIAL_VAULT_DIR = dir;
+    vi.doMock("keytar", () => {
+      throw new Error("no native keychain");
+    });
+
+    const { deleteCliOAuthCredentials, saveCliOAuthCredentials } = await import(
+      "../src/lib/credentials/store.js"
+    );
+
+    await saveCliOAuthCredentials("default", {
+      accessToken: "access-one",
+      refreshToken: "refresh-one",
+    });
+
+    process.env.OBJECTIFIED_CLI_CREDENTIAL_DISABLE_FILE_FALLBACK = "1";
+    await expect(deleteCliOAuthCredentials("default")).rejects.toMatchObject({
+      name: "ObjectifiedCliError",
+      message: expect.stringContaining("OS keychain is unavailable for CLI credentials"),
+    });
+    expect(fs.existsSync(path.join(dir, "credentials.enc"))).toBe(false);
+    expect(fs.existsSync(path.join(dir, ".cli-credential-passphrase"))).toBe(false);
   });
 });

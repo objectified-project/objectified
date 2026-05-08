@@ -282,12 +282,25 @@ export async function deleteCliOAuthCredentials(profile: string): Promise<void> 
     memoryBackends.delete(profile);
     return;
   }
-  await tryKeytar((k) => k.deletePassword(SERVICE_NAME, profile));
-  if (!fileFallbackDisabled()) {
+  let keychainError: unknown;
+  if (fileFallbackDisabled()) {
     try {
-      await removeProfileFromVault(profile, vaultDeps());
-    } catch {
-      /* ignore vault cleanup failures */
+      const k = await loadKeytarOrThrow();
+      await k.deletePassword(SERVICE_NAME, profile);
+    } catch (err: unknown) {
+      keychainError = err;
     }
+  } else {
+    await tryKeytar((k) => k.deletePassword(SERVICE_NAME, profile));
+  }
+  try {
+    await removeProfileFromVault(profile, vaultDeps());
+  } catch {
+    /* ignore vault cleanup failures */
+  }
+  if (keychainError !== undefined) {
+    if (keychainError instanceof Error) throw keychainError;
+    if (typeof keychainError === "string") throw new Error(keychainError);
+    throw new Error("Could not delete credentials from OS keychain.");
   }
 }
