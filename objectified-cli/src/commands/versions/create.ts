@@ -267,7 +267,7 @@ export default class VersionsCreate extends BaseCommand {
     const headId = resolveHeadRevisionId(versions);
     if (headId === undefined) {
       throw new ObjectifiedCliError({
-        message: `Project '${project.slug}' has no existing revisions, so a draft cannot be created with optimistic locking yet.`,
+        message: `Project '${project.slug}' has no existing revisions, so a draft cannot be created yet.`,
         exitCode: EXIT_CODES.NOT_FOUND,
         title: "Not found",
         hint: "Create the initial revision first (for example in the UI), then retry this command.",
