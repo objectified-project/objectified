@@ -16,7 +16,7 @@ export function parseValidSemverVersionId(raw: string): string {
       hint: "Pass a semantic version such as 2.2.0-rc.1 (see https://semver.org/).",
     });
   }
-  const v = semver.valid(t);
+  const v = semver.valid(t, { loose: true });
   if (v === null) {
     throw new ObjectifiedCliError({
       message: `Invalid semantic version: ${t}`,
@@ -28,16 +28,21 @@ export function parseValidSemverVersionId(raw: string): string {
   return v;
 }
 
-/** Latest published revision by semver ordering (ignores drafts). */
+/** Latest published revision (prefers strict semver ordering when parseable; ignores drafts). */
 export function pickLatestPublishedRevision(versions: VersionSchema[]): VersionSchema | undefined {
   const candidates = versions.filter((v) => {
     const m = versionStateMembership(v);
     return m.has("published");
   });
   if (candidates.length === 0) return undefined;
-  const sorted = [...candidates].sort((a, b) =>
-    compareSemverVersionIdsAsc(a.version_id, b.version_id),
-  );
+  const sorted = [...candidates].sort((a, b) => {
+    const sa = semver.parse(a.version_id.trim(), { loose: true });
+    const sb = semver.parse(b.version_id.trim(), { loose: true });
+    if (sa !== null && sb !== null) return semver.compare(sa, sb);
+    if (sa !== null) return 1;
+    if (sb !== null) return -1;
+    return compareSemverVersionIdsAsc(a.version_id, b.version_id);
+  });
   return sorted[sorted.length - 1];
 }
 
@@ -56,7 +61,7 @@ export function resolveHeadRevisionId(versions: VersionSchema[]): string | undef
 
 export function versionLineExists(versions: VersionSchema[], normalizedNewVersionId: string): boolean {
   for (const v of versions) {
-    const existing = semver.valid(v.version_id.trim());
+    const existing = semver.valid(v.version_id.trim(), { loose: true });
     if (existing !== null && semver.eq(existing, normalizedNewVersionId)) {
       return true;
     }

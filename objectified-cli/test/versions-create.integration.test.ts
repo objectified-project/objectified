@@ -344,4 +344,87 @@ describe("versions create CLI (#3210)", () => {
       );
     }
   });
+
+  it("fails fast when no head revision exists", async () => {
+    const projId = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+    let postCalled = false;
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      const url = new URL(req.url ?? "/", "http://127.0.0.1");
+
+      if (
+        req.method === "GET" &&
+        (url.pathname === "/v1/projects/acme/domains" || url.pathname === "/v1/projects/domains")
+      ) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/v1/projects/acme/by-slug/api") {
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify({
+            id: projId,
+            tenant_id: "t1",
+            name: "Api",
+            slug: "api",
+            enabled: true,
+          }),
+        );
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === `/v1/versions/acme/${projId}`) {
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === `/v1/version-tags/acme/${projId}`) {
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === `/v1/versions/acme/${projId}`) {
+        postCalled = true;
+        res.statusCode = 500;
+        res.end("should not post");
+        return;
+      }
+
+      res.statusCode = 500;
+      res.end();
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const out = await runCliCaptureAsync([
+        "--base-url",
+        `http://127.0.0.1:${String(addr.port)}`,
+        "--api-key",
+        "k",
+        "--tenant",
+        "acme",
+        "versions",
+        "create",
+        "api",
+        "--version",
+        "1.0.0",
+        "--notes",
+        "init",
+      ]);
+      expect(out.code).toBe(5);
+      expect(postCalled).toBe(false);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
 });

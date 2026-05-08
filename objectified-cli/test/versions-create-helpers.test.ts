@@ -36,6 +36,14 @@ describe("versions create helpers (#3210)", () => {
     expect(pickLatestPublishedRevision(rows)?.id).toBe("b");
   });
 
+  it("uses semver prerelease numeric ordering for published rows", () => {
+    const rows = [
+      v({ id: "a", version_id: "1.0.0-beta.2", published: true }),
+      v({ id: "b", version_id: "1.0.0-beta.10", published: true }),
+    ];
+    expect(pickLatestPublishedRevision(rows)?.id).toBe("b");
+  });
+
   it("resolves head by created_at descending", () => {
     const rows = [
       v({ id: "old", version_id: "1.0.0", created_at: "2026-01-01T00:00:00Z" }),
