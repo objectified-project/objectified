@@ -3333,6 +3333,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionSchema'
+        '409':
+          description: Conflict — breaking compatibility change detected when allowBreaking
+            is false
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
         '422':
           description: Validation Error
           content:
@@ -7551,9 +7558,12 @@ paths:
       responses:
         '200':
           description: Successful Response
-          content:
-            application/json:
-              schema: {}
+        '401':
+          description: Unauthorized — missing or invalid credentials
+        '403':
+          description: Forbidden — caller lacks access to this tenant
+        '404':
+          description: Tenant not found
         '422':
           description: Validation Error
           content:

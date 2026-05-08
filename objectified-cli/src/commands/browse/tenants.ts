@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { BaseCommand } from "../../base-command.js";
 import { formatBrowsePublicTenantsHumanLines } from "../../lib/browse/public-tenants-format.js";
+import { createApiClient } from "../../lib/client.js";
 import { ObjectifiedCliError } from "../../lib/errors.js";
 import { EXIT_CODES } from "../../lib/exit-codes.js";
 import { stableDeepSort } from "../../lib/output.js";
@@ -62,7 +63,16 @@ export default class BrowseTenants extends BaseCommand {
     const sort =
       sortFlag === "latest" || sortFlag === "projects" || sortFlag === "name" ? sortFlag : "name";
 
-    const payload = await this.api.listPublicBrowseTenants({
+    // This is a public unauthenticated endpoint — use a credential-free client so that
+    // any stored API key / bearer token is never forwarded to the server.
+    const publicClient = createApiClient({
+      baseUrl: this.context.baseUrl,
+      auth: {},
+      verbose: this.verboseEffective,
+      stderrWrite: (line) => process.stderr.write(`${line}\n`),
+    });
+
+    const payload = await publicClient.listPublicBrowseTenants({
       search,
       sort,
     });

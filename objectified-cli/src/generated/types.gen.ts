@@ -5759,6 +5759,10 @@ export type PublishVersionV1VersionsTenantSlugProjectIdVersionRecordIdPublishPos
 
 export type PublishVersionV1VersionsTenantSlugProjectIdVersionRecordIdPublishPostErrors = {
     /**
+     * Conflict — breaking compatibility change detected when allowBreaking is false
+     */
+    409: HttpValidationError;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
@@ -9209,6 +9213,18 @@ export type VerifyTenantAccessV1TenantsTenantSlugHeadData = {
 };
 
 export type VerifyTenantAccessV1TenantsTenantSlugHeadErrors = {
+    /**
+     * Unauthorized — missing or invalid credentials
+     */
+    401: unknown;
+    /**
+     * Forbidden — caller lacks access to this tenant
+     */
+    403: unknown;
+    /**
+     * Tenant not found
+     */
+    404: unknown;
     /**
      * Validation Error
      */

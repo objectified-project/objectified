@@ -89,7 +89,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers (data_router first so /v1/data/* is matched before any generic patterns)
+# Include routers (browse_public_router first for unauthenticated /v1/browse/* routes;
+# data_router next so /v1/data/* is matched before any generic patterns)
 app.include_router(browse_public_router)
 app.include_router(data_router)
 app.include_router(primitives_router)
