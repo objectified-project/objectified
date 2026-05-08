@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.18 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.19 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -88,6 +88,7 @@ USAGE
 * [`objectified tenants list`](#objectified-tenants-list)
 * [`objectified tenants use [SLUG]`](#objectified-tenants-use-slug)
 * [`objectified version`](#objectified-version)
+* [`objectified versions create PROJECT`](#objectified-versions-create-project)
 * [`objectified versions list PROJECT`](#objectified-versions-list-project)
 * [`objectified versions show PROJECT VERSION`](#objectified-versions-show-project-version)
 * [`objectified whoami`](#objectified-whoami)
@@ -1353,6 +1354,72 @@ FLAG DESCRIPTIONS
 ```
 
 _See code: [@oclif/plugin-version](https://github.com/oclif/plugin-version/blob/2.2.43/src/commands/version.ts)_
+
+## `objectified versions create PROJECT`
+
+Create a new draft schema revision (POST /v1/versions/{tenant_slug}/{project_id}); CI-friendly.
+
+```
+USAGE
+  $ objectified versions create PROJECT [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--version <value>] [--notes
+    <value>] [--notes-file <value>] [--base <value>] [--branch <value>] [--draft] [--from-file <value>]
+
+ARGUMENTS
+  PROJECT  Project slug or UUID (uuid-shaped refs resolve as id first)
+
+DESCRIPTION
+  Create a new draft schema revision (POST /v1/versions/{tenant_slug}/{project_id}); CI-friendly.
+
+EXAMPLES
+  $ objectified versions create payments-api --version 2.2.0-rc.1 --notes 'Adds idempotency keys'
+
+  $ objectified --json versions create payments-api --version 1.4.0 --notes-file ./CHANGELOG.md
+
+  $ objectified versions create payments-api --version 2.0.0 --base v1.9.0
+
+  $ objectified versions create payments-api --from-file ./version-create.json
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --base=<value>        Copy schema from this semver, revision UUID, or tag (default: latest published revision, if
+                        any).
+  --branch=<value>      Named branch to advance when the project has multiple version branches.
+  --[no-]draft          Create a draft revision (default). Publishing via --no-draft is not supported here — use
+                        `versions publish` when available.
+  --from-file=<value>   Merge fields from a JSON object (VersionCreateRequest-shaped). CLI flags override file values
+                        where both are set.
+  --notes=<value>       Release notes (markdown). First line is also used as the short revision note.
+  --notes-file=<value>  Read release notes as UTF-8 markdown from a file (mutually exclusive with --notes).
+  --version=<value>     Semantic version for the new draft (required unless set in --from-file).
+
+SEE ALSO
+  objectified versions list
+
+  objectified versions show
+
+  objectified projects show
+
+  objectified docs errors
+```
 
 ## `objectified versions list PROJECT`
 
