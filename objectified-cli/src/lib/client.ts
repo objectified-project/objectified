@@ -886,7 +886,7 @@ function parseBrowsePublicVersionsPayload(data: unknown): BrowsePublicVersionsRe
   for (const raw of o.versions) {
     if (!raw || typeof raw !== "object") {
       throw new ObjectifiedCliError({
-        message: "Invalid version row in browse directory response.",
+        message: "Invalid version row in browse versions response.",
         exitCode: EXIT_CODES.VALIDATION,
         title: "Validation failed",
         hint: "Each version row must be an object.",

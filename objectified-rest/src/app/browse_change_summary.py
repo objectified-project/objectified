@@ -54,7 +54,7 @@ def _structured_summary(model: Dict[str, Any], baseline_version_slug: Optional[s
 
     parts: List[str] = []
     if path_keys:
-        parts.append(f"+{len(path_keys)} paths")
+        parts.append(f"{len(path_keys)} paths changed")
     class_moves = modified_n + added_n + removed_n
     if class_moves:
         parts.append(f"~{class_moves} classes")

@@ -208,6 +208,63 @@ def test_browse_versions_member_lists_all_visibilities():
     m.list_public_browse_versions_for_project.assert_not_called()
 
 
+def test_browse_versions_semver_prerelease_ordering():
+    tenant = {"id": "tid-1", "slug": "acme-corp", "name": "Acme Corp"}
+    project = {"id": "pid-1", "slug": "payments-api", "name": "Payments API"}
+    rows = [
+        {
+            "id": "v1",
+            "version_id": "2.0.0-rc.2",
+            "published_at": datetime(2026, 5, 1, 12, 0, 0),
+            "description": None,
+            "change_log": None,
+            "change_model_json": None,
+            "tags": [],
+        },
+        {
+            "id": "v2",
+            "version_id": "2.0.0",
+            "published_at": datetime(2026, 5, 2, 12, 0, 0),
+            "description": None,
+            "change_log": None,
+            "change_model_json": None,
+            "tags": [],
+        },
+        {
+            "id": "v3",
+            "version_id": "2.0.0-rc.10",
+            "published_at": datetime(2026, 5, 3, 12, 0, 0),
+            "description": None,
+            "change_log": None,
+            "change_model_json": None,
+            "tags": [],
+        },
+        {
+            "id": "v4",
+            "version_id": "2.0.0-alpha",
+            "published_at": datetime(2026, 5, 4, 12, 0, 0),
+            "description": None,
+            "change_log": None,
+            "change_model_json": None,
+            "tags": [],
+        },
+    ]
+    with patch("app.browse_public_routes.db") as m:
+        m.get_tenant_row_by_slug.return_value = tenant
+        m.get_project_by_slug.return_value = project
+        m.project_has_public_published_version.return_value = True
+        m.list_public_browse_versions_for_project.return_value = rows
+        r = client.get("/v1/browse/tenants/acme-corp/projects/payments-api/versions")
+    assert r.status_code == 200
+    body = r.json()
+    assert [v["version_id"] for v in body["versions"]] == [
+        "2.0.0",
+        "2.0.0-rc.10",
+        "2.0.0-rc.2",
+        "2.0.0-alpha",
+    ]
+
+
 def test_browse_versions_unknown_project_is_404():
     tenant = {"id": "tid-1", "slug": "acme-corp", "name": "Acme Corp"}
     with patch("app.browse_public_routes.db") as m:

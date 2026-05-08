@@ -18,7 +18,7 @@ def test_prefers_structured_when_change_model_has_paths_and_classes():
         baseline_version_slug="2.0.0",
     )
     assert out is not None
-    assert "+2 paths" in out
+    assert "2 paths changed" in out
     assert "~2 classes" in out
     assert "vs v2.0.0" in out
 
