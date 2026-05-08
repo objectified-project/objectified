@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.17 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.18 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -89,6 +89,7 @@ USAGE
 * [`objectified tenants use [SLUG]`](#objectified-tenants-use-slug)
 * [`objectified version`](#objectified-version)
 * [`objectified versions list PROJECT`](#objectified-versions-list-project)
+* [`objectified versions show PROJECT VERSION`](#objectified-versions-show-project-version)
 * [`objectified whoami`](#objectified-whoami)
 
 ## `objectified auth login`
@@ -1410,6 +1411,63 @@ SEE ALSO
   objectified projects show
 
   objectified projects list
+
+  objectified tenants use
+
+  objectified docs errors
+```
+
+## `objectified versions show PROJECT VERSION`
+
+Show one schema revision by semver, revision UUID, or tag name (GET …/{record_id} or …/by-version/{version_id}; tags from version tags)
+
+```
+USAGE
+  $ objectified versions show PROJECT VERSION [--api-key <value>] [--api-key-file <value>] [--base-url <value>]
+    [--config <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
+
+ARGUMENTS
+  PROJECT  Project slug or UUID (uuid-shaped refs resolve as id first)
+  VERSION  Semver string (with or without v), revision UUID, or tag name (e.g. stable)
+
+DESCRIPTION
+  Show one schema revision by semver, revision UUID, or tag name (GET …/{record_id} or …/by-version/{version_id}; tags
+  from version tags)
+
+EXAMPLES
+  $ objectified versions show payments-api v2.1.0
+
+  $ objectified versions show payments-api 2.1.0
+
+  $ objectified --json versions show payments-api stable
+
+  $ objectified versions show payments-api 22222222-2222-2222-2222-222222222222
+
+  $ objectified --profile staging versions show my-api next
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+SEE ALSO
+  objectified versions list
+
+  objectified projects show
 
   objectified tenants use
 

@@ -42,6 +42,14 @@ function uniqSorted(values: string[]): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
 
+function versionIdCompletionVariants(versionId: string): string[] {
+  const raw = versionId.trim();
+  if (raw === "") return [];
+  if (!/^v?\d+(?:\.\d+)*(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/i.test(raw)) return [raw];
+  const stripped = raw.replace(/^v/i, "");
+  return uniqSorted([raw, stripped, `v${stripped}`]);
+}
+
 function resolveCommandId(config: Config, cmdParts: string[]): string | undefined {
   for (let len = cmdParts.length; len >= 1; len--) {
     const id = cmdParts.slice(0, len).join(":");
@@ -217,9 +225,13 @@ async function tryDynamicCandidates(opts: {
       profileCacheKey,
       ["versions", tenantSlug, projectId],
       async () => {
-        const rows = await api.listVersions(tenantSlug, projectId);
-        const ids = rows.flatMap((v) => [v.version_id, v.id]);
-        return uniqSorted(ids);
+        const [rows, tagRows] = await Promise.all([
+          api.listVersions(tenantSlug, projectId),
+          api.listVersionTags(tenantSlug, projectId),
+        ]);
+        const ids = rows.flatMap((v) => [...versionIdCompletionVariants(v.version_id), v.id]);
+        const tagNames = tagRows.map((t) => t.name.trim()).filter((n) => n !== "");
+        return uniqSorted([...ids, ...tagNames]);
       },
     );
     return filterByPrefix(values, current);
