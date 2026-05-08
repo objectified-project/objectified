@@ -6,7 +6,7 @@ objectified completion \- Install or print shell completion scripts for bash, zs
 USAGE
   $ objectified completion [--api-key <value>] [--api-key-file
     <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [-q] [--verbose]
+    [--profile <value>] [--tenant <value>] [-q] [--verbose]
 
 DESCRIPTION
   Install or print shell completion scripts for bash, zsh, fish, or
@@ -28,6 +28,8 @@ COMMON
                       path`).
   --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls
                       back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only
+                      (overrides OBJECTIFIED_TENANT and config tenant_slug).
 
 OUTPUT
   --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR;

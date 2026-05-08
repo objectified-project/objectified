@@ -12,17 +12,17 @@ export default class ProjectsList extends BaseCommand {
     "<%= config.bin %> --profile staging <%= command.id %>",
   ];
 
-  static seeAlso = ["config path", "docs errors", "hello"];
+  static seeAlso = ["tenants use", "config path", "docs errors"];
 
   async run(): Promise<void> {
     const tenant = this.context.tenantSlug;
     if (tenant === undefined || tenant === "") {
       throw new ObjectifiedCliError({
         message:
-          "Tenant slug is required for this command. Set OBJECTIFIED_TENANT or `tenant_slug` in your profile (config.toml).",
+          "Tenant slug is required for this command. Pass --tenant, set OBJECTIFIED_TENANT, or configure tenant_slug for your profile.",
         exitCode: EXIT_CODES.CONFIG,
         title: "Configuration error",
-        hint: "Run `objectified config path` to locate config.toml, then set tenant_slug for your profile.",
+        hint: "Run `objectified tenants use <slug>` to save a default tenant, or `objectified tenants list` to see accessible tenants.",
       });
     }
 

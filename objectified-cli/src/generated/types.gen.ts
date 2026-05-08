@@ -9074,6 +9074,56 @@ export type GetTenantInfoV1TenantsTenantSlugGetResponses = {
 
 export type GetTenantInfoV1TenantsTenantSlugGetResponse = GetTenantInfoV1TenantsTenantSlugGetResponses[keyof GetTenantInfoV1TenantsTenantSlugGetResponses];
 
+export type VerifyTenantAccessV1TenantsTenantSlugHeadData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+        /**
+         * X-Api-Key
+         */
+        'X-API-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Tenant Slug
+         */
+        tenant_slug: string;
+    };
+    query?: never;
+    url: '/v1/tenants/{tenant_slug}';
+};
+
+export type VerifyTenantAccessV1TenantsTenantSlugHeadErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Tenant not found or path reserved
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type VerifyTenantAccessV1TenantsTenantSlugHeadError = VerifyTenantAccessV1TenantsTenantSlugHeadErrors[keyof VerifyTenantAccessV1TenantsTenantSlugHeadErrors];
+
+export type VerifyTenantAccessV1TenantsTenantSlugHeadResponses = {
+    /**
+     * Caller has access to the tenant.
+     */
+    200: unknown;
+};
+
 export type ListTenantRepositoriesV1TenantsTenantSlugRepositoriesGetData = {
     body?: never;
     headers?: {

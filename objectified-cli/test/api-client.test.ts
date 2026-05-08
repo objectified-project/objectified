@@ -261,4 +261,18 @@ describe("createApiClient + generated SDK", () => {
     expect(info.slug).toBe("acme-corp");
     expect(info.members_count).toBe(2);
   });
+
+  it("verifyTenantAccess performs HEAD /v1/tenants/{slug}", async () => {
+    const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const request = input instanceof Request ? input : new Request(input);
+      expect(request.method).toBe("HEAD");
+      expect(request.url).toContain("/v1/tenants/acme-corp");
+      return new Response(null, { status: 200 });
+    });
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const api = createApiClient({ baseUrl: "http://127.0.0.1:9", auth: { apiKey: "k" } });
+    await expect(api.verifyTenantAccess("acme-corp")).resolves.toBeUndefined();
+    expect(mockFetch).toHaveBeenCalled();
+  });
 });

@@ -39,7 +39,7 @@ from .tenants_session_routes import router as tenants_session_router
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.45"
+    version="1.0.46"
 )
 
 

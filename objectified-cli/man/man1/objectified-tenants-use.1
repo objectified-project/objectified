@@ -1,22 +1,28 @@
-.TH OBJECTIFIED\-CONFIG\-PATH 1 "" "" "User Commands"
+.TH OBJECTIFIED\-TENANTS\-USE 1 "" "" "User Commands"
 .SH NAME
-objectified config path \- Print the resolved config.toml path
+objectified tenants use \- Set or clear the default tenant slug for the active profile (writes tenant_slug in config.toml; validates via HEAD /v1/tenants/{slug})
 .SH DESCRIPTION
 .nf
 USAGE
-  $ objectified config path [--api-key <value>] [--api-key-file
+  $ objectified tenants use [SLUG] [--api-key <value>] [--api-key-file
     <value>] [--base-url <value>] [--config <value>] [--json] [--color]
-    [--profile <value>] [--tenant <value>] [-q] [--verbose]
+    [--profile <value>] [--tenant <value>] [-q] [--verbose] [--clear]
+
+ARGUMENTS
+  [SLUG]  Tenant slug to use as the profile default
 
 DESCRIPTION
-  Print the resolved config.toml path
+  Set or clear the default tenant slug for the active profile (writes
+  tenant_slug in config.toml; validates via HEAD /v1/tenants/{slug})
 
 EXAMPLES
-  $ objectified config path
+  $ objectified tenants use acme-corp
 
-  $ objectified --json config path
+  $ objectified tenants use --profile staging acme-staging
 
-  $ objectified config path | pbcopy
+  $ objectified --json tenants use acme-corp
+
+  $ objectified tenants use --clear
 
 COMMON
   --base-url=<value>  Root REST API URL.
@@ -43,8 +49,14 @@ AUTH
   --api-key-file=<value>  Read API key from a file (single line; avoids shell
                           history).
 
-SEE ALSO
-  objectified config get
+OTHER
+  --clear  Remove tenant_slug from this profile so each command needs --tenant
+           or OBJECTIFIED_TENANT.
 
-  objectified config list
+SEE ALSO
+  objectified tenants list
+
+  objectified config path
+
+  objectified docs profiles
 .fi

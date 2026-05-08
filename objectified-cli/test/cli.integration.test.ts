@@ -212,6 +212,7 @@ describe("objectified CLI", () => {
   it("projects list requires tenant slug (no network)", () => {
     const err = runExpectFailure(["--json", "projects", "list"]);
     expect(err).toMatch(/Tenant slug is required/i);
+    expect(err).toMatch(/tenants use/i);
   });
 
   it("docs errors prints exit code reference", () => {
@@ -444,6 +445,204 @@ tenant_slug = "acme"
         { OBJECTIFIED_TENANT: "acme" },
       );
       expect(code).toBe(4);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
+  it("tenants use validates HEAD then writes tenant_slug (#3199)", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-tuse-"));
+    const cfg = path.join(dir, "config.toml");
+
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (
+        req.method === "HEAD" &&
+        req.url?.startsWith("/v1/tenants/acme-staging") &&
+        req.headers["x-api-key"] === "good-key"
+      ) {
+        res.statusCode = 200;
+        res.end();
+        return;
+      }
+      res.statusCode = 404;
+      res.end();
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const base = `http://127.0.0.1:${String(addr.port)}`;
+      fs.writeFileSync(
+        cfg,
+        `default_profile = "default"\n\n[profile.default]\nbase_url = "${base}"\n`,
+        "utf8",
+      );
+
+      const code = await runExitAsync(
+        ["--no-json", "--config", cfg, "--api-key", "good-key", "tenants", "use", "acme-staging"],
+        {},
+      );
+      expect(code).toBe(0);
+      expect(fs.readFileSync(cfg, "utf8")).toContain('tenant_slug = "acme-staging"');
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
+  it("tenants use exit 5 suggests similar slug after HEAD 404 (#3199)", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-tuse404-"));
+    const cfg = path.join(dir, "config.toml");
+
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (
+        req.method === "HEAD" &&
+        req.url?.startsWith("/v1/tenants/acme-stagin") &&
+        req.headers["x-api-key"] === "good-key"
+      ) {
+        res.statusCode = 404;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ detail: "Tenant not found: acme-stagin" }));
+        return;
+      }
+      if (req.method === "GET" && req.url?.startsWith("/v1/tenants/me")) {
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify({
+            items: [
+              { slug: "acme-staging", name: "Staging", role: "admin" },
+              { slug: "acme-prod", name: "Prod", role: "member" },
+            ],
+            total: 2,
+            limit: 50,
+            offset: 0,
+          }),
+        );
+        return;
+      }
+      res.statusCode = 404;
+      res.end();
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const base = `http://127.0.0.1:${String(addr.port)}`;
+      fs.writeFileSync(
+        cfg,
+        `default_profile = "default"\n\n[profile.default]\nbase_url = "${base}"\n`,
+        "utf8",
+      );
+
+      const { code, stderr } = await spawnCliCaptureAsync(
+        ["--no-json", "--config", cfg, "--api-key", "good-key", "tenants", "use", "acme-stagin"],
+        {},
+      );
+      expect(code).toBe(5);
+      expect(stderr).toMatch(/Did you mean/i);
+      expect(stderr).toMatch(/acme-staging/);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
+  it("tenants use exit 4 when HEAD returns 403 (#3199)", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-tuse403-"));
+    const cfg = path.join(dir, "config.toml");
+
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (
+        req.method === "HEAD" &&
+        req.url?.startsWith("/v1/tenants/other") &&
+        req.headers["x-api-key"] === "good-key"
+      ) {
+        res.statusCode = 403;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ detail: "No access to tenant: other" }));
+        return;
+      }
+      res.statusCode = 404;
+      res.end();
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const base = `http://127.0.0.1:${String(addr.port)}`;
+      fs.writeFileSync(
+        cfg,
+        `default_profile = "default"\n\n[profile.default]\nbase_url = "${base}"\n`,
+        "utf8",
+      );
+
+      const code = await runExitAsync(
+        ["--no-json", "--config", cfg, "--api-key", "good-key", "tenants", "use", "other"],
+        {},
+      );
+      expect(code).toBe(4);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
+  it("projects list honors --tenant over OBJECTIFIED_TENANT (#3199)", async () => {
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (!req.url?.startsWith("/v1/projects/from-flag")) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      if (req.headers["x-api-key"] !== "good-key") {
+        res.statusCode = 401;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ detail: "Authentication required" }));
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify([]));
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const code = await runExitAsync(
+        [
+          "--base-url",
+          `http://127.0.0.1:${String(addr.port)}`,
+          "--api-key",
+          "good-key",
+          "--tenant",
+          "from-flag",
+          "--no-json",
+          "projects",
+          "list",
+        ],
+        { OBJECTIFIED_TENANT: "wrong-tenant" },
+      );
+      expect(code).toBe(0);
     } finally {
       server.closeAllConnections?.();
       await new Promise<void>((resolve, reject) =>

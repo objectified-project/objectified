@@ -11,6 +11,8 @@ export type GlobalCliFlags = {
   json?: boolean;
   color?: boolean;
   profile?: string;
+  /** Per-invocation tenant override (`--tenant` / OBJECTIFIED_TENANT). */
+  tenant?: string;
   quiet?: boolean;
   verbose?: boolean;
   /** Set by BaseCommand after parsing (includes OBJECTIFIED_VERBOSE=1). */
@@ -156,7 +158,7 @@ export function buildObjectifiedContext(opts: {
   const baseUrl = resolveBaseUrl(opts.flags.baseUrl, opts.env, cfgLayer);
   const apiKey = resolveApiKey(opts.flags.apiKey, opts.env);
   const accessToken = resolveAccessToken(opts.env);
-  const tenantSlug = resolveTenantSlug(undefined, opts.env, cfgLayer);
+  const tenantSlug = resolveTenantSlug(opts.flags.tenant, opts.env, cfgLayer);
 
   const json = resolveJson(opts.flags.json, opts.env, opts.stdoutIsTTY);
   const color = resolveAllowColor(

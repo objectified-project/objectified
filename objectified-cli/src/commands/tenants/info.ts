@@ -14,7 +14,7 @@ export default class TenantsInfo extends BaseCommand {
     "<%= config.bin %> --json <%= command.id %> acme-corp",
   ];
 
-  static seeAlso = ["tenants list", "auth status", "config path"];
+  static seeAlso = ["tenants list", "tenants use", "auth status", "config path"];
 
   static args = {
     slug: Args.string({

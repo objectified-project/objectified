@@ -239,7 +239,7 @@ def validate_session_credentials(
     """
     Validate JWT or API key without requiring a tenant path segment.
 
-    Used by ``GET /v1/tenants/me`` and similar session-scoped endpoints.
+    Used by ``GET /v1/tenants/me``, ``HEAD /v1/tenants/{slug}``, and similar session-scoped endpoints.
     """
     if authorization:
         jwt_payload = decode_jwt(authorization)

@@ -15,7 +15,7 @@ export default class TenantsList extends BaseCommand {
     "<%= config.bin %> <%= command.id %> --limit 100 --offset 0",
   ];
 
-  static seeAlso = ["tenants info", "auth status", "config path"];
+  static seeAlso = ["tenants info", "tenants use", "auth status", "config path"];
 
   static flags = {
     limit: Flags.integer({

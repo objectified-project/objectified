@@ -20,6 +20,7 @@ const GLOBAL_FLAG_TOKENS = [
   "--color",
   "--no-color",
   "--profile",
+  "--tenant",
   "--quiet",
   "--no-quiet",
   "-q",
@@ -40,16 +41,6 @@ const EXTRA_SUBCOMMANDS: Record<string, string[]> = {
 
 function uniqSorted(values: string[]): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
-}
-
-function tenantSlugsFromConfig(doc: ParsedTomlConfig): string[] {
-  const s = new Set<string>();
-  if (doc.default.tenantSlug) s.add(doc.default.tenantSlug);
-  for (const p of Object.values(doc.profiles)) {
-    const slug = p.tenantSlug;
-    if (slug) s.add(slug);
-  }
-  return uniqSorted([...s]);
 }
 
 function resolveCommandId(config: Config, cmdParts: string[]): string | undefined {
@@ -145,11 +136,10 @@ async function tryDynamicCandidates(opts: {
   api: ObjectifiedApi;
   tenantSlug: string | undefined;
   profileCacheKey: string;
-  configDoc: ParsedTomlConfig;
   cmdParts: string[];
   current: string;
 }): Promise<string[] | undefined> {
-  const { api, tenantSlug, profileCacheKey, configDoc, cmdParts, current } = opts;
+  const { api, tenantSlug, profileCacheKey, cmdParts, current } = opts;
 
   if (cmdParts[0] === "tenants" && cmdParts[1] === "info" && cmdParts.length === 2) {
     const slugs = await withCompletionCache(profileCacheKey, ["tenants-me-slugs"], async () => {
@@ -169,7 +159,20 @@ async function tryDynamicCandidates(opts: {
   }
 
   if (cmdParts[0] === "tenants" && cmdParts[1] === "use" && cmdParts.length === 2) {
-    return filterByPrefix(tenantSlugsFromConfig(configDoc), current);
+    const slugs = await withCompletionCache(profileCacheKey, ["tenants-me-slugs"], async () => {
+      const collected: string[] = [];
+      let offset = 0;
+      const limit = 100;
+      for (;;) {
+        const page = await api.listMyTenantsPage(limit, offset);
+        for (const it of page.items) collected.push(it.slug);
+        if (collected.length >= page.total || page.items.length === 0) break;
+        offset += limit;
+        if (offset > 10_000) break;
+      }
+      return uniqSorted(collected);
+    });
+    return filterByPrefix(slugs, current);
   }
 
   if (!tenantSlug || tenantSlug === "") return undefined;
@@ -288,7 +291,6 @@ export async function computeCompletionCandidates(opts: {
       api,
       tenantSlug,
       profileCacheKey,
-      configDoc,
       cmdParts,
       current,
     });

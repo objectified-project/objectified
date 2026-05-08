@@ -70,6 +70,12 @@ export abstract class BaseCommand extends Command {
         "Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.",
       helpGroup: "Common",
     }),
+    tenant: Flags.string({
+      description:
+        "Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config tenant_slug).",
+      helpGroup: "Common",
+      env: "OBJECTIFIED_TENANT",
+    }),
     quiet: Flags.boolean({
       char: "q",
       description: "Suppress non-error stdout (spinners, banners, tips).",
@@ -163,6 +169,7 @@ export abstract class BaseCommand extends Command {
       json: parsedFlags.json as boolean | undefined,
       color: parsedFlags.color as boolean | undefined,
       profile: parsedFlags.profile as string | undefined,
+      tenant: parsedFlags.tenant as string | undefined,
       quiet: parsedFlags.quiet as boolean | undefined,
       verbose: parsedFlags.verbose as boolean | undefined,
     };
