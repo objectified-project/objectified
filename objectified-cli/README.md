@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.24 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.25 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -88,6 +88,7 @@ USAGE
 * [`objectified projects list`](#objectified-projects-list)
 * [`objectified projects show REF`](#objectified-projects-show-ref)
 * [`objectified schema fetch REF`](#objectified-schema-fetch-ref)
+* [`objectified schema swagger REF`](#objectified-schema-swagger-ref)
 * [`objectified tenants info SLUG`](#objectified-tenants-info-slug)
 * [`objectified tenants list`](#objectified-tenants-list)
 * [`objectified tenants use [SLUG]`](#objectified-tenants-use-slug)
@@ -1434,6 +1435,68 @@ SEE ALSO
   objectified versions show
 
   objectified docs errors
+```
+
+## `objectified schema swagger REF`
+
+Open hosted Swagger UI at GET /v1/swagger/{tenant}/{project}/{version} or download the published OpenAPI bundle (GET /v1/schema/…) as JSON/YAML. On an interactive TTY, defaults to opening the browser unless --output or --format is set; piping, non-TTY stdout, or global --json emits the bundle instead.
+
+```
+USAGE
+  $ objectified schema swagger REF [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--open] [--format json|yaml]
+    [-o <value>]
+
+ARGUMENTS
+  REF  Published target as tenant/project/version (slashes separate the three slugs; semver or published tag slug).
+
+DESCRIPTION
+  Open hosted Swagger UI at GET /v1/swagger/{tenant}/{project}/{version} or download the published OpenAPI bundle (GET
+  /v1/schema/…) as JSON/YAML. On an interactive TTY, defaults to opening the browser unless --output or --format is set;
+  piping, non-TTY stdout, or global --json emits the bundle instead.
+
+EXAMPLES
+  $ objectified schema swagger acme-corp/payments-api/2.1.0
+
+  $ objectified schema swagger acme-corp/payments-api/2.1.0 --open
+
+  $ objectified schema swagger acme-corp/payments-api/2.1.0 --output ./swagger.json
+
+  $ objectified schema swagger acme-corp/payments-api/2.1.0 --format json > ./openapi.json
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --format=<option>  Bundle serialization for download mode (GET /v1/schema/…). When set without --output, writes to
+                         stdout. Full-bundle YAML is converted client-side from JSON.
+                         <options: json|yaml>
+      --open             Open the Swagger UI page in the default browser (also the default when stdout is a TTY and
+                         neither --output nor --format is set).
+  -o, --output=<value>   Write the OpenAPI bundle to this path instead of stdout (GET /v1/schema/…).
+
+SEE ALSO
+  objectified schema fetch
+
+  objectified browse versions
+
+  objectified versions show
 ```
 
 ## `objectified tenants info SLUG`
