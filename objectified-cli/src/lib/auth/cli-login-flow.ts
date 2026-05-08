@@ -35,6 +35,8 @@ export type RunCliPkceLoginOpts = {
 
 export type RunCliPkceLoginResult = CliOAuthBundle & {
   displayEmail?: string;
+  /** Seconds until access token expiry when the token endpoint returned `expires_in`. */
+  expiresIn?: number;
 };
 
 function shouldUseLoopbackBrowserFlow(opts: RunCliPkceLoginOpts): boolean {
@@ -76,7 +78,9 @@ export async function runCliPkceLogin(opts: RunCliPkceLoginOpts): Promise<RunCli
     } else {
       const waitForCode = lb?.waitForCode;
       if (!waitForCode) {
-        throw new Error("internal error: browser auth flow expected a loopback server, but none was started");
+        throw new Error(
+          "internal error: browser auth flow expected a loopback server, but none was started",
+        );
       }
       opts.stdoutLine(`Opening ${opts.webLoginUrl.replace(/\?.*$/, "")} in your browser…`);
       opts.stderrLine("Waiting for browser… (Ctrl+C to cancel)");
@@ -113,5 +117,6 @@ export async function runCliPkceLogin(opts: RunCliPkceLoginOpts): Promise<RunCli
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token,
     displayEmail,
+    expiresIn: tokens.expires_in,
   };
 }

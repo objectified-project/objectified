@@ -9,6 +9,11 @@ import { ObjectifiedCliError } from "../../lib/errors.js";
 import { EXIT_CODES } from "../../lib/exit-codes.js";
 import { authLoginIntendsApiKeyStore } from "../../lib/normalize-argv.js";
 
+function expiresAtFromExpiresIn(expiresIn: number | undefined): string | undefined {
+  if (expiresIn === undefined || !Number.isFinite(expiresIn)) return undefined;
+  return new Date(Date.now() + expiresIn * 1000).toISOString();
+}
+
 export default class AuthLogin extends BaseCommand {
   static description =
     "Sign in via PKCE browser flow or store an API key in the OS keychain (`--api-key`).";
@@ -96,6 +101,8 @@ export default class AuthLogin extends BaseCommand {
     await saveCliOAuthCredentials(this.context.profile, {
       accessToken: bundle.accessToken,
       refreshToken: bundle.refreshToken,
+      expiresAt: expiresAtFromExpiresIn(bundle.expiresIn),
+      tenantSlug: this.context.tenantSlug ?? undefined,
     });
     this.apiAuth.apiKey = undefined;
     this.apiAuth.bearer = bundle.accessToken;
