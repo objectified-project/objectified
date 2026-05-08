@@ -6,8 +6,9 @@ import type {
 } from "../client.js";
 
 import { ellipsizeEnd } from "../projects/format.js";
+import { stableDeepSort } from "../output.js";
 
-import { formatVersionLabel } from "./list-format.js";
+import { buildTagsByRevisionId, formatVersionLabel } from "./list-format.js";
 import { versionIsArchived } from "./list-query.js";
 import type { VersionShowResolution } from "./show-resolve.js";
 
@@ -115,7 +116,8 @@ export function summarizeClassDelta(base: ClassSchema[], head: ClassSchema[]): C
   for (const [name, h] of headByName) {
     const b = baseByName.get(name);
     if (b === undefined) added++;
-    else if (JSON.stringify(b.schema) !== JSON.stringify(h.schema)) modified++;
+    else if (JSON.stringify(stableDeepSort(b.schema)) !== JSON.stringify(stableDeepSort(h.schema)))
+      modified++;
   }
   for (const name of baseByName.keys()) {
     if (!headByName.has(name)) removed++;
@@ -237,9 +239,5 @@ export function formatVersionsShowHumanLines(opts: VersionsShowHumanOpts): strin
 }
 
 export function tagsOnRevisionFromIndex(tags: VersionTagSchema[], revisionId: string): string[] {
-  const names: string[] = [];
-  for (const t of tags) {
-    if (t.version_id === revisionId) names.push(t.name);
-  }
-  return names;
+  return buildTagsByRevisionId(tags).get(revisionId) ?? [];
 }

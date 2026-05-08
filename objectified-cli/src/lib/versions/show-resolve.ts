@@ -18,9 +18,18 @@ export function findSemverPredecessor(
   const sorted = [...allVersions].sort((a, b) =>
     compareSemverVersionIdsAsc(a.version_id, b.version_id),
   );
-  const idx = sorted.findIndex((v) => v.version_id === currentVersionId);
+  const idx = sorted.findIndex(
+    (v) => compareSemverVersionIdsAsc(v.version_id, currentVersionId) === 0,
+  );
   if (idx <= 0) return undefined;
   return sorted[idx - 1];
+}
+
+function semverLookupCandidates(ref: string): string[] {
+  if (!/^v?\d+(?:\.\d+)*(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/i.test(ref)) return [ref];
+  const stripped = ref.replace(/^v/i, "");
+  const prefixed = `v${stripped}`;
+  return ref.toLowerCase().startsWith("v") ? [ref, stripped] : [ref, prefixed];
 }
 
 export async function resolveVersionForShow(opts: {
@@ -45,12 +54,14 @@ export async function resolveVersionForShow(opts: {
     return { version, resolution: { kind: "revision_id", revisionId: ref.toLowerCase() } };
   }
 
-  try {
-    const version = await opts.api.getVersionByVersionId(opts.tenantSlug, opts.projectId, ref);
-    return { version, resolution: { kind: "semver", semverArg: ref } };
-  } catch (e) {
-    if (!(e instanceof ObjectifiedCliError) || e.exitCode !== EXIT_CODES.NOT_FOUND) {
-      throw e;
+  for (const candidate of semverLookupCandidates(ref)) {
+    try {
+      const version = await opts.api.getVersionByVersionId(opts.tenantSlug, opts.projectId, candidate);
+      return { version, resolution: { kind: "semver", semverArg: ref } };
+    } catch (e) {
+      if (!(e instanceof ObjectifiedCliError) || e.exitCode !== EXIT_CODES.NOT_FOUND) {
+        throw e;
+      }
     }
   }
 
