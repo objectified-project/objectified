@@ -52,6 +52,7 @@ from .version_notes import (
     enforce_max_commit_payload,
     validate_version_notes,
 )
+from .version_publish_prechecks import enforce_publish_prechecks
 from .version_pull_delta import SCHEMA_PULL_DELTA_GUARANTEE, build_schema_pull_delta
 from .version_pull_payload import filter_version_pull_dump, resolve_pull_sections
 
@@ -1915,6 +1916,14 @@ async def publish_version(
             version_record_id,
             request.change_report_baseline_revision_id,
         )
+
+    enforce_publish_prechecks(
+        tenant_slug=tenant_slug,
+        tenant_id=auth_data["tenant_id"],
+        project_id=project_id,
+        existing=existing,
+        request=request,
+    )
 
     version = db.publish_version(
         version_record_id,

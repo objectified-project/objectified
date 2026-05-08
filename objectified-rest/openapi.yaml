@@ -3288,6 +3288,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionSchema'
+        '409':
+          description: Conflict — e.g. breaking compatibility vs baseline without allowBreaking
+            (#3212).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
         '422':
           description: Validation Error
           content:
@@ -11456,6 +11464,18 @@ components:
           title: Changereportbaselinerevisionid
           description: 'Required when changeReportBaselineMode is manual: published
             revision to diff from.'
+        allowBreaking:
+          type: boolean
+          title: Allowbreaking
+          description: Allow publishing when backward-compatibility versus the resolved
+            baseline is breaking (#3212).
+          default: false
+        skipPublishChecks:
+          type: boolean
+          title: Skippublishchecks
+          description: Bypass OpenAPI build, documentation, and compatibility gates
+            before publish (emergency only).
+          default: false
       type: object
       title: VersionPublishRequest
       description: 'Publish: optional last-minute revision note / changelog applied

@@ -76,10 +76,16 @@ def test_publish_persists_change_report_via_background_task():
     shared = MagicMock()
     shared.get_version_by_id.side_effect = [_UNPUBLISHED, {**_UNPUBLISHED, "published": True, "published_at": _PUBLISHED_ROW["published_at"]}]
     shared.publish_version.return_value = _PUBLISHED_ROW
-    shared.get_project_by_id.return_value = {"id": "pid-1", "name": "My Project", "metadata": {}}
+    shared.get_project_by_id.return_value = {"id": "pid-1", "name": "My Project", "slug": "my-project", "metadata": {}}
     shared.get_prior_published_baseline_revision_id.return_value = None
+    shared.get_classes_for_version.return_value = [{"name": "Pet", "description": "Animal"}]
 
     with patch("app.versions_routes.db", shared), patch("app.publication_change_report.db", shared), patch(
+        "app.version_publish_prechecks.db", shared,
+    ), patch(
+        "app.version_publish_prechecks.openapi_for_revision",
+        return_value=_CANDIDATE_OPENAPI,
+    ), patch(
         "app.publication_change_report.openapi_for_revision",
         return_value=_CANDIDATE_OPENAPI,
     ), patch(

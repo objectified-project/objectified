@@ -422,7 +422,6 @@ See each ticket on GitHub for the full description, acceptance criteria, ASCII d
 | #         | Title                              | Description                                                        | Labels                                          | MVP | Parallel |
 |-----------|------------------------------------|--------------------------------------------------------------------|-------------------------------------------------|-----|----------|
 | 4.4 (#3211) | `versions fork`                  | Fork existing version into a new semver                            | `enhancement`, `cli`, `roadmap-cli`, `versions`, `git-behavior` | No  | Yes |
-| 4.5 (#3212) | `versions publish`               | Pre-publish checks → freeze → tag move → publish                   | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `versions` | Yes | Yes      |
 | 4.6 (#3213) | `versions unpublish`             | Retract published version with audit reason                        | `enhancement`, `cli`, `roadmap-cli`, `versions` | No  | Yes      |
 | 4.7 (#3214) | `versions freeze`                | Immutable schema snapshot; `--unfreeze` allowed pre-download       | `enhancement`, `cli`, `roadmap-cli`, `versions` | No  | Yes      |
 | 4.8 (#3215) | `versions compatibility`         | Backward-compat check; SARIF + CI exit codes                       | `enhancement`, `cli`, `roadmap-cli`, `versions`, `validation` | No  | Yes |
@@ -440,26 +439,9 @@ Shipped `objectified versions show <project> <version>`: resolves a revision via
 
 Shipped `objectified versions create <project>` for CI: `--version` (semver validated client-side), mutually exclusive `--notes` / `--notes-file` (UTF-8 markdown), optional `--base` (semver / revision UUID / tag → schema source via `source_version_id`; default source is latest **published** revision when present), `--branch` for multi-branch projects, `--from-file` JSON merged under CLI overrides, draft-only (`--no-draft` refused), `--json` returning the created `VersionSchema`, exit **6** on version-line collision (local check + server 409 hint), exit **7** on invalid semver (#3210).
 
-### Notable Detail — 4.5 (#3212) `versions publish`
+#### 4.5 (#3212) — `versions publish` (**done**)
 
-```
-$ objectified versions publish payments-api v2.1.0
-
-  Pre-publish checks:
-    ✔ schema valid (OpenAPI 3.1)
-    ✔ no unfilled required descriptions (24 classes)
-    ✔ backwards-compatible vs v2.0.0 (no breaking changes)
-    ✔ change report generated
-
-  Publishing v2.1.0 …
-    ✔ frozen schema snapshot stored (sha256: 7f2c…a041)
-    ✔ tag 'latest' moved from v2.0.0 → v2.1.0
-    ✔ change-report URL: https://app.objectified.dev/acme/payments-api/changes/v2.0.0...v2.1.0
-
-  ✔ Published v2.1.0 in 1.4s.
-```
-
-`--allow-breaking` required if compatibility (4.8) finds breaks. `--update-tag stable` moves a tag pointer in the same step. `--skip-checks` for emergencies; requires `--yes` and prints a banner.
+Shipped `objectified versions publish <project> <version>`: resolves a **draft** like `versions show`; client pre-publish uses `POST …/change-report/publish-preview`, class descriptions via `GET …/classes?version_id=…`, and `POST …/compatibility` when a baseline exists; `POST …/publish` sends `allowBreaking` / `skipPublishChecks` matching `--allow-breaking` / `--skip-checks`; `--skip-checks` requires `--yes` and prints a stderr banner; `--update-tag <name>` moves or creates a version tag; `--message` maps to `shortMessage`; exit **6** (`CONFLICT`) when compatibility is breaking without `--allow-breaking`; `--json` returns `version`, `spec_urls`, optional `change_report_url`, `compatibility`, `publish_preview`. REST enforces the same gates unless `skipPublishChecks` (#3212).
 
 ### Notable Detail — 4.8 (#3215) `versions compatibility`
 
@@ -770,12 +752,12 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ## MVP Release — Ticket Bundle
 
-The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **12 open sub-tickets** across 4 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, #3194, #3195, #3202, #3203, #3204, #3208, #3209, and #3210).
+The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **11 open sub-tickets** across 4 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, #3194, #3195, #3202, #3203, #3204, #3208, #3209, #3210, and #3212).
 
 | Epic     | Tickets                                                                                                   | Count |
 |----------|-----------------------------------------------------------------------------------------------------------|-------|
 | 2 (#3175) | #3196, #3197, #3198, #3199                                                                                | 4     |
-| 4 (#3177) | #3212                                                                                                      | 1     |
+| 4 (#3177) | _(none — #3212 shipped)_                                                                                    | 0     |
 | 9 (#3182) | #3244, #3245, #3246, #3247, #3248                                                                          | 5     |
 | 12 (#3185) | #3267, #3268                                                                                               | 2     |
 
