@@ -9,12 +9,14 @@ import type {
   TenantInfoResponse,
   TenantsMeResponse,
   VersionChangeReportOut,
+  VersionCreateRequest,
   VersionSchema,
   VersionTagSchema,
   WorkflowAuditPageResponse,
 } from "../generated/models.js";
 import {
   checkRevisionCompatibilityV1VersionsTenantSlugProjectIdCompatibilityPost,
+  createVersionV1VersionsTenantSlugProjectIdPost,
   createProjectV1ProjectsTenantSlugPost,
   getProjectBySlugV1ProjectsTenantSlugBySlugProjectSlugGet,
   getProjectV1ProjectsTenantSlugProjectIdGet,
@@ -46,6 +48,7 @@ export type {
   ProjectCreateRequest,
   ProjectSchema,
   VersionChangeReportOut,
+  VersionCreateRequest,
   VersionSchema,
   VersionTagSchema,
   WorkflowAuditEntryOut,
@@ -89,6 +92,11 @@ export type ObjectifiedApi = {
   getProject(tenantSlug: string, projectId: string): Promise<ProjectSchema>;
   getProjectBySlug(tenantSlug: string, projectSlug: string): Promise<ProjectSchema>;
   listVersions(tenantSlug: string, projectId: string): Promise<VersionSchema[]>;
+  createVersion(
+    tenantSlug: string,
+    projectId: string,
+    body: VersionCreateRequest,
+  ): Promise<VersionSchema>;
   getVersion(
     tenantSlug: string,
     projectId: string,
@@ -953,6 +961,32 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
       }
       return parseVersionsPayload(
         unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
+    async createVersion(
+      tenantSlug: string,
+      projectId: string,
+      body: VersionCreateRequest,
+    ): Promise<VersionSchema> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await createVersionV1VersionsTenantSlugProjectIdPost({
+          client: hey,
+          path: { tenant_slug: tenantSlug, project_id: projectId },
+          body,
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseVersionSinglePayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+        "version create",
       );
     },
 

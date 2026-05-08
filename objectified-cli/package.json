@@ -1,6 +1,6 @@
 {
   "name": "objectified-cli",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "description": "Objectified command-line interface",
   "author": "Objectified",
   "type": "module",
@@ -55,6 +55,7 @@
     "leven": "^4.0.0",
     "open": "^11.0.0",
     "ora": "^9.4.0",
+    "semver": "^7.7.4",
     "supports-color": "^10.2.2",
     "yaml": "^2.8.4"
   },
@@ -63,6 +64,7 @@
     "@hey-api/openapi-ts": "^0.74",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.10.0",
+    "@types/semver": "^7.7.1",
     "@types/supports-color": "^10.0.0",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.1",
@@ -102,6 +104,7 @@
     "./man/man1/objectified-tenants-list.1",
     "./man/man1/objectified-tenants-use.1",
     "./man/man1/objectified-version.1",
+    "./man/man1/objectified-versions-create.1",
     "./man/man1/objectified-versions-list.1",
     "./man/man1/objectified-versions-show.1",
     "./man/man1/objectified-whoami.1",
