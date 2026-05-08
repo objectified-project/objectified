@@ -321,7 +321,7 @@ export default class VersionsPublish extends BaseCommand {
     }
 
     if (!skipChecks) {
-      this.output.text(`    ${mark} frozen schema snapshot stored (sha256: ${fpDisplay})`);
+      this.output.text(`    ${mark} compatibility report fingerprint: ${fpDisplay}`);
       if (tagSummary !== undefined) {
         this.output.text(`    ${mark} ${tagSummary}`);
       } else if (updateTagName !== undefined) {
