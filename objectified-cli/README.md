@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.23 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.24 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -87,6 +87,7 @@ USAGE
 * [`objectified projects create`](#objectified-projects-create)
 * [`objectified projects list`](#objectified-projects-list)
 * [`objectified projects show REF`](#objectified-projects-show-ref)
+* [`objectified schema fetch REF`](#objectified-schema-fetch-ref)
 * [`objectified tenants info SLUG`](#objectified-tenants-info-slug)
 * [`objectified tenants list`](#objectified-tenants-list)
 * [`objectified tenants use [SLUG]`](#objectified-tenants-use-slug)
@@ -1358,6 +1359,79 @@ SEE ALSO
   objectified projects list
 
   objectified tenants use
+
+  objectified docs errors
+```
+
+## `objectified schema fetch REF`
+
+Download the published OpenAPI bundle or one class schema from GET /v1/schema/{tenant}/{project}/{version}[/{class}] (stdin/stdout friendly; optional checksum gate).
+
+```
+USAGE
+  $ objectified schema fetch REF [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [-c <value>] [--format
+    json|yaml] [-o <value>] [--expect-sha256 <value>] [--latest] [--accept <value>]
+
+ARGUMENTS
+  REF  Published target as tenant/project/version (slashes separate the three slugs; semver, latest, or server-resolved
+       tag via --accept).
+
+DESCRIPTION
+  Download the published OpenAPI bundle or one class schema from GET /v1/schema/{tenant}/{project}/{version}[/{class}]
+  (stdin/stdout friendly; optional checksum gate).
+
+EXAMPLES
+  $ objectified schema fetch acme-corp/payments-api/2.1.0
+
+  $ objectified schema fetch acme-corp/payments-api/2.1.0 --format yaml > spec.yaml
+
+  $ objectified schema fetch acme-corp/payments-api/2.1.0 --class Charge --format json
+
+  $ objectified schema fetch acme-corp/payments-api/2.1.0 --output ./build/openapi.json
+
+  $ objectified schema fetch acme-corp/payments-api/2.1.0 --expect-sha256 <64-hex>
+
+  $ objectified schema fetch acme-corp/payments-api/2.1.0 --latest
+
+  $ objectified schema fetch acme-corp/payments-api/2.1.0 --accept tag:stable
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --accept=<value>         Extra Accept token forwarded to the API (for example tag:stable); combined with class
+                               format negotiation when --class is set.
+  -c, --class=<value>          Fetch only this class (GET adds /{class_name}; uses content negotiation for JSON vs
+                               YAML).
+      --expect-sha256=<value>  SHA-256 of the emitted bytes (after --format); exit 7 when the digest does not match (CI
+                               drift gate).
+      --format=<option>        [default: json] Output serialization. Full-bundle YAML is converted client-side from
+                               JSON.
+                               <options: json|yaml>
+      --latest                 Send version_slug `latest` (overrides the third segment of the positional ref).
+  -o, --output=<value>         Write bytes to this path instead of stdout.
+
+SEE ALSO
+  objectified browse versions
+
+  objectified versions show
 
   objectified docs errors
 ```
