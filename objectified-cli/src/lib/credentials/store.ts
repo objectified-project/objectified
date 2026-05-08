@@ -188,6 +188,14 @@ function keychainUnavailableError(cause: string): ObjectifiedCliError {
   });
 }
 
+function keychainDeleteError(cause: string): ObjectifiedCliError {
+  return new ObjectifiedCliError({
+    message: `Could not delete CLI credentials from OS keychain (${cause}).`,
+    exitCode: EXIT_CODES.GENERIC,
+    hint: "Install a system keychain (libsecret on Linux), unset OBJECTIFIED_CLI_CREDENTIAL_DISABLE_FILE_FALLBACK if set, or use OBJECTIFIED_CLI_CREDENTIAL_BACKEND=memory in CI.",
+  });
+}
+
 export async function saveCliOAuthCredentials(
   profile: string,
   bundle: CliOAuthBundle,
@@ -300,8 +308,12 @@ export async function deleteCliOAuthCredentials(profile: string): Promise<void> 
     /* ignore vault cleanup failures */
   }
   if (keychainError !== undefined) {
-    if (keychainError instanceof Error) throw keychainError;
-    if (typeof keychainError === "string") throw new Error(keychainError);
-    throw new Error(`Could not delete credentials from OS keychain: ${inspect(keychainError)}`);
+    const detail =
+      keychainError instanceof Error
+        ? keychainError.message
+        : typeof keychainError === "string"
+          ? keychainError
+          : inspect(keychainError);
+    throw keychainDeleteError(detail);
   }
 }

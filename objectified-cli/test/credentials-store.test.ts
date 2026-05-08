@@ -130,7 +130,14 @@ describe("CLI credential store", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-cli-vault-"));
     process.env.OBJECTIFIED_CLI_CREDENTIAL_VAULT_DIR = dir;
     vi.doMock("keytar", () => {
-      throw new Error("no native keychain");
+      const noNative = async () => Promise.reject(new Error("no native keychain"));
+      return {
+        default: {
+          deletePassword: noNative,
+          getPassword: noNative,
+          setPassword: noNative,
+        },
+      };
     });
 
     const { deleteCliOAuthCredentials, saveCliOAuthCredentials } = await import(
@@ -145,7 +152,7 @@ describe("CLI credential store", () => {
     process.env.OBJECTIFIED_CLI_CREDENTIAL_DISABLE_FILE_FALLBACK = "1";
     await expect(deleteCliOAuthCredentials("default")).rejects.toMatchObject({
       name: "ObjectifiedCliError",
-      message: expect.stringContaining("OS keychain is unavailable for CLI credentials"),
+      message: expect.stringContaining("Could not delete CLI credentials from OS keychain"),
     });
     expect(fs.existsSync(path.join(dir, "credentials.enc"))).toBe(false);
     expect(fs.existsSync(path.join(dir, ".cli-credential-passphrase"))).toBe(false);
