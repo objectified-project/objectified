@@ -2779,6 +2779,16 @@ export type VersionPublishRequest = {
      * Required when changeReportBaselineMode is manual: published revision to diff from.
      */
     changeReportBaselineRevisionId?: string | null;
+    /**
+     * Allowbreaking
+     * Allow publishing when backward-compatibility versus the resolved baseline is breaking (#3212).
+     */
+    allowBreaking?: boolean;
+    /**
+     * Skippublishchecks
+     * Bypass OpenAPI build, documentation, and compatibility gates before publish (emergency only).
+     */
+    skipPublishChecks?: boolean;
 };
 
 /**
@@ -5646,6 +5656,12 @@ export type PublishVersionV1VersionsTenantSlugProjectIdVersionRecordIdPublishPos
 };
 
 export type PublishVersionV1VersionsTenantSlugProjectIdVersionRecordIdPublishPostErrors = {
+    /**
+     * Conflict — e.g. breaking compatibility vs baseline without allowBreaking (#3212).
+     */
+    409: {
+        [key: string]: unknown;
+    };
     /**
      * Validation Error
      */
