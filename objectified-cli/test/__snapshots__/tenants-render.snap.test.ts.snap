@@ -1,0 +1,55 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`tenants renderers (#3198) > human tenant info 1`] = `
+"  Slug:         acme-corp
+  Name:         Acme Corporation
+  Plan:         Enterprise
+  Created:      2024-08-12
+  Members:      34
+  Projects:     7
+  Versions:     142  (38 published)
+  Storage:      1.20 GiB / 100.00 GiB"
+`;
+
+exports[`tenants renderers (#3198) > human tenants list uses ASCII star when langAscii 1`] = `
+"  SLUG          NAME                  ROLE      ACTIVE
+  acme-corp     Acme Corporation      admin    *
+  acme-staging  Acme (staging)        admin    
+  contoso-ltd   Contoso Ltd.          member   
+
+(* = current default for profile 'default')"
+`;
+
+exports[`tenants renderers (#3198) > human tenants list with active default (Unicode star) 1`] = `
+"  SLUG          NAME                  ROLE      ACTIVE
+  acme-corp     Acme Corporation      admin    ★
+  acme-staging  Acme (staging)        admin    
+  contoso-ltd   Contoso Ltd.          member   
+
+(★ = current default for profile 'default')"
+`;
+
+exports[`tenants renderers (#3198) > stable JSON document for tenants list command 1`] = `
+"{
+  "default_tenant_slug": "acme-corp",
+  "profile": "default",
+  "tenants": [
+    {
+      "name": "Acme Corporation",
+      "role": "admin",
+      "slug": "acme-corp"
+    },
+    {
+      "name": "Acme (staging)",
+      "role": "admin",
+      "slug": "acme-staging"
+    },
+    {
+      "name": "Contoso Ltd.",
+      "role": "member",
+      "slug": "contoso-ltd"
+    }
+  ],
+  "total": 3
+}"
+`;

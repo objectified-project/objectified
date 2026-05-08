@@ -230,3 +230,48 @@ def get_authenticated_user_id(auth_data: Dict[str, Any]) -> Optional[str]:
     if auth_data.get('auth_method') == 'jwt':
         return auth_data.get('user_id')
     return None
+
+
+def validate_session_credentials(
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+) -> Dict[str, Any]:
+    """
+    Validate JWT or API key without requiring a tenant path segment.
+
+    Used by ``GET /v1/tenants/me`` and similar session-scoped endpoints.
+    """
+    if authorization:
+        jwt_payload = decode_jwt(authorization)
+        if jwt_payload:
+            user_id = jwt_payload.get('user_id') or jwt_payload.get('sub')
+            if not user_id:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid JWT token: missing user identifier",
+                )
+            return {
+                'auth_method': 'jwt',
+                'user_id': user_id,
+                'user_email': jwt_payload.get('email'),
+                'user_name': jwt_payload.get('name'),
+            }
+
+    if x_api_key:
+        api_key_data = db.validate_api_key(x_api_key)
+        if not api_key_data:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired API key",
+                headers={"WWW-Authenticate": "API-Key"},
+            )
+        return {**api_key_data, 'auth_method': 'api_key'}
+
+    raise HTTPException(
+        status_code=401,
+        detail=(
+            "Authentication required. Provide either JWT token "
+            "(Authorization: Bearer <token>) or API key (X-API-Key: <key>)"
+        ),
+        headers={"WWW-Authenticate": "Bearer, API-Key"},
+    )

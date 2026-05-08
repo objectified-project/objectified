@@ -253,7 +253,7 @@ Part of Epic: CLI Foundation & DevEx (#3174)
 |-----------|--------------------------------------------------------|-------------------------------------------------------------------|---------------------------------------------------------|-----|----------|
 | 2.3 (#3196) | `auth status` / `whoami` — **COMPLETE** | Show profile, base-url, tenant, user, expiry, plan via `GET /v1/auth/cli/whoami`; OAuth silent refresh on 401 | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`     | Yes | Yes      |
 | 2.4 (#3197) | Secure credential storage (keytar + encrypted fallback) — **COMPLETE** | OS keychain primary, AES-GCM file fallback for headless           | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `auth`, `security` | Yes | No       |
-| 2.5 (#3198) | `tenants list` / `tenants info`                      | Enumerate user's tenants and inspect one                          | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `tenancy`  | Yes | Yes      |
+| 2.5 (#3198) | `tenants list` / `tenants info` — **COMPLETE** | Enumerate user's tenants (`GET /v1/tenants/me`) and inspect one (`GET /v1/tenants/{slug}`); `--json`; active profile tenant marker; pagination flags; REST + CLI tests | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `tenancy`  | Yes | Yes      |
 | 2.6 (#3199) | `tenants use <slug>`                                 | Set default tenant per profile                                    | `enhancement`, `mvp`, `cli`, `roadmap-cli`, `tenancy`  | Yes | No       |
 | 2.7 (#3200) | Multi-profile management                             | `auth profiles list/add/remove/set-default`                       | `enhancement`, `cli`, `roadmap-cli`, `auth`            | No  | Yes      |
 | 2.8 (#3201) | Token refresh + 401 auto-retry                       | Pre-emptive refresh + transparent retry                           | `enhancement`, `cli`, `roadmap-cli`, `auth`            | No  | Yes      |
@@ -332,7 +332,9 @@ Part of Epic: Authentication & Tenant Context (#3175)
 
 ---
 
-#### 2.5 (#3198) — `tenants list` / `tenants info`
+#### 2.5 (#3198) — `tenants list` / `tenants info` — **COMPLETE**
+
+Landed: REST `GET /v1/tenants/me` (JWT memberships with admin/member role, API key → single tenant) and `GET /v1/tenants/{slug}` (usage counts; 403 without access); `objectified tenants list` aggregates pages by default, `--limit` / `--offset` for explicit pagination; `objectified tenants info <slug>`; `--json` on both; active default tenant marker from resolved profile; snapshot tests for human + JSON renderers; Vitest integration against loopback stubs.
 
 ```
 $ objectified tenants list

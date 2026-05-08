@@ -50,7 +50,7 @@ $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.11 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.12 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
@@ -82,6 +82,8 @@ USAGE
 * [`objectified hello [NAME]`](#objectified-hello-name)
 * [`objectified help [COMMAND]`](#objectified-help-command)
 * [`objectified projects list`](#objectified-projects-list)
+* [`objectified tenants info SLUG`](#objectified-tenants-info-slug)
+* [`objectified tenants list`](#objectified-tenants-list)
 * [`objectified version`](#objectified-version)
 * [`objectified whoami`](#objectified-whoami)
 
@@ -1000,6 +1002,99 @@ SEE ALSO
   objectified docs errors
 
   objectified hello
+```
+
+## `objectified tenants info SLUG`
+
+Show tenant details when you have access (GET /v1/tenants/{slug})
+
+```
+USAGE
+  $ objectified tenants info SLUG [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [-q] [--verbose]
+
+ARGUMENTS
+  SLUG  Tenant slug
+
+DESCRIPTION
+  Show tenant details when you have access (GET /v1/tenants/{slug})
+
+EXAMPLES
+  $ objectified tenants info acme-corp
+
+  $ objectified --json tenants info acme-corp
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+SEE ALSO
+  objectified tenants list
+
+  objectified auth status
+
+  objectified config path
+```
+
+## `objectified tenants list`
+
+List tenants you can access (GET /v1/tenants/me)
+
+```
+USAGE
+  $ objectified tenants list [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [-q] [--verbose] [--limit <value>] [--offset <value>]
+
+DESCRIPTION
+  List tenants you can access (GET /v1/tenants/me)
+
+EXAMPLES
+  $ objectified tenants list
+
+  $ objectified --json tenants list
+
+  $ objectified tenants list --limit 100 --offset 0
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --limit=<value>   [default: 50] Page size for /v1/tenants/me (1–100; default 50).
+  --offset=<value>  Offset into the full tenant list (pagination).
+
+SEE ALSO
+  objectified tenants info
+
+  objectified auth status
+
+  objectified config path
 ```
 
 ## `objectified version`
