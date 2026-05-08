@@ -1,4 +1,5 @@
 import os from "node:os";
+import { inspect } from "node:util";
 
 import { ObjectifiedCliError } from "../errors.js";
 import { EXIT_CODES } from "../exit-codes.js";
@@ -301,6 +302,6 @@ export async function deleteCliOAuthCredentials(profile: string): Promise<void> 
   if (keychainError !== undefined) {
     if (keychainError instanceof Error) throw keychainError;
     if (typeof keychainError === "string") throw new Error(keychainError);
-    throw new Error("Could not delete credentials from OS keychain.");
+    throw new Error(`Could not delete credentials from OS keychain: ${inspect(keychainError)}`);
   }
 }
