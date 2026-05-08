@@ -3,10 +3,14 @@ import type {
   ClassSchema,
   PrimitiveSchema,
   ProjectSchema,
+  TenantInfoResponse,
+  TenantsMeResponse,
   VersionSchema,
 } from "../generated/models.js";
 import {
+  getTenantInfoV1TenantsTenantSlugGet,
   listClassesV1ClassesTenantSlugGet,
+  listMyTenantsV1TenantsMeGet,
   listPrimitivesV1PrimitivesTenantSlugGet,
   listProjectsV1ProjectsTenantSlugGet,
   listVersionsV1VersionsTenantSlugProjectIdGet,
@@ -42,6 +46,8 @@ export type ObjectifiedApi = {
   listVersions(tenantSlug: string, projectId: string): Promise<VersionSchema[]>;
   listClasses(tenantSlug: string, versionId?: string): Promise<ClassSchema[]>;
   listPrimitives(tenantSlug: string): Promise<PrimitiveSchema[]>;
+  listMyTenantsPage(limit: number, offset: number): Promise<TenantsMeResponse>;
+  getTenantInfo(tenantSlug: string): Promise<TenantInfoResponse>;
 };
 
 const MAX_RETRY_AFTER_MS = 120_000;
@@ -314,6 +320,108 @@ function parsePrimitivesPayload(data: unknown): PrimitiveSchema[] {
   return primitives;
 }
 
+function parseTenantsMePayload(data: unknown): TenantsMeResponse {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for tenants list.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "The API returned an unexpected JSON shape; try again or upgrade the CLI.",
+    });
+  }
+  const o = data as Record<string, unknown>;
+  if (!Array.isArray(o.items)) {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for tenants list.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected `items` array from GET /v1/tenants/me.",
+    });
+  }
+  const items: TenantsMeResponse["items"] = [];
+  for (const raw of o.items) {
+    if (!raw || typeof raw !== "object") {
+      throw new ObjectifiedCliError({
+        message: "Invalid tenant row in response.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "The API returned invalid tenant membership rows.",
+      });
+    }
+    const t = raw as Record<string, unknown>;
+    if (typeof t.slug !== "string" || typeof t.name !== "string" || typeof t.role !== "string") {
+      throw new ObjectifiedCliError({
+        message: "Invalid tenant membership fields in response.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "Each tenant row needs slug, name, and role strings.",
+      });
+    }
+    items.push({ slug: t.slug, name: t.name, role: t.role });
+  }
+  const total = typeof o.total === "number" ? o.total : Number.NaN;
+  const limit = typeof o.limit === "number" ? o.limit : Number.NaN;
+  const offset = typeof o.offset === "number" ? o.offset : Number.NaN;
+  if (!Number.isFinite(total) || !Number.isFinite(limit) || !Number.isFinite(offset)) {
+    throw new ObjectifiedCliError({
+      message: "Invalid pagination fields in tenants list response.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected numeric total, limit, and offset from GET /v1/tenants/me.",
+    });
+  }
+  return { items, total, limit, offset };
+}
+
+function parseTenantInfoPayload(data: unknown): TenantInfoResponse {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for tenant info.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "The API returned an unexpected JSON shape; try again or upgrade the CLI.",
+    });
+  }
+  const t = data as Record<string, unknown>;
+  if (typeof t.slug !== "string" || typeof t.name !== "string") {
+    throw new ObjectifiedCliError({
+      message: "Invalid tenant info fields in response.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected slug and name from GET /v1/tenants/{slug}.",
+    });
+  }
+  const plan = t.plan === null || t.plan === undefined ? null : typeof t.plan === "string" ? t.plan : null;
+  const created_at =
+    t.created_at === null || t.created_at === undefined
+      ? null
+      : typeof t.created_at === "string"
+        ? t.created_at
+        : null;
+  const num = (k: string): number => {
+    const v = t[k];
+    return typeof v === "number" && Number.isFinite(v) ? v : 0;
+  };
+  const optInt = (k: string): number | null | undefined => {
+    const v = t[k];
+    if (v === null || v === undefined) return v === null ? null : undefined;
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    return null;
+  };
+  return {
+    slug: t.slug,
+    name: t.name,
+    plan,
+    created_at,
+    members_count: num("members_count"),
+    projects_count: num("projects_count"),
+    versions_count: num("versions_count"),
+    published_versions_count: num("published_versions_count"),
+    storage_used_bytes: optInt("storage_used_bytes") ?? null,
+    storage_quota_bytes: optInt("storage_quota_bytes") ?? null,
+  };
+}
+
 function createInstrumentedFetch(opts: {
   inner: typeof fetch;
   auth: ApiAuthSnapshot;
@@ -507,6 +615,46 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
         throw e;
       }
       return parsePrimitivesPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
+    async listMyTenantsPage(limit: number, offset: number): Promise<TenantsMeResponse> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await listMyTenantsV1TenantsMeGet({
+          client: hey,
+          query: { limit, offset },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseTenantsMePayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
+    async getTenantInfo(tenantSlug: string): Promise<TenantInfoResponse> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await getTenantInfoV1TenantsTenantSlugGet({
+          client: hey,
+          path: { tenant_slug: tenantSlug },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseTenantInfoPayload(
         unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
       );
     },

@@ -613,6 +613,78 @@ base_url = "https://api.prod.example"
     expect(lines).toContain("show");
   });
 
+  it("tenants list calls GET /v1/tenants/me with --json", async () => {
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      if (req.url?.startsWith("/v1/tenants/me")) {
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify({
+            items: [{ slug: "acme", name: "Acme", role: "member" }],
+            total: 1,
+            limit: 100,
+            offset: 0,
+          }),
+        );
+        return;
+      }
+      res.statusCode = 404;
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+    try {
+      const { code, stdout } = await spawnCliCaptureAsync(
+        ["--json", "--base-url", `http://127.0.0.1:${addr.port}`, "--api-key", "k", "tenants", "list"],
+        {},
+      );
+      expect(code).toBe(0);
+      const j = JSON.parse(stdout.trim()) as { tenants: Array<{ slug: string }> };
+      expect(j.tenants).toHaveLength(1);
+      expect(j.tenants[0]?.slug).toBe("acme");
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
+  it("tenants info exits 4 when API returns 403", async () => {
+    const server = http.createServer((req, res) => {
+      res.setHeader("Connection", "close");
+      res.statusCode = 403;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ detail: "No access to tenant: other" }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+    try {
+      const code = await runExitAsync(
+        [
+          "--base-url",
+          `http://127.0.0.1:${addr.port}`,
+          "--api-key",
+          "k",
+          "--no-json",
+          "tenants",
+          "info",
+          "other",
+        ],
+        {},
+      );
+      expect(code).toBe(4);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
   it("cold-starts --version within 200 ms on developer machines", () => {
     const iterations = process.env.CI ? 2 : 5;
     let fastest = Number.POSITIVE_INFINITY;

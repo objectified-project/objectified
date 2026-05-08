@@ -692,6 +692,80 @@ class Database:
 
         return None
 
+    def count_tenants_for_user(self, user_id: str) -> int:
+        """Count enabled, non-deleted tenants the user belongs to."""
+        query = """
+            SELECT COUNT(*)::int AS c
+            FROM odb.tenants t
+            INNER JOIN odb.tenant_users tu ON tu.tenant_id = t.id
+            WHERE tu.user_id = %s
+              AND t.deleted_at IS NULL
+              AND t.enabled IS TRUE
+        """
+        rows = self.execute_query(query, (user_id,))
+        if not rows:
+            return 0
+        c = rows[0].get("c")
+        return int(c) if c is not None else 0
+
+    def list_tenants_for_user_page(
+        self, user_id: str, limit: int, offset: int
+    ) -> List[Dict[str, Any]]:
+        """
+        List tenants for a user with role ``admin`` (tenant administrator) or ``member``.
+        Ordered by slug ascending.
+        """
+        query = """
+            SELECT t.id::text AS id, t.slug, t.name,
+                   CASE WHEN ta.user_id IS NOT NULL THEN 'admin' ELSE 'member' END AS role
+            FROM odb.tenants t
+            INNER JOIN odb.tenant_users tu ON tu.tenant_id = t.id AND tu.user_id = %s
+            LEFT JOIN odb.tenant_administrators ta
+              ON ta.tenant_id = t.id AND ta.user_id = tu.user_id
+            WHERE t.deleted_at IS NULL AND t.enabled IS TRUE
+            ORDER BY t.slug ASC
+            LIMIT %s OFFSET %s
+        """
+        return self.execute_query(query, (user_id, limit, offset))
+
+    def get_tenant_row_by_slug(self, slug: str) -> Optional[Dict[str, Any]]:
+        """Return tenant id/slug/name/created_at if slug exists and is active."""
+        query = """
+            SELECT t.id::text AS id, t.slug, t.name, t.created_at
+            FROM odb.tenants t
+            WHERE t.slug = %s AND t.deleted_at IS NULL AND t.enabled IS TRUE
+            LIMIT 1
+        """
+        rows = self.execute_query(query, (slug,))
+        return rows[0] if rows else None
+
+    def get_tenant_usage_stats(self, tenant_id: str) -> Dict[str, Any]:
+        """Aggregate member, project, and version counts for tenant detail (#3198)."""
+        query = """
+            SELECT
+              (SELECT COUNT(*)::int FROM odb.tenant_users tu WHERE tu.tenant_id = %s) AS members_count,
+              (SELECT COUNT(*)::int FROM odb.projects p
+                 WHERE p.tenant_id = %s AND p.deleted_at IS NULL) AS projects_count,
+              (SELECT COUNT(*)::int
+                 FROM odb.versions v
+                 INNER JOIN odb.projects p ON v.project_id = p.id
+                 WHERE p.tenant_id = %s AND p.deleted_at IS NULL) AS versions_count,
+              (SELECT COUNT(*)::int
+                 FROM odb.versions v
+                 INNER JOIN odb.projects p ON v.project_id = p.id
+                 WHERE p.tenant_id = %s AND p.deleted_at IS NULL AND v.published IS TRUE)
+                AS published_versions_count
+        """
+        rows = self.execute_query(query, (tenant_id, tenant_id, tenant_id, tenant_id))
+        if not rows:
+            return {
+                "members_count": 0,
+                "projects_count": 0,
+                "versions_count": 0,
+                "published_versions_count": 0,
+            }
+        return dict(rows[0])
+
     def get_tags_for_project(self, project_id: str) -> List[Dict[str, Any]]:
         """Get all tags for a specific project."""
         query = """

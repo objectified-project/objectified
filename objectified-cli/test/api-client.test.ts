@@ -207,4 +207,58 @@ describe("createApiClient + generated SDK", () => {
     await expect(pending).resolves.toEqual([]);
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
+
+  it("listMyTenantsPage performs GET /v1/tenants/me with query", async () => {
+    const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string" ? input : input instanceof Request ? input.url : input.href;
+      expect(url).toContain("/v1/tenants/me");
+      expect(url).toMatch(/limit=25/);
+      expect(url).toMatch(/offset=10/);
+      return new Response(
+        JSON.stringify({
+          items: [{ slug: "a", name: "A", role: "member" }],
+          total: 1,
+          limit: 25,
+          offset: 10,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const api = createApiClient({ baseUrl: "http://127.0.0.1:9", auth: { apiKey: "k" } });
+    const page = await api.listMyTenantsPage(25, 10);
+    expect(page.items).toHaveLength(1);
+    expect(page.total).toBe(1);
+  });
+
+  it("getTenantInfo performs GET /v1/tenants/{slug}", async () => {
+    const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string" ? input : input instanceof Request ? input.url : input.href;
+      expect(url).toContain("/v1/tenants/acme-corp");
+      return new Response(
+        JSON.stringify({
+          slug: "acme-corp",
+          name: "Acme",
+          plan: null,
+          created_at: "2024-08-12",
+          members_count: 2,
+          projects_count: 1,
+          versions_count: 5,
+          published_versions_count: 1,
+          storage_used_bytes: null,
+          storage_quota_bytes: null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    const api = createApiClient({ baseUrl: "http://127.0.0.1:9", auth: { apiKey: "k" } });
+    const info = await api.getTenantInfo("acme-corp");
+    expect(info.slug).toBe("acme-corp");
+    expect(info.members_count).toBe(2);
+  });
 });

@@ -1903,3 +1903,37 @@ class TenantRepositoryFileContentResponse(BaseModel):
     content: str
     truncated: bool = False
 
+
+# --- CLI / session tenant discovery (#3198) ---
+
+
+class TenantMembershipSchema(BaseModel):
+    """One tenant the authenticated user may access."""
+
+    slug: str
+    name: str
+    role: str
+
+
+class TenantsMeResponse(BaseModel):
+    """Paginated list of tenants for the current principal (JWT user or API key tenant)."""
+
+    items: List[TenantMembershipSchema]
+    total: int
+    limit: int
+    offset: int
+
+
+class TenantInfoResponse(BaseModel):
+    """Tenant summary for ``GET /v1/tenants/{slug}``."""
+
+    slug: str
+    name: str
+    plan: Optional[str] = None
+    created_at: Optional[str] = None
+    members_count: int = 0
+    projects_count: int = 0
+    versions_count: int = 0
+    published_versions_count: int = 0
+    storage_used_bytes: Optional[int] = None
+    storage_quota_bytes: Optional[int] = None
