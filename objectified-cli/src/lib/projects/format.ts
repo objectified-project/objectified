@@ -88,7 +88,8 @@ export function latestColumnDisplay(p: ProjectSchema, nowMs: number): string {
     const r = formatRelativeAgo(at, nowMs);
     return r !== "" ? r : "—";
   }
-  if (versionsCountDisplay(p) === "—") return "(no published versions)";
+  const vc = versionsCountDisplay(p);
+  if (vc === "—" || vc === "0") return "(no published versions)";
   return "—";
 }
 
@@ -133,9 +134,11 @@ function cellForColumn(key: string, p: ProjectSchema, nowMs: number): string {
     case "versions":
       return versionsCountDisplay(p);
     case "latest":
-    case "latest_published_at":
       return latestColumnDisplay(p, nowMs);
-    case "description":
+    case "latest_published_at": {
+      const iso = latestPublishedIso(p);
+      return iso !== undefined ? iso.slice(0, 19) : ""; // YYYY-MM-DDTHH:MM:SS
+    }
       return p.description ?? "";
     case "id":
       return p.id;
@@ -161,7 +164,10 @@ function buildSpecs(keys: string[]): ProjectColumnSpec[] {
   if (keys.length === def.length && keys.every((k, i) => k === def[i])) {
     return defaultSpecs();
   }
-  const width = Math.max(8, Math.min(24, Math.floor(78 / Math.max(1, keys.length))));
+  const width = Math.max(
+    8,
+    Math.min(24, Math.floor((78 - (keys.length - 1)) / Math.max(1, keys.length))),
+  );
   return keys.map((key) => ({
     key,
     header: EXTRA_HEADERS[key] ?? key.toUpperCase(),

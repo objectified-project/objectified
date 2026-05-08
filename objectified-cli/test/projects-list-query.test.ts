@@ -25,7 +25,7 @@ describe("projects list query helpers (#3202)", () => {
   it("parses columns with aliases", () => {
     expect(parseColumnKeys(undefined)).toEqual(["slug", "name", "domain", "versions", "latest"]);
     expect(parseColumnKeys("slug,name")).toEqual(["slug", "name"]);
-    expect(parseColumnKeys("slug, latest_published_at ")).toEqual(["slug", "latest"]);
+    expect(parseColumnKeys("slug, latest_published_at ")).toEqual(["slug", "latest_published_at"]);
   });
 
   it("validates column keys", () => {

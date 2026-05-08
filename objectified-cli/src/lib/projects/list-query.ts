@@ -5,9 +5,7 @@ export const DEFAULT_PROJECT_COLUMNS = ["slug", "name", "domain", "versions", "l
 export type ProjectColumnKey = (typeof DEFAULT_PROJECT_COLUMNS)[number] | (string & {});
 
 /** Maps user-facing column names (and aliases) to internal keys. */
-const COLUMN_ALIASES: Record<string, string> = {
-  latest_published_at: "latest",
-};
+const COLUMN_ALIASES: Record<string, string> = {};
 
 export const KNOWN_PROJECT_COLUMN_KEYS = new Set<string>([
   ...DEFAULT_PROJECT_COLUMNS,

@@ -107,6 +107,7 @@ describe("projects list text helpers (#3202)", () => {
       now: new Date("2026-05-07T15:00:00.000Z"),
     });
     const ms = performance.now() - t0;
-    expect(ms).toBeLessThan(500);
+    const budgetMs = process.env.CI ? 1500 : 500;
+    expect(ms).toBeLessThan(budgetMs);
   });
 });

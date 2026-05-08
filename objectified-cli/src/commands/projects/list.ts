@@ -11,7 +11,7 @@ import {
   validateProjectColumns,
 } from "../../lib/projects/list-query.js";
 import { formatProjectsListHumanLines } from "../../lib/projects/format.js";
-import { chalkForContext, stableDeepSort } from "../../lib/output.js";
+import { chalkForContext } from "../../lib/output.js";
 
 const LIMIT_MAX = 500;
 
@@ -106,8 +106,11 @@ export default class ProjectsList extends BaseCommand {
 
     this.ensureAuthenticated();
 
-    const includeDeleted = Boolean(this.flags["include-deleted"]);
-    const rawProjects = await this.api.listProjects(tenant, { include_deleted: includeDeleted });
+    const includeDeleted = this.flags["include-deleted"] === true;
+    const rawProjects = await this.api.listProjects(
+      tenant,
+      includeDeleted ? { include_deleted: true } : undefined,
+    );
 
     const search = (this.flags.search as string | undefined) ?? "";
     const pipeline = applyProjectListQuery(rawProjects, {
@@ -124,7 +127,7 @@ export default class ProjectsList extends BaseCommand {
     const truncated = !useAll && pipeline.length > displayed.length;
 
     if (this.context.json) {
-      this.output.json(stableDeepSort(displayed));
+      this.output.json(displayed);
       return;
     }
 

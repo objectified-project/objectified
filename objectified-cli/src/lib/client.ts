@@ -556,10 +556,7 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
         rawUnknown = await listProjectsV1ProjectsTenantSlugGet({
           client: hey,
           path: { tenant_slug: tenantSlug },
-          query:
-            options?.include_deleted === undefined
-              ? {}
-              : { include_deleted: options.include_deleted },
+          query: options?.include_deleted === true ? { include_deleted: true } : {},
           throwOnError: false,
         });
       } catch (e) {
