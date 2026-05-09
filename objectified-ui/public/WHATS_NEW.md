@@ -37,6 +37,7 @@ We continue to improve the platform based on your feedback with improvements and
 - **`objectified-cli`**: shared output layer (`lib/output.ts`) with `this.output` on `BaseCommand` — tables (`cli-table3`), stable sorted JSON/YAML, ora spinners, stderr warnings/errors, and TTY / `--json` / `--quiet` / `--no-color` / `LANG=C` behavior; Vitest snapshots cover render modes (#3189).
 
 ## Import
+- **Database**: `odb.import_jobs` migration (`objectified-db/scripts/20260508-120000.sql`) persists REST/import job state for multi-worker and sidecar restarts; `objectified-db/fixtures/import_jobs_terminal_states.sql` seeds one row per terminal state for harnesses (#3305).
 - Race condition fixed in 3.0.1 specification imports
 - Import supports Swagger 2.0 format
 - Adds the ability to import multiple versions of the same project 
