@@ -26,8 +26,8 @@ export const EXIT_CODE_TABLE: ExitCodeRow[] = [
   { code: 0, label: "success", hint: "Command completed normally." },
   {
     code: 1,
-    label: "generic failure",
-    hint: "Unexpected error; see message and retry with OBJECTIFIED_DEBUG=1.",
+    label: "generic failure / canceled",
+    hint: "Ctrl-C during long operations exits 1; other unexpected errors — see message and retry with OBJECTIFIED_DEBUG=1.",
   },
   { code: 2, label: "misuse", hint: "Fix flags or arguments; try --help on the command." },
   {

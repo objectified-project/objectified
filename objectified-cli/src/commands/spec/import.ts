@@ -5,12 +5,7 @@ import { Args, Flags } from "@oclif/core";
 import YAML from "yaml";
 
 import { BaseCommand } from "../../base-command.js";
-import type {
-  ImportJobResponse,
-  ImportSourceKind,
-  ObjectifiedApi,
-  ProjectSchema,
-} from "../../lib/client.js";
+import type { ImportJobResponse, ImportSourceKind, ProjectSchema } from "../../lib/client.js";
 import { ObjectifiedCliError } from "../../lib/errors.js";
 import { EXIT_CODES } from "../../lib/exit-codes.js";
 import { localePrefersAsciiTable } from "../../lib/output.js";
@@ -25,14 +20,16 @@ import {
   suggestProjectSlugFromSpec,
   type SpecProjectDraft,
 } from "../../lib/spec/project-draft-from-spec.js";
+import {
+  followImportJobPoll,
+  openImportReportSink,
+  writeReportSummaryLine,
+  type ImportReportSink,
+} from "../../lib/spec/import-job-follow.js";
 
 const SOURCE_FLAG_OPTIONS = ["openapi", "swagger", "arazzo", "auto"] as const;
 
 type SourceFlag = (typeof SOURCE_FLAG_OPTIONS)[number];
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function pickStr(o: Record<string, unknown>, keys: string[]): string | undefined {
   for (const k of keys) {
@@ -250,44 +247,6 @@ function progressSpinnerText(job: ImportJobResponse): string {
   return `[${phase}]${item}`;
 }
 
-function isPollingTerminalState(state: string): boolean {
-  return (
-    state === "completed" ||
-    state === "failed" ||
-    state === "canceled" ||
-    state === "rolled-back" ||
-    state === "pending-approval"
-  );
-}
-
-async function followImportJob(opts: {
-  api: ObjectifiedApi;
-  tenantSlug: string;
-  initial: ImportJobResponse;
-  spinnerText: (job: ImportJobResponse) => string;
-  createSpinner: (text: string) => import("ora").Ora;
-}): Promise<ImportJobResponse> {
-  let job = opts.initial;
-  const spin = opts.createSpinner(opts.spinnerText(job));
-  spin.start();
-  try {
-    const pollEpoch = Date.now();
-    let delayMs = 1000;
-    while (!isPollingTerminalState(job.state)) {
-      const elapsed = Date.now() - pollEpoch;
-      if (elapsed >= 30_000) {
-        delayMs = Math.min(5000, delayMs * 2);
-      }
-      await sleep(delayMs);
-      job = await opts.api.getImportJob(opts.tenantSlug, job.jobId);
-      spin.text = opts.spinnerText(job);
-    }
-    return job;
-  } finally {
-    spin.stop();
-  }
-}
-
 function formatSummaryFollowUp(job: ImportJobResponse, projectSlug: string): string | undefined {
   const vid =
     job.result?.versionId ??
@@ -315,7 +274,7 @@ function formatClassesSummary(
 
 export default class SpecImport extends BaseCommand {
   static description =
-    "Import an OpenAPI / Swagger / Arazzo document (POST /v1/imports/{tenant_slug}). Omit --project to create a project from spec info, then import.";
+    "Import an OpenAPI / Swagger / Arazzo document (POST /v1/imports/{tenant_slug}). Omit --project to create a project from spec info, then import. CI flags: --dry-run, --review, --report, --ndjson (see `objectified docs spec-import`).";
 
   static examples = [
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --project payments-api",
@@ -328,7 +287,13 @@ export default class SpecImport extends BaseCommand {
     "<%= config.bin %> <%= command.id %> ./arazzo.yaml --project checkout --source arazzo",
   ];
 
-  static seeAlso = ["versions show", "versions list", "projects show", "docs errors"];
+  static seeAlso = [
+    "versions show",
+    "versions list",
+    "projects show",
+    "docs errors",
+    "docs spec-import",
+  ];
 
   static args = {
     file: Args.string({
@@ -373,8 +338,33 @@ export default class SpecImport extends BaseCommand {
     }),
     yes: Flags.boolean({
       description:
-        "Skip confirmation when creating a project from the spec; required when stdin is not a TTY and --project is omitted.",
+        "Skip interactive confirms (CI guard); required when stdin is not a TTY and --project is omitted.",
       default: false,
+    }),
+    "dry-run": Flags.boolean({
+      description:
+        "POST import with engine dryRun (options.dryRun=true): preview only, exits 0 with would-be summary — no durable import writes.",
+      default: false,
+    }),
+    review: Flags.boolean({
+      description:
+        "Poll until state=pending-approval, print job id on stdout, exit 0; fails if the job completes without that gate.",
+      default: false,
+    }),
+    report: Flags.string({
+      description:
+        "Append per-event NDJSON plus a final summary line (creates parent dirs). Each line is a JSON object.",
+    }),
+    ndjson: Flags.boolean({
+      description:
+        "Stream poll deltas as NDJSON on stdout (events + progress); final line is the terminal result object. Mutually exclusive with --json.",
+      default: false,
+    }),
+    "commit-on-complete": Flags.boolean({
+      description:
+        "Forward options.commitOnComplete to the engine (default true). Pair --no-commit-on-complete with --review when you need an explicit hold.",
+      default: true,
+      allowNo: true,
     }),
   };
 
@@ -440,6 +430,43 @@ export default class SpecImport extends BaseCommand {
 
     const optionsPayload =
       importFileDoc !== undefined ? buildOptionsFromImportFile(importFileDoc) : {};
+
+    const dryRun = this.flags["dry-run"] === true;
+    const reviewMode = this.flags.review === true;
+    const ndjson = this.flags.ndjson === true;
+    const reportRaw = typeof this.flags.report === "string" ? this.flags.report.trim() : "";
+
+    if (ndjson && this.context.json) {
+      throw new ObjectifiedCliError({
+        message: "Cannot combine --ndjson with global --json.",
+        exitCode: EXIT_CODES.CONFLICT,
+        title: "Conflict",
+        hint: "Use --ndjson alone for streaming machine output on stdout.",
+      });
+    }
+
+    if (dryRun && reviewMode) {
+      throw new ObjectifiedCliError({
+        message: "Cannot combine --dry-run with --review.",
+        exitCode: EXIT_CODES.CONFLICT,
+        title: "Conflict",
+        hint: "Dry-run previews without an approval gate; omit one of these flags.",
+      });
+    }
+
+    if (this.flags.report !== undefined && reportRaw === "") {
+      throw new ObjectifiedCliError({
+        message: "Flag --report requires a non-empty file path.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "Example: --report ./artifacts/spec-import.ndjson",
+      });
+    }
+
+    if (dryRun) optionsPayload.dryRun = true;
+    if (this.flags["commit-on-complete"] === false) {
+      optionsPayload.commitOnComplete = false;
+    }
 
     const fileName = pickStr(importFileDoc ?? {}, ["name"]);
     const fileSlug = pickStr(importFileDoc ?? {}, ["slug"]);
@@ -715,21 +742,79 @@ export default class SpecImport extends BaseCommand {
     try {
       const created = await this.api.createImportJob(tenant, body);
 
-      const job = isPollingTerminalState(created.state)
-        ? created
-        : await followImportJob({
-            api: this.api,
-            tenantSlug: tenant,
-            initial: created,
-            spinnerText: progressSpinnerText,
-            createSpinner: (t) => this.output.spinner(t),
-          });
-
-      if (this.context.json) {
-        this.output.json(job);
+      let reportSink: ImportReportSink | undefined;
+      if (reportRaw !== "") {
+        reportSink = openImportReportSink(reportRaw);
       }
 
-      this.finishImportJob(job, projectSlug);
+      let terminalJob: ImportJobResponse | undefined;
+      let exitCodeForReport = 0;
+
+      try {
+        const showSpinner = !this.context.json && !quiet && !ndjson;
+        const { job, reviewMiss } = await followImportJobPoll({
+          api: this.api,
+          tenantSlug: tenant,
+          initial: created,
+          reviewMode,
+          ndjson,
+          verbose: this.verboseEffective,
+          showSpinner,
+          reportSink,
+          spinnerText: progressSpinnerText,
+          createSpinner: (t) => this.output.spinner(t),
+          stderrLine: (line) => {
+            process.stderr.write(`${line}\n`);
+          },
+        });
+
+        terminalJob = job;
+
+        if (reviewMiss) {
+          if (ndjson) {
+            this.emitImportNdjsonResult(job);
+          }
+          exitCodeForReport = EXIT_CODES.CONFLICT;
+          throw new ObjectifiedCliError({
+            message: `Import ended in state ${JSON.stringify(job.state)} before reaching pending-approval (--review requires a pending approval gate).`,
+            exitCode: EXIT_CODES.CONFLICT,
+            title: "Conflict",
+            hint: "Incremental imports may finish without a pending-approval step; omit --review or use transaction mode on the engine.",
+            requestId: this.api.lastRequestId,
+            retriesAttempted: this.api.lastRetriesAttempted,
+          });
+        }
+
+        if (ndjson && !(reviewMode && job.state === "pending-approval")) {
+          this.emitImportNdjsonResult(job);
+        }
+
+        this.finalizeSpecImportJob(job, projectSlug, {
+          dryRun,
+          reviewMode,
+          ndjson,
+          quiet,
+          json: this.context.json,
+        });
+
+        exitCodeForReport = 0;
+      } catch (err) {
+        if (err instanceof ObjectifiedCliError) {
+          exitCodeForReport = err.exitCode;
+        } else {
+          exitCodeForReport = EXIT_CODES.GENERIC;
+        }
+        throw err;
+      } finally {
+        if (reportSink !== undefined && terminalJob !== undefined) {
+          writeReportSummaryLine(reportSink, {
+            summary: terminalJob.summary,
+            result: terminalJob.result,
+            exitCode: exitCodeForReport,
+          });
+        }
+        reportSink?.close();
+      }
     } catch (err) {
       if (
         freshProjectSlug !== undefined &&
@@ -742,26 +827,45 @@ export default class SpecImport extends BaseCommand {
     }
   }
 
-  private augmentFreshProjectFailure(
-    err: ObjectifiedCliError,
-    projectSlug: string,
-  ): ObjectifiedCliError {
-    const tail = `An empty project '${projectSlug}' may remain; delete with \`objectified projects delete ${projectSlug} --force\` before retrying if needed.`;
-    return new ObjectifiedCliError({
-      message: err.message,
-      exitCode: err.exitCode,
-      title: err.title,
-      hint: err.hint !== undefined && err.hint !== "" ? `${err.hint} ${tail}` : tail,
-      requestId: err.requestId,
-      retriesAttempted: err.retriesAttempted,
-    });
+  private emitImportNdjsonResult(job: ImportJobResponse): void {
+    process.stdout.write(
+      `${JSON.stringify({
+        type: "result",
+        state: job.state,
+        summary: job.summary ?? null,
+        result: job.result ?? null,
+        error: job.error ?? null,
+      })}\n`,
+    );
   }
 
-  private finishImportJob(job: ImportJobResponse, projectSlug: string): void {
+  private finalizeSpecImportJob(
+    job: ImportJobResponse,
+    projectSlug: string,
+    opts: {
+      dryRun: boolean;
+      reviewMode: boolean;
+      ndjson: boolean;
+      quiet: boolean;
+      json: boolean;
+    },
+  ): void {
+    if (opts.reviewMode && job.state === "pending-approval") {
+      process.stdout.write(`${job.jobId}\n`);
+      return;
+    }
+
     if (job.state === "pending-approval") {
-      if (!this.context.json) {
+      if (!opts.ndjson && opts.json) {
+        if (opts.dryRun) {
+          this.output.json(job.summary ?? { jobId: job.jobId, dryRun: true, state: job.state });
+        } else {
+          this.output.json(job);
+        }
+      }
+      if (!opts.ndjson && !opts.json && !opts.quiet) {
         this.output.text(
-          `Import job ${job.jobId} is pending approval (review in the app or via a future CLI flag).`,
+          `Import job ${job.jobId} is pending approval (review in the app or via \`objectified spec import status …\` when available).`,
         );
       }
       return;
@@ -806,37 +910,64 @@ export default class SpecImport extends BaseCommand {
       });
     }
 
-    if (this.context.json) {
+    if (opts.json && !opts.ndjson) {
+      if (opts.dryRun) {
+        this.output.json(job.summary ?? { jobId: job.jobId, dryRun: true, state: job.state });
+      } else {
+        this.output.json(job);
+      }
       return;
     }
 
-    const vid =
-      job.result?.versionId ??
-      pickStr(
+    if (!opts.quiet && !opts.ndjson) {
+      if (opts.dryRun) {
+        this.output.text(`Dry-run preview OK (job ${job.jobId.slice(0, 8)}…).`);
+      }
+      const vid =
+        job.result?.versionId ??
+        pickStr(
+          job.summary !== undefined && job.summary !== null && typeof job.summary === "object"
+            ? (job.summary as Record<string, unknown>)
+            : {},
+          ["versionId", "version_id"],
+        ) ??
+        "?";
+      const langAscii = localePrefersAsciiTable(process.env);
+      const mark = langAscii ? "[ok]" : "✔";
+      if (!opts.dryRun) {
+        this.output.text(
+          `${mark} Imported as draft revision ${vid} (job ${job.jobId.slice(0, 8)}…) into project ${projectSlug}.`,
+        );
+      }
+
+      const cls = formatClassesSummary(
         job.summary !== undefined && job.summary !== null && typeof job.summary === "object"
           ? (job.summary as Record<string, unknown>)
-          : {},
-        ["versionId", "version_id"],
-      ) ??
-      "?";
-    const langAscii = localePrefersAsciiTable(process.env);
-    const mark = langAscii ? "[ok]" : "✔";
-    this.output.text(
-      `${mark} Imported as draft revision ${vid} (job ${job.jobId.slice(0, 8)}…) into project ${projectSlug}.`,
-    );
+          : undefined,
+      );
+      if (cls !== undefined) {
+        this.output.text(`  ${cls}`);
+      }
 
-    const cls = formatClassesSummary(
-      job.summary !== undefined && job.summary !== null && typeof job.summary === "object"
-        ? (job.summary as Record<string, unknown>)
-        : undefined,
-    );
-    if (cls !== undefined) {
-      this.output.text(`  ${cls}`);
+      const hint = formatSummaryFollowUp(job, projectSlug);
+      if (hint !== undefined) {
+        this.output.text(`  ${hint}`);
+      }
     }
+  }
 
-    const hint = formatSummaryFollowUp(job, projectSlug);
-    if (hint !== undefined) {
-      this.output.text(`  ${hint}`);
-    }
+  private augmentFreshProjectFailure(
+    err: ObjectifiedCliError,
+    projectSlug: string,
+  ): ObjectifiedCliError {
+    const tail = `An empty project '${projectSlug}' may remain; delete with \`objectified projects delete ${projectSlug} --force\` before retrying if needed.`;
+    return new ObjectifiedCliError({
+      message: err.message,
+      exitCode: err.exitCode,
+      title: err.title,
+      hint: err.hint !== undefined && err.hint !== "" ? `${err.hint} ${tail}` : tail,
+      requestId: err.requestId,
+      retriesAttempted: err.retriesAttempted,
+    });
   }
 }
