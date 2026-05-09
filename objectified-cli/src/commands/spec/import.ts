@@ -748,6 +748,7 @@ export default class SpecImport extends BaseCommand {
       }
 
       let terminalJob: ImportJobResponse | undefined;
+      let lastObservedJob: ImportJobResponse = created;
       let exitCodeForReport = 0;
 
       try {
@@ -765,6 +766,9 @@ export default class SpecImport extends BaseCommand {
           createSpinner: (t) => this.output.spinner(t),
           stderrLine: (line) => {
             process.stderr.write(`${line}\n`);
+          },
+          onJobUpdate: (updated) => {
+            lastObservedJob = updated;
           },
         });
 
@@ -806,10 +810,11 @@ export default class SpecImport extends BaseCommand {
         }
         throw err;
       } finally {
-        if (reportSink !== undefined && terminalJob !== undefined) {
+        if (reportSink !== undefined) {
+          const reportJob = terminalJob ?? lastObservedJob;
           writeReportSummaryLine(reportSink, {
-            summary: terminalJob.summary,
-            result: terminalJob.result,
+            summary: reportJob.summary,
+            result: reportJob.result,
             exitCode: exitCodeForReport,
           });
         }

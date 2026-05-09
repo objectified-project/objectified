@@ -15,13 +15,18 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       reject(err);
       return;
     }
-    const t = setTimeout(resolve, ms);
-    const onAbort = (): void => {
+    function onAbort(): void {
       clearTimeout(t);
+      signal?.removeEventListener("abort", onAbort);
       const err = new Error("Aborted");
       err.name = "AbortError";
       reject(err);
-    };
+    }
+    function onTimeout(): void {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }
+    const t = setTimeout(onTimeout, ms);
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
@@ -53,14 +58,11 @@ export function openImportReportSink(reportPath: string): ImportReportSink {
       hint: "Pass a file path for the NDJSON report.",
     });
   }
-  const stream = fs.createWriteStream(abs, { flags: "a" });
   return {
     writeLine(obj: unknown) {
-      stream.write(ndjsonLine(obj));
+      fs.appendFileSync(abs, ndjsonLine(obj));
     },
-    close() {
-      stream.end();
-    },
+    close() {},
   };
 }
 
@@ -94,11 +96,11 @@ export type FollowImportJobOptions = {
   spinnerText: (job: ImportJobResponse) => string;
   createSpinner: (text: string) => Ora;
   stderrLine: (line: string) => void;
+  onJobUpdate?: (job: ImportJobResponse) => void;
 };
 
 export type FollowImportJobResult = {
   job: ImportJobResponse;
-  sigint: boolean;
   /** True when --review was set but the job reached another terminal state first. */
   reviewMiss: boolean;
 };
@@ -128,6 +130,8 @@ export async function followImportJobPoll(
   let lastProgressKey = "";
 
   const emitDelta = (current: ImportJobResponse): void => {
+    opts.onJobUpdate?.(current);
+
     const evs = current.events;
     if (Array.isArray(evs) && evs.length > emittedEvents) {
       for (let i = emittedEvents; i < evs.length; i++) {
@@ -204,7 +208,7 @@ export async function followImportJobPoll(
     const reviewMiss =
       opts.reviewMode && job.state !== "pending-approval" && reviewViolatedTerminal(job.state);
 
-    return { job, sigint: false, reviewMiss };
+    return { job, reviewMiss };
   } finally {
     process.off("SIGINT", onSigint);
     spin?.stop();

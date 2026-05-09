@@ -550,6 +550,127 @@ describe("spec import CI ergonomics (#3310)", () => {
     }
   });
 
+  it("--report appends summary line when polling fails before terminal state", async () => {
+    const projId = "cfcfcfcf-cfcf-cfcf-cfcf-cfcfcfcfcfcf";
+    const jobId = "dfdfdfdf-dfdf-dfdf-dfdf-dfdfdfdfdfdf";
+
+    const server = http.createServer((req, res) => {
+      void (async () => {
+        res.setHeader("Connection", "close");
+        const url = new URL(req.url ?? "/", "http://127.0.0.1");
+
+        if (
+          req.method === "GET" &&
+          (url.pathname === "/v1/projects/acme/domains" || url.pathname === "/v1/projects/domains")
+        ) {
+          res.statusCode = 404;
+          res.end();
+          return;
+        }
+
+        if (req.method === "GET" && url.pathname === "/v1/projects/acme/by-slug/petstore") {
+          res.setHeader("Content-Type", "application/json");
+          res.end(
+            JSON.stringify({
+              id: projId,
+              tenant_id: "t1",
+              name: "Petstore",
+              slug: "petstore",
+              enabled: true,
+            }),
+          );
+          return;
+        }
+
+        if (req.method === "POST" && url.pathname === "/v1/imports/acme") {
+          res.statusCode = 201;
+          res.setHeader("Content-Type", "application/json");
+          res.end(
+            JSON.stringify({
+              jobId,
+              tenantId: "t1",
+              projectId: projId,
+              state: "running",
+              percent: 10,
+              progress: { phase: "start", total: 2, completed: 0, currentItem: "A" },
+              events: [{ code: "START", level: "info", message: "go" }],
+              summary: null,
+              result: null,
+              error: null,
+              createdAt: "2026-05-09T12:00:00.000Z",
+              updatedAt: "2026-05-09T12:00:00.000Z",
+              finishedAt: null,
+            }),
+          );
+          return;
+        }
+
+        if (req.method === "GET" && url.pathname === `/v1/imports/acme/${jobId}`) {
+          res.statusCode = 500;
+          res.end();
+          return;
+        }
+
+        res.statusCode = 500;
+        res.end();
+      })().catch(() => {
+        if (!res.headersSent) res.statusCode = 500;
+        res.end();
+      });
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    const tmpReport = path.join(os.tmpdir(), `spec-import-report-fail-${String(Date.now())}.ndjson`);
+
+    try {
+      const base = `http://127.0.0.1:${String(addr.port)}`;
+      const fixture = path.join(pkgRoot, "fixtures", "petstore.yaml");
+      const result = await runCliCapture([
+        "--base-url",
+        base,
+        "--api-key",
+        "k",
+        "--tenant",
+        "acme",
+        "--quiet",
+        "--no-json",
+        "spec",
+        "import",
+        fixture,
+        "--project",
+        "petstore",
+        "--report",
+        tmpReport,
+      ]);
+      expect(result.code).not.toBe(0);
+      const raw = fs.readFileSync(tmpReport, "utf8").trimEnd().split("\n");
+      expect(raw.length).toBeGreaterThanOrEqual(2);
+      const last = JSON.parse(raw[raw.length - 1] as string) as {
+        type?: string;
+        summary?: unknown;
+        result?: unknown;
+        exitCode?: number;
+      };
+      expect(last.type).toBe("summary");
+      expect(last.summary).toBeNull();
+      expect(last.result).toBeNull();
+      expect(last.exitCode).toBe(result.code);
+    } finally {
+      try {
+        fs.unlinkSync(tmpReport);
+      } catch {
+        /* ignore */
+      }
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
   it("--ndjson streams progress and final result", async () => {
     const projId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
     const jobId = "ffffffff-ffff-ffff-ffff-ffffffffffff";
