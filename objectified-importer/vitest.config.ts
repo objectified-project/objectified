@@ -8,6 +8,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    globalSetup: ['./tests/runner-bundle-global-setup.ts'],
     setupFiles: ['./tests/vitest-setup.ts'],
     testTimeout: 30000,
   },

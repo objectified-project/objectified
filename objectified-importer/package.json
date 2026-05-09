@@ -1,8 +1,11 @@
 {
   "name": "objectified-importer",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
+  "bin": {
+    "objectified-importer-run": "./bin/run.js"
+  },
   "exports": {
     ".": {
       "types": "./src/browser.ts",
@@ -14,15 +17,17 @@
     }
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json --noEmit",
+    "build": "tsc --project tsconfig.json --noEmit && node scripts/build-import-runner.mjs",
     "test": "vitest run"
   },
   "dependencies": {
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/pg": "^8.15.5",
+    "esbuild": "^0.28.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }

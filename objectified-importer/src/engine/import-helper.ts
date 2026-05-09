@@ -132,7 +132,7 @@ interface JobState {
 }
 
 export interface ImportEngine {
-  startImport(input: ImportJobInput): Promise<{ jobId: string }>;
+  startImport(input: ImportJobInput, opts?: { jobId?: string }): Promise<{ jobId: string }>;
   getImportStatus(jobId: string): Promise<{
     jobId: string;
     state: ImportJobState;
@@ -605,8 +605,12 @@ async function writeClassWithProperties(
   await linkRec(classId, cls.properties || [], null);
 }
 
-export async function startImport(input: ImportJobInput) {
-  const jobId = rndId();
+export async function startImport(input: ImportJobInput, opts?: { jobId?: string }) {
+  const requested = opts?.jobId?.trim();
+  const jobId = requested && requested.length > 0 ? requested : rndId();
+  if (jobs.has(jobId)) {
+    throw new Error(`Import job ID already in use: ${jobId}`);
+  }
   const startTime = Date.now();
 
   // Validate required IDs early

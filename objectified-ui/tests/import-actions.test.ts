@@ -10,6 +10,7 @@ import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 import type { ImportJobInput, ImportStatus } from 'objectified-importer/server';
 
 jest.mock('objectified-importer/server', () => ({
+  configureUiImportEngine: jest.fn(),
   startImport: jest.fn(),
   getImportStatus: jest.fn(),
   cancelImport: jest.fn(),
