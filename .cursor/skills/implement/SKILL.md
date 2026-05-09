@@ -12,6 +12,8 @@ When user invokes **implement** with issue number (for example `/implement 124`)
 - Apply **.cursorrules**
 - Use context7 MCP for latest documentation.
 - Only change what ticket requires: avoid unnecessary refactors.
+- Database is PostgreSQL with pgvector.
+- Database scripts filenames `YYYYMMDD-HHMMSS.sql` ONLY.
 - Never commit credentials or tokens.
 - If blocked, stop, explain.
 - Python favor PEP8.  Follow `import this` rules.
