@@ -2646,40 +2646,48 @@ class Database:
         new_state: str,
         *,
         finished_at_now: bool = False,
+        expected_state: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         conn = self.connect()
         try:
             with conn.cursor() as cursor:
+                # Build WHERE clause; optional expected_state guards against races
+                where = "WHERE tenant_id = %s AND job_id = %s"
+                params_suffix: tuple = (tenant_id, job_id)
+                if expected_state is not None:
+                    where += " AND state = %s"
+                    params_suffix = (tenant_id, job_id, expected_state)
+
+                returning = """
+                        RETURNING job_id::text AS job_id, tenant_id::text AS tenant_id,
+                                  project_id::text AS project_id, state, source_kind,
+                                  blob_sha, repository_source, input, events, progress, summary,
+                                  result, percent, error, created_by::text AS created_by,
+                                  created_at, updated_at, finished_at, expires_at, idempotency_key
+                """
+
                 if finished_at_now:
                     cursor.execute(
-                        """
+                        f"""
                         UPDATE odb.import_jobs
                         SET state = %s,
                             updated_at = NOW(),
                             finished_at = NOW()
-                        WHERE tenant_id = %s AND job_id = %s
-                        RETURNING job_id::text AS job_id, tenant_id::text AS tenant_id,
-                                  project_id::text AS project_id, state, source_kind,
-                                  blob_sha, repository_source, input, events, progress, summary,
-                                  result, percent, error, created_by::text AS created_by,
-                                  created_at, updated_at, finished_at, expires_at, idempotency_key
+                        {where}
+                        {returning}
                         """,
-                        (new_state, tenant_id, job_id),
+                        (new_state, *params_suffix),
                     )
                 else:
                     cursor.execute(
-                        """
+                        f"""
                         UPDATE odb.import_jobs
                         SET state = %s,
                             updated_at = NOW()
-                        WHERE tenant_id = %s AND job_id = %s
-                        RETURNING job_id::text AS job_id, tenant_id::text AS tenant_id,
-                                  project_id::text AS project_id, state, source_kind,
-                                  blob_sha, repository_source, input, events, progress, summary,
-                                  result, percent, error, created_by::text AS created_by,
-                                  created_at, updated_at, finished_at, expires_at, idempotency_key
+                        {where}
+                        {returning}
                         """,
-                        (new_state, tenant_id, job_id),
+                        (new_state, *params_suffix),
                     )
                 row = cursor.fetchone()
                 conn.commit()

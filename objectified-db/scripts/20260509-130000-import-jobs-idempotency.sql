@@ -4,8 +4,8 @@ SET search_path TO odb, public;
 ALTER TABLE odb.import_jobs
     ADD COLUMN IF NOT EXISTS idempotency_key TEXT NULL;
 
-CREATE INDEX IF NOT EXISTS import_jobs_tenant_idempotency_created_idx
-    ON odb.import_jobs (tenant_id, idempotency_key, created_at DESC)
+CREATE UNIQUE INDEX IF NOT EXISTS import_jobs_tenant_idempotency_key_udx
+    ON odb.import_jobs (tenant_id, idempotency_key)
     WHERE idempotency_key IS NOT NULL;
 
 COMMENT ON COLUMN odb.import_jobs.idempotency_key IS

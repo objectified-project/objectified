@@ -3,7 +3,7 @@
   "info": {
     "title": "Objectified REST API",
     "description": "REST API for serving OpenAPI specifications from the Objectified database",
-    "version": "1.0.46"
+    "version": "1.0.61"
   },
   "paths": {
     "/v1/browse/tenants": {
@@ -183,6 +183,15 @@
               }
             }
           },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user does not belong to this tenant"
+          },
+          "404": {
+            "description": "Tenant not found"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -284,6 +293,15 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user does not belong to this tenant"
+          },
+          "404": {
+            "description": "Tenant or project not found"
           },
           "422": {
             "description": "Validation Error",
@@ -12990,7 +13008,14 @@
             }
           },
           "200": {
-            "description": "Existing job for Idempotency-Key (replay within 24h)"
+            "description": "Existing job for Idempotency-Key (replay within 24h)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobResponse"
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid body or headers"
@@ -15301,8 +15326,7 @@
             "title": "Projectid"
           },
           "state": {
-            "type": "string",
-            "title": "State"
+            "$ref": "#/components/schemas/ImportJobState"
           },
           "percent": {
             "type": "integer",
@@ -15417,6 +15441,20 @@
         },
         "type": "object",
         "title": "ImportJobResult"
+      },
+      "ImportJobState": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "pending-approval",
+          "committing",
+          "completed",
+          "failed",
+          "canceled",
+          "rolled-back"
+        ],
+        "title": "ImportJobState"
       },
       "ImportJobVersionInput": {
         "properties": {
@@ -18350,6 +18388,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",

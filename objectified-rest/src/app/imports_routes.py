@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+import psycopg2.errors
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from fastapi.responses import JSONResponse
 
@@ -22,6 +24,7 @@ from .models import (
     ImportJobProgress,
     ImportJobResponse,
     ImportJobResult,
+    ImportJobState,
 )
 
 router = APIRouter(prefix="/v1/imports", tags=["imports"])
@@ -131,11 +134,16 @@ def _events_trim(events: Any) -> List[Dict[str, Any]]:
 
 def _row_to_response(row: Dict[str, Any]) -> ImportJobResponse:
     pid = row.get("project_id")
+    raw_state = str(row["state"])
+    try:
+        state = ImportJobState(raw_state)
+    except ValueError:
+        state = ImportJobState.failed
     return ImportJobResponse(
         job_id=str(row["job_id"]),
         tenant_id=str(row["tenant_id"]),
         project_id=str(pid) if pid else None,
-        state=str(row["state"]),
+        state=state,
         percent=int(row.get("percent") or 0),
         progress=_coerce_progress(row.get("progress")),
         events=_events_trim(row.get("events")),
@@ -175,7 +183,10 @@ def _normalize_idempotency_key(raw: Optional[str]) -> Optional[str]:
     response_model_by_alias=True,
     status_code=201,
     responses={
-        200: {"description": "Existing job for Idempotency-Key (replay within 24h)"},
+        200: {
+            "description": "Existing job for Idempotency-Key (replay within 24h)",
+            "model": ImportJobResponse,
+        },
         201: {"description": "Job created (queued)"},
         400: {"description": "Invalid body or headers"},
         403: {"description": "Tenant access denied"},
@@ -236,19 +247,34 @@ async def create_import_job(
         {"type": "queued", "at": datetime.now(timezone.utc).isoformat()},
     ]
 
-    row = db.insert_import_job(
-        tenant_id=tenant_id,
-        project_id=str(body.existing_project_id) if body.existing_project_id else None,
-        state="queued",
-        source_kind=str(body.source_kind.value),
-        input_payload=input_payload,
-        events=events,
-        created_by=created_by,
-        blob_sha=blob_sha,
-        repository_source=repo_row,
-        idempotency_key=idem,
-        percent=0,
-    )
+    try:
+        row = db.insert_import_job(
+            tenant_id=tenant_id,
+            project_id=str(body.existing_project_id) if body.existing_project_id else None,
+            state="queued",
+            source_kind=str(body.source_kind.value),
+            input_payload=input_payload,
+            events=events,
+            created_by=created_by,
+            blob_sha=blob_sha,
+            repository_source=repo_row,
+            idempotency_key=idem,
+            percent=0,
+        )
+    except Exception as exc:
+        # Unique-constraint violation: concurrent POST with the same Idempotency-Key raced us.
+        # Re-query and return the existing row (idempotency replay) instead of surfacing a 500.
+        if idem and isinstance(exc.__cause__, psycopg2.errors.UniqueViolation):
+            existing = db.find_import_job_by_idempotency_key(tenant_id, idem)
+            if existing:
+                r = _row_to_response(existing)
+                etag = _weak_etag_import_job(existing.get("updated_at"), str(existing["job_id"]))
+                return JSONResponse(
+                    status_code=200,
+                    content=r.model_dump(by_alias=True, mode="json"),
+                    headers={"ETag": etag},
+                )
+        raise
 
     _workflow_audit_import(
         tenant_id,
@@ -325,7 +351,7 @@ async def commit_import_job(
             hint="Wait for preview to finish and require approval, or use cancel if abandoning.",
         )
 
-    updated = db.update_import_job_state(tenant_id, str(job_id), "committing", finished_at_now=False)
+    updated = db.update_import_job_state(tenant_id, str(job_id), "committing", finished_at_now=False, expected_state=state)
     if not updated:
         raise HTTPException(status_code=404, detail=f"Import job not found: {job_id}")
 
@@ -364,7 +390,7 @@ async def cancel_import_job(
             hint="Terminal jobs cannot be canceled.",
         )
 
-    updated = db.update_import_job_state(tenant_id, str(job_id), "canceled", finished_at_now=True)
+    updated = db.update_import_job_state(tenant_id, str(job_id), "canceled", finished_at_now=True, expected_state=state)
     if not updated:
         raise HTTPException(status_code=404, detail=f"Import job not found: {job_id}")
 
@@ -403,7 +429,7 @@ async def rollback_import_job(
             hint="Only successfully completed imports can be rolled back.",
         )
 
-    updated = db.update_import_job_state(tenant_id, str(job_id), "rolled-back", finished_at_now=True)
+    updated = db.update_import_job_state(tenant_id, str(job_id), "rolled-back", finished_at_now=True, expected_state=state)
     if not updated:
         raise HTTPException(status_code=404, detail=f"Import job not found: {job_id}")
 

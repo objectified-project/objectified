@@ -2121,7 +2121,7 @@ class ImportJobResponse(BaseModel):
     job_id: str = Field(alias="jobId")
     tenant_id: str = Field(alias="tenantId")
     project_id: Optional[str] = Field(None, alias="projectId")
-    state: str
+    state: ImportJobState
     percent: int
     progress: Optional[ImportJobProgress] = None
     events: List[Dict[str, Any]] = Field(default_factory=list)
