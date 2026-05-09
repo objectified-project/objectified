@@ -78,7 +78,7 @@ describe("spec import skeleton (#3308)", () => {
   it("new project: POST project + POST import + poll (snapshot stdout, #3309)", async () => {
     const projId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
     const jobId = "55555555-5555-5555-5555-555555555555";
-    const projectRouteMethods: string[] = [];
+    const requestMethods: string[] = [];
 
     const server = http.createServer((req, res) => {
       void (async () => {
@@ -94,7 +94,7 @@ describe("spec import skeleton (#3308)", () => {
           return;
         }
         if (req.method === "POST" && url.pathname === "/v1/projects/acme") {
-          projectRouteMethods.push(req.method);
+          requestMethods.push(req.method);
           const raw = await readBody(req);
           const body = JSON.parse(raw) as {
             name?: string;
@@ -122,7 +122,7 @@ describe("spec import skeleton (#3308)", () => {
         }
 
         if (req.method === "POST" && url.pathname === "/v1/imports/acme") {
-          projectRouteMethods.push(req.method);
+          requestMethods.push(req.method);
           const raw = await readBody(req);
           const body = JSON.parse(raw) as {
             sourceKind?: string;
@@ -189,7 +189,7 @@ describe("spec import skeleton (#3308)", () => {
       ]);
       expect(result.code).toBe(0);
       expect(result.stderr.trim()).toBe("");
-      expect(projectRouteMethods).toEqual(["POST", "POST"]);
+      expect(requestMethods).toEqual(["POST", "POST"]);
       expect(result.stdout).toMatchSnapshot();
     } finally {
       server.closeAllConnections?.();
@@ -200,6 +200,7 @@ describe("spec import skeleton (#3308)", () => {
   });
 
   it("new project: exits 6 on create conflict and suggests --slug (#3309)", async () => {
+    const conflictDetail = "A project with slug 'swagger-petstore' already exists in this tenant";
     const server = http.createServer((req, res) => {
       void (async () => {
         res.setHeader("Connection", "close");
@@ -217,11 +218,7 @@ describe("spec import skeleton (#3308)", () => {
         if (req.method === "POST" && url.pathname === "/v1/projects/acme") {
           res.statusCode = 409;
           res.setHeader("Content-Type", "application/json");
-          res.end(
-            JSON.stringify({
-              detail: "A project with slug 'swagger-petstore' already exists in this tenant",
-            }),
-          );
+          res.end(JSON.stringify({ detail: conflictDetail }));
           return;
         }
 
