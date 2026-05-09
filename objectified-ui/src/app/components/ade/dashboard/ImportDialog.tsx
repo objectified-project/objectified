@@ -21,7 +21,8 @@ import ClipboardImportPanel from './ClipboardImportPanel';
 import GitImportPanel from './GitImportPanel';
 import SwaggerHubImportPanel from './SwaggerHubImportPanel';
 import PostmanImportPanel from './PostmanImportPanel';
-import { startImport, getImportStatus, rollbackImport } from '../../../../../lib/db/import-actions';
+import { postImportJob, getImportJobStatus, postImportCancel } from '@lib/import-api-client';
+import { importJobInputToRestBody } from '@lib/import-job-rest-body';
 import { generateSlug } from '../../../utils/slug';
 import { appendProjectQualitySnapshot } from '../../../utils/project-quality-score-history';
 
@@ -98,7 +99,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     let cancelled = false;
     void (async () => {
       try {
-        const status = await getImportStatus(jobId);
+        const status = await getImportJobStatus(jobId);
         if (cancelled) return;
         const projectId = (status as { result?: { projectId?: string } }).result?.projectId;
         if (!projectId) return;
@@ -229,9 +230,9 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     if (openedFromNewProjectAI && onReturnToNewProjectAI) {
       if (jobId && currentStep === 'import') {
         try {
-          await rollbackImport(jobId);
+          await postImportCancel(jobId);
         } catch (e) {
-          console.error('Failed to rollback import on close:', e);
+          console.error('Failed to cancel import on close:', e);
         }
       }
       resetDialogState();
@@ -239,12 +240,12 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       return;
     }
 
-    // If there's a pending import job (during import step), roll back the transaction
+    // If there's a pending import job (during import step), request cancel on the server
     if (jobId && currentStep === 'import') {
       try {
-        await rollbackImport(jobId);
+        await postImportCancel(jobId);
       } catch (e) {
-        console.error('Failed to rollback import on close:', e);
+        console.error('Failed to cancel import on close:', e);
       }
     }
 
@@ -390,24 +391,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     }
   };
 
-  const beginImport = async () => {
-    if (!analysisResult || !importOptions) return;
-
-    dryRunRef.current = Boolean(importOptions.dryRun);
-
-    // Validate that we have required IDs
-    if (!tenantId) {
-      console.error('Import failed: No tenant ID available');
-      return;
-    }
-    if (!userId) {
-      console.error('Import failed: No user ID available');
-      return;
-    }
+  const buildProjectsImportRestBody = (): Record<string, unknown> | null => {
+    if (!analysisResult || !importOptions) return null;
+    if (!tenantId || !userId) return null;
 
     const document = analysisResult.document;
     const sourceKind = analysisResult.format === 'arazzo' ? 'arazzo' : 'openapi';
-    const job = await startImport({
+    return importJobInputToRestBody({
       tenantId,
       userId,
       sourceKind,
@@ -415,11 +405,11 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       project: {
         name: importOptions.projectName || (document?.info?.title || 'New Project'),
         slug: importOptions.projectSlug || generateSlug(document?.info?.title || 'new-project') || 'imported-project',
-        description: document?.info?.description || null
+        description: document?.info?.description || null,
       },
       version: {
         versionId: importOptions.targetVersion || (document?.info?.version || '1.0.0'),
-        description: 'Imported from OpenAPI specification'
+        description: 'Imported from OpenAPI specification',
       },
       options: {
         selectedSchemas: importOptions.selectedSchemas,
@@ -435,9 +425,29 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         descriptionOverrides: importOptions.descriptionOverrides,
         generateExamples: importOptions.generateExamples ?? false,
         dryRun: importOptions.dryRun ?? false,
-        incrementalMode: importOptions.incrementalMode ?? false
-      }
+        incrementalMode: importOptions.incrementalMode ?? false,
+      },
     });
+  };
+
+  const beginImport = async () => {
+    if (!analysisResult || !importOptions) return;
+
+    dryRunRef.current = Boolean(importOptions.dryRun);
+
+    if (!tenantId) {
+      console.error('Import failed: No tenant ID available');
+      return;
+    }
+    if (!userId) {
+      console.error('Import failed: No user ID available');
+      return;
+    }
+
+    const body = buildProjectsImportRestBody();
+    if (!body) return;
+
+    const job = await postImportJob(body);
 
     setJobId(job.jobId);
     setCurrentStep('import');
@@ -1010,6 +1020,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   onRetry={(newJobId) => {
                     setJobId(newJobId);
                     setImportComplete(false);
+                  }}
+                  restartImportJob={async () => {
+                    const body = buildProjectsImportRestBody();
+                    if (!body) {
+                      throw new Error('Missing import context for retry');
+                    }
+                    return postImportJob(body);
                   }}
                 />
               );

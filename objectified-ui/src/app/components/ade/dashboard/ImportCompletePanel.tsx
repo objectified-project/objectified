@@ -17,7 +17,7 @@ import {
   ShieldX,
   Undo2
 } from 'lucide-react';
-import { getImportStatus, rollbackCompletedImport } from '../../../../../lib/db/import-actions';
+import { getImportJobStatus, postImportRollback } from '@lib/import-api-client';
 import { buildImportErrorReport, getImportErrorReportFilename, type ImportStatusForReport } from 'objectified-importer';
 
 interface ImportCompletePanelProps {
@@ -66,7 +66,7 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const status = await getImportStatus(jobId);
+        const status = await getImportJobStatus(jobId);
         setState(status.state);
 
         // Extract summary from status; use result for projectId/versionId when completed
@@ -118,7 +118,7 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
     setIsRollingBack(true);
     setRollbackError(null);
     try {
-      const result = await rollbackCompletedImport(jobId);
+      const result = await postImportRollback(jobId);
       if (result.success) {
         setState('rolled-back');
       } else {
@@ -134,7 +134,7 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
 
   const handleDownloadErrorReport = async () => {
     try {
-      const status = await getImportStatus(jobId);
+      const status = await getImportJobStatus(jobId);
       const exportedAt = new Date().toISOString();
       const report = buildImportErrorReport(status as ImportStatusForReport, exportedAt);
       const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
