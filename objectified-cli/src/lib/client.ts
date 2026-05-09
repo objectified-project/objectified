@@ -6,6 +6,8 @@ import type {
   ClassSchema,
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
+  ImportJobCreateRequest,
+  ImportJobResponse,
   PrimitiveSchema,
   ProjectCreateRequest,
   ProjectSchema,
@@ -24,9 +26,11 @@ import type {
 } from "../generated/models.js";
 import {
   checkRevisionCompatibilityV1VersionsTenantSlugProjectIdCompatibilityPost,
+  createImportJobV1ImportsTenantSlugPost,
   createVersionTagV1VersionTagsTenantSlugProjectIdPost,
   createVersionV1VersionsTenantSlugProjectIdPost,
   createProjectV1ProjectsTenantSlugPost,
+  getImportJobV1ImportsTenantSlugJobIdGet,
   getProjectBySlugV1ProjectsTenantSlugBySlugProjectSlugGet,
   getProjectV1ProjectsTenantSlugProjectIdGet,
   getTenantInfoV1TenantsTenantSlugGet,
@@ -63,6 +67,9 @@ export type {
   ClassSchema,
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
+  ImportJobCreateRequest,
+  ImportJobResponse,
+  ImportSourceKind,
   ProjectCreateRequest,
   ProjectSchema,
   VersionChangeReportOut,
@@ -188,6 +195,8 @@ export type ObjectifiedApi = {
     projectSlug: string;
     since?: string;
   }): Promise<BrowsePublicVersionsResponse>;
+  createImportJob(tenantSlug: string, body: ImportJobCreateRequest): Promise<ImportJobResponse>;
+  getImportJob(tenantSlug: string, jobId: string): Promise<ImportJobResponse>;
   /** Raw GET /v1/schema/… for streaming or hashing (published OpenAPI bundle or single class). */
   fetchOpenApiPublishedSchema(opts: {
     tenantSlug: string;
@@ -1065,6 +1074,35 @@ function parseTenantInfoPayload(data: unknown): TenantInfoResponse {
   };
 }
 
+function parseImportJobPayload(data: unknown, ctx: string): ImportJobResponse {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: `Unexpected response shape for ${ctx}.`,
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "The API returned an unexpected JSON shape; include request-id when reporting.",
+    });
+  }
+  const o = data as Record<string, unknown>;
+  if (typeof o.jobId !== "string" || typeof o.state !== "string" || typeof o.tenantId !== "string") {
+    throw new ObjectifiedCliError({
+      message: `Invalid import job fields in ${ctx}.`,
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected jobId, state, and tenantId from the imports API.",
+    });
+  }
+  if (typeof o.percent !== "number" || !Number.isFinite(o.percent)) {
+    throw new ObjectifiedCliError({
+      message: `Invalid import job percent in ${ctx}.`,
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected numeric percent from the imports API.",
+    });
+  }
+  return data as ImportJobResponse;
+}
+
 function createInstrumentedFetch(opts: {
   inner: typeof fetch;
   auth: ApiAuthSnapshot;
@@ -1860,6 +1898,49 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
       }
       return parseBrowsePublicVersionsPayload(
         unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
+    async createImportJob(tenantSlug: string, body: ImportJobCreateRequest): Promise<ImportJobResponse> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await createImportJobV1ImportsTenantSlugPost({
+          client: hey,
+          path: { tenant_slug: tenantSlug },
+          body,
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseImportJobPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+        "import job create",
+      );
+    },
+
+    async getImportJob(tenantSlug: string, jobId: string): Promise<ImportJobResponse> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await getImportJobV1ImportsTenantSlugJobIdGet({
+          client: hey,
+          path: { tenant_slug: tenantSlug, job_id: jobId },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseImportJobPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+        "import job status",
       );
     },
 

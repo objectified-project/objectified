@@ -1,0 +1,10 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`spec import skeleton (#3308) > happy path: POST import + poll GET until completed (snapshot stdout) 1`] = `
+"Detected: OpenAPI 3.0.3 (info.title='Swagger Petstore', info.version='1.0.0')
+Target:   tenant=acme, project=petstore (bbbb…)
+[ok] Imported as draft revision 1.0.0 (job 11111111…) into project petstore.
+  Classes: 14 created, 3 warnings, 0 failed.
+  Run \`objectified versions show petstore 1.0.0\` to inspect.
+"
+`;

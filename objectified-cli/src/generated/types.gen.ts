@@ -769,10 +769,7 @@ export type ImportJobResponse = {
      * Projectid
      */
     projectId?: string | null;
-    /**
-     * State
-     */
-    state: string;
+    state: ImportJobState;
     /**
      * Percent
      */
@@ -819,6 +816,11 @@ export type ImportJobResult = {
      */
     versionId?: string | null;
 };
+
+/**
+ * ImportJobState
+ */
+export type ImportJobState = 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
 
 /**
  * ImportJobVersionInput
@@ -2432,6 +2434,16 @@ export type ValidationError = {
      * Error Type
      */
     type: string;
+    /**
+     * Input
+     */
+    input?: unknown;
+    /**
+     * Context
+     */
+    ctx?: {
+        [key: string]: unknown;
+    };
 };
 
 /**
@@ -3621,6 +3633,18 @@ export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetData = {
 
 export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetErrors = {
     /**
+     * Missing or invalid authentication credentials
+     */
+    401: unknown;
+    /**
+     * Authenticated user does not belong to this tenant
+     */
+    403: unknown;
+    /**
+     * Tenant not found
+     */
+    404: unknown;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
@@ -3670,6 +3694,18 @@ export type ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlug
 };
 
 export type ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGetErrors = {
+    /**
+     * Missing or invalid authentication credentials
+     */
+    401: unknown;
+    /**
+     * Authenticated user does not belong to this tenant
+     */
+    403: unknown;
+    /**
+     * Tenant or project not found
+     */
+    404: unknown;
     /**
      * Validation Error
      */
@@ -9997,7 +10033,7 @@ export type CreateImportJobV1ImportsTenantSlugPostResponses = {
     /**
      * Existing job for Idempotency-Key (replay within 24h)
      */
-    200: unknown;
+    200: ImportJobResponse;
     /**
      * Job created (queued)
      */
