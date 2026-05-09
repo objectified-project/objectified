@@ -305,6 +305,8 @@ class SpecImportJobResult(BaseModel):
 class SpecImportJobStatus(BaseModel):
     """Poll payload for an import job."""
 
+    model_config = ConfigDict(extra="forbid")
+
     job_id: str
     state: SpecImportJobState
     percent: int = Field(0, ge=0, le=100)
@@ -317,6 +319,8 @@ class SpecImportJobStatus(BaseModel):
 class SpecImportJobAccepted(BaseModel):
     """Returned when a job is accepted (HTTP 202)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     job_id: str
     status_path: str = Field(
         description="Relative URL path for GET …/imports/{job_id} until the job reaches a terminal state.",
@@ -325,6 +329,8 @@ class SpecImportJobAccepted(BaseModel):
 
 class SpecImportCommitResponse(BaseModel):
     """Response after a successful commit."""
+
+    model_config = ConfigDict(extra="forbid")
 
     job_id: str
     state: Literal["completed"] = "completed"
@@ -336,6 +342,8 @@ class SpecImportCommitResponse(BaseModel):
 
 class SpecImportRollbackResponse(BaseModel):
     """Response after rolling back a committed import."""
+
+    model_config = ConfigDict(extra="forbid")
 
     job_id: str
     state: Literal["rolled-back"] = "rolled-back"

@@ -39,6 +39,20 @@ SPEC_IMPORT_NOT_IMPLEMENTED = (
     "this route documents the REST contract only (#3329)."
 )
 
+_501_RESPONSE: dict = {
+    501: {
+        "description": "Not Implemented — backend importer is not yet available.",
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {"detail": {"type": "string"}},
+                }
+            }
+        },
+    }
+}
+
 
 def _not_implemented() -> None:
     raise HTTPException(status_code=501, detail=SPEC_IMPORT_NOT_IMPLEMENTED)
@@ -48,6 +62,7 @@ def _not_implemented() -> None:
     "/{tenant_slug}/imports",
     status_code=202,
     response_model=SpecImportJobAccepted,
+    responses=_501_RESPONSE,
     summary="Start specification import (JSON + base64)",
     description=(
         "Create an asynchronous import job using a JSON body. "
@@ -67,6 +82,7 @@ async def start_spec_import_json(
     "/{tenant_slug}/imports/upload",
     status_code=202,
     response_model=SpecImportJobAccepted,
+    responses=_501_RESPONSE,
     summary="Start specification import (multipart file)",
     description=(
         "Create an asynchronous import job using multipart upload. "
@@ -91,6 +107,7 @@ async def start_spec_import_multipart(
 @router.get(
     "/{tenant_slug}/imports/{job_id}",
     response_model=SpecImportJobStatus,
+    responses=_501_RESPONSE,
     summary="Get specification import job status",
 )
 async def get_spec_import_status(
@@ -105,6 +122,7 @@ async def get_spec_import_status(
 @router.delete(
     "/{tenant_slug}/imports/{job_id}",
     status_code=204,
+    responses=_501_RESPONSE,
     summary="Cancel specification import job",
 )
 async def cancel_spec_import_job(
@@ -119,6 +137,7 @@ async def cancel_spec_import_job(
 @router.post(
     "/{tenant_slug}/imports/{job_id}/commit",
     response_model=SpecImportCommitResponse,
+    responses=_501_RESPONSE,
     summary="Commit a previewed specification import",
 )
 async def commit_spec_import_job(
@@ -133,6 +152,7 @@ async def commit_spec_import_job(
 @router.post(
     "/{tenant_slug}/imports/{job_id}/rollback",
     response_model=SpecImportRollbackResponse,
+    responses=_501_RESPONSE,
     summary="Rollback a committed specification import",
 )
 async def rollback_spec_import_job(

@@ -116,6 +116,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BrowsePublicProjectsResponse'
+        '401':
+          description: Credentials provided but could not be validated.
+        '403':
+          description: Credentials provided but not authorized for this tenant.
+        '404':
+          description: Tenant not found.
         '422':
           description: Validation Error
           content:
@@ -177,6 +183,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BrowsePublicVersionsResponse'
+        '401':
+          description: Credentials provided but could not be validated.
+        '403':
+          description: Credentials provided but not authorized for this tenant.
+        '404':
+          description: Tenant or project not found.
         '422':
           description: Validation Error
           content:
@@ -7684,10 +7696,13 @@ paths:
           title: X-Api-Key
       responses:
         '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
+          description: Caller has access to the tenant.
+        '401':
+          description: Missing or invalid session credentials.
+        '403':
+          description: Credentials valid but caller has no access to this tenant.
+        '404':
+          description: Tenant not found.
         '422':
           description: Validation Error
           content:
@@ -7781,6 +7796,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecImportJobAccepted'
+        '501':
+          description: Not Implemented — backend importer is not yet available.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
         '422':
           description: Validation Error
           content:
@@ -7833,6 +7857,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecImportJobAccepted'
+        '501':
+          description: Not Implemented — backend importer is not yet available.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
         '422':
           description: Validation Error
           content:
@@ -7881,6 +7914,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecImportJobStatus'
+        '501':
+          description: Not Implemented — backend importer is not yet available.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
         '422':
           description: Validation Error
           content:
@@ -7924,6 +7966,15 @@ paths:
       responses:
         '204':
           description: Successful Response
+        '501':
+          description: Not Implemented — backend importer is not yet available.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
         '422':
           description: Validation Error
           content:
@@ -7972,6 +8023,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecImportCommitResponse'
+        '501':
+          description: Not Implemented — backend importer is not yet available.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
         '422':
           description: Validation Error
           content:
@@ -8020,6 +8080,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecImportRollbackResponse'
+        '501':
+          description: Not Implemented — backend importer is not yet available.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
         '422':
           description: Validation Error
           content:
@@ -8875,7 +8944,7 @@ components:
       properties:
         file:
           type: string
-          format: binary
+          contentMediaType: application/octet-stream
           title: File
           description: Raw specification file bytes.
         metadata:
@@ -10810,6 +10879,7 @@ components:
         version_record_id:
           type: string
           title: Version Record Id
+      additionalProperties: false
       type: object
       required:
       - job_id
@@ -10866,6 +10936,7 @@ components:
           title: Status Path
           description: Relative URL path for GET …/imports/{job_id} until the job
             reaches a terminal state.
+      additionalProperties: false
       type: object
       required:
       - job_id
@@ -10940,6 +11011,7 @@ components:
           anyOf:
           - $ref: '#/components/schemas/SpecImportJobResult'
           - type: 'null'
+      additionalProperties: false
       type: object
       required:
       - job_id
@@ -11072,6 +11144,7 @@ components:
           - type: string
           - type: 'null'
           title: Version Record Id
+      additionalProperties: false
       type: object
       required:
       - job_id
@@ -11659,6 +11732,11 @@ components:
         type:
           type: string
           title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
       type: object
       required:
       - loc

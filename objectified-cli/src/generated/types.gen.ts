@@ -8,7 +8,7 @@ export type BodyStartSpecImportMultipartV1TenantsTenantSlugImportsUploadPost = {
      * File
      * Raw specification file bytes.
      */
-    file: Blob | File;
+    file: string;
     /**
      * Metadata
      * JSON string matching SpecImportStartMetadata (project, version, source_kind, options).
@@ -2552,6 +2552,16 @@ export type ValidationError = {
      * Error Type
      */
     type: string;
+    /**
+     * Input
+     */
+    input?: unknown;
+    /**
+     * Context
+     */
+    ctx?: {
+        [key: string]: unknown;
+    };
 };
 
 /**
@@ -3741,6 +3751,18 @@ export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetData = {
 
 export type ListPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGetErrors = {
     /**
+     * Credentials provided but could not be validated.
+     */
+    401: unknown;
+    /**
+     * Credentials provided but not authorized for this tenant.
+     */
+    403: unknown;
+    /**
+     * Tenant not found.
+     */
+    404: unknown;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
@@ -3790,6 +3812,18 @@ export type ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlug
 };
 
 export type ListPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGetErrors = {
+    /**
+     * Credentials provided but could not be validated.
+     */
+    401: unknown;
+    /**
+     * Credentials provided but not authorized for this tenant.
+     */
+    403: unknown;
+    /**
+     * Tenant or project not found.
+     */
+    404: unknown;
     /**
      * Validation Error
      */
@@ -9752,6 +9786,18 @@ export type VerifyTenantAccessV1TenantsTenantSlugHeadData = {
 
 export type VerifyTenantAccessV1TenantsTenantSlugHeadErrors = {
     /**
+     * Missing or invalid session credentials.
+     */
+    401: unknown;
+    /**
+     * Credentials valid but caller has no access to this tenant.
+     */
+    403: unknown;
+    /**
+     * Tenant not found.
+     */
+    404: unknown;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
@@ -9761,7 +9807,7 @@ export type VerifyTenantAccessV1TenantsTenantSlugHeadError = VerifyTenantAccessV
 
 export type VerifyTenantAccessV1TenantsTenantSlugHeadResponses = {
     /**
-     * Successful Response
+     * Caller has access to the tenant.
      */
     200: unknown;
 };
@@ -9793,6 +9839,12 @@ export type StartSpecImportJsonV1TenantsTenantSlugImportsPostErrors = {
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Not Implemented — backend importer is not yet available.
+     */
+    501: {
+        detail?: string;
+    };
 };
 
 export type StartSpecImportJsonV1TenantsTenantSlugImportsPostError = StartSpecImportJsonV1TenantsTenantSlugImportsPostErrors[keyof StartSpecImportJsonV1TenantsTenantSlugImportsPostErrors];
@@ -9833,6 +9885,12 @@ export type StartSpecImportMultipartV1TenantsTenantSlugImportsUploadPostErrors =
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Not Implemented — backend importer is not yet available.
+     */
+    501: {
+        detail?: string;
+    };
 };
 
 export type StartSpecImportMultipartV1TenantsTenantSlugImportsUploadPostError = StartSpecImportMultipartV1TenantsTenantSlugImportsUploadPostErrors[keyof StartSpecImportMultipartV1TenantsTenantSlugImportsUploadPostErrors];
@@ -9877,6 +9935,12 @@ export type CancelSpecImportJobV1TenantsTenantSlugImportsJobIdDeleteErrors = {
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Not Implemented — backend importer is not yet available.
+     */
+    501: {
+        detail?: string;
+    };
 };
 
 export type CancelSpecImportJobV1TenantsTenantSlugImportsJobIdDeleteError = CancelSpecImportJobV1TenantsTenantSlugImportsJobIdDeleteErrors[keyof CancelSpecImportJobV1TenantsTenantSlugImportsJobIdDeleteErrors];
@@ -9921,6 +9985,12 @@ export type GetSpecImportStatusV1TenantsTenantSlugImportsJobIdGetErrors = {
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Not Implemented — backend importer is not yet available.
+     */
+    501: {
+        detail?: string;
+    };
 };
 
 export type GetSpecImportStatusV1TenantsTenantSlugImportsJobIdGetError = GetSpecImportStatusV1TenantsTenantSlugImportsJobIdGetErrors[keyof GetSpecImportStatusV1TenantsTenantSlugImportsJobIdGetErrors];
@@ -9965,6 +10035,12 @@ export type CommitSpecImportJobV1TenantsTenantSlugImportsJobIdCommitPostErrors =
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Not Implemented — backend importer is not yet available.
+     */
+    501: {
+        detail?: string;
+    };
 };
 
 export type CommitSpecImportJobV1TenantsTenantSlugImportsJobIdCommitPostError = CommitSpecImportJobV1TenantsTenantSlugImportsJobIdCommitPostErrors[keyof CommitSpecImportJobV1TenantsTenantSlugImportsJobIdCommitPostErrors];
@@ -10009,6 +10085,12 @@ export type RollbackSpecImportJobV1TenantsTenantSlugImportsJobIdRollbackPostErro
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Not Implemented — backend importer is not yet available.
+     */
+    501: {
+        detail?: string;
+    };
 };
 
 export type RollbackSpecImportJobV1TenantsTenantSlugImportsJobIdRollbackPostError = RollbackSpecImportJobV1TenantsTenantSlugImportsJobIdRollbackPostErrors[keyof RollbackSpecImportJobV1TenantsTenantSlugImportsJobIdRollbackPostErrors];

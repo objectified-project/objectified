@@ -111,8 +111,16 @@ async def list_my_tenants(
     ]
     return TenantsMeResponse(items=items, total=total, limit=limit, offset=offset)
 
-
-@router.head("/{tenant_slug}")
+@router.head(
+    "/{tenant_slug}",
+    response_class=Response,
+    responses={
+        200: {"description": "Caller has access to the tenant."},
+        401: {"description": "Missing or invalid session credentials."},
+        403: {"description": "Credentials valid but caller has no access to this tenant."},
+        404: {"description": "Tenant not found."},
+    },
+)
 async def verify_tenant_access(
     tenant_slug: str,
     session: Dict[str, Any] = Depends(validate_session_credentials),

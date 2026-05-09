@@ -183,6 +183,15 @@
               }
             }
           },
+          "401": {
+            "description": "Credentials provided but could not be validated."
+          },
+          "403": {
+            "description": "Credentials provided but not authorized for this tenant."
+          },
+          "404": {
+            "description": "Tenant not found."
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -284,6 +293,15 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Credentials provided but could not be validated."
+          },
+          "403": {
+            "description": "Credentials provided but not authorized for this tenant."
+          },
+          "404": {
+            "description": "Tenant or project not found."
           },
           "422": {
             "description": "Validation Error",
@@ -12173,12 +12191,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
+            "description": "Caller has access to the tenant."
+          },
+          "401": {
+            "description": "Missing or invalid session credentials."
+          },
+          "403": {
+            "description": "Credentials valid but caller has no access to this tenant."
+          },
+          "404": {
+            "description": "Tenant not found."
           },
           "422": {
             "description": "Validation Error",
@@ -12338,6 +12360,21 @@
               }
             }
           },
+          "501": {
+            "description": "Not Implemented \u2014 backend importer is not yet available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -12419,6 +12456,21 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SpecImportJobAccepted"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented \u2014 backend importer is not yet available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -12506,6 +12558,21 @@
               }
             }
           },
+          "501": {
+            "description": "Not Implemented \u2014 backend importer is not yet available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -12579,6 +12646,21 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "501": {
+            "description": "Not Implemented \u2014 backend importer is not yet available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -12663,6 +12745,21 @@
               }
             }
           },
+          "501": {
+            "description": "Not Implemented \u2014 backend importer is not yet available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -12742,6 +12839,21 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SpecImportRollbackResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented \u2014 backend importer is not yet available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -14120,7 +14232,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File",
             "description": "Raw specification file bytes."
           },
@@ -17264,6 +17376,7 @@
             "title": "Version Record Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "job_id",
@@ -17339,6 +17452,7 @@
             "description": "Relative URL path for GET \u2026/imports/{job_id} until the job reaches a terminal state."
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "job_id",
@@ -17466,6 +17580,7 @@
             ]
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "job_id",
@@ -17662,6 +17777,7 @@
             "title": "Version Record Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "job_id"
@@ -18588,6 +18704,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
