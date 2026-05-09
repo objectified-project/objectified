@@ -759,7 +759,6 @@ objectified import
 
 | #          | Title                                                                 | Issue   | Description                                                                 | Labels                                               | MVP | Parallel |
 |------------|-----------------------------------------------------------------------|---------|-----------------------------------------------------------------------------|------------------------------------------------------|-----|----------|
-| 13.2 (#3330) | `import spec` — upload, poll, commit/rollback                       | #3330   | Multipart or documented binary upload; job lifecycle; `--json` summaries | `enhancement`, `cli`, `roadmap-cli`, `import`, `typescript` | No  | Yes      |
 | 13.3 (#3331) | Project flags: `--create-project`, `--map-project`, `--create-or-map-project` | #3331 | Map spec metadata → project; create-if-missing; exclusivity rules + errors | `enhancement`, `cli`, `roadmap-cli`, `import`, `tenancy` | No  | Yes      |
 | 13.4 (#3332) | Tests, man pages, supported-format parity                           | #3332   | Vitest stubs; README/man; checklist vs Import Dialog / scanner / importer | `enhancement`, `cli`, `roadmap-cli`, `import`, `documentation` | No  | Yes      |
 
@@ -805,11 +804,11 @@ Part of Epic: Specification Import via REST (#3328)
 
 ---
 
-#### 13.2 (#3330) — `objectified import spec`
+#### 13.2 (#3330) — `objectified import spec` (**done**)
 
-Implement file argument, REST job orchestration (start → poll → commit), global flags, and `--json` output. Optional `--no-wait` returning `job_id` is desirable for asynchronous CI.
+Shipped: `objectified import spec <path>` uses `POST /v1/tenants/{tenant_slug}/imports` (JSON + standard base64), exponential backoff polling on `GET …/{job_id}`, optional `--no-wait` (job id only), `--dry-run` forwarded in metadata options, `--rollback` for `POST …/rollback` after preview (implies no commit), default `POST …/commit` after `pending-approval` unless `--no-commit`. Filename/content sniff and `--format` override; stdin `-` with optional `--filename`. Vitest covers stubbed fetch (start → poll → commit) and format sniffing.
 
-**Parallelism / Dependencies:** Depends on #3329 (typed operations). Integrates with Epic 2 tenant resolution.
+**Parallelism / Dependencies:** Depended on #3329 (typed operations). Integrates with Epic 2 tenant resolution.
 
 Part of Epic: Specification Import via REST (#3328)
 
@@ -879,7 +878,7 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 | 10 (#3183) | #3253, #3254, #3255, #3256, #3257, #3258, #3259                                                                                | 7     |
 | 11 (#3184) | #3260, #3261, #3262, #3263, #3264, #3265, #3266                                                                                | 7     |
 | 12 (#3185) | #3269, #3270, #3271, #3272, #3273, #3274                                                                                       | 6     |
-| 13 (#3328) | #3329, #3330, #3331, #3332                                                                                                     | 4     |
+| 13 (#3328) | #3329, #3331, #3332                                                                                                             | 3     |
 
 **v2 capability deltas vs MVP:**
 - Full read/write CRUD for primitives, properties, classes, paths, operations, parameters, request bodies, and responses — i.e. you can model an entire API surface from the CLI.

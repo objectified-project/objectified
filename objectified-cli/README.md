@@ -84,6 +84,7 @@ USAGE
 * [`objectified docs telemetry`](#objectified-docs-telemetry)
 * [`objectified hello [NAME]`](#objectified-hello-name)
 * [`objectified help [COMMAND]`](#objectified-help-command)
+* [`objectified import spec PATH`](#objectified-import-spec-path)
 * [`objectified projects create`](#objectified-projects-create)
 * [`objectified projects list`](#objectified-projects-list)
 * [`objectified projects show REF`](#objectified-projects-show-ref)
@@ -1188,6 +1189,83 @@ OTHER
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.46/src/commands/help.ts)_
+
+## `objectified import spec PATH`
+
+Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`).
+
+```
+USAGE
+  $ objectified import spec PATH --project-name <value> --project-slug <value> --version <value> [--api-key
+    <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>] [--json] [--color] [--profile <value>]
+    [--tenant <value>] [-q] [--verbose] [--project-description <value>] [--version-description <value>]
+    [--existing-project-id <value>] [--format <value>] [--filename <value>] [--dry-run] [--no-wait] [--commit]
+    [--rollback]
+
+ARGUMENTS
+  PATH  Path to the spec file, or `-` to read raw bytes from stdin.
+
+DESCRIPTION
+  Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status
+  with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`).
+
+EXAMPLES
+  $ objectified import spec ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0
+
+  $ objectified --json import spec ./spec.json --project-slug my-api --project-name 'My API' --version 2.0.0 --no-wait
+
+  $ objectified import spec - --filename ./api.yaml --project-slug svc --project-name Service --version 0.1.0 < ./api.yaml
+
+  $ objectified import spec ./asyncapi.yml --project-slug events --project-name Events --version 1.0.0 --dry-run
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --[no-]commit                  After preview (pending-approval), POST …/commit (default). Use --no-commit to leave the
+                                 preview transaction open.
+  --dry-run                      Forward dry_run in import options (validate/analyze without persisting;
+                                 server-defined).
+  --existing-project-id=<value>  When set, skip project creation and attach the job to this catalog project id.
+  --filename=<value>             Original filename hint when PATH is `-` (improves sniffing for stdin payloads); may
+                                 include directories (basename is used).
+  --format=<value>               Importer kind when extension/content sniff is ambiguous (openapi-3, asyncapi-2,
+                                 protobuf, graphql, …).
+  --no-wait                      Start the job and print the job id immediately without polling or finalize calls (CI
+                                 stitching).
+  --project-description=<value>  Optional project description forwarded in import metadata.
+  --project-name=<value>         (required) Display name for the catalog project created or targeted by this import.
+  --project-slug=<value>         (required) URL-safe project slug (^[a-z][a-z0-9-]{1,62}$).
+  --rollback                     After preview (pending-approval), POST …/rollback instead of commit (implies
+                                 --no-commit).
+  --version=<value>              (required) Semantic version id for the imported catalog revision (for example 1.0.0).
+  --version-description=<value>  Optional version description forwarded in import metadata.
+
+SEE ALSO
+  objectified projects create
+
+  objectified versions create
+
+  objectified docs errors
+
+  objectified tenants use
+```
 
 ## `objectified projects create`
 

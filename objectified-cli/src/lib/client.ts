@@ -9,6 +9,11 @@ import type {
   PrimitiveSchema,
   ProjectCreateRequest,
   ProjectSchema,
+  SpecImportCommitResponse,
+  SpecImportJobAccepted,
+  SpecImportJobStatus,
+  SpecImportRollbackResponse,
+  SpecImportStartJsonRequest,
   TenantInfoResponse,
   TenantsMeResponse,
   VersionChangeReportOut,
@@ -24,11 +29,13 @@ import type {
 } from "../generated/models.js";
 import {
   checkRevisionCompatibilityV1VersionsTenantSlugProjectIdCompatibilityPost,
+  commitSpecImportJobV1TenantsTenantSlugImportsJobIdCommitPost,
   createVersionTagV1VersionTagsTenantSlugProjectIdPost,
   createVersionV1VersionsTenantSlugProjectIdPost,
   createProjectV1ProjectsTenantSlugPost,
   getProjectBySlugV1ProjectsTenantSlugBySlugProjectSlugGet,
   getProjectV1ProjectsTenantSlugProjectIdGet,
+  getSpecImportStatusV1TenantsTenantSlugImportsJobIdGet,
   getTenantInfoV1TenantsTenantSlugGet,
   getVersionByVersionIdV1VersionsTenantSlugProjectIdByVersionVersionIdGet,
   getVersionChangeReportV1VersionsTenantSlugProjectIdVersionRecordIdChangeReportGet,
@@ -46,6 +53,8 @@ import {
   patchVersionTagV1VersionTagsTenantSlugProjectIdTagIdPatch,
   previewChangeReportForPublishV1VersionsTenantSlugProjectIdVersionRecordIdChangeReportPublishPreviewPost,
   publishVersionV1VersionsTenantSlugProjectIdVersionRecordIdPublishPost,
+  rollbackSpecImportJobV1TenantsTenantSlugImportsJobIdRollbackPost,
+  startSpecImportJsonV1TenantsTenantSlugImportsPost,
   verifyTenantAccessV1TenantsTenantSlugHead,
 } from "../generated/operations.js";
 
@@ -65,6 +74,11 @@ export type {
   CompatibilityCheckResponse,
   ProjectCreateRequest,
   ProjectSchema,
+  SpecImportCommitResponse,
+  SpecImportJobAccepted,
+  SpecImportJobStatus,
+  SpecImportRollbackResponse,
+  SpecImportStartJsonRequest,
   VersionChangeReportOut,
   VersionCreateRequest,
   VersionPublishChangeReportPreviewOut,
@@ -173,6 +187,13 @@ export type ObjectifiedApi = {
   listMyTenantsPage(limit: number, offset: number): Promise<TenantsMeResponse>;
   getTenantInfo(tenantSlug: string): Promise<TenantInfoResponse>;
   verifyTenantAccess(tenantSlug: string): Promise<void>;
+  startSpecImportJson(
+    tenantSlug: string,
+    body: SpecImportStartJsonRequest,
+  ): Promise<SpecImportJobAccepted>;
+  getSpecImportStatus(tenantSlug: string, jobId: string): Promise<SpecImportJobStatus>;
+  commitSpecImportJob(tenantSlug: string, jobId: string): Promise<SpecImportCommitResponse>;
+  rollbackSpecImportJob(tenantSlug: string, jobId: string): Promise<SpecImportRollbackResponse>;
   listPublicBrowseTenants(opts?: {
     search?: string;
     sort?: "latest" | "name" | "projects";
@@ -603,11 +624,7 @@ function parseVersionTagSinglePayload(data: unknown, ctx: string): VersionTagSch
     });
   }
   const v = data as Record<string, unknown>;
-  if (
-    typeof v.id !== "string" ||
-    typeof v.name !== "string" ||
-    typeof v.version_id !== "string"
-  ) {
+  if (typeof v.id !== "string" || typeof v.name !== "string" || typeof v.version_id !== "string") {
     throw new ObjectifiedCliError({
       message: "Invalid version tag fields in response.",
       exitCode: EXIT_CODES.VALIDATION,
@@ -1063,6 +1080,118 @@ function parseTenantInfoPayload(data: unknown): TenantInfoResponse {
     storage_used_bytes: optInt("storage_used_bytes") ?? null,
     storage_quota_bytes: optInt("storage_quota_bytes") ?? null,
   };
+}
+
+const SPEC_IMPORT_STATES = new Set<SpecImportJobStatus["state"]>([
+  "queued",
+  "running",
+  "pending-approval",
+  "committing",
+  "completed",
+  "failed",
+  "canceled",
+  "rolled-back",
+]);
+
+function parseSpecImportJobAccepted(data: unknown): SpecImportJobAccepted {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for specification import start.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected job_id and status_path from POST …/imports.",
+    });
+  }
+  const o = data as Record<string, unknown>;
+  if (typeof o.job_id !== "string" || typeof o.status_path !== "string") {
+    throw new ObjectifiedCliError({
+      message: "Invalid specification import acceptance payload.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "job_id and status_path are required from POST …/imports.",
+    });
+  }
+  return data as SpecImportJobAccepted;
+}
+
+function parseSpecImportJobStatus(data: unknown): SpecImportJobStatus {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for specification import status.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected a SpecImportJobStatus object from GET …/imports/{job_id}.",
+    });
+  }
+  const o = data as Record<string, unknown>;
+  if (typeof o.job_id !== "string") {
+    throw new ObjectifiedCliError({
+      message: "Invalid specification import status payload.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "job_id is required from GET …/imports/{job_id}.",
+    });
+  }
+  if (
+    typeof o.state !== "string" ||
+    !SPEC_IMPORT_STATES.has(o.state as SpecImportJobStatus["state"])
+  ) {
+    throw new ObjectifiedCliError({
+      message: "Invalid specification import status state.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "State must be a known import job lifecycle value.",
+    });
+  }
+  return data as SpecImportJobStatus;
+}
+
+function parseSpecImportCommitResponse(data: unknown): SpecImportCommitResponse {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for specification import commit.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected SpecImportCommitResponse from POST …/imports/{job_id}/commit.",
+    });
+  }
+  const o = data as Record<string, unknown>;
+  if (
+    typeof o.job_id !== "string" ||
+    typeof o.project_id !== "string" ||
+    typeof o.project_slug !== "string" ||
+    typeof o.version_id !== "string" ||
+    typeof o.version_record_id !== "string"
+  ) {
+    throw new ObjectifiedCliError({
+      message: "Invalid specification import commit payload.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "job_id, project_id, project_slug, version_id, and version_record_id are required.",
+    });
+  }
+  return data as SpecImportCommitResponse;
+}
+
+function parseSpecImportRollbackResponse(data: unknown): SpecImportRollbackResponse {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for specification import rollback.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected SpecImportRollbackResponse from POST …/imports/{job_id}/rollback.",
+    });
+  }
+  const o = data as Record<string, unknown>;
+  if (typeof o.job_id !== "string") {
+    throw new ObjectifiedCliError({
+      message: "Invalid specification import rollback payload.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "job_id is required from POST …/imports/{job_id}/rollback.",
+    });
+  }
+  return data as SpecImportRollbackResponse;
 }
 
 function createInstrumentedFetch(opts: {
@@ -1780,6 +1909,96 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
       unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta);
     },
 
+    async startSpecImportJson(
+      tenantSlug: string,
+      body: SpecImportStartJsonRequest,
+    ): Promise<SpecImportJobAccepted> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await startSpecImportJsonV1TenantsTenantSlugImportsPost({
+          client: hey,
+          path: { tenant_slug: tenantSlug },
+          body,
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseSpecImportJobAccepted(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
+    async getSpecImportStatus(tenantSlug: string, jobId: string): Promise<SpecImportJobStatus> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await getSpecImportStatusV1TenantsTenantSlugImportsJobIdGet({
+          client: hey,
+          path: { tenant_slug: tenantSlug, job_id: jobId },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseSpecImportJobStatus(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
+    async commitSpecImportJob(
+      tenantSlug: string,
+      jobId: string,
+    ): Promise<SpecImportCommitResponse> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await commitSpecImportJobV1TenantsTenantSlugImportsJobIdCommitPost({
+          client: hey,
+          path: { tenant_slug: tenantSlug, job_id: jobId },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseSpecImportCommitResponse(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
+    async rollbackSpecImportJob(
+      tenantSlug: string,
+      jobId: string,
+    ): Promise<SpecImportRollbackResponse> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await rollbackSpecImportJobV1TenantsTenantSlugImportsJobIdRollbackPost({
+          client: hey,
+          path: { tenant_slug: tenantSlug, job_id: jobId },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseSpecImportRollbackResponse(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
     async listPublicBrowseTenants(opts?: {
       search?: string;
       sort?: "latest" | "name" | "projects";
@@ -1843,14 +2062,15 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
     }): Promise<BrowsePublicVersionsResponse> {
       let rawUnknown: unknown;
       try {
-        rawUnknown = await listPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGet({
-          client: hey,
-          path: { tenant_slug: opts.tenantSlug, project_slug: opts.projectSlug },
-          query: {
-            since: opts.since ?? undefined,
-          },
-          throwOnError: false,
-        });
+        rawUnknown =
+          await listPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGet({
+            client: hey,
+            path: { tenant_slug: opts.tenantSlug, project_slug: opts.projectSlug },
+            query: {
+              since: opts.since ?? undefined,
+            },
+            throwOnError: false,
+          });
       } catch (e) {
         if (e instanceof ObjectifiedCliError) throw e;
         if (e !== null && typeof e === "object" && "code" in e) {
