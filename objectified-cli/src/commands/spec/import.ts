@@ -156,16 +156,7 @@ function formatDetectedLine(kind: ImportSourceKind, doc: Record<string, unknown>
     ? (infoRaw as Record<string, unknown>)
     : undefined;
   const title = info !== undefined && typeof info.title === "string" ? info.title : "?";
-  const ver =
-    info !== undefined && typeof info.version === "string"
-      ? info.version
-      : typeof doc.openapi === "string"
-        ? doc.openapi
-        : typeof doc.swagger === "string"
-          ? doc.swagger
-          : typeof doc.arazzo === "string"
-            ? doc.arazzo
-            : "?";
+  const ver = info !== undefined && typeof info.version === "string" ? info.version : "?";
 
   if (kind === "openapi") {
     const ov = typeof doc.openapi === "string" ? doc.openapi : "?";
@@ -464,7 +455,7 @@ export default class SpecImport extends BaseCommand {
     if (!this.context.json) {
       this.output.text(`Detected: ${formatDetectedLine(sourceKind, document)}`);
       this.output.text(
-        `Target:   tenant=${tenant}, project=${project.slug} (${project.id.slice(0, 4)}…)`,
+        `Target:   tenant=${tenant}, project=${projectSlug} (${project.id.slice(0, 4)}…)`,
       );
     }
 
@@ -484,7 +475,7 @@ export default class SpecImport extends BaseCommand {
       this.output.json(job);
     }
 
-    this.finishImportJob(job, project.slug);
+    this.finishImportJob(job, projectSlug);
   }
 
   private finishImportJob(job: ImportJobResponse, projectSlug: string): void {

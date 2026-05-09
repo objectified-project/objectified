@@ -1074,13 +1074,14 @@ function parseTenantInfoPayload(data: unknown): TenantInfoResponse {
   };
 }
 
-function parseImportJobPayload(data: unknown, ctx: string): ImportJobResponse {
+function parseImportJobPayload(data: unknown, ctx: string, requestId: string | undefined): ImportJobResponse {
   if (!data || typeof data !== "object") {
     throw new ObjectifiedCliError({
       message: `Unexpected response shape for ${ctx}.`,
       exitCode: EXIT_CODES.VALIDATION,
       title: "Validation failed",
       hint: "The API returned an unexpected JSON shape; include request-id when reporting.",
+      requestId,
     });
   }
   const o = data as Record<string, unknown>;
@@ -1090,6 +1091,7 @@ function parseImportJobPayload(data: unknown, ctx: string): ImportJobResponse {
       exitCode: EXIT_CODES.VALIDATION,
       title: "Validation failed",
       hint: "Expected jobId, state, and tenantId from the imports API.",
+      requestId,
     });
   }
   if (typeof o.percent !== "number" || !Number.isFinite(o.percent)) {
@@ -1098,6 +1100,7 @@ function parseImportJobPayload(data: unknown, ctx: string): ImportJobResponse {
       exitCode: EXIT_CODES.VALIDATION,
       title: "Validation failed",
       hint: "Expected numeric percent from the imports API.",
+      requestId,
     });
   }
   return data as ImportJobResponse;
@@ -1920,6 +1923,7 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
       return parseImportJobPayload(
         unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
         "import job create",
+        lastRequestId,
       );
     },
 
@@ -1941,6 +1945,7 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
       return parseImportJobPayload(
         unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
         "import job status",
+        lastRequestId,
       );
     },
 
