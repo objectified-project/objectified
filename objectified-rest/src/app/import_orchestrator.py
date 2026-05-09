@@ -247,7 +247,14 @@ async def run_import_sidecar(
 
     saw_terminal = False
     terminal_state: Optional[str] = None
-    last_touch_at = 0.0
+    last_touch_at = asyncio.get_running_loop().time()
+
+    async def _touch_if_due() -> None:
+        nonlocal last_touch_at
+        now = asyncio.get_running_loop().time()
+        if now - last_touch_at >= 5.0:
+            await asyncio.to_thread(_db_call, "import_job_touch_updated_at", tenant_id, job_id)
+            last_touch_at = now
 
     assert proc.stdout is not None
     try:
@@ -257,10 +264,7 @@ async def run_import_sidecar(
                 break
             msg = _parse_ndjson_line(line)
             if not msg:
-                now = asyncio.get_running_loop().time()
-                if now - last_touch_at >= 5.0:
-                    await asyncio.to_thread(_db_call, "import_job_touch_updated_at", tenant_id, job_id)
-                    last_touch_at = now
+                await _touch_if_due()
                 continue
             mtype = msg.get("type")
             if mtype == "event" and isinstance(msg.get("event"), dict):
@@ -415,10 +419,7 @@ async def run_import_sidecar(
                 if finished:
                     break
             else:
-                now = asyncio.get_running_loop().time()
-                if now - last_touch_at >= 5.0:
-                    await asyncio.to_thread(_db_call, "import_job_touch_updated_at", tenant_id, job_id)
-                    last_touch_at = now
+                await _touch_if_due()
     finally:
         stop_watch.set()
         watcher.cancel()
