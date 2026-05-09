@@ -22,6 +22,7 @@ from .database import Database, ImportJobConcurrencyCaps
 _LOG = logging.getLogger(__name__)
 
 _EVENTS_CAP = 1000
+_STDERR_TAIL_CAP = 200
 
 _active_tasks: List[asyncio.Task[Any]] = []
 _stop = asyncio.Event()
@@ -108,17 +109,14 @@ def _percent_from_progress(progress: Dict[str, Any]) -> int:
     return min(100, int(100 * completed / total))
 
 
-def _workflow_audit_job(
-    db: Database,
-    tenant_id: str,
-    project_id: Optional[str],
-    version_id: Optional[str],
-    action: str,
-    outcome: str,
-    actor_id: Optional[str],
-    detail: Optional[Dict[str, Any]],
-) -> None:
-    db.insert_workflow_audit(tenant_id, project_id, version_id, action, outcome, actor_id, detail)
+def _db_call(method: str, *args: Any, **kwargs: Any) -> Any:
+    db = Database()
+    db.connect()
+    try:
+        fn = getattr(db, method)
+        return fn(*args, **kwargs)
+    finally:
+        db.close()
 
 
 async def _register_subprocess(proc: asyncio.subprocess.Process) -> None:
@@ -153,7 +151,6 @@ def _parse_ndjson_line(line: bytes) -> Optional[Dict[str, Any]]:
 
 
 async def _poll_cancel_requested(
-    db: Database,
     tenant_id: str,
     job_id: str,
     proc: asyncio.subprocess.Process,
@@ -161,7 +158,7 @@ async def _poll_cancel_requested(
 ) -> None:
     while not stop.is_set() and proc.returncode is None:
         await asyncio.sleep(0.3)
-        row = await asyncio.to_thread(db.get_import_job_row, tenant_id, job_id)
+        row = await asyncio.to_thread(_db_call, "get_import_job_row", tenant_id, job_id)
         if row and str(row.get("state")) == "canceled":
             _LOG.info(
                 "import cancel propagated",
@@ -175,11 +172,10 @@ async def _poll_cancel_requested(
 
 
 async def run_import_sidecar(
-    db: Database,
     row: Dict[str, Any],
 ) -> Tuple[int, List[str]]:
     """
-    Spawn importer subprocess; stream stdout NDJSON into ``db`` updates.
+    Spawn importer subprocess; stream stdout NDJSON into DB updates.
 
     Returns (exit_code, stderr_lines).
     """
@@ -234,13 +230,15 @@ async def run_import_sidecar(
                 break
             try:
                 stderr_tail.append(line.decode("utf-8", errors="replace").rstrip())
+                if len(stderr_tail) > _STDERR_TAIL_CAP:
+                    del stderr_tail[:-_STDERR_TAIL_CAP]
             except Exception:
                 continue
 
     stderr_task = asyncio.create_task(_drain_stderr())
 
     stop_watch = asyncio.Event()
-    watcher = asyncio.create_task(_poll_cancel_requested(db, tenant_id, job_id, proc, stop_watch))
+    watcher = asyncio.create_task(_poll_cancel_requested(tenant_id, job_id, proc, stop_watch))
 
     assert proc.stdin is not None
     proc.stdin.write(payload)
@@ -249,6 +247,7 @@ async def run_import_sidecar(
 
     saw_terminal = False
     terminal_state: Optional[str] = None
+    last_touch_at = 0.0
 
     assert proc.stdout is not None
     try:
@@ -256,13 +255,23 @@ async def run_import_sidecar(
             line = await proc.stdout.readline()
             if not line:
                 break
-            await asyncio.to_thread(db.import_job_touch_updated_at, tenant_id, job_id)
             msg = _parse_ndjson_line(line)
             if not msg:
+                now = asyncio.get_running_loop().time()
+                if now - last_touch_at >= 5.0:
+                    await asyncio.to_thread(_db_call, "import_job_touch_updated_at", tenant_id, job_id)
+                    last_touch_at = now
                 continue
             mtype = msg.get("type")
             if mtype == "event" and isinstance(msg.get("event"), dict):
-                await asyncio.to_thread(db.import_job_append_events, tenant_id, job_id, [msg["event"]], cap=_EVENTS_CAP)
+                await asyncio.to_thread(
+                    _db_call,
+                    "import_job_append_events",
+                    tenant_id,
+                    job_id,
+                    [msg["event"]],
+                    cap=_EVENTS_CAP,
+                )
                 ev = msg["event"]
                 pct = ev.get("percent") if isinstance(ev.get("percent"), int) else None
                 extra = {"job_id": job_id, "tenant_id": tenant_id, "phase": "event", "percent": pct}
@@ -270,7 +279,7 @@ async def run_import_sidecar(
             elif mtype == "progress" and isinstance(msg.get("progress"), dict):
                 prog = msg["progress"]
                 pct = _percent_from_progress(prog)
-                await asyncio.to_thread(db.import_job_set_progress, tenant_id, job_id, prog, pct)
+                await asyncio.to_thread(_db_call, "import_job_set_progress", tenant_id, job_id, prog, pct)
                 _LOG.info(
                     "import ndjson progress",
                     extra={
@@ -282,14 +291,15 @@ async def run_import_sidecar(
                     },
                 )
             elif mtype == "error" and isinstance(msg.get("code"), str):
-                cur_err = await asyncio.to_thread(db.get_import_job_row, tenant_id, job_id)
+                cur_err = await asyncio.to_thread(_db_call, "get_import_job_row", tenant_id, job_id)
                 if cur_err and str(cur_err.get("state")) == "canceled":
                     saw_terminal = True
                     terminal_state = "canceled"
                     break
                 err = {"code": msg["code"], "message": str(msg.get("message") or ""), "context": msg.get("context") or {}}
                 await asyncio.to_thread(
-                    db.import_job_apply_terminal,
+                    _db_call,
+                    "import_job_apply_terminal",
                     tenant_id,
                     job_id,
                     state="failed",
@@ -307,7 +317,7 @@ async def run_import_sidecar(
                 finished = state in ("completed", "failed", "canceled", "rolled-back")
                 pct: Optional[int] = 100 if state == "completed" else None
 
-                cur = await asyncio.to_thread(db.get_import_job_row, tenant_id, job_id)
+                cur = await asyncio.to_thread(_db_call, "get_import_job_row", tenant_id, job_id)
                 if cur and str(cur.get("state")) == "canceled":
                     saw_terminal = True
                     terminal_state = "canceled"
@@ -316,7 +326,8 @@ async def run_import_sidecar(
                 if state == "pending-approval":
                     summ = summary if isinstance(summary, dict) else {"raw": summary}
                     await asyncio.to_thread(
-                        db.import_job_apply_terminal,
+                        _db_call,
+                        "import_job_apply_terminal",
                         tenant_id,
                         job_id,
                         state="pending-approval",
@@ -330,7 +341,8 @@ async def run_import_sidecar(
                     continue
 
                 await asyncio.to_thread(
-                    db.import_job_apply_terminal,
+                    _db_call,
+                    "import_job_apply_terminal",
                     tenant_id,
                     job_id,
                     state=state,
@@ -365,7 +377,8 @@ async def run_import_sidecar(
                         blob_s = str(blob).strip() if blob else None
                         if rid:
                             await asyncio.to_thread(
-                                db.insert_tenant_repository_import_if_owned,
+                                _db_call,
+                                "insert_tenant_repository_import_if_owned",
                                 tenant_id=tenant_id,
                                 repository_id=rid,
                                 branch=branch,
@@ -375,8 +388,9 @@ async def run_import_sidecar(
                                 version_id=str(version_uuid),
                                 imported_by=str(row.get("created_by")),
                             )
-                    _workflow_audit_job(
-                        db,
+                    await asyncio.to_thread(
+                        _db_call,
+                        "insert_workflow_audit",
                         tenant_id,
                         str(project_uuid),
                         str(version_uuid),
@@ -386,8 +400,9 @@ async def run_import_sidecar(
                         {"jobId": job_id, "projectId": str(project_uuid), "versionId": str(version_uuid)},
                     )
                 elif state == "failed":
-                    _workflow_audit_job(
-                        db,
+                    await asyncio.to_thread(
+                        _db_call,
+                        "insert_workflow_audit",
                         tenant_id,
                         row.get("project_id"),
                         None,
@@ -399,6 +414,11 @@ async def run_import_sidecar(
 
                 if finished:
                     break
+            else:
+                now = asyncio.get_running_loop().time()
+                if now - last_touch_at >= 5.0:
+                    await asyncio.to_thread(_db_call, "import_job_touch_updated_at", tenant_id, job_id)
+                    last_touch_at = now
     finally:
         stop_watch.set()
         watcher.cancel()
@@ -409,12 +429,13 @@ async def run_import_sidecar(
 
     code = await proc.wait()
     if not saw_terminal:
-        cur = await asyncio.to_thread(db.get_import_job_row, tenant_id, job_id)
+        cur = await asyncio.to_thread(_db_call, "get_import_job_row", tenant_id, job_id)
         if cur and str(cur.get("state")) == "canceled":
             return code, stderr_tail
         err = {"code": "subprocess-exit", "message": f"Importer exited without terminal NDJSON (code {code})"}
         await asyncio.to_thread(
-            db.import_job_apply_terminal,
+            _db_call,
+            "import_job_apply_terminal",
             tenant_id,
             job_id,
             state="failed",
@@ -428,19 +449,18 @@ async def run_import_sidecar(
 
 
 async def _run_single_job(caps: ImportJobConcurrencyCaps, row: Dict[str, Any]) -> None:
-    db = Database()
-    db.connect()
     tenant_id = str(row["tenant_id"])
     job_id = str(row["job_id"])
     try:
-        await run_import_sidecar(db, row)
+        await run_import_sidecar(row)
     except asyncio.CancelledError:
         raise
     except Exception:
         _LOG.exception("import job crashed job_id=%s tenant_id=%s", job_id, tenant_id)
         err = {"code": "orchestrator-exception", "message": "Orchestrator crashed processing import"}
         await asyncio.to_thread(
-            db.import_job_apply_terminal,
+            _db_call,
+            "import_job_apply_terminal",
             tenant_id,
             job_id,
             state="failed",
@@ -454,9 +474,7 @@ async def _run_single_job(caps: ImportJobConcurrencyCaps, row: Dict[str, Any]) -
 async def _worker_loop(worker_id: int, caps: ImportJobConcurrencyCaps) -> None:
     log = _LOG
     while not _stop.is_set():
-        db = Database()
-        db.connect()
-        row = await asyncio.to_thread(db.claim_import_job_with_caps, caps)
+        row = await asyncio.to_thread(_db_call, "claim_import_job_with_caps", caps)
         if row is None:
             await asyncio.sleep(0.12)
             continue
