@@ -187,10 +187,30 @@ export default function ImportExecutionPanel({
         setState(status.state as JobState);
         setEvents((status.events || []) as unknown as ImportEvent[]);
       } else {
-        const status = await getImportJobStatus(jobId);
-        setState(status.state as JobState);
-        setPercent(status.percent || 0);
-        setEvents((status.events || []) as unknown as ImportEvent[]);
+        // Poll (1 s intervals, max 5 min) until the job reaches a terminal state after commit.
+        const MAX_POLL_MS = 5 * 60 * 1000;
+        const pollStart = Date.now();
+        let terminalState: JobState | null = null;
+        while (terminalState === null) {
+          const status = await getImportJobStatus(jobId);
+          const currentState = status.state as JobState;
+          setState(currentState);
+          setPercent(status.percent || 0);
+          setProgress(status.progress as ProgressInfo | undefined);
+          setEvents((status.events || []) as unknown as ImportEvent[]);
+          setSummary(status.summary || null);
+          if (['completed', 'failed', 'canceled', 'rolled-back'].includes(currentState)) {
+            terminalState = currentState;
+          } else if (Date.now() - pollStart >= MAX_POLL_MS) {
+            console.error('Commit polling timed out waiting for terminal state');
+            terminalState = 'failed';
+          } else {
+            await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+          }
+        }
+        if (onComplete) {
+          onComplete(terminalState === 'completed');
+        }
       }
     } catch (e) {
       console.error('Failed to commit:', e);
