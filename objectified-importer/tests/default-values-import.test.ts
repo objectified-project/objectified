@@ -5,8 +5,7 @@
  * - Recurses into children and array items.
  */
 
-import { describe, it, expect } from '@jest/globals';
-import { openApiImporter } from '../../lib/importers/openapi';
+import { openApiImporter } from '../src/parsers/openapi';
 
 describe('#758 Default values during import', () => {
   it('sets default for properties that have no default', () => {

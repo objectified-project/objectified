@@ -4,10 +4,11 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "test": "yarn workspace objectified-cli test && yarn workspace objectified-mcp test && yarn workspace objectified-ui test && yarn workspace objectified-web test"
+    "test": "yarn workspace objectified-cli test && yarn workspace objectified-mcp test && yarn workspace objectified-importer test && yarn workspace objectified-ui test && yarn workspace objectified-web test"
   },
   "workspaces": [
     "objectified-cli",
+    "objectified-importer",
     "objectified-mcp",
     "objectified-ui",
     "objectified-browse",

@@ -18,7 +18,7 @@ import {
   Undo2
 } from 'lucide-react';
 import { getImportStatus, rollbackCompletedImport } from '../../../../../lib/db/import-actions';
-import { buildImportErrorReport, getImportErrorReportFilename, type ImportStatusForReport } from '../../../../../lib/db/import-error-report';
+import { buildImportErrorReport, getImportErrorReportFilename, type ImportStatusForReport } from 'objectified-importer';
 
 interface ImportCompletePanelProps {
   jobId: string;

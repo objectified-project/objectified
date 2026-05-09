@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '../../ui/Dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/Collapsible';
-import { collectExternalTypeKeysFromDocument } from '../../../../../lib/importers/openapi';
+import { collectExternalTypeKeysFromDocument } from 'objectified-importer';
 import { Button } from '../../ui/Button';
 import { analyzeSpecification, AnalysisResult, extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
 import { importClassesToVersion, ImportClassesResult } from '../../../../../lib/db/class-import-actions';

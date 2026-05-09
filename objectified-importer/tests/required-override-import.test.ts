@@ -4,8 +4,7 @@
  * Applied before naming convention; keys use original schema and property names.
  */
 
-import { describe, it, expect } from '@jest/globals';
-import { openApiImporter } from '../../lib/importers/openapi';
+import { openApiImporter } from '../src/parsers/openapi';
 
 describe('#759 Required field override for imported properties', () => {
   it('applies required override: make optional property required', () => {

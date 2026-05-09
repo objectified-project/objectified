@@ -1,11 +1,11 @@
 'use server';
 
 import { createClass, addPropertyToClass, updateClass, getClassesForVersion, getClassWithPropertiesAndTags, deleteClassPropertiesForClass } from './helper';
-import { getImporter, NormalizedClass, type NormalizedProperty } from '../importers';
+import { getImporter, NormalizedClass, type NormalizedProperty } from 'objectified-importer';
 import { cookies } from 'next/headers';
 import { mergeClasses, type MergeStrategy, type ArrayMergeStrategy } from '../../src/app/utils/schema-merge';
 import { extractPaths, extractSecuritySchemes } from '../../src/app/utils/openapi-import';
-import { importOpenAPIPathsAndSecurity } from './import-openapi-paths-security';
+import { importOpenAPIPathsAndSecurity } from 'objectified-importer/server';
 
 export interface ImportClassesInput {
   versionId: string;

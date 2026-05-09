@@ -2374,7 +2374,7 @@ export async function importProjectFromOpenAPI(
 
     // Import paths and security schemes (OpenAPI 3.1 pathing + components.securitySchemes) - #425
     if (options?.paths?.length || options?.securitySchemes?.length) {
-      const { importOpenAPIPathsAndSecurity } = await import('./import-openapi-paths-security');
+      const { importOpenAPIPathsAndSecurity } = await import('objectified-importer/server');
       const pathResult = await importOpenAPIPathsAndSecurity(
         version.id,
         options.paths ?? [],

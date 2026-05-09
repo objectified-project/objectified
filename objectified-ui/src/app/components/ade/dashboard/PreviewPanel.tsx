@@ -6,7 +6,7 @@ import * as Checkbox from '@radix-ui/react-checkbox';
 import { AnalysisResult } from '../../../utils/openapi-analyzer';
 import { buildSchemaTree, buildRelationshipDiagramEdges, extractSchemaReferences, getSchemaType, getSchemaTags, type SchemaTreeNode, type SchemaDisplayType } from '../../../utils/schema-tree-utils';
 import { getSmartClassName } from '../../../../../lib/schema-context-naming';
-import { collectExternalTypeKeysFromDocument } from '../../../../../lib/importers/openapi';
+import { collectExternalTypeKeysFromDocument } from 'objectified-importer';
 import { extractDirectProperties } from '../../../utils/openapi-import';
 import { generateSlug } from '../../../utils/slug';
 import YAML from 'yaml';

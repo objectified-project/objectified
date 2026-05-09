@@ -4,8 +4,7 @@
  * example (by type/format). Existing examples are preserved; $refs are skipped.
  */
 
-import { describe, it, expect } from '@jest/globals';
-import { openApiImporter } from '../../lib/importers/openapi';
+import { openApiImporter } from '../src/parsers/openapi';
 
 describe('#761 Generate examples during property import', () => {
   it('does not add examples when generateExamples is false', () => {

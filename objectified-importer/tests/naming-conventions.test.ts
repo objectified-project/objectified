@@ -12,8 +12,8 @@ import {
   detectNamingConvention,
   applyNamingConventionToClass,
   applyNamingConventionToClasses,
-} from '../src/app/utils/naming-conventions';
-import { openApiImporter } from '../lib/importers/openapi';
+} from '@/app/utils/naming-conventions';
+import { openApiImporter } from '../src/parsers/openapi';
 
 describe('naming-conventions (#581)', () => {
   describe('convertToNamingConvention', () => {

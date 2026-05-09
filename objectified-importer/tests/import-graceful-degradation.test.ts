@@ -6,7 +6,6 @@
  * - Verification failure: verification mismatches → do not throw, emit VERIFY_MISMATCHES warn, reach pending-approval
  */
 
-import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 
 // Track addPropertyToClassTx call count for "fail on Nth call" behavior
 let addPropertyToClassTxCallCount = 0;
@@ -15,28 +14,28 @@ let addPropertyToClassTxFailOnCall: number | null = null;
 // Control getClassesWithPropertiesAndTagsTx response for verification tests
 let getClassesWithPropertiesAndTagsTxReturnsMismatch = false;
 
-const mockClient = { query: jest.fn(), release: jest.fn() };
+const mockClient = { query: vi.fn(), release: vi.fn() };
 
-jest.mock('../lib/db/import-transaction', () => ({
-  getTransactionClient: jest.fn(() => Promise.resolve(mockClient)),
-  beginTransaction: jest.fn(() => Promise.resolve()),
-  commitTransaction: jest.fn(() => Promise.resolve()),
-  rollbackTransaction: jest.fn(() => Promise.resolve()),
-  releaseClient: jest.fn(() => Promise.resolve()),
-  createProjectTx: jest.fn(() =>
+vi.mock('../src/engine/import-transaction', () => ({
+  getTransactionClient: vi.fn(() => Promise.resolve(mockClient)),
+  beginTransaction: vi.fn(() => Promise.resolve()),
+  commitTransaction: vi.fn(() => Promise.resolve()),
+  rollbackTransaction: vi.fn(() => Promise.resolve()),
+  releaseClient: vi.fn(() => Promise.resolve()),
+  createProjectTx: vi.fn(() =>
     Promise.resolve(JSON.stringify({ success: true, project: { id: 'proj-1' } }))
   ),
-  createVersionTx: jest.fn(() =>
+  createVersionTx: vi.fn(() =>
     Promise.resolve(JSON.stringify({ success: true, version: { id: 'ver-1' } }))
   ),
-  createPropertyTx: jest.fn((_client: any, _projectId: string, _name: string, _desc: any, data: any) => {
+  createPropertyTx: vi.fn((_client: any, _projectId: string, _name: string, _desc: any, data: any) => {
     const id = 'prop-' + JSON.stringify(data).length;
     return Promise.resolve(JSON.stringify({ success: true, property: { id } }));
   }),
-  createClassTx: jest.fn(() =>
+  createClassTx: vi.fn(() =>
     Promise.resolve(JSON.stringify({ success: true, class: { id: 'class-1' } }))
   ),
-  addPropertyToClassTx: jest.fn(async () => {
+  addPropertyToClassTx: vi.fn(async () => {
     addPropertyToClassTxCallCount++;
     if (addPropertyToClassTxFailOnCall !== null && addPropertyToClassTxCallCount === addPropertyToClassTxFailOnCall) {
       return Promise.resolve(
@@ -47,7 +46,7 @@ jest.mock('../lib/db/import-transaction', () => ({
       JSON.stringify({ success: true, classProperty: { id: 'cp-' + addPropertyToClassTxCallCount } })
     );
   }),
-  getClassesWithPropertiesAndTagsTx: jest.fn(async () => {
+  getClassesWithPropertiesAndTagsTx: vi.fn(async () => {
     if (getClassesWithPropertiesAndTagsTxReturnsMismatch) {
       return Promise.resolve(JSON.stringify([])); // No classes → verification will find missing_class
     }
@@ -64,8 +63,8 @@ jest.mock('../lib/db/import-transaction', () => ({
       ])
     );
   }),
-  getLatestVersionUuidForProjectTx: jest.fn(() => Promise.resolve(null)),
-  listProjectLibraryPropertiesTx: jest.fn(() => Promise.resolve([])),
+  getLatestVersionUuidForProjectTx: vi.fn(() => Promise.resolve(null)),
+  listProjectLibraryPropertiesTx: vi.fn(() => Promise.resolve([])),
 }));
 
 // Normalized class: two properties with different types so we get two addPropertyToClassTx calls
@@ -84,8 +83,8 @@ const mockNormalizeResult = {
   warnings: [] as string[]
 };
 
-jest.mock('../lib/importers', () => ({
-  getImporter: jest.fn(() => ({
+vi.mock('../src/parsers/index', () => ({
+  getImporter: vi.fn(() => ({
     kind: 'openapi',
     normalize: () => mockNormalizeResult
   })),
@@ -128,13 +127,13 @@ describe('Import Graceful Degradation (#733)', () => {
   });
 
   afterEach(() => {
-    jest.resetModules();
+    vi.resetModules();
   });
 
   test('when addPropertyToClassTx fails for one property: emits PROPERTY_LINK_FAILED warn and reaches pending-approval', async () => {
     addPropertyToClassTxFailOnCall = 2; // Fail on second property link
 
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(validInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -152,7 +151,7 @@ describe('Import Graceful Degradation (#733)', () => {
   test('when verification fails (mismatches): does not throw, emits VERIFY_MISMATCHES warn and reaches pending-approval', async () => {
     getClassesWithPropertiesAndTagsTxReturnsMismatch = true; // DB "returns" no classes → verification finds missing_class
 
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(validInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -168,7 +167,7 @@ describe('Import Graceful Degradation (#733)', () => {
   });
 
   test('when no non-critical errors: reaches pending-approval and completes without critical failure', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(validInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -181,7 +180,7 @@ describe('Import Graceful Degradation (#733)', () => {
   });
 
   test('critical error (missing tenantId) throws and does not start job', async () => {
-    const { startImport } = await import('../lib/db/import-helper');
+    const { startImport } = await import('../src/engine/import-helper');
 
     await expect(
       startImport({ ...validInput, tenantId: '' })

@@ -30,7 +30,7 @@ jest.mock('next/headers', () => ({
 }));
 
 const mockNormalize = jest.fn();
-jest.mock('../../lib/importers', () => ({
+jest.mock('objectified-importer', () => ({
   getImporter: jest.fn(() => ({ normalize: (input: unknown) => mockNormalize(input) })),
 }));
 

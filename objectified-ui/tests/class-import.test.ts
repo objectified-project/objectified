@@ -10,7 +10,7 @@ jest.mock('../lib/db/helper', () => ({
 }));
 
 // Mock the importers module
-jest.mock('../lib/importers', () => ({
+jest.mock('objectified-importer', () => ({
   getImporter: jest.fn(() => ({
     normalize: jest.fn((_input: { document: any; options: any }) => ({
       classes: [

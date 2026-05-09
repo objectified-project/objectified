@@ -4,7 +4,7 @@
  * #593: Selective merge — per-property strategy via propertyMergeStrategies (schema key → property path → strategy).
  */
 
-import type { NormalizedClass, NormalizedProperty } from '../../../lib/importers';
+import type { NormalizedClass, NormalizedProperty } from 'objectified-importer';
 
 export type MergeStrategy = 'additive' | 'override';
 

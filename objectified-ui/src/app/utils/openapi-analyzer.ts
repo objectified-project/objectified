@@ -13,7 +13,7 @@ import { convertRAMLToOpenAPI, isRAML } from './raml-converter';
 import { convertProtobufToOpenAPI, isProtobuf } from './protobuf-converter';
 import { convertAvroToOpenAPI, isAvroSchemaObject } from './avro-converter';
 import { convertThriftToOpenAPI, isThrift } from './thrift-converter';
-import { inferArazzoSchemasFromWorkflows } from '../../../lib/importers/arazzo';
+import { inferArazzoSchemasFromWorkflows } from 'objectified-importer';
 import { letterGradeFromOverallPercent } from './numeric-score-tier';
 
 export interface AnalysisResult {

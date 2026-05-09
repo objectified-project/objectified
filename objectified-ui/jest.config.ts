@@ -28,6 +28,8 @@ const config: Config = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@lib/(.*)$': '<rootDir>/lib/$1',
+    '^objectified-importer$': '<rootDir>/../objectified-importer/src/browser.ts',
+    '^objectified-importer/server$': '<rootDir>/../objectified-importer/src/server.ts',
     '^react-markdown$': '<rootDir>/tests/__mocks__/react-markdown.tsx',
     '^remark-gfm$': '<rootDir>/tests/__mocks__/remark-gfm.ts',
     '^rehype-raw$': '<rootDir>/tests/__mocks__/rehype-raw.ts',
