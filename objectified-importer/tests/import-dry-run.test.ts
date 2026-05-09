@@ -8,26 +8,25 @@
  * - getTransactionClient and beginTransaction are never called
  */
 
-import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 
-const mockGetTransactionClient = jest.fn();
-const mockBeginTransaction = jest.fn();
-const mockClient = { query: jest.fn(), release: jest.fn() };
+const mockGetTransactionClient = vi.fn();
+const mockBeginTransaction = vi.fn();
+const mockClient = { query: vi.fn(), release: vi.fn() };
 
-jest.mock('../lib/db/import-transaction', () => ({
+vi.mock('../src/engine/import-transaction', () => ({
   getTransactionClient: (...args: any[]) => mockGetTransactionClient(...args),
   beginTransaction: (...args: any[]) => mockBeginTransaction(...args),
-  commitTransaction: jest.fn(),
-  rollbackTransaction: jest.fn(),
-  releaseClient: jest.fn(),
-  createProjectTx: jest.fn(),
-  createVersionTx: jest.fn(),
-  createPropertyTx: jest.fn(),
-  createClassTx: jest.fn(),
-  addPropertyToClassTx: jest.fn(),
-  getClassesWithPropertiesAndTagsTx: jest.fn(),
-  getLatestVersionUuidForProjectTx: jest.fn(() => Promise.resolve(null)),
-  listProjectLibraryPropertiesTx: jest.fn(() => Promise.resolve([])),
+  commitTransaction: vi.fn(),
+  rollbackTransaction: vi.fn(),
+  releaseClient: vi.fn(),
+  createProjectTx: vi.fn(),
+  createVersionTx: vi.fn(),
+  createPropertyTx: vi.fn(),
+  createClassTx: vi.fn(),
+  addPropertyToClassTx: vi.fn(),
+  getClassesWithPropertiesAndTagsTx: vi.fn(),
+  getLatestVersionUuidForProjectTx: vi.fn(() => Promise.resolve(null)),
+  listProjectLibraryPropertiesTx: vi.fn(() => Promise.resolve([])),
 }));
 
 const mockNormalizeResult = {
@@ -54,8 +53,8 @@ const mockNormalizeResult = {
   warnings: [] as string[],
 };
 
-jest.mock('../lib/importers', () => ({
-  getImporter: jest.fn(() => ({
+vi.mock('../src/parsers/index', () => ({
+  getImporter: vi.fn(() => ({
     kind: 'openapi',
     normalize: () => mockNormalizeResult,
   })),
@@ -102,11 +101,11 @@ describe('Import Dry Run (#729)', () => {
   });
 
   afterEach(() => {
-    jest.resetModules();
+    vi.resetModules();
   });
 
   test('dry run completes with state completed and summary.dryRun true', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(dryRunInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -117,7 +116,7 @@ describe('Import Dry Run (#729)', () => {
   });
 
   test('dry run does not create project or version (no result IDs)', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(dryRunInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -128,7 +127,7 @@ describe('Import Dry Run (#729)', () => {
   });
 
   test('dry run does not call getTransactionClient or beginTransaction', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(dryRunInput);
 
     await waitForJobEnd(getImportStatus, jobId);
@@ -138,7 +137,7 @@ describe('Import Dry Run (#729)', () => {
   });
 
   test('dry run emits DRY_RUN and DRY_RUN_COMPLETE events', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(dryRunInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -153,7 +152,7 @@ describe('Import Dry Run (#729)', () => {
   });
 
   test('dry run summary contains expected class and property counts', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(dryRunInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -170,7 +169,7 @@ describe('Import Dry Run (#729)', () => {
   });
 
   test('dry run percent reaches 100', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(dryRunInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -180,7 +179,7 @@ describe('Import Dry Run (#729)', () => {
 
   test('dry run with empty selectedSchemas still runs and completes', async () => {
     const input = { ...dryRunInput, options: { selectedSchemas: [], dryRun: true } };
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(input);
 
     const status = await waitForJobEnd(getImportStatus, jobId);

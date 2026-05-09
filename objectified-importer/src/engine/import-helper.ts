@@ -1,5 +1,3 @@
-'use server';
-
 import {
   PoolClient,
   getTransactionClient,
@@ -16,12 +14,12 @@ import {
   getLatestVersionUuidForProjectTx,
   listProjectLibraryPropertiesTx,
 } from './import-transaction';
-import { ImportSourceKind, getImporter, NormalizedClass, NormalizedProperty } from '../importers';
-import { withRetry } from '../retry';
-import { permanentDeleteProject } from './helper';
-import { extractPaths, extractSecuritySchemes } from '../../src/app/utils/openapi-import';
+import { ImportSourceKind, getImporter, NormalizedClass, NormalizedProperty } from '../parsers/index';
+import { withRetry } from '../../../objectified-ui/lib/retry';
+import { permanentDeleteProject } from '../../../objectified-ui/lib/db/helper';
+import { extractPaths, extractSecuritySchemes } from '../../../objectified-ui/src/app/utils/openapi-import';
 import { importOpenAPIPathsAndSecurity } from './import-openapi-paths-security';
-import { recordTenantRepositoryImport } from './repository-import-metrics';
+import { recordTenantRepositoryImport } from '../../../objectified-ui/lib/db/repository-import-metrics';
 
 export type ImportJobState = 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
 

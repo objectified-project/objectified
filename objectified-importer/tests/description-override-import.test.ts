@@ -4,8 +4,7 @@
  * Empty string clears the description. Applied before naming convention.
  */
 
-import { describe, it, expect } from '@jest/globals';
-import { openApiImporter } from '../../lib/importers/openapi';
+import { openApiImporter } from '../src/parsers/openapi';
 
 describe('#760 Property description override during import', () => {
   it('applies description override: add description to property without one', () => {

@@ -1,6 +1,6 @@
 'use server';
 
-import * as importHelper from './import-helper';
+import * as importHelper from 'objectified-importer/server';
 
 export async function startImport(input: importHelper.ImportJobInput) {
   return importHelper.startImport(input);
@@ -30,5 +30,5 @@ export async function retryImport(jobId: string) {
   return importHelper.retryImport(jobId);
 }
 
-export type { ImportJobInput, ImportStatus, ImportEvent, ProgressEvent, ImportJobState, ImportLogLevel } from './import-helper';
+export type { ImportJobInput, ImportStatus, ImportEvent, ProgressEvent, ImportJobState, ImportLogLevel } from 'objectified-importer/server';
 

@@ -9,28 +9,27 @@
  * - transactionPending remains false (no pending-approval step)
  */
 
-import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 
-const mockGetTransactionClient = jest.fn();
-const mockBeginTransaction = jest.fn();
-const mockCommitTransaction = jest.fn();
-const mockRollbackTransaction = jest.fn();
-const mockReleaseClient = jest.fn();
-const mockCreateProjectTx = jest.fn();
-const mockCreateVersionTx = jest.fn();
-const mockCreatePropertyTx = jest.fn();
-const mockCreateClassTx = jest.fn();
-const mockAddPropertyToClassTx = jest.fn();
-const mockGetClassesWithPropertiesAndTagsTx = jest.fn();
-const mockGetLatestVersionUuidForProjectTx = jest.fn(() => Promise.resolve(null));
-const mockListProjectLibraryPropertiesTx = jest.fn(() => Promise.resolve([]));
+const mockGetTransactionClient = vi.fn();
+const mockBeginTransaction = vi.fn();
+const mockCommitTransaction = vi.fn();
+const mockRollbackTransaction = vi.fn();
+const mockReleaseClient = vi.fn();
+const mockCreateProjectTx = vi.fn();
+const mockCreateVersionTx = vi.fn();
+const mockCreatePropertyTx = vi.fn();
+const mockCreateClassTx = vi.fn();
+const mockAddPropertyToClassTx = vi.fn();
+const mockGetClassesWithPropertiesAndTagsTx = vi.fn();
+const mockGetLatestVersionUuidForProjectTx = vi.fn(() => Promise.resolve(null));
+const mockListProjectLibraryPropertiesTx = vi.fn(() => Promise.resolve([]));
 
 // When set, createClassTx will return failure for this class name (simulate one class failing)
 let createClassTxFailForClassName: string | null = null;
 
-const mockClient = { query: jest.fn(), release: jest.fn() };
+const mockClient = { query: vi.fn(), release: vi.fn() };
 
-jest.mock('../lib/db/import-transaction', () => ({
+vi.mock('../src/engine/import-transaction', () => ({
   getTransactionClient: (...args: any[]) => mockGetTransactionClient(...args),
   beginTransaction: (...args: any[]) => mockBeginTransaction(...args),
   commitTransaction: (...args: any[]) => mockCommitTransaction(...args),
@@ -73,8 +72,8 @@ const mockNormalizeResult = {
   warnings: [] as string[],
 };
 
-jest.mock('../lib/importers', () => ({
-  getImporter: jest.fn(() => ({
+vi.mock('../src/parsers/index', () => ({
+  getImporter: vi.fn(() => ({
     kind: 'openapi',
     normalize: () => mockNormalizeResult,
   })),
@@ -166,11 +165,11 @@ describe('Import Incremental Mode (#730)', () => {
   });
 
   afterEach(() => {
-    jest.resetModules();
+    vi.resetModules();
   });
 
   test('incremental mode completes with state completed and summary.incrementalMode true', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(incrementalInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -181,7 +180,7 @@ describe('Import Incremental Mode (#730)', () => {
   });
 
   test('incremental mode sets result with projectId and versionId', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(incrementalInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -192,7 +191,7 @@ describe('Import Incremental Mode (#730)', () => {
   });
 
   test('incremental mode does not set transactionPending (no pending-approval)', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(incrementalInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -202,7 +201,7 @@ describe('Import Incremental Mode (#730)', () => {
   });
 
   test('incremental mode emits INCREMENTAL_MODE and INCREMENTAL_COMPLETE events', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(incrementalInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -218,7 +217,7 @@ describe('Import Incremental Mode (#730)', () => {
   });
 
   test('incremental mode calls getTransactionClient and releaseClient', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(incrementalInput);
 
     await waitForJobEnd(getImportStatus, jobId);
@@ -228,7 +227,7 @@ describe('Import Incremental Mode (#730)', () => {
   });
 
   test('incremental mode uses per-class transaction (begin/commit per class)', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(incrementalInput);
 
     await waitForJobEnd(getImportStatus, jobId);
@@ -241,7 +240,7 @@ describe('Import Incremental Mode (#730)', () => {
   });
 
   test('incremental mode summary has classesCreated and totalTime', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(incrementalInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -255,7 +254,7 @@ describe('Import Incremental Mode (#730)', () => {
   test('when one class fails in incremental mode: job still completes, failed class skipped', async () => {
     createClassTxFailForClassName = 'Product';
 
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(incrementalInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -273,7 +272,7 @@ describe('Import Incremental Mode (#730)', () => {
   test('when one class fails in incremental mode: rollback called for that class only', async () => {
     createClassTxFailForClassName = 'Product';
 
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(incrementalInput);
 
     await waitForJobEnd(getImportStatus, jobId);
@@ -286,7 +285,7 @@ describe('Import Incremental Mode (#730)', () => {
   test('when one class fails in incremental mode: CLASS_FAILED event emitted', async () => {
     createClassTxFailForClassName = 'Product';
 
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(incrementalInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -312,7 +311,7 @@ describe('Import Incremental Mode (#730)', () => {
   });
 
   test('incrementalMode false (transaction mode) reaches pending-approval', async () => {
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(transactionModeInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -328,7 +327,7 @@ describe('Import Incremental Mode (#730)', () => {
       options: { ...incrementalInput.options, dryRun: true },
     };
 
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(dryRunIncrementalInput);
 
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -351,7 +350,7 @@ describe('Import Incremental Mode (#730)', () => {
       existingProjectId: 'already-created-project',
     };
 
-    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(inputWithExisting);
 
     await waitForJobEnd(getImportStatus, jobId);

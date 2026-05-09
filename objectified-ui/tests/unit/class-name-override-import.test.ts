@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { openApiImporter } from '../../lib/importers/openapi';
+import { openApiImporter } from 'objectified-importer';
 import { getSmartClassName } from '../../lib/schema-context-naming';
 
 describe('#754 Custom name override for imported classes', () => {

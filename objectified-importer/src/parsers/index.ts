@@ -87,4 +87,6 @@ registerImporter(openApiImporter);
 registerImporter(arazzoImporter);
 
 export { openApiImporter, arazzoImporter };
+export { collectExternalTypeKeysFromDocument, getExternalTypeKey } from './openapi';
+export { inferArazzoSchemasFromWorkflows } from './arazzo';
 

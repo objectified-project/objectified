@@ -1,7 +1,7 @@
 import { Importer, ImportSourceKind, NormalizeOptions, NormalizeResult, NormalizedClass, NormalizedProperty } from './index';
-import { applyNamingConventionToClasses } from '../../src/app/utils/naming-conventions';
-import { extractDirectProperties } from '../../src/app/utils/openapi-schema-direct-properties';
-import { getSmartClassName } from '../schema-context-naming';
+import { applyNamingConventionToClasses } from '../../../objectified-ui/src/app/utils/naming-conventions';
+import { extractDirectProperties } from '../../../objectified-ui/src/app/utils/openapi-schema-direct-properties';
+import { getSmartClassName } from '../../../objectified-ui/lib/schema-context-naming';
 import { collectReservedNameWarnings } from './reserved-names';
 
 /** Build external type key from property data for type mapping (#757). Returns null for refs or missing type. */

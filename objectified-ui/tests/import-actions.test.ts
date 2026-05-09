@@ -7,10 +7,9 @@
  */
 
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
-import type { ImportJobInput, ImportStatus } from '../lib/db/import-helper';
+import type { ImportJobInput, ImportStatus } from 'objectified-importer/server';
 
-// Mock the import-helper module
-jest.mock('../lib/db/import-helper', () => ({
+jest.mock('objectified-importer/server', () => ({
   startImport: jest.fn(),
   getImportStatus: jest.fn(),
   cancelImport: jest.fn(),
@@ -102,7 +101,7 @@ describe('Import Actions - Type Exports', () => {
 describe('Import Actions - startImport Integration', () => {
   test('should call import-helper startImport with correct parameters', async () => {
     const { startImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockInput: ImportJobInput = {
       tenantId: 'tenant-123',
@@ -136,7 +135,7 @@ describe('Import Actions - startImport Integration', () => {
 
   test('should handle startImport errors gracefully', async () => {
     const { startImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockInput: ImportJobInput = {
       tenantId: 'test',
@@ -156,7 +155,7 @@ describe('Import Actions - startImport Integration', () => {
 
   test('should pass through all import options', async () => {
     const { startImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockInput: ImportJobInput = {
       tenantId: 'tenant-123',
@@ -193,7 +192,7 @@ describe('Import Actions - startImport Integration', () => {
 
   test('should pass dryRun: true to import-helper for preview-only import (#729)', async () => {
     const { startImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockInput: ImportJobInput = {
       tenantId: 'tenant-123',
@@ -226,7 +225,7 @@ describe('Import Actions - startImport Integration', () => {
 
   test('should pass incrementalMode: true to import-helper for incremental import (#730)', async () => {
     const { startImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockInput: ImportJobInput = {
       tenantId: 'tenant-123',
@@ -263,7 +262,7 @@ describe('Import Actions - startImport Integration', () => {
 describe('Import Actions - getImportStatus Integration', () => {
   test('should call import-helper getImportStatus with jobId', async () => {
     const { getImportStatus } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockStatus: ImportStatus = {
       jobId: 'job-123',
@@ -299,7 +298,7 @@ describe('Import Actions - getImportStatus Integration', () => {
 
   test('should handle queued state', async () => {
     const { getImportStatus } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockStatus: ImportStatus = {
       jobId: 'job-queued',
@@ -318,7 +317,7 @@ describe('Import Actions - getImportStatus Integration', () => {
 
   test('should handle completed state with summary', async () => {
     const { getImportStatus } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockStatus: ImportStatus = {
       jobId: 'job-complete',
@@ -343,7 +342,7 @@ describe('Import Actions - getImportStatus Integration', () => {
 
   test('should handle failed state with error events', async () => {
     const { getImportStatus } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockStatus: ImportStatus = {
       jobId: 'job-failed',
@@ -371,7 +370,7 @@ describe('Import Actions - getImportStatus Integration', () => {
 
   test('should handle canceled state', async () => {
     const { getImportStatus } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockStatus: ImportStatus = {
       jobId: 'job-canceled',
@@ -397,7 +396,7 @@ describe('Import Actions - getImportStatus Integration', () => {
 
   test('should handle non-existent job', async () => {
     const { getImportStatus } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockStatus: ImportStatus = {
       jobId: 'job-nonexistent',
@@ -425,7 +424,7 @@ describe('Import Actions - getImportStatus Integration', () => {
 describe('Import Actions - cancelImport Integration', () => {
   test('should call import-helper cancelImport with jobId', async () => {
     const { cancelImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.cancelImport as jest.Mock).mockResolvedValue({ success: true });
 
@@ -437,7 +436,7 @@ describe('Import Actions - cancelImport Integration', () => {
 
   test('should handle successful cancellation', async () => {
     const { cancelImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.cancelImport as jest.Mock).mockResolvedValue({ success: true });
 
@@ -448,7 +447,7 @@ describe('Import Actions - cancelImport Integration', () => {
 
   test('should handle failed cancellation', async () => {
     const { cancelImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.cancelImport as jest.Mock).mockResolvedValue({ success: false });
 
@@ -459,7 +458,7 @@ describe('Import Actions - cancelImport Integration', () => {
 
   test('should handle cancellation of already completed job', async () => {
     const { cancelImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     // Job already completed, cancellation returns false
     (importHelper.cancelImport as jest.Mock).mockResolvedValue({ success: false });
@@ -473,7 +472,7 @@ describe('Import Actions - cancelImport Integration', () => {
 describe('Import Actions - retryImport (error recovery)', () => {
   test('should call import-helper retryImport with jobId', async () => {
     const { retryImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.retryImport as jest.Mock).mockResolvedValue({ success: true, jobId: 'job-new-123' });
 
@@ -486,7 +485,7 @@ describe('Import Actions - retryImport (error recovery)', () => {
 
   test('should return new jobId on successful retry', async () => {
     const { retryImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.retryImport as jest.Mock).mockResolvedValue({ success: true, jobId: 'job-retry-789' });
 
@@ -497,7 +496,7 @@ describe('Import Actions - retryImport (error recovery)', () => {
 
   test('should return error when job not found', async () => {
     const { retryImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.retryImport as jest.Mock).mockResolvedValue({ success: false, error: 'Job not found' });
 
@@ -510,7 +509,7 @@ describe('Import Actions - retryImport (error recovery)', () => {
 
   test('should return error when job state does not allow retry', async () => {
     const { retryImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.retryImport as jest.Mock).mockResolvedValue({
       success: false,
@@ -525,7 +524,7 @@ describe('Import Actions - retryImport (error recovery)', () => {
 
   test('should propagate retryImport errors', async () => {
     const { retryImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.retryImport as jest.Mock).mockRejectedValue(new Error('Failed to start retry'));
 
@@ -543,7 +542,7 @@ describe('Import Actions - Server Action Behavior', () => {
 
   test('should delegate all logic to import-helper', async () => {
     const { startImport, getImportStatus, cancelImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     // Setup mocks
     (importHelper.startImport as jest.Mock).mockResolvedValue({ jobId: 'test' });
@@ -574,7 +573,7 @@ describe('Import Actions - Server Action Behavior', () => {
 describe('Import Actions - Error Propagation', () => {
   test('should propagate startImport errors', async () => {
     const { startImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockInput: ImportJobInput = {
       tenantId: 'test',
@@ -593,7 +592,7 @@ describe('Import Actions - Error Propagation', () => {
 
   test('should propagate getImportStatus errors', async () => {
     const { getImportStatus } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.getImportStatus as jest.Mock).mockRejectedValue(new Error('Job not found'));
 
@@ -602,7 +601,7 @@ describe('Import Actions - Error Propagation', () => {
 
   test('should propagate cancelImport errors', async () => {
     const { cancelImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.cancelImport as jest.Mock).mockRejectedValue(new Error('Cannot cancel'));
 
@@ -613,7 +612,7 @@ describe('Import Actions - Error Propagation', () => {
 describe('Import Actions - rollbackCompletedImport (#735)', () => {
   test('should call import-helper rollbackCompletedImport with jobId', async () => {
     const { rollbackCompletedImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.rollbackCompletedImport as jest.Mock).mockResolvedValue({ success: true });
 
@@ -625,7 +624,7 @@ describe('Import Actions - rollbackCompletedImport (#735)', () => {
 
   test('should return error when rollback fails', async () => {
     const { rollbackCompletedImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.rollbackCompletedImport as jest.Mock).mockResolvedValue({
       success: false,
@@ -640,7 +639,7 @@ describe('Import Actions - rollbackCompletedImport (#735)', () => {
 
   test('should only allow rollback when import is completed', async () => {
     const { rollbackCompletedImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     (importHelper.rollbackCompletedImport as jest.Mock).mockResolvedValue({
       success: false,
@@ -657,7 +656,7 @@ describe('Import Actions - rollbackCompletedImport (#735)', () => {
 describe('Import Actions - Real-World Scenarios', () => {
   test('should handle complete import workflow', async () => {
     const { startImport, getImportStatus } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockInput: ImportJobInput = {
       tenantId: 'tenant-123',
@@ -707,7 +706,7 @@ describe('Import Actions - Real-World Scenarios', () => {
 
   test('should handle import cancellation workflow', async () => {
     const { startImport, getImportStatus, cancelImport } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockInput: ImportJobInput = {
       tenantId: 'test',
@@ -751,7 +750,7 @@ describe('Import Actions - Real-World Scenarios', () => {
 
   test('should handle import failure workflow', async () => {
     const { startImport, getImportStatus } = await import('../lib/db/import-actions');
-    const importHelper = await import('../lib/db/import-helper');
+    const importHelper = await import('objectified-importer/server');
 
     const mockInput: ImportJobInput = {
       tenantId: 'test',

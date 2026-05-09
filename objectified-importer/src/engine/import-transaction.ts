@@ -1,13 +1,13 @@
-'use server';
-
 /**
  * Transaction-aware database functions for imports.
  * These functions accept an optional client parameter to run within a transaction.
  */
 
-import { getPlanBlockMessageForNewProject, getPlanBlockMessageForNewVersion } from './plan-entitlements';
+import { getPlanBlockMessageForNewProject, getPlanBlockMessageForNewVersion } from '../../../objectified-ui/lib/db/plan-entitlements';
+import { createImporterEngineRequire } from './importer-node-require';
 
-const connectionPool = require('./db');
+const nodeRequire = createImporterEngineRequire();
+const connectionPool = nodeRequire('../../../objectified-ui/lib/db/db');
 
 // Type for a Postgres client (from pool)
 export type PoolClient = {

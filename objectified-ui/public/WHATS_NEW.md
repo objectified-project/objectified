@@ -46,6 +46,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Files in the imports tab now leads to the original file that was imported
 
 ## UI
+- Spec import engine and format parsers live in the **`objectified-importer`** workspace package (`objectified-importer` client-safe entry + `objectified-importer/server` for DB-backed import); the UI keeps thin server-action wrappers and the same import APIs (#3302).
 - Adds the ability to view projects that were deleted (show deleted toggle)
 - Introduces undelete for soft deleted projects
 

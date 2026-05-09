@@ -2,7 +2,6 @@
  * Tests for Import Dialog Back Button Navigation
  */
 
-import { describe, it, expect } from '@jest/globals';
 
 describe('Import Dialog Back Button Navigation', () => {
   describe('handleBack logic for LLM imports', () => {

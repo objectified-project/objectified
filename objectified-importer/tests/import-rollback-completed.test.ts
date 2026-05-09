@@ -5,37 +5,33 @@
  * the created project and all its data. Only allowed when state === 'completed'.
  */
 
-import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 
-const mockPermanentDeleteProject = jest.fn();
-const mockClient = { query: jest.fn(), release: jest.fn() };
+import * as uiHelper from '../../objectified-ui/lib/db/helper';
 
-jest.mock('../lib/db/helper', () => ({
-  permanentDeleteProject: (...args: any[]) => mockPermanentDeleteProject(...args),
-}));
+const mockClient = { query: vi.fn(), release: vi.fn() };
 
-jest.mock('../lib/db/import-transaction', () => ({
-  getTransactionClient: jest.fn(() => Promise.resolve(mockClient)),
-  beginTransaction: jest.fn(() => Promise.resolve()),
-  commitTransaction: jest.fn(() => Promise.resolve()),
-  rollbackTransaction: jest.fn(() => Promise.resolve()),
-  releaseClient: jest.fn(() => Promise.resolve()),
-  createProjectTx: jest.fn(() =>
+vi.mock('../src/engine/import-transaction', () => ({
+  getTransactionClient: vi.fn(() => Promise.resolve(mockClient)),
+  beginTransaction: vi.fn(() => Promise.resolve()),
+  commitTransaction: vi.fn(() => Promise.resolve()),
+  rollbackTransaction: vi.fn(() => Promise.resolve()),
+  releaseClient: vi.fn(() => Promise.resolve()),
+  createProjectTx: vi.fn(() =>
     Promise.resolve(JSON.stringify({ success: true, project: { id: 'proj-rollback-test' } }))
   ),
-  createVersionTx: jest.fn(() =>
+  createVersionTx: vi.fn(() =>
     Promise.resolve(JSON.stringify({ success: true, version: { id: 'ver-rollback-test' } }))
   ),
-  createPropertyTx: jest.fn((_client: any, _projectId: string, _name: string, _desc: any, data: any) =>
+  createPropertyTx: vi.fn((_client: any, _projectId: string, _name: string, _desc: any, data: any) =>
     Promise.resolve(JSON.stringify({ success: true, property: { id: 'prop-' + JSON.stringify(data).length } }))
   ),
-  createClassTx: jest.fn(() =>
+  createClassTx: vi.fn(() =>
     Promise.resolve(JSON.stringify({ success: true, class: { id: 'class-1' } }))
   ),
-  addPropertyToClassTx: jest.fn(() =>
+  addPropertyToClassTx: vi.fn(() =>
     Promise.resolve(JSON.stringify({ success: true, classProperty: { id: 'cp-1' } }))
   ),
-  getClassesWithPropertiesAndTagsTx: jest.fn(() =>
+  getClassesWithPropertiesAndTagsTx: vi.fn(() =>
     Promise.resolve(
       JSON.stringify([
         {
@@ -49,8 +45,8 @@ jest.mock('../lib/db/import-transaction', () => ({
       ])
     )
   ),
-  getLatestVersionUuidForProjectTx: jest.fn(() => Promise.resolve(null)),
-  listProjectLibraryPropertiesTx: jest.fn(() => Promise.resolve([])),
+  getLatestVersionUuidForProjectTx: vi.fn(() => Promise.resolve(null)),
+  listProjectLibraryPropertiesTx: vi.fn(() => Promise.resolve([])),
 }));
 
 const mockNormalizeResult = {
@@ -68,8 +64,8 @@ const mockNormalizeResult = {
   warnings: [] as string[],
 };
 
-jest.mock('../lib/importers', () => ({
-  getImporter: jest.fn(() => ({
+vi.mock('../src/parsers/index', () => ({
+  getImporter: vi.fn(() => ({
     kind: 'openapi',
     normalize: () => mockNormalizeResult,
   })),
@@ -104,28 +100,28 @@ describe('rollbackCompletedImport (#735)', () => {
   };
 
   beforeEach(() => {
-    mockPermanentDeleteProject.mockReset();
-    mockPermanentDeleteProject.mockResolvedValue(JSON.stringify({ success: true }));
+    vi.mocked(uiHelper.permanentDeleteProject).mockReset();
+    vi.mocked(uiHelper.permanentDeleteProject).mockResolvedValue(JSON.stringify({ success: true }));
     mockClient.query.mockClear();
     mockClient.release.mockClear();
   });
 
   afterEach(() => {
-    jest.resetModules();
+    vi.resetModules();
   });
 
   test('returns Job not found for unknown jobId', async () => {
-    const { rollbackCompletedImport } = await import('../lib/db/import-helper');
+    const { rollbackCompletedImport } = await import('../src/engine/import-helper');
 
     const result = await rollbackCompletedImport('nonexistent-job-id');
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Job not found');
-    expect(mockPermanentDeleteProject).not.toHaveBeenCalled();
+    expect(uiHelper.permanentDeleteProject).not.toHaveBeenCalled();
   });
 
   test('returns error when job is pending-approval (not completed)', async () => {
-    const { startImport, getImportStatus, rollbackCompletedImport } = await import('../lib/db/import-helper');
+    const { startImport, getImportStatus, rollbackCompletedImport } = await import('../src/engine/import-helper');
 
     const { jobId } = await startImport(validInput);
     const status = await waitForJobEnd(getImportStatus, jobId);
@@ -136,12 +132,12 @@ describe('rollbackCompletedImport (#735)', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('only allowed when the import has been committed');
     expect(result.error).toContain('pending-approval');
-    expect(mockPermanentDeleteProject).not.toHaveBeenCalled();
+    expect(uiHelper.permanentDeleteProject).not.toHaveBeenCalled();
   });
 
   test('calls permanentDeleteProject with projectId and sets state to rolled-back when job is completed', async () => {
     const { startImport, getImportStatus, commitImport, rollbackCompletedImport } = await import(
-      '../lib/db/import-helper'
+      '../src/engine/import-helper'
     );
 
     const { jobId } = await startImport(validInput);
@@ -155,8 +151,8 @@ describe('rollbackCompletedImport (#735)', () => {
     const rollbackResult = await rollbackCompletedImport(jobId);
 
     expect(rollbackResult.success).toBe(true);
-    expect(mockPermanentDeleteProject).toHaveBeenCalledTimes(1);
-    expect(mockPermanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
+    expect(uiHelper.permanentDeleteProject).toHaveBeenCalledTimes(1);
+    expect(uiHelper.permanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
 
     const afterStatus = await getImportStatus(jobId);
     expect(afterStatus.state).toBe('rolled-back');
@@ -165,7 +161,7 @@ describe('rollbackCompletedImport (#735)', () => {
 
   test('emits ROLLBACK_STARTED and ROLLED_BACK events on success', async () => {
     const { startImport, getImportStatus, commitImport, rollbackCompletedImport } = await import(
-      '../lib/db/import-helper'
+      '../src/engine/import-helper'
     );
 
     const { jobId } = await startImport(validInput);
@@ -180,12 +176,12 @@ describe('rollbackCompletedImport (#735)', () => {
   });
 
   test('returns error when permanentDeleteProject returns success: false', async () => {
-    mockPermanentDeleteProject.mockResolvedValue(
+    vi.mocked(uiHelper.permanentDeleteProject).mockResolvedValue(
       JSON.stringify({ success: false, error: 'Project in use' })
     );
 
     const { startImport, getImportStatus, commitImport, rollbackCompletedImport } = await import(
-      '../lib/db/import-helper'
+      '../src/engine/import-helper'
     );
 
     const { jobId } = await startImport(validInput);
@@ -196,7 +192,7 @@ describe('rollbackCompletedImport (#735)', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Project in use');
-    expect(mockPermanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
+    expect(uiHelper.permanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
 
     const status = await getImportStatus(jobId);
     expect(status.state).toBe('completed');
@@ -206,10 +202,10 @@ describe('rollbackCompletedImport (#735)', () => {
   });
 
   test('returns error when permanentDeleteProject throws', async () => {
-    mockPermanentDeleteProject.mockRejectedValue(new Error('Database connection lost'));
+    vi.mocked(uiHelper.permanentDeleteProject).mockRejectedValue(new Error('Database connection lost'));
 
     const { startImport, getImportStatus, commitImport, rollbackCompletedImport } = await import(
-      '../lib/db/import-helper'
+      '../src/engine/import-helper'
     );
 
     const { jobId } = await startImport(validInput);
@@ -220,14 +216,14 @@ describe('rollbackCompletedImport (#735)', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Database connection lost');
-    expect(mockPermanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
+    expect(uiHelper.permanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
   });
 
   test('handles permanentDeleteProject returning object (not JSON string)', async () => {
-    mockPermanentDeleteProject.mockResolvedValue({ success: true });
+    vi.mocked(uiHelper.permanentDeleteProject).mockResolvedValue({ success: true });
 
     const { startImport, getImportStatus, commitImport, rollbackCompletedImport } = await import(
-      '../lib/db/import-helper'
+      '../src/engine/import-helper'
     );
 
     const { jobId } = await startImport(validInput);
@@ -237,6 +233,6 @@ describe('rollbackCompletedImport (#735)', () => {
     const result = await rollbackCompletedImport(jobId);
 
     expect(result.success).toBe(true);
-    expect(mockPermanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
+    expect(uiHelper.permanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
   });
 });

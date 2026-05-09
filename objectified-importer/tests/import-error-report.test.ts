@@ -3,12 +3,11 @@
  * Tests buildImportErrorReport and getImportErrorReportFilename.
  */
 
-import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import {
   buildImportErrorReport,
   getImportErrorReportFilename,
   type ImportStatusForReport
-} from '../../lib/db/import-error-report';
+} from '../src/engine/import-error-report';
 
 describe('buildImportErrorReport', () => {
   const fixedExportedAt = '2025-02-10T12:00:00.000Z';

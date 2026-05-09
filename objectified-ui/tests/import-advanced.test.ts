@@ -17,9 +17,7 @@ import * as path from 'path';
 import * as YAML from 'yaml';
 import { Pool } from 'pg';
 
-// Import the actual tools
-import { importFromSourceKind } from '../lib/importers';
-import type { ImportJobInput } from '../lib/db/import-helper';
+import type { ImportJobInput } from 'objectified-importer/server';
 import {
   createProject,
   createVersion,

@@ -5,8 +5,7 @@
  * - Refs are not modified; array items are recursively mapped.
  */
 
-import { describe, it, expect } from '@jest/globals';
-import { openApiImporter, getExternalTypeKey, collectExternalTypeKeysFromDocument } from '../../lib/importers/openapi';
+import { openApiImporter, getExternalTypeKey, collectExternalTypeKeysFromDocument } from '../src/parsers/openapi';
 
 describe('#757 Type mapping for imported properties', () => {
   describe('getExternalTypeKey', () => {

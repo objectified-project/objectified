@@ -10,7 +10,6 @@
  * - Error handling
  */
 
-import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import type {
   ImportJobInput,
   ImportJobState,
@@ -18,20 +17,10 @@ import type {
   ImportEvent,
   ProgressEvent,
   ImportStatus
-} from '../lib/db/import-helper';
+} from '../src/engine/import-helper';
 
-// Mock the helper module
-jest.mock('../lib/db/helper', () => ({
-  createProject: jest.fn(),
-  createVersion: jest.fn(),
-  createClass: jest.fn(),
-  createProperty: jest.fn(),
-  addPropertyToClass: jest.fn(),
-}));
-
-// Mock the importers module
-jest.mock('../lib/importers', () => ({
-  getImporter: jest.fn(),
+vi.mock('../src/parsers/index', () => ({
+  getImporter: vi.fn(),
   ImportSourceKind: 'openapi',
 }));
 

@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from '@jest/globals';
 import { mergeClasses, type MergeStrategy } from '../../src/app/utils/schema-merge';
-import type { NormalizedClass, NormalizedProperty } from '../../lib/importers';
+import type { NormalizedClass, NormalizedProperty } from 'objectified-importer';
 
 function prop(
   name: string,

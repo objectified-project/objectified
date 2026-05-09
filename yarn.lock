@@ -14218,6 +14218,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"objectified-importer@workspace:*, objectified-importer@workspace:objectified-importer":
+  version: 0.0.0-use.local
+  resolution: "objectified-importer@workspace:objectified-importer"
+  dependencies:
+    "@types/node": "npm:^22.10.0"
+    typescript: "npm:^5.9.3"
+    vitest: "npm:^3.2.4"
+  languageName: unknown
+  linkType: soft
+
 "objectified-mcp@workspace:objectified-mcp":
   version: 0.0.0-use.local
   resolution: "objectified-mcp@workspace:objectified-mcp"
@@ -14302,6 +14312,7 @@ __metadata:
     next: "npm:^16.2.3"
     next-auth: "npm:^4.24.14"
     next-themes: "npm:^0.4.6"
+    objectified-importer: "workspace:*"
     pg: "npm:^8.20.0"
     react: "npm:^19.2.5"
     react-dom: "npm:^19.2.5"

@@ -3,8 +3,7 @@
  * Supports components.schemas and inferring schemas from workflow steps.
  */
 
-import { describe, it, expect } from '@jest/globals';
-import { arazzoImporter, inferArazzoSchemasFromWorkflows } from '../../lib/importers/arazzo';
+import { arazzoImporter, inferArazzoSchemasFromWorkflows } from '../src/parsers/arazzo';
 
 describe('#299 Arazzo import', () => {
   describe('inferArazzoSchemasFromWorkflows', () => {

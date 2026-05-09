@@ -26,7 +26,7 @@ import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { AVAILABLE_OPERATIONS, OPERATION_COLORS } from './paths-operation-colors';
 import type { ParameterLocation } from './paths-theme';
 import { parseOpenAPISpec } from '../../../../utils/openapi-import';
-import { importPathsFromOpenAPIForVersion } from '../../../../../../lib/db/import-openapi-paths-security';
+import { importPathsFromOpenAPIForVersion } from '@lib/db/import-paths-server-actions';
 import SidebarShell, { SidebarSectionLabel } from '../../../../components/sidebar/SidebarShell';
 import SidebarDensityToggle from '../../../../components/sidebar/SidebarDensityToggle';
 import { sidebarTheme, useSidebarTokens } from '../../../../components/sidebar/sidebar-theme';

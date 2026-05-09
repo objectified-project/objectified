@@ -5,10 +5,9 @@
  * names produce warnings.
  */
 
-import { describe, it, expect } from '@jest/globals';
-import { openApiImporter } from '../../lib/importers/openapi';
-import { isReservedName, collectReservedNameWarnings } from '../../lib/importers/reserved-names';
-import type { NormalizedClass } from '../../lib/importers';
+import { openApiImporter } from '../src/parsers/openapi';
+import { isReservedName, collectReservedNameWarnings } from '../src/parsers/reserved-names';
+import type { NormalizedClass } from '../src/parsers/index';
 
 describe('#756 Reserved name detection on import', () => {
   describe('isReservedName', () => {

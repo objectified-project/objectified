@@ -20,8 +20,7 @@ import { generateOpenApiSpec } from '../src/app/utils/openapi';
 import { STUDIO_EXPORT_OPENAPI_VERSION } from '../src/app/utils/openapi-versions';
 import { parseOpenAPISpec } from '../src/app/utils/openapi-import';
 import { isOpenAPI30, convertOpenAPI30ToOpenAPI31 } from '../src/app/utils/openapi30-converter';
-import { openApiImporter } from '../lib/importers';
-import type { NormalizedClass, NormalizedProperty } from '../lib/importers';
+import { openApiImporter, type NormalizedClass, type NormalizedProperty } from 'objectified-importer';
 
 const EXAMPLES_DIR = path.join(__dirname, '../examples/openapi');
 

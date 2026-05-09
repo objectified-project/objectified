@@ -1,13 +1,13 @@
-'use server';
-
 /**
  * Import OpenAPI paths and security schemes into an existing version (#425).
  * Call after importProjectFromOpenAPI when the spec contains paths or components.securitySchemes.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const connectionPool = require('./db');
-import type { ParsedPath, ParsedOperation, ParsedSecurityScheme } from '../../src/app/utils/openapi-import';
+import type { ParsedPath, ParsedSecurityScheme } from '../../../objectified-ui/src/app/utils/openapi-import';
+import { createImporterEngineRequire } from './importer-node-require';
+
+const nodeRequire = createImporterEngineRequire();
+const connectionPool = nodeRequire('../../../objectified-ui/lib/db/db');
 
 function getRefSchemaName(ref: string | undefined): string | null {
   if (!ref || typeof ref !== 'string') return null;
