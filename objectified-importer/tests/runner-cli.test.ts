@@ -156,7 +156,6 @@ describe('runner mocked engine', () => {
     const runPromise = runImportWithEngine(envelope.envelope, stdout, process.stderr, engine);
     await new Promise((r) => setTimeout(r, 10));
     process.kill(process.pid, 'SIGTERM');
-    process.kill(process.pid, 'SIGINT');
 
     const code = await runPromise;
     expect(code).toBe(0);
