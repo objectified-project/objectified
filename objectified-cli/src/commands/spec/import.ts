@@ -5,11 +5,26 @@ import { Args, Flags } from "@oclif/core";
 import YAML from "yaml";
 
 import { BaseCommand } from "../../base-command.js";
-import type { ImportJobResponse, ImportSourceKind, ObjectifiedApi } from "../../lib/client.js";
+import type {
+  ImportJobResponse,
+  ImportSourceKind,
+  ObjectifiedApi,
+  ProjectSchema,
+} from "../../lib/client.js";
 import { ObjectifiedCliError } from "../../lib/errors.js";
 import { EXIT_CODES } from "../../lib/exit-codes.js";
 import { localePrefersAsciiTable } from "../../lib/output.js";
+import { PROJECT_DOMAIN_CATEGORY_NONE } from "../../lib/projects/domain-categories.js";
+import type { Visibility } from "../../lib/projects/project-create-body.js";
+import { buildProjectCreateRequest } from "../../lib/projects/project-create-body.js";
+import { validateProjectSlug } from "../../lib/projects/project-slug.js";
 import { completionProfileCacheKey, resolveProjectForTenant } from "../../lib/resolve.js";
+import {
+  metadataRecordFromSpecDraft,
+  projectDraftFromSpecContent,
+  suggestProjectSlugFromSpec,
+  type SpecProjectDraft,
+} from "../../lib/spec/project-draft-from-spec.js";
 
 const SOURCE_FLAG_OPTIONS = ["openapi", "swagger", "arazzo", "auto"] as const;
 
@@ -30,7 +45,7 @@ function pickStr(o: Record<string, unknown>, keys: string[]): string | undefined
   return undefined;
 }
 
-function loadStructuredSpecFile(filePath: string): unknown {
+function loadStructuredSpecFile(filePath: string): { raw: string; parsed: unknown } {
   const abs = path.resolve(process.cwd(), filePath);
   if (!fs.existsSync(abs)) {
     throw new ObjectifiedCliError({
@@ -44,7 +59,7 @@ function loadStructuredSpecFile(filePath: string): unknown {
   const lower = abs.toLowerCase();
   if (lower.endsWith(".yaml") || lower.endsWith(".yml")) {
     try {
-      return YAML.parse(raw) as unknown;
+      return { raw, parsed: YAML.parse(raw) as unknown };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       throw new ObjectifiedCliError({
@@ -56,7 +71,7 @@ function loadStructuredSpecFile(filePath: string): unknown {
     }
   }
   try {
-    return JSON.parse(raw) as unknown;
+    return { raw, parsed: JSON.parse(raw) as unknown };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new ObjectifiedCliError({
@@ -66,6 +81,13 @@ function loadStructuredSpecFile(filePath: string): unknown {
       hint: "Fix the JSON syntax or use .yaml / .yml for YAML.",
     });
   }
+}
+
+function normalizeDomainCategory(raw: string | undefined): string | undefined {
+  if (raw === undefined) return undefined;
+  const t = raw.trim();
+  if (t === "" || t === PROJECT_DOMAIN_CATEGORY_NONE) return undefined;
+  return t;
 }
 
 function loadImportOptionsJson(filePath: string): Record<string, unknown> {
@@ -115,7 +137,12 @@ function buildOptionsFromImportFile(fileDoc: Record<string, unknown>): Record<st
   ]);
   const options: Record<string, unknown> = {};
   const nested = fileDoc.options;
-  if (nested !== undefined && nested !== null && typeof nested === "object" && !Array.isArray(nested)) {
+  if (
+    nested !== undefined &&
+    nested !== null &&
+    typeof nested === "object" &&
+    !Array.isArray(nested)
+  ) {
     Object.assign(options, nested as Record<string, unknown>);
   }
   for (const [k, v] of Object.entries(fileDoc)) {
@@ -152,9 +179,13 @@ function detectSourceKind(doc: unknown, override: SourceFlag): ImportSourceKind 
 
 function formatDetectedLine(kind: ImportSourceKind, doc: Record<string, unknown>): string {
   const infoRaw = doc.info;
-  const info = infoRaw !== undefined && infoRaw !== null && typeof infoRaw === "object" && !Array.isArray(infoRaw)
-    ? (infoRaw as Record<string, unknown>)
-    : undefined;
+  const info =
+    infoRaw !== undefined &&
+    infoRaw !== null &&
+    typeof infoRaw === "object" &&
+    !Array.isArray(infoRaw)
+      ? (infoRaw as Record<string, unknown>)
+      : undefined;
   const title = info !== undefined && typeof info.title === "string" ? info.title : "?";
   const ver = info !== undefined && typeof info.version === "string" ? info.version : "?";
 
@@ -170,10 +201,16 @@ function formatDetectedLine(kind: ImportSourceKind, doc: Record<string, unknown>
   return `Arazzo ${av} (info.title='${title}', info.version='${ver}')`;
 }
 
-function extractVersionMeta(doc: Record<string, unknown>): { versionId: string; description: string | null } {
+function extractVersionMeta(doc: Record<string, unknown>): {
+  versionId: string;
+  description: string | null;
+} {
   const infoRaw = doc.info;
   const info =
-    infoRaw !== undefined && infoRaw !== null && typeof infoRaw === "object" && !Array.isArray(infoRaw)
+    infoRaw !== undefined &&
+    infoRaw !== null &&
+    typeof infoRaw === "object" &&
+    !Array.isArray(infoRaw)
       ? (infoRaw as Record<string, unknown>)
       : undefined;
   const versionId =
@@ -203,7 +240,10 @@ function progressSpinnerText(job: ImportJobResponse): string {
   const phase = p.phase.trim() !== "" ? p.phase : "working";
   const total = p.total;
   const done = p.completed;
-  const item = typeof p.currentItem === "string" && p.currentItem.trim() !== "" ? ` ${p.currentItem.trim()}` : "";
+  const item =
+    typeof p.currentItem === "string" && p.currentItem.trim() !== ""
+      ? ` ${p.currentItem.trim()}`
+      : "";
   if (typeof total === "number" && typeof done === "number" && total > 0) {
     return `[${phase} ${String(done)}/${String(total)}]${item}`;
   }
@@ -260,16 +300,14 @@ function formatSummaryFollowUp(job: ImportJobResponse, projectSlug: string): str
   return undefined;
 }
 
-function formatClassesSummary(summary: Record<string, unknown> | null | undefined): string | undefined {
+function formatClassesSummary(
+  summary: Record<string, unknown> | null | undefined,
+): string | undefined {
   if (summary === undefined || summary === null || typeof summary !== "object") return undefined;
   const created = summary.classesCreated ?? summary.classes_created;
   const warnings = summary.warnings ?? summary.class_warnings;
   const failed = summary.failed ?? summary.classes_failed;
-  if (
-    typeof created === "number" &&
-    typeof warnings === "number" &&
-    typeof failed === "number"
-  ) {
+  if (typeof created === "number" && typeof warnings === "number" && typeof failed === "number") {
     return `Classes: ${String(created)} created, ${String(warnings)} warnings, ${String(failed)} failed.`;
   }
   return undefined;
@@ -277,10 +315,12 @@ function formatClassesSummary(summary: Record<string, unknown> | null | undefine
 
 export default class SpecImport extends BaseCommand {
   static description =
-    "Import an OpenAPI / Swagger / Arazzo document into an existing project (POST /v1/imports/{tenant_slug}; poll until terminal).";
+    "Import an OpenAPI / Swagger / Arazzo document (POST /v1/imports/{tenant_slug}). Omit --project to create a project from spec info, then import.";
 
   static examples = [
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --project payments-api",
+    "<%= config.bin %> <%= command.id %> ./openapi.yaml --yes",
+    "<%= config.bin %> <%= command.id %> ./spec.json --slug my-api --visibility public --yes",
     "<%= config.bin %> <%= command.id %> ./spec.json --project payments-api --source openapi",
     "<%= config.bin %> <%= command.id %> ./workflow.yaml --project api --from-file ./import-options.json",
     "<%= config.bin %> --json <%= command.id %> ./openapi.yaml --project payments-api",
@@ -299,8 +339,8 @@ export default class SpecImport extends BaseCommand {
 
   static flags = {
     project: Flags.string({
-      description: "Existing project slug or UUID (uuid-shaped refs resolve as id first).",
-      required: true,
+      description:
+        "Existing project slug or UUID (omit to create a project from spec info.title / info.description / contact / license, then import).",
     }),
     source: Flags.string({
       description: "Override format detection (default: auto-detect from document keys).",
@@ -308,20 +348,37 @@ export default class SpecImport extends BaseCommand {
       default: "auto",
     }),
     "from-file": Flags.string({
-      description: "Merge ImportOptions JSON (selectedSchemas, naming, etc.). CLI flags override file values.",
+      description:
+        "Merge ImportOptions JSON (selectedSchemas, naming, etc.). CLI flags override file values.",
     }),
-    name: Flags.string({ description: "Override project display name sent with the import body." }),
-    slug: Flags.string({ description: "Override project slug sent with the import body." }),
-    description: Flags.string({ description: "Override project description sent with the import body." }),
+    name: Flags.string({
+      description:
+        "Project display name (import body; when creating a project, also used for POST /v1/projects unless omitted).",
+    }),
+    slug: Flags.string({
+      description:
+        "Project slug (import body; when creating a project, must match ^[a-z][a-z0-9-]{1,62}$ — use another if the tenant already has this slug).",
+    }),
+    description: Flags.string({
+      description:
+        "Project description (import body; when creating a project, stored on the new project).",
+    }),
+    domain: Flags.string({
+      description:
+        "When creating a project: metadata domainCategory (same as `projects create --domain`).",
+    }),
+    visibility: Flags.string({
+      description: "When creating a project: metadata visibility (private or public).",
+      options: ["private", "public"],
+    }),
     yes: Flags.boolean({
-      description: "Reserved for non-interactive / CI parity (no prompts in this command yet).",
+      description:
+        "Skip confirmation when creating a project from the spec; required when stdin is not a TTY and --project is omitted.",
       default: false,
     }),
   };
 
   async run(): Promise<void> {
-    void this.flags.yes;
-
     const tenant = this.context.tenantSlug;
     if (tenant === undefined || tenant === "") {
       throw new ObjectifiedCliError({
@@ -345,14 +402,7 @@ export default class SpecImport extends BaseCommand {
     }
 
     const rawProject = typeof this.flags.project === "string" ? this.flags.project.trim() : "";
-    if (rawProject === "") {
-      throw new ObjectifiedCliError({
-        message: "Missing required flag --project.",
-        exitCode: EXIT_CODES.MISUSE,
-        title: "Invalid usage",
-        hint: "Target an existing project slug or id (`objectified projects list`). New-project flow is not implemented yet.",
-      });
-    }
+    const createProjectFromSpec = rawProject === "";
 
     const sourceRaw = (this.flags.source as string | undefined)?.trim().toLowerCase() ?? "auto";
     if (!SOURCE_FLAG_OPTIONS.includes(sourceRaw as SourceFlag)) {
@@ -365,8 +415,12 @@ export default class SpecImport extends BaseCommand {
     }
     const sourceFlag = sourceRaw as SourceFlag;
 
-    const parsedUnknown = loadStructuredSpecFile(specPath);
-    if (parsedUnknown === null || typeof parsedUnknown !== "object" || Array.isArray(parsedUnknown)) {
+    const { raw: rawContent, parsed: parsedUnknown } = loadStructuredSpecFile(specPath);
+    if (
+      parsedUnknown === null ||
+      typeof parsedUnknown !== "object" ||
+      Array.isArray(parsedUnknown)
+    ) {
       throw new ObjectifiedCliError({
         message: "Spec document must parse to a JSON object.",
         exitCode: EXIT_CODES.VALIDATION,
@@ -391,11 +445,15 @@ export default class SpecImport extends BaseCommand {
     const fileSlug = pickStr(importFileDoc ?? {}, ["slug"]);
     const fileDesc = pickStr(importFileDoc ?? {}, ["description"]);
     const fileVersionId = pickStr(importFileDoc ?? {}, ["versionId", "version_id"]);
-    const fileVersionDesc = pickStr(importFileDoc ?? {}, ["versionDescription", "version_description"]);
+    const fileVersionDesc = pickStr(importFileDoc ?? {}, [
+      "versionDescription",
+      "version_description",
+    ]);
 
     const nameFlag = typeof this.flags.name === "string" ? this.flags.name.trim() : "";
     const slugFlag = typeof this.flags.slug === "string" ? this.flags.slug.trim() : "";
-    const descFlag = typeof this.flags.description === "string" ? this.flags.description : undefined;
+    const descFlag =
+      typeof this.flags.description === "string" ? this.flags.description : undefined;
 
     let versionIdMerged: string;
     let versionDescMerged: string | null;
@@ -414,6 +472,130 @@ export default class SpecImport extends BaseCommand {
           : versionMeta.description;
     }
 
+    let specDraft: SpecProjectDraft | undefined;
+    if (createProjectFromSpec) {
+      const derived = projectDraftFromSpecContent(rawContent, specPath);
+      if (!derived.ok) {
+        throw new ObjectifiedCliError({
+          message: derived.reason,
+          exitCode: EXIT_CODES.VALIDATION,
+          title: "Validation failed",
+          hint: "Fix the spec or pass --project to target an existing project.",
+        });
+      }
+      specDraft = derived.draft;
+    }
+
+    const tty = process.stdin.isTTY && process.stdout.isTTY;
+    const yes = this.flags.yes === true;
+    const quiet = this.flags.quiet === true;
+
+    if (createProjectFromSpec && !tty && !yes) {
+      throw new ObjectifiedCliError({
+        message:
+          "When stdin is not a TTY, omitting --project requires --yes to create a project non-interactively.",
+        exitCode: EXIT_CODES.MISUSE,
+        title: "Invalid usage",
+        hint: "Example: `objectified spec import ./openapi.yaml --yes`",
+      });
+    }
+
+    const visibilityFlag = this.flags.visibility as Visibility | undefined;
+
+    const domainFlagRaw =
+      typeof this.flags.domain === "string" ? this.flags.domain.trim() : undefined;
+
+    let mergedName: string;
+    let mergedSlug: string;
+    let mergedDesc: string | null;
+
+    if (createProjectFromSpec && specDraft !== undefined) {
+      mergedName = nameFlag !== "" ? nameFlag : (fileName ?? specDraft.projectName);
+
+      const resolveSlug = (): string => {
+        if (slugFlag !== "") {
+          const c = validateProjectSlug(slugFlag);
+          if (!c.ok) {
+            throw new ObjectifiedCliError({
+              message: c.message,
+              exitCode: EXIT_CODES.VALIDATION,
+              title: "Validation failed",
+              hint:
+                c.suggestion !== undefined
+                  ? `Try slug \`${c.suggestion}\`.`
+                  : "Slug must match ^[a-z][a-z0-9-]{1,62}$.",
+            });
+          }
+          return c.slug;
+        }
+        if (fileSlug !== undefined && fileSlug.trim() !== "") {
+          const c = validateProjectSlug(fileSlug.trim());
+          if (!c.ok) {
+            throw new ObjectifiedCliError({
+              message: c.message,
+              exitCode: EXIT_CODES.VALIDATION,
+              title: "Validation failed",
+              hint:
+                c.suggestion !== undefined
+                  ? `Try slug \`${c.suggestion}\`.`
+                  : "Slug must match ^[a-z][a-z0-9-]{1,62}$.",
+            });
+          }
+          return c.slug;
+        }
+        return suggestProjectSlugFromSpec(mergedName, specPath);
+      };
+      mergedSlug = resolveSlug();
+
+      if (descFlag !== undefined) {
+        const t = descFlag.trim();
+        mergedDesc = t === "" ? null : t;
+      } else if (fileDesc !== undefined) {
+        mergedDesc = fileDesc;
+      } else {
+        const d = specDraft.projectDescription.trim();
+        mergedDesc = d === "" ? null : d;
+      }
+    } else {
+      mergedName = "";
+      mergedSlug = "";
+      mergedDesc = null;
+    }
+
+    if (!this.context.json && !quiet) {
+      this.output.text(`Detected: ${formatDetectedLine(sourceKind, document)}`);
+      if (createProjectFromSpec && specDraft !== undefined) {
+        const vis = visibilityFlag ?? "private";
+        this.output.text("No --project provided; creating new project from spec:");
+        this.output.text(`  name:        ${mergedName}`);
+        this.output.text(`  slug:        ${mergedSlug}`);
+        this.output.text(`  description: ${mergedDesc ?? ""}`);
+        const domainShow = normalizeDomainCategory(domainFlagRaw);
+        if (domainShow !== undefined) {
+          this.output.text(`  domain:      ${domainShow}`);
+        }
+        this.output.text(`  visibility:  ${vis}`);
+      }
+    }
+
+    const needConfirmNewProject =
+      createProjectFromSpec && !this.context.json && tty && !yes && !quiet;
+
+    if (needConfirmNewProject) {
+      const { confirm } = await import("@inquirer/prompts");
+      const ok = await confirm({
+        message: "Create project and import spec?",
+        default: true,
+      });
+      if (!ok) {
+        throw new ObjectifiedCliError({
+          message: "Import aborted.",
+          exitCode: EXIT_CODES.MISUSE,
+          title: "Aborted",
+        });
+      }
+    }
+
     this.ensureAuthenticated();
 
     const profileKey = completionProfileCacheKey({
@@ -422,12 +604,84 @@ export default class SpecImport extends BaseCommand {
       tenantSlug: tenant,
     });
 
-    const project = await resolveProjectForTenant(this.api, tenant, rawProject, profileKey);
+    let project: ProjectSchema;
+    let freshProjectSlug: string | undefined;
 
-    const projectName = nameFlag !== "" ? nameFlag : fileName ?? project.name;
-    const projectSlug = slugFlag !== "" ? slugFlag : fileSlug ?? project.slug;
+    if (createProjectFromSpec) {
+      const allowlistArr = await this.api.fetchProjectDomainsAllowlist(tenant);
+      const allowlist = new Set(allowlistArr);
+      const domainNorm = normalizeDomainCategory(domainFlagRaw);
+      if (domainNorm !== undefined && !allowlist.has(domainNorm)) {
+        throw new ObjectifiedCliError({
+          message: `Unknown domain category '${domainNorm}'.`,
+          exitCode: EXIT_CODES.VALIDATION,
+          title: "Validation failed",
+          hint: `Choose one of: ${Array.from(allowlist).sort().join(", ")}`,
+        });
+      }
+
+      const visibilityResolved: Visibility = visibilityFlag ?? "private";
+      const baseMeta = specDraft !== undefined ? metadataRecordFromSpecDraft(specDraft) : {};
+
+      const createBody = buildProjectCreateRequest({
+        name: mergedName,
+        slug: mergedSlug,
+        description: mergedDesc,
+        domainCategory: domainNorm ?? null,
+        visibility: visibilityResolved,
+        baseMetadata: Object.keys(baseMeta).length > 0 ? baseMeta : undefined,
+      });
+
+      let createdProject: ProjectSchema;
+      try {
+        createdProject = await this.api.createProject(tenant, createBody);
+      } catch (e) {
+        if (
+          e instanceof ObjectifiedCliError &&
+          e.exitCode === EXIT_CODES.CONFLICT &&
+          /\bslug\b/i.test(e.message) &&
+          /\balready exists\b|\balready in use\b/i.test(e.message)
+        ) {
+          throw new ObjectifiedCliError({
+            message: `Project slug '${mergedSlug}' is already in use for this tenant.`,
+            exitCode: EXIT_CODES.CONFLICT,
+            title: e.title ?? "Conflict",
+            hint: "Pass a different --slug or delete the existing project first.",
+            requestId: e.requestId,
+            retriesAttempted: e.retriesAttempted,
+          });
+        }
+        throw e;
+      }
+      project = createdProject;
+      freshProjectSlug = mergedSlug;
+
+      if (!this.context.json && !quiet) {
+        const langAscii = localePrefersAsciiTable(process.env);
+        const mark = langAscii ? "[ok]" : "✔";
+        const id = createdProject.id;
+        const idShort = id.length <= 14 ? id : `${id.slice(0, 8)}…`;
+        this.output.text(`${mark} Created project ${mergedSlug} (${idShort})`);
+      }
+    } else {
+      project = await resolveProjectForTenant(this.api, tenant, rawProject, profileKey);
+    }
+
+    const projectName = createProjectFromSpec
+      ? mergedName
+      : nameFlag !== ""
+        ? nameFlag
+        : (fileName ?? project.name);
+    const projectSlug = createProjectFromSpec
+      ? mergedSlug
+      : slugFlag !== ""
+        ? slugFlag
+        : (fileSlug ?? project.slug);
+
     let projectDescription: string | null;
-    if (descFlag !== undefined) {
+    if (createProjectFromSpec) {
+      projectDescription = mergedDesc;
+    } else if (descFlag !== undefined) {
       const t = descFlag.trim();
       projectDescription = t === "" ? null : t;
     } else if (fileDesc !== undefined) {
@@ -452,30 +706,55 @@ export default class SpecImport extends BaseCommand {
       existingProjectId: project.id,
     };
 
-    if (!this.context.json) {
-      this.output.text(`Detected: ${formatDetectedLine(sourceKind, document)}`);
+    if (!this.context.json && !quiet) {
       this.output.text(
         `Target:   tenant=${tenant}, project=${projectSlug} (${project.id.slice(0, 4)}…)`,
       );
     }
 
-    const created = await this.api.createImportJob(tenant, body);
+    try {
+      const created = await this.api.createImportJob(tenant, body);
 
-    const job = isPollingTerminalState(created.state)
-      ? created
-      : await followImportJob({
-          api: this.api,
-          tenantSlug: tenant,
-          initial: created,
-          spinnerText: progressSpinnerText,
-          createSpinner: (t) => this.output.spinner(t),
-        });
+      const job = isPollingTerminalState(created.state)
+        ? created
+        : await followImportJob({
+            api: this.api,
+            tenantSlug: tenant,
+            initial: created,
+            spinnerText: progressSpinnerText,
+            createSpinner: (t) => this.output.spinner(t),
+          });
 
-    if (this.context.json) {
-      this.output.json(job);
+      if (this.context.json) {
+        this.output.json(job);
+      }
+
+      this.finishImportJob(job, projectSlug);
+    } catch (err) {
+      if (
+        freshProjectSlug !== undefined &&
+        err instanceof ObjectifiedCliError &&
+        err.exitCode !== EXIT_CODES.MISUSE
+      ) {
+        throw this.augmentFreshProjectFailure(err, freshProjectSlug);
+      }
+      throw err;
     }
+  }
 
-    this.finishImportJob(job, projectSlug);
+  private augmentFreshProjectFailure(
+    err: ObjectifiedCliError,
+    projectSlug: string,
+  ): ObjectifiedCliError {
+    const tail = `An empty project '${projectSlug}' may remain; delete with \`objectified projects delete ${projectSlug} --force\` before retrying if needed.`;
+    return new ObjectifiedCliError({
+      message: err.message,
+      exitCode: err.exitCode,
+      title: err.title,
+      hint: err.hint !== undefined && err.hint !== "" ? `${err.hint} ${tail}` : tail,
+      requestId: err.requestId,
+      retriesAttempted: err.retriesAttempted,
+    });
   }
 
   private finishImportJob(job: ImportJobResponse, projectSlug: string): void {
@@ -533,9 +812,12 @@ export default class SpecImport extends BaseCommand {
 
     const vid =
       job.result?.versionId ??
-      pickStr(job.summary !== undefined && job.summary !== null && typeof job.summary === "object"
-        ? (job.summary as Record<string, unknown>)
-        : {}, ["versionId", "version_id"]) ??
+      pickStr(
+        job.summary !== undefined && job.summary !== null && typeof job.summary === "object"
+          ? (job.summary as Record<string, unknown>)
+          : {},
+        ["versionId", "version_id"],
+      ) ??
       "?";
     const langAscii = localePrefersAsciiTable(process.env);
     const mark = langAscii ? "[ok]" : "✔";
