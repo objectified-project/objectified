@@ -19,14 +19,14 @@ Legend: **UI** = Import dialog / analyzer path; **Scan** = `detected_kind_from_p
 | OpenAPI 3.x | `.yaml`/`.yml`/`.json`, `openapi*` / `swagger*` names | Yes | `openapi-candidate` | YAML/JSON body sniff | `openapi-3`, aliases `openapi`, `swagger`, … | REST contract; handlers may return **501** until importer is wired. |
 | Swagger 2.x | Same extensions | Yes (`swagger`) | Via `swagger*` name | Same as OpenAPI when parsed as OpenAPI/Swagger JSON/YAML | `openapi-3` after conversion server-side (product-defined) | Treated as OpenAPI family in CLI metadata. |
 | AsyncAPI | `.yaml`/`.yml`/`.json`, `asyncapi*` names | Yes | `asyncapi-candidate` | Body sniff `asyncapi` | `asyncapi-2`, aliases `asyncapi`, … | CLI sends discriminant server expects for AsyncAPI 2.x style payloads. |
-| Arazzo | `.yaml`/`.yml`/`.json`, `arazzo*` / `.arazzo.yaml` | Yes | `arazzo-candidate` | Not inferred without `--format` unless content carries `arazzo` key (analyzer path) | `arazzo` | Prefer `--format arazzo` when filename alone is ambiguous. |
+| Arazzo | `.yaml`/`.yml`/`.json`, `arazzo*` / `.arazzo.yaml` | Yes | `arazzo-candidate` | Not inferred by CLI sniff | `arazzo` | **CLI gap:** use `--format arazzo` for Arazzo imports. |
 | GraphQL | `.graphql`, `.gql` | Yes | `graphql-candidate` | Extension → `graphql` | `graphql` | |
 | Protobuf | `.proto` | Yes | `protobuf-candidate` | Extension → `protobuf`; body can reinforce | `protobuf`, alias `proto` | |
 | Avro | `.avsc` | Yes | `avro-candidate` | Extension → `avro` | `avro` | |
-| Postman | `postman_collection.json`, `*.postman.json` | Yes (collections) | `postman-candidate` | Not sniffed from generic JSON; use name or `--format` | `postman` | |
-| RAML | `.raml`, YAML with RAML headers | Yes | Not specialized (often `yaml-candidate`) | No dedicated extension hint | `raml` | Scanner gap vs UI: scan may only see generic YAML; CLI relies on `--format` or content. |
+| Postman | `postman_collection.json`, `*.postman.json` | Yes (collections) | `postman-candidate` | Not sniffed from JSON or filename in CLI | `postman` | **CLI gap:** use `--format postman`. |
+| RAML | `.raml`, YAML with RAML headers | Yes | Not specialized (often `yaml-candidate`) | No dedicated extension hint/content sniff | `raml` | **Scanner + CLI gap:** scan may only see generic YAML; CLI requires `--format raml`. |
 | Thrift | `.thrift` | Yes | Not in `detected_kind_from_path` | No extension hint | `thrift` | **Scanner gap:** no `*-candidate`; **CLI gap:** no `.thrift` extension sniff — use `--format thrift`. |
-| DBML | `.dbml` | If presented as analyzable doc | `dbml-candidate` | Extension → `dbml` when basename ends with `.dbml` | `dbml` | |
+| DBML | `.dbml` | If presented as analyzable doc | `dbml-candidate` | No dedicated extension hint/content sniff | `dbml` | **CLI gap:** use `--format dbml`. |
 | Prisma | `schema.prisma` | Product-dependent | `prisma-candidate` | No path sniff for `schema.prisma` | `prisma` | **CLI gap:** no prisma path heuristic — use `--format prisma` and a sensible `--filename`. |
 | SQL DDL | `.sql`, `.ddl` | Product-dependent | `sql-ddl-candidate` | Not sniffed | `sql` (passthrough) | Confirm server kind string matches importer. |
 | ZIP bundle | `.zip` | When server accepts archives | Not classified by `detected_kind_from_path` | Not sniffed | `zip` (passthrough) | **Scanner + CLI sniff gap:** use `--format` if required by API; verify multipart vs JSON endpoints for large blobs. |
