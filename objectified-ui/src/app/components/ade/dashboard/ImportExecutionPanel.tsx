@@ -15,7 +15,11 @@ import {
   RotateCw,
   MinusCircle,
 } from 'lucide-react';
-import { cancelImport, getImportStatus, commitImport, rollbackImport, retryImport } from '../../../../../lib/db/import-actions';
+import {
+  getImportJobStatus,
+  postImportCancel,
+  postImportCommit,
+} from '@lib/import-api-client';
 import {
   getErrorEvents,
   formatEventContext,
@@ -36,6 +40,8 @@ interface ImportExecutionPanelProps {
   onComplete?: (succeeded: boolean) => void;
   /** When user retries a failed/canceled import, called with the new job ID so the dialog can switch to it. */
   onRetry?: (newJobId: string) => void;
+  /** Re-queue the same import inputs (REST has no replay endpoint). Required when `onRetry` is used. */
+  restartImportJob?: () => Promise<{ jobId: string }>;
   isReviewing?: boolean; // True when viewing from 'done' step via Back button
 }
 
@@ -85,6 +91,7 @@ export default function ImportExecutionPanel({
   selectedSchemas = [],
   onComplete,
   onRetry,
+  restartImportJob,
   isReviewing,
 }: ImportExecutionPanelProps) {
   const [state, setState] = useState<JobState>('queued');
@@ -126,7 +133,7 @@ export default function ImportExecutionPanel({
 
     const poll = async () => {
       try {
-        const status = await getImportStatus(jobId);
+        const status = await getImportJobStatus(jobId);
         if (!mounted) return;
         if (importStartedAtMs.current === null && ((status.percent ?? 0) > 0 || (status.events?.length ?? 0) > 0)) {
           importStartedAtMs.current = Date.now();
@@ -134,7 +141,7 @@ export default function ImportExecutionPanel({
         setState(status.state as JobState);
         setPercent(status.percent || 0);
         setProgress(status.progress as ProgressInfo | undefined);
-        setEvents(status.events || []);
+        setEvents((status.events || []) as unknown as ImportEvent[]);
         setSummary(status.summary || null);
         setTransactionPending((status as { transactionPending?: boolean }).transactionPending || false);
 
@@ -164,22 +171,46 @@ export default function ImportExecutionPanel({
   }, [jobId, onComplete, isReviewing]);
 
   const onCancel = async () => {
-    await cancelImport(jobId);
+    try {
+      await postImportCancel(jobId);
+    } catch {
+      // fire-and-forget cancel while polling continues
+    }
   };
 
   const onAccept = async () => {
     setIsCommitting(true);
     try {
-      const result = await commitImport(jobId);
-      if (result.success) {
-        setState('completed');
-        if (onComplete) {
-          onComplete(true);
-        }
-      } else {
-        const status = await getImportStatus(jobId);
+      const result = await postImportCommit(jobId);
+      if (!result.ok) {
+        const status = await getImportJobStatus(jobId);
         setState(status.state as JobState);
-        setEvents(status.events || []);
+        setEvents((status.events || []) as unknown as ImportEvent[]);
+      } else {
+        // Poll (1 s intervals, max 5 min) until the job reaches a terminal state after commit.
+        const MAX_POLL_MS = 5 * 60 * 1000;
+        const pollStart = Date.now();
+        let terminalState: JobState | null = null;
+        while (terminalState === null) {
+          const status = await getImportJobStatus(jobId);
+          const currentState = status.state as JobState;
+          setState(currentState);
+          setPercent(status.percent || 0);
+          setProgress(status.progress as ProgressInfo | undefined);
+          setEvents((status.events || []) as unknown as ImportEvent[]);
+          setSummary(status.summary || null);
+          if (['completed', 'failed', 'canceled', 'rolled-back'].includes(currentState)) {
+            terminalState = currentState;
+          } else if (Date.now() - pollStart >= MAX_POLL_MS) {
+            console.error('Commit polling timed out waiting for terminal state');
+            terminalState = 'failed';
+          } else {
+            await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+          }
+        }
+        if (onComplete) {
+          onComplete(terminalState === 'completed');
+        }
       }
     } catch (e) {
       console.error('Failed to commit:', e);
@@ -191,26 +222,26 @@ export default function ImportExecutionPanel({
   const onReject = async () => {
     setIsRollingBack(true);
     try {
-      await rollbackImport(jobId);
-      setState('rolled-back');
+      const updated = await postImportCancel(jobId);
+      setState(updated.state as JobState);
+      setPercent(updated.percent ?? 0);
+      setEvents((updated.events || []) as unknown as ImportEvent[]);
       if (onComplete) {
         onComplete(false);
       }
     } catch (e) {
-      console.error('Failed to rollback:', e);
+      console.error('Failed to cancel preview:', e);
     } finally {
       setIsRollingBack(false);
     }
   };
 
   const onRetryClick = async () => {
-    if (!onRetry) return;
+    if (!onRetry || !restartImportJob) return;
     setIsRetrying(true);
     try {
-      const result = await retryImport(jobId);
-      if (result.success && result.jobId) {
-        onRetry(result.jobId);
-      }
+      const { jobId: newJobId } = await restartImportJob();
+      onRetry(newJobId);
     } catch (e) {
       console.error('Failed to retry:', e);
     } finally {
@@ -342,7 +373,7 @@ export default function ImportExecutionPanel({
             </>
           ) : state === 'failed' || state === 'canceled' ? (
             <>
-              {onRetry && (
+              {onRetry && restartImportJob && (
                 <Button
                   onClick={onRetryClick}
                   disabled={isRetrying}

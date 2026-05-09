@@ -13,7 +13,8 @@ import { useSession } from 'next-auth/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { createProject } from '@lib/db/helper';
-import { startImport, getImportStatus } from '@lib/db/import-actions';
+import { postImportJob, getImportJobStatus } from '@lib/import-api-client';
+import { importJobInputToRestBody } from '@lib/import-job-rest-body';
 import { appendProjectQualitySnapshot } from '@/app/utils/project-quality-score-history';
 import { analyzeSpecification, type AnalysisResult } from '@/app/utils/openapi-analyzer';
 import { generateSlug } from '@/app/utils/slug';
@@ -231,6 +232,7 @@ export function RepositoryFileImportMapping({
   const [catalogImportExecutionComplete, setCatalogImportExecutionComplete] = useState(false);
   const [catalogImportSucceeded, setCatalogImportSucceeded] = useState(false);
   const dryRunRef = useRef(false);
+  const catalogImportRestBodyRef = useRef<Record<string, unknown> | null>(null);
 
   const specMetadata = useMemo(
     () => parseRepositoryFileSpecMetadata(payload?.content ?? '', file.path),
@@ -371,6 +373,7 @@ export function RepositoryFileImportMapping({
   };
 
   const resetCatalogImportFlow = () => {
+    catalogImportRestBodyRef.current = null;
     setCatalogImportPhase('idle');
     setCatalogImportJobId(null);
     setCatalogImportSchemas([]);
@@ -390,7 +393,7 @@ export function RepositoryFileImportMapping({
         return;
       }
       try {
-        const status = await getImportStatus(id);
+        const status = await getImportJobStatus(id);
         if (status.state === 'pending-approval') {
           return;
         }
@@ -409,7 +412,7 @@ export function RepositoryFileImportMapping({
     let cancelled = false;
     void (async () => {
       try {
-        const status = await getImportStatus(catalogImportJobId);
+        const status = await getImportJobStatus(catalogImportJobId);
         if (cancelled) return;
         const projectId = (status as { result?: { projectId?: string } }).result?.projectId;
         if (!projectId) return;
@@ -495,7 +498,7 @@ export function RepositoryFileImportMapping({
         const document = analysis.document;
         const sourceKind = analysis.format === 'arazzo' ? 'arazzo' : 'openapi';
 
-        const job = await startImport({
+        const restBody = importJobInputToRestBody({
           tenantId: currentTenantId,
           userId: currentUserId,
           sourceKind,
@@ -536,6 +539,9 @@ export function RepositoryFileImportMapping({
           },
           existingProjectId: catalogProjectId,
         });
+        catalogImportRestBodyRef.current = restBody;
+
+        const job = await postImportJob(restBody);
 
         setCatalogImportJobId(job.jobId);
         setCatalogImportSchemas(importOptions.selectedSchemas);
@@ -607,6 +613,13 @@ export function RepositoryFileImportMapping({
               onRetry={(newJobId) => {
                 setCatalogImportJobId(newJobId);
                 setCatalogImportExecutionComplete(false);
+              }}
+              restartImportJob={async () => {
+                const body = catalogImportRestBodyRef.current;
+                if (!body) {
+                  throw new Error('Missing catalog import payload for retry');
+                }
+                return postImportJob(body);
               }}
             />
           </div>
