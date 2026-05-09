@@ -262,6 +262,15 @@ describe("objectified CLI", () => {
     expect(out).toMatch(/--api-key/);
   });
 
+  it("import spec help lists EXAMPLES, project flags, and format parity pointer (#3332)", () => {
+    const out = run(["import", "spec", "--help"]);
+    expect(out).toMatch(/^EXAMPLES/m);
+    expect(out).toMatch(/CLI_SPEC_IMPORT_FORMAT_PARITY\.md/);
+    expect(out).toMatch(/#3328/);
+    expect(out).toMatch(/--create-or-map-project/);
+    expect(out).toMatch(/--format/);
+  });
+
   it("auth status exits 3 without credentials", () => {
     expect(runExit(["--no-json", "auth", "status"])).toBe(3);
   });

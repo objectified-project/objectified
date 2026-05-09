@@ -1,6 +1,6 @@
 .TH OBJECTIFIED\-IMPORT\-SPEC 1 "" "" "User Commands"
 .SH NAME
-objectified import spec \- Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`).
+objectified import spec \- Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 .SH DESCRIPTION
 .nf
 USAGE
@@ -21,7 +21,9 @@ DESCRIPTION
   Start a tenant-scoped specification import (POST
   /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with
   backoff, then commit (default), rollback preview, or stop after preview
-  (`--no-commit`).
+  (`--no-commit`). Supported formats vs the dashboard Import dialog and
+  repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic
+  #3328).
 
 EXAMPLES
   $ objectified import spec ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0

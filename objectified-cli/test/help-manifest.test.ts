@@ -23,6 +23,23 @@ describe("CLI manifest help metadata", () => {
     }
   });
 
+  it("documents import spec format parity and epic #3328 in repo checklist", () => {
+    const repoRoot = path.join(pkgRoot, "..");
+    const parityPath = path.join(repoRoot, "docs", "CLI_SPEC_IMPORT_FORMAT_PARITY.md");
+    const body = readFileSync(parityPath, "utf8");
+    expect(body).toMatch(/#3328/);
+    expect(body).toMatch(/Import dialog|ImportDialog/i);
+    expect(body).toMatch(/detected_kind_from_path|repository/i);
+  });
+
+  it("requires ≥2 examples on import:spec explicitly (#3332)", () => {
+    const raw = readFileSync(path.join(pkgRoot, "oclif.manifest.json"), "utf8");
+    const manifest = JSON.parse(raw) as { commands: Record<string, ManifestCommand> };
+    const ex = manifest.commands["import:spec"]?.examples;
+    expect(Array.isArray(ex)).toBe(true);
+    expect((ex as unknown[]).length).toBeGreaterThanOrEqual(2);
+  });
+
   it("ships a root man page and one page per core command id", () => {
     const raw = readFileSync(path.join(pkgRoot, "oclif.manifest.json"), "utf8");
     const manifest = JSON.parse(raw) as {
