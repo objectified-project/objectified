@@ -1,6 +1,6 @@
 {
   "name": "objectified-cli",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "description": "Objectified command-line interface",
   "author": "Objectified",
   "type": "module",
@@ -100,6 +100,7 @@
     "./man/man1/objectified-docs.1",
     "./man/man1/objectified-hello.1",
     "./man/man1/objectified-help.1",
+    "./man/man1/objectified-import-spec.1",
     "./man/man1/objectified-projects-create.1",
     "./man/man1/objectified-projects-list.1",
     "./man/man1/objectified-projects-show.1",
