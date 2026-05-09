@@ -181,9 +181,15 @@ export default class ImportSpec extends BaseCommand {
 
     const pathArg = typeof this.commandArgs.path === "string" ? this.commandArgs.path : "";
 
-    void this.flags.yes;
-
     const mapRaw = typeof this.flags["map-project"] === "string" ? this.flags["map-project"].trim() : "";
+    if (typeof this.flags["map-project"] === "string" && mapRaw === "") {
+      throw new ObjectifiedCliError({
+        message: "--map-project requires a non-empty slug value.",
+        exitCode: EXIT_CODES.MISUSE,
+        title: "Invalid usage",
+        hint: "Pass a project slug, e.g. --map-project payments-api",
+      });
+    }
     const hasMap = mapRaw !== "";
     const createProject = this.flags["create-project"] === true;
     const createOrMap = this.flags["create-or-map-project"] === true;
@@ -247,6 +253,16 @@ export default class ImportSpec extends BaseCommand {
     const descriptionProvided = typeof projDescRaw === "string";
     const projectDescriptionForTarget =
       typeof projDescRaw === "string" && projDescRaw.trim() !== "" ? projDescRaw.trim() : null;
+
+    if (hasMap && descriptionProvided) {
+      throw new ObjectifiedCliError({
+        message:
+          "--project-description cannot be used with --map-project (the existing project's description is used).",
+        exitCode: EXIT_CODES.MISUSE,
+        title: "Invalid usage",
+        hint: "Remove --project-description or use --create-project / --create-or-map-project instead.",
+      });
+    }
 
     let resolved: ResolvedSpecImportProject;
 
