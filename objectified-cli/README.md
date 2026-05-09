@@ -1198,10 +1198,10 @@ Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/impor
 
 ```
 USAGE
-  $ objectified import spec PATH --version <value> [--api-key <value>] [--api-key-file <value>] [--base-url
-    <value>] [--config <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
-    [--map-project <value> | --create-project | --create-or-map-project | --existing-project-id <value>] [--project-name
-    <value>] [--project-slug <value>] [--project-description <value>] [--version-description <value>] [--domain <value>]
+  $ objectified import spec PATH [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
+    <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--map-project <value> |
+    --create-project | --create-or-map-project | --existing-project-id <value>] [--project-name <value>] [--project-slug
+    <value>] [--version <value>] [--project-description <value>] [--version-description <value>] [--domain <value>]
     [--visibility private|public] [--yes] [--format <value>] [--filename <value>] [--dry-run] [--no-wait] [--commit]
     [--rollback]
 
@@ -1219,6 +1219,8 @@ EXAMPLES
   $ objectified import spec ./openapi.yaml --map-project payments-api --version 1.0.0
 
   $ objectified import spec ./openapi.yaml --create-project --project-name 'Payments API' --project-slug payments-api --version 1.0.0 --yes
+
+  $ objectified import spec ./openapi.yaml --tenant acme --create-or-map-project --yes --no-wait
 
   $ objectified import spec ./openapi.yaml --create-or-map-project --project-name 'Payments API' --project-slug payments-api --version 1.0.0 --yes --no-wait
 
@@ -1270,13 +1272,17 @@ OTHER
   --no-wait                      Start the job and print the job id immediately without polling or finalize calls (CI
                                  stitching).
   --project-description=<value>  Optional project description forwarded in import metadata.
-  --project-name=<value>         Display name for the catalog project. Required except with --map-project (optional
-                                 there for validation only).
-  --project-slug=<value>         URL-safe project slug (^[a-z][a-z0-9-]{1,62}$). Required unless --map-project supplies
+  --project-name=<value>         Display name for the catalog project. With --create-or-map-project, defaults to
+                                 info.title from OpenAPI/AsyncAPI. Otherwise required except with --map-project
+                                 (optional there for validation only).
+  --project-slug=<value>         URL-safe project slug (^[a-z][a-z0-9-]{1,62}$). With --create-or-map-project, derived
+                                 from the display name when omitted. Otherwise required unless --map-project supplies
                                  the slug.
   --rollback                     After preview (pending-approval), POST …/rollback instead of commit (implies
                                  --no-commit).
-  --version=<value>              (required) Semantic version id for the imported catalog revision (for example 1.0.0).
+  --version=<value>              Semantic version id for the imported catalog revision (for example 1.0.0). With
+                                 --create-or-map-project, defaults to info.version from OpenAPI/AsyncAPI when omitted.
+                                 Required for other project strategies.
   --version-description=<value>  Optional version description forwarded in import metadata.
   --visibility=<option>          Optional visibility metadata when creating a project: private or public (default:
                                  private).

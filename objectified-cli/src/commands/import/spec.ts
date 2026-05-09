@@ -9,11 +9,15 @@ import type {
 } from "../../lib/client.js";
 import { ObjectifiedCliError } from "../../lib/errors.js";
 import { EXIT_CODES } from "../../lib/exit-codes.js";
-import { resolveSpecImportKind } from "../../lib/import/spec-format.js";
+import { resolveSpecImportKind, type ResolvedSpecKind } from "../../lib/import/spec-format.js";
 import {
   pollSpecImportUntilGate,
   pollSpecImportUntilTerminal,
 } from "../../lib/import/spec-import-flow.js";
+import {
+  deriveCatalogIdentityFromSpecBytes,
+  resolveCatalogIdentityForCreateOrMap,
+} from "../../lib/import/spec-import-catalog-identity.js";
 import { readSpecInput } from "../../lib/import/read-spec-input.js";
 import {
   resolveCreateOrMapProjectImport,
@@ -64,6 +68,7 @@ export default class ImportSpec extends BaseCommand {
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0",
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --map-project payments-api --version 1.0.0",
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --create-project --project-name 'Payments API' --project-slug payments-api --version 1.0.0 --yes",
+    "<%= config.bin %> <%= command.id %> ./openapi.yaml --tenant acme --create-or-map-project --yes --no-wait",
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --create-or-map-project --project-name 'Payments API' --project-slug payments-api --version 1.0.0 --yes --no-wait",
     "<%= config.bin %> --json <%= command.id %> ./spec.json --project-slug my-api --project-name 'My API' --version 2.0.0 --no-wait",
     "<%= config.bin %> <%= command.id %> - --filename ./api.yaml --project-slug svc --project-name Service --version 0.1.0 < ./api.yaml",
@@ -99,15 +104,15 @@ export default class ImportSpec extends BaseCommand {
     }),
     "project-name": Flags.string({
       description:
-        "Display name for the catalog project. Required except with --map-project (optional there for validation only).",
+        "Display name for the catalog project. With --create-or-map-project, defaults to info.title from OpenAPI/AsyncAPI. Otherwise required except with --map-project (optional there for validation only).",
     }),
     "project-slug": Flags.string({
       description:
-        "URL-safe project slug (^[a-z][a-z0-9-]{1,62}$). Required unless --map-project supplies the slug.",
+        "URL-safe project slug (^[a-z][a-z0-9-]{1,62}$). With --create-or-map-project, derived from the display name when omitted. Otherwise required unless --map-project supplies the slug.",
     }),
     version: Flags.string({
-      description: "Semantic version id for the imported catalog revision (for example 1.0.0).",
-      required: true,
+      description:
+        "Semantic version id for the imported catalog revision (for example 1.0.0). With --create-or-map-project, defaults to info.version from OpenAPI/AsyncAPI when omitted. Required for other project strategies.",
     }),
     "project-description": Flags.string({
       description: "Optional project description forwarded in import metadata.",
@@ -240,14 +245,13 @@ export default class ImportSpec extends BaseCommand {
     const projectSlugRaw = this.flags["project-slug"];
     const versionRaw = typeof this.flags.version === "string" ? this.flags.version.trim() : "";
 
-    if (versionRaw === "") {
+    if (!createOrMap && versionRaw === "") {
       throw new ObjectifiedCliError({
-        message: "--version is required.",
+        message: "--version is required unless --create-or-map-project derives it from the spec.",
         exitCode: EXIT_CODES.MISUSE,
         title: "Invalid usage",
       });
     }
-    const versionId = parseValidSemverVersionId(versionRaw);
 
     const projDescRaw = this.flags["project-description"];
     const descriptionProvided = typeof projDescRaw === "string";
@@ -264,9 +268,21 @@ export default class ImportSpec extends BaseCommand {
       });
     }
 
+    const formatRaw = typeof this.flags.format === "string" ? this.flags.format.trim() : "";
+    const explicitFormat = formatRaw !== "" ? formatRaw : undefined;
+
+    const stdinFilenameRaw =
+      typeof this.flags.filename === "string" ? this.flags.filename.trim() : "";
+    const stdinFilename = stdinFilenameRaw !== "" ? stdinFilenameRaw : undefined;
+
     let resolved: ResolvedSpecImportProject;
+    let versionId: string;
+    let bytes: Buffer;
+    let resolvedPath: string;
+    let kind: ResolvedSpecKind;
 
     if (hasMap) {
+      versionId = parseValidSemverVersionId(versionRaw);
       resolved = await resolveMapProjectImport({
         api: this.api,
         tenant,
@@ -277,11 +293,52 @@ export default class ImportSpec extends BaseCommand {
             ? projectSlugRaw
             : undefined,
       });
-    } else if (createProject || createOrMap) {
+      ({ bytes, resolvedPath } = await readSpecInput(pathArg));
+      kind = resolveSpecImportKind({
+        explicitFormat,
+        stdinFilename,
+        resolvedPath,
+        bytes,
+      });
+    } else if (createOrMap) {
+      ({ bytes, resolvedPath } = await readSpecInput(pathArg));
+      kind = resolveSpecImportKind({
+        explicitFormat,
+        stdinFilename,
+        resolvedPath,
+        bytes,
+      });
+      const derived = deriveCatalogIdentityFromSpecBytes(bytes, kind.sourceKind);
+      const catalogIdentity = resolveCatalogIdentityForCreateOrMap({
+        derived,
+        sourceKind: kind.sourceKind,
+        cliProjectName: projectName,
+        cliProjectSlug: typeof projectSlugRaw === "string" ? projectSlugRaw.trim() : "",
+        cliVersionRaw: versionRaw,
+      });
+      versionId = catalogIdentity.versionId;
+      const projectTarget = {
+        name: catalogIdentity.projectName,
+        slug: catalogIdentity.projectSlug,
+        description: projectDescriptionForTarget,
+      };
+      resolved = await resolveCreateOrMapProjectImport({
+        api: this.api,
+        tenant,
+        project: projectTarget,
+        hints: {
+          descriptionProvided,
+          domainProvided,
+          visibilityProvided,
+        },
+        domain: domainCli,
+        visibility: visibilityCli,
+      });
+    } else if (createProject) {
+      versionId = parseValidSemverVersionId(versionRaw);
       if (projectName === "") {
         throw new ObjectifiedCliError({
-          message:
-            "--project-name is required with --create-project or --create-or-map-project.",
+          message: "--project-name is required with --create-project.",
           exitCode: EXIT_CODES.MISUSE,
           title: "Invalid usage",
         });
@@ -305,29 +362,22 @@ export default class ImportSpec extends BaseCommand {
         slug: slugCheckCreate.slug,
         description: projectDescriptionForTarget,
       };
-      if (createProject) {
-        resolved = await resolveCreateProjectImport({
-          api: this.api,
-          tenant,
-          project: projectTarget,
-          domain: domainCli,
-          visibility: visibilityCli,
-        });
-      } else {
-        resolved = await resolveCreateOrMapProjectImport({
-          api: this.api,
-          tenant,
-          project: projectTarget,
-          hints: {
-            descriptionProvided,
-            domainProvided,
-            visibilityProvided,
-          },
-          domain: domainCli,
-          visibility: visibilityCli,
-        });
-      }
+      resolved = await resolveCreateProjectImport({
+        api: this.api,
+        tenant,
+        project: projectTarget,
+        domain: domainCli,
+        visibility: visibilityCli,
+      });
+      ({ bytes, resolvedPath } = await readSpecInput(pathArg));
+      kind = resolveSpecImportKind({
+        explicitFormat,
+        stdinFilename,
+        resolvedPath,
+        bytes,
+      });
     } else {
+      versionId = parseValidSemverVersionId(versionRaw);
       if (projectName === "") {
         throw new ObjectifiedCliError({
           message: "--project-name is required unless --map-project is set.",
@@ -357,6 +407,13 @@ export default class ImportSpec extends BaseCommand {
           description: projectDescriptionForTarget,
         },
       };
+      ({ bytes, resolvedPath } = await readSpecInput(pathArg));
+      kind = resolveSpecImportKind({
+        explicitFormat,
+        stdinFilename,
+        resolvedPath,
+        bytes,
+      });
     }
 
     const rollback = this.flags.rollback === true;
@@ -364,22 +421,6 @@ export default class ImportSpec extends BaseCommand {
 
     const dryRun = this.flags["dry-run"] === true;
     const noWait = this.flags["no-wait"] === true;
-
-    const formatRaw = typeof this.flags.format === "string" ? this.flags.format.trim() : "";
-    const explicitFormat = formatRaw !== "" ? formatRaw : undefined;
-
-    const stdinFilenameRaw =
-      typeof this.flags.filename === "string" ? this.flags.filename.trim() : "";
-    const stdinFilename = stdinFilenameRaw !== "" ? stdinFilenameRaw : undefined;
-
-    const { bytes, resolvedPath } = await readSpecInput(pathArg);
-
-    const kind = resolveSpecImportKind({
-      explicitFormat,
-      stdinFilename,
-      resolvedPath,
-      bytes,
-    });
 
     const verDescRaw = this.flags["version-description"];
 

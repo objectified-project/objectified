@@ -1,0 +1,25 @@
+# Sample Objectified CLI configuration (TOML).
+#
+# Copy to your real config path (see `objectified config path`) or use:
+#   objectified --config /path/to/this/file.toml …
+#   OBJECTIFIED_CONFIG=/path/to/this/file.toml
+#
+# Secrets (API keys, tokens) are NOT stored here — use `objectified auth login`,
+# `--api-key`, `OBJECTIFIED_API_KEY`, or `--api-key-file`. See `objectified docs profiles`.
+
+# Profile used when --profile and OBJECTIFIED_PROFILE are unset.
+default_profile = "default"
+
+# Values merged under every named profile unless overridden in [profile.NAME].
+[default]
+base_url = "https://api.objectified.dev"
+# tenant_slug = "your-tenant-slug"
+
+[profile.default]
+# Overrides [default] for the "default" profile only (often matches [default]).
+base_url = "https://api.objectified.dev"
+
+# Example second profile (switch with --profile staging or OBJECTIFIED_PROFILE=staging).
+[profile.staging]
+base_url = "https://api.staging.example.com"
+tenant_slug = "acme-staging"
