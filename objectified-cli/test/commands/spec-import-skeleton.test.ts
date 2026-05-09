@@ -92,7 +92,6 @@ describe("spec import skeleton (#3308)", () => {
           res.end();
           return;
         }
-
         if (req.method === "POST" && url.pathname === "/v1/projects/acme") {
           const raw = await readBody(req);
           const body = JSON.parse(raw) as {
