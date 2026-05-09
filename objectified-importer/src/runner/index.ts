@@ -32,6 +32,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/** When set, auto-commit after preview so REST orchestrator sees a single process reach `completed`. */
+function orchestratorAutoCommitEnabled(): boolean {
+  const v = process.env.OBJECTIFIED_IMPORTER_ORCHESTRATOR;
+  return v === '1' || v === 'true';
+}
+
 function readPositiveIntFromEnv(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -169,6 +175,7 @@ async function streamUntilTerminal(engine: ImportEngine, jobId: string, stdout: 
         type: 'result',
         state: mapCliResultState(status),
         summary: status.summary,
+        result: status.result,
       });
 
       return status.state;
@@ -206,7 +213,20 @@ export async function runImportWithEngine(
       await engine.cancelImport(envelope.jobId);
     }
 
-    await streamUntilTerminal(engine, envelope.jobId, stdout);
+    let state = await streamUntilTerminal(engine, envelope.jobId, stdout);
+    if (orchestratorAutoCommitEnabled() && state === 'pending-approval') {
+      const commitRes = await engine.commitImport(envelope.jobId);
+      if (!commitRes.success) {
+        await writeNdjsonLine(stdout, {
+          type: 'error',
+          code: 'COMMIT_FAILED',
+          message: commitRes.error || 'commitImport failed',
+        });
+        await writeNdjsonLine(stdout, { type: 'result', state: 'failed', summary: undefined });
+        return 0;
+      }
+      state = await streamUntilTerminal(engine, envelope.jobId, stdout);
+    }
     return 0;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

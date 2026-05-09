@@ -34,6 +34,10 @@ from .version_change_report_routes import router as version_change_report_router
 from .change_report_template_routes import router as change_report_template_router
 from .tenant_repositories_routes import router as tenant_repositories_router
 from .imports_routes import router as imports_router
+from .import_orchestrator import (
+    shutdown_import_orchestrator_tasks,
+    start_import_orchestrator_tasks,
+)
 from .tenants_session_routes import router as tenants_session_router
 from .browse_public_routes import router as browse_public_router
 
@@ -41,7 +45,7 @@ from .browse_public_routes import router as browse_public_router
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.61"
+    version="1.0.62"
 )
 
 
@@ -195,10 +199,14 @@ async def startup_event():
     global _repository_file_scan_task
     _repository_file_scan_task = asyncio.create_task(_repository_file_scan_sweep())
 
+    start_import_orchestrator_tasks()
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Close database connection on shutdown."""
+    await shutdown_import_orchestrator_tasks()
+
     global _webhook_delivery_task
     if _webhook_delivery_task is not None:
         _webhook_delivery_task.cancel()
