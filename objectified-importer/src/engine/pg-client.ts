@@ -3,8 +3,18 @@
  */
 
 import type { Pool, PoolClient } from 'pg';
-import { getPlanBlockMessageForNewProject, getPlanBlockMessageForNewVersion } from '../../../objectified-ui/lib/db/plan-entitlements';
 import type { TransactionHandle, TransactionalClient } from './transactional-client';
+
+/**
+ * Optional plan/entitlement check callbacks injected into {@link PgTransactionalClient}.
+ * Keeping these out of the constructor's required args avoids importing UI DB modules here.
+ */
+export type PgClientPlanChecks = {
+  /** Returns a block-error message when the user cannot create a new project, or null if allowed. */
+  checkPlanForNewProject?: (userId: string, client: PgQueryable) => Promise<string | null>;
+  /** Returns a block-error message when the user cannot create a new version, or null if allowed. */
+  checkPlanForNewVersion?: (userId: string, client: PgQueryable) => Promise<string | null>;
+};
 
 export type PgQueryable = Pick<PoolClient, 'query' | 'release'>;
 
@@ -45,7 +55,8 @@ async function createProjectTxImpl(
   name: string,
   description: string,
   slug: string,
-  metadata?: unknown
+  metadata?: unknown,
+  planChecks?: PgClientPlanChecks
 ): Promise<string> {
   try {
     if (!name?.trim()) return errorResponse('Project name is required');
@@ -53,8 +64,10 @@ async function createProjectTxImpl(
     const slugError = validateSlug(slug.trim());
     if (slugError) return errorResponse(slugError);
 
-    const planErr = await getPlanBlockMessageForNewProject(creatorId, client);
-    if (planErr) return errorResponse(planErr);
+    if (planChecks?.checkPlanForNewProject) {
+      const planErr = await planChecks.checkPlanForNewProject(creatorId, client);
+      if (planErr) return errorResponse(planErr);
+    }
 
     const result = await client.query(
       `INSERT INTO odb.projects (tenant_id, creator_id, name, description, slug, metadata) 
@@ -104,13 +117,16 @@ async function createVersionTxImpl(
   versionId: string,
   description: string,
   changeLog: string,
-  opts?: { parentVersionUuid?: string | null }
+  opts?: { parentVersionUuid?: string | null },
+  planChecks?: PgClientPlanChecks
 ): Promise<string> {
   try {
     if (!versionId?.trim()) return errorResponse('Version ID is required');
 
-    const planErr = await getPlanBlockMessageForNewVersion(creatorId, client);
-    if (planErr) return errorResponse(planErr);
+    if (planChecks?.checkPlanForNewVersion) {
+      const planErr = await planChecks.checkPlanForNewVersion(creatorId, client);
+      if (planErr) return errorResponse(planErr);
+    }
 
     const parentUuid = opts?.parentVersionUuid?.trim() || null;
     const result = parentUuid
@@ -400,7 +416,10 @@ export async function getClassesWithPropertiesAndTagsTx(client: PgQueryable, ver
 }
 
 class PgTransactionHandle implements TransactionHandle {
-  constructor(private readonly client: PoolClient) {}
+  constructor(
+    private readonly client: PoolClient,
+    private readonly planChecks?: PgClientPlanChecks
+  ) {}
 
   begin(): Promise<void> {
     return beginTransaction(this.client);
@@ -423,7 +442,7 @@ class PgTransactionHandle implements TransactionHandle {
     slug: string,
     metadata?: unknown
   ): Promise<string> {
-    return createProjectTxImpl(this.client, tenantId, creatorId, name, description, slug, metadata);
+    return createProjectTxImpl(this.client, tenantId, creatorId, name, description, slug, metadata, this.planChecks);
   }
 
   createVersionTx(
@@ -434,7 +453,7 @@ class PgTransactionHandle implements TransactionHandle {
     changeLog: string,
     opts?: { parentVersionUuid?: string | null }
   ): Promise<string> {
-    return createVersionTxImpl(this.client, projectId, creatorId, versionId, description, changeLog, opts);
+    return createVersionTxImpl(this.client, projectId, creatorId, versionId, description, changeLog, opts, this.planChecks);
   }
 
   getLatestVersionUuidForProjectTx(projectId: string): Promise<string | null> {
@@ -472,10 +491,13 @@ class PgTransactionHandle implements TransactionHandle {
 }
 
 export class PgTransactionalClient implements TransactionalClient {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly planChecks?: PgClientPlanChecks
+  ) {}
 
   async connect(): Promise<TransactionHandle> {
     const client = await this.pool.connect();
-    return new PgTransactionHandle(client);
+    return new PgTransactionHandle(client, this.planChecks);
   }
 }

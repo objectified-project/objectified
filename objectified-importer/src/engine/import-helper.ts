@@ -1,5 +1,6 @@
 import type { ImportEngineDeps, TransactionHandle } from './transactional-client';
-import { ImportSourceKind, getImporter, NormalizedClass, NormalizedProperty } from '../parsers/index';
+import { getImporter } from '../parsers/index';
+import type { ImportSourceKind, NormalizedClass, NormalizedProperty } from '../parsers/index';
 import { withRetry } from '../../../objectified-ui/lib/retry';
 import { extractPaths, extractSecuritySchemes } from '../../../objectified-ui/src/app/utils/openapi-import';
 

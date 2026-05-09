@@ -1,4 +1,40 @@
-import type { ParsedPath, ParsedSecurityScheme } from '../../../objectified-ui/src/app/utils/openapi-import';
+/** Parsed OpenAPI operation (get, post, etc.) */
+export interface ParsedOperation {
+  method: string;
+  operationId?: string;
+  summary?: string;
+  description?: string;
+  tags?: string[];
+  deprecated?: boolean;
+  parameters: Array<{ name: string; in: string; required?: boolean; description?: string; schema?: Record<string, unknown> }>;
+  requestBody?: {
+    required?: boolean;
+    description?: string;
+    content: Record<string, { schema?: Record<string, unknown>; $ref?: string }>;
+  };
+  responses: Record<string, { description?: string; content?: Record<string, { schema?: Record<string, unknown>; $ref?: string }>; headers?: Record<string, unknown>; links?: Record<string, unknown> }>;
+  security?: Record<string, string[]>;
+}
+
+/** Parsed OpenAPI path item. */
+export interface ParsedPath {
+  path: string;
+  summary?: string;
+  description?: string;
+  parameters?: Array<{ name: string; in: string; required?: boolean; description?: string; schema?: Record<string, unknown> }>;
+  operations: ParsedOperation[];
+}
+
+/** Parsed OpenAPI security scheme (components.securitySchemes). */
+export interface ParsedSecurityScheme {
+  scheme_name: string;
+  scheme_type: 'apiKey' | 'http' | 'oauth2' | 'openIdConnect' | 'mutualTLS';
+  in_location?: 'header' | 'query' | 'cookie';
+  param_name?: string;
+  http_scheme?: string;
+  description?: string;
+  data?: Record<string, unknown>;
+}
 
 /** Payload for optional repository-import linkage after a successful import (UI records metrics). */
 export type RepositoryImportLink = {

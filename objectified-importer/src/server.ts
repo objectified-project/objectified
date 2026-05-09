@@ -1,5 +1,4 @@
-import type { ParsedPath, ParsedSecurityScheme } from '../../objectified-ui/src/app/utils/openapi-import';
-import type { ImportEngineDeps } from './engine/transactional-client';
+import type { ParsedPath, ParsedSecurityScheme, ImportEngineDeps } from './engine/transactional-client';
 export * from './browser';
 import { createImporterEngineRequire } from './engine/importer-node-require';
 import {
@@ -61,7 +60,16 @@ export { importOpenAPIPathsAndSecurityWithPool } from './engine/import-openapi-p
 
 function buildDefaultImportEngineDeps(): ImportEngineDeps {
   return {
-    txClient: new PgTransactionalClient(uiConnectionPool()),
+    txClient: new PgTransactionalClient(uiConnectionPool(), {
+      checkPlanForNewProject: async (userId, client) => {
+        const { getPlanBlockMessageForNewProject } = nodeRequire('../../../objectified-ui/lib/db/plan-entitlements');
+        return getPlanBlockMessageForNewProject(userId, client);
+      },
+      checkPlanForNewVersion: async (userId, client) => {
+        const { getPlanBlockMessageForNewVersion } = nodeRequire('../../../objectified-ui/lib/db/plan-entitlements');
+        return getPlanBlockMessageForNewVersion(userId, client);
+      },
+    }),
     recordRepositoryImport: async link => {
       const { recordTenantRepositoryImport } = nodeRequire('../../../objectified-ui/lib/db/repository-import-metrics');
       await recordTenantRepositoryImport(link);
@@ -76,7 +84,14 @@ function buildDefaultImportEngineDeps(): ImportEngineDeps {
   };
 }
 
-createImportEngine(buildDefaultImportEngineDeps());
+/**
+ * Wire the import engine with UI-backed Postgres dependencies.
+ * Call this once from the UI server bootstrap before any import functions are used.
+ * Idempotent: subsequent calls replace the current engine configuration.
+ */
+export function configureUiImportEngine(): void {
+  createImportEngine(buildDefaultImportEngineDeps());
+}
 
 export { startImport, getImportStatus, cancelImport, commitImport, rollbackImport, rollbackCompletedImport, retryImport };
 

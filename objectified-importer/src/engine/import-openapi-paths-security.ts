@@ -3,7 +3,7 @@
  * Call after importProjectFromOpenAPI when the spec contains paths or components.securitySchemes.
  */
 
-import type { ParsedPath, ParsedSecurityScheme } from '../../../objectified-ui/src/app/utils/openapi-import';
+import type { ParsedPath, ParsedSecurityScheme } from './transactional-client';
 
 export type OpenApiPathsPgClient = {
   query: (text: string, params?: unknown[]) => Promise<unknown>;
@@ -322,6 +322,12 @@ export async function importOpenAPIPathsAndSecurityWithPool(
   paths: ParsedPath[],
   securitySchemes: ParsedSecurityScheme[]
 ): Promise<{ success: boolean; error?: string }> {
+  if (!versionId?.trim()) {
+    return { success: false, error: 'versionId is required' };
+  }
+  if (!paths?.length && !securitySchemes?.length) {
+    return { success: false, error: 'No paths or security schemes to import' };
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
