@@ -20,7 +20,7 @@ export default class SpecImportStatus extends BaseCommand {
     "<%= config.bin %> <%= command.id %> 7c3d2a1b-…-e22a",
     "<%= config.bin %> <%= command.id %> --last",
     "<%= config.bin %> --json <%= command.id %> --last",
-    "<%= config.bin %> <%= command.id %> --watch",
+    "<%= config.bin %> <%= command.id %> --last --watch",
   ];
 
   static seeAlso = ["spec import", "spec import commit", "spec import cancel", "docs errors"];

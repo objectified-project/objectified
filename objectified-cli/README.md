@@ -1782,7 +1782,7 @@ EXAMPLES
 
   $ objectified --json spec import status --last
 
-  $ objectified spec import status --watch
+  $ objectified spec import status --last --watch
 
 COMMON
   --base-url=<value>  Root REST API URL.

@@ -20,8 +20,12 @@ export function writeLastImportJobId(tenantSlug: string, jobId: string): void {
   const id = jobId.trim();
   if (id === "") return;
   const filePath = lastImportJobCacheFilePath(tenantSlug);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${id}\n`, "utf8");
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, `${id}\n`, "utf8");
+  } catch {
+    // Cache is a convenience; ignore write failures so they don't fail CLI commands.
+  }
 }
 
 export function readLastImportJobId(tenantSlug: string): string | undefined {
@@ -29,12 +33,8 @@ export function readLastImportJobId(tenantSlug: string): string | undefined {
   try {
     const raw = fs.readFileSync(filePath, "utf8").trim();
     return raw === "" ? undefined : raw;
-  } catch (err: unknown) {
-    const code =
-      typeof err === "object" && err && "code" in err
-        ? (err as NodeJS.ErrnoException).code
-        : undefined;
-    if (code === "ENOENT") return undefined;
-    throw err;
+  } catch {
+    // Cache is a convenience; treat any read error (including ENOENT) as a cache miss.
+    return undefined;
   }
 }
