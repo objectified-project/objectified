@@ -47,6 +47,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## UI
 - Spec import engine and format parsers live in the **`objectified-importer`** workspace package (`objectified-importer` client-safe entry + `objectified-importer/server` for DB-backed import); the UI keeps thin server-action wrappers and the same import APIs (#3302).
+- **`objectified-importer`**: import engine depends on injected `TransactionalClient` / `TransactionHandle`, `ImportEngineDeps`, and `createImportEngine` (Postgres via `PgTransactionalClient`); repository metrics and completed rollback use injected helpers; Vitest setup no longer loads the engine before per-file `vi.mock` (#3303).
 - Adds the ability to view projects that were deleted (show deleted toggle)
 - Introduces undelete for soft deleted projects
 

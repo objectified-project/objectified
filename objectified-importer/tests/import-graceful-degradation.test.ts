@@ -1,73 +1,60 @@
 /**
  * Import Graceful Degradation Tests (#733)
- *
- * Unit tests for "continue on non-critical errors" during import execution:
- * - Property link failure: addPropertyToClassTx fails → emit PROPERTY_LINK_FAILED warn, continue, reach pending-approval
- * - Verification failure: verification mismatches → do not throw, emit VERIFY_MISMATCHES warn, reach pending-approval
  */
 
+import { createImportEngine } from '../src/engine/import-helper';
+import { mockTxConnect } from './import-test-mocks';
 
-// Track addPropertyToClassTx call count for "fail on Nth call" behavior
 let addPropertyToClassTxCallCount = 0;
 let addPropertyToClassTxFailOnCall: number | null = null;
-
-// Control getClassesWithPropertiesAndTagsTx response for verification tests
 let getClassesWithPropertiesAndTagsTxReturnsMismatch = false;
 
-const mockClient = { query: vi.fn(), release: vi.fn() };
+const mockBeginTransaction = vi.fn();
+const mockCommitTransaction = vi.fn();
+const mockRollbackTransaction = vi.fn();
+const mockReleaseClient = vi.fn();
+const mockCreateProjectTx = vi.fn(() =>
+  Promise.resolve(JSON.stringify({ success: true, project: { id: 'proj-1' } }))
+);
+const mockCreateVersionTx = vi.fn(() =>
+  Promise.resolve(JSON.stringify({ success: true, version: { id: 'ver-1' } }))
+);
+const mockCreatePropertyTx = vi.fn((_projectId: string, _name: string, _desc: any, data: any) => {
+  const id = 'prop-' + JSON.stringify(data).length;
+  return Promise.resolve(JSON.stringify({ success: true, property: { id } }));
+});
+const mockCreateClassTx = vi.fn(() =>
+  Promise.resolve(JSON.stringify({ success: true, class: { id: 'class-1' } }))
+);
+const mockAddPropertyToClassTx = vi.fn(async () => {
+  addPropertyToClassTxCallCount++;
+  if (addPropertyToClassTxFailOnCall !== null && addPropertyToClassTxCallCount === addPropertyToClassTxFailOnCall) {
+    return Promise.resolve(JSON.stringify({ success: false, error: 'Constraint violation (simulated)' }));
+  }
+  return Promise.resolve(
+    JSON.stringify({ success: true, classProperty: { id: 'cp-' + addPropertyToClassTxCallCount } })
+  );
+});
+const mockGetClassesWithPropertiesAndTagsTx = vi.fn(async () => {
+  if (getClassesWithPropertiesAndTagsTxReturnsMismatch) {
+    return Promise.resolve(JSON.stringify([]));
+  }
+  return Promise.resolve(
+    JSON.stringify([
+      {
+        name: 'TestClass',
+        schema: {},
+        properties: [
+          { id: 'p1', name: 'id', data: { type: 'string' }, children: [] },
+          { id: 'p2', name: 'name', data: { type: 'number' }, children: [] },
+        ],
+      },
+    ])
+  );
+});
+const mockGetLatestVersionUuidForProjectTx = vi.fn(() => Promise.resolve(null));
+const mockListProjectLibraryPropertiesTx = vi.fn(() => Promise.resolve([]));
 
-vi.mock('../src/engine/import-transaction', () => ({
-  getTransactionClient: vi.fn(() => Promise.resolve(mockClient)),
-  beginTransaction: vi.fn(() => Promise.resolve()),
-  commitTransaction: vi.fn(() => Promise.resolve()),
-  rollbackTransaction: vi.fn(() => Promise.resolve()),
-  releaseClient: vi.fn(() => Promise.resolve()),
-  createProjectTx: vi.fn(() =>
-    Promise.resolve(JSON.stringify({ success: true, project: { id: 'proj-1' } }))
-  ),
-  createVersionTx: vi.fn(() =>
-    Promise.resolve(JSON.stringify({ success: true, version: { id: 'ver-1' } }))
-  ),
-  createPropertyTx: vi.fn((_client: any, _projectId: string, _name: string, _desc: any, data: any) => {
-    const id = 'prop-' + JSON.stringify(data).length;
-    return Promise.resolve(JSON.stringify({ success: true, property: { id } }));
-  }),
-  createClassTx: vi.fn(() =>
-    Promise.resolve(JSON.stringify({ success: true, class: { id: 'class-1' } }))
-  ),
-  addPropertyToClassTx: vi.fn(async () => {
-    addPropertyToClassTxCallCount++;
-    if (addPropertyToClassTxFailOnCall !== null && addPropertyToClassTxCallCount === addPropertyToClassTxFailOnCall) {
-      return Promise.resolve(
-        JSON.stringify({ success: false, error: 'Constraint violation (simulated)' })
-      );
-    }
-    return Promise.resolve(
-      JSON.stringify({ success: true, classProperty: { id: 'cp-' + addPropertyToClassTxCallCount } })
-    );
-  }),
-  getClassesWithPropertiesAndTagsTx: vi.fn(async () => {
-    if (getClassesWithPropertiesAndTagsTxReturnsMismatch) {
-      return Promise.resolve(JSON.stringify([])); // No classes → verification will find missing_class
-    }
-    return Promise.resolve(
-      JSON.stringify([
-        {
-          name: 'TestClass',
-          schema: {},
-          properties: [
-            { id: 'p1', name: 'id', data: { type: 'string' }, children: [] },
-            { id: 'p2', name: 'name', data: { type: 'number' }, children: [] }
-          ]
-        }
-      ])
-    );
-  }),
-  getLatestVersionUuidForProjectTx: vi.fn(() => Promise.resolve(null)),
-  listProjectLibraryPropertiesTx: vi.fn(() => Promise.resolve([])),
-}));
-
-// Normalized class: two properties with different types so we get two addPropertyToClassTx calls
 const mockNormalizeResult = {
   classes: [
     {
@@ -76,19 +63,19 @@ const mockNormalizeResult = {
       schema: { type: 'object' },
       properties: [
         { name: 'id', data: { type: 'string' }, description: null },
-        { name: 'count', data: { type: 'number' }, description: null }
-      ]
-    }
+        { name: 'count', data: { type: 'number' }, description: null },
+      ],
+    },
   ],
-  warnings: [] as string[]
+  warnings: [] as string[],
 };
 
 vi.mock('../src/parsers/index', () => ({
   getImporter: vi.fn(() => ({
     kind: 'openapi',
-    normalize: () => mockNormalizeResult
+    normalize: () => mockNormalizeResult,
   })),
-  ImportSourceKind: { openapi: 'openapi', arazzo: 'arazzo', unknown: 'unknown' }
+  ImportSourceKind: { openapi: 'openapi', arazzo: 'arazzo', unknown: 'unknown' },
 }));
 
 async function waitForJobEnd(
@@ -115,23 +102,45 @@ describe('Import Graceful Degradation (#733)', () => {
     document: { openapi: '3.1.0' },
     project: { name: 'Test', slug: 'test', description: null },
     version: { versionId: '1.0.0', description: null },
-    options: { selectedSchemas: [] }
+    options: { selectedSchemas: [] },
   };
 
   beforeEach(() => {
     addPropertyToClassTxCallCount = 0;
     addPropertyToClassTxFailOnCall = null;
     getClassesWithPropertiesAndTagsTxReturnsMismatch = false;
-    mockClient.query.mockReset();
-    mockClient.release.mockReset();
-  });
+    mockTxConnect.mockReset();
 
-  afterEach(() => {
-    vi.resetModules();
+    mockBeginTransaction.mockResolvedValue(undefined);
+    mockCommitTransaction.mockResolvedValue(undefined);
+    mockRollbackTransaction.mockResolvedValue(undefined);
+    mockReleaseClient.mockResolvedValue(undefined);
+
+    mockTxConnect.mockImplementation(async () => ({
+      begin: mockBeginTransaction,
+      commit: mockCommitTransaction,
+      rollback: mockRollbackTransaction,
+      release: mockReleaseClient,
+      createProjectTx: mockCreateProjectTx,
+      createVersionTx: mockCreateVersionTx,
+      createPropertyTx: mockCreatePropertyTx,
+      createClassTx: mockCreateClassTx,
+      addPropertyToClassTx: mockAddPropertyToClassTx,
+      getClassesWithPropertiesAndTagsTx: mockGetClassesWithPropertiesAndTagsTx,
+      getLatestVersionUuidForProjectTx: mockGetLatestVersionUuidForProjectTx,
+      listProjectLibraryPropertiesTx: mockListProjectLibraryPropertiesTx,
+    }));
+
+    createImportEngine({
+      txClient: { connect: () => mockTxConnect() },
+      recordRepositoryImport: vi.fn(async () => {}),
+      permanentDeleteProject: vi.fn(async () => ({ success: true })),
+      importOpenApiPathsAndSecurity: vi.fn(async () => ({ success: true })),
+    });
   });
 
   test('when addPropertyToClassTx fails for one property: emits PROPERTY_LINK_FAILED warn and reaches pending-approval', async () => {
-    addPropertyToClassTxFailOnCall = 2; // Fail on second property link
+    addPropertyToClassTxFailOnCall = 2;
 
     const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(validInput);
@@ -149,7 +158,7 @@ describe('Import Graceful Degradation (#733)', () => {
   });
 
   test('when verification fails (mismatches): does not throw, emits VERIFY_MISMATCHES warn and reaches pending-approval', async () => {
-    getClassesWithPropertiesAndTagsTxReturnsMismatch = true; // DB "returns" no classes → verification finds missing_class
+    getClassesWithPropertiesAndTagsTxReturnsMismatch = true;
 
     const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(validInput);
@@ -182,8 +191,6 @@ describe('Import Graceful Degradation (#733)', () => {
   test('critical error (missing tenantId) throws and does not start job', async () => {
     const { startImport } = await import('../src/engine/import-helper');
 
-    await expect(
-      startImport({ ...validInput, tenantId: '' })
-    ).rejects.toThrow('Tenant ID is required');
+    await expect(startImport({ ...validInput, tenantId: '' })).rejects.toThrow('Tenant ID is required');
   });
 });

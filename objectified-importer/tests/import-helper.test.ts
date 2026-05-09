@@ -20,8 +20,11 @@ import type {
 } from '../src/engine/import-helper';
 
 vi.mock('../src/parsers/index', () => ({
-  getImporter: vi.fn(),
-  ImportSourceKind: 'openapi',
+  getImporter: vi.fn(() => ({
+    kind: 'openapi',
+    normalize: () => ({ classes: [], warnings: [] as string[] }),
+  })),
+  ImportSourceKind: { openapi: 'openapi', arazzo: 'arazzo', unknown: 'unknown' },
 }));
 
 describe('Import Helper - Type Definitions', () => {

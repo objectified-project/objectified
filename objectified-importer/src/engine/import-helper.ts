@@ -1,25 +1,7 @@
-import {
-  PoolClient,
-  getTransactionClient,
-  beginTransaction,
-  commitTransaction,
-  rollbackTransaction,
-  releaseClient,
-  createProjectTx,
-  createVersionTx,
-  createPropertyTx,
-  createClassTx,
-  addPropertyToClassTx,
-  getClassesWithPropertiesAndTagsTx,
-  getLatestVersionUuidForProjectTx,
-  listProjectLibraryPropertiesTx,
-} from './import-transaction';
+import type { ImportEngineDeps, TransactionHandle } from './transactional-client';
 import { ImportSourceKind, getImporter, NormalizedClass, NormalizedProperty } from '../parsers/index';
 import { withRetry } from '../../../objectified-ui/lib/retry';
-import { permanentDeleteProject } from '../../../objectified-ui/lib/db/helper';
 import { extractPaths, extractSecuritySchemes } from '../../../objectified-ui/src/app/utils/openapi-import';
-import { importOpenAPIPathsAndSecurity } from './import-openapi-paths-security';
-import { recordTenantRepositoryImport } from '../../../objectified-ui/lib/db/repository-import-metrics';
 
 export type ImportJobState = 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
 
@@ -106,6 +88,8 @@ export interface ImportJobInput {
   };
 }
 
+export type { ImportEngineDeps, RepositoryImportLink } from './transactional-client';
+
 interface JobState {
   input: ImportJobInput;
   state: ImportJobState;
@@ -115,7 +99,7 @@ interface JobState {
   result?: { projectId?: string; versionId?: string };
   canceled?: boolean;
   // Transaction state
-  transactionClient?: PoolClient;
+  transactionClient?: TransactionHandle;
   transactionPending?: boolean;
   summary?: {
     classesCreated: number;
@@ -146,6 +130,36 @@ interface JobState {
   };
 }
 
+export interface ImportEngine {
+  startImport(input: ImportJobInput): Promise<{ jobId: string }>;
+  getImportStatus(jobId: string): Promise<{
+    jobId: string;
+    state: ImportJobState;
+    percent: number;
+    events: ImportEvent[];
+    progress?: ProgressEvent;
+    summary?: JobState['summary'];
+    transactionPending?: boolean;
+    result?: { projectId?: string; versionId?: string };
+  }>;
+  cancelImport(jobId: string): Promise<{ success: boolean }>;
+  commitImport(jobId: string): Promise<{ success: boolean; error?: string }>;
+  rollbackImport(jobId: string): Promise<{ success: boolean; error?: string }>;
+  rollbackCompletedImport(jobId: string): Promise<{ success: boolean; error?: string }>;
+  retryImport(jobId: string): Promise<{ success: boolean; jobId?: string; error?: string }>;
+}
+
+let activeImportDeps: ImportEngineDeps | null = null;
+
+function importDeps(): ImportEngineDeps {
+  if (!activeImportDeps) {
+    throw new Error(
+      'Import engine dependencies not configured. Call createImportEngine() from the application bootstrap.'
+    );
+  }
+  return activeImportDeps;
+}
+
 const jobs = new Map<string, JobState>();
 
 async function recordRepositoryImportMetricIfApplicable(job: JobState): Promise<void> {
@@ -154,21 +168,42 @@ async function recordRepositoryImportMetricIfApplicable(job: JobState): Promise<
   const projectId = job.result?.projectId;
   const versionUuid = job.result?.versionId;
   if (!projectId || !versionUuid) return;
+  const recordFn = importDeps().recordRepositoryImport;
+  if (!recordFn) return;
   try {
-    await recordTenantRepositoryImport({
-      tenantId: job.input.tenantId,
-      repositorySource: {
-        repositoryId: src.repositoryId.trim(),
-        branch: src.branch,
-        path: src.path,
-        blobSha: src.blobSha ?? null,
-      },
-      projectId,
-      versionUuid,
-      importedByUserId: job.input.userId,
-    });
+    await recordFn({
+        tenantId: job.input.tenantId,
+        repositorySource: {
+          repositoryId: src.repositoryId.trim(),
+          branch: src.branch,
+          path: src.path,
+          blobSha: src.blobSha ?? null,
+        },
+        projectId,
+        versionUuid,
+        importedByUserId: job.input.userId,
+      });
   } catch (err) {
-    console.error('[import-helper] recordTenantRepositoryImport failed:', err);
+    console.error('[import-helper] recordRepositoryImport failed:', err);
+  }
+}
+
+async function maybeImportOpenApiPaths(
+  versionId: string,
+  paths: ReturnType<typeof extractPaths>,
+  securitySchemes: ReturnType<typeof extractSecuritySchemes>,
+  job: JobState
+): Promise<void> {
+  const run = importDeps().importOpenApiPathsAndSecurity;
+  if (!run) {
+    emit(job, 'warn', 'PATHS_SKIP', 'OpenAPI paths import not configured for this engine instance.');
+    return;
+  }
+  const pathResult = await run(versionId, paths, securitySchemes);
+  if (pathResult.success) {
+    emit(job, 'info', 'PATHS_IMPORTED', 'Paths and security schemes imported.');
+  } else {
+    emit(job, 'warn', 'PATHS_IMPORT_WARN', `Paths/security import had issues: ${pathResult.error}`);
   }
 }
 
@@ -203,7 +238,7 @@ function stableStringify(obj: any): string {
 type NormalizedModel = { classes: NormalizedClass[] };
 
 async function buildPropertyIdMapForImport(
-  client: PoolClient,
+  tx: TransactionHandle,
   projectId: string,
   norm: NormalizedModel,
   job: JobState,
@@ -234,7 +269,7 @@ async function buildPropertyIdMapForImport(
   const sigToLibraryId = new Map<string, string>();
 
   if (reuseLibraryFromProject) {
-    const rows = await listProjectLibraryPropertiesTx(client, projectId);
+    const rows = await tx.listProjectLibraryPropertiesTx(projectId);
     for (const row of rows) {
       usedNames.add(row.name);
       const sig = stableStringify(row.data);
@@ -277,7 +312,7 @@ async function buildPropertyIdMapForImport(
     });
 
     const resProp = JSON.parse(
-      await createPropertyTx(client, projectId, propName, payload.description || null, payload.data)
+      await tx.createPropertyTx(projectId, propName, payload.description || null, payload.data)
     );
     if (!resProp.success) {
       emit(job, 'warn', 'PROPERTY_CREATE_WARN', `Could not create property "${propName}": ${resProp.error}`);
@@ -417,7 +452,7 @@ function verifyClass(
 
 // Main verification function - verifies imported data matches the original schema
 async function verifyImport(
-  client: PoolClient,
+  tx: TransactionHandle,
   versionId: string,
   normalizedClasses: NormalizedClass[],
   job: JobState
@@ -434,7 +469,7 @@ async function verifyImport(
   emit(job, 'info', 'VERIFY_START', `Starting import verification for ${normalizedClasses.length} classes`);
 
   // Fetch all classes with properties from database using transaction client
-  const dbClassesJson = await getClassesWithPropertiesAndTagsTx(client, versionId);
+  const dbClassesJson = await tx.getClassesWithPropertiesAndTagsTx(versionId);
   const dbClasses = JSON.parse(dbClassesJson);
 
   // Build a map of database classes by name
@@ -508,14 +543,14 @@ async function verifyImport(
 }
 
 async function writeClassWithProperties(
-  client: PoolClient,
+  tx: TransactionHandle,
   projectId: string,
   versionId: string,
   cls: NormalizedClass,
   job: JobState,
   propertyIdMap: Map<string, string>
 ) {
-  const resClass = JSON.parse(await createClassTx(client, versionId, cls.name, cls.description || null, cls.schema || { type: 'object' }));
+  const resClass = JSON.parse(await tx.createClassTx(versionId, cls.name, cls.description || null, cls.schema || { type: 'object' }));
   if (!resClass.success) throw new Error(resClass.error || 'Failed to create class');
   const classId = resClass.class.id as string;
 
@@ -550,7 +585,7 @@ async function writeClassWithProperties(
         parentId
       });
       const addRes = JSON.parse(
-        await addPropertyToClassTx(client, classId, propertyId, p.name, p.description || null, p.data, parentId)
+        await tx.addPropertyToClassTx(classId, propertyId, p.name, p.description || null, p.data, parentId)
       );
       if (!addRes.success) {
         // Graceful degradation: log and continue with remaining properties
@@ -601,7 +636,7 @@ export async function startImport(input: ImportJobInput) {
   jobs.set(jobId, job);
 
   (async () => {
-    let client: PoolClient | null = null;
+    let tx: TransactionHandle | null = null;
     const isDryRun = input.options.dryRun === true;
 
     try {
@@ -702,12 +737,12 @@ export async function startImport(input: ImportJobInput) {
       const incrementalMode = input.options.incrementalMode === true;
 
       // Get a transaction client (with retry for transient connection errors)
-      client = await withRetry(() => getTransactionClient(), {
+      tx = await withRetry(() => importDeps().txClient.connect(), {
         maxAttempts: 3,
         initialDelayMs: 500,
-        label: 'getTransactionClient'
+        label: 'txClient.connect'
       });
-      job.transactionClient = client;
+      job.transactionClient = tx;
 
       if (incrementalMode) {
         // Incremental mode: no single transaction; commit as we go and skip failures
@@ -723,7 +758,7 @@ export async function startImport(input: ImportJobInput) {
         } else {
           const resProj = JSON.parse(
             await withRetry(
-              () => createProjectTx(client!, input.tenantId, input.userId, input.project.name, input.project.description || '', input.project.slug),
+              () => tx!.createProjectTx(input.tenantId, input.userId, input.project.name, input.project.description || '', input.project.slug),
               { maxAttempts: 3, initialDelayMs: 500, label: 'createProject' }
             )
           );
@@ -735,13 +770,12 @@ export async function startImport(input: ImportJobInput) {
         setProgress(job, 'creating-version', 2, 1, input.version.versionId);
         const reuseLibraryInc = Boolean(existingInc);
         const parentVersionUuidInc = reuseLibraryInc
-          ? await getLatestVersionUuidForProjectTx(client!, projectId)
+          ? await tx!.getLatestVersionUuidForProjectTx(projectId)
           : null;
         const resVer = JSON.parse(
           await withRetry(
             () =>
-              createVersionTx(
-                client!,
+              tx!.createVersionTx(
                 projectId,
                 input.userId,
                 input.version.versionId,
@@ -762,7 +796,7 @@ export async function startImport(input: ImportJobInput) {
         });
 
         const propertyIdMapInc = await buildPropertyIdMapForImport(
-          client!,
+          tx!,
           projectId,
           norm,
           job,
@@ -775,9 +809,9 @@ export async function startImport(input: ImportJobInput) {
           if (job.canceled) throw new Error('Import canceled');
           setProgress(job, 'creating-classes', 2 + norm.classes.length, 2 + classCountInc, cls.name);
           try {
-            await beginTransaction(client!);
-            await writeClassWithProperties(client!, projectId, versionId, cls, job, propertyIdMapInc);
-            await commitTransaction(client!);
+            await tx!.begin();
+            await writeClassWithProperties(tx!, projectId, versionId, cls, job, propertyIdMapInc);
+            await tx!.commit();
             emit(job, 'info', 'CLASS_CREATED', `Imported class: ${cls.name}`);
             if (job.summary) {
               job.summary.classesCreated++;
@@ -785,7 +819,7 @@ export async function startImport(input: ImportJobInput) {
             }
           } catch (classErr: any) {
             try {
-              await rollbackTransaction(client!);
+              await tx!.rollback();
             } catch (_) { /* ignore */ }
             emit(job, 'error', 'CLASS_FAILED', `Failed to create class ${cls.name}: ${classErr?.message}`);
             if (job.summary) {
@@ -798,7 +832,7 @@ export async function startImport(input: ImportJobInput) {
 
         if (job.canceled) throw new Error('Import canceled');
         setProgress(job, 'verifying', 3 + norm.classes.length, 2 + norm.classes.length, 'Verifying import...');
-        const verificationResultInc = await verifyImport(client!, versionId, norm.classes, job);
+        const verificationResultInc = await verifyImport(tx!, versionId, norm.classes, job);
         if (job.summary) job.summary.verification = verificationResultInc;
         if (!verificationResultInc.passed && job.summary) job.summary.warnings++;
 
@@ -807,12 +841,7 @@ export async function startImport(input: ImportJobInput) {
           const securitySchemes = extractSecuritySchemes(input.document);
           if (paths.length > 0 || securitySchemes.length > 0) {
             emit(job, 'info', 'IMPORTING_PATHS', `Importing ${paths.length} path(s) and ${securitySchemes.length} security scheme(s)...`);
-            const pathResult = await importOpenAPIPathsAndSecurity(versionId, paths, securitySchemes);
-            if (pathResult.success) {
-              emit(job, 'info', 'PATHS_IMPORTED', 'Paths and security schemes imported.');
-            } else {
-              emit(job, 'warn', 'PATHS_IMPORT_WARN', `Paths/security import had issues: ${pathResult.error}`);
-            }
+            await maybeImportOpenApiPaths(versionId, paths, securitySchemes, job);
           }
         }
 
@@ -826,16 +855,16 @@ export async function startImport(input: ImportJobInput) {
           job.summary.incrementalMode = true;
         }
         emit(job, 'info', 'INCREMENTAL_COMPLETE', 'Incremental import complete. Successful classes were saved; failed classes were skipped.', job.result);
-        await releaseClient(client!);
+        await tx!.release();
         job.transactionClient = undefined;
         return;
       }
 
       // Transaction mode: single transaction, pending-approval to commit or rollback
-      await withRetry(() => beginTransaction(client!), {
+      await withRetry(() => tx!.begin(), {
         maxAttempts: 3,
         initialDelayMs: 300,
-        label: 'beginTransaction'
+        label: 'transactionHandle.begin'
       });
       job.transactionPending = true;
       emit(job, 'info', 'TRANSACTION_STARTED', 'Database transaction started - changes will be committed only after approval');
@@ -851,7 +880,7 @@ export async function startImport(input: ImportJobInput) {
       } else {
         const resProj = JSON.parse(
           await withRetry(
-            () => createProjectTx(client!, input.tenantId, input.userId, input.project.name, input.project.description || '', input.project.slug),
+            () => tx!.createProjectTx(input.tenantId, input.userId, input.project.name, input.project.description || '', input.project.slug),
             { maxAttempts: 3, initialDelayMs: 500, label: 'createProject' }
           )
         );
@@ -865,13 +894,12 @@ export async function startImport(input: ImportJobInput) {
       setProgress(job, 'creating-version', 2, 1, input.version.versionId);
       const reuseLibraryTx = Boolean(existingTx);
       const parentVersionUuidTx = reuseLibraryTx
-        ? await getLatestVersionUuidForProjectTx(client!, projectId)
+        ? await tx!.getLatestVersionUuidForProjectTx(projectId)
         : null;
       const resVer = JSON.parse(
         await withRetry(
           () =>
-            createVersionTx(
-              client!,
+            tx!.createVersionTx(
               projectId,
               input.userId,
               input.version.versionId,
@@ -891,7 +919,7 @@ export async function startImport(input: ImportJobInput) {
         parentVersionUuid: parentVersionUuidTx ?? undefined,
       });
 
-      const propertyIdMap = await buildPropertyIdMapForImport(client, projectId, norm, job, reuseLibraryTx);
+      const propertyIdMap = await buildPropertyIdMapForImport(tx!, projectId, norm, job, reuseLibraryTx);
 
       // Create classes and link properties
       setProgress(job, 'creating-classes', 2 + norm.classes.length, 2);
@@ -900,7 +928,7 @@ export async function startImport(input: ImportJobInput) {
         if (job.canceled) throw new Error('Import canceled');
         setProgress(job, 'creating-classes', 2 + norm.classes.length, 2 + classCount, cls.name);
         try {
-          await writeClassWithProperties(client, projectId, versionId, cls, job, propertyIdMap);
+          await writeClassWithProperties(tx!, projectId, versionId, cls, job, propertyIdMap);
           emit(job, 'info', 'CLASS_CREATED', `Imported class: ${cls.name}`);
           if (job.summary) {
             job.summary.classesCreated++;
@@ -920,7 +948,7 @@ export async function startImport(input: ImportJobInput) {
       if (job.canceled) throw new Error('Import canceled');
       setProgress(job, 'verifying', 3 + norm.classes.length, 2 + norm.classes.length, 'Verifying import...');
 
-      const verificationResult = await verifyImport(client, versionId, norm.classes, job);
+      const verificationResult = await verifyImport(tx!, versionId, norm.classes, job);
 
       if (job.summary) {
         job.summary.verification = verificationResult;
@@ -949,9 +977,9 @@ export async function startImport(input: ImportJobInput) {
 
     } catch (err: any) {
       // Rollback transaction on any error
-      if (client && job.transactionPending) {
+      if (tx && job.transactionPending) {
         try {
-          await rollbackTransaction(client);
+          await tx.rollback();
           job.transactionPending = false;
           emit(job, 'info', 'TRANSACTION_ROLLED_BACK', 'Transaction rolled back due to error');
         } catch (rollbackErr) {
@@ -959,13 +987,13 @@ export async function startImport(input: ImportJobInput) {
         }
       }
 
-      // Release client on error
-      if (client) {
+      // Release pooled connection on error
+      if (tx) {
         try {
-          await releaseClient(client);
+          await tx.release();
           job.transactionClient = undefined;
         } catch (releaseErr) {
-          emit(job, 'error', 'RELEASE_FAILED', `Failed to release client: ${releaseErr}`);
+          emit(job, 'error', 'RELEASE_FAILED', `Failed to release connection: ${releaseErr}`);
         }
       }
 
@@ -1003,17 +1031,17 @@ export async function commitImport(jobId: string): Promise<{ success: boolean; e
     job.state = 'committing';
     emit(job, 'info', 'COMMITTING', 'Committing import transaction...');
 
-    await withRetry(() => commitTransaction(job.transactionClient!), {
+    await withRetry(() => job.transactionClient!.commit(), {
       maxAttempts: 3,
       initialDelayMs: 500,
-      label: 'commitTransaction'
+      label: 'transactionHandle.commit'
     });
     job.transactionPending = false;
 
     emit(job, 'info', 'COMMITTED', 'Import transaction committed successfully');
 
     // Release the client
-    await releaseClient(job.transactionClient);
+    await job.transactionClient.release();
     job.transactionClient = undefined;
 
     const versionId = job.result?.versionId as string | undefined;
@@ -1022,12 +1050,7 @@ export async function commitImport(jobId: string): Promise<{ success: boolean; e
       const securitySchemes = extractSecuritySchemes(job.input.document);
       if (paths.length > 0 || securitySchemes.length > 0) {
         emit(job, 'info', 'IMPORTING_PATHS', `Importing ${paths.length} path(s) and ${securitySchemes.length} security scheme(s)...`);
-        const pathResult = await importOpenAPIPathsAndSecurity(versionId, paths, securitySchemes);
-        if (pathResult.success) {
-          emit(job, 'info', 'PATHS_IMPORTED', 'Paths and security schemes imported.');
-        } else {
-          emit(job, 'warn', 'PATHS_IMPORT_WARN', `Paths/security import had issues: ${pathResult.error}`);
-        }
+        await maybeImportOpenApiPaths(versionId, paths, securitySchemes, job);
       }
     }
 
@@ -1044,7 +1067,7 @@ export async function commitImport(jobId: string): Promise<{ success: boolean; e
     // Try to release the client
     if (job.transactionClient) {
       try {
-        await releaseClient(job.transactionClient);
+        await job.transactionClient.release();
         job.transactionClient = undefined;
       } catch (releaseErr) {
         // Ignore release errors
@@ -1079,13 +1102,12 @@ export async function rollbackImport(jobId: string): Promise<{ success: boolean;
   try {
     emit(job, 'info', 'ROLLING_BACK', 'Rolling back import transaction...');
 
-    await rollbackTransaction(job.transactionClient);
+    await job.transactionClient.rollback();
     job.transactionPending = false;
 
     emit(job, 'info', 'ROLLED_BACK', 'Import transaction rolled back - no changes were saved');
 
-    // Release the client
-    await releaseClient(job.transactionClient);
+    await job.transactionClient.release();
     job.transactionClient = undefined;
 
     job.state = 'rolled-back';
@@ -1098,7 +1120,7 @@ export async function rollbackImport(jobId: string): Promise<{ success: boolean;
     // Try to release the client
     if (job.transactionClient) {
       try {
-        await releaseClient(job.transactionClient);
+        await job.transactionClient.release();
         job.transactionClient = undefined;
       } catch (releaseErr) {
         // Ignore release errors
@@ -1131,7 +1153,14 @@ export async function rollbackCompletedImport(jobId: string): Promise<{ success:
   try {
     emit(job, 'info', 'ROLLBACK_STARTED', 'Rolling back completed import - removing imported project and data...');
 
-    const raw = await permanentDeleteProject(projectId);
+    const deleteProject = importDeps().permanentDeleteProject;
+    if (!deleteProject) {
+      return {
+        success: false,
+        error: 'Rollback completed import requires permanentDeleteProject to be configured on the import engine.',
+      };
+    }
+    const raw = await deleteProject(projectId);
     const result = typeof raw === 'string' ? JSON.parse(raw) : raw;
     if (!result.success) {
       emit(job, 'error', 'ROLLBACK_FAILED', result.error || 'Failed to delete project');
@@ -1197,5 +1226,18 @@ export async function cancelImport(jobId: string) {
   }
 
   return { success: true };
+}
+
+export function createImportEngine(deps: ImportEngineDeps): ImportEngine {
+  activeImportDeps = deps;
+  return {
+    startImport,
+    getImportStatus,
+    cancelImport,
+    commitImport,
+    rollbackImport,
+    rollbackCompletedImport,
+    retryImport,
+  };
 }
 

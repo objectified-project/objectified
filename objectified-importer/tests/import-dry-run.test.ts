@@ -5,29 +5,11 @@
  * - When options.dryRun === true, no DB transaction or writes occur
  * - Job completes with state 'completed', summary.dryRun === true, no result.projectId/versionId
  * - Log events include DRY_RUN and DRY_RUN_COMPLETE
- * - getTransactionClient and beginTransaction are never called
+ * - txClient.connect is never called
  */
 
-
-const mockGetTransactionClient = vi.fn();
-const mockBeginTransaction = vi.fn();
-const mockClient = { query: vi.fn(), release: vi.fn() };
-
-vi.mock('../src/engine/import-transaction', () => ({
-  getTransactionClient: (...args: any[]) => mockGetTransactionClient(...args),
-  beginTransaction: (...args: any[]) => mockBeginTransaction(...args),
-  commitTransaction: vi.fn(),
-  rollbackTransaction: vi.fn(),
-  releaseClient: vi.fn(),
-  createProjectTx: vi.fn(),
-  createVersionTx: vi.fn(),
-  createPropertyTx: vi.fn(),
-  createClassTx: vi.fn(),
-  addPropertyToClassTx: vi.fn(),
-  getClassesWithPropertiesAndTagsTx: vi.fn(),
-  getLatestVersionUuidForProjectTx: vi.fn(() => Promise.resolve(null)),
-  listProjectLibraryPropertiesTx: vi.fn(() => Promise.resolve([])),
-}));
+import { createImportEngine } from '../src/engine/import-helper';
+import { mockTxConnect } from './import-test-mocks';
 
 const mockNormalizeResult = {
   classes: [
@@ -94,14 +76,13 @@ describe('Import Dry Run (#729)', () => {
   };
 
   beforeEach(() => {
-    mockGetTransactionClient.mockReset();
-    mockBeginTransaction.mockReset();
-    mockGetTransactionClient.mockResolvedValue(mockClient);
-    mockBeginTransaction.mockResolvedValue(undefined);
-  });
-
-  afterEach(() => {
-    vi.resetModules();
+    mockTxConnect.mockClear();
+    createImportEngine({
+      txClient: { connect: () => mockTxConnect() },
+      recordRepositoryImport: vi.fn(async () => {}),
+      permanentDeleteProject: vi.fn(async () => ({ success: true })),
+      importOpenApiPathsAndSecurity: vi.fn(async () => ({ success: true })),
+    });
   });
 
   test('dry run completes with state completed and summary.dryRun true', async () => {
@@ -126,14 +107,13 @@ describe('Import Dry Run (#729)', () => {
     expect(status.summary?.versionId).toBe(dryRunInput.version.versionId);
   });
 
-  test('dry run does not call getTransactionClient or beginTransaction', async () => {
+  test('dry run does not call txClient.connect', async () => {
     const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(dryRunInput);
 
     await waitForJobEnd(getImportStatus, jobId);
 
-    expect(mockGetTransactionClient).not.toHaveBeenCalled();
-    expect(mockBeginTransaction).not.toHaveBeenCalled();
+    expect(mockTxConnect).not.toHaveBeenCalled();
   });
 
   test('dry run emits DRY_RUN and DRY_RUN_COMPLETE events', async () => {
@@ -162,7 +142,6 @@ describe('Import Dry Run (#729)', () => {
     expect(status.summary?.classes?.map((c: any) => c.name)).toEqual(
       expect.arrayContaining(['User', 'Product'])
     );
-    // Unique properties by JSON signature (id/email/name may share type → 1 or more)
     expect(status.summary?.propertiesCreated).toBeGreaterThanOrEqual(1);
     expect(status.summary?.totalTime).toBeDefined();
     expect(typeof status.summary?.totalTime).toBe('number');
@@ -186,7 +165,7 @@ describe('Import Dry Run (#729)', () => {
 
     expect(status.state).toBe('completed');
     expect(status.summary?.dryRun).toBe(true);
-    expect(mockGetTransactionClient).not.toHaveBeenCalled();
+    expect(mockTxConnect).not.toHaveBeenCalled();
   });
 
   test('ImportJobInput allows dryRun in options', () => {
