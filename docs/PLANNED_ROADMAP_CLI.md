@@ -759,7 +759,6 @@ objectified import
 
 | #          | Title                                                                 | Issue   | Description                                                                 | Labels                                               | MVP | Parallel |
 |------------|-----------------------------------------------------------------------|---------|-----------------------------------------------------------------------------|------------------------------------------------------|-----|----------|
-| 13.1 (#3329) | OpenAPI/codegen — import REST surface                               | #3329   | Extend `openapi.yaml` + regenerate `objectified-cli` client for import ops | `enhancement`, `cli`, `roadmap-cli`, `import`, `openapi`, `documentation` | No  | Yes      |
 | 13.2 (#3330) | `import spec` — upload, poll, commit/rollback                       | #3330   | Multipart or documented binary upload; job lifecycle; `--json` summaries | `enhancement`, `cli`, `roadmap-cli`, `import`, `typescript` | No  | Yes      |
 | 13.3 (#3331) | Project flags: `--create-project`, `--map-project`, `--create-or-map-project` | #3331 | Map spec metadata → project; create-if-missing; exclusivity rules + errors | `enhancement`, `cli`, `roadmap-cli`, `import`, `tenancy` | No  | Yes      |
 | 13.4 (#3332) | Tests, man pages, supported-format parity                           | #3332   | Vitest stubs; README/man; checklist vs Import Dialog / scanner / importer | `enhancement`, `cli`, `roadmap-cli`, `import`, `documentation` | No  | Yes      |
@@ -796,11 +795,11 @@ These flags must be **documented as mutually exclusive** where combinations are 
 
 ### Detailed issue descriptions
 
-#### 13.1 (#3329) — OpenAPI/codegen alignment
+#### 13.1 (#3329) — OpenAPI/codegen alignment (**done**)
 
-Ensure every HTTP operation required for CLI import appears in `objectified-rest/openapi.yaml`; regenerate `objectified-cli` SDK and keep the existing ESLint import boundary. Document upload encoding and job lifecycle payloads so #3330 does not guess.
+Landed: tenant-scoped **`/v1/tenants/{tenant_slug}/imports`** REST contract in FastAPI (`spec_import_routes.py`) drives `scripts/generate_openapi.py` output; documents JSON+base64 (`POST …/imports`) vs multipart (`POST …/imports/upload`), job poll (`GET …/{job_id}`), cancel (`DELETE …/{job_id}`), commit/rollback, and shared Pydantic models in `models.py`. Handlers return **501** until the importer is wired; `python-multipart` added for documented multipart. Regenerated `objectified-cli` SDK via `yarn codegen`; ESLint boundary unchanged (`generated/` imports only from `lib/client.ts`). Dashboard import still runs via Next.js server actions (`objectified-ui/lib/db/import-helper.ts`), not these URLs.
 
-**Parallelism / Dependencies:** Depends on Epic 1 (#3174) client scaffold. Blocks #3330.
+**Parallelism / Dependencies:** Depended on Epic 1 (#3174) client scaffold. Unblocked #3330.
 
 Part of Epic: Specification Import via REST (#3328)
 

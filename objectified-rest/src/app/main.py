@@ -35,12 +35,13 @@ from .change_report_template_routes import router as change_report_template_rout
 from .tenant_repositories_routes import router as tenant_repositories_router
 from .tenants_session_routes import router as tenants_session_router
 from .browse_public_routes import router as browse_public_router
+from .spec_import_routes import router as spec_import_router
 
 # Create FastAPI app
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.46"
+    version="1.0.61"
 )
 
 
@@ -110,6 +111,7 @@ app.include_router(change_report_router)
 app.include_router(version_change_report_router)
 app.include_router(change_report_template_router)
 app.include_router(tenants_session_router)
+app.include_router(spec_import_router)
 app.include_router(tenant_repositories_router)
 
 

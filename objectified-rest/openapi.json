@@ -3,7 +3,7 @@
   "info": {
     "title": "Objectified REST API",
     "description": "REST API for serving OpenAPI specifications from the Objectified database",
-    "version": "1.0.46"
+    "version": "1.0.61"
   },
   "paths": {
     "/v1/browse/tenants": {
@@ -57,6 +57,230 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BrowsePublicTenantsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/browse/tenants/{tenant_slug}/projects": {
+      "get": {
+        "tags": [
+          "browse"
+        ],
+        "summary": "List Public Browse Projects",
+        "operationId": "list_public_browse_projects_v1_browse_tenants__tenant_slug__projects_get",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive substring filter on project slug and name.",
+              "title": "Search"
+            },
+            "description": "Case-insensitive substring filter on project slug and name."
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by project metadata domain or domainCategory (case-insensitive).",
+              "title": "Domain"
+            },
+            "description": "Filter by project metadata domain or domainCategory (case-insensitive)."
+          },
+          {
+            "name": "has_published",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only include projects with at least one published version (visibility rules apply).",
+              "default": false,
+              "title": "Has Published"
+            },
+            "description": "Only include projects with at least one published version (visibility rules apply)."
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowsePublicProjectsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/browse/tenants/{tenant_slug}/projects/{project_slug}/versions": {
+      "get": {
+        "tags": [
+          "browse"
+        ],
+        "summary": "List Public Browse Versions",
+        "operationId": "list_public_browse_versions_v1_browse_tenants__tenant_slug__projects__project_slug__versions_get",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "project_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Slug"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Include only versions whose published_at is at or after this timestamp (ISO 8601).",
+              "title": "Since"
+            },
+            "description": "Include only versions whose published_at is at or after this timestamp (ISO 8601)."
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowsePublicVersionsResponse"
                 }
               }
             }
@@ -12042,6 +12266,499 @@
         }
       }
     },
+    "/v1/tenants/{tenant_slug}/imports": {
+      "post": {
+        "tags": [
+          "spec-import"
+        ],
+        "summary": "Start specification import (JSON + base64)",
+        "description": "Create an asynchronous import job using a JSON body. The document is sent as standard base64 in ``document_base64``.",
+        "operationId": "start_spec_import_json_v1_tenants__tenant_slug__imports_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecImportStartJsonRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecImportJobAccepted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenant_slug}/imports/upload": {
+      "post": {
+        "tags": [
+          "spec-import"
+        ],
+        "summary": "Start specification import (multipart file)",
+        "description": "Create an asynchronous import job using multipart upload. The ``metadata`` field must be a JSON string matching ``SpecImportStartMetadata`` (same structure as the ``metadata`` object in the JSON endpoint). The ``file`` part carries raw spec bytes.",
+        "operationId": "start_spec_import_multipart_v1_tenants__tenant_slug__imports_upload_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_start_spec_import_multipart_v1_tenants__tenant_slug__imports_upload_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecImportJobAccepted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenant_slug}/imports/{job_id}": {
+      "get": {
+        "tags": [
+          "spec-import"
+        ],
+        "summary": "Get specification import job status",
+        "operationId": "get_spec_import_status_v1_tenants__tenant_slug__imports__job_id__get",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecImportJobStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "spec-import"
+        ],
+        "summary": "Cancel specification import job",
+        "operationId": "cancel_spec_import_job_v1_tenants__tenant_slug__imports__job_id__delete",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenant_slug}/imports/{job_id}/commit": {
+      "post": {
+        "tags": [
+          "spec-import"
+        ],
+        "summary": "Commit a previewed specification import",
+        "operationId": "commit_spec_import_job_v1_tenants__tenant_slug__imports__job_id__commit_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecImportCommitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenant_slug}/imports/{job_id}/rollback": {
+      "post": {
+        "tags": [
+          "spec-import"
+        ],
+        "summary": "Rollback a committed specification import",
+        "operationId": "rollback_spec_import_job_v1_tenants__tenant_slug__imports__job_id__rollback_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecImportRollbackResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/tenants/{tenant_slug}/repositories": {
       "get": {
         "tags": [
@@ -13399,6 +14116,27 @@
   },
   "components": {
     "schemas": {
+      "Body_start_spec_import_multipart_v1_tenants__tenant_slug__imports_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File",
+            "description": "Raw specification file bytes."
+          },
+          "metadata": {
+            "type": "string",
+            "title": "Metadata",
+            "description": "JSON string matching SpecImportStartMetadata (project, version, source_kind, options)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "metadata"
+        ],
+        "title": "Body_start_spec_import_multipart_v1_tenants__tenant_slug__imports_upload_post"
+      },
       "BrowseDirectoryStats": {
         "properties": {
           "tenant_count": {
@@ -13422,6 +14160,90 @@
         ],
         "title": "BrowseDirectoryStats",
         "description": "Aggregate counts for published public specs (browse directory home)."
+      },
+      "BrowsePublicProjectRow": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "published_versions": {
+            "type": "integer",
+            "title": "Published Versions"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "latest_published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Published At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "domain",
+          "published_versions"
+        ],
+        "title": "BrowsePublicProjectRow",
+        "description": "One project row for public browse (per tenant)."
+      },
+      "BrowsePublicProjectsResponse": {
+        "properties": {
+          "tenant_slug": {
+            "type": "string",
+            "title": "Tenant Slug"
+          },
+          "tenant_name": {
+            "type": "string",
+            "title": "Tenant Name"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/BrowsePublicProjectRow"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "filtered_count": {
+            "type": "integer",
+            "title": "Filtered Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_slug",
+          "tenant_name",
+          "projects",
+          "filtered_count"
+        ],
+        "title": "BrowsePublicProjectsResponse",
+        "description": "Published-public projects for a tenant (anonymous), or full tenant project list for members."
       },
       "BrowsePublicTenantRow": {
         "properties": {
@@ -13500,6 +14322,120 @@
         ],
         "title": "BrowsePublicTenantsResponse",
         "description": "Public tenant directory for CLI and integrations (no authentication)."
+      },
+      "BrowsePublicVersionRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version_id": {
+            "type": "string",
+            "title": "Version Id"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "changes_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changes Summary"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "change_log": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Log"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version_id",
+          "tags"
+        ],
+        "title": "BrowsePublicVersionRow",
+        "description": "One published version row for public browse (per project)."
+      },
+      "BrowsePublicVersionsResponse": {
+        "properties": {
+          "tenant_slug": {
+            "type": "string",
+            "title": "Tenant Slug"
+          },
+          "tenant_name": {
+            "type": "string",
+            "title": "Tenant Name"
+          },
+          "project_slug": {
+            "type": "string",
+            "title": "Project Slug"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/BrowsePublicVersionRow"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "filtered_count": {
+            "type": "integer",
+            "title": "Filtered Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_slug",
+          "tenant_name",
+          "project_slug",
+          "project_name",
+          "versions",
+          "filtered_count"
+        ],
+        "title": "BrowsePublicVersionsResponse",
+        "description": "Published versions for browse parity (anonymous public slice or member-authenticated view)."
       },
       "ChangeReportModel": {
         "properties": {
@@ -16298,6 +17234,550 @@
         ],
         "title": "SharedResponseSchema",
         "description": "Pydantic model for a shared response."
+      },
+      "SpecImportCommitResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "state": {
+            "type": "string",
+            "const": "completed",
+            "title": "State",
+            "default": "completed"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "project_slug": {
+            "type": "string",
+            "title": "Project Slug"
+          },
+          "version_id": {
+            "type": "string",
+            "title": "Version Id"
+          },
+          "version_record_id": {
+            "type": "string",
+            "title": "Version Record Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "project_id",
+          "project_slug",
+          "version_id",
+          "version_record_id"
+        ],
+        "title": "SpecImportCommitResponse",
+        "description": "Response after a successful commit."
+      },
+      "SpecImportEvent": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "ts": {
+            "type": "integer",
+            "title": "Ts"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warn",
+              "error"
+            ],
+            "title": "Level"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "ts",
+          "level",
+          "code",
+          "message"
+        ],
+        "title": "SpecImportEvent",
+        "description": "Structured log line from an import job."
+      },
+      "SpecImportJobAccepted": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "status_path": {
+            "type": "string",
+            "title": "Status Path",
+            "description": "Relative URL path for GET \u2026/imports/{job_id} until the job reaches a terminal state."
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "status_path"
+        ],
+        "title": "SpecImportJobAccepted",
+        "description": "Returned when a job is accepted (HTTP 202)."
+      },
+      "SpecImportJobResult": {
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "project_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Slug"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          },
+          "version_record_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Record Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SpecImportJobResult",
+        "description": "Identifiers produced when an import finishes or after commit."
+      },
+      "SpecImportJobStatus": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "pending-approval",
+              "committing",
+              "completed",
+              "failed",
+              "canceled",
+              "rolled-back"
+            ],
+            "title": "State"
+          },
+          "percent": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Percent",
+            "default": 0
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/SpecImportEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpecImportProgress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpecImportJobResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "state"
+        ],
+        "title": "SpecImportJobStatus",
+        "description": "Poll payload for an import job."
+      },
+      "SpecImportOptions": {
+        "properties": {
+          "selected_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Selected Schemas"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          },
+          "incremental_mode": {
+            "type": "boolean",
+            "title": "Incremental Mode",
+            "default": false
+          },
+          "apply_naming_convention": {
+            "type": "boolean",
+            "title": "Apply Naming Convention",
+            "default": false
+          },
+          "class_naming_convention": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PascalCase",
+                  "camelCase",
+                  "snake_case",
+                  "kebab-case",
+                  "none"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Naming Convention"
+          },
+          "property_naming_convention": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PascalCase",
+                  "camelCase",
+                  "snake_case",
+                  "kebab-case",
+                  "none"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Property Naming Convention"
+          },
+          "auto_layout": {
+            "type": "boolean",
+            "title": "Auto Layout",
+            "default": false
+          },
+          "create_relationships": {
+            "type": "boolean",
+            "title": "Create Relationships",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SpecImportOptions",
+        "description": "Optional importer flags (parity with dashboard Import dialog)."
+      },
+      "SpecImportProgress": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "initializing",
+              "creating-project",
+              "creating-version",
+              "creating-properties",
+              "creating-classes",
+              "linking-properties",
+              "verifying",
+              "finalizing"
+            ],
+            "title": "Phase"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "current_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Item"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "phase",
+          "total",
+          "completed"
+        ],
+        "title": "SpecImportProgress",
+        "description": "Coarse-grained progress snapshot."
+      },
+      "SpecImportProjectTarget": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "slug"
+        ],
+        "title": "SpecImportProjectTarget",
+        "description": "Project identity for a specification import job."
+      },
+      "SpecImportRollbackResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "state": {
+            "type": "string",
+            "const": "rolled-back",
+            "title": "State",
+            "default": "rolled-back"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "version_record_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Record Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "title": "SpecImportRollbackResponse",
+        "description": "Response after rolling back a committed import."
+      },
+      "SpecImportStartJsonRequest": {
+        "properties": {
+          "metadata": {
+            "$ref": "#/components/schemas/SpecImportStartMetadata"
+          },
+          "document_base64": {
+            "type": "string",
+            "title": "Document Base64",
+            "description": "Standard base64 (RFC 4648) of the spec file bytes; no data: URL prefix."
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename",
+            "description": "Original filename for format sniffing when bytes alone are ambiguous."
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type",
+            "description": "Optional MIME type hint (for example application/yaml or application/json)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "metadata",
+          "document_base64"
+        ],
+        "title": "SpecImportStartJsonRequest",
+        "description": "Start an import using base64-encoded document bytes (application/json)."
+      },
+      "SpecImportStartMetadata": {
+        "properties": {
+          "source_kind": {
+            "type": "string",
+            "title": "Source Kind",
+            "description": "Importer discriminator (for example openapi-3, asyncapi-2, protobuf). Supported values match product import kinds."
+          },
+          "project": {
+            "$ref": "#/components/schemas/SpecImportProjectTarget"
+          },
+          "version": {
+            "$ref": "#/components/schemas/SpecImportVersionTarget"
+          },
+          "existing_project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Existing Project Id",
+            "description": "When set, skip project creation and attach the job to this catalog project id."
+          },
+          "options": {
+            "$ref": "#/components/schemas/SpecImportOptions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_kind",
+          "project",
+          "version"
+        ],
+        "title": "SpecImportStartMetadata",
+        "description": "Shared metadata for JSON-base64 and multipart upload flows."
+      },
+      "SpecImportVersionTarget": {
+        "properties": {
+          "version_id": {
+            "type": "string",
+            "title": "Version Id",
+            "description": "Semantic version id for the draft/catalog revision (for example 1.0.0)."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version_id"
+        ],
+        "title": "SpecImportVersionTarget",
+        "description": "Target catalog revision for an import job."
       },
       "SunsetTimelineEntryOut": {
         "properties": {
