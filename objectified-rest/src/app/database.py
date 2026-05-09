@@ -1,6 +1,7 @@
 import psycopg2
 import json
 import logging
+import threading
 import hashlib
 from datetime import datetime
 import bcrypt
@@ -15,6 +16,28 @@ from .revision_lifecycle import prepare_version_metadata_update, sql_effective_l
 from .push_webhook_crypto import encrypt_signing_secret
 
 _logger = logging.getLogger(__name__)
+
+
+class ImportJobConcurrencyCaps:
+    """Shared limits for import orchestrator subprocess concurrency (#3307)."""
+
+    __slots__ = ("lock", "max_total", "max_per_tenant", "total_running", "per_tenant")
+
+    def __init__(self, max_total: int, max_per_tenant: int):
+        self.lock = threading.Lock()
+        self.max_total = max_total
+        self.max_per_tenant = max_per_tenant
+        self.total_running = 0
+        self.per_tenant: Dict[str, int] = {}
+
+    def release(self, tenant_id: str) -> None:
+        with self.lock:
+            self.total_running = max(0, self.total_running - 1)
+            cur = self.per_tenant.get(tenant_id, 0) - 1
+            if cur <= 0:
+                self.per_tenant.pop(tenant_id, None)
+            else:
+                self.per_tenant[tenant_id] = cur
 
 
 def _deep_equal(a: Any, b: Any) -> bool:
@@ -2689,6 +2712,248 @@ class Database:
                 row = cursor.fetchone()
                 conn.commit()
                 return dict(row) if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def claim_import_job_with_caps(self, caps: ImportJobConcurrencyCaps) -> Optional[Dict[str, Any]]:
+        """
+        Atomically claim one queued job respecting per-process concurrency caps (#3307).
+
+        Uses FOR UPDATE SKIP LOCKED with an in-memory cap gate so tenant/total limits are enforced
+        before flipping queued → running.
+        """
+        conn = self.connect()
+        _upd = (
+            "UPDATE odb.import_jobs SET state = 'running', updated_at = NOW() "
+            "WHERE job_id = %s AND state = 'queued' "
+            "RETURNING job_id::text AS job_id, tenant_id::text AS tenant_id, "
+            "project_id::text AS project_id, state, source_kind, "
+            "blob_sha, repository_source, input, events, progress, summary, "
+            "result, percent, error, created_by::text AS created_by, "
+            "created_at, updated_at, finished_at, expires_at, idempotency_key"
+        )
+        with caps.lock:
+            if caps.total_running >= caps.max_total:
+                return None
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT job_id, tenant_id::text AS tenant_id
+                        FROM odb.import_jobs
+                        WHERE state = 'queued'
+                        ORDER BY created_at ASC
+                        FOR UPDATE SKIP LOCKED
+                        LIMIT 32
+                        """
+                    )
+                    candidates = cursor.fetchall()
+                    for cand in candidates:
+                        tid = str(cand["tenant_id"])
+                        if caps.per_tenant.get(tid, 0) >= caps.max_per_tenant:
+                            continue
+                        chosen_id = str(cand["job_id"])
+                        cursor.execute(_upd, (chosen_id,))
+                        row = cursor.fetchone()
+                        if row:
+                            caps.total_running += 1
+                            caps.per_tenant[tid] = caps.per_tenant.get(tid, 0) + 1
+                            conn.commit()
+                            return dict(row)
+                conn.rollback()
+                return None
+            except Exception:
+                conn.rollback()
+                raise
+
+    def import_job_append_events(
+        self,
+        tenant_id: str,
+        job_id: str,
+        fragments: List[Any],
+        *,
+        cap: int = 1000,
+    ) -> None:
+        if not fragments:
+            return
+        conn = self.connect()
+        try:
+            self._begin_tx(conn)
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT events FROM odb.import_jobs WHERE tenant_id = %s AND job_id = %s FOR UPDATE",
+                    (tenant_id, job_id),
+                )
+                one = cursor.fetchone()
+                if not one:
+                    conn.rollback()
+                    return
+                ev = one["events"]
+                events: List[Any] = list(ev) if isinstance(ev, list) else []
+                for frag in fragments:
+                    if isinstance(frag, dict):
+                        events.append(frag)
+                if len(events) > cap:
+                    events = events[-cap:]
+                cursor.execute(
+                    "UPDATE odb.import_jobs SET events = %s::jsonb, updated_at = NOW() "
+                    "WHERE tenant_id = %s AND job_id = %s",
+                    (Json(events), tenant_id, job_id),
+                )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def import_job_set_progress(
+        self,
+        tenant_id: str,
+        job_id: str,
+        progress: Optional[Dict[str, Any]],
+        percent: int,
+    ) -> None:
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE odb.import_jobs SET progress = %s::jsonb, percent = %s, updated_at = NOW() "
+                    "WHERE tenant_id = %s AND job_id = %s",
+                    (Json(progress) if progress is not None else None, percent, tenant_id, job_id),
+                )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def import_job_touch_updated_at(self, tenant_id: str, job_id: str) -> None:
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE odb.import_jobs SET updated_at = NOW() WHERE tenant_id = %s AND job_id = %s",
+                    (tenant_id, job_id),
+                )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def import_job_apply_terminal(
+        self,
+        tenant_id: str,
+        job_id: str,
+        *,
+        state: str,
+        summary: Optional[Any] = None,
+        result: Optional[Any] = None,
+        error: Optional[Any] = None,
+        percent: Optional[int] = None,
+        finished_now: bool,
+        clear_error: bool = False,
+        clear_result: bool = False,
+    ) -> None:
+        conn = self.connect()
+        parts: List[str] = ["state = %s", "updated_at = NOW()"]
+        params: List[Any] = [state]
+        if summary is not None:
+            parts.append("summary = %s::jsonb")
+            params.append(Json(summary))
+        if result is not None:
+            parts.append("result = %s::jsonb")
+            params.append(Json(result))
+        elif clear_result:
+            parts.append("result = NULL")
+        if error is not None:
+            parts.append("error = %s::jsonb")
+            params.append(Json(error))
+        elif clear_error:
+            parts.append("error = NULL")
+        if percent is not None:
+            parts.append("percent = %s")
+            params.append(percent)
+        if finished_now:
+            parts.append("finished_at = NOW()")
+        sql = f"UPDATE odb.import_jobs SET {', '.join(parts)} WHERE tenant_id = %s AND job_id = %s"
+        params.extend([tenant_id, job_id])
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(sql, tuple(params))
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def mark_stale_running_import_jobs_failed(self, stale_after_seconds: int) -> int:
+        """Mark stuck running/committing jobs as failed (orchestrator restart / crash recovery)."""
+        err = Json({"code": "orchestrator-crash", "message": "Import worker lost contact with the orchestrator"})
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE odb.import_jobs
+                    SET state = 'failed',
+                        error = %s::jsonb,
+                        finished_at = NOW(),
+                        updated_at = NOW()
+                    WHERE state IN ('running', 'committing')
+                      AND updated_at < NOW() - (%s * INTERVAL '1 second')
+                    """,
+                    (err, stale_after_seconds),
+                )
+                n = cursor.rowcount or 0
+            conn.commit()
+            return int(n)
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def insert_tenant_repository_import_if_owned(
+        self,
+        *,
+        tenant_id: str,
+        repository_id: str,
+        branch: str,
+        path: str,
+        blob_sha: Optional[str],
+        project_id: str,
+        version_id: str,
+        imported_by: str,
+    ) -> bool:
+        """Mirror objectified-ui/lib/db/repository-import-metrics.ts insert (tenant-owned repo guard)."""
+        repo_id = repository_id.strip()
+        if not repo_id:
+            return False
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO odb.tenant_repository_imports (
+                       tenant_id, repository_id, branch, path, blob_sha, project_id, version_id, imported_by
+                     )
+                     SELECT %s::uuid, %s::uuid, %s, %s, %s, %s::uuid, %s::uuid, %s::uuid
+                     FROM odb.tenant_repositories tr
+                     WHERE tr.id = %s::uuid AND tr.tenant_id = %s::uuid AND tr.deleted_at IS NULL
+                     RETURNING id
+                    """,
+                    (
+                        tenant_id,
+                        repo_id,
+                        branch,
+                        path,
+                        blob_sha.strip() if blob_sha and str(blob_sha).strip() else None,
+                        project_id,
+                        version_id,
+                        imported_by,
+                        repo_id,
+                        tenant_id,
+                    ),
+                )
+                ok = cursor.fetchone() is not None
+            conn.commit()
+            return ok
         except Exception as e:
             conn.rollback()
             raise e
