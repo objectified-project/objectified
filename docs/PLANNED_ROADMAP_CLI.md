@@ -27,7 +27,7 @@ The MVP delivers an `npm i -g objectified-cli` install that lets a developer:
 - Receive helpful error messages with documented exit codes (3 unauth, 4 forbidden, 5 not-found, 6 conflict, 7 validation, 8 server, 9 network, 10 rate-limited, 11 config).
 - Publish to a configurable NPM artifactory (npmjs.com by default) on every tagged release via `objectified-cli-publish.yml`.
 
-Everything else (data plane, full paths/classes/properties CRUD, primitives import, plugins, self-update, telemetry, Homebrew/Scoop) lands in v2.
+Everything else (data plane, full paths/classes/properties CRUD, primitives import, **specification file import via REST**, plugins, self-update, telemetry, Homebrew/Scoop) lands in v2.
 
 ---
 
@@ -95,8 +95,9 @@ Every command lives in one of three connection modes:
 | 10  | [Data Records (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3183)                     | #3183   | 7           | 0 (v2)       |
 | 11  | [Migration Plans & Version Tags (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3184)   | #3184   | 7           | 0 (v2)       |
 | 12  | [Distribution, Release & Self-Update](https://github.com/KenSuenobu/objectified-commercial/issues/3185)    | #3185   | 8           | 2 of 8       |
+| 13  | [Specification Import via REST (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3328)    | #3328   | 4           | 0 (v2)       |
 
-Total: **12 epics**, **87 sub-tickets** (open roadmap items; completed work is dropped from the Epic 1 summary table below).
+Total: **13 epics**, **91 sub-tickets** (open roadmap items; completed work is dropped from the Epic 1 summary table below).
 
 ---
 
@@ -741,6 +742,100 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ---
 
+## Epic 13 (#3328): Specification Import via REST (CLI)
+
+End-to-end **specification file import** for authenticated tenants: upload local files through the **same REST import pipeline** the application uses (no duplicate parsers in the CLI). Parsed output is persisted as **project-linked draft schema** — primitives/properties/classes/paths/operations and associated objects **as the backend importer produces today** — then surfaced with familiar job polling / commit semantics.
+
+### Topic tree
+
+```
+objectified import
+        └── spec <path>       # primary entry (stdin '-' if supported by REST contract)
+```
+
+(Command naming may ship as `objectified import spec` or a flattened variant; oclif topic structure must stay consistent with the Global Design Principles section above.)
+
+### Summary Table
+
+| #          | Title                                                                 | Issue   | Description                                                                 | Labels                                               | MVP | Parallel |
+|------------|-----------------------------------------------------------------------|---------|-----------------------------------------------------------------------------|------------------------------------------------------|-----|----------|
+| 13.1 (#3329) | OpenAPI/codegen — import REST surface                               | #3329   | Extend `openapi.yaml` + regenerate `objectified-cli` client for import ops | `enhancement`, `cli`, `roadmap-cli`, `import`, `openapi`, `documentation` | No  | Yes      |
+| 13.2 (#3330) | `import spec` — upload, poll, commit/rollback                       | #3330   | Multipart or documented binary upload; job lifecycle; `--json` summaries | `enhancement`, `cli`, `roadmap-cli`, `import`, `typescript` | No  | Yes      |
+| 13.3 (#3331) | Project flags: `--create-project`, `--map-project`, `--create-or-map-project` | #3331 | Map spec metadata → project; create-if-missing; exclusivity rules + errors | `enhancement`, `cli`, `roadmap-cli`, `import`, `tenancy` | No  | Yes      |
+| 13.4 (#3332) | Tests, man pages, supported-format parity                           | #3332   | Vitest stubs; README/man; checklist vs Import Dialog / scanner / importer | `enhancement`, `cli`, `roadmap-cli`, `import`, `documentation` | No  | Yes      |
+
+### Supported formats (parity target)
+
+Align CLI acceptance and help text with **product-supported import kinds**, including at minimum: OpenAPI/Swagger (YAML/JSON), AsyncAPI, Arazzo, GraphQL (`.graphql`/`.gql`), Protobuf (`.proto`), Avro (`.avsc`), Postman collections, RAML, Thrift, DBML, Prisma schema, SQL DDL, and ZIP bundles where the server accepts them. Filename sniff + optional `--format` override mirrors UI behavior when content is ambiguous.
+
+### Project resolution semantics
+
+| Flag | Behavior |
+|------|----------|
+| `--map-project <slug>` | Target an **existing** project under the resolved tenant; fail with hints on 404/403. |
+| `--create-project` | If the **resolved project identity from the spec** (plus CLI overrides) does not exist, **create** the project via REST, then attach the import job to it. Refuse or warn when the slug already exists (document exact behavior to match REST). |
+| `--create-or-map-project` | **Idempotent automation**: if a project matching spec-derived identity exists → behave like map; otherwise → create then import. Intended for CI (`--yes`). |
+
+These flags must be **documented as mutually exclusive** where combinations are invalid; misuse exits **2** (see Error handling, exit code **2**).
+
+### Notable detail — REST-only pipeline
+
+```
+  ./payments-openapi.yaml
+           │
+           │  CLI: tenant + auth + project flags + optional format override
+           ▼
+  POST … import (multipart / JSON+body — exact shape from openapi.yaml)
+           │
+           ▼
+  poll GET … job status (progress / events)
+           │
+           ├──► POST … commit  ──► draft schema + linked objects persisted
+           └──► POST … rollback (optional operator path)
+```
+
+### Detailed issue descriptions
+
+#### 13.1 (#3329) — OpenAPI/codegen alignment
+
+Ensure every HTTP operation required for CLI import appears in `objectified-rest/openapi.yaml`; regenerate `objectified-cli` SDK and keep the existing ESLint import boundary. Document upload encoding and job lifecycle payloads so #3330 does not guess.
+
+**Parallelism / Dependencies:** Depends on Epic 1 (#3174) client scaffold. Blocks #3330.
+
+Part of Epic: Specification Import via REST (#3328)
+
+---
+
+#### 13.2 (#3330) — `objectified import spec`
+
+Implement file argument, REST job orchestration (start → poll → commit), global flags, and `--json` output. Optional `--no-wait` returning `job_id` is desirable for asynchronous CI.
+
+**Parallelism / Dependencies:** Depends on #3329 (typed operations). Integrates with Epic 2 tenant resolution.
+
+Part of Epic: Specification Import via REST (#3328)
+
+---
+
+#### 13.3 (#3331) — Project resolution flags
+
+Implement `--create-project`, `--map-project`, and `--create-or-map-project` as specified in the summary table; forward resolved `project_id`/slug in import requests per REST contract.
+
+**Parallelism / Dependencies:** Depends on Epic 3 `projects create` patterns (#3176). Coordinated with #3330.
+
+Part of Epic: Specification Import via REST (#3328)
+
+---
+
+#### 13.4 (#3332) — Tests, man pages, format parity
+
+Enforce ≥2 examples per command; update man pages and `oclif readme` outputs; maintain explicit checklist of supported formats vs UI/importer.
+
+**Parallelism / Dependencies:** Depends on #3330–#3331.
+
+Part of Epic: Specification Import via REST (#3328)
+
+---
+
 ## MVP Release — Ticket Bundle
 
 The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **6 open sub-tickets** across 4 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, #3194, #3195, #3202, #3203, #3204, #3208, #3209, #3210, #3212, #3244, #3245, #3246, #3247, and #3248).
@@ -769,7 +864,7 @@ The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for 
 
 ## v2 Release — Ticket Bundle
 
-v2 fills out the writable surface for primitives, properties, classes, paths, data records, migrations, version tags, and the release-engineering polish (binaries, self-update, telemetry, plugins, Homebrew/Scoop). Total: **62 sub-tickets**.
+v2 fills out the writable surface for primitives, properties, classes, paths, data records, migrations, version tags, **specification import via REST**, and the release-engineering polish (binaries, self-update, telemetry, plugins, Homebrew/Scoop). Total: **65 sub-tickets** (sum of the v2 Count column below, including Epic 13).
 
 | Epic     | v2 Tickets                                                                                                                     | Count |
 |----------|--------------------------------------------------------------------------------------------------------------------------------|-------|
@@ -785,9 +880,11 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 | 10 (#3183) | #3253, #3254, #3255, #3256, #3257, #3258, #3259                                                                                | 7     |
 | 11 (#3184) | #3260, #3261, #3262, #3263, #3264, #3265, #3266                                                                                | 7     |
 | 12 (#3185) | #3269, #3270, #3271, #3272, #3273, #3274                                                                                       | 6     |
+| 13 (#3328) | #3329, #3330, #3331, #3332                                                                                                     | 4     |
 
 **v2 capability deltas vs MVP:**
 - Full read/write CRUD for primitives, properties, classes, paths, operations, parameters, request bodies, and responses — i.e. you can model an entire API surface from the CLI.
+- **Specification file import** (`objectified import spec`): REST-backed uploads for product-supported formats; `--create-project`, `--map-project`, and `--create-or-map-project` for project binding from spec metadata.
 - Data plane (records list/get/create/update/delete/restore + bulk import).
 - Migration plans + version tags as first-class topics.
 - Cross-platform single-file binaries (mac/linux/win, signed/notarized) so install no longer requires Node.
@@ -838,14 +935,15 @@ The tickets were created in the order below — that is also the recommended **e
 2. **Epic 2 — Auth & Tenants** (#3175; #3194–#3197 shipped — continue #3198 → #3201). Required for any tenant-scoped command.
 3. **Epic 3 — Projects** (#3176 then #3205 → #3207; #3203 and #3204 shipped). The first useful read/write surface.
 4. **Epic 4 — Versions** (#3177 then #3211 → #3216; #3208 `versions list`, #3209 `versions show`, and #3210 `versions create` shipped). The publish flow that makes the CLI valuable in CI.
-5. **Epic 9 — Browse & Schema Export** (#3182 then #3249 → #3252; #3244 `browse tenants`, #3245 `browse projects`, #3246 `browse versions`, #3247 `schema fetch`, and #3248 `schema swagger` shipped). The most-used consumer surface; lands early because it works without auth.
-6. **Epic 12 — Distribution (CI + NPM publish only)** (#3185 then #3267, #3268). Ship MVP — `npm i -g objectified-cli` works.
-7. **Epic 5 — Primitives** (#3178 then #3217 → #3222). v2 schema-modeling surface starts here.
-8. **Epic 6 — Properties** (#3179 then #3223 → #3228). Builds on primitives.
-9. **Epic 7 — Classes** (#3180 then #3229 → #3236). Builds on properties.
-10. **Epic 8 — Paths & Operations** (#3181 then #3237 → #3243). Builds on classes (for `copy-from-class`).
-11. **Epic 10 — Data Records** (#3183 then #3253 → #3259). Runtime data plane after schema is locked.
-12. **Epic 11 — Migration Plans & Version Tags** (#3184 then #3260 → #3266). Polishing on top of versions.
-13. **Epic 12 — Distribution (rest)** (#3269 → #3274). Release engineering polish: changesets, binaries, self-update, telemetry, plugins, Homebrew/Scoop.
+5. **Epic 13 — Specification Import** (#3328 then #3329 → #3332). REST-backed file import; depends on stable projects + versions semantics for draft targets. Issue numbers are newer than the original roadmap pack.
+6. **Epic 9 — Browse & Schema Export** (#3182 then #3249 → #3252; #3244 `browse tenants`, #3245 `browse projects`, #3246 `browse versions`, #3247 `schema fetch`, and #3248 `schema swagger` shipped). The most-used consumer surface; lands early because it works without auth.
+7. **Epic 12 — Distribution (CI + NPM publish only)** (#3185 then #3267, #3268). Ship MVP — `npm i -g objectified-cli` works.
+8. **Epic 5 — Primitives** (#3178 then #3217 → #3222). v2 schema-modeling surface starts here.
+9. **Epic 6 — Properties** (#3179 then #3223 → #3228). Builds on primitives.
+10. **Epic 7 — Classes** (#3180 then #3229 → #3236). Builds on properties.
+11. **Epic 8 — Paths & Operations** (#3181 then #3237 → #3243). Builds on classes (for `copy-from-class`).
+12. **Epic 10 — Data Records** (#3183 then #3253 → #3259). Runtime data plane after schema is locked.
+13. **Epic 11 — Migration Plans & Version Tags** (#3184 then #3260 → #3266). Polishing on top of versions.
+14. **Epic 12 — Distribution (rest)** (#3269 → #3274). Release engineering polish: changesets, binaries, self-update, telemetry, plugins, Homebrew/Scoop.
 
-This order is also encoded in the ticket numbering: every dependency is on a lower-numbered ticket.
+The original ticket pack used ascending numeric IDs for dependency hints; **Epic 13** (#3328–#3332) was added later — execute it after Projects + Versions REST surfaces are stable.
