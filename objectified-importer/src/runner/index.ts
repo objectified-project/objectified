@@ -32,7 +32,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function readPositiveIntEnv(name: string, fallback: number): number {
+function readPositiveIntFromEnv(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
   const parsed = Number(raw);
@@ -40,9 +40,9 @@ function readPositiveIntEnv(name: string, fallback: number): number {
   return parsed;
 }
 
-const STATUS_POLL_INITIAL_MS = readPositiveIntEnv('OBJECTIFIED_IMPORTER_RUNNER_POLL_MS', 100);
-const STATUS_POLL_MAX_MS = readPositiveIntEnv('OBJECTIFIED_IMPORTER_RUNNER_MAX_POLL_MS', 1_000);
-const EMITTED_EVENT_IDS_LIMIT = readPositiveIntEnv('OBJECTIFIED_IMPORTER_RUNNER_MAX_TRACKED_EVENT_IDS', 2_048);
+const STATUS_POLL_INITIAL_MS = readPositiveIntFromEnv('OBJECTIFIED_IMPORTER_RUNNER_POLL_MS', 100);
+const STATUS_POLL_MAX_MS = readPositiveIntFromEnv('OBJECTIFIED_IMPORTER_RUNNER_MAX_POLL_MS', 1_000);
+const EMITTED_EVENT_IDS_LIMIT = readPositiveIntFromEnv('OBJECTIFIED_IMPORTER_RUNNER_MAX_TRACKED_EVENT_IDS', 2_048);
 
 export function parseEnvelope(raw: unknown): { ok: true; envelope: RunnerEnvelope } | { ok: false; error: EnvelopeParseFailure } {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -123,7 +123,7 @@ async function streamUntilTerminal(engine: ImportEngine, jobId: string, stdout: 
 
   for (;;) {
     const status = await engine.getImportStatus(jobId);
-    let stateChanged = previousState !== status.state;
+    const stateChanged = previousState !== status.state;
     previousState = status.state;
     let observedOutput = false;
 
