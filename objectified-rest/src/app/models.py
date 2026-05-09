@@ -163,6 +163,194 @@ class PrimitiveImportRequest(BaseModel):
         from_attributes = True
 
 
+# ==================== Specification import job (CLI / REST contract) ====================
+#
+# Today the dashboard runs imports via Next.js server actions (see objectified-ui/lib/db/import-helper.ts).
+# These models describe the canonical tenant-scoped REST surface for CLI "import spec" (#3329).
+
+SpecImportJobState = Literal[
+    "queued",
+    "running",
+    "pending-approval",
+    "committing",
+    "completed",
+    "failed",
+    "canceled",
+    "rolled-back",
+]
+
+
+class SpecImportProjectTarget(BaseModel):
+    """Project identity for a specification import job."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    slug: str
+    description: Optional[str] = None
+
+
+class SpecImportVersionTarget(BaseModel):
+    """Target catalog revision for an import job."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: str = Field(description="Semantic version id for the draft/catalog revision (for example 1.0.0).")
+    description: Optional[str] = None
+
+
+class SpecImportOptions(BaseModel):
+    """Optional importer flags (parity with dashboard Import dialog)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    selected_schemas: List[str] = Field(default_factory=list)
+    dry_run: bool = False
+    incremental_mode: bool = False
+    apply_naming_convention: bool = False
+    class_naming_convention: Optional[
+        Literal["PascalCase", "camelCase", "snake_case", "kebab-case", "none"]
+    ] = None
+    property_naming_convention: Optional[
+        Literal["PascalCase", "camelCase", "snake_case", "kebab-case", "none"]
+    ] = None
+    auto_layout: bool = False
+    create_relationships: bool = False
+
+
+class SpecImportStartMetadata(BaseModel):
+    """Shared metadata for JSON-base64 and multipart upload flows."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_kind: str = Field(
+        description=(
+            "Importer discriminator (for example openapi-3, asyncapi-2, protobuf). "
+            "Supported values match product import kinds."
+        )
+    )
+    project: SpecImportProjectTarget
+    version: SpecImportVersionTarget
+    existing_project_id: Optional[str] = Field(
+        None,
+        description="When set, skip project creation and attach the job to this catalog project id.",
+    )
+    options: SpecImportOptions = Field(default_factory=SpecImportOptions)
+
+
+class SpecImportStartJsonRequest(BaseModel):
+    """Start an import using base64-encoded document bytes (application/json)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    metadata: SpecImportStartMetadata
+    document_base64: str = Field(
+        ...,
+        description="Standard base64 (RFC 4648) of the spec file bytes; no data: URL prefix.",
+    )
+    filename: Optional[str] = Field(
+        None,
+        description="Original filename for format sniffing when bytes alone are ambiguous.",
+    )
+    content_type: Optional[str] = Field(
+        None,
+        description="Optional MIME type hint (for example application/yaml or application/json).",
+    )
+
+
+class SpecImportEvent(BaseModel):
+    """Structured log line from an import job."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    ts: int
+    level: Literal["info", "warn", "error"]
+    code: str
+    message: str
+    context: Optional[Dict[str, Any]] = None
+
+
+class SpecImportProgress(BaseModel):
+    """Coarse-grained progress snapshot."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    phase: Literal[
+        "initializing",
+        "creating-project",
+        "creating-version",
+        "creating-properties",
+        "creating-classes",
+        "linking-properties",
+        "verifying",
+        "finalizing",
+    ]
+    total: int
+    completed: int
+    current_item: Optional[str] = None
+
+
+class SpecImportJobResult(BaseModel):
+    """Identifiers produced when an import finishes or after commit."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: Optional[str] = None
+    project_slug: Optional[str] = None
+    version_id: Optional[str] = None
+    version_record_id: Optional[str] = None
+
+
+class SpecImportJobStatus(BaseModel):
+    """Poll payload for an import job."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    state: SpecImportJobState
+    percent: int = Field(0, ge=0, le=100)
+    events: List[SpecImportEvent] = Field(default_factory=list)
+    progress: Optional[SpecImportProgress] = None
+    summary: Optional[Dict[str, Any]] = None
+    result: Optional[SpecImportJobResult] = None
+
+
+class SpecImportJobAccepted(BaseModel):
+    """Returned when a job is accepted (HTTP 202)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    status_path: str = Field(
+        description="Relative URL path for GET …/imports/{job_id} until the job reaches a terminal state.",
+    )
+
+
+class SpecImportCommitResponse(BaseModel):
+    """Response after a successful commit."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    state: Literal["completed"] = "completed"
+    project_id: str
+    project_slug: str
+    version_id: str
+    version_record_id: str
+
+
+class SpecImportRollbackResponse(BaseModel):
+    """Response after rolling back a committed import."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    state: Literal["rolled-back"] = "rolled-back"
+    project_id: Optional[str] = None
+    version_record_id: Optional[str] = None
+
+
 # ==================== Project Models ====================
 
 class ProjectSchema(BaseModel):
