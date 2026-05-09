@@ -200,7 +200,6 @@ describe("spec import skeleton (#3308)", () => {
   });
 
   it("new project: exits 6 on create conflict and suggests --slug (#3309)", async () => {
-    const conflictDetail = "A project with slug 'swagger-petstore' already exists in this tenant";
     const server = http.createServer((req, res) => {
       void (async () => {
         res.setHeader("Connection", "close");
@@ -218,7 +217,11 @@ describe("spec import skeleton (#3308)", () => {
         if (req.method === "POST" && url.pathname === "/v1/projects/acme") {
           res.statusCode = 409;
           res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ detail: conflictDetail }));
+          res.end(
+            JSON.stringify({
+              detail: "A project with slug 'swagger-petstore' already exists in this tenant",
+            }),
+          );
           return;
         }
 
