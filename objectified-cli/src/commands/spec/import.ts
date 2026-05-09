@@ -818,7 +818,7 @@ export default class SpecImport extends BaseCommand {
             exitCode: exitCodeForReport,
           });
         }
-        reportSink?.close();
+        await reportSink?.close();
       }
     } catch (err) {
       if (

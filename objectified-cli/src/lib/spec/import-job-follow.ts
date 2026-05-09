@@ -42,7 +42,7 @@ function stableProgressKey(p: ImportJobResponse["progress"]): string {
 
 export type ImportReportSink = {
   writeLine(obj: unknown): void;
-  close(): void;
+  close(): Promise<void>;
 };
 
 /** Append NDJSON report; creates parent dirs. Caller writes the final summary line via writeReportSummaryLine. */
@@ -58,11 +58,26 @@ export function openImportReportSink(reportPath: string): ImportReportSink {
       hint: "Pass a file path for the NDJSON report.",
     });
   }
+  const stream = fs.createWriteStream(abs, { flags: "a" });
   return {
     writeLine(obj: unknown) {
-      fs.appendFileSync(abs, ndjsonLine(obj));
+      stream.write(ndjsonLine(obj));
     },
-    close() {},
+    close() {
+      return new Promise((resolve, reject) => {
+        const onError = (err: Error): void => {
+          stream.off("finish", onFinish);
+          reject(err);
+        };
+        const onFinish = (): void => {
+          stream.off("error", onError);
+          resolve();
+        };
+        stream.once("error", onError);
+        stream.once("finish", onFinish);
+        stream.end();
+      });
+    },
   };
 }
 
