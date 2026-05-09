@@ -15,6 +15,14 @@ import {
   pollSpecImportUntilTerminal,
 } from "../../lib/import/spec-import-flow.js";
 import { readSpecInput } from "../../lib/import/read-spec-input.js";
+import {
+  resolveCreateOrMapProjectImport,
+  resolveCreateProjectImport,
+  resolveMapProjectImport,
+  throwIfConflictingImportProjectFlags,
+  type ResolvedSpecImportProject,
+} from "../../lib/import/spec-import-project-resolution.js";
+import type { Visibility } from "../../lib/projects/project-create-body.js";
 import { validateProjectSlug } from "../../lib/projects/project-slug.js";
 import { parseValidSemverVersionId } from "../../lib/versions/create-helpers.js";
 
@@ -54,6 +62,9 @@ export default class ImportSpec extends BaseCommand {
 
   static examples = [
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0",
+    "<%= config.bin %> <%= command.id %> ./openapi.yaml --map-project payments-api --version 1.0.0",
+    "<%= config.bin %> <%= command.id %> ./openapi.yaml --create-project --project-name 'Payments API' --project-slug payments-api --version 1.0.0 --yes",
+    "<%= config.bin %> <%= command.id %> ./openapi.yaml --create-or-map-project --project-name 'Payments API' --project-slug payments-api --version 1.0.0 --yes --no-wait",
     "<%= config.bin %> --json <%= command.id %> ./spec.json --project-slug my-api --project-name 'My API' --version 2.0.0 --no-wait",
     "<%= config.bin %> <%= command.id %> - --filename ./api.yaml --project-slug svc --project-name Service --version 0.1.0 < ./api.yaml",
     "<%= config.bin %> <%= command.id %> ./asyncapi.yml --project-slug events --project-name Events --version 1.0.0 --dry-run",
@@ -69,13 +80,30 @@ export default class ImportSpec extends BaseCommand {
   };
 
   static flags = {
+    "map-project": Flags.string({
+      description:
+        "Target an existing catalog project by slug (tenant-scoped lookup); forwards metadata.existing_project_id. Mutually exclusive with --create-project, --create-or-map-project, and --existing-project-id.",
+      exclusive: ["create-project", "create-or-map-project", "existing-project-id"],
+    }),
+    "create-project": Flags.boolean({
+      description:
+        "POST /v1/projects/{tenant} when --project-slug is free, then import onto that project id. Refuses if the slug already exists.",
+      default: false,
+      exclusive: ["map-project", "create-or-map-project", "existing-project-id"],
+    }),
+    "create-or-map-project": Flags.boolean({
+      description:
+        "Resolve project by slug: reuse when metadata matches; otherwise create then import (CI-friendly). Mutually exclusive with --map-project and --create-project.",
+      default: false,
+      exclusive: ["map-project", "create-project", "existing-project-id"],
+    }),
     "project-name": Flags.string({
-      description: "Display name for the catalog project created or targeted by this import.",
-      required: true,
+      description:
+        "Display name for the catalog project. Required except with --map-project (optional there for validation only).",
     }),
     "project-slug": Flags.string({
-      description: "URL-safe project slug (^[a-z][a-z0-9-]{1,62}$).",
-      required: true,
+      description:
+        "URL-safe project slug (^[a-z][a-z0-9-]{1,62}$). Required unless --map-project supplies the slug.",
     }),
     version: Flags.string({
       description: "Semantic version id for the imported catalog revision (for example 1.0.0).",
@@ -88,7 +116,23 @@ export default class ImportSpec extends BaseCommand {
       description: "Optional version description forwarded in import metadata.",
     }),
     "existing-project-id": Flags.string({
-      description: "When set, skip project creation and attach the job to this catalog project id.",
+      description:
+        "Legacy: attach the job to this catalog project id. Cannot be combined with --map-project / --create-project / --create-or-map-project.",
+      exclusive: ["map-project", "create-project", "create-or-map-project"],
+    }),
+    domain: Flags.string({
+      description:
+        "Optional domainCategory when creating a project (only with --create-project or --create-or-map-project).",
+    }),
+    visibility: Flags.string({
+      description:
+        "Optional visibility metadata when creating a project: private or public (default: private).",
+      options: ["private", "public"],
+    }),
+    yes: Flags.boolean({
+      description:
+        "Non-interactive guard for CI scripts (recommended with create-if-missing flags; import itself does not prompt).",
+      default: false,
     }),
     format: Flags.string({
       description:
@@ -136,27 +180,60 @@ export default class ImportSpec extends BaseCommand {
     this.ensureAuthenticated();
 
     const pathArg = typeof this.commandArgs.path === "string" ? this.commandArgs.path : "";
+
+    void this.flags.yes;
+
+    const mapRaw = typeof this.flags["map-project"] === "string" ? this.flags["map-project"].trim() : "";
+    const hasMap = mapRaw !== "";
+    const createProject = this.flags["create-project"] === true;
+    const createOrMap = this.flags["create-or-map-project"] === true;
+
+    const existingRaw = this.flags["existing-project-id"];
+    const existingTrim =
+      typeof existingRaw === "string" && existingRaw.trim() !== "" ? existingRaw.trim() : undefined;
+
+    throwIfConflictingImportProjectFlags({
+      mapProjectRaw: hasMap ? mapRaw : undefined,
+      createProject,
+      createOrMapProject: createOrMap,
+      existingProjectId: existingTrim,
+    });
+
+    const domainRaw = typeof this.flags.domain === "string" ? this.flags.domain.trim() : "";
+    const domainCli = domainRaw !== "" ? domainRaw : undefined;
+    const domainProvided = typeof this.flags.domain === "string";
+
+    const visibilityRaw =
+      typeof this.flags.visibility === "string" ? this.flags.visibility.trim() : "";
+    const visibilityProvided = typeof this.flags.visibility === "string";
+    let visibilityCli: Visibility | undefined;
+    if (visibilityProvided) {
+      if (visibilityRaw !== "private" && visibilityRaw !== "public") {
+        throw new ObjectifiedCliError({
+          message: "--visibility must be private or public.",
+          exitCode: EXIT_CODES.MISUSE,
+          title: "Invalid usage",
+        });
+      }
+      visibilityCli = visibilityRaw as Visibility;
+    }
+
+    if (domainProvided || visibilityProvided) {
+      if (!createProject && !createOrMap) {
+        throw new ObjectifiedCliError({
+          message:
+            "--domain and --visibility are only valid with --create-project or --create-or-map-project.",
+          exitCode: EXIT_CODES.MISUSE,
+          title: "Invalid usage",
+        });
+      }
+    }
+
     const projectNameRaw = this.flags["project-name"];
     const projectName = typeof projectNameRaw === "string" ? projectNameRaw.trim() : "";
     const projectSlugRaw = this.flags["project-slug"];
     const versionRaw = typeof this.flags.version === "string" ? this.flags.version.trim() : "";
 
-    if (projectName === "") {
-      throw new ObjectifiedCliError({
-        message: "--project-name is required.",
-        exitCode: EXIT_CODES.MISUSE,
-        title: "Invalid usage",
-      });
-    }
-    const slugCheck = validateProjectSlug(typeof projectSlugRaw === "string" ? projectSlugRaw : "");
-    if (!slugCheck.ok) {
-      throw new ObjectifiedCliError({
-        message: slugCheck.message,
-        exitCode: EXIT_CODES.VALIDATION,
-        title: "Validation failed",
-        hint: slugCheck.suggestion !== undefined ? `Try slug ${slugCheck.suggestion}` : undefined,
-      });
-    }
     if (versionRaw === "") {
       throw new ObjectifiedCliError({
         message: "--version is required.",
@@ -165,6 +242,106 @@ export default class ImportSpec extends BaseCommand {
       });
     }
     const versionId = parseValidSemverVersionId(versionRaw);
+
+    const projDescRaw = this.flags["project-description"];
+    const descriptionProvided = typeof projDescRaw === "string";
+    const projectDescriptionForTarget =
+      typeof projDescRaw === "string" && projDescRaw.trim() !== "" ? projDescRaw.trim() : null;
+
+    let resolved: ResolvedSpecImportProject;
+
+    if (hasMap) {
+      resolved = await resolveMapProjectImport({
+        api: this.api,
+        tenant,
+        mapSlugRaw: mapRaw,
+        cliProjectName: projectName !== "" ? projectName : undefined,
+        cliProjectSlug:
+          typeof projectSlugRaw === "string" && projectSlugRaw.trim() !== ""
+            ? projectSlugRaw
+            : undefined,
+      });
+    } else if (createProject || createOrMap) {
+      if (projectName === "") {
+        throw new ObjectifiedCliError({
+          message:
+            "--project-name is required with --create-project or --create-or-map-project.",
+          exitCode: EXIT_CODES.MISUSE,
+          title: "Invalid usage",
+        });
+      }
+      const slugCheckCreate = validateProjectSlug(
+        typeof projectSlugRaw === "string" ? projectSlugRaw : "",
+      );
+      if (!slugCheckCreate.ok) {
+        throw new ObjectifiedCliError({
+          message: slugCheckCreate.message,
+          exitCode: EXIT_CODES.VALIDATION,
+          title: "Validation failed",
+          hint:
+            slugCheckCreate.suggestion !== undefined
+              ? `Try slug ${slugCheckCreate.suggestion}`
+              : undefined,
+        });
+      }
+      const projectTarget = {
+        name: projectName,
+        slug: slugCheckCreate.slug,
+        description: projectDescriptionForTarget,
+      };
+      if (createProject) {
+        resolved = await resolveCreateProjectImport({
+          api: this.api,
+          tenant,
+          project: projectTarget,
+          domain: domainCli,
+          visibility: visibilityCli,
+        });
+      } else {
+        resolved = await resolveCreateOrMapProjectImport({
+          api: this.api,
+          tenant,
+          project: projectTarget,
+          hints: {
+            descriptionProvided,
+            domainProvided,
+            visibilityProvided,
+          },
+          domain: domainCli,
+          visibility: visibilityCli,
+        });
+      }
+    } else {
+      if (projectName === "") {
+        throw new ObjectifiedCliError({
+          message: "--project-name is required unless --map-project is set.",
+          exitCode: EXIT_CODES.MISUSE,
+          title: "Invalid usage",
+        });
+      }
+      const slugCheckLegacy = validateProjectSlug(
+        typeof projectSlugRaw === "string" ? projectSlugRaw : "",
+      );
+      if (!slugCheckLegacy.ok) {
+        throw new ObjectifiedCliError({
+          message: slugCheckLegacy.message,
+          exitCode: EXIT_CODES.VALIDATION,
+          title: "Validation failed",
+          hint:
+            slugCheckLegacy.suggestion !== undefined
+              ? `Try slug ${slugCheckLegacy.suggestion}`
+              : undefined,
+        });
+      }
+      resolved = {
+        existingProjectId: existingTrim ?? null,
+        project: {
+          name: projectName,
+          slug: slugCheckLegacy.slug,
+          description: projectDescriptionForTarget,
+        },
+      };
+    }
 
     const rollback = this.flags.rollback === true;
     const commit = !rollback && this.flags.commit !== false;
@@ -188,31 +365,20 @@ export default class ImportSpec extends BaseCommand {
       bytes,
     });
 
-    const projDescRaw = this.flags["project-description"];
     const verDescRaw = this.flags["version-description"];
-    const existingRaw = this.flags["existing-project-id"];
-    const existingTrim =
-      typeof existingRaw === "string" && existingRaw.trim() !== "" ? existingRaw.trim() : undefined;
 
     const documentBase64 = bytes.toString("base64");
 
     const accepted: SpecImportJobAccepted = await this.api.startSpecImportJson(tenant, {
       metadata: {
         source_kind: kind.sourceKind,
-        project: {
-          name: projectName,
-          slug: slugCheck.slug,
-          description:
-            typeof projDescRaw === "string" && projDescRaw.trim() !== ""
-              ? projDescRaw.trim()
-              : null,
-        },
+        project: resolved.project,
         version: {
           version_id: versionId,
           description:
             typeof verDescRaw === "string" && verDescRaw.trim() !== "" ? verDescRaw.trim() : null,
         },
-        existing_project_id: existingTrim ?? null,
+        existing_project_id: resolved.existingProjectId ?? null,
         options: dryRun ? { dry_run: true } : undefined,
       },
       document_base64: documentBase64,
