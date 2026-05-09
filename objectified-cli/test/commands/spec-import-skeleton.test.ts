@@ -93,12 +93,6 @@ describe("spec import skeleton (#3308)", () => {
           return;
         }
 
-        if (req.method === "GET" && url.pathname === "/v1/projects/acme") {
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify([]));
-          return;
-        }
-
         if (req.method === "POST" && url.pathname === "/v1/projects/acme") {
           const raw = await readBody(req);
           const body = JSON.parse(raw) as {
@@ -194,6 +188,73 @@ describe("spec import skeleton (#3308)", () => {
       expect(result.code).toBe(0);
       expect(result.stderr.trim()).toBe("");
       expect(result.stdout).toMatchSnapshot();
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
+  it("new project: exits 6 on create conflict and suggests --slug (#3309)", async () => {
+    const server = http.createServer((req, res) => {
+      void (async () => {
+        res.setHeader("Connection", "close");
+        const url = new URL(req.url ?? "/", "http://127.0.0.1");
+
+        if (
+          req.method === "GET" &&
+          (url.pathname === "/v1/projects/acme/domains" || url.pathname === "/v1/projects/domains")
+        ) {
+          res.statusCode = 404;
+          res.end();
+          return;
+        }
+
+        if (req.method === "POST" && url.pathname === "/v1/projects/acme") {
+          res.statusCode = 409;
+          res.setHeader("Content-Type", "application/json");
+          res.end(
+            JSON.stringify({
+              detail: "A project with slug 'swagger-petstore' already exists in this tenant",
+            }),
+          );
+          return;
+        }
+
+        res.statusCode = 500;
+        res.end(`unexpected ${req.method ?? "?"} ${url.pathname}`);
+      })().catch(() => {
+        if (!res.headersSent) res.statusCode = 500;
+        res.end("handler error");
+      });
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const base = `http://127.0.0.1:${String(addr.port)}`;
+      const fixture = path.join(pkgRoot, "fixtures", "petstore.yaml");
+      const result = await runCliCapture([
+        "--base-url",
+        base,
+        "--api-key",
+        "k",
+        "--tenant",
+        "acme",
+        "--quiet",
+        "--no-json",
+        "spec",
+        "import",
+        fixture,
+        "--yes",
+      ]);
+      expect(result.code).toBe(6);
+      expect(result.stdout.trim()).toBe("");
+      expect(result.stderr).toContain("Project slug 'swagger-petstore' is already in use");
+      expect(result.stderr).toContain("Pass a different --slug or delete the existing project first.");
     } finally {
       server.closeAllConnections?.();
       await new Promise<void>((resolve, reject) =>

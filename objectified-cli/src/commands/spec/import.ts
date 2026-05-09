@@ -17,7 +17,7 @@ import { localePrefersAsciiTable } from "../../lib/output.js";
 import { PROJECT_DOMAIN_CATEGORY_NONE } from "../../lib/projects/domain-categories.js";
 import type { Visibility } from "../../lib/projects/project-create-body.js";
 import { buildProjectCreateRequest } from "../../lib/projects/project-create-body.js";
-import { normalizeSlugInput, validateProjectSlug } from "../../lib/projects/project-slug.js";
+import { validateProjectSlug } from "../../lib/projects/project-slug.js";
 import { completionProfileCacheKey, resolveProjectForTenant } from "../../lib/resolve.js";
 import {
   metadataRecordFromSpecDraft,
@@ -45,7 +45,7 @@ function pickStr(o: Record<string, unknown>, keys: string[]): string | undefined
   return undefined;
 }
 
-function loadStructuredSpecFile(filePath: string): unknown {
+function loadStructuredSpecFile(filePath: string): { raw: string; parsed: unknown } {
   const abs = path.resolve(process.cwd(), filePath);
   if (!fs.existsSync(abs)) {
     throw new ObjectifiedCliError({
@@ -59,7 +59,7 @@ function loadStructuredSpecFile(filePath: string): unknown {
   const lower = abs.toLowerCase();
   if (lower.endsWith(".yaml") || lower.endsWith(".yml")) {
     try {
-      return YAML.parse(raw) as unknown;
+      return { raw, parsed: YAML.parse(raw) as unknown };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       throw new ObjectifiedCliError({
@@ -71,7 +71,7 @@ function loadStructuredSpecFile(filePath: string): unknown {
     }
   }
   try {
-    return JSON.parse(raw) as unknown;
+    return { raw, parsed: JSON.parse(raw) as unknown };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new ObjectifiedCliError({
@@ -81,19 +81,6 @@ function loadStructuredSpecFile(filePath: string): unknown {
       hint: "Fix the JSON syntax or use .yaml / .yml for YAML.",
     });
   }
-}
-
-function readSpecFileUtf8(filePath: string): string {
-  const abs = path.resolve(process.cwd(), filePath);
-  if (!fs.existsSync(abs)) {
-    throw new ObjectifiedCliError({
-      message: `Spec file not found: ${abs}`,
-      exitCode: EXIT_CODES.MISUSE,
-      title: "Invalid usage",
-      hint: "Pass a path to an existing OpenAPI, Swagger, or Arazzo document.",
-    });
-  }
-  return fs.readFileSync(abs, "utf8");
 }
 
 function normalizeDomainCategory(raw: string | undefined): string | undefined {
@@ -428,7 +415,7 @@ export default class SpecImport extends BaseCommand {
     }
     const sourceFlag = sourceRaw as SourceFlag;
 
-    const parsedUnknown = loadStructuredSpecFile(specPath);
+    const { raw: rawContent, parsed: parsedUnknown } = loadStructuredSpecFile(specPath);
     if (
       parsedUnknown === null ||
       typeof parsedUnknown !== "object" ||
@@ -487,7 +474,6 @@ export default class SpecImport extends BaseCommand {
 
     let specDraft: SpecProjectDraft | undefined;
     if (createProjectFromSpec) {
-      const rawContent = readSpecFileUtf8(specPath);
       const derived = projectDraftFromSpecContent(rawContent, specPath);
       if (!derived.ok) {
         throw new ObjectifiedCliError({
@@ -592,7 +578,8 @@ export default class SpecImport extends BaseCommand {
       }
     }
 
-    const needConfirmNewProject = createProjectFromSpec && tty && !yes && !quiet;
+    const needConfirmNewProject =
+      createProjectFromSpec && !this.context.json && tty && !yes && !quiet;
 
     if (needConfirmNewProject) {
       const { confirm } = await import("@inquirer/prompts");
@@ -645,18 +632,22 @@ export default class SpecImport extends BaseCommand {
         baseMetadata: Object.keys(baseMeta).length > 0 ? baseMeta : undefined,
       });
 
-      const existingList = await this.api.listProjects(tenant);
-      const taken = existingList.some((p) => normalizeSlugInput(p.slug) === mergedSlug);
-      if (taken) {
-        throw new ObjectifiedCliError({
-          message: `Project slug '${mergedSlug}' is already in use for this tenant.`,
-          exitCode: EXIT_CODES.CONFLICT,
-          title: "Conflict",
-          hint: "Pass a different --slug or delete the existing project first.",
-        });
+      let createdProject: ProjectSchema;
+      try {
+        createdProject = await this.api.createProject(tenant, createBody);
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError && e.exitCode === EXIT_CODES.CONFLICT) {
+          throw new ObjectifiedCliError({
+            message: `Project slug '${mergedSlug}' is already in use for this tenant.`,
+            exitCode: EXIT_CODES.CONFLICT,
+            title: e.title ?? "Conflict",
+            hint: "Pass a different --slug or delete the existing project first.",
+            requestId: e.requestId,
+            retriesAttempted: e.retriesAttempted,
+          });
+        }
+        throw e;
       }
-
-      const createdProject = await this.api.createProject(tenant, createBody);
       project = createdProject;
       freshProjectSlug = mergedSlug;
 
