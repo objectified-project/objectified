@@ -59,16 +59,13 @@ export async function importPathsFromOpenAPIForVersion(
 export { importOpenAPIPathsAndSecurityWithPool } from './engine/import-openapi-paths-security';
 
 function buildDefaultImportEngineDeps(): ImportEngineDeps {
+  const planEntitlements = nodeRequire('../../../objectified-ui/lib/db/plan-entitlements');
   return {
     txClient: new PgTransactionalClient(uiConnectionPool(), {
-      checkPlanForNewProject: async (userId, client) => {
-        const { getPlanBlockMessageForNewProject } = nodeRequire('../../../objectified-ui/lib/db/plan-entitlements');
-        return getPlanBlockMessageForNewProject(userId, client);
-      },
-      checkPlanForNewVersion: async (userId, client) => {
-        const { getPlanBlockMessageForNewVersion } = nodeRequire('../../../objectified-ui/lib/db/plan-entitlements');
-        return getPlanBlockMessageForNewVersion(userId, client);
-      },
+      checkPlanForNewProject: async (userId, client) =>
+        planEntitlements.getPlanBlockMessageForNewProject(userId, client),
+      checkPlanForNewVersion: async (userId, client) =>
+        planEntitlements.getPlanBlockMessageForNewVersion(userId, client),
     }),
     recordRepositoryImport: async link => {
       const { recordTenantRepositoryImport } = nodeRequire('../../../objectified-ui/lib/db/repository-import-metrics');

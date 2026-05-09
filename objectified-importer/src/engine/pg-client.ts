@@ -10,9 +10,17 @@ import type { TransactionHandle, TransactionalClient } from './transactional-cli
  * Keeping these out of the constructor's required args avoids importing UI DB modules here.
  */
 export type PgClientPlanChecks = {
-  /** Returns a block-error message when the user cannot create a new project, or null if allowed. */
+  /**
+   * Returns a block-error message when the user cannot create a new project, or null if allowed.
+   * @param userId - The ID of the user creating the project.
+   * @param client - The active Postgres queryable (pool or transaction client).
+   */
   checkPlanForNewProject?: (userId: string, client: PgQueryable) => Promise<string | null>;
-  /** Returns a block-error message when the user cannot create a new version, or null if allowed. */
+  /**
+   * Returns a block-error message when the user cannot create a new version, or null if allowed.
+   * @param userId - The ID of the user creating the version.
+   * @param client - The active Postgres queryable (pool or transaction client).
+   */
   checkPlanForNewVersion?: (userId: string, client: PgQueryable) => Promise<string | null>;
 };
 
