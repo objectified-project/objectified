@@ -2325,6 +2325,94 @@ export type TenantRepositoryGetResponse = {
 };
 
 /**
+ * TenantRepositoryImportMetricRow
+ * One recorded catalog import from a registered Git repository.
+ */
+export type TenantRepositoryImportMetricRow = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Branch
+     */
+    branch: string;
+    /**
+     * Blob Sha
+     */
+    blob_sha?: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Project Name
+     */
+    project_name: string;
+    /**
+     * Project Slug
+     */
+    project_slug: string;
+    /**
+     * Catalog Version Label
+     */
+    catalog_version_label: string;
+    /**
+     * Version Uuid
+     */
+    version_uuid: string;
+    /**
+     * Imported By
+     */
+    imported_by?: string | null;
+    /**
+     * Imported By Name
+     */
+    imported_by_name?: string | null;
+    /**
+     * Imported By Email
+     */
+    imported_by_email?: string | null;
+};
+
+/**
+ * TenantRepositoryImportStats30d
+ */
+export type TenantRepositoryImportStats30D = {
+    /**
+     * Totalimports
+     */
+    totalImports: number;
+    /**
+     * Distinctprojects
+     */
+    distinctProjects: number;
+};
+
+/**
+ * TenantRepositoryImportsResponse
+ */
+export type TenantRepositoryImportsResponse = {
+    /**
+     * Success
+     */
+    success?: boolean;
+    /**
+     * Imports
+     */
+    imports: Array<TenantRepositoryImportMetricRow>;
+    stats30d: TenantRepositoryImportStats30D;
+};
+
+/**
  * TenantRepositoryRecord
  * Single repository row returned to the UI (snake_case keys for the dashboard).
  */
@@ -2434,16 +2522,6 @@ export type ValidationError = {
      * Error Type
      */
     type: string;
-    /**
-     * Input
-     */
-    input?: unknown;
-    /**
-     * Context
-     */
-    ctx?: {
-        [key: string]: unknown;
-    };
 };
 
 /**
@@ -9852,6 +9930,55 @@ export type GetTenantRepositoryV1TenantsTenantSlugRepositoriesRepositoryIdGetRes
 };
 
 export type GetTenantRepositoryV1TenantsTenantSlugRepositoriesRepositoryIdGetResponse = GetTenantRepositoryV1TenantsTenantSlugRepositoriesRepositoryIdGetResponses[keyof GetTenantRepositoryV1TenantsTenantSlugRepositoriesRepositoryIdGetResponses];
+
+export type ListTenantRepositoryImportMetricsV1TenantsTenantSlugRepositoriesRepositoryIdImportsGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+        /**
+         * X-Api-Key
+         */
+        'X-API-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Tenant Slug
+         */
+        tenant_slug: string;
+        /**
+         * Repository Id
+         */
+        repository_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/v1/tenants/{tenant_slug}/repositories/{repository_id}/imports';
+};
+
+export type ListTenantRepositoryImportMetricsV1TenantsTenantSlugRepositoriesRepositoryIdImportsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListTenantRepositoryImportMetricsV1TenantsTenantSlugRepositoriesRepositoryIdImportsGetError = ListTenantRepositoryImportMetricsV1TenantsTenantSlugRepositoriesRepositoryIdImportsGetErrors[keyof ListTenantRepositoryImportMetricsV1TenantsTenantSlugRepositoriesRepositoryIdImportsGetErrors];
+
+export type ListTenantRepositoryImportMetricsV1TenantsTenantSlugRepositoriesRepositoryIdImportsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: TenantRepositoryImportsResponse;
+};
+
+export type ListTenantRepositoryImportMetricsV1TenantsTenantSlugRepositoriesRepositoryIdImportsGetResponse = ListTenantRepositoryImportMetricsV1TenantsTenantSlugRepositoriesRepositoryIdImportsGetResponses[keyof ListTenantRepositoryImportMetricsV1TenantsTenantSlugRepositoriesRepositoryIdImportsGetResponses];
 
 export type ListTenantRepositoryFilesV1TenantsTenantSlugRepositoriesRepositoryIdFilesGetData = {
     body?: never;

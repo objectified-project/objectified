@@ -1,8 +1,18 @@
 """
-Spec import jobs — REST surface for queued orchestrator workers (#3306).
+Spec import jobs — REST surface for asynchronous specification imports.
 
-POST inserts a ``queued`` row; T6 worker advances state. Auth and tenant guard match
-``validate_authentication`` + path ``tenant_slug`` (JWT or API key).
+**Orchestrator contract**
+
+``POST /v1/imports/{tenant_slug}`` inserts a ``queued`` row (REST ticket #3306).
+Startup workers in ``import_orchestrator`` claim jobs, spawn
+``OBJECTIFIED_IMPORT_RUNNER_CMD`` (typically the ``objectified-importer`` CLI), and
+merge NDJSON **event** / **progress** / **result** lines into ``import_jobs``.
+Commit, cancel, and rollback are separate POSTs on ``…/{job_id}/…``; cancel stops the
+runner (e.g. SIGTERM). Process lifecycle, stdin envelope, and sidecar semantics are
+in commercial issue #3307 (T6 orchestrator worker).
+
+Auth and tenant guard: ``validate_authentication`` + path ``tenant_slug`` (JWT or API
+key).
 """
 
 from __future__ import annotations

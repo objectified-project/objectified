@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Objectified REST API
   description: REST API for serving OpenAPI specifications from the Objectified database
-  version: 1.0.61
+  version: 1.0.63
 paths:
   /v1/browse/tenants:
     get:
@@ -7939,6 +7939,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/tenants/{tenant_slug}/repositories/{repository_id}/imports:
+    get:
+      tags:
+      - tenant-repositories
+      summary: List Tenant Repository Import Metrics
+      description: Recent catalog imports and 30-day stats for Map & Import dashboard
+        (#3313).
+      operationId: list_tenant_repository_import_metrics_v1_tenants__tenant_slug__repositories__repository_id__imports_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: repository_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Repository Id
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 100
+          title: Limit
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantRepositoryImportsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/tenants/{tenant_slug}/repositories/{repository_id}/files:
     get:
       tags:
@@ -11389,6 +11447,99 @@ components:
       required:
       - repository
       title: TenantRepositoryGetResponse
+    TenantRepositoryImportMetricRow:
+      properties:
+        id:
+          type: string
+          title: Id
+        path:
+          type: string
+          title: Path
+        branch:
+          type: string
+          title: Branch
+        blob_sha:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Blob Sha
+        created_at:
+          type: string
+          title: Created At
+        project_id:
+          type: string
+          title: Project Id
+        project_name:
+          type: string
+          title: Project Name
+        project_slug:
+          type: string
+          title: Project Slug
+        catalog_version_label:
+          type: string
+          title: Catalog Version Label
+        version_uuid:
+          type: string
+          title: Version Uuid
+        imported_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Imported By
+        imported_by_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Imported By Name
+        imported_by_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Imported By Email
+      type: object
+      required:
+      - id
+      - path
+      - branch
+      - created_at
+      - project_id
+      - project_name
+      - project_slug
+      - catalog_version_label
+      - version_uuid
+      title: TenantRepositoryImportMetricRow
+      description: One recorded catalog import from a registered Git repository.
+    TenantRepositoryImportStats30d:
+      properties:
+        totalImports:
+          type: integer
+          title: Totalimports
+        distinctProjects:
+          type: integer
+          title: Distinctprojects
+      type: object
+      required:
+      - totalImports
+      - distinctProjects
+      title: TenantRepositoryImportStats30d
+    TenantRepositoryImportsResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+          default: true
+        imports:
+          items:
+            $ref: '#/components/schemas/TenantRepositoryImportMetricRow'
+          type: array
+          title: Imports
+        stats30d:
+          $ref: '#/components/schemas/TenantRepositoryImportStats30d'
+      type: object
+      required:
+      - imports
+      - stats30d
+      title: TenantRepositoryImportsResponse
     TenantRepositoryRecord:
       properties:
         id:
@@ -11510,11 +11661,6 @@ components:
         type:
           type: string
           title: Error Type
-        input:
-          title: Input
-        ctx:
-          type: object
-          title: Context
       type: object
       required:
       - loc

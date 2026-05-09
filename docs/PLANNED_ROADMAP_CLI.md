@@ -95,8 +95,9 @@ Every command lives in one of three connection modes:
 | 10  | [Data Records (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3183)                     | #3183   | 7           | 0 (v2)       |
 | 11  | [Migration Plans & Version Tags (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3184)   | #3184   | 7           | 0 (v2)       |
 | 12  | [Distribution, Release & Self-Update](https://github.com/KenSuenobu/objectified-commercial/issues/3185)    | #3185   | 8           | 2 of 8       |
+| 13  | [CLI-IMPORT — REST-first specification import](https://github.com/KenSuenobu/objectified-commercial/issues/3301) | #3301   | 13          | CLI + REST jobs + UI |
 
-Total: **12 epics**, **87 sub-tickets** (open roadmap items; completed work is dropped from the Epic 1 summary table below).
+Total: **13 epics**, **100 sub-tickets** (open roadmap items; completed work is dropped from the Epic 1 summary table below).
 
 ---
 
@@ -741,6 +742,77 @@ The `NPM_REGISTRY` env var lets us point at npmjs.com, GitHub Packages, JFrog Ar
 
 ---
 
+## Epic 13 (#3301): CLI-IMPORT — REST-first specification import
+
+Cross-package work tracked under commercial epic **[CLI-IMPORT EPIC: REST-First Spec Import](https://github.com/KenSuenobu/objectified-commercial/issues/3301)**. Child tickets (dependency map from [#3314](https://github.com/KenSuenobu/objectified-commercial/issues/3314)):
+
+| Ticket | Commercial issue |
+|--------|------------------|
+| T1 | [#3302](https://github.com/KenSuenobu/objectified-commercial/issues/3302) |
+| T2 | [#3303](https://github.com/KenSuenobu/objectified-commercial/issues/3303) |
+| T3 | [#3304](https://github.com/KenSuenobu/objectified-commercial/issues/3304) |
+| T4 | [#3305](https://github.com/KenSuenobu/objectified-commercial/issues/3305) |
+| T5 | [#3306](https://github.com/KenSuenobu/objectified-commercial/issues/3306) |
+| T6 | [#3307](https://github.com/KenSuenobu/objectified-commercial/issues/3307) |
+| T7 | [#3308](https://github.com/KenSuenobu/objectified-commercial/issues/3308) |
+| T8 | [#3309](https://github.com/KenSuenobu/objectified-commercial/issues/3309) |
+| T9 | [#3310](https://github.com/KenSuenobu/objectified-commercial/issues/3310) |
+| T10 | [#3311](https://github.com/KenSuenobu/objectified-commercial/issues/3311) |
+| T11 | [#3312](https://github.com/KenSuenobu/objectified-commercial/issues/3312) |
+| T12 | [#3313](https://github.com/KenSuenobu/objectified-commercial/issues/3313) |
+| T13 | [#3314](https://github.com/KenSuenobu/objectified-commercial/issues/3314) |
+
+### Topic tree (CLI — T7–T10)
+
+```
+objectified spec import <file>              # queue job; poll to completion (POST /v1/imports/{tenant_slug})
+objectified spec import status [job-id]    # GET …/{job_id}; --watch, --last
+objectified spec import commit [job-id]    # POST …/{job_id}/commit
+objectified spec import cancel [job-id]    # POST …/{job_id}/cancel
+```
+
+### Summary table (user-facing CLI — T7–T10)
+
+| # | Title | Description | Labels | MVP | Parallel |
+|---|-------|-------------|--------|-----|----------|
+| T7 (#3308) | `spec import <file> --project …` | OpenAPI / Swagger / Arazzo → `POST /v1/imports/{tenant_slug}` with `existingProjectId`; poll `GET …/{job_id}` | `cli`, `import`, `roadmap-cli` | Yes | After REST jobs API |
+| T8 (#3309) | `spec import <file>` without `--project` | Derive project metadata from spec; `POST /v1/projects/{tenant}` then import | `cli`, `import`, `roadmap-cli` | Yes | After T7 |
+| T9 (#3310) | `spec import` CI flags | `--dry-run`, `--review`, `--report`, `--ndjson`, `--commit-on-complete`; `objectified docs spec-import` | `cli`, `import`, `roadmap-cli` | Yes | After T7 |
+| T10 (#3311) | `spec import status|commit|cancel` | Job control subcommands, `--watch`, `--last`, cache file, `--yes` off-TTY | `cli`, `import`, `roadmap-cli` | Yes | After T7 |
+
+### Notable Detail — spec import flow
+
+REST queues work; **`objectified-rest`** orchestrator workers claim **`queued`** rows, spawn the configured **`objectified-importer`** runner, and persist NDJSON **`event`** / **`progress`** / **`result`** streams. The CLI and UI are thin clients over the same **`/v1/imports/{tenant_slug}`** surface.
+
+```
+   objectified CLI                    objectified UI (Next.js routes)
+          │                                      │
+          │  JWT / API key                       │  session JWT → REST
+          ▼                                      ▼
+   ┌──────────────────────────────────────────────────────────────┐
+   │                     objectified-rest                          │
+   │   POST/GET …/imports/{tenant_slug}[/{job_id}[/commit|cancel]] │
+   └───────────────────────────────┬──────────────────────────────┘
+                                   │ workers claim queued rows
+                                   ▼
+                        ┌─────────────────────┐
+                        │ import orchestrator │  (#3307 — spawn, SIGTERM cancel)
+                        └──────────┬──────────┘
+                                   │ OBJECTIFIED_IMPORT_RUNNER_CMD
+                                   ▼
+                        ┌─────────────────────┐
+                        │ objectified-importer │  (#3304 — NDJSON sidecar)
+                        │ (stdin envelope →    │
+                        │  stdout events)       │
+                        └──────────┬──────────┘
+                                   ▼
+                        ┌─────────────────────┐
+                        │ import engine        │  (#3302 — parsers + schema writes)
+                        └─────────────────────┘
+```
+
+---
+
 ## MVP Release — Ticket Bundle
 
 The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for a single project's lifecycle. Total: **6 open sub-tickets** across 4 epics (plus completed foundation items such as #3186, #3187, #3188, #3189, #3190, #3191, #3192, #3193, #3194, #3195, #3202, #3203, #3204, #3208, #3209, #3210, #3212, #3244, #3245, #3246, #3247, and #3248).
@@ -847,5 +919,6 @@ The tickets were created in the order below — that is also the recommended **e
 11. **Epic 10 — Data Records** (#3183 then #3253 → #3259). Runtime data plane after schema is locked.
 12. **Epic 11 — Migration Plans & Version Tags** (#3184 then #3260 → #3266). Polishing on top of versions.
 13. **Epic 12 — Distribution (rest)** (#3269 → #3274). Release engineering polish: changesets, binaries, self-update, telemetry, plugins, Homebrew/Scoop.
+14. **Epic 13 — REST-first specification import** (#3301; [#3302](https://github.com/KenSuenobu/objectified-commercial/issues/3302) → [#3314](https://github.com/KenSuenobu/objectified-commercial/issues/3314)). Backend jobs API + orchestrator + **`objectified-importer`** sidecar land before CLI **`spec import`** (T7–T10); UI proxy and metrics (T11–T12) align Map & Import with REST; T13 doc sweep keeps **`docs/PLANNED_ROADMAP_CLI.md`**, CLI README/man, and **`WHATS_NEW`** in sync.
 
 This order is also encoded in the ticket numbering: every dependency is on a lower-numbered ticket.
