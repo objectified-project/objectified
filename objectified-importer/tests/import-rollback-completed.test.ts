@@ -1,53 +1,47 @@
 /**
  * Import Rollback Completed Tests (#735)
- *
- * Tests for rollbackCompletedImport: undo a completed import by removing
- * the created project and all its data. Only allowed when state === 'completed'.
  */
 
+import { createImportEngine } from '../src/engine/import-helper';
+import { mockTxConnect } from './import-test-mocks';
 
-import * as uiHelper from '../../objectified-ui/lib/db/helper';
+const mockPermanentDeleteProject = vi.fn();
 
-const mockClient = { query: vi.fn(), release: vi.fn() };
-
-vi.mock('../src/engine/import-transaction', () => ({
-  getTransactionClient: vi.fn(() => Promise.resolve(mockClient)),
-  beginTransaction: vi.fn(() => Promise.resolve()),
-  commitTransaction: vi.fn(() => Promise.resolve()),
-  rollbackTransaction: vi.fn(() => Promise.resolve()),
-  releaseClient: vi.fn(() => Promise.resolve()),
-  createProjectTx: vi.fn(() =>
-    Promise.resolve(JSON.stringify({ success: true, project: { id: 'proj-rollback-test' } }))
-  ),
-  createVersionTx: vi.fn(() =>
-    Promise.resolve(JSON.stringify({ success: true, version: { id: 'ver-rollback-test' } }))
-  ),
-  createPropertyTx: vi.fn((_client: any, _projectId: string, _name: string, _desc: any, data: any) =>
-    Promise.resolve(JSON.stringify({ success: true, property: { id: 'prop-' + JSON.stringify(data).length } }))
-  ),
-  createClassTx: vi.fn(() =>
-    Promise.resolve(JSON.stringify({ success: true, class: { id: 'class-1' } }))
-  ),
-  addPropertyToClassTx: vi.fn(() =>
-    Promise.resolve(JSON.stringify({ success: true, classProperty: { id: 'cp-1' } }))
-  ),
-  getClassesWithPropertiesAndTagsTx: vi.fn(() =>
-    Promise.resolve(
-      JSON.stringify([
-        {
-          name: 'TestClass',
-          schema: {},
-          properties: [
-            { id: 'p1', name: 'id', data: { type: 'string' }, children: [] },
-            { id: 'p2', name: 'name', data: { type: 'number' }, children: [] },
-          ],
-        },
-      ])
-    )
-  ),
-  getLatestVersionUuidForProjectTx: vi.fn(() => Promise.resolve(null)),
-  listProjectLibraryPropertiesTx: vi.fn(() => Promise.resolve([])),
-}));
+const mockBeginTransaction = vi.fn();
+const mockCommitTransaction = vi.fn();
+const mockRollbackTransaction = vi.fn();
+const mockReleaseClient = vi.fn();
+const mockCreateProjectTx = vi.fn(() =>
+  Promise.resolve(JSON.stringify({ success: true, project: { id: 'proj-rollback-test' } }))
+);
+const mockCreateVersionTx = vi.fn(() =>
+  Promise.resolve(JSON.stringify({ success: true, version: { id: 'ver-rollback-test' } }))
+);
+const mockCreatePropertyTx = vi.fn((_projectId: string, _name: string, _desc: any, data: any) =>
+  Promise.resolve(JSON.stringify({ success: true, property: { id: 'prop-' + JSON.stringify(data).length } }))
+);
+const mockCreateClassTx = vi.fn(() =>
+  Promise.resolve(JSON.stringify({ success: true, class: { id: 'class-1' } }))
+);
+const mockAddPropertyToClassTx = vi.fn(() =>
+  Promise.resolve(JSON.stringify({ success: true, classProperty: { id: 'cp-1' } }))
+);
+const mockGetClassesWithPropertiesAndTagsTx = vi.fn(() =>
+  Promise.resolve(
+    JSON.stringify([
+      {
+        name: 'TestClass',
+        schema: {},
+        properties: [
+          { id: 'p1', name: 'id', data: { type: 'string' }, children: [] },
+          { id: 'p2', name: 'name', data: { type: 'number' }, children: [] },
+        ],
+      },
+    ])
+  )
+);
+const mockGetLatestVersionUuidForProjectTx = vi.fn(() => Promise.resolve(null));
+const mockListProjectLibraryPropertiesTx = vi.fn(() => Promise.resolve([]));
 
 const mockNormalizeResult = {
   classes: [
@@ -100,14 +94,36 @@ describe('rollbackCompletedImport (#735)', () => {
   };
 
   beforeEach(() => {
-    vi.mocked(uiHelper.permanentDeleteProject).mockReset();
-    vi.mocked(uiHelper.permanentDeleteProject).mockResolvedValue(JSON.stringify({ success: true }));
-    mockClient.query.mockClear();
-    mockClient.release.mockClear();
-  });
+    mockPermanentDeleteProject.mockReset();
+    mockPermanentDeleteProject.mockResolvedValue({ success: true });
+    mockTxConnect.mockReset();
 
-  afterEach(() => {
-    vi.resetModules();
+    mockBeginTransaction.mockResolvedValue(undefined);
+    mockCommitTransaction.mockResolvedValue(undefined);
+    mockRollbackTransaction.mockResolvedValue(undefined);
+    mockReleaseClient.mockResolvedValue(undefined);
+
+    mockTxConnect.mockImplementation(async () => ({
+      begin: mockBeginTransaction,
+      commit: mockCommitTransaction,
+      rollback: mockRollbackTransaction,
+      release: mockReleaseClient,
+      createProjectTx: mockCreateProjectTx,
+      createVersionTx: mockCreateVersionTx,
+      createPropertyTx: mockCreatePropertyTx,
+      createClassTx: mockCreateClassTx,
+      addPropertyToClassTx: mockAddPropertyToClassTx,
+      getClassesWithPropertiesAndTagsTx: mockGetClassesWithPropertiesAndTagsTx,
+      getLatestVersionUuidForProjectTx: mockGetLatestVersionUuidForProjectTx,
+      listProjectLibraryPropertiesTx: mockListProjectLibraryPropertiesTx,
+    }));
+
+    createImportEngine({
+      txClient: { connect: () => mockTxConnect() },
+      recordRepositoryImport: vi.fn(async () => {}),
+      permanentDeleteProject: mockPermanentDeleteProject,
+      importOpenApiPathsAndSecurity: vi.fn(async () => ({ success: true })),
+    });
   });
 
   test('returns Job not found for unknown jobId', async () => {
@@ -117,7 +133,7 @@ describe('rollbackCompletedImport (#735)', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Job not found');
-    expect(uiHelper.permanentDeleteProject).not.toHaveBeenCalled();
+    expect(mockPermanentDeleteProject).not.toHaveBeenCalled();
   });
 
   test('returns error when job is pending-approval (not completed)', async () => {
@@ -132,7 +148,7 @@ describe('rollbackCompletedImport (#735)', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('only allowed when the import has been committed');
     expect(result.error).toContain('pending-approval');
-    expect(uiHelper.permanentDeleteProject).not.toHaveBeenCalled();
+    expect(mockPermanentDeleteProject).not.toHaveBeenCalled();
   });
 
   test('calls permanentDeleteProject with projectId and sets state to rolled-back when job is completed', async () => {
@@ -151,8 +167,8 @@ describe('rollbackCompletedImport (#735)', () => {
     const rollbackResult = await rollbackCompletedImport(jobId);
 
     expect(rollbackResult.success).toBe(true);
-    expect(uiHelper.permanentDeleteProject).toHaveBeenCalledTimes(1);
-    expect(uiHelper.permanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
+    expect(mockPermanentDeleteProject).toHaveBeenCalledTimes(1);
+    expect(mockPermanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
 
     const afterStatus = await getImportStatus(jobId);
     expect(afterStatus.state).toBe('rolled-back');
@@ -176,9 +192,7 @@ describe('rollbackCompletedImport (#735)', () => {
   });
 
   test('returns error when permanentDeleteProject returns success: false', async () => {
-    vi.mocked(uiHelper.permanentDeleteProject).mockResolvedValue(
-      JSON.stringify({ success: false, error: 'Project in use' })
-    );
+    mockPermanentDeleteProject.mockResolvedValue({ success: false, error: 'Project in use' });
 
     const { startImport, getImportStatus, commitImport, rollbackCompletedImport } = await import(
       '../src/engine/import-helper'
@@ -192,7 +206,7 @@ describe('rollbackCompletedImport (#735)', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Project in use');
-    expect(uiHelper.permanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
+    expect(mockPermanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
 
     const status = await getImportStatus(jobId);
     expect(status.state).toBe('completed');
@@ -202,7 +216,7 @@ describe('rollbackCompletedImport (#735)', () => {
   });
 
   test('returns error when permanentDeleteProject throws', async () => {
-    vi.mocked(uiHelper.permanentDeleteProject).mockRejectedValue(new Error('Database connection lost'));
+    mockPermanentDeleteProject.mockRejectedValue(new Error('Database connection lost'));
 
     const { startImport, getImportStatus, commitImport, rollbackCompletedImport } = await import(
       '../src/engine/import-helper'
@@ -216,11 +230,11 @@ describe('rollbackCompletedImport (#735)', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Database connection lost');
-    expect(uiHelper.permanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
+    expect(mockPermanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
   });
 
   test('handles permanentDeleteProject returning object (not JSON string)', async () => {
-    vi.mocked(uiHelper.permanentDeleteProject).mockResolvedValue({ success: true });
+    mockPermanentDeleteProject.mockResolvedValue({ success: true });
 
     const { startImport, getImportStatus, commitImport, rollbackCompletedImport } = await import(
       '../src/engine/import-helper'
@@ -233,6 +247,6 @@ describe('rollbackCompletedImport (#735)', () => {
     const result = await rollbackCompletedImport(jobId);
 
     expect(result.success).toBe(true);
-    expect(uiHelper.permanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
+    expect(mockPermanentDeleteProject).toHaveBeenCalledWith('proj-rollback-test');
   });
 });

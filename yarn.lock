@@ -6542,7 +6542,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/pg@npm:^8.20.0":
+"@types/pg@npm:^8.15.5, @types/pg@npm:^8.20.0":
   version: 8.20.0
   resolution: "@types/pg@npm:8.20.0"
   dependencies:
@@ -14223,6 +14223,8 @@ __metadata:
   resolution: "objectified-importer@workspace:objectified-importer"
   dependencies:
     "@types/node": "npm:^22.10.0"
+    "@types/pg": "npm:^8.15.5"
+    pg: "npm:^8.20.0"
     typescript: "npm:^5.9.3"
     vitest: "npm:^3.2.4"
   languageName: unknown

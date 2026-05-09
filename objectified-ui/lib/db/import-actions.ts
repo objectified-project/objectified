@@ -2,6 +2,9 @@
 
 import * as importHelper from 'objectified-importer/server';
 
+// Wire UI-backed Postgres dependencies into the import engine at module load.
+importHelper.configureUiImportEngine();
+
 export async function startImport(input: importHelper.ImportJobInput) {
   return importHelper.startImport(input);
 }

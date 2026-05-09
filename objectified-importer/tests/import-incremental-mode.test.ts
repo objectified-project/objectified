@@ -1,16 +1,10 @@
 /**
  * Import Incremental Mode Tests (#730)
- *
- * Unit tests for incremental mode: import all available, skip failures.
- * - When options.incrementalMode === true, no single transaction; each class is committed separately
- * - Failed classes are skipped and the job still completes with state 'completed'
- * - summary.incrementalMode === true, result has projectId/versionId
- * - Events include INCREMENTAL_MODE and INCREMENTAL_COMPLETE
- * - transactionPending remains false (no pending-approval step)
  */
 
+import { createImportEngine } from '../src/engine/import-helper';
+import { mockTxConnect } from './import-test-mocks';
 
-const mockGetTransactionClient = vi.fn();
 const mockBeginTransaction = vi.fn();
 const mockCommitTransaction = vi.fn();
 const mockRollbackTransaction = vi.fn();
@@ -24,29 +18,7 @@ const mockGetClassesWithPropertiesAndTagsTx = vi.fn();
 const mockGetLatestVersionUuidForProjectTx = vi.fn(() => Promise.resolve(null));
 const mockListProjectLibraryPropertiesTx = vi.fn(() => Promise.resolve([]));
 
-// When set, createClassTx will return failure for this class name (simulate one class failing)
 let createClassTxFailForClassName: string | null = null;
-
-const mockClient = { query: vi.fn(), release: vi.fn() };
-
-vi.mock('../src/engine/import-transaction', () => ({
-  getTransactionClient: (...args: any[]) => mockGetTransactionClient(...args),
-  beginTransaction: (...args: any[]) => mockBeginTransaction(...args),
-  commitTransaction: (...args: any[]) => mockCommitTransaction(...args),
-  rollbackTransaction: (...args: any[]) => mockRollbackTransaction(...args),
-  releaseClient: (...args: any[]) => mockReleaseClient(...args),
-  createProjectTx: (...args: any[]) => mockCreateProjectTx(...args),
-  createVersionTx: (...args: any[]) => mockCreateVersionTx(...args),
-  createPropertyTx: (...args: any[]) => mockCreatePropertyTx(...args),
-  createClassTx: async (...args: any[]) => {
-    const result = await mockCreateClassTx(...args);
-    return result;
-  },
-  addPropertyToClassTx: (...args: any[]) => mockAddPropertyToClassTx(...args),
-  getClassesWithPropertiesAndTagsTx: (...args: any[]) => mockGetClassesWithPropertiesAndTagsTx(...args),
-  getLatestVersionUuidForProjectTx: (...args: any[]) => mockGetLatestVersionUuidForProjectTx(...args),
-  listProjectLibraryPropertiesTx: (...args: any[]) => mockListProjectLibraryPropertiesTx(...args),
-}));
 
 const mockNormalizeResult = {
   classes: [
@@ -114,7 +86,6 @@ describe('Import Incremental Mode (#730)', () => {
 
   beforeEach(() => {
     createClassTxFailForClassName = null;
-    mockGetTransactionClient.mockReset();
     mockBeginTransaction.mockReset();
     mockCommitTransaction.mockReset();
     mockRollbackTransaction.mockReset();
@@ -127,8 +98,8 @@ describe('Import Incremental Mode (#730)', () => {
     mockGetClassesWithPropertiesAndTagsTx.mockReset();
     mockGetLatestVersionUuidForProjectTx.mockReset();
     mockListProjectLibraryPropertiesTx.mockReset();
+    mockTxConnect.mockReset();
 
-    mockGetTransactionClient.mockResolvedValue(mockClient);
     mockBeginTransaction.mockResolvedValue(undefined);
     mockCommitTransaction.mockResolvedValue(undefined);
     mockRollbackTransaction.mockResolvedValue(undefined);
@@ -139,13 +110,12 @@ describe('Import Incremental Mode (#730)', () => {
     mockCreateVersionTx.mockResolvedValue(
       JSON.stringify({ success: true, version: { id: 'ver-incremental' } })
     );
-    mockCreatePropertyTx.mockImplementation(
-      (_c: any, _pid: string, name: string, _desc: any, data: any) =>
-        Promise.resolve(
-          JSON.stringify({ success: true, property: { id: `prop-${name}-${JSON.stringify(data).length}` } })
-        )
+    mockCreatePropertyTx.mockImplementation((_pid: string, name: string, _desc: any, data: any) =>
+      Promise.resolve(
+        JSON.stringify({ success: true, property: { id: `prop-${name}-${JSON.stringify(data).length}` } })
+      )
     );
-    mockCreateClassTx.mockImplementation((_c: any, _vid: string, name: string) => {
+    mockCreateClassTx.mockImplementation((_vid: string, name: string) => {
       if (createClassTxFailForClassName !== null && name === createClassTxFailForClassName) {
         return Promise.resolve(JSON.stringify({ success: false, error: 'Duplicate class (simulated)' }));
       }
@@ -162,10 +132,28 @@ describe('Import Incremental Mode (#730)', () => {
     );
     mockGetLatestVersionUuidForProjectTx.mockResolvedValue(null);
     mockListProjectLibraryPropertiesTx.mockResolvedValue([]);
-  });
 
-  afterEach(() => {
-    vi.resetModules();
+    mockTxConnect.mockImplementation(async () => ({
+      begin: mockBeginTransaction,
+      commit: mockCommitTransaction,
+      rollback: mockRollbackTransaction,
+      release: mockReleaseClient,
+      createProjectTx: mockCreateProjectTx,
+      createVersionTx: mockCreateVersionTx,
+      createPropertyTx: mockCreatePropertyTx,
+      createClassTx: mockCreateClassTx,
+      addPropertyToClassTx: mockAddPropertyToClassTx,
+      getClassesWithPropertiesAndTagsTx: mockGetClassesWithPropertiesAndTagsTx,
+      getLatestVersionUuidForProjectTx: mockGetLatestVersionUuidForProjectTx,
+      listProjectLibraryPropertiesTx: mockListProjectLibraryPropertiesTx,
+    }));
+
+    createImportEngine({
+      txClient: { connect: () => mockTxConnect() },
+      recordRepositoryImport: vi.fn(async () => {}),
+      permanentDeleteProject: vi.fn(async () => ({ success: true })),
+      importOpenApiPathsAndSecurity: vi.fn(async () => ({ success: true })),
+    });
   });
 
   test('incremental mode completes with state completed and summary.incrementalMode true', async () => {
@@ -216,13 +204,13 @@ describe('Import Incremental Mode (#730)', () => {
     expect(completeEvent?.message).toMatch(/complete|skipped/i);
   });
 
-  test('incremental mode calls getTransactionClient and releaseClient', async () => {
+  test('incremental mode connects once and releases', async () => {
     const { startImport, getImportStatus } = await import('../src/engine/import-helper');
     const { jobId } = await startImport(incrementalInput);
 
     await waitForJobEnd(getImportStatus, jobId);
 
-    expect(mockGetTransactionClient).toHaveBeenCalled();
+    expect(mockTxConnect).toHaveBeenCalled();
     expect(mockReleaseClient).toHaveBeenCalled();
   });
 
@@ -232,7 +220,6 @@ describe('Import Incremental Mode (#730)', () => {
 
     await waitForJobEnd(getImportStatus, jobId);
 
-    // Two classes → begin and commit each (no global begin at start in incremental path)
     expect(mockBeginTransaction).toHaveBeenCalled();
     expect(mockCommitTransaction).toHaveBeenCalled();
     expect(mockBeginTransaction.mock.calls.length).toBe(2);
@@ -277,9 +264,8 @@ describe('Import Incremental Mode (#730)', () => {
 
     await waitForJobEnd(getImportStatus, jobId);
 
-    // First class: begin, commit. Second class: begin, then createClassTx fails → rollback
     expect(mockRollbackTransaction).toHaveBeenCalled();
-    expect(mockCommitTransaction.mock.calls.length).toBe(1); // only User committed
+    expect(mockCommitTransaction.mock.calls.length).toBe(1);
   });
 
   test('when one class fails in incremental mode: CLASS_FAILED event emitted', async () => {
@@ -334,8 +320,7 @@ describe('Import Incremental Mode (#730)', () => {
 
     expect(status.state).toBe('completed');
     expect(status.summary?.dryRun).toBe(true);
-    expect(mockGetTransactionClient).not.toHaveBeenCalled();
-    // When dry run, incremental path is never hit
+    expect(mockTxConnect).not.toHaveBeenCalled();
     expect(status.summary?.incrementalMode).toBeFalsy();
   });
 
@@ -356,21 +341,14 @@ describe('Import Incremental Mode (#730)', () => {
     await waitForJobEnd(getImportStatus, jobId);
 
     expect(mockCreateProjectTx).not.toHaveBeenCalled();
-    expect(mockGetLatestVersionUuidForProjectTx).toHaveBeenCalledWith(
-      expect.anything(),
-      'already-created-project'
-    );
-    expect(mockListProjectLibraryPropertiesTx).toHaveBeenCalledWith(
-      expect.anything(),
-      'already-created-project'
-    );
+    expect(mockGetLatestVersionUuidForProjectTx).toHaveBeenCalledWith('already-created-project');
+    expect(mockListProjectLibraryPropertiesTx).toHaveBeenCalledWith('already-created-project');
 
-    // Normalized fixture uses only { type: 'string' } for scalars; one library row covers every occurrence.
     expect(mockCreatePropertyTx).not.toHaveBeenCalled();
 
     const versionCalls = mockCreateVersionTx.mock.calls;
     expect(versionCalls.length).toBeGreaterThanOrEqual(1);
     const lastCall = versionCalls[versionCalls.length - 1];
-    expect(lastCall[6]).toEqual({ parentVersionUuid: 'previous-version-uuid' });
+    expect(lastCall[5]).toEqual({ parentVersionUuid: 'previous-version-uuid' });
   });
 });
