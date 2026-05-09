@@ -95,7 +95,7 @@ Every command lives in one of three connection modes:
 | 10  | [Data Records (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3183)                     | #3183   | 7           | 0 (v2)       |
 | 11  | [Migration Plans & Version Tags (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3184)   | #3184   | 7           | 0 (v2)       |
 | 12  | [Distribution, Release & Self-Update](https://github.com/KenSuenobu/objectified-commercial/issues/3185)    | #3185   | 8           | 2 of 8       |
-| 13  | [Specification Import via REST (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3328)    | #3328   | 4           | 0 (v2)       |
+| 13  | [Specification Import via REST (CLI)](https://github.com/KenSuenobu/objectified-commercial/issues/3328)    | #3328   | 4           | 4 of 4       |
 
 Total: **13 epics**, **91 sub-tickets** (open roadmap items; completed work is dropped from the Epic 1 summary table below).
 
@@ -757,9 +757,7 @@ objectified import
 
 ### Summary Table
 
-| #          | Title                                                                 | Issue   | Description                                                                 | Labels                                               | MVP | Parallel |
-|------------|-----------------------------------------------------------------------|---------|-----------------------------------------------------------------------------|------------------------------------------------------|-----|----------|
-| 13.4 (#3332) | Tests, man pages, supported-format parity                           | #3332   | Vitest stubs; README/man; checklist vs Import Dialog / scanner / importer | `enhancement`, `cli`, `roadmap-cli`, `import`, `documentation` | No  | Yes      |
+No open tickets in this epic’s summary pack (#3329–#3332 shipped).
 
 ### Supported formats (parity target)
 
@@ -823,11 +821,11 @@ Part of Epic: Specification Import via REST (#3328)
 
 ---
 
-#### 13.4 (#3332) — Tests, man pages, format parity
+#### 13.4 (#3332) — Tests, man pages, format parity (**done**)
 
-Enforce ≥2 examples per command; update man pages and `oclif readme` outputs; maintain explicit checklist of supported formats vs UI/importer.
+Shipped: Vitest asserts ≥2 examples on every command (explicit guard for `import:spec`), integration test on `import spec --help` (EXAMPLES + parity doc pointer + epic #3328), repo checklist [`docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md`](./CLI_SPEC_IMPORT_FORMAT_PARITY.md) vs Import dialog / `openapi-analyzer`, repository scanner, and CLI `--format`; README + command description cross-link Epic [#3328](https://github.com/KenSuenobu/objectified-commercial/issues/3328); man/readme regenerated via `yarn workspace objectified-cli build`.
 
-**Parallelism / Dependencies:** Depends on #3330–#3331 (both landed).
+**Parallelism / Dependencies:** Depended on #3330–#3331 (both landed).
 
 Part of Epic: Specification Import via REST (#3328)
 
@@ -861,7 +859,7 @@ The MVP delivers an installable, useful CLI focused on _read_ and _publish_ for 
 
 ## v2 Release — Ticket Bundle
 
-v2 fills out the writable surface for primitives, properties, classes, paths, data records, migrations, version tags, **specification import via REST**, and the release-engineering polish (binaries, self-update, telemetry, plugins, Homebrew/Scoop). Total: **65 sub-tickets** (sum of the v2 Count column below, including Epic 13).
+v2 fills out the writable surface for primitives, properties, classes, paths, data records, migrations, version tags, **specification import via REST**, and the release-engineering polish (binaries, self-update, telemetry, plugins, Homebrew/Scoop). Total: **64 sub-tickets** (sum of the v2 Count column below; Epic 13 import pack is complete).
 
 | Epic     | v2 Tickets                                                                                                                     | Count |
 |----------|--------------------------------------------------------------------------------------------------------------------------------|-------|
@@ -877,7 +875,7 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 | 10 (#3183) | #3253, #3254, #3255, #3256, #3257, #3258, #3259                                                                                | 7     |
 | 11 (#3184) | #3260, #3261, #3262, #3263, #3264, #3265, #3266                                                                                | 7     |
 | 12 (#3185) | #3269, #3270, #3271, #3272, #3273, #3274                                                                                       | 6     |
-| 13 (#3328) | #3332                                                                                                                           | 1     |
+| 13 (#3328) | *(complete — #3329–#3332 shipped)*                                                                                              | 0     |
 
 **v2 capability deltas vs MVP:**
 - Full read/write CRUD for primitives, properties, classes, paths, operations, parameters, request bodies, and responses — i.e. you can model an entire API surface from the CLI.
