@@ -51,6 +51,21 @@ function extensionHint(filename: string): string | undefined {
   return undefined;
 }
 
+function explicitFormatContentType(sourceKind: string, filename?: string): string | null {
+  switch (sourceKind) {
+    case "openapi-3":
+    case "asyncapi-2":
+      if (filename === undefined) return null;
+      return filename.toLowerCase().endsWith(".json") ? "application/json" : "application/yaml";
+    case "protobuf":
+      return "text/plain";
+    case "graphql":
+      return "application/graphql";
+    default:
+      return null;
+  }
+}
+
 export function sniffSourceKindFromBytes(bytes: Buffer): string | undefined {
   const head = bytes.subarray(0, Math.min(bytes.length, 65_536)).toString("utf8");
   const trimmed = head.trimStart();
@@ -92,22 +107,9 @@ export function resolveSpecImportKind(opts: {
 
   if (opts.explicitFormat !== undefined && opts.explicitFormat !== "") {
     const sourceKind = normalizeExplicitFormat(opts.explicitFormat);
-    const endsJson = derivedName?.toLowerCase().endsWith(".json") ?? false;
-    const contentType =
-      sourceKind === "openapi-3" || sourceKind === "asyncapi-2"
-        ? endsJson
-          ? "application/json"
-          : derivedName !== undefined
-            ? "application/yaml"
-            : null
-        : sourceKind === "protobuf"
-          ? "text/plain"
-          : sourceKind === "graphql"
-            ? "application/graphql"
-            : null;
     return {
       sourceKind,
-      contentType,
+      contentType: explicitFormatContentType(sourceKind, derivedName),
       filenameForRequest: derivedName ?? null,
     };
   }
