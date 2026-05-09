@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Objectified REST API
   description: REST API for serving OpenAPI specifications from the Objectified database
-  version: 1.0.63
+  version: 1.0.64
 paths:
   /v1/browse/tenants:
     get:

@@ -63,7 +63,10 @@ async function main() {
 
   const topicSep = config.topicSeparator ?? " ";
 
-  const rootBody = help.formatRoot();
+  const rootBody = help.formatRoot().replace(
+    /(\bobjectified-cli\/[\d.]+)\s+\S+-\S+\s+node-v[\d.]+/g,
+    "$1"
+  );
   writeManPage({
     base: "objectified",
     title: "OBJECTIFIED",
