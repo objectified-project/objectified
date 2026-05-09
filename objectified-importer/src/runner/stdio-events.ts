@@ -1,4 +1,5 @@
 import type { Writable } from 'node:stream';
+import { once } from 'node:events';
 
 import type { ImportEvent, ProgressEvent } from '../engine/import-helper';
 
@@ -9,6 +10,9 @@ export type RunnerNdjsonLine =
   | { type: 'result'; state: string; summary?: unknown }
   | { type: 'error'; code: string; message: string; context?: unknown };
 
-export function writeNdjsonLine(stream: Writable, line: RunnerNdjsonLine): void {
-  stream.write(`${JSON.stringify(line)}\n`);
+export async function writeNdjsonLine(stream: Writable, line: RunnerNdjsonLine): Promise<void> {
+  const ok = stream.write(`${JSON.stringify(line)}\n`);
+  if (!ok) {
+    await once(stream, 'drain');
+  }
 }

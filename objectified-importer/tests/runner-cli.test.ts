@@ -86,10 +86,10 @@ describe('runner mapCliResultState', () => {
 });
 
 describe('runner NDJSON line buffering', () => {
-  test('each writeNdjsonLine is exactly one JSON line', () => {
+  test('each writeNdjsonLine is exactly one JSON line', async () => {
     const { stream, getText } = collectWritable();
-    writeNdjsonLine(stream, { type: 'progress', progress: { phase: 'creating-classes', total: 3, completed: 1 } });
-    writeNdjsonLine(stream, { type: 'result', state: 'completed', summary: { ok: true } });
+    await writeNdjsonLine(stream, { type: 'progress', progress: { phase: 'creating-classes', total: 3, completed: 1 } });
+    await writeNdjsonLine(stream, { type: 'result', state: 'completed', summary: { ok: true } });
     const lines = getText().trim().split('\n');
     expect(lines).toHaveLength(2);
     expect(JSON.parse(lines[0])).toMatchObject({ type: 'progress' });
@@ -98,6 +98,76 @@ describe('runner NDJSON line buffering', () => {
 });
 
 describe('runner mocked engine', () => {
+  test('SIGTERM during startup cancels once and exits 0 with canceled result', async () => {
+    let canceled = false;
+    let cancelCalls = 0;
+    const envelope = parseEnvelope({
+      schemaVersion: RUNNER_SCHEMA_VERSION,
+      jobId: '550e8400-e29b-41d4-a716-446655440010',
+      input: {
+        tenantId: 't',
+        userId: 'u',
+        sourceKind: 'openapi',
+        document: {},
+        project: { name: 'P', slug: 'p', description: null },
+        version: { versionId: '1.0.0', description: null },
+        options: { selectedSchemas: [] },
+      },
+      dbConfig: { connectionString: 'postgresql://noop' },
+    });
+    expect(envelope.ok).toBe(true);
+    if (!envelope.ok) throw new Error('fixture');
+
+    const engine: ImportEngine = {
+      startImport: async (_input, opts) => {
+        await new Promise((r) => setTimeout(r, 40));
+        return { jobId: opts?.jobId ?? 'missing' };
+      },
+      getImportStatus: async (jobId) => {
+        if (canceled) {
+          return {
+            jobId,
+            state: 'canceled',
+            percent: 0,
+            events: [{ id: 'sig-done', ts: 1, level: 'warn', code: 'CANCELED', message: 'canceled' }],
+            summary: {},
+          };
+        }
+        return {
+          jobId,
+          state: 'running',
+          percent: 10,
+          events: [{ id: 'sig-run', ts: 1, level: 'info', code: 'RUN', message: 'running' }],
+          progress: { phase: 'creating-classes', total: 10, completed: 1 },
+        };
+      },
+      cancelImport: async () => {
+        cancelCalls += 1;
+        canceled = true;
+        return { success: true };
+      },
+      commitImport: async () => ({ success: false }),
+      rollbackImport: async () => ({ success: true }),
+      rollbackCompletedImport: async () => ({ success: false }),
+      retryImport: async () => ({ success: false }),
+    };
+
+    const { stream: stdout, getText } = collectWritable();
+    const runPromise = runImportWithEngine(envelope.envelope, stdout, process.stderr, engine);
+    await new Promise((r) => setTimeout(r, 10));
+    process.kill(process.pid, 'SIGTERM');
+    process.kill(process.pid, 'SIGINT');
+
+    const code = await runPromise;
+    expect(code).toBe(0);
+    expect(cancelCalls).toBe(1);
+
+    const lines = parseNdjsonLines(getText());
+    const last = lines[lines.length - 1] as { type?: string; state?: string };
+    expect(last.type).toBe('result');
+    expect(last.state).toBe('canceled');
+  });
+
   test('cancelImport mid-run yields canceled result and exit 0', async () => {
     let canceled = false;
     const envelope = parseEnvelope({
@@ -160,6 +230,51 @@ describe('runner mocked engine', () => {
     expect(last.state).toBe('canceled');
     expect(lines.some((l) => (l as { type?: string }).type === 'progress')).toBe(true);
     expect(lines.some((l) => (l as { type?: string }).type === 'event')).toBe(true);
+  });
+
+  test('failed terminal state still exits 0', async () => {
+    const envelope = parseEnvelope({
+      schemaVersion: RUNNER_SCHEMA_VERSION,
+      jobId: '550e8400-e29b-41d4-a716-446655440099',
+      input: {
+        tenantId: 't',
+        userId: 'u',
+        sourceKind: 'openapi',
+        document: {},
+        project: { name: 'P', slug: 'p', description: null },
+        version: { versionId: '1.0.0', description: null },
+        options: { selectedSchemas: [] },
+      },
+      dbConfig: { connectionString: 'postgresql://noop' },
+    });
+    expect(envelope.ok).toBe(true);
+    if (!envelope.ok) throw new Error('fixture');
+
+    const engine: ImportEngine = {
+      startImport: async (_input, opts) => ({ jobId: opts?.jobId ?? 'missing' }),
+      getImportStatus: async (jobId) => ({
+        jobId,
+        state: 'failed',
+        percent: 100,
+        events: [{ id: 'f1', ts: 1, level: 'error', code: 'FAILED', message: 'boom' }],
+        summary: { errors: 1 },
+      }),
+      cancelImport: async () => ({ success: true }),
+      commitImport: async () => ({ success: false }),
+      rollbackImport: async () => ({ success: true }),
+      rollbackCompletedImport: async () => ({ success: false }),
+      retryImport: async () => ({ success: false }),
+    };
+
+    const { stream: stdout, getText } = collectWritable();
+    const code = await runImportWithEngine(envelope.envelope, stdout, process.stderr, engine);
+    expect(code).toBe(0);
+
+    const lines = parseNdjsonLines(getText());
+    expect(lines.some((line) => (line as { type?: string; code?: string }).type === 'error')).toBe(true);
+    expect(lines.some((line) => (line as { type?: string; code?: string }).code === 'FAILED')).toBe(true);
+    const last = lines[lines.length - 1] as { type?: string; state?: string };
+    expect(last).toMatchObject({ type: 'result', state: 'failed' });
   });
 });
 

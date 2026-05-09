@@ -32,6 +32,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) return fallback;
+  return parsed;
+}
+
+const STATUS_POLL_INITIAL_MS = readPositiveIntEnv('OBJECTIFIED_IMPORTER_RUNNER_POLL_MS', 100);
+const STATUS_POLL_MAX_MS = readPositiveIntEnv('OBJECTIFIED_IMPORTER_RUNNER_MAX_POLL_MS', 1_000);
+const EMITTED_EVENT_IDS_LIMIT = readPositiveIntEnv('OBJECTIFIED_IMPORTER_RUNNER_MAX_TRACKED_EVENT_IDS', 2_048);
+
 export function parseEnvelope(raw: unknown): { ok: true; envelope: RunnerEnvelope } | { ok: false; error: EnvelopeParseFailure } {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ok: false, error: { code: 'INVALID_ENVELOPE', message: 'Expected a single JSON object on stdin' } };
@@ -104,15 +116,27 @@ export function mapCliResultState(status: ImportStatus): string {
 
 async function streamUntilTerminal(engine: ImportEngine, jobId: string, stdout: Writable): Promise<ImportJobState> {
   const emittedEventIds = new Set<string>();
+  const emittedEventOrder: string[] = [];
   let lastProgressJson: string | null = null;
+  let previousState: ImportJobState | null = null;
+  let pollDelayMs = STATUS_POLL_INITIAL_MS;
 
   for (;;) {
     const status = await engine.getImportStatus(jobId);
+    let stateChanged = previousState !== status.state;
+    previousState = status.state;
+    let observedOutput = false;
 
     for (const ev of status.events) {
       if (!emittedEventIds.has(ev.id)) {
         emittedEventIds.add(ev.id);
-        writeNdjsonLine(stdout, { type: 'event', event: ev });
+        emittedEventOrder.push(ev.id);
+        while (emittedEventOrder.length > EMITTED_EVENT_IDS_LIMIT) {
+          const evictedId = emittedEventOrder.shift();
+          if (evictedId) emittedEventIds.delete(evictedId);
+        }
+        await writeNdjsonLine(stdout, { type: 'event', event: ev });
+        observedOutput = true;
       }
     }
 
@@ -120,7 +144,8 @@ async function streamUntilTerminal(engine: ImportEngine, jobId: string, stdout: 
       const pj = JSON.stringify(status.progress);
       if (pj !== lastProgressJson) {
         lastProgressJson = pj;
-        writeNdjsonLine(stdout, { type: 'progress', progress: status.progress });
+        await writeNdjsonLine(stdout, { type: 'progress', progress: status.progress });
+        observedOutput = true;
       }
     }
 
@@ -128,7 +153,7 @@ async function streamUntilTerminal(engine: ImportEngine, jobId: string, stdout: 
       if (status.state === 'failed') {
         const lastErr = [...status.events].reverse().find((e) => e.level === 'error');
         if (lastErr) {
-          writeNdjsonLine(stdout, {
+          await writeNdjsonLine(stdout, {
             type: 'error',
             code: lastErr.code,
             message: lastErr.message,
@@ -137,7 +162,7 @@ async function streamUntilTerminal(engine: ImportEngine, jobId: string, stdout: 
         }
       }
 
-      writeNdjsonLine(stdout, {
+      await writeNdjsonLine(stdout, {
         type: 'result',
         state: mapCliResultState(status),
         summary: status.summary,
@@ -146,7 +171,12 @@ async function streamUntilTerminal(engine: ImportEngine, jobId: string, stdout: 
       return status.state;
     }
 
-    await sleep(50);
+    if (stateChanged || observedOutput) {
+      pollDelayMs = STATUS_POLL_INITIAL_MS;
+    } else {
+      pollDelayMs = Math.min(STATUS_POLL_MAX_MS, pollDelayMs * 2);
+    }
+    await sleep(pollDelayMs);
   }
 }
 
@@ -156,26 +186,35 @@ export async function runImportWithEngine(
   stderr: Writable,
   engine: ImportEngine
 ): Promise<number> {
+  let importStarted = false;
+  let cancelAfterStart = false;
   const disposeSignals = installRunnerSignals(async () => {
+    if (!importStarted) {
+      cancelAfterStart = true;
+      return;
+    }
     await engine.cancelImport(envelope.jobId);
   });
 
   try {
     await engine.startImport(envelope.input, { jobId: envelope.jobId });
-    const finalState = await streamUntilTerminal(engine, envelope.jobId, stdout);
+    importStarted = true;
+    if (cancelAfterStart) {
+      await engine.cancelImport(envelope.jobId);
+    }
 
-    if (finalState === 'failed') return 1;
+    await streamUntilTerminal(engine, envelope.jobId, stdout);
     return 0;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     stderr.write(`${message}\n`);
-    writeNdjsonLine(stdout, {
+    await writeNdjsonLine(stdout, {
       type: 'error',
       code: 'RUNNER_EXCEPTION',
       message,
     });
-    writeNdjsonLine(stdout, { type: 'result', state: 'failed', summary: undefined });
-    return 1;
+    await writeNdjsonLine(stdout, { type: 'result', state: 'failed', summary: undefined });
+    return 0;
   } finally {
     disposeSignals();
   }
@@ -193,13 +232,13 @@ export async function runStdioImportCli(streams: {
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    writeNdjsonLine(streams.stdout, { type: 'error', code: 'STDIN_READ_FAILED', message });
+    await writeNdjsonLine(streams.stdout, { type: 'error', code: 'STDIN_READ_FAILED', message });
     return EXIT_VALIDATION;
   }
 
   const text = Buffer.concat(chunks).toString('utf8').trim();
   if (!text) {
-    writeNdjsonLine(streams.stdout, {
+    await writeNdjsonLine(streams.stdout, {
       type: 'error',
       code: 'EMPTY_STDIN',
       message: 'Expected one JSON envelope on stdin',
@@ -211,13 +250,13 @@ export async function runStdioImportCli(streams: {
   try {
     parsed = JSON.parse(text) as unknown;
   } catch {
-    writeNdjsonLine(streams.stdout, { type: 'error', code: 'INVALID_JSON', message: 'stdin is not valid JSON' });
+    await writeNdjsonLine(streams.stdout, { type: 'error', code: 'INVALID_JSON', message: 'stdin is not valid JSON' });
     return EXIT_VALIDATION;
   }
 
   const parsedEnvelope = parseEnvelope(parsed);
   if (!parsedEnvelope.ok) {
-    writeNdjsonLine(streams.stdout, {
+    await writeNdjsonLine(streams.stdout, {
       type: 'error',
       code: parsedEnvelope.error.code,
       message: parsedEnvelope.error.message,
