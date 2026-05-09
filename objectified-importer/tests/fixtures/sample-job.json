@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "jobId": "550e8400-e29b-41d4-a716-446655440000",
+  "input": {
+    "tenantId": "00000000-0000-0000-0000-000000000001",
+    "userId": "00000000-0000-0000-0000-000000000002",
+    "sourceKind": "openapi",
+    "document": {
+      "openapi": "3.1.0",
+      "info": { "title": "Sidecar Sample", "version": "1.0.0" },
+      "paths": {},
+      "components": {
+        "schemas": {
+          "Pet": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "project": {
+      "name": "Sidecar Sample Project",
+      "slug": "sidecar-sample",
+      "description": null
+    },
+    "version": { "versionId": "1.0.0", "description": null },
+    "options": {
+      "selectedSchemas": ["Pet"],
+      "dryRun": true
+    }
+  },
+  "dbConfig": {
+    "connectionString": "postgresql://127.0.0.1:65534/unused_for_dry_run"
+  }
+}
