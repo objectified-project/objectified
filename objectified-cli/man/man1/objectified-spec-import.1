@@ -1,24 +1,30 @@
 .TH OBJECTIFIED\-SPEC\-IMPORT 1 "" "" "User Commands"
 .SH NAME
-objectified spec import \- Import an OpenAPI / Swagger / Arazzo document into an existing project (POST /v1/imports/{tenant_slug}; poll until terminal).
+objectified spec import \- Import an OpenAPI / Swagger / Arazzo document (POST /v1/imports/{tenant_slug}). Omit --project to create a project from spec info, then import.
 .SH DESCRIPTION
 .nf
 USAGE
-  $ objectified spec import FILE --project <value> [--api-key <value>]
-    [--api-key-file <value>] [--base-url <value>] [--config <value>] [--json]
-    [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
-    [--source openapi|swagger|arazzo|auto] [--from-file <value>] [--name
-    <value>] [--slug <value>] [--description <value>] [--yes]
+  $ objectified spec import FILE [--api-key <value>] [--api-key-file
+    <value>] [--base-url <value>] [--config <value>] [--json] [--color]
+    [--profile <value>] [--tenant <value>] [-q] [--verbose] [--project
+    <value>] [--source openapi|swagger|arazzo|auto] [--from-file <value>]
+    [--name <value>] [--slug <value>] [--description <value>] [--domain
+    <value>] [--visibility private|public] [--yes]
 
 ARGUMENTS
   FILE  Path to OpenAPI 3.x, Swagger 2.0, or Arazzo 1.x spec (JSON or YAML).
 
 DESCRIPTION
-  Import an OpenAPI / Swagger / Arazzo document into an existing project (POST
-  /v1/imports/{tenant_slug}; poll until terminal).
+  Import an OpenAPI / Swagger / Arazzo document (POST
+  /v1/imports/{tenant_slug}). Omit --project to create a project from spec
+  info, then import.
 
 EXAMPLES
   $ objectified spec import ./openapi.yaml --project payments-api
+
+  $ objectified spec import ./openapi.yaml --yes
+
+  $ objectified spec import ./spec.json --slug my-api --visibility public --yes
 
   $ objectified spec import ./spec.json --project payments-api --source openapi
 
@@ -56,20 +62,30 @@ AUTH
                           history).
 
 OTHER
-  --description=<value>  Override project description sent with the import
-                         body.
+  --description=<value>  Project description (import body; when creating a
+                         project, stored on the new project).
+  --domain=<value>       When creating a project: metadata domainCategory
+                         (same as `projects create --domain`).
   --from-file=<value>    Merge ImportOptions JSON (selectedSchemas, naming,
                          etc.). CLI flags override file values.
-  --name=<value>         Override project display name sent with the import
-                         body.
-  --project=<value>      (required) Existing project slug or UUID (uuid-shaped
-                         refs resolve as id first).
-  --slug=<value>         Override project slug sent with the import body.
+  --name=<value>         Project display name (import body; when creating a
+                         project, also used for POST /v1/projects unless
+                         omitted).
+  --project=<value>      Existing project slug or UUID (omit to create a
+                         project from spec info.title / info.description /
+                         contact / license, then import).
+  --slug=<value>         Project slug (import body; when creating a project,
+                         must match ^[a-z][a-z0-9-]{1,62}$ — use another if
+                         the tenant already has this slug).
   --source=<option>      [default: auto] Override format detection (default:
                          auto-detect from document keys).
                          <options: openapi|swagger|arazzo|auto>
-  --yes                  Reserved for non-interactive / CI parity (no prompts
-                         in this command yet).
+  --visibility=<option>  When creating a project: metadata visibility (private
+                         or public).
+                         <options: private|public>
+  --yes                  Skip confirmation when creating a project from the
+                         spec; required when stdin is not a TTY and --project
+                         is omitted.
 
 SEE ALSO
   objectified versions show

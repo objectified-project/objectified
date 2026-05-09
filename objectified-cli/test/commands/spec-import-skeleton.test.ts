@@ -75,6 +75,133 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 }
 
 describe("spec import skeleton (#3308)", () => {
+  it("new project: POST project + POST import + poll (snapshot stdout, #3309)", async () => {
+    const projId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+    const jobId = "55555555-5555-5555-5555-555555555555";
+
+    const server = http.createServer((req, res) => {
+      void (async () => {
+        res.setHeader("Connection", "close");
+        const url = new URL(req.url ?? "/", "http://127.0.0.1");
+
+        if (
+          req.method === "GET" &&
+          (url.pathname === "/v1/projects/acme/domains" || url.pathname === "/v1/projects/domains")
+        ) {
+          res.statusCode = 404;
+          res.end();
+          return;
+        }
+
+        if (req.method === "GET" && url.pathname === "/v1/projects/acme") {
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify([]));
+          return;
+        }
+
+        if (req.method === "POST" && url.pathname === "/v1/projects/acme") {
+          const raw = await readBody(req);
+          const body = JSON.parse(raw) as {
+            name?: string;
+            slug?: string;
+            metadata?: Record<string, unknown>;
+          };
+          expect(body.name).toBe("Swagger Petstore");
+          expect(body.slug).toBe("swagger-petstore");
+          expect(body.metadata?.visibility).toBe("private");
+
+          res.statusCode = 201;
+          res.setHeader("Content-Type", "application/json");
+          res.end(
+            JSON.stringify({
+              id: projId,
+              tenant_id: "t1",
+              name: body.name,
+              slug: body.slug,
+              description: null,
+              enabled: true,
+              metadata: body.metadata ?? null,
+            }),
+          );
+          return;
+        }
+
+        if (req.method === "POST" && url.pathname === "/v1/imports/acme") {
+          const raw = await readBody(req);
+          const body = JSON.parse(raw) as {
+            sourceKind?: string;
+            existingProjectId?: string;
+            document?: { openapi?: string };
+          };
+          expect(body.sourceKind).toBe("openapi");
+          expect(body.existingProjectId).toBe(projId);
+          expect(body.document?.openapi).toBe("3.0.3");
+
+          res.statusCode = 201;
+          res.setHeader("Content-Type", "application/json");
+          res.end(
+            JSON.stringify({
+              jobId,
+              tenantId: "t1",
+              projectId: projId,
+              state: "completed",
+              percent: 100,
+              progress: null,
+              events: [],
+              summary: {
+                classesCreated: 14,
+                warnings: 3,
+                failed: 0,
+              },
+              result: { versionId: "1.0.0", projectId: projId },
+              error: null,
+              createdAt: "2026-05-09T12:00:00.000Z",
+              updatedAt: "2026-05-09T12:00:02.000Z",
+              finishedAt: "2026-05-09T12:00:02.000Z",
+            }),
+          );
+          return;
+        }
+
+        res.statusCode = 500;
+        res.end(`unexpected ${req.method ?? "?"} ${url.pathname}`);
+      })().catch(() => {
+        if (!res.headersSent) res.statusCode = 500;
+        res.end("handler error");
+      });
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === "string") throw new Error("expected AddressInfo");
+
+    try {
+      const base = `http://127.0.0.1:${String(addr.port)}`;
+      const fixture = path.join(pkgRoot, "fixtures", "petstore.yaml");
+      const result = await runCliCapture([
+        "--base-url",
+        base,
+        "--api-key",
+        "k",
+        "--tenant",
+        "acme",
+        "--no-json",
+        "spec",
+        "import",
+        fixture,
+        "--yes",
+      ]);
+      expect(result.code).toBe(0);
+      expect(result.stderr.trim()).toBe("");
+      expect(result.stdout).toMatchSnapshot();
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err !== undefined ? reject(err) : resolve())),
+      );
+    }
+  });
+
   it("happy path: POST import + poll GET until completed (snapshot stdout)", async () => {
     const projId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
     const jobId = "11111111-1111-1111-1111-111111111111";

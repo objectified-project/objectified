@@ -8,3 +8,18 @@ Target:   tenant=acme, project=petstore (bbbb…)
   Run \`objectified versions show petstore 1.0.0\` to inspect.
 "
 `;
+
+exports[`spec import skeleton (#3308) > new project: POST project + POST import + poll (snapshot stdout, #3309) 1`] = `
+"Detected: OpenAPI 3.0.3 (info.title='Swagger Petstore', info.version='1.0.0')
+No --project provided; creating new project from spec:
+  name:        Swagger Petstore
+  slug:        swagger-petstore
+  description: 
+  visibility:  private
+[ok] Created project swagger-petstore (eeeeeeee…)
+Target:   tenant=acme, project=swagger-petstore (eeee…)
+[ok] Imported as draft revision 1.0.0 (job 55555555…) into project swagger-petstore.
+  Classes: 14 created, 3 warnings, 0 failed.
+  Run \`objectified versions show swagger-petstore 1.0.0\` to inspect.
+"
+`;
