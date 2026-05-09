@@ -77,6 +77,7 @@ export type {
   SpecImportCommitResponse,
   SpecImportJobAccepted,
   SpecImportJobStatus,
+  SpecImportProjectTarget,
   SpecImportRollbackResponse,
   SpecImportStartJsonRequest,
   VersionChangeReportOut,

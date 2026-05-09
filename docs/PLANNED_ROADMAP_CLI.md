@@ -759,7 +759,6 @@ objectified import
 
 | #          | Title                                                                 | Issue   | Description                                                                 | Labels                                               | MVP | Parallel |
 |------------|-----------------------------------------------------------------------|---------|-----------------------------------------------------------------------------|------------------------------------------------------|-----|----------|
-| 13.3 (#3331) | Project flags: `--create-project`, `--map-project`, `--create-or-map-project` | #3331 | Map spec metadata → project; create-if-missing; exclusivity rules + errors | `enhancement`, `cli`, `roadmap-cli`, `import`, `tenancy` | No  | Yes      |
 | 13.4 (#3332) | Tests, man pages, supported-format parity                           | #3332   | Vitest stubs; README/man; checklist vs Import Dialog / scanner / importer | `enhancement`, `cli`, `roadmap-cli`, `import`, `documentation` | No  | Yes      |
 
 ### Supported formats (parity target)
@@ -814,11 +813,11 @@ Part of Epic: Specification Import via REST (#3328)
 
 ---
 
-#### 13.3 (#3331) — Project resolution flags
+#### 13.3 (#3331) — Project resolution flags (**done**)
 
-Implement `--create-project`, `--map-project`, and `--create-or-map-project` as specified in the summary table; forward resolved `project_id`/slug in import requests per REST contract.
+Shipped in `objectified-cli`: mutually exclusive `--map-project`, `--create-project`, and `--create-or-map-project` on `objectified import spec`, tenant-scoped slug lookup, optional `POST /v1/projects/{tenant}` create path, metadata collision handling for `--create-or-map-project`, misuse exit **2** on invalid flag mixes, and Vitest coverage for resolution helpers.
 
-**Parallelism / Dependencies:** Depends on Epic 3 `projects create` patterns (#3176). Coordinated with #3330.
+**Parallelism / Dependencies:** Depended on Epic 3 `projects create` patterns (#3176). Coordinated with #3330.
 
 Part of Epic: Specification Import via REST (#3328)
 
@@ -828,7 +827,7 @@ Part of Epic: Specification Import via REST (#3328)
 
 Enforce ≥2 examples per command; update man pages and `oclif readme` outputs; maintain explicit checklist of supported formats vs UI/importer.
 
-**Parallelism / Dependencies:** Depends on #3330–#3331.
+**Parallelism / Dependencies:** Depends on #3330–#3331 (both landed).
 
 Part of Epic: Specification Import via REST (#3328)
 
@@ -878,7 +877,7 @@ v2 fills out the writable surface for primitives, properties, classes, paths, da
 | 10 (#3183) | #3253, #3254, #3255, #3256, #3257, #3258, #3259                                                                                | 7     |
 | 11 (#3184) | #3260, #3261, #3262, #3263, #3264, #3265, #3266                                                                                | 7     |
 | 12 (#3185) | #3269, #3270, #3271, #3272, #3273, #3274                                                                                       | 6     |
-| 13 (#3328) | #3329, #3331, #3332                                                                                                             | 3     |
+| 13 (#3328) | #3332                                                                                                                           | 1     |
 
 **v2 capability deltas vs MVP:**
 - Full read/write CRUD for primitives, properties, classes, paths, operations, parameters, request bodies, and responses — i.e. you can model an entire API surface from the CLI.
