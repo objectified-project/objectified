@@ -93,13 +93,21 @@ export function resolveSpecImportKind(opts: {
   if (opts.explicitFormat !== undefined && opts.explicitFormat !== "") {
     const sourceKind = normalizeExplicitFormat(opts.explicitFormat);
     const endsJson = derivedName?.toLowerCase().endsWith(".json") ?? false;
+    const contentType =
+      sourceKind === "openapi-3" || sourceKind === "asyncapi-2"
+        ? endsJson
+          ? "application/json"
+          : derivedName !== undefined
+            ? "application/yaml"
+            : null
+        : sourceKind === "protobuf"
+          ? "text/plain"
+          : sourceKind === "graphql"
+            ? "application/graphql"
+            : null;
     return {
       sourceKind,
-      contentType: endsJson
-        ? "application/json"
-        : derivedName !== undefined
-          ? "application/yaml"
-          : null,
+      contentType,
       filenameForRequest: derivedName ?? null,
     };
   }

@@ -31,6 +31,7 @@ describe("resolveSpecImportKind", () => {
       bytes,
     });
     expect(r.sourceKind).toBe("protobuf");
+    expect(r.contentType).toBe("text/plain");
   });
 
   it("detects protobuf by extension", () => {
