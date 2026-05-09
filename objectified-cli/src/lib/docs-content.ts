@@ -81,3 +81,30 @@ Default posture
 Verbose diagnostics
   Use --verbose or OBJECTIFIED_VERBOSE=1 for stderr diagnostics. OBJECTIFIED_DEBUG=1 may include stack traces for unexpected failures—avoid enabling in CI logs that are world-readable.
 `.trim();
+
+export const docsTopicSpecImport = `
+SPEC IMPORT (CI)
+
+Command
+  objectified spec import <file> … — POST /v1/imports/{tenant_slug}, poll GET …/{job_id} until a terminal state.
+
+Flags
+  --dry-run
+    Sets options.dryRun=true on the import body. Preview-only path from the engine: exits 0 with the would-be summary; pair with --json for a single JSON object on stdout (the summary payload).
+  --review
+    Poll until state=pending-approval, print the job id alone on stdout, exit 0. If the job reaches completed/failed/canceled/rolled-back without passing through pending-approval (common with incrementalMode), the CLI exits 6 (conflict).
+  --report <path>
+    Append NDJSON (one JSON object per line): lines with type "event" | "progress", then a final line type "summary" with summary, result, and exitCode matching the process exit. Parent directories are created. Opened append-only at job start; flushed each poll.
+  --yes
+    Skips interactive confirms; required when stdin is not a TTY and you omit --project (same as other destructive/create flows).
+  --ndjson
+    Streams type "event" and type "progress" objects on stdout during polling; the last line is type "result" with state, summary, result, error. Mutually exclusive with global --json (exit 6).
+  --commit-on-complete / --no-commit-on-complete
+    Forwards options.commitOnComplete (default true). Use --no-commit-on-complete with --review when you want the approval gate documented explicitly for your pipeline (engine/orchestrator must honor the option).
+
+Polling & output
+  Default human mode: stderr spinner shows progress.phase and counts (--quiet hides spinners). --verbose also prints each orchestrator event line on stderr. --ndjson sends machine lines to stdout only (line-buffered writes).
+
+Exit codes
+  Align with objectified docs errors: 0 success (including dry-run OK, review stopped at pending-approval); 1 generic/canceled user interrupt; 3–11 API/auth/config as documented; 6 conflict (e.g. --ndjson with --json, --review miss); 7 validation (bad spec/YAML, bad --report path); 8 server/import failed from REST.
+`.trim();

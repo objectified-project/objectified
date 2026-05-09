@@ -226,6 +226,7 @@ describe("objectified CLI", () => {
     const out = run(["docs", "--no-json"]);
     expect(out).toMatch(/Topic/);
     expect(out).toMatch(/\berrors\b/);
+    expect(out).toMatch(/\bspec-import\b/);
     expect(out).toMatch(/\boutput\b/);
     expect(out).toMatch(/\bprofiles\b/);
     expect(out).toMatch(/\bcompletions\b/);

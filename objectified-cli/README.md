@@ -3,15 +3,14 @@
 TypeScript CLI for [Objectified](https://objectified.dev), built with [oclif](https://oclif.io/) v4.
 
 <!-- toc -->
-
-- [objectified-cli](#objectified-cli)
-- [Requirements](#requirements)
-- [Install (monorepo / local)](#install-monorepo--local)
-- [or](#or)
-- [Development](#development)
-- [Usage](#usage)
-- [Commands](#commands)
-- [Performance](#performance)
+* [objectified-cli](#objectified-cli)
+* [Requirements](#requirements)
+* [Install (monorepo / local)](#install-monorepo--local)
+* [or](#or)
+* [Development](#development)
+* [Usage](#usage)
+* [Commands](#commands)
+* [Performance](#performance)
 <!-- tocstop -->
 
 # Requirements
@@ -46,63 +45,61 @@ The workspace root pins `ansi-regex`, `string-width`, and `strip-ansi` so oclif�
 # Usage
 
 <!-- usage -->
-
 ```sh-session
 $ npm install -g objectified-cli
 $ objectified COMMAND
 running command...
 $ objectified (--version)
-objectified-cli/0.1.27 <platform> node-v<major.minor.patch>
+objectified-cli/0.1.28 <platform> node-v<major.minor.patch>
 $ objectified --help [COMMAND]
 USAGE
   $ objectified COMMAND
 ...
 ```
-
 <!-- usagestop -->
 
 # Commands
 
 <!-- commands -->
-
-- [`objectified auth login`](#objectified-auth-login)
-- [`objectified auth logout`](#objectified-auth-logout)
-- [`objectified auth status`](#objectified-auth-status)
-- [`objectified browse projects TENANT`](#objectified-browse-projects-tenant)
-- [`objectified browse tenants`](#objectified-browse-tenants)
-- [`objectified browse versions REF`](#objectified-browse-versions-ref)
-- [`objectified completion`](#objectified-completion)
-- [`objectified completion install [SHELL]`](#objectified-completion-install-shell)
-- [`objectified completion show [SHELL]`](#objectified-completion-show-shell)
-- [`objectified completion uninstall`](#objectified-completion-uninstall)
-- [`objectified config get KEY`](#objectified-config-get-key)
-- [`objectified config list`](#objectified-config-list)
-- [`objectified config path`](#objectified-config-path)
-- [`objectified config set KEY VALUE`](#objectified-config-set-key-value)
-- [`objectified docs`](#objectified-docs)
-- [`objectified docs completions`](#objectified-docs-completions)
-- [`objectified docs errors`](#objectified-docs-errors)
-- [`objectified docs output`](#objectified-docs-output)
-- [`objectified docs plugins`](#objectified-docs-plugins)
-- [`objectified docs profiles`](#objectified-docs-profiles)
-- [`objectified docs telemetry`](#objectified-docs-telemetry)
-- [`objectified hello [NAME]`](#objectified-hello-name)
-- [`objectified help [COMMAND]`](#objectified-help-command)
-- [`objectified projects create`](#objectified-projects-create)
-- [`objectified projects list`](#objectified-projects-list)
-- [`objectified projects show REF`](#objectified-projects-show-ref)
-- [`objectified schema fetch REF`](#objectified-schema-fetch-ref)
-- [`objectified schema swagger REF`](#objectified-schema-swagger-ref)
-- [`objectified spec import FILE`](#objectified-spec-import-file)
-- [`objectified tenants info SLUG`](#objectified-tenants-info-slug)
-- [`objectified tenants list`](#objectified-tenants-list)
-- [`objectified tenants use [SLUG]`](#objectified-tenants-use-slug)
-- [`objectified version`](#objectified-version)
-- [`objectified versions create PROJECT`](#objectified-versions-create-project)
-- [`objectified versions list PROJECT`](#objectified-versions-list-project)
-- [`objectified versions publish PROJECT VERSION`](#objectified-versions-publish-project-version)
-- [`objectified versions show PROJECT VERSION`](#objectified-versions-show-project-version)
-- [`objectified whoami`](#objectified-whoami)
+* [`objectified auth login`](#objectified-auth-login)
+* [`objectified auth logout`](#objectified-auth-logout)
+* [`objectified auth status`](#objectified-auth-status)
+* [`objectified browse projects TENANT`](#objectified-browse-projects-tenant)
+* [`objectified browse tenants`](#objectified-browse-tenants)
+* [`objectified browse versions REF`](#objectified-browse-versions-ref)
+* [`objectified completion`](#objectified-completion)
+* [`objectified completion install [SHELL]`](#objectified-completion-install-shell)
+* [`objectified completion show [SHELL]`](#objectified-completion-show-shell)
+* [`objectified completion uninstall`](#objectified-completion-uninstall)
+* [`objectified config get KEY`](#objectified-config-get-key)
+* [`objectified config list`](#objectified-config-list)
+* [`objectified config path`](#objectified-config-path)
+* [`objectified config set KEY VALUE`](#objectified-config-set-key-value)
+* [`objectified docs`](#objectified-docs)
+* [`objectified docs completions`](#objectified-docs-completions)
+* [`objectified docs errors`](#objectified-docs-errors)
+* [`objectified docs output`](#objectified-docs-output)
+* [`objectified docs plugins`](#objectified-docs-plugins)
+* [`objectified docs profiles`](#objectified-docs-profiles)
+* [`objectified docs spec-import`](#objectified-docs-spec-import)
+* [`objectified docs telemetry`](#objectified-docs-telemetry)
+* [`objectified hello [NAME]`](#objectified-hello-name)
+* [`objectified help [COMMAND]`](#objectified-help-command)
+* [`objectified projects create`](#objectified-projects-create)
+* [`objectified projects list`](#objectified-projects-list)
+* [`objectified projects show REF`](#objectified-projects-show-ref)
+* [`objectified schema fetch REF`](#objectified-schema-fetch-ref)
+* [`objectified schema swagger REF`](#objectified-schema-swagger-ref)
+* [`objectified spec import FILE`](#objectified-spec-import-file)
+* [`objectified tenants info SLUG`](#objectified-tenants-info-slug)
+* [`objectified tenants list`](#objectified-tenants-list)
+* [`objectified tenants use [SLUG]`](#objectified-tenants-use-slug)
+* [`objectified version`](#objectified-version)
+* [`objectified versions create PROJECT`](#objectified-versions-create-project)
+* [`objectified versions list PROJECT`](#objectified-versions-list-project)
+* [`objectified versions publish PROJECT VERSION`](#objectified-versions-publish-project-version)
+* [`objectified versions show PROJECT VERSION`](#objectified-versions-show-project-version)
+* [`objectified whoami`](#objectified-whoami)
 
 ## `objectified auth login`
 
@@ -1082,6 +1079,52 @@ SEE ALSO
   objectified config get
 ```
 
+## `objectified docs spec-import`
+
+Flags for CI pipelines: dry-run, review/hold, NDJSON streaming, reports, and exit codes.
+
+```
+USAGE
+  $ objectified docs spec-import [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
+
+DESCRIPTION
+  Flags for CI pipelines: dry-run, review/hold, NDJSON streaming, reports, and exit codes.
+
+EXAMPLES
+  $ objectified docs spec-import
+
+  $ objectified --json docs spec-import
+
+  $ objectified spec import ./openapi.yaml --help
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY). Not
+                          persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+SEE ALSO
+  objectified spec import
+
+  objectified docs errors
+
+  objectified docs output
+```
+
 ## `objectified docs telemetry`
 
 Telemetry posture and safe verbose debugging
@@ -1506,21 +1549,22 @@ SEE ALSO
 
 ## `objectified spec import FILE`
 
-Import an OpenAPI / Swagger / Arazzo document (POST /v1/imports/{tenant_slug}). Omit --project to create a project from spec info, then import.
+Import an OpenAPI / Swagger / Arazzo document (POST /v1/imports/{tenant_slug}). Omit --project to create a project from spec info, then import. CI flags: --dry-run, --review, --report, --ndjson (see `objectified docs spec-import`).
 
 ```
 USAGE
   $ objectified spec import FILE [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config
     <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--project <value>] [--source
     openapi|swagger|arazzo|auto] [--from-file <value>] [--name <value>] [--slug <value>] [--description <value>]
-    [--domain <value>] [--visibility private|public] [--yes]
+    [--domain <value>] [--visibility private|public] [--yes] [--dry-run] [--review] [--report <value>] [--ndjson]
+    [--commit-on-complete]
 
 ARGUMENTS
   FILE  Path to OpenAPI 3.x, Swagger 2.0, or Arazzo 1.x spec (JSON or YAML).
 
 DESCRIPTION
   Import an OpenAPI / Swagger / Arazzo document (POST /v1/imports/{tenant_slug}). Omit --project to create a project
-  from spec info, then import.
+  from spec info, then import. CI flags: --dry-run, --review, --report, --ndjson (see `objectified docs spec-import`).
 
 EXAMPLES
   $ objectified spec import ./openapi.yaml --project payments-api
@@ -1559,21 +1603,31 @@ AUTH
   --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 OTHER
-  --description=<value>  Project description (import body; when creating a project, stored on the new project).
-  --domain=<value>       When creating a project: metadata domainCategory (same as `projects create --domain`).
-  --from-file=<value>    Merge ImportOptions JSON (selectedSchemas, naming, etc.). CLI flags override file values.
-  --name=<value>         Project display name (import body; when creating a project, also used for POST /v1/projects
-                         unless omitted).
-  --project=<value>      Existing project slug or UUID (omit to create a project from spec info.title / info.description
-                         / contact / license, then import).
-  --slug=<value>         Project slug (import body; when creating a project, must match ^[a-z][a-z0-9-]{1,62}$ — use
-                         another if the tenant already has this slug).
-  --source=<option>      [default: auto] Override format detection (default: auto-detect from document keys).
-                         <options: openapi|swagger|arazzo|auto>
-  --visibility=<option>  When creating a project: metadata visibility (private or public).
-                         <options: private|public>
-  --yes                  Skip confirmation when creating a project from the spec; required when stdin is not a TTY and
-                         --project is omitted.
+  --[no-]commit-on-complete  Forward options.commitOnComplete to the engine (default true). Pair --no-commit-on-complete
+                             with --review when you need an explicit hold.
+  --description=<value>      Project description (import body; when creating a project, stored on the new project).
+  --domain=<value>           When creating a project: metadata domainCategory (same as `projects create --domain`).
+  --dry-run                  POST import with engine dryRun (options.dryRun=true): preview only, exits 0 with would-be
+                             summary — no durable import writes.
+  --from-file=<value>        Merge ImportOptions JSON (selectedSchemas, naming, etc.). CLI flags override file values.
+  --name=<value>             Project display name (import body; when creating a project, also used for POST /v1/projects
+                             unless omitted).
+  --ndjson                   Stream poll deltas as NDJSON on stdout (events + progress); final line is the terminal
+                             result object. Mutually exclusive with --json.
+  --project=<value>          Existing project slug or UUID (omit to create a project from spec info.title /
+                             info.description / contact / license, then import).
+  --report=<value>           Append per-event NDJSON plus a final summary line (creates parent dirs). Each line is a
+                             JSON object.
+  --review                   Poll until state=pending-approval, print job id on stdout, exit 0; fails if the job
+                             completes without that gate.
+  --slug=<value>             Project slug (import body; when creating a project, must match ^[a-z][a-z0-9-]{1,62}$ — use
+                             another if the tenant already has this slug).
+  --source=<option>          [default: auto] Override format detection (default: auto-detect from document keys).
+                             <options: openapi|swagger|arazzo|auto>
+  --visibility=<option>      When creating a project: metadata visibility (private or public).
+                             <options: private|public>
+  --yes                      Skip interactive confirms (CI guard); required when stdin is not a TTY and --project is
+                             omitted.
 
 SEE ALSO
   objectified versions show
@@ -1583,6 +1637,8 @@ SEE ALSO
   objectified projects show
 
   objectified docs errors
+
+  objectified docs spec-import
 ```
 
 ## `objectified tenants info SLUG`
@@ -2066,7 +2122,6 @@ SEE ALSO
 ALIASES
   $ objectified whoami
 ```
-
 <!-- commandsstop -->
 
 Global flags apply to every command (see **`objectified --help`**): `--api-key`, `--base-url`, `--config`, `--json`, `--no-color`, `--profile`, `--quiet`/`-q`, `--verbose`, plus env vars `OBJECTIFIED_*` and `NO_COLOR`. Effective API URL and optional API key resolve in order: **CLI flag → environment → `[profile.NAME]` in config → `[default]` in config → built-in default** (`https://api.objectified.dev` for the URL). Config file default path: `~/.config/objectified/config.toml`.

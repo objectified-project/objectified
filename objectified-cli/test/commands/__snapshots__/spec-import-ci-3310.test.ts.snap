@@ -1,0 +1,113 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`spec import CI ergonomics (#3310) > --ndjson streams progress and final result 1`] = `
+[
+  {
+    "progress": {
+      "completed": 0,
+      "currentItem": null,
+      "phase": "p0",
+      "total": 1,
+    },
+    "type": "progress",
+  },
+  {
+    "progress": {
+      "completed": 1,
+      "currentItem": null,
+      "phase": "done",
+      "total": 1,
+    },
+    "type": "progress",
+  },
+  {
+    "error": null,
+    "result": {
+      "projectId": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+      "versionId": "1.0.0",
+    },
+    "state": "completed",
+    "summary": {
+      "classesCreated": 1,
+      "failed": 0,
+      "warnings": 0,
+    },
+    "type": "result",
+  },
+]
+`;
+
+exports[`spec import CI ergonomics (#3310) > --report writes NDJSON event/progress/summary lines 1`] = `
+[
+  {
+    "event": {
+      "code": "START",
+      "level": "info",
+      "message": "go",
+    },
+    "type": "event",
+  },
+  {
+    "progress": {
+      "completed": 0,
+      "currentItem": "A",
+      "phase": "start",
+      "total": 2,
+    },
+    "type": "progress",
+  },
+  {
+    "progress": {
+      "completed": 1,
+      "currentItem": "B",
+      "phase": "mid",
+      "total": 2,
+    },
+    "type": "progress",
+  },
+  {
+    "event": {
+      "code": "DONE",
+      "level": "info",
+      "message": "fin",
+    },
+    "type": "event",
+  },
+  {
+    "progress": {
+      "completed": 2,
+      "currentItem": null,
+      "phase": "done",
+      "total": 2,
+    },
+    "type": "progress",
+  },
+  {
+    "exitCode": 0,
+    "result": {
+      "projectId": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      "versionId": "1.0.0",
+    },
+    "summary": {
+      "classesCreated": 2,
+      "failed": 0,
+      "warnings": 0,
+    },
+    "type": "summary",
+  },
+]
+`;
+
+exports[`spec import CI ergonomics (#3310) > --review prints job id at pending-approval (exit 0) 1`] = `
+"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+"
+`;
+
+exports[`spec import CI ergonomics (#3310) > POST includes dryRun when --dry-run 1`] = `
+{
+  "classesCreated": 1,
+  "dryRun": true,
+  "failed": 0,
+  "warnings": 0,
+}
+`;
