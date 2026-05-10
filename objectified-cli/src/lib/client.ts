@@ -3,9 +3,11 @@ import type {
   BrowsePublicProjectsResponse,
   BrowsePublicTenantsResponse,
   BrowsePublicVersionsResponse,
+  ChangeReportModel,
   ClassSchema,
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
+  OpenApiChangeReportRequest,
   PrimitiveSchema,
   ProjectCreateRequest,
   ProjectSchema,
@@ -53,6 +55,7 @@ import {
   listVersionsV1VersionsTenantSlugProjectIdGet,
   listWorkflowAuditV1VersionsTenantSlugWorkflowAuditGet,
   patchVersionTagV1VersionTagsTenantSlugProjectIdTagIdPatch,
+  postOpenapiChangeReportV1OpenapiChangeReportPost,
   previewChangeReportForPublishV1VersionsTenantSlugProjectIdVersionRecordIdChangeReportPublishPreviewPost,
   publishVersionV1VersionsTenantSlugProjectIdVersionRecordIdPublishPost,
   rollbackSpecImportJobV1TenantsTenantSlugImportsJobIdRollbackPost,
@@ -71,9 +74,11 @@ export type {
   BrowsePublicProjectsResponse,
   BrowsePublicTenantsResponse,
   BrowsePublicVersionsResponse,
+  ChangeReportModel,
   ClassSchema,
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
+  OpenApiChangeReportRequest,
   ProjectCreateRequest,
   ProjectSchema,
   SpecImportCommitResponse,
@@ -215,6 +220,11 @@ export type ObjectifiedApi = {
     projectSlug: string;
     since?: string;
   }): Promise<BrowsePublicVersionsResponse>;
+  /** POST /v1/openapi/change-report — semantic OpenAPI diff (resolved JSON documents). */
+  postOpenApiChangeReport(
+    tenantSlug: string,
+    body: OpenApiChangeReportRequest,
+  ): Promise<ChangeReportModel>;
   /** Raw GET /v1/schema/… for streaming or hashing (published OpenAPI bundle or single class). */
   fetchOpenApiPublishedSchema(opts: {
     tenantSlug: string;
@@ -564,6 +574,60 @@ function parseCompatibilityPayload(data: unknown): CompatibilityCheckResponse {
     });
   }
   return data as CompatibilityCheckResponse;
+}
+
+function parseOpenApiChangeReportPayload(data: unknown): ChangeReportModel {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for POST …/openapi/change-report.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "The API returned an unexpected JSON shape; include request-id when reporting.",
+    });
+  }
+  const o = data as Record<string, unknown>;
+  if (typeof o.schemaVersion !== "string") {
+    throw new ObjectifiedCliError({
+      message: "Invalid OpenAPI change-report fields.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected string schemaVersion from POST …/openapi/change-report.",
+    });
+  }
+  const schemas = o.schemas;
+  if (!schemas || typeof schemas !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Invalid OpenAPI change-report fields.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected schemas object from POST …/openapi/change-report.",
+    });
+  }
+  const s = schemas as Record<string, unknown>;
+  if (!Array.isArray(s.added) || !Array.isArray(s.removed) || !Array.isArray(s.modified)) {
+    throw new ObjectifiedCliError({
+      message: "Invalid OpenAPI change-report schemas section.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected schemas.added, schemas.removed, and schemas.modified arrays.",
+    });
+  }
+  if (
+    !Array.isArray(o.properties) ||
+    !Array.isArray(o.references) ||
+    !Array.isArray(o.relationships) ||
+    !Array.isArray(o.documentation) ||
+    !Array.isArray(o.warnings) ||
+    !Array.isArray(o.skipped)
+  ) {
+    throw new ObjectifiedCliError({
+      message: "Invalid OpenAPI change-report fields.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected properties, references, relationships, documentation, warnings, and skipped arrays.",
+    });
+  }
+  return data as ChangeReportModel;
 }
 
 function parseChangeReportPayload(data: unknown): VersionChangeReportOut {
@@ -2164,6 +2228,30 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
         throw e;
       }
       return parseBrowsePublicVersionsPayload(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
+    async postOpenApiChangeReport(
+      tenantSlug: string,
+      body: OpenApiChangeReportRequest,
+    ): Promise<ChangeReportModel> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await postOpenapiChangeReportV1OpenapiChangeReportPost({
+          client: hey,
+          query: { tenant_slug: tenantSlug },
+          body,
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseOpenApiChangeReportPayload(
         unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
       );
     },

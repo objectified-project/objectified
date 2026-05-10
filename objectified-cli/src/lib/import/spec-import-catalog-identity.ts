@@ -11,7 +11,8 @@ export type DerivedCatalogIdentity = {
   version?: string;
 };
 
-function parseSpecDocument(bytes: Buffer): Record<string, unknown> {
+/** Parse a YAML or JSON specification root object (used by import and audit). */
+export function parseSpecRootDocument(bytes: Buffer, hint?: string): Record<string, unknown> {
   const text = bytes.toString("utf8");
   const trimmed = text.trimStart();
   try {
@@ -31,7 +32,9 @@ function parseSpecDocument(bytes: Buffer): Record<string, unknown> {
       message: `Could not parse specification document: ${msg}`,
       exitCode: EXIT_CODES.VALIDATION,
       title: "Validation failed",
-      hint: "Fix JSON/YAML syntax, or pass --project-name, --project-slug, and --version explicitly.",
+      hint:
+        hint ??
+        "Fix JSON/YAML syntax, or pass --project-name, --project-slug, and --version explicitly.",
     });
   }
 }
@@ -61,7 +64,7 @@ export function deriveCatalogIdentityFromSpecBytes(
   if (sourceKind !== "openapi-3" && sourceKind !== "asyncapi-2") {
     return {};
   }
-  const doc = parseSpecDocument(bytes);
+  const doc = parseSpecRootDocument(bytes);
   const info = readInfoRecord(doc);
   if (info === undefined) {
     return {};
@@ -90,7 +93,7 @@ export function extractSpecInfoForCliDisplay(bytes: Buffer, sourceKind: string):
   if (sourceKind !== "openapi-3" && sourceKind !== "asyncapi-2") {
     return null;
   }
-  const doc = parseSpecDocument(bytes);
+  const doc = parseSpecRootDocument(bytes);
   const info = readInfoRecord(doc);
   if (info === undefined) {
     return {

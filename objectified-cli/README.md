@@ -63,6 +63,7 @@ USAGE
 # Commands
 
 <!-- commands -->
+* [`objectified audit PATH`](#objectified-audit-path)
 * [`objectified auth login`](#objectified-auth-login)
 * [`objectified auth logout`](#objectified-auth-logout)
 * [`objectified auth status`](#objectified-auth-status)
@@ -102,6 +103,70 @@ USAGE
 * [`objectified versions publish PROJECT VERSION`](#objectified-versions-publish-project-version)
 * [`objectified versions show PROJECT VERSION`](#objectified-versions-show-project-version)
 * [`objectified whoami`](#objectified-whoami)
+
+## `objectified audit PATH`
+
+Compare a local OpenAPI 3.x file to the published catalog bundle from GET /v1/schema/{tenant}/{project}/{version} using POST /v1/openapi/change-report. Exits with a validation error when anything would be removed from the local spec relative to the catalog, added on the catalog side, or semantically modified.
+
+```
+USAGE
+  $ objectified audit PATH --ref <value> [--api-key <value>] [--api-key-file <value>] [--base-url <value>]
+    [--config <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--latest] [--accept
+    <value>] [--format <value>] [--filename <value>]
+
+ARGUMENTS
+  PATH  Path to the OpenAPI file, or `-` to read from stdin.
+
+DESCRIPTION
+  Compare a local OpenAPI 3.x file to the published catalog bundle from GET /v1/schema/{tenant}/{project}/{version}
+  using POST /v1/openapi/change-report. Exits with a validation error when anything would be removed from the local spec
+  relative to the catalog, added on the catalog side, or semantically modified.
+
+EXAMPLES
+  $ objectified audit ./openapi.yaml --ref acme-corp/payments-api/2.1.0
+
+  $ objectified audit ./spec.json --ref acme-corp/payments-api/2.1.0 --latest
+
+  $ objectified --json audit ./openapi.yaml --ref acme/my-api/1.0.0
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY); overrides
+                          config.toml api_key. Not persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+OTHER
+  --accept=<value>    Optional Accept token for tag negotiation on GET /v1/schema (for example tag:stable), same as
+                      `objectified schema fetch --accept`.
+  --filename=<value>  Original filename hint when PATH is `-` (improves format sniffing).
+  --format=<value>    Importer kind when extension/content sniff is ambiguous (must resolve to openapi-3 for this
+                      command).
+  --latest            Use version slug `latest` instead of the third segment of --ref.
+  --ref=<value>       (required) Published catalog target as tenant/project/version (three slash-separated slugs; same
+                      shape as `objectified schema fetch`).
+
+SEE ALSO
+  objectified import spec
+
+  objectified schema fetch
+
+  objectified versions show
+
+  objectified docs errors
+```
 
 ## `objectified auth login`
 
