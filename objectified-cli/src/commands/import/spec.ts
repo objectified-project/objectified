@@ -62,7 +62,7 @@ function throwForBadTerminalState(st: SpecImportJobStatus): never {
 
 export default class ImportSpec extends BaseCommand {
   static description =
-    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Use `--verbose` for step-by-step progress on stderr (polling, finalize POSTs). Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
+    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
 
   static examples = [
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0",
@@ -75,7 +75,7 @@ export default class ImportSpec extends BaseCommand {
     "<%= config.bin %> <%= command.id %> ./asyncapi.yml --project-slug events --project-name Events --version 1.0.0 --dry-run",
   ];
 
-  static seeAlso = ["projects create", "versions create", "docs errors", "tenants use"];
+  static seeAlso = ["import jobs", "projects create", "versions create", "docs errors", "tenants use"];
 
   static args = {
     path: Args.string({
@@ -183,7 +183,8 @@ export default class ImportSpec extends BaseCommand {
     }
 
     this.ensureAuthenticated();
-    this.importVerbose(`start tenant=${tenant} base_url=${this.context.baseUrl}`);
+    this.importProgressReset();
+    this.importProgress(`authenticated; tenant=${tenant} base_url=${this.context.baseUrl}`);
 
     const pathArg = typeof this.commandArgs.path === "string" ? this.commandArgs.path : "";
 
@@ -210,6 +211,7 @@ export default class ImportSpec extends BaseCommand {
       createOrMapProject: createOrMap,
       existingProjectId: existingTrim,
     });
+    this.importProgress("validated project strategy flags");
 
     const domainRaw = typeof this.flags.domain === "string" ? this.flags.domain.trim() : "";
     const domainCli = domainRaw !== "" ? domainRaw : undefined;
@@ -284,6 +286,7 @@ export default class ImportSpec extends BaseCommand {
 
     if (hasMap) {
       versionId = parseValidSemverVersionId(versionRaw);
+      this.importProgress(`resolving --map-project slug=${mapRaw} (GET project by slug)`);
       resolved = await resolveMapProjectImport({
         api: this.api,
         tenant,
@@ -294,6 +297,7 @@ export default class ImportSpec extends BaseCommand {
             ? projectSlugRaw
             : undefined,
       });
+      this.importProgress(`reading specification input (${pathArg === "-" ? "stdin" : pathArg})`);
       ({ bytes, resolvedPath } = await readSpecInput(pathArg));
       kind = resolveSpecImportKind({
         explicitFormat,
@@ -301,7 +305,9 @@ export default class ImportSpec extends BaseCommand {
         resolvedPath,
         bytes,
       });
+      this.importProgress(`detected source_kind=${kind.sourceKind} (${String(bytes.length)} bytes)`);
     } else if (createOrMap) {
+      this.importProgress(`reading specification input (${pathArg === "-" ? "stdin" : pathArg})`);
       ({ bytes, resolvedPath } = await readSpecInput(pathArg));
       kind = resolveSpecImportKind({
         explicitFormat,
@@ -309,6 +315,7 @@ export default class ImportSpec extends BaseCommand {
         resolvedPath,
         bytes,
       });
+      this.importProgress(`detected source_kind=${kind.sourceKind} (${String(bytes.length)} bytes)`);
       const derived = deriveCatalogIdentityFromSpecBytes(bytes, kind.sourceKind);
       const catalogIdentity = resolveCatalogIdentityForCreateOrMap({
         derived,
@@ -323,6 +330,10 @@ export default class ImportSpec extends BaseCommand {
         slug: catalogIdentity.projectSlug,
         description: projectDescriptionForTarget,
       };
+      this.importProgress(
+        `derived catalog identity slug=${catalogIdentity.projectSlug} version_id=${catalogIdentity.versionId}`,
+      );
+      this.importProgress("resolving --create-or-map-project (GET or POST project)");
       resolved = await resolveCreateOrMapProjectImport({
         api: this.api,
         tenant,
@@ -363,6 +374,7 @@ export default class ImportSpec extends BaseCommand {
         slug: slugCheckCreate.slug,
         description: projectDescriptionForTarget,
       };
+      this.importProgress(`creating project slug=${slugCheckCreate.slug} (POST /v1/projects)`);
       resolved = await resolveCreateProjectImport({
         api: this.api,
         tenant,
@@ -370,6 +382,7 @@ export default class ImportSpec extends BaseCommand {
         domain: domainCli,
         visibility: visibilityCli,
       });
+      this.importProgress(`reading specification input (${pathArg === "-" ? "stdin" : pathArg})`);
       ({ bytes, resolvedPath } = await readSpecInput(pathArg));
       kind = resolveSpecImportKind({
         explicitFormat,
@@ -377,6 +390,7 @@ export default class ImportSpec extends BaseCommand {
         resolvedPath,
         bytes,
       });
+      this.importProgress(`detected source_kind=${kind.sourceKind} (${String(bytes.length)} bytes)`);
     } else {
       versionId = parseValidSemverVersionId(versionRaw);
       if (projectName === "") {
@@ -408,6 +422,10 @@ export default class ImportSpec extends BaseCommand {
           description: projectDescriptionForTarget,
         },
       };
+      this.importProgress(
+        `using metadata-only targets slug=${slugCheckLegacy.slug}${existingTrim !== undefined ? ` existing_project_id=${existingTrim}` : ""}`,
+      );
+      this.importProgress(`reading specification input (${pathArg === "-" ? "stdin" : pathArg})`);
       ({ bytes, resolvedPath } = await readSpecInput(pathArg));
       kind = resolveSpecImportKind({
         explicitFormat,
@@ -415,6 +433,7 @@ export default class ImportSpec extends BaseCommand {
         resolvedPath,
         bytes,
       });
+      this.importProgress(`detected source_kind=${kind.sourceKind} (${String(bytes.length)} bytes)`);
     }
 
     const projectStrategy = hasMap
@@ -424,11 +443,11 @@ export default class ImportSpec extends BaseCommand {
         : createProject
           ? "create-project"
           : "metadata-only";
-    this.importVerbose(
-      `resolved project_strategy=${projectStrategy} project_slug=${resolved.project.slug} project_name=${resolved.project.name} existing_project_id=${resolved.existingProjectId ?? "none"}`,
+    this.importProgress(
+      `targets ready strategy=${projectStrategy} project_slug=${resolved.project.slug} project_name=${resolved.project.name} catalog_project_id=${resolved.existingProjectId ?? "none"}`,
     );
-    this.importVerbose(
-      `resolved spec input_path=${resolvedPath} source_kind=${kind.sourceKind} bytes=${String(bytes.length)} catalog_version_id=${versionId}`,
+    this.importProgress(
+      `resolved spec path=${resolvedPath} catalog_version_id=${versionId}`,
     );
 
     const rollback = this.flags.rollback === true;
@@ -441,8 +460,8 @@ export default class ImportSpec extends BaseCommand {
 
     const documentBase64 = bytes.toString("base64");
 
-    this.importVerbose(
-      `POST /v1/tenants/${tenant}/imports dry_run=${String(dryRun)} no_wait=${String(noWait)} document_base64_octets=${String(documentBase64.length)}`,
+    this.importProgress(
+      `starting import job POST /v1/tenants/${tenant}/imports dry_run=${String(dryRun)} no_wait=${String(noWait)} payload_base64_octets=${String(documentBase64.length)}`,
     );
 
     const accepted: SpecImportJobAccepted = await this.api.startSpecImportJson(tenant, {
@@ -462,12 +481,10 @@ export default class ImportSpec extends BaseCommand {
       content_type: kind.contentType ?? undefined,
     });
 
-    this.importVerbose(
-      `import job accepted job_id=${accepted.job_id} status_path=${accepted.status_path}`,
-    );
+    this.importProgress(`import job accepted job_id=${accepted.job_id}`);
 
     if (noWait) {
-      this.importVerbose(`--no-wait: skipping poll and finalize`);
+      this.importProgress("--no-wait: skipping poll and finalize POSTs");
       const early: ImportSpecSummaryJson = {
         tenant_slug: tenant,
         job_id: accepted.job_id,
@@ -496,15 +513,17 @@ export default class ImportSpec extends BaseCommand {
           ],
         );
       }
+      this.importProgress("done final_state=queued (--no-wait; poll status_path manually)");
       return;
     }
 
-    const pollLog = this.verboseEffective
+    const pollLog = this.flags.quiet !== true
       ? (line: string): void => {
-          this.importVerbose(line);
+          if (line.startsWith("waiting ") && !this.verboseEffective) return;
+          this.importProgress(line);
         }
       : undefined;
-    this.importVerbose(`polling GET ${accepted.status_path} until gate state`);
+    this.importProgress(`polling GET ${accepted.status_path} until gate state`);
 
     let commitOut: SpecImportCommitResponse | undefined;
     let rollbackOut: SpecImportRollbackResponse | undefined;
@@ -525,7 +544,7 @@ export default class ImportSpec extends BaseCommand {
     }
 
     if (st.state === "completed") {
-      this.importVerbose(`gate reached state=completed (no commit step required)`);
+      this.importProgress("gate reached state=completed (no server commit step required)");
       const summary = this.buildSummaryJson({
         tenant,
         accepted,
@@ -536,13 +555,16 @@ export default class ImportSpec extends BaseCommand {
         stoppedAt: null,
       });
       this.emitSummary(summary);
+      this.importProgress(`done final_state=${summary.final_state}`);
       return;
     }
 
     if (st.state === "pending-approval") {
-      this.importVerbose(`gate reached state=pending-approval commit=${String(commit)} rollback=${String(rollback)}`);
+      this.importProgress(
+        `gate reached state=pending-approval commit=${String(commit)} rollback=${String(rollback)}`,
+      );
       if (!commit && !rollback) {
-        this.importVerbose(`stopping at pending-approval (--no-commit); no finalize POST`);
+        this.importProgress("stopping at pending-approval (--no-commit); no finalize POST");
         const summary = this.buildSummaryJson({
           tenant,
           accepted,
@@ -553,18 +575,19 @@ export default class ImportSpec extends BaseCommand {
           stoppedAt: "pending-approval",
         });
         this.emitSummary(summary);
+        this.importProgress(`done final_state=${summary.final_state}`);
         return;
       }
 
       if (rollback) {
-        this.importVerbose(`POST /v1/tenants/${tenant}/imports/${accepted.job_id}/rollback`);
+        this.importProgress(`POST rollback /v1/tenants/${tenant}/imports/${accepted.job_id}/rollback`);
         rollbackOut = await this.api.rollbackSpecImportJob(tenant, accepted.job_id);
       } else {
-        this.importVerbose(`POST /v1/tenants/${tenant}/imports/${accepted.job_id}/commit`);
+        this.importProgress(`POST commit /v1/tenants/${tenant}/imports/${accepted.job_id}/commit`);
         commitOut = await this.api.commitSpecImportJob(tenant, accepted.job_id);
       }
 
-      this.importVerbose(`polling until terminal state after finalize`);
+      this.importProgress("polling GET until terminal state after finalize");
       st = await pollSpecImportUntilTerminal({
         api: this.api,
         tenantSlug: tenant,
@@ -580,7 +603,7 @@ export default class ImportSpec extends BaseCommand {
       }
     }
 
-    this.importVerbose(`terminal state=${st.state}`);
+    this.importProgress(`terminal job state=${st.state}`);
     const summary = this.buildSummaryJson({
       tenant,
       accepted,
@@ -591,12 +614,24 @@ export default class ImportSpec extends BaseCommand {
       stoppedAt: null,
     });
     this.emitSummary(summary);
+    this.importProgress(`done final_state=${summary.final_state}`);
   }
 
-  /** Stderr diagnostics when `--verbose` / OBJECTIFIED_VERBOSE=1 (does not change stdout JSON). */
-  private importVerbose(message: string): void {
-    if (!this.verboseEffective) return;
-    process.stderr.write(`objectified: import: ${message}\n`);
+  /** Sequential counter so stderr lines stay ordered per invocation. */
+  private importProgressSeq = 0;
+
+  private importProgressReset(): void {
+    this.importProgressSeq = 0;
+  }
+
+  /**
+   * Import milestones and poll snapshots on stderr (`objectified: import: [n] …`).
+   * Suppressed by `--quiet`. Does not change stdout or `--json` payloads.
+   */
+  private importProgress(message: string): void {
+    if (this.flags.quiet === true) return;
+    this.importProgressSeq++;
+    process.stderr.write(`objectified: import: [${String(this.importProgressSeq)}] ${message}\n`);
   }
 
   private buildSummaryJson(opts: {

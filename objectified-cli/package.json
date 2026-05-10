@@ -100,6 +100,7 @@
     "./man/man1/objectified-docs.1",
     "./man/man1/objectified-hello.1",
     "./man/man1/objectified-help.1",
+    "./man/man1/objectified-import-jobs.1",
     "./man/man1/objectified-import-spec.1",
     "./man/man1/objectified-projects-create.1",
     "./man/man1/objectified-projects-list.1",

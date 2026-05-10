@@ -305,8 +305,6 @@ class SpecImportJobResult(BaseModel):
 class SpecImportJobStatus(BaseModel):
     """Poll payload for an import job."""
 
-    model_config = ConfigDict(extra="forbid")
-
     job_id: str
     state: SpecImportJobState
     percent: int = Field(0, ge=0, le=100)
@@ -316,10 +314,29 @@ class SpecImportJobStatus(BaseModel):
     result: Optional[SpecImportJobResult] = None
 
 
-class SpecImportJobAccepted(BaseModel):
-    """Returned when a job is accepted (HTTP 202)."""
+class SpecImportJobListItem(BaseModel):
+    """Summary row for GET …/imports (no full event log)."""
 
     model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    state: SpecImportJobState
+    percent: int = Field(0, ge=0, le=100)
+    status_path: str = Field(description="Relative URL for GET …/imports/{job_id}.")
+    progress: Optional[SpecImportProgress] = None
+    result: Optional[SpecImportJobResult] = None
+
+
+class SpecImportJobListResponse(BaseModel):
+    """Tenant-scoped import jobs visible to this API process."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    jobs: List[SpecImportJobListItem]
+
+
+class SpecImportJobAccepted(BaseModel):
+    """Returned when a job is accepted (HTTP 202)."""
 
     job_id: str
     status_path: str = Field(
@@ -329,8 +346,6 @@ class SpecImportJobAccepted(BaseModel):
 
 class SpecImportCommitResponse(BaseModel):
     """Response after a successful commit."""
-
-    model_config = ConfigDict(extra="forbid")
 
     job_id: str
     state: Literal["completed"] = "completed"
@@ -342,8 +357,6 @@ class SpecImportCommitResponse(BaseModel):
 
 class SpecImportRollbackResponse(BaseModel):
     """Response after rolling back a committed import."""
-
-    model_config = ConfigDict(extra="forbid")
 
     job_id: str
     state: Literal["rolled-back"] = "rolled-back"

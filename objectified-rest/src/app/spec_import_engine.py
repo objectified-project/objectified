@@ -23,6 +23,8 @@ from .config import settings
 from .models import (
     SpecImportCommitResponse,
     SpecImportJobAccepted,
+    SpecImportJobListItem,
+    SpecImportJobListResponse,
     SpecImportJobStatus,
     SpecImportRollbackResponse,
     SpecImportStartJsonRequest,
@@ -310,6 +312,26 @@ async def schedule_spec_import_multipart(
 def get_spec_import_status(tenant_slug: str, job_id: str) -> SpecImportJobStatus:
     rec = _get_record(tenant_slug, job_id)
     return rec.status
+
+
+async def list_spec_import_jobs(tenant_slug: str) -> SpecImportJobListResponse:
+    async with _jobs_lock:
+        items: list[SpecImportJobListItem] = []
+        for rec in _jobs.values():
+            if rec.tenant_slug != tenant_slug:
+                continue
+            st = rec.status
+            items.append(
+                SpecImportJobListItem(
+                    job_id=st.job_id,
+                    state=st.state,
+                    percent=st.percent,
+                    status_path=f"/v1/tenants/{tenant_slug}/imports/{st.job_id}",
+                    progress=st.progress,
+                    result=st.result,
+                )
+            )
+    return SpecImportJobListResponse(jobs=items)
 
 
 async def cancel_spec_import_job(tenant_slug: str, job_id: str) -> None:

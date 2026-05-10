@@ -27,6 +27,7 @@ from .auth import get_authenticated_user_id, validate_authentication
 from .models import (
     SpecImportCommitResponse,
     SpecImportJobAccepted,
+    SpecImportJobListResponse,
     SpecImportJobStatus,
     SpecImportRollbackResponse,
     SpecImportStartJsonRequest,
@@ -36,6 +37,7 @@ from .spec_import_engine import (
     cancel_spec_import_job as engine_cancel_spec_import_job,
     commit_spec_import_job as engine_commit_spec_import_job,
     get_spec_import_status as engine_get_spec_import_status,
+    list_spec_import_jobs as engine_list_spec_import_jobs,
     rollback_spec_import_job as engine_rollback_spec_import_job,
     schedule_spec_import,
     schedule_spec_import_multipart,
@@ -58,6 +60,23 @@ def _require_tenant_and_user(auth_data: Dict[str, Any]) -> tuple[str, str]:
     if not tid:
         raise HTTPException(status_code=403, detail="Tenant id missing from authentication context.")
     return str(tid), uid
+
+
+@router.get(
+    "/{tenant_slug}/imports",
+    response_model=SpecImportJobListResponse,
+    summary="List specification import jobs",
+    description=(
+        "Jobs tracked in this API process for the tenant (in-memory). "
+        "After restart the list is empty; use GET …/imports/{job_id} for full event history."
+    ),
+)
+async def list_spec_import_jobs(
+    tenant_slug: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> SpecImportJobListResponse:
+    _ = auth_data
+    return await engine_list_spec_import_jobs(tenant_slug)
 
 
 @router.post(

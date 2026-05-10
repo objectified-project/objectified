@@ -11,6 +11,7 @@ import type {
   ProjectSchema,
   SpecImportCommitResponse,
   SpecImportJobAccepted,
+  SpecImportJobListResponse,
   SpecImportJobStatus,
   SpecImportRollbackResponse,
   SpecImportStartJsonRequest,
@@ -47,6 +48,7 @@ import {
   listPublicBrowseProjectsV1BrowseTenantsTenantSlugProjectsGet,
   listPublicBrowseTenantsV1BrowseTenantsGet,
   listPublicBrowseVersionsV1BrowseTenantsTenantSlugProjectsProjectSlugVersionsGet,
+  listSpecImportJobsV1TenantsTenantSlugImportsGet,
   listVersionTagsV1VersionTagsTenantSlugProjectIdGet,
   listVersionsV1VersionsTenantSlugProjectIdGet,
   listWorkflowAuditV1VersionsTenantSlugWorkflowAuditGet,
@@ -76,6 +78,8 @@ export type {
   ProjectSchema,
   SpecImportCommitResponse,
   SpecImportJobAccepted,
+  SpecImportJobListItem,
+  SpecImportJobListResponse,
   SpecImportJobStatus,
   SpecImportProjectTarget,
   SpecImportRollbackResponse,
@@ -193,6 +197,7 @@ export type ObjectifiedApi = {
     body: SpecImportStartJsonRequest,
   ): Promise<SpecImportJobAccepted>;
   getSpecImportStatus(tenantSlug: string, jobId: string): Promise<SpecImportJobStatus>;
+  listSpecImportJobs(tenantSlug: string): Promise<SpecImportJobListResponse>;
   commitSpecImportJob(tenantSlug: string, jobId: string): Promise<SpecImportCommitResponse>;
   rollbackSpecImportJob(tenantSlug: string, jobId: string): Promise<SpecImportRollbackResponse>;
   listPublicBrowseTenants(opts?: {
@@ -1147,6 +1152,65 @@ function parseSpecImportJobStatus(data: unknown): SpecImportJobStatus {
   return data as SpecImportJobStatus;
 }
 
+function parseSpecImportJobListResponse(data: unknown): SpecImportJobListResponse {
+  if (!data || typeof data !== "object") {
+    throw new ObjectifiedCliError({
+      message: "Unexpected response shape for specification import job list.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Expected { jobs: [...] } from GET …/imports.",
+    });
+  }
+  const outer = data as Record<string, unknown>;
+  if (!Array.isArray(outer.jobs)) {
+    throw new ObjectifiedCliError({
+      message: "Invalid specification import job list payload.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "jobs must be an array from GET …/imports.",
+    });
+  }
+  for (const row of outer.jobs) {
+    if (!row || typeof row !== "object") {
+      throw new ObjectifiedCliError({
+        message: "Invalid row in specification import job list.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "Each jobs[] entry must be an object.",
+      });
+    }
+    const r = row as Record<string, unknown>;
+    if (typeof r.job_id !== "string" || typeof r.status_path !== "string") {
+      throw new ObjectifiedCliError({
+        message: "Invalid specification import job list row.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "job_id and status_path are required on each list row.",
+      });
+    }
+    if (
+      typeof r.state !== "string" ||
+      !SPEC_IMPORT_STATES.has(r.state as SpecImportJobStatus["state"])
+    ) {
+      throw new ObjectifiedCliError({
+        message: "Invalid specification import job list state.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "state must be a known import job lifecycle value.",
+      });
+    }
+    if (typeof r.percent !== "number" || !Number.isFinite(r.percent)) {
+      throw new ObjectifiedCliError({
+        message: "Invalid specification import job list percent.",
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "percent must be a finite number.",
+      });
+    }
+  }
+  return data as SpecImportJobListResponse;
+}
+
 function parseSpecImportCommitResponse(data: unknown): SpecImportCommitResponse {
   if (!data || typeof data !== "object") {
     throw new ObjectifiedCliError({
@@ -1950,6 +2014,26 @@ export function createApiClient(options: CreateApiClientOptions): ObjectifiedApi
         throw e;
       }
       return parseSpecImportJobStatus(
+        unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
+      );
+    },
+
+    async listSpecImportJobs(tenantSlug: string): Promise<SpecImportJobListResponse> {
+      let rawUnknown: unknown;
+      try {
+        rawUnknown = await listSpecImportJobsV1TenantsTenantSlugImportsGet({
+          client: hey,
+          path: { tenant_slug: tenantSlug },
+          throwOnError: false,
+        });
+      } catch (e) {
+        if (e instanceof ObjectifiedCliError) throw e;
+        if (e !== null && typeof e === "object" && "code" in e) {
+          throw networkErrnoToCliError(e as NodeJS.ErrnoException);
+        }
+        throw e;
+      }
+      return parseSpecImportJobListResponse(
         unwrapSdkGet(rawUnknown, lastRequestId, lastRetriesAttempted, requestMeta),
       );
     },

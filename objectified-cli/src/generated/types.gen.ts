@@ -1921,6 +1921,42 @@ export type SpecImportJobStatus = {
 };
 
 /**
+ * SpecImportJobListItem
+ * Summary row for GET …/imports (no full event log).
+ */
+export type SpecImportJobListItem = {
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * State
+     */
+    state: 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
+    /**
+     * Percent
+     */
+    percent: number;
+    /**
+     * Status Path
+     */
+    status_path: string;
+    progress?: SpecImportProgress | null;
+    result?: SpecImportJobResult | null;
+};
+
+/**
+ * SpecImportJobListResponse
+ * Wrapper for tenant-scoped import job listing.
+ */
+export type SpecImportJobListResponse = {
+    /**
+     * Jobs
+     */
+    jobs: Array<SpecImportJobListItem>;
+};
+
+/**
  * SpecImportOptions
  * Optional importer flags (parity with dashboard Import dialog).
  */
@@ -9811,6 +9847,46 @@ export type VerifyTenantAccessV1TenantsTenantSlugHeadResponses = {
      */
     200: unknown;
 };
+
+export type ListSpecImportJobsV1TenantsTenantSlugImportsGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+        /**
+         * X-Api-Key
+         */
+        'X-API-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Tenant Slug
+         */
+        tenant_slug: string;
+    };
+    query?: never;
+    url: '/v1/tenants/{tenant_slug}/imports';
+};
+
+export type ListSpecImportJobsV1TenantsTenantSlugImportsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListSpecImportJobsV1TenantsTenantSlugImportsGetError = ListSpecImportJobsV1TenantsTenantSlugImportsGetErrors[keyof ListSpecImportJobsV1TenantsTenantSlugImportsGetErrors];
+
+export type ListSpecImportJobsV1TenantsTenantSlugImportsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: SpecImportJobListResponse;
+};
+
+export type ListSpecImportJobsV1TenantsTenantSlugImportsGetResponse = ListSpecImportJobsV1TenantsTenantSlugImportsGetResponses[keyof ListSpecImportJobsV1TenantsTenantSlugImportsGetResponses];
 
 export type StartSpecImportJsonV1TenantsTenantSlugImportsPostData = {
     body: SpecImportStartJsonRequest;

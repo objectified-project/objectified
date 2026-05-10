@@ -86,6 +86,7 @@ USAGE
 * [`objectified docs telemetry`](#objectified-docs-telemetry)
 * [`objectified hello [NAME]`](#objectified-hello-name)
 * [`objectified help [COMMAND]`](#objectified-help-command)
+* [`objectified import jobs`](#objectified-import-jobs)
 * [`objectified import spec PATH`](#objectified-import-spec-path)
 * [`objectified projects create`](#objectified-projects-create)
 * [`objectified projects list`](#objectified-projects-list)
@@ -1192,9 +1193,57 @@ OTHER
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.46/src/commands/help.ts)_
 
+## `objectified import jobs`
+
+List specification import jobs for the tenant (GET /v1/tenants/{tenant_slug}/imports). Rows are summaries only (no event log); use GET …/imports/{job_id} for full status. The API keeps jobs in this server process—restarts clear the list.
+
+```
+USAGE
+  $ objectified import jobs [--api-key <value>] [--api-key-file <value>] [--base-url <value>] [--config <value>]
+    [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose]
+
+DESCRIPTION
+  List specification import jobs for the tenant (GET /v1/tenants/{tenant_slug}/imports). Rows are summaries only (no
+  event log); use GET …/imports/{job_id} for full status. The API keeps jobs in this server process—restarts clear the
+  list.
+
+EXAMPLES
+  $ objectified import jobs
+
+  $ objectified --json import jobs
+
+  $ objectified import jobs --tenant acme
+
+COMMON
+  --base-url=<value>  Root REST API URL.
+  --config=<value>    Path to config file (default: XDG config dir / Objectified AppData on Windows — see `objectified
+                      config path`).
+  --profile=<value>   Named credentials profile (OBJECTIFIED_PROFILE); falls back to default_profile in config.
+  --tenant=<value>    [env: OBJECTIFIED_TENANT] Tenant slug for this run only (overrides OBJECTIFIED_TENANT and config
+                      tenant_slug).
+
+OUTPUT
+  --[no-]color  Enable/disable ANSI colors (--no-color sets NO_COLOR; colors are off when stdout is not a TTY).
+      --[no-]json   Emit machine-readable JSON (OBJECTIFIED_JSON=1; auto-enabled when stdout is not a TTY).
+  -q, --quiet       Suppress non-error stdout (spinners, banners, tips).
+      --verbose     Verbose logging on stderr (OBJECTIFIED_VERBOSE=1).
+
+AUTH
+  --api-key=<value>       [env: OBJECTIFIED_API_KEY] API key for direct authentication (OBJECTIFIED_API_KEY); overrides
+                          config.toml api_key. Not persisted unless you run `auth login --api-key`.
+  --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
+
+SEE ALSO
+  objectified import spec
+
+  objectified tenants use
+
+  objectified docs errors
+```
+
 ## `objectified import spec PATH`
 
-Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 
 ```
 USAGE
@@ -1210,8 +1259,10 @@ ARGUMENTS
 
 DESCRIPTION
   Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status
-  with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Supported formats vs the
-  dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+  with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are
+  logged to stderr as `[n] …` (use `--quiet` to suppress). `--verbose` adds HTTP diagnostics and poll backoff timings.
+  Supported formats vs the dashboard Import dialog and repository filename scanner:
+  docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 
 EXAMPLES
   $ objectified import spec ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0
@@ -1291,6 +1342,8 @@ OTHER
                                  itself does not prompt).
 
 SEE ALSO
+  objectified import jobs
+
   objectified projects create
 
   objectified versions create

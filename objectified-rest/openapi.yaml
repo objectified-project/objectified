@@ -7753,6 +7753,49 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
   /v1/tenants/{tenant_slug}/imports:
+    get:
+      tags:
+      - spec-import
+      summary: List specification import jobs
+      description: Returns import jobs for this tenant held in this API process (in-memory;
+        restart clears the list). Use GET …/imports/{job_id} for full events.
+      operationId: list_spec_import_jobs_v1_tenants__tenant_slug__imports_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpecImportJobListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     post:
       tags:
       - spec-import
@@ -11018,6 +11061,62 @@ components:
       - state
       title: SpecImportJobStatus
       description: Poll payload for an import job.
+    SpecImportJobListItem:
+      properties:
+        job_id:
+          type: string
+          title: Job Id
+        state:
+          type: string
+          enum:
+          - queued
+          - running
+          - pending-approval
+          - committing
+          - completed
+          - failed
+          - canceled
+          - rolled-back
+          title: State
+        percent:
+          type: integer
+          maximum: 100.0
+          minimum: 0.0
+          title: Percent
+          default: 0
+        status_path:
+          type: string
+          title: Status Path
+        progress:
+          anyOf:
+          - $ref: '#/components/schemas/SpecImportProgress'
+          - type: 'null'
+        result:
+          anyOf:
+          - $ref: '#/components/schemas/SpecImportJobResult'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - job_id
+      - state
+      - percent
+      - status_path
+      title: SpecImportJobListItem
+      description: Summary row for GET …/imports (no full event log).
+    SpecImportJobListResponse:
+      properties:
+        jobs:
+          items:
+            $ref: '#/components/schemas/SpecImportJobListItem'
+          type: array
+          title: Jobs
+      additionalProperties: false
+      type: object
+      required:
+      - jobs
+      title: SpecImportJobListResponse
+      description: Wrapper for tenant-scoped import job listing.
     SpecImportOptions:
       properties:
         selected_schemas:

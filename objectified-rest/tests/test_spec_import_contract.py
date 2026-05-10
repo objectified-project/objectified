@@ -31,6 +31,15 @@ def _auth_override():
     app.openapi_schema = None
 
 
+@pytest.fixture(autouse=True)
+def _clear_spec_import_jobs_between_tests():
+    from app import spec_import_engine as sie
+
+    sie._jobs.clear()
+    yield
+    sie._jobs.clear()
+
+
 @pytest.fixture
 def spec_import_fake_worker(monkeypatch):
     async def _fake(payload: dict) -> dict:
@@ -101,6 +110,7 @@ def test_openapi_lists_spec_import_paths_and_operations():
     upload = f"{base}/upload"
     job = f"{base}/{{job_id}}"
     assert base in paths
+    assert "get" in paths[base]
     assert "post" in paths[base]
     assert upload in paths
     assert job in paths
@@ -108,6 +118,38 @@ def test_openapi_lists_spec_import_paths_and_operations():
     assert "delete" in paths[job]
     assert f"{job}/commit" in paths
     assert f"{job}/rollback" in paths
+
+
+def test_list_spec_import_jobs_empty():
+    r = client.get("/v1/tenants/acme/imports")
+    assert r.status_code == 200, r.text
+    assert r.json() == {"jobs": []}
+
+
+def test_list_spec_import_jobs_includes_started_job(spec_import_fake_worker):
+    body = {
+        "metadata": {
+            "source_kind": "openapi-3",
+            "project": {"name": "Payments", "slug": "payments-api"},
+            "version": {"version_id": "1.0.0"},
+            "options": {},
+        },
+        "document_base64": "b3BlbmFwaTogMy4xLjA=",
+        "filename": "spec.yaml",
+    }
+    started = client.post("/v1/tenants/acme/imports", json=body)
+    assert started.status_code == 202, started.text
+    job_id = started.json()["job_id"]
+
+    listed = client.get("/v1/tenants/acme/imports")
+    assert listed.status_code == 200, listed.text
+    rows = listed.json()["jobs"]
+    assert any(j["job_id"] == job_id for j in rows)
+    match = next(j for j in rows if j["job_id"] == job_id)
+    assert match["status_path"].endswith(f"/imports/{job_id}")
+    assert "state" in match and "percent" in match
+
+    _wait_completed(job_id)
 
 
 def test_start_spec_import_json_returns_202(spec_import_fake_worker):
