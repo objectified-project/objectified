@@ -51,6 +51,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## UI
 - Adds the ability to view projects that were deleted (show deleted toggle)
 - Introduces undelete for soft deleted projects
+- Updates Projects page to improve layout and display
 
 ## Export
 
