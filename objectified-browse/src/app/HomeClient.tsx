@@ -6,7 +6,7 @@ import { AppShell } from './components/AppShell';
 import { DataTable } from './components/DataTable';
 import { DiscoveryRail } from './components/DiscoveryRail';
 import { SpecCard } from './components/SpecCard';
-import { sanitizeSearchInput, SAFE_SEARCH_HTML_PATTERN } from './utils/searchValidation';
+import { sanitizeSearchInput } from './utils/searchValidation';
 
 interface Tenant {
   id: string;
@@ -129,9 +129,8 @@ export function HomeClient({
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(sanitizeSearchInput(e.target.value))}
-                  pattern={SAFE_SEARCH_HTML_PATTERN}
-                  placeholder="Search organizations, projects, descriptions..."
-                  className="h-12 w-full rounded-lg border border-zinc-200 bg-white pl-12 pr-4 text-[15px] text-zinc-900 placeholder-zinc-400 shadow-sm transition-colors focus-visible:border-[var(--brand)] focus-visible:outline-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500"
+                  placeholder="Search paths, schemas, projects, organizations…"
+              className="h-12 w-full rounded-lg border border-zinc-200 bg-white pl-12 pr-4 text-[15px] text-zinc-900 placeholder-zinc-400 shadow-sm transition-colors focus-visible:border-[var(--brand)] focus-visible:outline-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500"
                 />
               </div>
               <button
