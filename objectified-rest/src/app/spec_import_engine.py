@@ -11,11 +11,12 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import uuid
 import base64
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
 
 from fastapi import HTTPException
 
@@ -34,17 +35,53 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_WORKER_CMD = [
-    "yarn",
-    "workspace",
-    "objectified-ui",
-    "exec",
-    "tsx",
-    "scripts/rest-spec-import-worker.ts",
-]
+_WORKER_SCRIPT = "scripts/rest-spec-import-worker.ts"
+
+# Override with JSON argv, e.g. ["yarn","workspace","objectified-ui","exec","tsx","scripts/rest-spec-import-worker.ts"]
+_WORKER_ARGV_ENV_KEYS = ("SPEC_IMPORT_WORKER_ARGV", "OBJECTIFIED_SPEC_IMPORT_WORKER_ARGV")
 
 # Test hook: monkeypatch ``_worker_runner`` to an async callable(payload) -> dict (worker JSON).
 _worker_runner: Optional[Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]] = None
+
+
+def _parse_worker_argv_env(raw: str) -> List[str]:
+    parsed = json.loads(raw)
+    if not isinstance(parsed, list) or not parsed:
+        raise ValueError("must be a non-empty JSON array")
+    if not all(isinstance(x, str) and x for x in parsed):
+        raise ValueError("must be a JSON array of non-empty strings")
+    return list(parsed)
+
+
+def resolve_spec_import_worker_argv() -> List[str]:
+    """Argv to spawn the UI tsx worker from the monorepo root (``_REPO_ROOT``).
+
+    ``FileNotFoundError`` from asyncio subprocess almost always means the *executable*
+    (first element) is missing from ``PATH`` — not the uploaded spec path.
+
+    Resolution order:
+
+    1. ``SPEC_IMPORT_WORKER_ARGV`` or ``OBJECTIFIED_SPEC_IMPORT_WORKER_ARGV`` — JSON array.
+    2. ``yarn workspace objectified-ui exec tsx …`` if ``yarn`` is on ``PATH``.
+    3. ``corepack yarn workspace …`` if ``corepack`` is on ``PATH``.
+    4. ``npm exec --workspace=objectified-ui -- tsx …`` if ``npm`` is on ``PATH``.
+    5. Fallback to the ``yarn`` form so errors stay actionable.
+    """
+    for key in _WORKER_ARGV_ENV_KEYS:
+        raw = (os.environ.get(key) or "").strip()
+        if raw:
+            return _parse_worker_argv_env(raw)
+
+    tail_yarn = ["workspace", "objectified-ui", "exec", "tsx", _WORKER_SCRIPT]
+    candidates: Sequence[List[str]] = (
+        ["yarn", *tail_yarn],
+        ["corepack", "yarn", *tail_yarn],
+        ["npm", "exec", "--workspace=objectified-ui", "--", "tsx", _WORKER_SCRIPT],
+    )
+    for argv in candidates:
+        if shutil.which(argv[0]):
+            return list(argv)
+    return list(candidates[0])
 
 
 @dataclass
@@ -127,14 +164,27 @@ async def _run_subprocess_worker(payload: Dict[str, Any]) -> Dict[str, Any]:
     db_url = os.environ.get("DATABASE_URL") or settings.effective_database_url
     env["DATABASE_URL"] = db_url
 
-    proc = await asyncio.create_subprocess_exec(
-        *_WORKER_CMD,
-        cwd=str(_REPO_ROOT),
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=env,
-    )
+    argv = resolve_spec_import_worker_argv()
+    logger.debug("spec import worker spawn argv=%s cwd=%s", argv, _REPO_ROOT)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
+            cwd=str(_REPO_ROOT),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+    except FileNotFoundError as exc:
+        exe = argv[0]
+        raise FileNotFoundError(
+            f"{exc}; failed to execute {exe!r} while spawning spec import worker "
+            f"(cwd={_REPO_ROOT}). errno 2 means the program was not found on PATH — "
+            "not your uploaded spec path. Install Node tooling (yarn, or npm/corepack) on the API host, "
+            "or set SPEC_IMPORT_WORKER_ARGV to a JSON argv array whose first token is an absolute path "
+            '(example: ["/home/you/.local/bin/yarn","workspace","objectified-ui","exec","tsx",'
+            f'"{_WORKER_SCRIPT}"].)'
+        ) from exc
     job_id = str(payload.get("rest_job_id", ""))
     async with _jobs_lock:
         rec = _jobs.get(job_id)

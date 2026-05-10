@@ -248,3 +248,38 @@ def test_commit_returns_501_when_pending_approval(spec_import_pending_worker):
 
     r = client.post(f"/v1/tenants/acme/imports/{job_id}/rollback")
     assert r.status_code == 501
+
+
+def test_resolve_spec_import_worker_argv_env_json(monkeypatch):
+    monkeypatch.setenv("SPEC_IMPORT_WORKER_ARGV", '["/bin/true"]')
+    from app.spec_import_engine import resolve_spec_import_worker_argv
+
+    assert resolve_spec_import_worker_argv() == ["/bin/true"]
+
+
+def test_resolve_spec_import_worker_argv_prefers_yarn_when_on_path(monkeypatch):
+    monkeypatch.delenv("SPEC_IMPORT_WORKER_ARGV", raising=False)
+    monkeypatch.delenv("OBJECTIFIED_SPEC_IMPORT_WORKER_ARGV", raising=False)
+
+    def _which(cmd: str):
+        return f"/fake/{cmd}" if cmd == "yarn" else None
+
+    monkeypatch.setattr("app.spec_import_engine.shutil.which", _which)
+    from app.spec_import_engine import resolve_spec_import_worker_argv
+
+    argv = resolve_spec_import_worker_argv()
+    assert argv[:4] == ["yarn", "workspace", "objectified-ui", "exec"]
+
+
+def test_resolve_spec_import_worker_argv_falls_back_to_npm(monkeypatch):
+    monkeypatch.delenv("SPEC_IMPORT_WORKER_ARGV", raising=False)
+    monkeypatch.delenv("OBJECTIFIED_SPEC_IMPORT_WORKER_ARGV", raising=False)
+
+    def _which(cmd: str):
+        return f"/fake/{cmd}" if cmd == "npm" else None
+
+    monkeypatch.setattr("app.spec_import_engine.shutil.which", _which)
+    from app.spec_import_engine import resolve_spec_import_worker_argv
+
+    argv = resolve_spec_import_worker_argv()
+    assert argv[:3] == ["npm", "exec", "--workspace=objectified-ui"]
