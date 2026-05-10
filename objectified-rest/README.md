@@ -35,6 +35,26 @@ pip install -r requirements.txt
 uv sync
 ```
 
+### PostgreSQL (required)
+
+The API connects at startup. Default database name is **`objectified`** (`POSTGRES_DB` / `DATABASE_URL`).
+
+1. Ensure PostgreSQL is listening (often `localhost:5432`).
+2. Create the database if it does not exist:
+
+   ```bash
+   psql -U postgres -h localhost -p 5432 -c 'CREATE DATABASE objectified;'
+   ```
+
+3. Apply schema migrations (run SQL files in timestamp order from the monorepo):
+
+   ```bash
+   cd ../objectified-db
+   for f in scripts/*.sql; do echo "$f"; psql -U postgres -h localhost -d objectified -f "$f"; done
+   ```
+
+   See **`objectified-db/docs/README.md`** for details.
+
 ### Configuration
 
 Create a `.env` file based on `.env.example`:

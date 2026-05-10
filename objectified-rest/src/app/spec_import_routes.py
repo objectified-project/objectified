@@ -9,12 +9,11 @@ Content negotiation
   ``metadata`` string field containing JSON for :class:`SpecImportStartMetadata`. Prefer this for
   large documents.
 
-Deployment note
----------------
-The dashboard still runs imports through Next.js server actions
-(``objectified-ui/lib/db/import-helper.ts``), not these URLs. These routes are the canonical
-``/v1/tenants/{{tenant_slug}}/imports/…`` contract for ``objectified-cli`` and future REST-backed
-import. Until implemented, handlers return HTTP 501 with a JSON ``detail`` string.
+Implementation note
+-------------------
+Jobs run a ``tsx`` worker in ``objectified-ui`` that shares the same ``DATABASE_URL`` as this API,
+using incremental import mode so results are persisted without a separate commit step. Two-phase
+preview commit/rollback (pending-approval) is not exposed yet for REST callers.
 """
 
 from __future__ import annotations
@@ -22,47 +21,49 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from pydantic import ValidationError
 
-from .auth import validate_authentication
+from .auth import get_authenticated_user_id, validate_authentication
 from .models import (
     SpecImportCommitResponse,
     SpecImportJobAccepted,
     SpecImportJobStatus,
     SpecImportRollbackResponse,
     SpecImportStartJsonRequest,
+    SpecImportStartMetadata,
+)
+from .spec_import_engine import (
+    cancel_spec_import_job as engine_cancel_spec_import_job,
+    commit_spec_import_job as engine_commit_spec_import_job,
+    get_spec_import_status as engine_get_spec_import_status,
+    rollback_spec_import_job as engine_rollback_spec_import_job,
+    schedule_spec_import,
+    schedule_spec_import_multipart,
 )
 
 router = APIRouter(prefix="/v1/tenants", tags=["spec-import"])
 
-SPEC_IMPORT_NOT_IMPLEMENTED = (
-    "Specification import jobs are not implemented on this server yet; "
-    "this route documents the REST contract only (#3329)."
-)
 
-_501_RESPONSE: dict = {
-    501: {
-        "description": "Not Implemented — backend importer is not yet available.",
-        "content": {
-            "application/json": {
-                "schema": {
-                    "type": "object",
-                    "properties": {"detail": {"type": "string"}},
-                }
-            }
-        },
-    }
-}
-
-
-def _not_implemented() -> None:
-    raise HTTPException(status_code=501, detail=SPEC_IMPORT_NOT_IMPLEMENTED)
+def _require_tenant_and_user(auth_data: Dict[str, Any]) -> tuple[str, str]:
+    uid = get_authenticated_user_id(auth_data)
+    if not uid:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "An authenticated user id is required for specification import "
+                "(ensure API keys set created_by_user_id or use a JWT session)."
+            ),
+        )
+    tid = auth_data.get("tenant_id")
+    if not tid:
+        raise HTTPException(status_code=403, detail="Tenant id missing from authentication context.")
+    return str(tid), uid
 
 
 @router.post(
     "/{tenant_slug}/imports",
     status_code=202,
     response_model=SpecImportJobAccepted,
-    responses=_501_RESPONSE,
     summary="Start specification import (JSON + base64)",
     description=(
         "Create an asynchronous import job using a JSON body. "
@@ -74,15 +75,14 @@ async def start_spec_import_json(
     body: SpecImportStartJsonRequest,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> SpecImportJobAccepted:
-    _ = (tenant_slug, body, auth_data)
-    _not_implemented()
+    tenant_id, user_id = _require_tenant_and_user(auth_data)
+    return await schedule_spec_import(tenant_slug, tenant_id, user_id, body)
 
 
 @router.post(
     "/{tenant_slug}/imports/upload",
     status_code=202,
     response_model=SpecImportJobAccepted,
-    responses=_501_RESPONSE,
     summary="Start specification import (multipart file)",
     description=(
         "Create an asynchronous import job using multipart upload. "
@@ -100,14 +100,26 @@ async def start_spec_import_multipart(
     ),
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> SpecImportJobAccepted:
-    _ = (tenant_slug, file, metadata, auth_data)
-    _not_implemented()
+    tenant_id, user_id = _require_tenant_and_user(auth_data)
+    try:
+        meta = SpecImportStartMetadata.model_validate_json(metadata)
+    except (ValidationError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    raw = await file.read()
+    return await schedule_spec_import_multipart(
+        tenant_slug,
+        tenant_id,
+        user_id,
+        meta,
+        raw,
+        file.filename,
+        file.content_type,
+    )
 
 
 @router.get(
     "/{tenant_slug}/imports/{job_id}",
     response_model=SpecImportJobStatus,
-    responses=_501_RESPONSE,
     summary="Get specification import job status",
 )
 async def get_spec_import_status(
@@ -115,14 +127,13 @@ async def get_spec_import_status(
     job_id: str,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> SpecImportJobStatus:
-    _ = (tenant_slug, job_id, auth_data)
-    _not_implemented()
+    _ = auth_data
+    return engine_get_spec_import_status(tenant_slug, job_id)
 
 
 @router.delete(
     "/{tenant_slug}/imports/{job_id}",
     status_code=204,
-    responses=_501_RESPONSE,
     summary="Cancel specification import job",
 )
 async def cancel_spec_import_job(
@@ -130,14 +141,13 @@ async def cancel_spec_import_job(
     job_id: str,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> None:
-    _ = (tenant_slug, job_id, auth_data)
-    _not_implemented()
+    _ = auth_data
+    await engine_cancel_spec_import_job(tenant_slug, job_id)
 
 
 @router.post(
     "/{tenant_slug}/imports/{job_id}/commit",
     response_model=SpecImportCommitResponse,
-    responses=_501_RESPONSE,
     summary="Commit a previewed specification import",
 )
 async def commit_spec_import_job(
@@ -145,14 +155,13 @@ async def commit_spec_import_job(
     job_id: str,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> SpecImportCommitResponse:
-    _ = (tenant_slug, job_id, auth_data)
-    _not_implemented()
+    _ = auth_data
+    return engine_commit_spec_import_job(tenant_slug, job_id)
 
 
 @router.post(
     "/{tenant_slug}/imports/{job_id}/rollback",
     response_model=SpecImportRollbackResponse,
-    responses=_501_RESPONSE,
     summary="Rollback a committed specification import",
 )
 async def rollback_spec_import_job(
@@ -160,5 +169,5 @@ async def rollback_spec_import_job(
     job_id: str,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
 ) -> SpecImportRollbackResponse:
-    _ = (tenant_slug, job_id, auth_data)
-    _not_implemented()
+    _ = auth_data
+    return engine_rollback_spec_import_job(tenant_slug, job_id)

@@ -1300,8 +1300,16 @@ async def create_version(
         )
 
     try:
-        # Get creator_id from auth data (will be None for API key auth)
         creator_id = get_authenticated_user_id(auth_data)
+        if creator_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Cannot resolve creator user for this tenant (versions.creator_id is required). "
+                    "With API keys: apply DB migration 20260509-220000.sql, create a new key from the UI "
+                    "(stores created_by_user_id), or ensure the tenant has at least one member."
+                ),
+            )
 
         limits = effective_commit_policy(tenant_id, project.get("metadata"))
         try:

@@ -18,6 +18,45 @@ from .auth import validate_authentication, get_authenticated_user_id
 
 router = APIRouter(prefix="/v1/projects", tags=["projects"])
 
+# Ids must stay aligned with objectified-cli `domain-categories.ts` PROJECT_DOMAIN_CHOICES (#3204).
+PROJECT_DOMAIN_CATEGORY_IDS: List[str] = [
+    "iot",
+    "social",
+    "gaming",
+    "travel",
+    "media",
+    "ecommerce",
+    "healthcare",
+    "finance",
+    "saas",
+    "education",
+    "realestate",
+    "logistics",
+]
+
+
+@router.get("/domains")
+async def list_project_domain_categories_global() -> Dict[str, List[str]]:
+    """
+    Allowlist of ``domainCategory`` ids for project metadata.
+
+    Public read (CLI prefetch uses no credentials). Register before ``/{tenant_slug}`` so
+    ``/v1/projects/domains`` is not captured as a tenant slug.
+    """
+    return {"domains": list(PROJECT_DOMAIN_CATEGORY_IDS)}
+
+
+@router.get("/{tenant_slug}/domains")
+async def list_project_domain_categories_for_tenant(tenant_slug: str) -> Dict[str, List[str]]:
+    """
+    Same allowlist under the tenant-scoped URL shape expected by the CLI.
+
+    Must be registered before ``/{tenant_slug}/{project_id}`` so the final segment
+    ``domains`` is not interpreted as a project UUID.
+    """
+    _ = tenant_slug  # reserved for future tenant-specific overrides
+    return {"domains": list(PROJECT_DOMAIN_CATEGORY_IDS)}
+
 
 @router.get("/{tenant_slug}")
 async def list_projects(
@@ -164,8 +203,17 @@ async def create_project(
         )
 
     try:
-        # Get creator_id from auth data (will be None for API key auth)
+        # JWT: token user_id. API key: api_keys.created_by_user_id or tenant admin/member fallback.
         creator_id = get_authenticated_user_id(auth_data)
+        if creator_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Cannot resolve creator user for this tenant (projects.creator_id is required). "
+                    "With API keys: apply DB migration 20260509-220000.sql, create a new key from the UI "
+                    "(stores created_by_user_id), or ensure the tenant has at least one member."
+                ),
+            )
 
         # Create project
         project = db.create_project(

@@ -78,10 +78,24 @@ class Database:
     def connect(self):
         """Establish database connection."""
         if not self.connection or self.connection.closed:
-            self.connection = psycopg2.connect(
-                settings.effective_database_url,
-                cursor_factory=RealDictCursor
-            )
+            try:
+                self.connection = psycopg2.connect(
+                    settings.effective_database_url,
+                    cursor_factory=RealDictCursor,
+                )
+            except psycopg2.OperationalError as e:
+                err_s = str(e).lower()
+                if "does not exist" in err_s and "database" in err_s:
+                    db_name = settings.postgres_db
+                    raise psycopg2.OperationalError(
+                        f"{e}\n\n"
+                        "PostgreSQL has no database with that name yet. Create it, then apply migrations "
+                        "from objectified-db/scripts (see objectified-db/docs/README.md). Example:\n"
+                        f"  psql -U {settings.postgres_user} -h {settings.postgres_host} "
+                        f"-p {settings.postgres_port} -c 'CREATE DATABASE {db_name};'\n"
+                        "If you use DATABASE_URL, the database name is the path segment after the last '/'."
+                    ) from e
+                raise
         return self.connection
 
     def close(self):
@@ -651,7 +665,19 @@ class Database:
         # Match UI format: key_prefix is first 12 characters + '...'
         key_prefix = api_key[:12] + '...'
 
-        query = """
+        query_with_creator = """
+            SELECT ak.id, ak.tenant_id, ak.created_by_user_id, ak.key_hash, ak.expires_at, ak.enabled,
+                   t.id as tenant_id, t.slug as tenant_slug, t.name as tenant_name
+            FROM odb.api_keys ak
+            JOIN odb.tenants t ON ak.tenant_id = t.id
+            WHERE ak.key_prefix = %s
+              AND ak.deleted_at IS NULL
+              AND ak.enabled = true
+              AND t.deleted_at IS NULL
+              AND t.enabled = true
+              AND (ak.expires_at IS NULL OR ak.expires_at > CURRENT_TIMESTAMP)
+        """
+        query_legacy = """
             SELECT ak.id, ak.tenant_id, ak.key_hash, ak.expires_at, ak.enabled,
                    t.id as tenant_id, t.slug as tenant_slug, t.name as tenant_name
             FROM odb.api_keys ak
@@ -663,7 +689,16 @@ class Database:
               AND t.enabled = true
               AND (ak.expires_at IS NULL OR ak.expires_at > CURRENT_TIMESTAMP)
         """
-        results = self.execute_query(query, (key_prefix,))
+        try:
+            results = self.execute_query(query_with_creator, (key_prefix,))
+        except Exception as e:
+            root = e.__cause__ if getattr(e, "__cause__", None) else e
+            pgcode = getattr(root, "pgcode", None)
+            msg_l = str(e).lower()
+            if pgcode == "42703" or ("created_by_user_id" in msg_l and "does not exist" in msg_l):
+                results = self.execute_query(query_legacy, (key_prefix,))
+            else:
+                raise
 
         if not results:
             return None
@@ -690,6 +725,37 @@ class Database:
             except (ValueError, TypeError):
                 continue
 
+        return None
+
+    def get_fallback_creator_user_id_for_tenant(self, tenant_id: str) -> Optional[str]:
+        """
+        When an API key has no created_by_user_id (legacy rows), attribute writes to the first
+        tenant administrator if any, otherwise the first tenant member.
+        """
+        admin_q = """
+            SELECT user_id::text AS user_id
+            FROM odb.tenant_administrators
+            WHERE tenant_id = %s::uuid
+            ORDER BY created_at ASC
+            LIMIT 1
+        """
+        rows = self.execute_query(admin_q, (tenant_id,))
+        if rows:
+            uid = rows[0].get("user_id")
+            if uid:
+                return str(uid)
+        member_q = """
+            SELECT user_id::text AS user_id
+            FROM odb.tenant_users
+            WHERE tenant_id = %s::uuid
+            ORDER BY created_at ASC
+            LIMIT 1
+        """
+        rows = self.execute_query(member_q, (tenant_id,))
+        if rows:
+            uid = rows[0].get("user_id")
+            if uid:
+                return str(uid)
         return None
 
     def count_tenants_for_user(self, user_id: str) -> int:

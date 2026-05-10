@@ -29,7 +29,7 @@
     "codegen": "openapi-ts -i ../objectified-rest/openapi.yaml -o src/generated -c @hey-api/client-fetch && node ./scripts/fix-generated-imports.mjs && node ./scripts/finish-codegen.mjs",
     "codegen:check": "yarn codegen && git diff --quiet HEAD -- src/generated || (echo '' >&2 && echo 'OpenAPI-generated client is out of date. From objectified-cli/, run: yarn codegen' >&2 && echo '' >&2 && exit 1)",
     "build": "shx rm -rf dist && tsc && oclif manifest && oclif readme && node ./scripts/normalize-readme-usage.mjs && node ./scripts/generate-man.mjs",
-    "dev": "node bin/dev.js",
+    "dev": "node --import tsx bin/dev.js",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -71,7 +71,7 @@
     "oclif": "^4.23.0",
     "prettier": "^3.6.2",
     "shx": "^0.4.0",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.0",
     "vitest": "^3.2.4"

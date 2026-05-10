@@ -2429,6 +2429,11 @@ export async function createApiKey(tenantId: string, name: string, description: 
       return JSON.stringify({ success: false, error: 'API key name is required' });
     }
 
+    const session = await getAuthSession();
+    const sessionUser = session?.user as { id?: string } | undefined;
+    const createdByUserId =
+      typeof sessionUser?.id === 'string' && sessionUser.id.trim() !== '' ? sessionUser.id.trim() : null;
+
     // Generate a random API key
     const apiKey = 'sk_' + crypto.randomBytes(32).toString('hex');
     const keyPrefix = apiKey.substring(0, 12) + '...';
@@ -2445,12 +2450,12 @@ export async function createApiKey(tenantId: string, name: string, description: 
       expiresAt = expirationDate;
     }
 
-    // Insert the API key
+    // Insert the API key (created_by_user_id: REST uses this as creator_id for API-key writes)
     const result = await connectionPool.query(
-      `INSERT INTO odb.api_keys (tenant_id, name, description, key_hash, key_prefix, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO odb.api_keys (tenant_id, name, description, key_hash, key_prefix, expires_at, created_by_user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, key_prefix, created_at`,
-      [tenantId, name.trim(), description?.trim() || null, keyHash, keyPrefix, expiresAt]
+      [tenantId, name.trim(), description?.trim() || null, keyHash, keyPrefix, expiresAt, createdByUserId]
     );
 
     // Return the plain API key (only time it will be visible)

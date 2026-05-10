@@ -30,7 +30,7 @@ import {
   resolveEffectiveExitCode,
 } from "./lib/handle-error.js";
 import { createCliOutput, localePrefersAsciiTable, type CliOutput } from "./lib/output.js";
-import { normalizeCliArgv } from "./lib/normalize-argv.js";
+import { normalizeCliArgv, readExplicitConfigFromArgv } from "./lib/normalize-argv.js";
 
 export abstract class BaseCommand extends Command {
   static baseFlags = {
@@ -143,6 +143,12 @@ export abstract class BaseCommand extends Command {
     const Cmd = this.constructor as typeof Command;
     const parsed = await this.parse(Cmd);
     const parsedFlags = parsed.flags as Record<string, unknown>;
+    const normalizedArgvEarly = normalizeCliArgv(process.argv.slice(2));
+    const fromOclif =
+      typeof parsedFlags.config === "string" && parsedFlags.config.trim() !== ""
+        ? parsedFlags.config.trim()
+        : undefined;
+    const configPathFlag = fromOclif ?? readExplicitConfigFromArgv(normalizedArgvEarly);
     // Keep camelCase fallback for compatibility while normalize-argv continues accepting legacy aliases.
     const apiKeyFlag =
       (parsedFlags["api-key"] as string | undefined) ?? (parsedFlags.apiKey as string | undefined);
@@ -165,7 +171,7 @@ export abstract class BaseCommand extends Command {
       baseUrl:
         (parsedFlags["base-url"] as string | undefined) ??
         (parsedFlags.baseUrl as string | undefined),
-      config: parsedFlags.config as string | undefined,
+      config: configPathFlag,
       json: parsedFlags.json as boolean | undefined,
       color: parsedFlags.color as boolean | undefined,
       profile: parsedFlags.profile as string | undefined,
@@ -175,7 +181,7 @@ export abstract class BaseCommand extends Command {
     };
     this.parsedGlobalFlags = globalPart;
     this.commandArgs = parsed.args as Record<string, unknown>;
-    this.normalizedArgv = normalizeCliArgv(process.argv.slice(2));
+    this.normalizedArgv = normalizedArgvEarly;
 
     this.resolvedConfigPath = resolveConfigFilePath(globalPart.config, process.env, os.homedir);
     await ensureDefaultConfigFile(this.resolvedConfigPath);

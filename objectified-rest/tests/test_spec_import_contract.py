@@ -1,13 +1,13 @@
 """Contract tests for specification import REST surface (#3329)."""
 
 import json
+import time
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.auth import validate_authentication
 from app.main import app
-from app.spec_import_routes import SPEC_IMPORT_NOT_IMPLEMENTED
 
 client = TestClient(app)
 
@@ -31,6 +31,69 @@ def _auth_override():
     app.openapi_schema = None
 
 
+@pytest.fixture
+def spec_import_fake_worker(monkeypatch):
+    async def _fake(payload: dict) -> dict:
+        jid = payload["rest_job_id"]
+        md = payload["metadata"]
+        return {
+            "ok": True,
+            "job_id": jid,
+            "status": {
+                "job_id": jid,
+                "state": "completed",
+                "percent": 100,
+                "events": [],
+                "summary": {},
+                "result": {
+                    "project_id": "550e8400-e29b-41d4-a716-446655440099",
+                    "project_slug": md["project"]["slug"],
+                    "version_id": md["version"]["version_id"],
+                    "version_record_id": "660e8400-e29b-41d4-a716-446655440088",
+                },
+            },
+        }
+
+    monkeypatch.setattr("app.spec_import_engine._worker_runner", _fake)
+
+
+@pytest.fixture
+def spec_import_pending_worker(monkeypatch):
+    async def _fake(payload: dict) -> dict:
+        jid = payload["rest_job_id"]
+        md = payload["metadata"]
+        return {
+            "ok": True,
+            "job_id": jid,
+            "status": {
+                "job_id": jid,
+                "state": "pending-approval",
+                "percent": 100,
+                "events": [],
+                "summary": {},
+                "result": {
+                    "project_id": "550e8400-e29b-41d4-a716-446655440099",
+                    "project_slug": md["project"]["slug"],
+                    "version_id": md["version"]["version_id"],
+                    "version_record_id": "660e8400-e29b-41d4-a716-446655440088",
+                },
+            },
+        }
+
+    monkeypatch.setattr("app.spec_import_engine._worker_runner", _fake)
+
+
+def _wait_completed(job_id: str) -> dict:
+    for _ in range(200):
+        r = client.get(f"/v1/tenants/acme/imports/{job_id}")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        if body["state"] in ("completed", "failed", "pending-approval", "canceled", "rolled-back"):
+            return body
+        time.sleep(0.01)
+    raise AssertionError("import job did not reach a gate state")
+
+
 def test_openapi_lists_spec_import_paths_and_operations():
     spec = app.openapi()
     paths = spec["paths"]
@@ -47,7 +110,7 @@ def test_openapi_lists_spec_import_paths_and_operations():
     assert f"{job}/rollback" in paths
 
 
-def test_start_spec_import_json_returns_501():
+def test_start_spec_import_json_returns_202(spec_import_fake_worker):
     body = {
         "metadata": {
             "source_kind": "openapi-3",
@@ -59,11 +122,17 @@ def test_start_spec_import_json_returns_501():
         "filename": "spec.yaml",
     }
     r = client.post("/v1/tenants/acme/imports", json=body)
-    assert r.status_code == 501
-    assert r.json()["detail"] == SPEC_IMPORT_NOT_IMPLEMENTED
+    assert r.status_code == 202, r.text
+    data = r.json()
+    assert "job_id" in data and data["job_id"]
+    assert data["status_path"].endswith(f"/imports/{data['job_id']}")
+
+    final = _wait_completed(data["job_id"])
+    assert final["state"] == "completed"
+    assert final["result"]["project_slug"] == "payments-api"
 
 
-def test_start_spec_import_multipart_returns_501():
+def test_start_spec_import_multipart_returns_202(spec_import_fake_worker):
     meta = json.dumps(
         {
             "source_kind": "openapi-3",
@@ -77,17 +146,63 @@ def test_start_spec_import_multipart_returns_501():
         files={"file": ("spec.yaml", b"openapi: 3.1.0\n", "application/yaml")},
         data={"metadata": meta},
     )
+    assert r.status_code == 202, r.text
+    job_id = r.json()["job_id"]
+    final = _wait_completed(job_id)
+    assert final["state"] == "completed"
+
+
+def test_get_cancel_commit_rollback(spec_import_fake_worker):
+    body = {
+        "metadata": {
+            "source_kind": "openapi-3",
+            "project": {"name": "Payments", "slug": "payments-api"},
+            "version": {"version_id": "1.0.0"},
+            "options": {},
+        },
+        "document_base64": "e30=",
+    }
+    r = client.post("/v1/tenants/acme/imports", json=body)
+    job_id = r.json()["job_id"]
+    _wait_completed(job_id)
+
+    r = client.get(f"/v1/tenants/acme/imports/{job_id}")
+    assert r.status_code == 200
+    assert r.json()["state"] == "completed"
+
+    r = client.post(f"/v1/tenants/acme/imports/{job_id}/commit")
+    assert r.status_code == 200
+    c = r.json()
+    assert c["project_slug"] == "payments-api"
+    assert c["version_id"] == "1.0.0"
+
+    r = client.post(f"/v1/tenants/acme/imports/{job_id}/commit")
+    assert r.status_code == 200
+
+    r = client.post(f"/v1/tenants/acme/imports/{job_id}/rollback")
+    assert r.status_code == 409
+
+    r = client.delete(f"/v1/tenants/acme/imports/{job_id}")
+    assert r.status_code == 204
+
+
+def test_commit_returns_501_when_pending_approval(spec_import_pending_worker):
+    body = {
+        "metadata": {
+            "source_kind": "openapi-3",
+            "project": {"name": "Payments", "slug": "payments-api"},
+            "version": {"version_id": "1.0.0"},
+            "options": {},
+        },
+        "document_base64": "e30=",
+    }
+    r = client.post("/v1/tenants/acme/imports", json=body)
+    job_id = r.json()["job_id"]
+    final = _wait_completed(job_id)
+    assert final["state"] == "pending-approval"
+
+    r = client.post(f"/v1/tenants/acme/imports/{job_id}/commit")
     assert r.status_code == 501
-    assert r.json()["detail"] == SPEC_IMPORT_NOT_IMPLEMENTED
 
-
-def test_get_cancel_commit_rollback_return_501():
-    for method, url in [
-        ("GET", "/v1/tenants/acme/imports/job-1"),
-        ("DELETE", "/v1/tenants/acme/imports/job-1"),
-        ("POST", "/v1/tenants/acme/imports/job-1/commit"),
-        ("POST", "/v1/tenants/acme/imports/job-1/rollback"),
-    ]:
-        r = client.request(method, url)
-        assert r.status_code == 501, (method, url, r.text)
-        assert r.json()["detail"] == SPEC_IMPORT_NOT_IMPLEMENTED
+    r = client.post(f"/v1/tenants/acme/imports/{job_id}/rollback")
+    assert r.status_code == 501

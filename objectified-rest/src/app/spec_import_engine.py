@@ -1,0 +1,363 @@
+"""
+Async spec-import jobs: schedule work and run the objectified-ui tsx worker (#3329).
+
+The worker uses incremental import mode so the open transaction is not held across
+HTTP requests; commit/rollback endpoints are idempotent or return 409 when N/A.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import uuid
+import base64
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Awaitable, Callable, Dict, Optional
+
+from fastapi import HTTPException
+
+from .config import settings
+from .models import (
+    SpecImportCommitResponse,
+    SpecImportJobAccepted,
+    SpecImportJobStatus,
+    SpecImportRollbackResponse,
+    SpecImportStartJsonRequest,
+    SpecImportStartMetadata,
+)
+
+logger = logging.getLogger(__name__)
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_WORKER_CMD = [
+    "yarn",
+    "workspace",
+    "objectified-ui",
+    "exec",
+    "tsx",
+    "scripts/rest-spec-import-worker.ts",
+]
+
+# Test hook: monkeypatch ``_worker_runner`` to an async callable(payload) -> dict (worker JSON).
+_worker_runner: Optional[Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]] = None
+
+
+@dataclass
+class _JobRecord:
+    tenant_slug: str
+    job_id: str
+    state: str
+    status: SpecImportJobStatus
+    proc: Optional[asyncio.subprocess.Process] = None
+    cancel_requested: bool = False
+    commit_response: Optional[SpecImportCommitResponse] = None
+    rollback_response: Optional[SpecImportRollbackResponse] = None
+
+
+_jobs: Dict[str, _JobRecord] = {}
+_jobs_lock = asyncio.Lock()
+
+
+def _build_worker_payload(
+    *,
+    rest_job_id: str,
+    tenant_id: str,
+    user_id: str,
+    body: SpecImportStartJsonRequest,
+) -> Dict[str, Any]:
+    meta = body.metadata
+    return {
+        "rest_job_id": rest_job_id,
+        "tenant_id": tenant_id,
+        "user_id": user_id,
+        "metadata": json.loads(meta.model_dump_json()),
+        "document_base64": body.document_base64,
+        "filename": body.filename,
+        "content_type": body.content_type,
+    }
+
+
+def _default_result_status(
+    job_id: str, message: str, code: str = "WORKER_ERROR"
+) -> SpecImportJobStatus:
+    return SpecImportJobStatus(
+        job_id=job_id,
+        state="failed",
+        percent=0,
+        events=[
+            {
+                "id": "rest-1",
+                "ts": 0,
+                "level": "error",
+                "code": code,
+                "message": message,
+                "context": None,
+            }
+        ],
+    )
+
+
+def _maybe_build_commit_response(
+    job_id: str, status: SpecImportJobStatus
+) -> Optional[SpecImportCommitResponse]:
+    if status.state != "completed":
+        return None
+    r = status.result
+    if r is None:
+        return None
+    if not r.project_id or not r.project_slug or not r.version_id or not r.version_record_id:
+        return None
+    return SpecImportCommitResponse(
+        job_id=job_id,
+        state="completed",
+        project_id=r.project_id,
+        project_slug=r.project_slug,
+        version_id=r.version_id,
+        version_record_id=r.version_record_id,
+    )
+
+
+async def _run_subprocess_worker(payload: Dict[str, Any]) -> Dict[str, Any]:
+    env = {**os.environ}
+    db_url = os.environ.get("DATABASE_URL") or settings.effective_database_url
+    env["DATABASE_URL"] = db_url
+
+    proc = await asyncio.create_subprocess_exec(
+        *_WORKER_CMD,
+        cwd=str(_REPO_ROOT),
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=env,
+    )
+    job_id = str(payload.get("rest_job_id", ""))
+    async with _jobs_lock:
+        rec = _jobs.get(job_id)
+        if rec is not None:
+            rec.proc = proc
+    data = json.dumps(payload).encode("utf-8")
+    try:
+        stdout_b, stderr_b = await proc.communicate(data)
+    finally:
+        async with _jobs_lock:
+            r2 = _jobs.get(job_id)
+            if r2 is not None:
+                r2.proc = None
+
+    stderr_text = (stderr_b or b"").decode("utf-8", errors="replace").strip()
+    if stderr_text:
+        logger.warning("spec import worker stderr job=%s: %s", job_id, stderr_text[:4000])
+
+    raw_out = (stdout_b or b"").decode("utf-8", errors="replace").strip()
+    if not raw_out:
+        return {"ok": False, "error": "Worker produced no stdout"}
+
+    try:
+        parsed: Dict[str, Any] = json.loads(raw_out)
+    except json.JSONDecodeError:
+        return {"ok": False, "error": f"Worker stdout is not JSON (exit {proc.returncode})"}
+
+    if proc.returncode != 0 and not parsed.get("ok"):
+        return parsed
+
+    if proc.returncode != 0:
+        return {"ok": False, "error": parsed.get("error") or f"Worker exited {proc.returncode}"}
+
+    return parsed
+
+
+async def _invoke_worker(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if _worker_runner is not None:
+        return await _worker_runner(payload)
+    return await _run_subprocess_worker(payload)
+
+
+async def _drive_job(job_id: str, payload: Dict[str, Any]) -> None:
+    async with _jobs_lock:
+        rec = _jobs.get(job_id)
+        if rec is None:
+            return
+        if rec.cancel_requested:
+            rec.state = "canceled"
+            rec.status = SpecImportJobStatus(job_id=job_id, state="canceled", percent=0)
+            return
+        rec.state = "running"
+        rec.status = SpecImportJobStatus(job_id=job_id, state="running", percent=5)
+
+    try:
+        raw = await _invoke_worker(payload)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("spec import worker crashed job=%s", job_id)
+        async with _jobs_lock:
+            rec = _jobs.get(job_id)
+            if rec is None:
+                return
+            rec.state = "failed"
+            rec.status = _default_result_status(job_id, str(e), code="WORKER_EXCEPTION")
+        return
+
+    async with _jobs_lock:
+        rec = _jobs.get(job_id)
+        if rec is None:
+            return
+        if rec.cancel_requested:
+            rec.state = "canceled"
+            rec.status = SpecImportJobStatus(job_id=job_id, state="canceled", percent=0)
+            return
+
+    if not raw.get("ok"):
+        msg = str(raw.get("error") or "Import worker failed")
+        async with _jobs_lock:
+            rec = _jobs.get(job_id)
+            if rec is None:
+                return
+            rec.state = "failed"
+            rec.status = _default_result_status(job_id, msg, code="WORKER_FAILED")
+        return
+
+    status_raw = raw.get("status")
+    if not isinstance(status_raw, dict):
+        async with _jobs_lock:
+            rec = _jobs.get(job_id)
+            if rec is None:
+                return
+            rec.state = "failed"
+            rec.status = _default_result_status(
+                job_id, "Worker returned ok but no status object", code="BAD_WORKER_PAYLOAD"
+            )
+        return
+
+    try:
+        status = SpecImportJobStatus.model_validate(status_raw)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Invalid worker status for job=%s: %s", job_id, e)
+        async with _jobs_lock:
+            rec = _jobs.get(job_id)
+            if rec is None:
+                return
+            rec.state = "failed"
+            rec.status = _default_result_status(
+                job_id, f"Invalid job status from worker: {e}", code="INVALID_STATUS"
+            )
+        return
+
+    async with _jobs_lock:
+        rec = _jobs.get(job_id)
+        if rec is None:
+            return
+        rec.state = status.state
+        rec.status = status
+        rec.commit_response = _maybe_build_commit_response(job_id, status)
+
+
+def _get_record(tenant_slug: str, job_id: str) -> _JobRecord:
+    rec = _jobs.get(job_id)
+    if rec is None or rec.tenant_slug != tenant_slug:
+        raise HTTPException(status_code=404, detail="Import job not found")
+    return rec
+
+
+async def schedule_spec_import(
+    tenant_slug: str,
+    tenant_id: str,
+    user_id: str,
+    body: SpecImportStartJsonRequest,
+) -> SpecImportJobAccepted:
+    job_id = str(uuid.uuid4())
+    payload = _build_worker_payload(
+        rest_job_id=job_id,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        body=body,
+    )
+    initial = SpecImportJobStatus(job_id=job_id, state="queued", percent=0)
+    async with _jobs_lock:
+        _jobs[job_id] = _JobRecord(
+            tenant_slug=tenant_slug,
+            job_id=job_id,
+            state="queued",
+            status=initial,
+        )
+    asyncio.create_task(_drive_job(job_id, payload))
+    return SpecImportJobAccepted(
+        job_id=job_id,
+        status_path=f"/v1/tenants/{tenant_slug}/imports/{job_id}",
+    )
+
+
+async def schedule_spec_import_multipart(
+    tenant_slug: str,
+    tenant_id: str,
+    user_id: str,
+    metadata: SpecImportStartMetadata,
+    file_bytes: bytes,
+    filename: Optional[str],
+    content_type: Optional[str],
+) -> SpecImportJobAccepted:
+    b64 = base64.standard_b64encode(file_bytes).decode("ascii")
+    body = SpecImportStartJsonRequest(
+        metadata=metadata,
+        document_base64=b64,
+        filename=filename,
+        content_type=content_type,
+    )
+    return await schedule_spec_import(tenant_slug, tenant_id, user_id, body)
+
+
+def get_spec_import_status(tenant_slug: str, job_id: str) -> SpecImportJobStatus:
+    rec = _get_record(tenant_slug, job_id)
+    return rec.status
+
+
+async def cancel_spec_import_job(tenant_slug: str, job_id: str) -> None:
+    async with _jobs_lock:
+        rec = _jobs.get(job_id)
+        if rec is None or rec.tenant_slug != tenant_slug:
+            raise HTTPException(status_code=404, detail="Import job not found")
+        if rec.state in ("completed", "failed", "canceled", "rolled-back"):
+            return
+        rec.cancel_requested = True
+        proc = rec.proc
+    if proc is not None and proc.returncode is None:
+        proc.kill()
+
+
+def commit_spec_import_job(tenant_slug: str, job_id: str) -> SpecImportCommitResponse:
+    rec = _get_record(tenant_slug, job_id)
+    if rec.commit_response is not None:
+        return rec.commit_response
+    if rec.status.state == "pending-approval":
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "Two-phase commit for preview imports is not available through REST yet; "
+                "this server runs incremental imports that finalize without a separate commit."
+            ),
+        )
+    raise HTTPException(
+        status_code=409,
+        detail=f"No commit available for import job in state {rec.status.state}",
+    )
+
+
+def rollback_spec_import_job(tenant_slug: str, job_id: str) -> SpecImportRollbackResponse:
+    rec = _get_record(tenant_slug, job_id)
+    if rec.rollback_response is not None:
+        return rec.rollback_response
+    if rec.status.state == "rolled-back":
+        return SpecImportRollbackResponse(job_id=job_id, state="rolled-back")
+    if rec.status.state == "pending-approval":
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "Rollback for preview imports is not wired through REST yet; "
+                "incremental imports do not use a held-open preview transaction."
+            ),
+        )
+    raise HTTPException(
+        status_code=409,
+        detail=f"Cannot rollback import job in state {rec.status.state}",
+    )

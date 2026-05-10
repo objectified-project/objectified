@@ -57,6 +57,27 @@ export function normalizeAuthLoginApiKeyPrompt(argv: string[]): string[] {
   return argv;
 }
 
+/** Read `--config` / `--config=` from argv (after normalization) if oclif ever omits it from parsed flags. */
+export function readExplicitConfigFromArgv(argv: string[]): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const t = argv[i];
+    if (t === undefined) continue;
+    if (t.startsWith("--config=")) {
+      const v = t.slice("--config=".length).trim();
+      return v === "" ? undefined : v;
+    }
+    if (t === "--config") {
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        const v = next.trim();
+        return v === "" ? undefined : v;
+      }
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 export function normalizeCliArgv(argv: string[]): string[] {
   return normalizeAuthLoginApiKeyPrompt(promoteLeadingGlobalFlags(argv));
 }

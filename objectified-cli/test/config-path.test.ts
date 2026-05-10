@@ -31,13 +31,27 @@ describe("config path resolution (#3188)", () => {
   it("expands ~/ in OBJECTIFIED_CONFIG", () => {
     vi.stubEnv("OBJECTIFIED_CONFIG", "~/foo/config.toml");
     expect(resolveConfigFilePath(undefined, process.env, homedir)).toBe(
-      "/home/testuser/foo/config.toml",
+      path.resolve("/home/testuser/foo/config.toml"),
     );
   });
 
   it("prefers --config flag over OBJECTIFIED_CONFIG", () => {
     vi.stubEnv("OBJECTIFIED_CONFIG", "/env.toml");
     expect(resolveConfigFilePath("/flag.toml", process.env, homedir)).toBe("/flag.toml");
+  });
+
+  it("resolves relative explicit paths against cwd", () => {
+    vi.stubEnv("OBJECTIFIED_CONFIG", "custom/objectified.toml");
+    expect(resolveConfigFilePath(undefined, process.env, homedir)).toBe(
+      path.resolve("custom/objectified.toml"),
+    );
+  });
+
+  it("trims whitespace on flag and OBJECTIFIED_CONFIG", () => {
+    vi.stubEnv("OBJECTIFIED_CONFIG", "  /env.toml  ");
+    expect(resolveConfigFilePath(undefined, process.env, homedir)).toBe("/env.toml");
+    vi.unstubAllEnvs();
+    expect(resolveConfigFilePath("  /flag.toml  ", {}, homedir)).toBe("/flag.toml");
   });
 
   it("on Linux uses XDG_CONFIG_HOME/objectified (env-paths)", () => {

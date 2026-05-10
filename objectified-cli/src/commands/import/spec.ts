@@ -62,7 +62,7 @@ function throwForBadTerminalState(st: SpecImportJobStatus): never {
 
 export default class ImportSpec extends BaseCommand {
   static description =
-    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
+    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Use `--verbose` for step-by-step progress on stderr (polling, finalize POSTs). Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
 
   static examples = [
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0",
@@ -183,6 +183,7 @@ export default class ImportSpec extends BaseCommand {
     }
 
     this.ensureAuthenticated();
+    this.importVerbose(`start tenant=${tenant} base_url=${this.context.baseUrl}`);
 
     const pathArg = typeof this.commandArgs.path === "string" ? this.commandArgs.path : "";
 
@@ -416,6 +417,20 @@ export default class ImportSpec extends BaseCommand {
       });
     }
 
+    const projectStrategy = hasMap
+      ? "map-project"
+      : createOrMap
+        ? "create-or-map-project"
+        : createProject
+          ? "create-project"
+          : "metadata-only";
+    this.importVerbose(
+      `resolved project_strategy=${projectStrategy} project_slug=${resolved.project.slug} project_name=${resolved.project.name} existing_project_id=${resolved.existingProjectId ?? "none"}`,
+    );
+    this.importVerbose(
+      `resolved spec input_path=${resolvedPath} source_kind=${kind.sourceKind} bytes=${String(bytes.length)} catalog_version_id=${versionId}`,
+    );
+
     const rollback = this.flags.rollback === true;
     const commit = !rollback && this.flags.commit !== false;
 
@@ -425,6 +440,10 @@ export default class ImportSpec extends BaseCommand {
     const verDescRaw = this.flags["version-description"];
 
     const documentBase64 = bytes.toString("base64");
+
+    this.importVerbose(
+      `POST /v1/tenants/${tenant}/imports dry_run=${String(dryRun)} no_wait=${String(noWait)} document_base64_octets=${String(documentBase64.length)}`,
+    );
 
     const accepted: SpecImportJobAccepted = await this.api.startSpecImportJson(tenant, {
       metadata: {
@@ -443,7 +462,12 @@ export default class ImportSpec extends BaseCommand {
       content_type: kind.contentType ?? undefined,
     });
 
+    this.importVerbose(
+      `import job accepted job_id=${accepted.job_id} status_path=${accepted.status_path}`,
+    );
+
     if (noWait) {
+      this.importVerbose(`--no-wait: skipping poll and finalize`);
       const early: ImportSpecSummaryJson = {
         tenant_slug: tenant,
         job_id: accepted.job_id,
@@ -475,6 +499,13 @@ export default class ImportSpec extends BaseCommand {
       return;
     }
 
+    const pollLog = this.verboseEffective
+      ? (line: string): void => {
+          this.importVerbose(line);
+        }
+      : undefined;
+    this.importVerbose(`polling GET ${accepted.status_path} until gate state`);
+
     let commitOut: SpecImportCommitResponse | undefined;
     let rollbackOut: SpecImportRollbackResponse | undefined;
 
@@ -482,6 +513,7 @@ export default class ImportSpec extends BaseCommand {
       api: this.api,
       tenantSlug: tenant,
       jobId: accepted.job_id,
+      log: pollLog,
     });
 
     if (st.state === "failed" || st.state === "canceled") {
@@ -493,6 +525,7 @@ export default class ImportSpec extends BaseCommand {
     }
 
     if (st.state === "completed") {
+      this.importVerbose(`gate reached state=completed (no commit step required)`);
       const summary = this.buildSummaryJson({
         tenant,
         accepted,
@@ -507,7 +540,9 @@ export default class ImportSpec extends BaseCommand {
     }
 
     if (st.state === "pending-approval") {
+      this.importVerbose(`gate reached state=pending-approval commit=${String(commit)} rollback=${String(rollback)}`);
       if (!commit && !rollback) {
+        this.importVerbose(`stopping at pending-approval (--no-commit); no finalize POST`);
         const summary = this.buildSummaryJson({
           tenant,
           accepted,
@@ -522,15 +557,19 @@ export default class ImportSpec extends BaseCommand {
       }
 
       if (rollback) {
+        this.importVerbose(`POST /v1/tenants/${tenant}/imports/${accepted.job_id}/rollback`);
         rollbackOut = await this.api.rollbackSpecImportJob(tenant, accepted.job_id);
       } else {
+        this.importVerbose(`POST /v1/tenants/${tenant}/imports/${accepted.job_id}/commit`);
         commitOut = await this.api.commitSpecImportJob(tenant, accepted.job_id);
       }
 
+      this.importVerbose(`polling until terminal state after finalize`);
       st = await pollSpecImportUntilTerminal({
         api: this.api,
         tenantSlug: tenant,
         jobId: accepted.job_id,
+        log: pollLog,
       });
 
       if (st.state === "failed" || st.state === "canceled") {
@@ -541,6 +580,7 @@ export default class ImportSpec extends BaseCommand {
       }
     }
 
+    this.importVerbose(`terminal state=${st.state}`);
     const summary = this.buildSummaryJson({
       tenant,
       accepted,
@@ -551,6 +591,12 @@ export default class ImportSpec extends BaseCommand {
       stoppedAt: null,
     });
     this.emitSummary(summary);
+  }
+
+  /** Stderr diagnostics when `--verbose` / OBJECTIFIED_VERBOSE=1 (does not change stdout JSON). */
+  private importVerbose(message: string): void {
+    if (!this.verboseEffective) return;
+    process.stderr.write(`objectified: import: ${message}\n`);
   }
 
   private buildSummaryJson(opts: {

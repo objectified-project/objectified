@@ -88,6 +88,24 @@ def test_get_project_by_slug_requires_auth():
     assert response.status_code == 401
 
 
+def test_project_domains_global_no_auth():
+    """GET /v1/projects/domains is public (CLI allowlist prefetch)."""
+    response = client.get("/v1/projects/domains")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["domains"]) >= 10
+    assert "ecommerce" in body["domains"]
+
+
+def test_project_domains_tenant_scoped_no_auth():
+    """GET …/{tenant}/domains must not hit get_project_by_id (uuid parse)."""
+    response = client.get("/v1/projects/apis-guru/domains")
+    assert response.status_code == 200
+    body = response.json()
+    assert isinstance(body["domains"], list)
+    assert "saas" in body["domains"]
+
+
 def test_create_project_requires_auth():
     """Test that creating a project requires authentication."""
     response = client.post(

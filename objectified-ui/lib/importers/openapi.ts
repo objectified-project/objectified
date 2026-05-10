@@ -201,7 +201,13 @@ export const openApiImporter: Importer = {
     const warnings: string[] = [];
 
     const schemas = document?.components?.schemas || {};
-    const selected = new Set(options.selectedSchemas || Object.keys(schemas));
+    const schemaKeys = Object.keys(schemas);
+    // Empty array is truthy in JS; REST/CLI send selected_schemas: [] by default meaning "no filter".
+    const effectiveSelection =
+      Array.isArray(options.selectedSchemas) && options.selectedSchemas.length > 0
+        ? options.selectedSchemas
+        : schemaKeys;
+    const selected = new Set(effectiveSelection);
 
     const classNameMap = options.classNameMap;
 

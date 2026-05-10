@@ -201,9 +201,11 @@ def validate_authentication(
                 detail="API key does not have access to this tenant"
             )
 
+        uid = api_key_data.get("created_by_user_id")
         return {
             **api_key_data,
-            'auth_method': 'api_key'
+            "auth_method": "api_key",
+            "user_id": uid,
         }
 
     # No authentication provided
@@ -216,19 +218,19 @@ def validate_authentication(
 
 def get_authenticated_user_id(auth_data: Dict[str, Any]) -> Optional[str]:
     """
-    Extract user ID from authentication data.
+    Extract user ID for attributing creates/updates (project creator_id, version creator_id, …).
 
-    For JWT auth, returns the user_id.
-    For API key auth, returns None (API keys are tenant-scoped, not user-scoped).
-
-    Args:
-        auth_data: Authentication data from validate_authentication
-
-    Returns:
-        User ID if available, None otherwise
+    JWT: ``user_id`` from the token.
+    API key: ``user_id`` from ``api_keys.created_by_user_id`` when set; otherwise the first tenant
+    administrator, else the first tenant member (legacy keys without ``created_by_user_id``).
     """
-    if auth_data.get('auth_method') == 'jwt':
-        return auth_data.get('user_id')
+    raw = auth_data.get("user_id")
+    if raw is not None and str(raw).strip() != "":
+        return str(raw)
+    if auth_data.get("auth_method") == "api_key":
+        tid = auth_data.get("tenant_id")
+        if tid is not None and str(tid).strip() != "":
+            return db.get_fallback_creator_user_id_for_tenant(str(tid))
     return None
 
 
@@ -265,7 +267,8 @@ def validate_session_credentials(
                 detail="Invalid or expired API key",
                 headers={"WWW-Authenticate": "API-Key"},
             )
-        return {**api_key_data, 'auth_method': 'api_key'}
+        uid = api_key_data.get("created_by_user_id")
+        return {**api_key_data, "auth_method": "api_key", "user_id": uid}
 
     raise HTTPException(
         status_code=401,

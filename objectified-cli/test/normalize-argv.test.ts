@@ -5,6 +5,7 @@ import {
   normalizeAuthLoginApiKeyPrompt,
   normalizeCliArgv,
   promoteLeadingGlobalFlags,
+  readExplicitConfigFromArgv,
 } from "../src/lib/normalize-argv.js";
 import { API_KEY_PROMPT_SENTINEL } from "../src/lib/constants.js";
 
@@ -44,6 +45,11 @@ describe("promoteLeadingGlobalFlags", () => {
       "hello",
       "--base-url=https://x.example",
     ]);
+    expect(promoteLeadingGlobalFlags(["--config=/tmp/obj.toml", "config", "path"])).toEqual([
+      "config",
+      "path",
+      "--config=/tmp/obj.toml",
+    ]);
   });
 
   it("stops at unknown leading flags", () => {
@@ -74,6 +80,14 @@ describe("authLoginIntendsApiKeyStore", () => {
 
   it("is false when --api-key appears only before auth login", () => {
     expect(authLoginIntendsApiKeyStore(["--api-key", "x", "auth", "login"])).toBe(false);
+  });
+});
+
+describe("readExplicitConfigFromArgv", () => {
+  it("reads equals and spaced forms after normalization", () => {
+    expect(readExplicitConfigFromArgv(["config", "path", "--config=/tmp/a.toml"])).toBe("/tmp/a.toml");
+    expect(readExplicitConfigFromArgv(["hello", "--config", "/tmp/b.toml"])).toBe("/tmp/b.toml");
+    expect(readExplicitConfigFromArgv(["hello"])).toBe(undefined);
   });
 });
 

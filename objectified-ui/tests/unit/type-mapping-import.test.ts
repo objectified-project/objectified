@@ -349,6 +349,22 @@ describe('#757 Type mapping for imported properties', () => {
       expect(prop?.data).toMatchObject({ type: 'string', format: 'date' });
     });
 
+    it('treats empty selectedSchemas as import all components.schemas (REST default)', () => {
+      const document = {
+        components: {
+          schemas: {
+            Alpha: { type: 'object', properties: { x: { type: 'string' } } },
+            Beta: { type: 'object', properties: { y: { type: 'integer' } } },
+          },
+        },
+      };
+      const result = openApiImporter.normalize({
+        document,
+        options: { selectedSchemas: [], applyNamingConvention: false },
+      });
+      expect(result.classes.map((c) => c.name).sort()).toEqual(['Alpha', 'Beta']);
+    });
+
     it('produces same classes when typeMapping is undefined or empty', () => {
       const document = {
         components: {

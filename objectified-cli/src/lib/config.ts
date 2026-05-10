@@ -98,15 +98,34 @@ export function defaultConfigFilePath(env: NodeJS.ProcessEnv, homedir: () => str
     : path.join(dir, "config.toml");
 }
 
+function trimmedEnvObjectifiedConfig(env: NodeJS.ProcessEnv): string | undefined {
+  const v = env.OBJECTIFIED_CONFIG;
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t === "" ? undefined : t;
+}
+
+/** Non-empty `--config` / OBJECTIFIED_CONFIG after trim; used to detect explicit override. */
+export function resolveExplicitConfigRaw(
+  flagConfig: string | undefined,
+  env: NodeJS.ProcessEnv,
+): string | undefined {
+  const flag =
+    flagConfig !== undefined && flagConfig.trim() !== "" ? flagConfig.trim() : undefined;
+  return firstNonEmpty(flag, trimmedEnvObjectifiedConfig(env));
+}
+
 export function resolveConfigFilePath(
   flagConfig: string | undefined,
   env: NodeJS.ProcessEnv,
   homedir: () => string,
 ): string {
-  const raw = firstNonEmpty(flagConfig, env.OBJECTIFIED_CONFIG);
+  const raw = resolveExplicitConfigRaw(flagConfig, env);
   if (raw === undefined) return defaultConfigFilePath(env, homedir);
-  if (raw.startsWith("~/")) return path.join(homedir(), raw.slice(2));
-  return raw;
+  if (raw.startsWith("~/")) {
+    return path.resolve(path.join(homedir(), raw.slice(2)));
+  }
+  return path.resolve(raw);
 }
 
 export function defaultConfigToml(): string {
