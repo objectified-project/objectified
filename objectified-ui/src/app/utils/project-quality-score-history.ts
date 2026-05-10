@@ -164,3 +164,38 @@ export function buildQualityTrendPoints(overallValues: number[]): SparklinePoint
     overall,
   }));
 }
+
+/** One point per import snapshot event across the portfolio (running average of latest score per project). */
+export interface PortfolioQualityPoint {
+  recordedAt: string;
+  avgOverall: number;
+}
+
+/**
+ * Merges per-project snapshot timelines chronologically. After each event, `avgOverall` is the
+ * mean of each project's latest known score among projects that have at least one snapshot so far.
+ */
+export function buildPortfolioQualitySeries(
+  historiesByProjectId: Record<string, ProjectQualitySnapshot[]>
+): PortfolioQualityPoint[] {
+  type Ev = { at: number; projectId: string; overall: number };
+  const events: Ev[] = [];
+  for (const [projectId, snaps] of Object.entries(historiesByProjectId)) {
+    for (const s of snaps) {
+      const at = new Date(s.recordedAt).getTime();
+      if (!Number.isFinite(at)) continue;
+      events.push({ at, projectId, overall: clampOverall(s.overall) });
+    }
+  }
+  events.sort((a, b) => a.at - b.at);
+  const latest = new Map<string, number>();
+  const out: PortfolioQualityPoint[] = [];
+  for (const e of events) {
+    latest.set(e.projectId, e.overall);
+    let sum = 0;
+    for (const v of latest.values()) sum += v;
+    const avgOverall = Math.round(sum / latest.size);
+    out.push({ recordedAt: new Date(e.at).toISOString(), avgOverall });
+  }
+  return out;
+}

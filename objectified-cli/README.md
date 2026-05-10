@@ -1308,7 +1308,7 @@ SEE ALSO
 
 ## `objectified import spec PATH`
 
-Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. Use `--publish=public` or `--publish=private` to publish after import completes; that step skips server publication gates — verify the catalog yourself (CLI warns on success). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status at a fixed interval, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. Use `--publish=public` or `--publish=private` to publish after import completes; that step skips server publication gates — verify the catalog yourself (CLI warns on success). `--poll` sets the interval in milliseconds between GET status polls (default 400). `--verbose` adds HTTP diagnostics and poll wait timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 
 ```
 USAGE
@@ -1317,21 +1317,22 @@ USAGE
     --create-project | --create-or-map-project | --existing-project-id <value>] [--project-name <value>] [--project-slug
     <value>] [--version <value>] [--project-description <value>] [--version-description <value>] [--domain <value>]
     [--visibility private|public] [--yes] [--format <value>] [--filename <value>] [--strict] [--dry-run] [--no-wait]
-    [--commit] [--rollback] [--publish public|private] [--publish-message <value>]
+    [--poll <value>] [--commit] [--rollback] [--publish public|private] [--publish-message <value>]
 
 ARGUMENTS
   PATH  Path to the spec file, or `-` to read raw bytes from stdin.
 
 DESCRIPTION
   Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status
-  with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are
-  logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an
-  extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as
-  contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer
-  2.0; pass `--strict` to enforce strict semver and fail on mismatch. Use `--publish=public` or `--publish=private` to
-  publish after import completes; that step skips server publication gates — verify the catalog yourself (CLI warns on
-  success). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog
-  and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+  at a fixed interval, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps
+  are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print
+  an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such
+  as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict
+  SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. Use `--publish=public` or
+  `--publish=private` to publish after import completes; that step skips server publication gates — verify the catalog
+  yourself (CLI warns on success). `--poll` sets the interval in milliseconds between GET status polls (default 400).
+  `--verbose` adds HTTP diagnostics and poll wait timings. Supported formats vs the dashboard Import dialog and
+  repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 
 EXAMPLES
   $ objectified import spec ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0
@@ -1351,6 +1352,8 @@ EXAMPLES
   $ objectified import spec ./asyncapi.yml --project-slug events --project-name Events --version 1.0.0 --dry-run
 
   $ objectified import spec ./openapi.yaml --create-or-map-project --yes --publish=private
+
+  $ objectified import spec ./openapi.yaml --map-project payments-api --version 1.0.0 --poll 2000
 
 COMMON
   --base-url=<value>  Root REST API URL.
@@ -1406,6 +1409,10 @@ OTHER
 
   --no-wait
       Start the job and print the job id immediately without polling or finalize calls (CI stitching).
+
+  --poll=<value>
+      Milliseconds between GET status polls while the import job is non-terminal (50–120000; default 400). Ignored with
+      --no-wait.
 
   --project-description=<value>
       Optional project description forwarded in import metadata.

@@ -1,17 +1,27 @@
 import type { ObjectifiedApi, SpecImportJobStatus } from "../client.js";
 
-const POLL_MS = [400, 800, 1600, 3200, 6400, 12_800];
+/** Default interval between GET …/imports/{job_id} polls when `--poll` is omitted (ms). */
+export const DEFAULT_SPEC_IMPORT_POLL_INTERVAL_MS = 400;
+
+const POLL_MS_MIN = 50;
+const POLL_MS_MAX = 120_000;
 
 /** Optional stderr hook for `objectified import spec --verbose`. */
 export type SpecImportPollLog = (line: string) => void;
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** Clamp `--poll` values to a supported range (ms). */
+export function clampSpecImportPollIntervalMs(ms: number): number {
+  return Math.min(Math.max(ms, POLL_MS_MIN), POLL_MS_MAX);
 }
 
-function pollDelayMs(attempt: number): number {
-  const idx = Math.min(Math.max(attempt, 0), POLL_MS.length - 1);
-  return POLL_MS[idx] ?? 12_800;
+function resolvePollIntervalMs(pollMs: number | undefined): number {
+  return pollMs === undefined
+    ? DEFAULT_SPEC_IMPORT_POLL_INTERVAL_MS
+    : clampSpecImportPollIntervalMs(pollMs);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** One-line snapshot after each GET …/imports/{job_id} (for --verbose). */
@@ -43,7 +53,10 @@ export async function pollSpecImportUntilGate(opts: {
   jobId: string;
   signal?: AbortSignal;
   log?: SpecImportPollLog;
+  /** Interval between polls (ms); see `--poll` on import spec (default {@link DEFAULT_SPEC_IMPORT_POLL_INTERVAL_MS}). */
+  pollIntervalMs?: number;
 }): Promise<SpecImportJobStatus> {
+  const intervalMs = resolvePollIntervalMs(opts.pollIntervalMs);
   let attempt = 0;
   for (;;) {
     opts.signal?.throwIfAborted();
@@ -58,9 +71,8 @@ export async function pollSpecImportUntilGate(opts: {
     ) {
       return st;
     }
-    const delay = pollDelayMs(attempt);
-    opts.log?.(`waiting ${String(delay)}ms before next poll`);
-    await sleep(delay);
+    opts.log?.(`waiting ${String(intervalMs)}ms before next poll`);
+    await sleep(intervalMs);
     attempt++;
   }
 }
@@ -72,7 +84,10 @@ export async function pollSpecImportUntilTerminal(opts: {
   jobId: string;
   signal?: AbortSignal;
   log?: SpecImportPollLog;
+  /** Interval between polls (ms); see `--poll` on import spec (default {@link DEFAULT_SPEC_IMPORT_POLL_INTERVAL_MS}). */
+  pollIntervalMs?: number;
 }): Promise<SpecImportJobStatus> {
+  const intervalMs = resolvePollIntervalMs(opts.pollIntervalMs);
   let attempt = 0;
   for (;;) {
     opts.signal?.throwIfAborted();
@@ -86,9 +101,8 @@ export async function pollSpecImportUntilTerminal(opts: {
     ) {
       return st;
     }
-    const delay = pollDelayMs(attempt);
-    opts.log?.(`waiting ${String(delay)}ms before next poll`);
-    await sleep(delay);
+    opts.log?.(`waiting ${String(intervalMs)}ms before next poll`);
+    await sleep(intervalMs);
     attempt++;
   }
 }

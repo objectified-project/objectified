@@ -2,12 +2,22 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef, useMemo, useCallback, type ReactNode } from 'react';
+import {
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+  useCallback,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from 'react';
 import {
   Plus,
   Edit2,
   Trash2,
   FolderOpen,
+  Folders,
   Lock,
   Upload,
   AlertTriangle,
@@ -20,6 +30,9 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Search,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import {
   Dialog,
@@ -57,13 +70,19 @@ import {
   CreateProjectManualFormFields,
   type CreateProjectManualFormModel,
 } from '../../../components/ade/dashboard/projects/CreateProjectManualFormFields';
-import { getProjectQualityHistory } from '../../../utils/project-quality-score-history';
+import { ProjectsDashboardProjectCard } from '../../../components/ade/dashboard/projects/ProjectsDashboardProjectCard';
+import {
+  getProjectQualityHistory,
+  buildPortfolioQualitySeries,
+} from '../../../utils/project-quality-score-history';
 import { getNumericScoreTier } from '../../../utils/numeric-score-tier';
 import { ProjectQualityTrendSparkline } from '../../../components/ade/dashboard/ProjectQualityTrendSparkline';
+import { PortfolioQualityTrendChart } from '../../../components/ade/dashboard/PortfolioQualityTrendChart';
 import { ProjectQualityHistoryDialog } from '../../../components/ade/dashboard/ProjectQualityHistoryDialog';
 import {
   dashboardContentStackClass,
   dashboardMainClass,
+  dashboardPanelClass,
   dashboardTableWrapClass,
   dashboardTableTheadClass,
   dashboardThClass,
@@ -76,8 +95,38 @@ import {
   type ProjectsDashboardSortColumn,
   type ProjectsDashboardSortDirection,
 } from '@/app/utils/projects-dashboard-sort';
+import { cn } from '../../../../../lib/utils';
 
 type ProjectMetadata = ProjectOpenApiMetadata;
+
+const PROJECT_CARD_GRADIENTS = [
+  'from-indigo-500 to-purple-500',
+  'from-emerald-500 to-cyan-500',
+  'from-amber-500 to-orange-500',
+  'from-rose-500 to-pink-500',
+  'from-purple-500 to-fuchsia-500',
+  'from-sky-500 to-cyan-500',
+] as const;
+
+function projectCardInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+  const w = parts[0] ?? '?';
+  return w.slice(0, 2).toUpperCase();
+}
+
+function projectCardGradientClass(projectId: string): string {
+  let h = 0;
+  for (let i = 0; i < projectId.length; i++) {
+    h = (h + projectId.charCodeAt(i) * (i + 1)) % 1_000_000;
+  }
+  return PROJECT_CARD_GRADIENTS[h % PROJECT_CARD_GRADIENTS.length] ?? PROJECT_CARD_GRADIENTS[0];
+}
+
+function formatShortProjectId(id: string): string {
+  const compact = id.replace(/-/g, '');
+  return `prj_${compact.slice(0, 5)}`;
+}
 
 interface Project {
   id: string;
@@ -144,6 +193,141 @@ function ProjectsSortTh({
   );
 }
 
+function ProjectDashboardActions({
+  project,
+  isDeleted,
+  openProjectDropdown,
+  setOpenProjectDropdown,
+  dropdownPosition,
+  setDropdownPosition,
+  onEdit,
+  onDelete,
+  onRestore,
+  onPermanentDelete,
+}: {
+  project: Project;
+  isDeleted: boolean;
+  openProjectDropdown: string | null;
+  setOpenProjectDropdown: Dispatch<SetStateAction<string | null>>;
+  dropdownPosition: { top: number; right: number } | null;
+  setDropdownPosition: Dispatch<SetStateAction<{ top: number; right: number } | null>>;
+  onEdit: (p: Project) => void;
+  onDelete: (id: string) => void | Promise<void>;
+  onRestore: (p: Project) => void | Promise<void>;
+  onPermanentDelete: (p: Project) => void | Promise<void>;
+}) {
+  return (
+    <div className="relative inline-flex items-center justify-end gap-0.5">
+      {isDeleted ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            void onRestore(project);
+          }}
+          className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+          title="Undelete project"
+          aria-label={`Undelete project ${project.name}`}
+        >
+          <Undo2 className="h-4 w-4" />
+        </button>
+      ) : null}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          setDropdownPosition({
+            top: rect.bottom + 4,
+            right: window.innerWidth - rect.right,
+          });
+          setOpenProjectDropdown(openProjectDropdown === project.id ? null : project.id);
+        }}
+        className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-white"
+        title="Actions"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+
+      {openProjectDropdown === project.id && dropdownPosition ? (
+        <>
+          <div
+            className="fixed inset-0 z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenProjectDropdown(null);
+            }}
+          />
+          <div
+            className="fixed z-20 w-56 min-w-0 overflow-x-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+            style={{
+              top: `${dropdownPosition.top}px`,
+              right: `${dropdownPosition.right}px`,
+            }}
+          >
+            <div className="py-1">
+              {!project.deleted_at ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenProjectDropdown(null);
+                      onEdit(project);
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                  >
+                    <Edit2 className="h-4 w-4 text-indigo-500" />
+                    Edit Project
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenProjectDropdown(null);
+                      void onDelete(project.id);
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                    Delete Project
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenProjectDropdown(null);
+                    void onRestore(project);
+                  }}
+                  className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                >
+                  <Undo2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  Undelete Project
+                </button>
+              )}
+              <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenProjectDropdown(null);
+                  void onPermanentDelete(project);
+                }}
+                className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Permanently Delete
+              </button>
+            </div>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 const Projects = () => {
   const router = useRouter();
   const { data: session } = useSession();
@@ -185,6 +369,11 @@ const Projects = () => {
   const [showDeleted, setShowDeleted] = useState(false);
   const [sortColumn, setSortColumn] = useState<ProjectsDashboardSortColumn>('name');
   const [sortDirection, setSortDirection] = useState<ProjectsDashboardSortDirection>('asc');
+  const [projectsViewMode, setProjectsViewMode] = useState<'cards' | 'table'>('cards');
+  const [projectSearchQuery, setProjectSearchQuery] = useState('');
+  const [projectsFilterChip, setProjectsFilterChip] = useState<'all' | 'active' | 'attention' | 'deleted'>(
+    'all'
+  );
   const prevImportOpen = useRef(false);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
@@ -237,6 +426,80 @@ const Projects = () => {
     [projects, sortColumn, sortDirection, latestQualityByProjectId]
   );
 
+  const portfolioQualitySeries = useMemo(
+    () => buildPortfolioQualitySeries(projectQualityHistoryMap),
+    [projectQualityHistoryMap]
+  );
+
+  const projectsHeaderSubtitle = useMemo(() => {
+    const n = projects.length;
+    const scored = projects
+      .map((p) => latestQualityByProjectId[p.id])
+      .filter((x): x is number => x != null);
+    const avg =
+      scored.length > 0 ? Math.round(scored.reduce((a, b) => a + b, 0) / scored.length) : null;
+    const active = projects.filter((p) => p.enabled && !p.deleted_at).length;
+    const parts: string[] = [`${n} project${n === 1 ? '' : 's'}`];
+    if (avg != null) parts.push(`avg quality ${avg}`);
+    parts.push(`${active} active`);
+    if (showDeleted) {
+      const del = projects.filter((p) => p.deleted_at).length;
+      if (del > 0) parts.push(`${del} deleted`);
+    }
+    return parts.join(' · ');
+  }, [projects, latestQualityByProjectId, showDeleted]);
+
+  const displayedProjects = useMemo(() => {
+    let rows = sortedProjects;
+    const q = projectSearchQuery.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.slug ?? '').toLowerCase().includes(q) ||
+          (p.description ?? '').toLowerCase().includes(q)
+      );
+    }
+    if (projectsFilterChip === 'active') {
+      rows = rows.filter((p) => p.enabled && !p.deleted_at);
+    } else if (projectsFilterChip === 'attention') {
+      rows = rows.filter((p) => !p.enabled || Boolean(p.deleted_at));
+    } else if (projectsFilterChip === 'deleted') {
+      rows = rows.filter((p) => Boolean(p.deleted_at));
+    }
+    return rows;
+  }, [sortedProjects, projectSearchQuery, projectsFilterChip]);
+
+  const filterChipCounts = useMemo(() => {
+    const all = sortedProjects.length;
+    const active = sortedProjects.filter((p) => p.enabled && !p.deleted_at).length;
+    const attention = sortedProjects.filter((p) => !p.enabled || Boolean(p.deleted_at)).length;
+    const deleted = sortedProjects.filter((p) => p.deleted_at).length;
+    return { all, active, attention, deleted };
+  }, [sortedProjects]);
+
+  const sortSummaryLabel = useMemo(() => {
+    const arrow = sortDirection === 'asc' ? '↑' : '↓';
+    switch (sortColumn) {
+      case 'updated':
+        return `last activity ${arrow}`;
+      case 'name':
+        return `name ${arrow}`;
+      case 'created':
+        return `created ${arrow}`;
+      case 'quality':
+        return `quality ${arrow}`;
+      case 'status':
+        return `status ${arrow}`;
+      case 'creator':
+        return `creator ${arrow}`;
+      case 'description':
+        return `description ${arrow}`;
+      default:
+        return `sorted ${arrow}`;
+    }
+  }, [sortColumn, sortDirection]);
+
   const handleProjectsSortHeaderClick = useCallback((column: ProjectsDashboardSortColumn) => {
     setSortColumn((prevCol) => {
       if (prevCol === column) {
@@ -278,6 +541,12 @@ const Projects = () => {
   useEffect(() => {
     if (currentTenantId) void loadProjects();
   }, [currentTenantId, loadProjects]);
+
+  useEffect(() => {
+    if (!showDeleted && projectsFilterChip === 'deleted') {
+      setProjectsFilterChip('all');
+    }
+  }, [showDeleted, projectsFilterChip]);
 
   const handleCreateClick = () => {
     setProjectName('');
@@ -573,47 +842,80 @@ const Projects = () => {
   return (
     <>
       <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <FolderOpen className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                Projects
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-                Manage projects for the current tenant. Click a project to open its versions.
-              </p>
+        <div className="px-6 py-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <Folders className="h-6 w-6 shrink-0 text-indigo-500 dark:text-indigo-400" aria-hidden />
+              Projects
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{projectsHeaderSubtitle}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <div className="hidden md:flex h-8 items-center gap-2 rounded-md border border-gray-200 bg-white px-3 dark:border-gray-700 dark:bg-gray-900/40">
+              <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+              <input
+                value={projectSearchQuery}
+                onChange={(e) => setProjectSearchQuery(e.target.value)}
+                className="w-40 bg-transparent text-xs outline-none placeholder:text-gray-400 dark:text-gray-200"
+                placeholder="Filter projects…"
+                aria-label="Filter projects"
+              />
             </div>
-            <div className="flex flex-col items-end gap-3 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-600 dark:bg-gray-800/80">
-                <Label htmlFor="projects-show-deleted" className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Show deleted
-                </Label>
-                <Switch
-                  id="projects-show-deleted"
-                  checked={showDeleted}
-                  onCheckedChange={setShowDeleted}
-                  aria-label="Show soft-deleted projects in the list"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={() => {
-                    setImportOpenedFromNewProjectAI(false);
-                    setShowNewImportDialog(true);
-                  }}
-                  variant="secondary"
-                  disabled={!currentTenantId}
-                  title={!currentTenantId ? 'Please select a tenant first' : 'Import specification'}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Import
-                </Button>
-                <Button onClick={handleCreateClick}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Project
-                </Button>
-              </div>
+            <div className="flex items-center gap-1 rounded-md border border-gray-200 p-0.5 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={() => setProjectsViewMode('cards')}
+                className={cn(
+                  'flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors',
+                  projectsViewMode === 'cards'
+                    ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                    : 'text-gray-500 hover:text-indigo-500 dark:text-gray-400'
+                )}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" aria-hidden />
+                Cards
+              </button>
+              <button
+                type="button"
+                onClick={() => setProjectsViewMode('table')}
+                className={cn(
+                  'flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors',
+                  projectsViewMode === 'table'
+                    ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                    : 'text-gray-500 hover:text-indigo-500 dark:text-gray-400'
+                )}
+              >
+                <List className="h-3.5 w-3.5" aria-hidden />
+                Table
+              </button>
+            </div>
+            <Button
+              onClick={() => {
+                setImportOpenedFromNewProjectAI(false);
+                setShowNewImportDialog(true);
+              }}
+              variant="secondary"
+              disabled={!currentTenantId}
+              title={!currentTenantId ? 'Please select a tenant first' : 'Import specification'}
+              className="h-9"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Import
+            </Button>
+            <Button onClick={handleCreateClick} className="h-9 bg-indigo-600 hover:bg-indigo-700">
+              <Plus className="mr-2 h-4 w-4" />
+              New project
+            </Button>
+            <div className="flex h-9 items-center gap-2 rounded-md border border-gray-200 px-3 dark:border-gray-700 dark:bg-gray-900/30">
+              <Label htmlFor="projects-show-deleted" className="cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300">
+                Show deleted
+              </Label>
+              <Switch
+                id="projects-show-deleted"
+                checked={showDeleted}
+                onCheckedChange={setShowDeleted}
+                aria-label="Show soft-deleted projects in the list"
+              />
             </div>
           </div>
         </div>
@@ -640,13 +942,123 @@ const Projects = () => {
           </div>
         </div>
       ) : (
-        <div className={dashboardTableWrapClass}>
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className={dashboardTableTheadClass}>
-                <tr>
-                  <ProjectsSortTh
-                    column="name"
+        <>
+          <section className="flex flex-wrap items-center gap-2">
+            <span className="mr-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Views:
+            </span>
+            <button
+              type="button"
+              onClick={() => setProjectsFilterChip('all')}
+              className={cn(
+                'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                projectsFilterChip === 'all'
+                  ? 'border-indigo-300 bg-indigo-500/10 text-indigo-600 dark:border-indigo-600 dark:text-indigo-400'
+                  : 'border-gray-200 text-gray-500 hover:border-indigo-300 dark:border-gray-700 dark:text-gray-400 dark:hover:border-indigo-600'
+              )}
+            >
+              All{' '}
+              <span className="ml-1 font-mono text-gray-400 dark:text-gray-500">{filterChipCounts.all}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setProjectsFilterChip('active')}
+              className={cn(
+                'rounded-full border px-3 py-1 text-xs transition-colors',
+                projectsFilterChip === 'active'
+                  ? 'border-indigo-300 bg-indigo-500/10 font-medium text-indigo-600 dark:border-indigo-600 dark:text-indigo-400'
+                  : 'border-gray-200 text-gray-500 hover:border-indigo-300 dark:border-gray-700 dark:text-gray-400'
+              )}
+            >
+              Active{' '}
+              <span className="ml-1 font-mono">{filterChipCounts.active}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setProjectsFilterChip('attention')}
+              className={cn(
+                'rounded-full border px-3 py-1 text-xs transition-colors',
+                projectsFilterChip === 'attention'
+                  ? 'border-amber-400 bg-amber-500/10 font-medium text-amber-800 dark:border-amber-700/40 dark:text-amber-300'
+                  : 'border-gray-200 text-gray-500 hover:border-amber-300 dark:border-gray-700 dark:text-gray-400'
+              )}
+            >
+              Needs attention{' '}
+              <span className="ml-1 font-mono">{filterChipCounts.attention}</span>
+            </button>
+            <button
+              type="button"
+              disabled={!showDeleted}
+              title={!showDeleted ? 'Turn on Show deleted to use this view' : undefined}
+              onClick={() => showDeleted && setProjectsFilterChip('deleted')}
+              className={cn(
+                'rounded-full border px-3 py-1 text-xs transition-colors',
+                projectsFilterChip === 'deleted'
+                  ? 'border-indigo-300 bg-indigo-500/10 font-medium text-indigo-600 dark:border-indigo-600 dark:text-indigo-400'
+                  : 'border-gray-200 text-gray-500 hover:border-indigo-300 dark:border-gray-700 dark:text-gray-400',
+                !showDeleted &&
+                  'cursor-not-allowed opacity-40 hover:border-gray-200 dark:hover:border-gray-700'
+              )}
+            >
+              Deleted{' '}
+              <span className="ml-1 font-mono">{filterChipCounts.deleted}</span>
+            </button>
+            <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+              Sorted by{' '}
+              <span className="font-medium text-indigo-600 dark:text-indigo-400">{sortSummaryLabel}</span>
+            </span>
+          </section>
+
+          {displayedProjects.length === 0 ? (
+            <div
+              className={`${dashboardPanelClass} p-10 text-center text-sm text-gray-600 dark:text-gray-400`}
+            >
+              No projects match your filters or search.
+            </div>
+          ) : projectsViewMode === 'cards' ? (
+            <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {displayedProjects.map((project) => {
+                const isDeleted = Boolean(project.deleted_at);
+                const qh = projectQualityHistoryMap[project.id] ?? [];
+                return (
+                  <ProjectsDashboardProjectCard
+                    key={project.id}
+                    project={project}
+                    qualityHistory={qh}
+                    avatarGradientClass={projectCardGradientClass(project.id)}
+                    avatarInitials={projectCardInitials(project.name)}
+                    creatorInitials={projectCardInitials(project.creator_name)}
+                    shortProjectId={formatShortProjectId(project.id)}
+                    onOpenQualityHistory={() => setQualityTrendProject(project)}
+                    onNavigateToVersions={() =>
+                      router.push(`/ade/dashboard/versions?projectId=${encodeURIComponent(project.id)}`)
+                    }
+                    actionsSlot={
+                      <ProjectDashboardActions
+                        project={project}
+                        isDeleted={isDeleted}
+                        openProjectDropdown={openProjectDropdown}
+                        setOpenProjectDropdown={setOpenProjectDropdown}
+                        dropdownPosition={dropdownPosition}
+                        setDropdownPosition={setDropdownPosition}
+                        onEdit={handleEditClick}
+                        onDelete={handleDelete}
+                        onRestore={handleRestore}
+                        onPermanentDelete={handlePermanentDelete}
+                      />
+                    }
+                  />
+                );
+              })}
+            </section>
+          ) : (
+            <div className={dashboardTableWrapClass}>
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className={dashboardTableTheadClass}>
+                    <tr>
+                      <ProjectsSortTh
+                        column="name"
                     sortColumn={sortColumn}
                     sortDirection={sortDirection}
                     onSortClick={handleProjectsSortHeaderClick}
@@ -729,7 +1141,7 @@ const Projects = () => {
                 </tr>
               </thead>
               <tbody className={dashboardTbodyClass}>
-                {sortedProjects.map((project) => {
+                {displayedProjects.map((project) => {
                   const domainCategoryLabel = getProjectDomainCategoryLabel(project.metadata?.domainCategory);
                   const isDeleted = Boolean(project.deleted_at);
                   return (
@@ -856,116 +1268,47 @@ const Projects = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="relative inline-flex items-center justify-end gap-0.5">
-                        {isDeleted ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleRestore(project);
-                            }}
-                            className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors text-emerald-600 dark:text-emerald-400"
-                            title="Undelete project"
-                            aria-label={`Undelete project ${project.name}`}
-                          >
-                            <Undo2 className="h-4 w-4" />
-                          </button>
-                        ) : null}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                            setDropdownPosition({
-                              top: rect.bottom + 4,
-                              right: window.innerWidth - rect.right
-                            });
-                            setOpenProjectDropdown(openProjectDropdown === project.id ? null : project.id);
-                          }}
-                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-white"
-                          title="Actions"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-
-                        {openProjectDropdown === project.id && dropdownPosition && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-10"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenProjectDropdown(null);
-                              }}
-                            />
-                            <div
-                              className="fixed w-56 min-w-0 overflow-x-hidden bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20"
-                              style={{
-                                top: `${dropdownPosition.top}px`,
-                                right: `${dropdownPosition.right}px`
-                              }}>
-                              <div className="py-1">
-                                {!project.deleted_at ? (
-                                  <>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setOpenProjectDropdown(null);
-                                        handleEditClick(project);
-                                      }}
-                                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                                    >
-                                      <Edit2 className="w-4 h-4 text-indigo-500" />
-                                      Edit Project
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setOpenProjectDropdown(null);
-                                        handleDelete(project.id);
-                                      }}
-                                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                                    >
-                                      <Trash2 className="w-4 h-4 text-red-500" />
-                                      Delete Project
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenProjectDropdown(null);
-                                      handleRestore(project);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                                  >
-                                    <Undo2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                                    Undelete Project
-                                  </button>
-                                )}
-                                <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenProjectDropdown(null);
-                                    handlePermanentDelete(project);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
-                                >
-                                  <AlertTriangle className="w-4 h-4" />
-                                  Permanently Delete
-                                </button>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      <ProjectDashboardActions
+                        project={project}
+                        isDeleted={isDeleted}
+                        openProjectDropdown={openProjectDropdown}
+                        setOpenProjectDropdown={setOpenProjectDropdown}
+                        dropdownPosition={dropdownPosition}
+                        setDropdownPosition={setDropdownPosition}
+                        onEdit={handleEditClick}
+                        onDelete={handleDelete}
+                        onRestore={handleRestore}
+                        onPermanentDelete={handlePermanentDelete}
+                      />
                     </td>
                 </tr>
                   );
                 })}
             </tbody>
           </table>
-          </div>
-        </div>
+              </div>
+            </div>
+          )}
+
+          <section className={`${dashboardPanelClass} overflow-hidden`}>
+            <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="h-5 w-5 shrink-0 text-indigo-500" aria-hidden />
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                    Portfolio quality trend
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Average quality score across projects after each import (this browser)
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5">
+              <PortfolioQualityTrendChart series={portfolioQualitySeries} />
+            </div>
+          </section>
+        </>
       )}
         </div>
       </main>

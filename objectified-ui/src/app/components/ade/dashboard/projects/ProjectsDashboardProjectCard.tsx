@@ -1,0 +1,231 @@
+'use client';
+
+import type { ReactNode } from 'react';
+import { cn } from '@lib/utils';
+import { getProjectDomainCategoryLabel } from '@/app/utils/project-domain-categories';
+import {
+  getNumericScoreTier,
+  letterGradeFromOverallPercent,
+  type NumericScoreTierStyle,
+} from '@/app/utils/numeric-score-tier';
+import type { ProjectQualitySnapshot } from '@/app/utils/project-quality-score-history';
+import { formatRelativeTime } from '@/app/ade/dashboard/versions/version-history-dag';
+
+function scoreOrbBorderClass(band: NumericScoreTierStyle['band'] | null): string {
+  if (!band) return 'border-gray-300 dark:border-gray-600';
+  if (band === 'excellent') return 'border-emerald-500';
+  if (band === 'good') return 'border-indigo-500';
+  if (band === 'fair') return 'border-amber-500';
+  return 'border-rose-500';
+}
+
+export interface ProjectsDashboardProjectCardProps {
+  project: {
+    id: string;
+    name: string;
+    slug?: string;
+    description: string;
+    enabled: boolean;
+    deleted_at: string | null;
+    updated_at: string;
+    creator_name: string;
+    creator_email: string;
+    metadata?: { domainCategory?: string; summary?: string };
+  };
+  qualityHistory: ProjectQualitySnapshot[];
+  avatarGradientClass: string;
+  avatarInitials: string;
+  creatorInitials: string;
+  shortProjectId: string;
+  onOpenQualityHistory: () => void;
+  onNavigateToVersions: () => void;
+  actionsSlot: ReactNode;
+}
+
+export function ProjectsDashboardProjectCard({
+  project,
+  qualityHistory,
+  avatarGradientClass,
+  avatarInitials,
+  creatorInitials,
+  shortProjectId,
+  onOpenQualityHistory,
+  onNavigateToVersions,
+  actionsSlot,
+}: ProjectsDashboardProjectCardProps) {
+  const domainCategoryLabel = getProjectDomainCategoryLabel(project.metadata?.domainCategory);
+  const isDeleted = Boolean(project.deleted_at);
+  const attentionVisual = !project.enabled || isDeleted;
+  const latest = qualityHistory.length > 0 ? qualityHistory[qualityHistory.length - 1] : null;
+  const tier = latest ? getNumericScoreTier(latest.overall) : null;
+  const lintLetter = latest ? letterGradeFromOverallPercent(latest.overall) : null;
+  const lintTier = latest ? getNumericScoreTier(latest.overall) : null;
+
+  const summaryLine =
+    project.metadata?.summary?.trim() ||
+    project.description?.trim() ||
+    'No description yet.';
+
+  const orbBase =
+    'mt-1 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 font-mono text-xs font-semibold tabular-nums';
+
+  return (
+    <article
+      className={cn(
+        'overflow-hidden rounded-lg border bg-white transition-colors dark:bg-gray-800',
+        attentionVisual
+          ? 'border-amber-200/60 dark:border-amber-700/40'
+          : 'border-gray-200 hover:border-indigo-300 dark:border-gray-700 dark:hover:border-indigo-600',
+        isDeleted && 'opacity-90'
+      )}
+    >
+      <div className="relative p-5">
+        <div className="absolute right-4 top-4 z-[1] flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+          {actionsSlot}
+        </div>
+
+        <div
+          role={isDeleted ? undefined : 'button'}
+          tabIndex={isDeleted ? undefined : 0}
+          className={cn(!isDeleted && 'cursor-pointer')}
+          onClick={() => {
+            if (!isDeleted) onNavigateToVersions();
+          }}
+          onKeyDown={(e) => {
+            if (isDeleted) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onNavigateToVersions();
+            }
+          }}
+        >
+          <div className="flex items-start gap-3 pr-10">
+            <span
+              className={cn(
+                'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br font-mono font-bold text-white',
+                avatarGradientClass
+              )}
+            >
+              {avatarInitials}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="truncate font-bold text-gray-900 dark:text-white">{project.name}</h3>
+                {domainCategoryLabel ? (
+                  <span
+                    className="inline-flex max-w-full shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300"
+                    title={domainCategoryLabel}
+                  >
+                    {domainCategoryLabel}
+                  </span>
+                ) : null}
+              </div>
+              <p
+                className="truncate font-mono text-[11px] text-gray-500 dark:text-gray-400"
+                title={project.slug ?? project.id}
+              >
+                {shortProjectId}
+                {project.slug ? ` · ${project.slug}` : ''}
+              </p>
+            </div>
+            <div className="shrink-0">
+              {isDeleted ? (
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                  Deleted
+                </span>
+              ) : !project.enabled ? (
+                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                  Disabled
+                </span>
+              ) : (
+                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  Active
+                </span>
+              )}
+            </div>
+          </div>
+
+          <p className="mt-3 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{summaryLine}</p>
+
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Quality
+              </p>
+              {latest ? (
+                <button
+                  type="button"
+                  className={cn(
+                    orbBase,
+                    scoreOrbBorderClass(tier!.band),
+                    tier!.textClass,
+                    'hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30'
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenQualityHistory();
+                  }}
+                >
+                  {latest.overall}
+                </button>
+              ) : (
+                <span className={cn(orbBase, 'border-gray-300 text-gray-400 dark:border-gray-600')}>—</span>
+              )}
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Lint
+              </p>
+              {lintLetter ? (
+                <span
+                  className={cn(
+                    orbBase,
+                    scoreOrbBorderClass(lintTier!.band),
+                    lintTier!.textClass
+                  )}
+                >
+                  {lintLetter}
+                </span>
+              ) : (
+                <span className={cn(orbBase, 'border-gray-300 text-gray-400 dark:border-gray-600')}>—</span>
+              )}
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Debt
+              </p>
+              <span className={cn(orbBase, 'border-gray-300 text-gray-400 dark:border-gray-600')}>—</span>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-semibold text-white ring-2 ring-white dark:ring-gray-800">
+              {(creatorInitials.slice(0, 2) || '?').toUpperCase()}
+            </div>
+            <span className="truncate text-[11px] text-gray-500 dark:text-gray-400">{project.creator_name}</span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={cn(
+          'flex items-center justify-between border-t px-5 py-3 text-xs',
+          attentionVisual
+            ? 'border-amber-200/60 bg-amber-50/40 dark:border-amber-700/40 dark:bg-amber-900/10'
+            : 'border-gray-100 bg-gray-50/60 dark:border-gray-700 dark:bg-gray-900/40'
+        )}
+      >
+        <span className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+          <span className="font-mono">{project.enabled ? 'enabled' : 'disabled'}</span>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
+          <span className={project.enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}>
+            {isDeleted ? 'deleted' : project.enabled ? 'active' : 'inactive'}
+          </span>
+        </span>
+        <span className="text-gray-500 dark:text-gray-400" title={project.updated_at}>
+          {formatRelativeTime(project.updated_at) ?? '—'}
+        </span>
+      </div>
+    </article>
+  );
+}

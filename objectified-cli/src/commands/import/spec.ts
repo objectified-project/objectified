@@ -72,7 +72,7 @@ function throwForBadTerminalState(st: SpecImportJobStatus): never {
 
 export default class ImportSpec extends BaseCommand {
   static description =
-    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. Use `--publish=public` or `--publish=private` to publish after import completes; that step skips server publication gates — verify the catalog yourself (CLI warns on success). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
+    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status at a fixed interval, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. Use `--publish=public` or `--publish=private` to publish after import completes; that step skips server publication gates — verify the catalog yourself (CLI warns on success). `--poll` sets the interval in milliseconds between GET status polls (default 400). `--verbose` adds HTTP diagnostics and poll wait timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
 
   static examples = [
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0",
@@ -84,6 +84,7 @@ export default class ImportSpec extends BaseCommand {
     "<%= config.bin %> <%= command.id %> - --filename ./api.yaml --project-slug svc --project-name Service --version 0.1.0 < ./api.yaml",
     "<%= config.bin %> <%= command.id %> ./asyncapi.yml --project-slug events --project-name Events --version 1.0.0 --dry-run",
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --create-or-map-project --yes --publish=private",
+    "<%= config.bin %> <%= command.id %> ./openapi.yaml --map-project payments-api --version 1.0.0 --poll 2000",
   ];
 
   static seeAlso = ["import jobs", "projects create", "versions create", "docs errors", "tenants use"];
@@ -172,6 +173,12 @@ export default class ImportSpec extends BaseCommand {
       description:
         "Start the job and print the job id immediately without polling or finalize calls (CI stitching).",
       default: false,
+    }),
+    poll: Flags.integer({
+      description:
+        "Milliseconds between GET status polls while the import job is non-terminal (50–120000; default 400). Ignored with --no-wait.",
+      min: 50,
+      max: 120_000,
     }),
     commit: Flags.boolean({
       description:
@@ -498,6 +505,10 @@ export default class ImportSpec extends BaseCommand {
 
     const dryRun = this.flags["dry-run"] === true;
     const noWait = this.flags["no-wait"] === true;
+    const pollIntervalMs = typeof this.flags.poll === "number" ? this.flags.poll : undefined;
+    if (pollIntervalMs !== undefined && noWait) {
+      this.warn("--poll is ignored with --no-wait (this run does not poll).");
+    }
     const publishIntent = this.parsePublishVisibilityIntent();
 
     const verDescRaw = this.flags["version-description"];
@@ -580,6 +591,7 @@ export default class ImportSpec extends BaseCommand {
       tenantSlug: tenant,
       jobId: accepted.job_id,
       log: pollLog,
+      pollIntervalMs,
     });
 
     if (st.state === "failed" || st.state === "canceled") {
@@ -646,6 +658,7 @@ export default class ImportSpec extends BaseCommand {
         tenantSlug: tenant,
         jobId: accepted.job_id,
         log: pollLog,
+        pollIntervalMs,
       });
 
       if (st.state === "failed" || st.state === "canceled") {

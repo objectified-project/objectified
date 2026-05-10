@@ -73,15 +73,16 @@ channels: {}
       }),
     );
     const x = extractSpecInfoForCliDisplay(bytes, "openapi-3");
-    expect(x).not.toBeNull();
-    expect(x!.title).toBe("T");
-    expect(x!.version).toBe("1.0.0");
-    expect(x!.description).toBe("Hello\nWorld");
-    expect(x!.infoMetadata).toEqual({
-      summary: "Short",
-      termsOfService: "https://example.com/tos",
-      contact: { name: "A", email: "a@ex.com" },
-      license: { name: "MIT" },
+    expect(x).toEqual({
+      title: "T",
+      version: "1.0.0",
+      description: "Hello\nWorld",
+      infoMetadata: {
+        summary: "Short",
+        termsOfService: "https://example.com/tos",
+        contact: { name: "A", email: "a@ex.com" },
+        license: { name: "MIT" },
+      },
     });
   });
 

@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { buildQualityTrendPoints } from '@/app/utils/project-quality-score-history';
+import {
+  buildQualityTrendPoints,
+  buildPortfolioQualitySeries,
+} from '@/app/utils/project-quality-score-history';
 
 describe('project-quality-score-history', () => {
   beforeEach(() => {
@@ -22,6 +25,27 @@ describe('project-quality-score-history', () => {
       expect(pts[0].x).toBe(0);
       expect(pts[2].x).toBe(100);
       expect(pts[2].y).toBe(0);
+    });
+  });
+
+  describe('buildPortfolioQualitySeries', () => {
+    it('returns an empty array when there is no history', () => {
+      expect(buildPortfolioQualitySeries({})).toEqual([]);
+      expect(buildPortfolioQualitySeries({ a: [] })).toEqual([]);
+    });
+
+    it('tracks running averages across projects in timestamp order', () => {
+      const series = buildPortfolioQualitySeries({
+        p1: [
+          { recordedAt: '2025-01-01T00:00:00.000Z', overall: 80, grade: 'B' },
+          { recordedAt: '2025-01-03T00:00:00.000Z', overall: 90, grade: 'A' },
+        ],
+        p2: [{ recordedAt: '2025-01-02T00:00:00.000Z', overall: 60, grade: 'C' }],
+      });
+      expect(series).toHaveLength(3);
+      expect(series[0].avgOverall).toBe(80);
+      expect(series[1].avgOverall).toBe(70);
+      expect(series[2].avgOverall).toBe(75);
     });
   });
 
