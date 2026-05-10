@@ -144,7 +144,8 @@ class Database:
         """Get version information by tenant, project, and version slugs."""
         query = """
             SELECT v.id, v.version_id, v.visibility, v.published,
-                   p.description as project_description, v.metadata
+                   p.description as project_description, p.metadata as project_metadata,
+                   v.metadata
             FROM odb.versions v
             JOIN odb.projects p ON v.project_id = p.id
             JOIN odb.tenants t ON p.tenant_id = t.id

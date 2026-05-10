@@ -8,6 +8,7 @@ import {
   rollbackTransaction,
   releaseClient,
   createProjectTx,
+  mergeProjectImportOpenApiFieldsTx,
   createVersionTx,
   createPropertyTx,
   createClassTx,
@@ -22,6 +23,7 @@ import { permanentDeleteProject } from './helper';
 import { extractPaths, extractSecuritySchemes } from '../../src/app/utils/openapi-import';
 import { importOpenAPIPathsAndSecurity } from './import-openapi-paths-security';
 import { recordTenantRepositoryImport } from './repository-import-metrics';
+import { mergeOpenApiDocumentIntoCatalogTargets } from '../rest-spec-import-merge';
 
 export type ImportJobState = 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
 
@@ -67,6 +69,8 @@ export interface ImportJobInput {
   document: any;
   project: { name: string; slug: string; description?: string | null };
   version: { versionId: string; description?: string | null };
+  /** JSON merged into odb.projects.metadata when creating a new project (REST import: OpenAPI info.contact, etc.). */
+  projectMetadata?: Record<string, unknown> | null;
   options: {
     selectedSchemas: string[];
     autoLayout?: boolean;
@@ -105,6 +109,34 @@ export interface ImportJobInput {
     branch: string;
     path: string;
     blobSha?: string | null;
+  };
+}
+
+/** Merge OpenAPI/Swagger `document.info` into project description + projects.metadata (all import entry points). */
+function enrichImportInputWithOpenApiInfo(input: ImportJobInput): ImportJobInput {
+  if (input.sourceKind !== 'openapi') return input;
+  const merged = mergeOpenApiDocumentIntoCatalogTargets(
+    {
+      project: input.project,
+      version: {
+        versionId: input.version.versionId,
+        description: input.version.description ?? null,
+      },
+    },
+    input.document,
+    'openapi',
+  );
+  const combinedMeta =
+    merged.projectMetadata || input.projectMetadata
+      ? { ...(merged.projectMetadata ?? {}), ...(input.projectMetadata ?? {}) }
+      : undefined;
+  const projectMetadata =
+    combinedMeta && Object.keys(combinedMeta).length > 0 ? combinedMeta : undefined;
+  return {
+    ...input,
+    project: merged.project,
+    version: merged.version,
+    projectMetadata,
   };
 }
 
@@ -188,6 +220,38 @@ function emit(job: JobState, level: ImportLogLevel, code: string, message: strin
 function setProgress(job: JobState, phase: ProgressEvent['phase'], total: number, completed: number, currentItem?: string) {
   job.progress = { phase, total, completed, currentItem };
   job.percent = total > 0 ? Math.floor((completed / total) * 100) : 0;
+}
+
+/** REST/CLI imports into an existing project skip createProjectTx — persist enriched OpenAPI info here. */
+async function mergeOpenApiIntoExistingProjectIfNeeded(
+  client: PoolClient,
+  job: JobState,
+  input: ImportJobInput,
+  existingProjectId: string | undefined,
+): Promise<void> {
+  const existing = existingProjectId?.trim();
+  if (!existing || input.sourceKind !== 'openapi') return;
+
+  const patch = input.projectMetadata;
+  const patchKeys = patch ? Object.keys(patch) : [];
+  const specDesc = (input.project.description ?? '').trim();
+  if (patchKeys.length === 0 && specDesc === '') return;
+
+  const resRaw = await withRetry(
+    () =>
+      mergeProjectImportOpenApiFieldsTx(client, existing, {
+        descriptionFromSpec: specDesc || null,
+        metadataPatch: patch ?? undefined,
+      }),
+    { maxAttempts: 3, initialDelayMs: 500, label: 'mergeProjectImportOpenApiFields' },
+  );
+  const res = JSON.parse(resRaw) as { success: boolean; error?: string };
+  if (!res.success) {
+    throw new Error(res.error || 'Failed to merge OpenAPI info into existing project');
+  }
+  emit(job, 'info', 'PROJECT_CATALOG_MERGED', 'Merged OpenAPI info.description and info metadata into existing catalog project.', {
+    projectId: existing,
+  });
 }
 
 // Stable JSON stringify that sorts object keys to ensure consistent signatures
@@ -583,8 +647,10 @@ export async function startImport(input: ImportJobInput) {
     throw new Error('User ID is required for import. Please ensure you are logged in.');
   }
 
+  const jobInput = enrichImportInputWithOpenApiInfo(input);
+
   const job: JobState = {
-    input,
+    input: jobInput,
     state: 'queued',
     events: [],
     percent: 0,
@@ -594,15 +660,16 @@ export async function startImport(input: ImportJobInput) {
       propertiesCreated: 0,
       warnings: 0,
       failed: 0,
-      sourceName: input.project.name,
-      projectName: input.project.name,
-      versionId: input.version.versionId,
+      sourceName: jobInput.project.name,
+      projectName: jobInput.project.name,
+      versionId: jobInput.version.versionId,
       classes: []
     }
   };
   jobs.set(jobId, job);
 
   (async () => {
+    const input = job.input;
     let client: PoolClient | null = null;
     const isDryRun = input.options.dryRun === true;
 
@@ -722,10 +789,20 @@ export async function startImport(input: ImportJobInput) {
         if (existingInc) {
           projectId = existingInc;
           emit(job, 'info', 'EXISTING_PROJECT', `Using existing project: ${input.project.name}`, { projectId });
+          await mergeOpenApiIntoExistingProjectIfNeeded(client!, job, input, existingInc);
         } else {
           const resProj = JSON.parse(
             await withRetry(
-              () => createProjectTx(client!, input.tenantId, input.userId, input.project.name, input.project.description || '', input.project.slug),
+              () =>
+                createProjectTx(
+                  client!,
+                  input.tenantId,
+                  input.userId,
+                  input.project.name,
+                  input.project.description || '',
+                  input.project.slug,
+                  input.projectMetadata ?? undefined,
+                ),
               { maxAttempts: 3, initialDelayMs: 500, label: 'createProject' }
             )
           );
@@ -850,10 +927,20 @@ export async function startImport(input: ImportJobInput) {
       if (existingTx) {
         projectId = existingTx;
         emit(job, 'info', 'EXISTING_PROJECT', `Using existing project: ${input.project.name}`, { projectId });
+        await mergeOpenApiIntoExistingProjectIfNeeded(client!, job, input, existingTx);
       } else {
         const resProj = JSON.parse(
           await withRetry(
-            () => createProjectTx(client!, input.tenantId, input.userId, input.project.name, input.project.description || '', input.project.slug),
+            () =>
+              createProjectTx(
+                client!,
+                input.tenantId,
+                input.userId,
+                input.project.name,
+                input.project.description || '',
+                input.project.slug,
+                input.projectMetadata ?? undefined,
+              ),
             { maxAttempts: 3, initialDelayMs: 500, label: 'createProject' }
           )
         );
@@ -1154,7 +1241,16 @@ export async function rollbackCompletedImport(jobId: string): Promise<{ success:
 
 export async function getImportStatus(jobId: string) {
   const job = jobs.get(jobId);
-  if (!job) return { jobId, state: 'failed' as ImportJobState, percent: 0, events: [{ id: rndId(), ts: now(), level: 'error' as ImportLogLevel, code: 'NOT_FOUND', message: 'Job not found' }] };
+  if (!job) {
+    const ev: ImportEvent = {
+      id: rndId(),
+      ts: now(),
+      level: 'error',
+      code: 'NOT_FOUND',
+      message: 'Job not found',
+    };
+    return { jobId, state: 'failed' as ImportJobState, percent: 0, events: [ev] };
+  }
   return {
     jobId,
     state: job.state,

@@ -72,6 +72,46 @@ export function deriveCatalogIdentityFromSpecBytes(
   };
 }
 
+/** `info.*` fields shown on the CLI before import (excludes title/version/description — those are separate). */
+export type SpecInfoMetadata = Record<string, unknown>;
+
+export type ExtractedSpecInfoForCli = {
+  title?: string;
+  version?: string;
+  description?: string;
+  infoMetadata: SpecInfoMetadata;
+};
+
+/**
+ * Reads OpenAPI / AsyncAPI `info` for console reporting.
+ * Returns null for formats without an `info` object (protobuf, graphql, …).
+ */
+export function extractSpecInfoForCliDisplay(bytes: Buffer, sourceKind: string): ExtractedSpecInfoForCli | null {
+  if (sourceKind !== "openapi-3" && sourceKind !== "asyncapi-2") {
+    return null;
+  }
+  const doc = parseSpecDocument(bytes);
+  const info = readInfoRecord(doc);
+  if (info === undefined) {
+    return {
+      infoMetadata: {},
+    };
+  }
+  const infoMetadata: SpecInfoMetadata = {};
+  for (const [key, value] of Object.entries(info)) {
+    if (key === "title" || key === "version" || key === "description") continue;
+    if (value !== undefined && value !== null) {
+      infoMetadata[key] = value;
+    }
+  }
+  return {
+    title: trimNonEmptyString(info.title),
+    version: trimNonEmptyString(info.version),
+    description: trimNonEmptyString(info.description),
+    infoMetadata,
+  };
+}
+
 export type ResolvedCatalogIdentityForImport = {
   projectName: string;
   projectSlug: string;

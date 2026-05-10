@@ -157,4 +157,5 @@ def openapi_for_revision(version: Dict[str, Any], tenant_slug: str, tenant_id: s
         project.get("description"),
         version_db_id=version["id"],
         revision_metadata=version.get("metadata"),
+        project_metadata=project.get("metadata"),
     )

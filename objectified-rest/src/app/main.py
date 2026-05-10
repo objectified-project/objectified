@@ -358,6 +358,7 @@ async def get_version_openapi_spec(
         version.get('project_description'),
         version_db_id=version['id'],  # Pass version database ID to load paths
         revision_metadata=version.get('metadata'),
+        project_metadata=version.get('project_metadata'),
     )
 
     return JSONResponse(content=openapi_spec)
@@ -507,6 +508,7 @@ async def get_swagger_ui(
         version.get('project_description'),
         version_db_id=version['id'],  # Pass version database ID to load paths
         revision_metadata=version.get('metadata'),
+        project_metadata=version.get('project_metadata'),
     )
 
     # Create a custom Swagger UI HTML page with the spec embedded

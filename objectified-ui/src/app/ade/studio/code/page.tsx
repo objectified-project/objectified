@@ -10,6 +10,10 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import YAML from 'yaml';
 import { useStudio } from '../StudioContext';
 import { getVersionRevisionNote } from '@/app/utils/version-display';
+import {
+  coerceProjectMetadataRecord,
+  projectDescriptionForOpenApiPreview,
+} from '../lib/coerce-project-metadata';
 import { generateOpenApiSpec } from '../../../utils/openapi';
 import { STUDIO_EXPORT_OPENAPI_VERSION } from '../../../utils/openapi-versions';
 import { validateOpenAPIExport } from '../../../utils/openapi-export-validation-server';
@@ -298,19 +302,23 @@ export default function CodePage() {
         const openApiContent = await generateOpenApiSpec(classesWithProperties, {
           projectName: currentProject?.name || 'API',
           version: currentVersion?.version_id || '1.0.0',
-          description: versionNote,
+          description:
+            projectDescriptionForOpenApiPreview(currentProject) || versionNote || undefined,
           openapiVersion: STUDIO_EXPORT_OPENAPI_VERSION,
           servers: servers.length > 0 ? servers : undefined,
           tags: [], // Top-level tags; can be populated from version/project when available
           security: hasSecuritySchemes ? Object.keys(securitySchemes).map((name) => ({ [name]: [] })) : undefined,
           externalDocs: undefined, // Version/project externalDocs when available
+          metadata: coerceProjectMetadataRecord((currentProject as { metadata?: unknown })?.metadata),
         }, pathsObject, hasSecuritySchemes ? securitySchemes : undefined);
         setOpenApiSpec(openApiContent);
 
         const arazzoContent = await generateArazzoSpec(classesWithProperties, {
           projectName: currentProject?.name || 'API',
           version: currentVersion?.version_id || '1.0.0',
-          description: versionNote
+          description:
+            projectDescriptionForOpenApiPreview(currentProject) || versionNote || undefined,
+          metadata: coerceProjectMetadataRecord((currentProject as { metadata?: unknown })?.metadata),
         });
         setArazzoSpec(arazzoContent);
 

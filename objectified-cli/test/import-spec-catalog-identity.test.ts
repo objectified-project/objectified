@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   deriveCatalogIdentityFromSpecBytes,
+  extractSpecInfoForCliDisplay,
   resolveCatalogIdentityForCreateOrMap,
 } from "../src/lib/import/spec-import-catalog-identity.js";
 
@@ -49,6 +50,46 @@ channels: {}
     expect(deriveCatalogIdentityFromSpecBytes(Buffer.from("syntax = \"proto3\";"), "protobuf")).toEqual(
       {},
     );
+  });
+
+  it("extractSpecInfoForCliDisplay returns null for protobuf", () => {
+    expect(extractSpecInfoForCliDisplay(Buffer.from("syntax = \"proto3\";"), "protobuf")).toBeNull();
+  });
+
+  it("extractSpecInfoForCliDisplay collects info metadata for OpenAPI", () => {
+    const bytes = Buffer.from(
+      JSON.stringify({
+        openapi: "3.0.0",
+        info: {
+          title: "T",
+          version: "1.0.0",
+          description: "Hello\nWorld",
+          termsOfService: "https://example.com/tos",
+          contact: { name: "A", email: "a@ex.com" },
+          license: { name: "MIT" },
+          summary: "Short",
+        },
+        paths: {},
+      }),
+    );
+    const x = extractSpecInfoForCliDisplay(bytes, "openapi-3");
+    expect(x).not.toBeNull();
+    expect(x!.title).toBe("T");
+    expect(x!.version).toBe("1.0.0");
+    expect(x!.description).toBe("Hello\nWorld");
+    expect(x!.infoMetadata).toEqual({
+      summary: "Short",
+      termsOfService: "https://example.com/tos",
+      contact: { name: "A", email: "a@ex.com" },
+      license: { name: "MIT" },
+    });
+  });
+
+  it("extractSpecInfoForCliDisplay yields empty infoMetadata when info is missing", () => {
+    const bytes = Buffer.from(JSON.stringify({ openapi: "3.0.0", paths: {} }));
+    expect(extractSpecInfoForCliDisplay(bytes, "openapi-3")).toEqual({
+      infoMetadata: {},
+    });
   });
 
   it("resolveCatalogIdentityForCreateOrMap uses spec when CLI omits fields", () => {

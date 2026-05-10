@@ -1243,7 +1243,7 @@ SEE ALSO
 
 ## `objectified import spec PATH`
 
-Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 
 ```
 USAGE
@@ -1260,9 +1260,10 @@ ARGUMENTS
 DESCRIPTION
   Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status
   with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are
-  logged to stderr as `[n] …` (use `--quiet` to suppress). `--verbose` adds HTTP diagnostics and poll backoff timings.
-  Supported formats vs the dashboard Import dialog and repository filename scanner:
-  docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+  logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an
+  extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as
+  contact and license). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard
+  Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 
 EXAMPLES
   $ objectified import spec ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0

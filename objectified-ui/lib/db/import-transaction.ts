@@ -100,6 +100,66 @@ export async function createProjectTx(
 }
 
 /**
+ * When importing OpenAPI into an existing catalog project, persist enriched description
+ * (fill-if-blank) and shallow-merge spec-derived metadata into `odb.projects.metadata`.
+ */
+export async function mergeProjectImportOpenApiFieldsTx(
+  client: PoolClient,
+  projectId: string,
+  opts: {
+    descriptionFromSpec?: string | null;
+    metadataPatch?: Record<string, unknown> | null;
+  },
+): Promise<string> {
+  try {
+    const row = await client.query(
+      `SELECT description, metadata FROM odb.projects WHERE id = $1 AND deleted_at IS NULL`,
+      [projectId],
+    );
+    if (!row.rows?.length) {
+      return errorResponse('Project not found');
+    }
+
+    const curDesc = row.rows[0].description as string | null | undefined;
+    const rawMeta = row.rows[0].metadata;
+
+    let metaObj: Record<string, unknown> = {};
+    if (rawMeta != null) {
+      if (typeof rawMeta === 'string') {
+        try {
+          const p = JSON.parse(rawMeta) as unknown;
+          if (p !== null && typeof p === 'object' && !Array.isArray(p)) {
+            metaObj = { ...(p as Record<string, unknown>) };
+          }
+        } catch {
+          metaObj = {};
+        }
+      } else if (typeof rawMeta === 'object' && !Array.isArray(rawMeta)) {
+        metaObj = { ...(rawMeta as Record<string, unknown>) };
+      }
+    }
+
+    const patch =
+      opts.metadataPatch !== undefined && opts.metadataPatch !== null && typeof opts.metadataPatch === 'object'
+        ? opts.metadataPatch
+        : {};
+    const mergedMeta = { ...metaObj, ...patch };
+
+    const incDesc = (opts.descriptionFromSpec ?? '').trim();
+    const curDescTrim = typeof curDesc === 'string' ? curDesc.trim() : '';
+    const nextDesc = incDesc !== '' && curDescTrim === '' ? incDesc : curDesc ?? null;
+
+    await client.query(
+      `UPDATE odb.projects SET description = $1, metadata = $2::jsonb, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND deleted_at IS NULL`,
+      [nextDesc === '' ? null : nextDesc, JSON.stringify(mergedMeta), projectId],
+    );
+    return successResponse({});
+  } catch (error: any) {
+    return errorResponse(error.message);
+  }
+}
+
+/**
  * Create a version within a transaction
  */
 export async function createVersionTx(

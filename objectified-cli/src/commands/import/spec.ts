@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { Args, Flags } from "@oclif/core";
 
 import { BaseCommand } from "../../base-command.js";
@@ -16,6 +18,7 @@ import {
 } from "../../lib/import/spec-import-flow.js";
 import {
   deriveCatalogIdentityFromSpecBytes,
+  extractSpecInfoForCliDisplay,
   resolveCatalogIdentityForCreateOrMap,
 } from "../../lib/import/spec-import-catalog-identity.js";
 import { readSpecInput } from "../../lib/import/read-spec-input.js";
@@ -62,7 +65,7 @@ function throwForBadTerminalState(st: SpecImportJobStatus): never {
 
 export default class ImportSpec extends BaseCommand {
   static description =
-    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
+    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
 
   static examples = [
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0",
@@ -450,6 +453,15 @@ export default class ImportSpec extends BaseCommand {
       `resolved spec path=${resolvedPath} catalog_version_id=${versionId}`,
     );
 
+    const extractedSpecInfo = extractSpecInfoForCliDisplay(bytes, kind.sourceKind);
+    this.logExtractedSpecificationSummary({
+      extracted: extractedSpecInfo,
+      sourceKind: kind.sourceKind,
+      resolved,
+      catalogVersionId: versionId,
+      resolvedPath,
+    });
+
     const rollback = this.flags.rollback === true;
     const commit = !rollback && this.flags.commit !== false;
 
@@ -632,6 +644,73 @@ export default class ImportSpec extends BaseCommand {
     if (this.flags.quiet === true) return;
     this.importProgressSeq++;
     process.stderr.write(`objectified: import: [${String(this.importProgressSeq)}] ${message}\n`);
+  }
+
+  /**
+   * OpenAPI/AsyncAPI: prints spec `info` (title, version, description, other fields).
+   * Other kinds: notes that no `info` block is available. Uses stderr; suppressed by `--quiet`.
+   */
+  private logExtractedSpecificationSummary(opts: {
+    extracted: ReturnType<typeof extractSpecInfoForCliDisplay>;
+    sourceKind: string;
+    resolved: ResolvedSpecImportProject;
+    catalogVersionId: string;
+    resolvedPath: string;
+  }): void {
+    if (this.flags.quiet === true) return;
+    const { extracted, sourceKind, resolved, catalogVersionId, resolvedPath } = opts;
+    const label = path.basename(resolvedPath);
+    this.importProgress(`extracted from specification (${label}, ${sourceKind}):`);
+    this.importProgress(`  catalog project name: ${resolved.project.name}`);
+    this.importProgress(`  catalog project slug: ${resolved.project.slug}`);
+    this.importProgress(`  catalog version id: ${catalogVersionId}`);
+    const cliProjDesc = resolved.project.description;
+    if (typeof cliProjDesc === "string" && cliProjDesc.trim() !== "") {
+      this.importProgress(`  catalog project description (from CLI): ${cliProjDesc.trim()}`);
+    }
+
+    if (extracted === null) {
+      this.importProgress(
+        `  spec info: (no structured info block for this format; title/description/metadata apply to OpenAPI and AsyncAPI)`,
+      );
+      return;
+    }
+
+    this.importProgress(`  spec title (info.title): ${extracted.title ?? "(not set)"}`);
+    this.importProgress(`  spec version (info.version): ${extracted.version ?? "(not set)"}`);
+
+    if (extracted.description !== undefined) {
+      const maxLines = 24;
+      const maxChars = 4000;
+      let body = extracted.description;
+      if (body.length > maxChars) {
+        body = `${body.slice(0, maxChars)}…`;
+      }
+      const lines = body.split(/\r?\n/);
+      const clipped = lines.slice(0, maxLines);
+      for (let i = 0; i < clipped.length; i++) {
+        const prefix = i === 0 ? "  spec description (info.description): " : "    ";
+        const line = clipped[i] ?? "";
+        this.importProgress(`${prefix}${line}`);
+      }
+      if (lines.length > maxLines) {
+        this.importProgress(`    … (${String(lines.length - maxLines)} more line(s) omitted)`);
+      }
+    } else {
+      this.importProgress(`  spec description (info.description): (not set)`);
+    }
+
+    const metaKeys = Object.keys(extracted.infoMetadata);
+    if (metaKeys.length === 0) {
+      this.importProgress(`  spec metadata (other info.* fields): (none)`);
+    } else {
+      try {
+        const json = JSON.stringify(extracted.infoMetadata);
+        this.importProgress(`  spec metadata (other info.* fields): ${json}`);
+      } catch {
+        this.importProgress(`  spec metadata (other info.* fields): (present but not JSON-serializable)`);
+      }
+    }
   }
 
   private buildSummaryJson(opts: {

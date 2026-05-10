@@ -83,6 +83,10 @@ import TagManager from '../../../components/ade/studio/TagManager';
 import ClassEditDialog from '../../../components/ade/studio/ClassEditDialog';
 import ExportWizard from '../../../components/ade/studio/ExportWizard';
 import { formatVersionSelectorLabel } from '@/app/utils/version-display';
+import {
+  coerceProjectMetadataRecord,
+  projectDescriptionForOpenApiPreview,
+} from '../lib/coerce-project-metadata';
 import { generateOpenApiSpec } from '@/app/utils/openapi';
 import { generateArazzoSpec } from '@/app/utils/arazzo';
 import { generateJsonSchema } from '@/app/utils/jsonschema';
@@ -3387,7 +3391,13 @@ const StudioContent = () => {
         const specJson = await generateOpenApiSpec(expanded, {
           projectName: project?.name ? `${project.name} — ${groupName}` : groupName,
           version: ver?.version_id ?? '1.0.0',
-          description: `OpenAPI components for canvas group "${groupName}" (Objectified export).`,
+          description: [
+            projectDescriptionForOpenApiPreview(project),
+            `OpenAPI components for canvas group "${groupName}" (Objectified export).`,
+          ]
+            .filter(Boolean)
+            .join('\n\n'),
+          metadata: coerceProjectMetadataRecord((project as { metadata?: unknown })?.metadata),
         });
         const safe = groupName.replace(/[^\w\-]+/g, '-').toLowerCase().slice(0, 80) || 'group';
         if (format === 'yaml') {
@@ -7668,7 +7678,8 @@ const StudioContent = () => {
             const spec = await generateOpenApiSpec(classesWithProperties, {
               projectName: currentProject?.name,
               version: currentVersion?.version_id,
-              metadata: (currentProject as any)?.metadata
+              description: projectDescriptionForOpenApiPreview(currentProject),
+              metadata: coerceProjectMetadataRecord((currentProject as { metadata?: unknown })?.metadata),
             });
             setOpenApiSpec(spec);
             console.log('Generated OpenAPI spec');
@@ -7676,7 +7687,8 @@ const StudioContent = () => {
             const arazzoSpecContent = await generateArazzoSpec(classesWithProperties, {
               projectName: currentProject?.name,
               version: currentVersion?.version_id,
-              metadata: (currentProject as any)?.metadata
+              description: projectDescriptionForOpenApiPreview(currentProject),
+              metadata: coerceProjectMetadataRecord((currentProject as { metadata?: unknown })?.metadata),
             });
             setArazzoSpec(arazzoSpecContent);
             console.log('Generated Arazzo spec');
@@ -7684,7 +7696,8 @@ const StudioContent = () => {
             const jsonSchemaContent = generateJsonSchema(classesWithProperties, {
               projectName: currentProject?.name,
               version: currentVersion?.version_id,
-              metadata: (currentProject as any)?.metadata
+              description: projectDescriptionForOpenApiPreview(currentProject),
+              metadata: coerceProjectMetadataRecord((currentProject as { metadata?: unknown })?.metadata),
             });
             setJsonSchemaSpec(jsonSchemaContent);
             console.log('Generated JSON Schema');

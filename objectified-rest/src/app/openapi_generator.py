@@ -221,6 +221,35 @@ def _security_schemes_from_rows(scheme_rows: List[Dict[str, Any]]) -> Dict[str, 
     return security_schemes
 
 
+def _merge_project_catalog_metadata_into_info(info: Dict[str, Any], project_metadata: Any) -> None:
+    """Apply ``odb.projects.metadata`` (API Metadata / import parity) into OpenAPI ``info``."""
+    meta = parse_json_field(project_metadata)
+    if not isinstance(meta, dict) or not meta:
+        return
+    summary = meta.get("summary")
+    if isinstance(summary, str) and summary.strip():
+        info["summary"] = summary.strip()
+    tos = meta.get("termsOfService") or meta.get("terms_of_service")
+    if isinstance(tos, str) and tos.strip():
+        info["termsOfService"] = tos.strip()
+    contact = meta.get("contact")
+    if isinstance(contact, dict):
+        ci = {k: contact[k] for k in ("name", "url", "email") if contact.get(k)}
+        if ci:
+            info["contact"] = ci
+    lic = meta.get("license")
+    if isinstance(lic, dict):
+        li = {k: lic[k] for k in ("name", "identifier", "url") if lic.get(k)}
+        if li:
+            info["license"] = li
+
+    merged_keys = {"summary", "termsOfService", "terms_of_service", "contact", "license"}
+    for key, value in meta.items():
+        if key in merged_keys or value is None:
+            continue
+        info[key] = value
+
+
 def _servers_from_rows(server_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     servers_list: List[Dict[str, Any]] = []
     for row in server_rows:
@@ -245,6 +274,7 @@ def generate_openapi_spec(
     project_description: Optional[str] = None,
     version_db_id: Optional[str] = None,
     revision_metadata: Any = None,
+    project_metadata: Any = None,
     paths_data: Optional[List[Dict[str, Any]]] = None,
     security_scheme_rows: Optional[List[Dict[str, Any]]] = None,
     server_rows: Optional[List[Dict[str, Any]]] = None,
@@ -319,6 +349,8 @@ def generate_openapi_spec(
     if dep_info:
         info_block["x-objectified-revision-deprecation"] = dep_info
 
+    _merge_project_catalog_metadata_into_info(info_block, project_metadata)
+
     openapi_spec: Dict[str, Any] = {
         "openapi": "3.1.0",
         "info": info_block,
@@ -327,6 +359,10 @@ def generate_openapi_spec(
     }
     if servers_list:
         openapi_spec["servers"] = servers_list
+
+    meta_parsed = parse_json_field(project_metadata)
+    if isinstance(meta_parsed, dict) and meta_parsed:
+        openapi_spec["x-metadata"] = meta_parsed
 
     return openapi_spec
 
