@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import YAML from 'yaml';
 import { useTheme, specThemes, SpecTheme } from './ThemeProvider';
-import { operationAnchorId } from './SpecSidebar';
+import { operationAnchorId, schemaAnchorId } from './SpecSidebar';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -428,10 +428,10 @@ function SpecOverview({ spec, format }: { spec: unknown; format: SpecFormat }) {
     const legacyDefinitions = isObject(spec.definitions) ? spec.definitions : {};
 
     const pathEntries = Object.entries(paths);
-    const schemaCount = new Set([
-      ...Object.keys(componentSchemas),
-      ...Object.keys(legacyDefinitions),
-    ]).size;
+    const schemaNames = [
+      ...new Set([...Object.keys(componentSchemas), ...Object.keys(legacyDefinitions)]),
+    ].sort((a, b) => a.localeCompare(b));
+    const schemaCount = schemaNames.length;
     let opCount = 0;
     const groups = new Map<string, { tag: string; description?: string; ops: { method: string; path: string; summary?: string; deprecated?: boolean }[] }>();
     const ensure = (tag: string) => {
@@ -589,6 +589,54 @@ function SpecOverview({ spec, format }: { spec: unknown; format: SpecFormat }) {
                 </ul>
               </div>
             ))}
+          </section>
+        )}
+
+        {schemaNames.length > 0 && (
+          <section className="space-y-3">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Schemas
+            </h4>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {schemaNames.map((schemaName) => {
+                const schemaObj =
+                  (isObject(componentSchemas[schemaName]) ? componentSchemas[schemaName] : null) ??
+                  (isObject(legacyDefinitions[schemaName]) ? legacyDefinitions[schemaName] : null);
+                const title =
+                  isObject(schemaObj) && typeof schemaObj.title === 'string' ? schemaObj.title : undefined;
+                const description =
+                  isObject(schemaObj) && typeof schemaObj.description === 'string'
+                    ? schemaObj.description
+                    : undefined;
+                const anchor = schemaAnchorId(schemaName);
+                return (
+                  <div
+                    key={schemaName}
+                    id={anchor}
+                    className="scroll-mt-24 rounded-xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-950"
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="mt-0.5 shrink-0 rounded bg-fuchsia-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase text-fuchsia-800 dark:bg-fuchsia-500/10 dark:text-fuchsia-300">
+                        CLS
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <code className="break-all font-mono text-[13px] font-semibold text-zinc-900 dark:text-zinc-50">
+                          {schemaName}
+                        </code>
+                        {title && (
+                          <p className="mt-1 text-[12px] font-medium text-zinc-700 dark:text-zinc-300">{title}</p>
+                        )}
+                        {description && (
+                          <p className="mt-1 line-clamp-4 text-[12px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+                            {description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </section>
         )}
       </div>

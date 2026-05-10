@@ -45,6 +45,9 @@ const HTTP_METHOD_TONE: Record<string, string> = {
   options: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
   head: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
   trace: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  cls: 'bg-fuchsia-50 text-fuchsia-800 dark:bg-fuchsia-500/10 dark:text-fuchsia-300',
+  def: 'bg-indigo-50 text-indigo-800 dark:bg-indigo-500/10 dark:text-indigo-300',
+  wf: 'bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-300',
 };
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head', 'trace'];
@@ -55,6 +58,14 @@ export function operationAnchorId(method: string, path: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return `op-${slug}`;
+}
+
+/** Anchor id for OpenAPI component schema / Swagger `definitions` entries (overview + sidebar TOC). */
+export function schemaAnchorId(schemaName: string): string {
+  const slug = schemaName
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '');
+  return `schema-${slug || 'unnamed'}`;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -126,6 +137,36 @@ function parseOpenApiToc(spec: unknown): TagGroup[] {
   return ordered;
 }
 
+function parseOpenApiSchemaGroup(spec: unknown): TagGroup | null {
+  if (!isObject(spec)) return null;
+  const components = isObject(spec.components) ? spec.components : null;
+  const componentSchemas = components && isObject(components.schemas) ? components.schemas : {};
+  const legacyDefinitions = isObject(spec.definitions) ? spec.definitions : {};
+  const names = [
+    ...new Set([...Object.keys(componentSchemas), ...Object.keys(legacyDefinitions)]),
+  ].sort((a, b) => a.localeCompare(b));
+  if (names.length === 0) return null;
+
+  return {
+    tag: 'Schemas',
+    operations: names.map((name) => {
+      const raw =
+        (isObject(componentSchemas[name]) ? componentSchemas[name] : null) ??
+        (isObject(legacyDefinitions[name]) ? legacyDefinitions[name] : null);
+      let summary: string | undefined;
+      if (isObject(raw)) {
+        if (typeof raw.title === 'string') summary = raw.title;
+      }
+      return {
+        method: 'CLS',
+        path: name,
+        summary,
+        anchorId: schemaAnchorId(name),
+      };
+    }),
+  };
+}
+
 function parseArazzoOutline(spec: unknown): TagGroup[] {
   if (!isObject(spec)) return [];
   const workflows = Array.isArray(spec.workflows) ? spec.workflows : [];
@@ -181,7 +222,11 @@ export function SpecSidebar({
 
   const groups = useMemo(() => {
     if (!spec) return [];
-    if (format === 'openapi') return parseOpenApiToc(spec);
+    if (format === 'openapi') {
+      const pathGroups = parseOpenApiToc(spec);
+      const schemaGroup = parseOpenApiSchemaGroup(spec);
+      return schemaGroup ? [...pathGroups, schemaGroup] : pathGroups;
+    }
     if (format === 'arazzo') return parseArazzoOutline(spec);
     if (format === 'jsonschema') return parseJsonSchemaOutline(spec);
     return [];
@@ -313,9 +358,9 @@ export function SpecSidebar({
                     type="search"
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
-                    placeholder="Filter operations..."
+                    placeholder="Filter paths & schemas..."
                     className="h-7 w-full rounded-md border border-zinc-200 bg-white px-2 text-[12px] text-zinc-900 placeholder-zinc-400 focus-visible:border-[var(--brand)] focus-visible:outline-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500"
-                    aria-label="Filter operations"
+                    aria-label="Filter table of contents"
                   />
                 </div>
                 <ul className="max-h-[60vh] overflow-y-auto py-1">
@@ -362,7 +407,10 @@ export function SpecSidebar({
                                       >
                                         {op.method.length > 3 ? op.method.slice(0, 3) : op.method}
                                       </span>
-                                      <span className="truncate font-mono" title={op.path}>
+                                      <span
+                                        className="truncate font-mono"
+                                        title={op.summary ? `${op.path} — ${op.summary}` : op.path}
+                                      >
                                         {op.path}
                                       </span>
                                     </a>
