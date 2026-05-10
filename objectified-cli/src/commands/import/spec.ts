@@ -31,7 +31,7 @@ import {
 } from "../../lib/import/spec-import-project-resolution.js";
 import type { Visibility } from "../../lib/projects/project-create-body.js";
 import { validateProjectSlug } from "../../lib/projects/project-slug.js";
-import { parseValidSemverVersionId } from "../../lib/versions/create-helpers.js";
+import { resolveImportCatalogVersionId } from "../../lib/versions/create-helpers.js";
 
 type ImportSpecSummaryJson = {
   tenant_slug: string;
@@ -65,7 +65,7 @@ function throwForBadTerminalState(st: SpecImportJobStatus): never {
 
 export default class ImportSpec extends BaseCommand {
   static description =
-    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
+    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
 
   static examples = [
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0",
@@ -115,7 +115,7 @@ export default class ImportSpec extends BaseCommand {
     }),
     version: Flags.string({
       description:
-        "Semantic version id for the imported catalog revision (for example 1.0.0). With --create-or-map-project, defaults to info.version from OpenAPI/AsyncAPI when omitted. Required for other project strategies.",
+        "Catalog revision version id (prefer SemVer 2.0). With --create-or-map-project, defaults to info.version from OpenAPI/AsyncAPI when omitted. Required for other project strategies. Without --strict, invalid strict semver is normalized or forwarded with a warning.",
     }),
     "project-description": Flags.string({
       description: "Optional project description forwarded in import metadata.",
@@ -149,6 +149,11 @@ export default class ImportSpec extends BaseCommand {
     filename: Flags.string({
       description:
         "Original filename hint when PATH is `-` (improves sniffing for stdin payloads); may include directories (basename is used).",
+    }),
+    strict: Flags.boolean({
+      description:
+        "Require catalog version ids (--version or spec info.version) to satisfy strict SemVer 2.0 parsing. Without this flag, loose semver is normalized when possible and non-semver labels are forwarded with a warning.",
+      default: false,
     }),
     "dry-run": Flags.boolean({
       description:
@@ -223,6 +228,7 @@ export default class ImportSpec extends BaseCommand {
     const visibilityRaw =
       typeof this.flags.visibility === "string" ? this.flags.visibility.trim() : "";
     const visibilityProvided = typeof this.flags.visibility === "string";
+    const strictSemver = this.flags.strict === true;
     let visibilityCli: Visibility | undefined;
     if (visibilityProvided) {
       if (visibilityRaw !== "private" && visibilityRaw !== "public") {
@@ -288,7 +294,9 @@ export default class ImportSpec extends BaseCommand {
     let kind: ResolvedSpecKind;
 
     if (hasMap) {
-      versionId = parseValidSemverVersionId(versionRaw);
+      const mapVer = resolveImportCatalogVersionId(versionRaw, strictSemver);
+      versionId = mapVer.versionId;
+      this.emitImportSemverWarnings(mapVer.semverWarnings);
       this.importProgress(`resolving --map-project slug=${mapRaw} (GET project by slug)`);
       resolved = await resolveMapProjectImport({
         api: this.api,
@@ -326,8 +334,10 @@ export default class ImportSpec extends BaseCommand {
         cliProjectName: projectName,
         cliProjectSlug: typeof projectSlugRaw === "string" ? projectSlugRaw.trim() : "",
         cliVersionRaw: versionRaw,
+        strictSemver,
       });
       versionId = catalogIdentity.versionId;
+      this.emitImportSemverWarnings(catalogIdentity.semverWarnings);
       const projectTarget = {
         name: catalogIdentity.projectName,
         slug: catalogIdentity.projectSlug,
@@ -350,7 +360,9 @@ export default class ImportSpec extends BaseCommand {
         visibility: visibilityCli,
       });
     } else if (createProject) {
-      versionId = parseValidSemverVersionId(versionRaw);
+      const cpVer = resolveImportCatalogVersionId(versionRaw, strictSemver);
+      versionId = cpVer.versionId;
+      this.emitImportSemverWarnings(cpVer.semverWarnings);
       if (projectName === "") {
         throw new ObjectifiedCliError({
           message: "--project-name is required with --create-project.",
@@ -395,7 +407,9 @@ export default class ImportSpec extends BaseCommand {
       });
       this.importProgress(`detected source_kind=${kind.sourceKind} (${String(bytes.length)} bytes)`);
     } else {
-      versionId = parseValidSemverVersionId(versionRaw);
+      const legVer = resolveImportCatalogVersionId(versionRaw, strictSemver);
+      versionId = legVer.versionId;
+      this.emitImportSemverWarnings(legVer.semverWarnings);
       if (projectName === "") {
         throw new ObjectifiedCliError({
           message: "--project-name is required unless --map-project is set.",
@@ -644,6 +658,14 @@ export default class ImportSpec extends BaseCommand {
     if (this.flags.quiet === true) return;
     this.importProgressSeq++;
     process.stderr.write(`objectified: import: [${String(this.importProgressSeq)}] ${message}\n`);
+  }
+
+  /** SemVer mismatch warnings (non-strict); suppressed when --quiet. */
+  private emitImportSemverWarnings(warnings: string[]): void {
+    if (this.flags.quiet === true || warnings.length === 0) return;
+    for (const w of warnings) {
+      this.warn(w);
+    }
   }
 
   /**

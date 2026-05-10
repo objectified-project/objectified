@@ -1243,7 +1243,7 @@ SEE ALSO
 
 ## `objectified import spec PATH`
 
-Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 
 ```
 USAGE
@@ -1251,8 +1251,8 @@ USAGE
     <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--map-project <value> |
     --create-project | --create-or-map-project | --existing-project-id <value>] [--project-name <value>] [--project-slug
     <value>] [--version <value>] [--project-description <value>] [--version-description <value>] [--domain <value>]
-    [--visibility private|public] [--yes] [--format <value>] [--filename <value>] [--dry-run] [--no-wait] [--commit]
-    [--rollback]
+    [--visibility private|public] [--yes] [--format <value>] [--filename <value>] [--strict] [--dry-run] [--no-wait]
+    [--commit] [--rollback]
 
 ARGUMENTS
   PATH  Path to the spec file, or `-` to read raw bytes from stdin.
@@ -1262,8 +1262,10 @@ DESCRIPTION
   with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are
   logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an
   extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as
-  contact and license). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard
-  Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+  contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer
+  2.0; pass `--strict` to enforce strict semver and fail on mismatch. `--verbose` adds HTTP diagnostics and poll backoff
+  timings. Supported formats vs the dashboard Import dialog and repository filename scanner:
+  docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 
 EXAMPLES
   $ objectified import spec ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0
@@ -1332,9 +1334,13 @@ OTHER
                                  the slug.
   --rollback                     After preview (pending-approval), POST …/rollback instead of commit (implies
                                  --no-commit).
-  --version=<value>              Semantic version id for the imported catalog revision (for example 1.0.0). With
-                                 --create-or-map-project, defaults to info.version from OpenAPI/AsyncAPI when omitted.
-                                 Required for other project strategies.
+  --strict                       Require catalog version ids (--version or spec info.version) to satisfy strict SemVer
+                                 2.0 parsing. Without this flag, loose semver is normalized when possible and non-semver
+                                 labels are forwarded with a warning.
+  --version=<value>              Catalog revision version id (prefer SemVer 2.0). With --create-or-map-project, defaults
+                                 to info.version from OpenAPI/AsyncAPI when omitted. Required for other project
+                                 strategies. Without --strict, invalid strict semver is normalized or forwarded with a
+                                 warning.
   --version-description=<value>  Optional version description forwarded in import metadata.
   --visibility=<option>          Optional visibility metadata when creating a project: private or public (default:
                                  private).

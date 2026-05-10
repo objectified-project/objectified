@@ -5,6 +5,7 @@ import {
   parseValidSemverVersionId,
   pickLatestPublishedRevision,
   resolveHeadRevisionId,
+  resolveImportCatalogVersionId,
   versionLineExists,
 } from "../src/lib/versions/create-helpers.js";
 
@@ -24,6 +25,28 @@ describe("versions create helpers (#3210)", () => {
 
   it("throws validation exit on invalid semver strings", () => {
     expect(() => parseValidSemverVersionId("not-a-version")).toThrow(/Invalid semantic version/);
+  });
+
+  it("resolveImportCatalogVersionId strict accepts normalized strict semver only", () => {
+    expect(resolveImportCatalogVersionId("1.2.3", true)).toEqual({
+      versionId: "1.2.3",
+      semverWarnings: [],
+    });
+    expect(() => resolveImportCatalogVersionId("01.2.3", true)).toThrow(/strict mode/);
+  });
+
+  it("resolveImportCatalogVersionId non-strict coerces loose semver with warning", () => {
+    const r = resolveImportCatalogVersionId("01.2.3", false);
+    expect(r.versionId).toBe("1.2.3");
+    expect(r.semverWarnings.length).toBe(1);
+    expect(r.semverWarnings[0]).toMatch(/not strict SemVer/);
+  });
+
+  it("resolveImportCatalogVersionId non-strict forwards arbitrary labels with warning", () => {
+    const r = resolveImportCatalogVersionId("not-a-version", false);
+    expect(r.versionId).toBe("not-a-version");
+    expect(r.semverWarnings.length).toBe(1);
+    expect(r.semverWarnings[0]).toMatch(/not parseable as semver/);
   });
 
   it("picks highest semver among published rows", () => {

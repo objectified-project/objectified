@@ -3,7 +3,7 @@ import { parse as parseYaml } from "yaml";
 import { ObjectifiedCliError } from "../errors.js";
 import { EXIT_CODES } from "../exit-codes.js";
 import { suggestSlugFromName, validateProjectSlug } from "../projects/project-slug.js";
-import { parseValidSemverVersionId } from "../versions/create-helpers.js";
+import { resolveImportCatalogVersionId } from "../versions/create-helpers.js";
 
 /** Fields commonly present under `info` in OpenAPI, Swagger 2.x, and AsyncAPI 2.x. */
 export type DerivedCatalogIdentity = {
@@ -116,6 +116,7 @@ export type ResolvedCatalogIdentityForImport = {
   projectName: string;
   projectSlug: string;
   versionId: string;
+  semverWarnings: string[];
 };
 
 /**
@@ -128,7 +129,10 @@ export function resolveCatalogIdentityForCreateOrMap(opts: {
   cliProjectName: string;
   cliProjectSlug: string;
   cliVersionRaw: string;
+  /** When true, catalog version must satisfy strict SemVer parsing. */
+  strictSemver?: boolean;
 }): ResolvedCatalogIdentityForImport {
+  const strictSemver = opts.strictSemver === true;
   const name =
     opts.cliProjectName !== ""
       ? opts.cliProjectName
@@ -173,7 +177,7 @@ export function resolveCatalogIdentityForCreateOrMap(opts: {
     });
   }
 
-  const versionId = parseValidSemverVersionId(versionRaw);
+  const { versionId, semverWarnings } = resolveImportCatalogVersionId(versionRaw, strictSemver);
 
   let slugRaw = opts.cliProjectSlug.trim();
   if (slugRaw === "") {
@@ -197,5 +201,6 @@ export function resolveCatalogIdentityForCreateOrMap(opts: {
     projectName: name,
     projectSlug: slugCheck.slug,
     versionId,
+    semverWarnings,
   };
 }

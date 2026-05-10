@@ -103,6 +103,7 @@ channels: {}
     expect(r.projectName).toBe("My API");
     expect(r.projectSlug).toBe("my-api");
     expect(r.versionId).toBe("1.2.3");
+    expect(r.semverWarnings).toEqual([]);
   });
 
   it("CLI overrides beat spec derivation", () => {
@@ -116,6 +117,32 @@ channels: {}
     expect(r.projectName).toBe("Shown");
     expect(r.projectSlug).toBe("shown-api");
     expect(r.versionId).toBe("3.0.0");
+    expect(r.semverWarnings).toEqual([]);
+  });
+
+  it("resolveCatalogIdentityForCreateOrMap propagates loose semver warnings when not strict", () => {
+    const r = resolveCatalogIdentityForCreateOrMap({
+      derived: { title: "My API", version: "01.2.3" },
+      sourceKind: "openapi-3",
+      cliProjectName: "",
+      cliProjectSlug: "",
+      cliVersionRaw: "",
+    });
+    expect(r.versionId).toBe("1.2.3");
+    expect(r.semverWarnings.length).toBe(1);
+  });
+
+  it("resolveCatalogIdentityForCreateOrMap throws for loose semver when strictSemver", () => {
+    expect(() =>
+      resolveCatalogIdentityForCreateOrMap({
+        derived: { title: "My API", version: "01.2.3" },
+        sourceKind: "openapi-3",
+        cliProjectName: "",
+        cliProjectSlug: "",
+        cliVersionRaw: "",
+        strictSemver: true,
+      }),
+    ).toThrow(/strict mode/);
   });
 
   it("throws when name cannot be resolved", () => {

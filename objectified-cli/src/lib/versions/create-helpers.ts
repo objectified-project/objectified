@@ -28,6 +28,63 @@ export function parseValidSemverVersionId(raw: string): string {
   return v;
 }
 
+export type ResolveImportCatalogVersionIdResult = {
+  /** Normalized semver when parseable, or the trimmed raw label when not (non-strict only). */
+  versionId: string;
+  /** Human-readable warnings for stderr (non-strict mode). */
+  semverWarnings: string[];
+};
+
+/**
+ * Catalog import version policy: default accepts loose semver or arbitrary labels and warns;
+ * `--strict` requires SemVer 2.0 forms that satisfy strict parsing (no loose-only coercion).
+ */
+export function resolveImportCatalogVersionId(
+  raw: string,
+  strict: boolean,
+): ResolveImportCatalogVersionIdResult {
+  const t = raw.trim();
+  if (t === "") {
+    throw new ObjectifiedCliError({
+      message: "Version string is empty.",
+      exitCode: EXIT_CODES.VALIDATION,
+      title: "Validation failed",
+      hint: "Pass a semantic version such as 2.2.0-rc.1 (see https://semver.org/).",
+    });
+  }
+
+  const strictNorm = semver.valid(t, { loose: false });
+  const looseNorm = semver.valid(t, { loose: true });
+
+  if (strict) {
+    if (strictNorm === null) {
+      throw new ObjectifiedCliError({
+        message: `Invalid semantic version (strict mode): ${t}`,
+        exitCode: EXIT_CODES.VALIDATION,
+        title: "Validation failed",
+        hint: "Use SemVer 2.0 accepted by strict parsing (e.g. 1.2.0, 2.0.0-beta.1). Run without --strict to allow loose semver or non-semver catalog version ids.",
+      });
+    }
+    return { versionId: strictNorm, semverWarnings: [] };
+  }
+
+  const semverWarnings: string[] = [];
+  if (strictNorm !== null) {
+    return { versionId: strictNorm, semverWarnings };
+  }
+  if (looseNorm !== null) {
+    semverWarnings.push(
+      `Import catalog version ${JSON.stringify(t)} is not strict SemVer 2.0; using normalized ${JSON.stringify(looseNorm)} (loose parse). Use --strict to require strict semver.`,
+    );
+    return { versionId: looseNorm, semverWarnings };
+  }
+
+  semverWarnings.push(
+    `Import catalog version ${JSON.stringify(t)} is not parseable as semver; forwarding as-is. The API may reject it. Use --strict to require SemVer 2.0.`,
+  );
+  return { versionId: t, semverWarnings };
+}
+
 /** Latest published revision (prefers strict semver ordering when parseable; ignores drafts). */
 export function pickLatestPublishedRevision(versions: VersionSchema[]): VersionSchema | undefined {
   const candidates = versions.filter((v) => {
