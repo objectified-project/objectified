@@ -1,6 +1,6 @@
 .TH OBJECTIFIED\-IMPORT\-SPEC 1 "" "" "User Commands"
 .SH NAME
-objectified import spec \- Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+objectified import spec \- Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. Use `--publish=public` or `--publish=private` to publish after import completes; that step skips server publication gates — verify the catalog yourself (CLI warns on success). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 .SH DESCRIPTION
 .nf
 USAGE
@@ -12,7 +12,8 @@ USAGE
     <value>] [--version <value>] [--project-description <value>]
     [--version-description <value>] [--domain <value>] [--visibility
     private|public] [--yes] [--format <value>] [--filename <value>] [--strict]
-    [--dry-run] [--no-wait] [--commit] [--rollback]
+    [--dry-run] [--no-wait] [--commit] [--rollback] [--publish public|private]
+    [--publish-message <value>]
 
 ARGUMENTS
   PATH  Path to the spec file, or `-` to read raw bytes from stdin.
@@ -27,9 +28,12 @@ DESCRIPTION
   description, and remaining `info` metadata such as contact and license).
   Catalog version ids default to permissive parsing with warnings when they
   are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail
-  on mismatch. `--verbose` adds HTTP diagnostics and poll backoff timings.
-  Supported formats vs the dashboard Import dialog and repository filename
-  scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+  on mismatch. Use `--publish=public` or `--publish=private` to publish after
+  import completes; that step skips server publication gates — verify the
+  catalog yourself (CLI warns on success). `--verbose` adds HTTP diagnostics
+  and poll backoff timings. Supported formats vs the dashboard Import dialog
+  and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic
+  #3328).
 
 EXAMPLES
   $ objectified import spec ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0
@@ -47,6 +51,8 @@ EXAMPLES
   $ objectified import spec - --filename ./api.yaml --project-slug svc --project-name Service --version 0.1.0 < ./api.yaml
 
   $ objectified import spec ./asyncapi.yml --project-slug events --project-name Events --version 1.0.0 --dry-run
+
+  $ objectified import spec ./openapi.yaml --create-or-map-project --yes --publish=private
 
 COMMON
   --base-url=<value>  Root REST API URL.
@@ -129,6 +135,21 @@ OTHER
       URL-safe project slug (^[a-z][a-z0-9-]{1,62}$). With
       --create-or-map-project, derived from the display name when omitted.
       Otherwise required unless --map-project supplies the slug.
+
+  --publish=<option>
+      After the import finishes successfully (saved revision, final state
+      completed), publish that revision with public or private visibility. POST
+      …/publish uses skipPublishChecks so server gates (class descriptions,
+      OpenAPI materialization, baseline compatibility) do not block — verify the
+      catalog yourself; the CLI warns after success. Ignored with --no-wait,
+      dry-run, or when stopping before commit. Sends shortMessage via
+      --publish-message, else first line of --version-description, else a
+      default.
+      <options: public|private>
+
+  --publish-message=<value>
+      Revision note (shortMessage) for POST …/publish when using --publish; max
+      500 characters. Overrides the default and --version-description.
 
   --rollback
       After preview (pending-approval), POST …/rollback instead of commit

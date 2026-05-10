@@ -8,6 +8,7 @@ import type {
   SpecImportJobAccepted,
   SpecImportJobStatus,
   SpecImportRollbackResponse,
+  VersionPublishRequest,
 } from "../../lib/client.js";
 import { ObjectifiedCliError } from "../../lib/errors.js";
 import { EXIT_CODES } from "../../lib/exit-codes.js";
@@ -47,6 +48,12 @@ type ImportSpecSummaryJson = {
   commit?: SpecImportCommitResponse | null;
   rollback?: SpecImportRollbackResponse | null;
   stopped_at?: "pending-approval" | null;
+  /** Present when --publish ran successfully after import */
+  publish?: {
+    visibility: "public" | "private";
+    published: true;
+    version_record_id: string;
+  } | null;
 };
 
 function throwForBadTerminalState(st: SpecImportJobStatus): never {
@@ -65,7 +72,7 @@ function throwForBadTerminalState(st: SpecImportJobStatus): never {
 
 export default class ImportSpec extends BaseCommand {
   static description =
-    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
+    "Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. Use `--publish=public` or `--publish=private` to publish after import completes; that step skips server publication gates — verify the catalog yourself (CLI warns on success). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).";
 
   static examples = [
     "<%= config.bin %> <%= command.id %> ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0",
@@ -76,6 +83,7 @@ export default class ImportSpec extends BaseCommand {
     "<%= config.bin %> --json <%= command.id %> ./spec.json --project-slug my-api --project-name 'My API' --version 2.0.0 --no-wait",
     "<%= config.bin %> <%= command.id %> - --filename ./api.yaml --project-slug svc --project-name Service --version 0.1.0 < ./api.yaml",
     "<%= config.bin %> <%= command.id %> ./asyncapi.yml --project-slug events --project-name Events --version 1.0.0 --dry-run",
+    "<%= config.bin %> <%= command.id %> ./openapi.yaml --create-or-map-project --yes --publish=private",
   ];
 
   static seeAlso = ["import jobs", "projects create", "versions create", "docs errors", "tenants use"];
@@ -175,6 +183,15 @@ export default class ImportSpec extends BaseCommand {
       description:
         "After preview (pending-approval), POST …/rollback instead of commit (implies --no-commit).",
       default: false,
+    }),
+    publish: Flags.string({
+      description:
+        "After the import finishes successfully (saved revision, final state completed), publish that revision with public or private visibility. POST …/publish uses skipPublishChecks so server gates (class descriptions, OpenAPI materialization, baseline compatibility) do not block — verify the catalog yourself; the CLI warns after success. Ignored with --no-wait, dry-run, or when stopping before commit. Sends shortMessage via --publish-message, else first line of --version-description, else a default.",
+      options: ["public", "private"],
+    }),
+    "publish-message": Flags.string({
+      description:
+        "Revision note (shortMessage) for POST …/publish when using --publish; max 500 characters. Overrides the default and --version-description.",
     }),
   };
 
@@ -481,6 +498,7 @@ export default class ImportSpec extends BaseCommand {
 
     const dryRun = this.flags["dry-run"] === true;
     const noWait = this.flags["no-wait"] === true;
+    const publishIntent = this.parsePublishVisibilityIntent();
 
     const verDescRaw = this.flags["version-description"];
 
@@ -510,6 +528,9 @@ export default class ImportSpec extends BaseCommand {
     this.importProgress(`import job accepted job_id=${accepted.job_id}`);
 
     if (noWait) {
+      if (publishIntent !== undefined) {
+        this.warn("--publish is ignored with --no-wait (this run does not wait for import completion).");
+      }
       this.importProgress("--no-wait: skipping poll and finalize POSTs");
       const early: ImportSpecSummaryJson = {
         tenant_slug: tenant,
@@ -580,6 +601,7 @@ export default class ImportSpec extends BaseCommand {
         rollback: undefined,
         stoppedAt: null,
       });
+      await this.maybePublishImportedRevision(tenant, summary, dryRun);
       this.emitSummary(summary);
       this.importProgress(`done final_state=${summary.final_state}`);
       return;
@@ -590,6 +612,11 @@ export default class ImportSpec extends BaseCommand {
         `gate reached state=pending-approval commit=${String(commit)} rollback=${String(rollback)}`,
       );
       if (!commit && !rollback) {
+        if (publishIntent !== undefined) {
+          this.warn(
+            "--publish is ignored when stopping at pending-approval without commit (no saved revision to publish).",
+          );
+        }
         this.importProgress("stopping at pending-approval (--no-commit); no finalize POST");
         const summary = this.buildSummaryJson({
           tenant,
@@ -639,6 +666,7 @@ export default class ImportSpec extends BaseCommand {
       rollback: rollbackOut ?? null,
       stoppedAt: null,
     });
+    await this.maybePublishImportedRevision(tenant, summary, dryRun);
     this.emitSummary(summary);
     this.importProgress(`done final_state=${summary.final_state}`);
   }
@@ -665,6 +693,97 @@ export default class ImportSpec extends BaseCommand {
     if (this.flags.quiet === true || warnings.length === 0) return;
     for (const w of warnings) {
       this.warn(w);
+    }
+  }
+
+  private parsePublishVisibilityIntent(): "public" | "private" | undefined {
+    const raw = this.flags.publish;
+    if (typeof raw !== "string") return undefined;
+    const v = raw.trim().toLowerCase();
+    return v === "public" || v === "private" ? v : undefined;
+  }
+
+  /** API requires shortMessage on publish; align with `versions publish --message`. */
+  private resolvePublishShortMessage(): string {
+    const pubMsg = this.flags["publish-message"];
+    if (typeof pubMsg === "string" && pubMsg.trim() !== "") {
+      return pubMsg.trim().slice(0, 500);
+    }
+    const verDesc = this.flags["version-description"];
+    if (typeof verDesc === "string" && verDesc.trim() !== "") {
+      const firstLine = verDesc.trim().split(/\r?\n/)[0]?.trim() ?? "";
+      if (firstLine !== "") return firstLine.slice(0, 500);
+    }
+    return "Published after specification import";
+  }
+
+  /**
+   * POST …/publish after a successful import (`final_state` completed, revision ids present).
+   * No-op when `--publish` omitted; warns when publish cannot apply (dry-run, wrong terminal state).
+   */
+  private async maybePublishImportedRevision(
+    tenant: string,
+    summary: ImportSpecSummaryJson,
+    dryRun: boolean,
+  ): Promise<void> {
+    const visibility = this.parsePublishVisibilityIntent();
+    if (visibility === undefined) return;
+
+    if (dryRun) {
+      this.warn(`--publish=${visibility} ignored: dry-run imports do not persist a catalog revision.`);
+      return;
+    }
+
+    if (summary.final_state !== "completed") {
+      this.warn(
+        `--publish=${visibility} ignored: import did not complete successfully (final_state=${summary.final_state}).`,
+      );
+      return;
+    }
+
+    const projectId = summary.project_id?.trim();
+    const versionRecordId = summary.version_record_id?.trim();
+    if (!projectId || !versionRecordId) {
+      throw new ObjectifiedCliError({
+        message: "Cannot publish: import result is missing project_id or version_record_id.",
+        exitCode: EXIT_CODES.GENERIC,
+        title: "Publish failed",
+        hint: "Import reported success but no revision identifiers were returned; inspect job status or retry without --no-wait.",
+      });
+    }
+
+    const shortMessage = this.resolvePublishShortMessage();
+    this.importProgress(`POST …/publish revision ${versionRecordId} visibility=${visibility}`);
+    const body: VersionPublishRequest = {
+      visibility,
+      shortMessage,
+      changeReportBaselineMode: "auto",
+      skipPublishChecks: true,
+    };
+    try {
+      const published = await this.api.publishVersion(tenant, projectId, versionRecordId, body);
+      summary.publish = {
+        visibility,
+        published: true,
+        version_record_id: published.id,
+      };
+      this.warn(
+        "Published without server publication gates (class descriptions, OpenAPI build, baseline compatibility were not enforced). Review the revision before sharing.",
+      );
+    } catch (e: unknown) {
+      if (e instanceof ObjectifiedCliError) {
+        const followUp =
+          "Import saved the revision; run `objectified versions publish …` if you need gated publication, or retry import with `--publish`.";
+        throw new ObjectifiedCliError({
+          message: `Import finished but publish failed: ${e.message}`,
+          exitCode: e.exitCode,
+          title: "Publish failed",
+          hint: e.hint !== undefined && e.hint !== "" ? `${e.hint} ${followUp}` : followUp,
+          requestId: e.requestId,
+          retriesAttempted: e.retriesAttempted,
+        });
+      }
+      throw e;
     }
   }
 
@@ -779,6 +898,11 @@ export default class ImportSpec extends BaseCommand {
       return;
     }
 
+    const publishCell =
+      summary.publish !== undefined && summary.publish !== null
+        ? `${summary.publish.visibility} (published)`
+        : "";
+
     const rows: Record<string, unknown>[] = [
       {
         job_id: summary.job_id,
@@ -789,6 +913,7 @@ export default class ImportSpec extends BaseCommand {
         project_id: summary.project_id ?? "",
         version_id: summary.version_id ?? "",
         version_record_id: summary.version_record_id ?? "",
+        publish: publishCell,
       },
     ];
 
@@ -801,6 +926,7 @@ export default class ImportSpec extends BaseCommand {
       { key: "project_id", label: "Project id" },
       { key: "version_id", label: "Version" },
       { key: "version_record_id", label: "Revision id" },
+      { key: "publish", label: "Publish" },
     ]);
 
     if (summary.stopped_at === "pending-approval") {

@@ -1243,7 +1243,7 @@ SEE ALSO
 
 ## `objectified import spec PATH`
 
-Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+Start a tenant-scoped specification import (POST /v1/tenants/{tenant_slug}/imports with JSON+base64), poll job status with backoff, then commit (default), rollback preview, or stop after preview (`--no-commit`). Progress steps are logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer 2.0; pass `--strict` to enforce strict semver and fail on mismatch. Use `--publish=public` or `--publish=private` to publish after import completes; that step skips server publication gates — verify the catalog yourself (CLI warns on success). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 
 ```
 USAGE
@@ -1252,7 +1252,7 @@ USAGE
     --create-project | --create-or-map-project | --existing-project-id <value>] [--project-name <value>] [--project-slug
     <value>] [--version <value>] [--project-description <value>] [--version-description <value>] [--domain <value>]
     [--visibility private|public] [--yes] [--format <value>] [--filename <value>] [--strict] [--dry-run] [--no-wait]
-    [--commit] [--rollback]
+    [--commit] [--rollback] [--publish public|private] [--publish-message <value>]
 
 ARGUMENTS
   PATH  Path to the spec file, or `-` to read raw bytes from stdin.
@@ -1263,9 +1263,10 @@ DESCRIPTION
   logged to stderr as `[n] …` (use `--quiet` to suppress). Before the job starts, OpenAPI and AsyncAPI specs print an
   extracted summary (catalog project name/slug/version, spec title, description, and remaining `info` metadata such as
   contact and license). Catalog version ids default to permissive parsing with warnings when they are not strict SemVer
-  2.0; pass `--strict` to enforce strict semver and fail on mismatch. `--verbose` adds HTTP diagnostics and poll backoff
-  timings. Supported formats vs the dashboard Import dialog and repository filename scanner:
-  docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
+  2.0; pass `--strict` to enforce strict semver and fail on mismatch. Use `--publish=public` or `--publish=private` to
+  publish after import completes; that step skips server publication gates — verify the catalog yourself (CLI warns on
+  success). `--verbose` adds HTTP diagnostics and poll backoff timings. Supported formats vs the dashboard Import dialog
+  and repository filename scanner: docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md (Epic #3328).
 
 EXAMPLES
   $ objectified import spec ./openapi.yaml --project-name 'Payments API' --project-slug payments-api --version 1.0.0
@@ -1283,6 +1284,8 @@ EXAMPLES
   $ objectified import spec - --filename ./api.yaml --project-slug svc --project-name Service --version 0.1.0 < ./api.yaml
 
   $ objectified import spec ./asyncapi.yml --project-slug events --project-name Events --version 1.0.0 --dry-run
+
+  $ objectified import spec ./openapi.yaml --create-or-map-project --yes --publish=private
 
 COMMON
   --base-url=<value>  Root REST API URL.
@@ -1304,49 +1307,85 @@ AUTH
   --api-key-file=<value>  Read API key from a file (single line; avoids shell history).
 
 OTHER
-  --[no-]commit                  After preview (pending-approval), POST …/commit (default). Use --no-commit to leave the
-                                 preview transaction open.
-  --create-or-map-project        Resolve project by slug: reuse when metadata matches; otherwise create then import
-                                 (CI-friendly). Mutually exclusive with --map-project and --create-project.
-  --create-project               POST /v1/projects/{tenant} when --project-slug is free, then import onto that project
-                                 id. Refuses if the slug already exists.
-  --domain=<value>               Optional domainCategory when creating a project (only with --create-project or
-                                 --create-or-map-project).
-  --dry-run                      Forward dry_run in import options (validate/analyze without persisting;
-                                 server-defined).
-  --existing-project-id=<value>  Legacy: attach the job to this catalog project id. Cannot be combined with
-                                 --map-project / --create-project / --create-or-map-project.
-  --filename=<value>             Original filename hint when PATH is `-` (improves sniffing for stdin payloads); may
-                                 include directories (basename is used).
-  --format=<value>               Importer kind when extension/content sniff is ambiguous (openapi-3, asyncapi-2,
-                                 protobuf, graphql, …).
-  --map-project=<value>          Target an existing catalog project by slug (tenant-scoped lookup); forwards
-                                 metadata.existing_project_id. Mutually exclusive with --create-project,
-                                 --create-or-map-project, and --existing-project-id.
-  --no-wait                      Start the job and print the job id immediately without polling or finalize calls (CI
-                                 stitching).
-  --project-description=<value>  Optional project description forwarded in import metadata.
-  --project-name=<value>         Display name for the catalog project. With --create-or-map-project, defaults to
-                                 info.title from OpenAPI/AsyncAPI. Otherwise required except with --map-project
-                                 (optional there for validation only).
-  --project-slug=<value>         URL-safe project slug (^[a-z][a-z0-9-]{1,62}$). With --create-or-map-project, derived
-                                 from the display name when omitted. Otherwise required unless --map-project supplies
-                                 the slug.
-  --rollback                     After preview (pending-approval), POST …/rollback instead of commit (implies
-                                 --no-commit).
-  --strict                       Require catalog version ids (--version or spec info.version) to satisfy strict SemVer
-                                 2.0 parsing. Without this flag, loose semver is normalized when possible and non-semver
-                                 labels are forwarded with a warning.
-  --version=<value>              Catalog revision version id (prefer SemVer 2.0). With --create-or-map-project, defaults
-                                 to info.version from OpenAPI/AsyncAPI when omitted. Required for other project
-                                 strategies. Without --strict, invalid strict semver is normalized or forwarded with a
-                                 warning.
-  --version-description=<value>  Optional version description forwarded in import metadata.
-  --visibility=<option>          Optional visibility metadata when creating a project: private or public (default:
-                                 private).
-                                 <options: private|public>
-  --yes                          Non-interactive guard for CI scripts (recommended with create-if-missing flags; import
-                                 itself does not prompt).
+  --[no-]commit
+      After preview (pending-approval), POST …/commit (default). Use --no-commit to leave the preview transaction open.
+
+  --create-or-map-project
+      Resolve project by slug: reuse when metadata matches; otherwise create then import (CI-friendly). Mutually exclusive
+      with --map-project and --create-project.
+
+  --create-project
+      POST /v1/projects/{tenant} when --project-slug is free, then import onto that project id. Refuses if the slug
+      already exists.
+
+  --domain=<value>
+      Optional domainCategory when creating a project (only with --create-project or --create-or-map-project).
+
+  --dry-run
+      Forward dry_run in import options (validate/analyze without persisting; server-defined).
+
+  --existing-project-id=<value>
+      Legacy: attach the job to this catalog project id. Cannot be combined with --map-project / --create-project /
+      --create-or-map-project.
+
+  --filename=<value>
+      Original filename hint when PATH is `-` (improves sniffing for stdin payloads); may include directories (basename is
+      used).
+
+  --format=<value>
+      Importer kind when extension/content sniff is ambiguous (openapi-3, asyncapi-2, protobuf, graphql, …).
+
+  --map-project=<value>
+      Target an existing catalog project by slug (tenant-scoped lookup); forwards metadata.existing_project_id. Mutually
+      exclusive with --create-project, --create-or-map-project, and --existing-project-id.
+
+  --no-wait
+      Start the job and print the job id immediately without polling or finalize calls (CI stitching).
+
+  --project-description=<value>
+      Optional project description forwarded in import metadata.
+
+  --project-name=<value>
+      Display name for the catalog project. With --create-or-map-project, defaults to info.title from OpenAPI/AsyncAPI.
+      Otherwise required except with --map-project (optional there for validation only).
+
+  --project-slug=<value>
+      URL-safe project slug (^[a-z][a-z0-9-]{1,62}$). With --create-or-map-project, derived from the display name when
+      omitted. Otherwise required unless --map-project supplies the slug.
+
+  --publish=<option>
+      After the import finishes successfully (saved revision, final state completed), publish that revision with public or
+      private visibility. POST …/publish uses skipPublishChecks so server gates (class descriptions, OpenAPI
+      materialization, baseline compatibility) do not block — verify the catalog yourself; the CLI warns after success.
+      Ignored with --no-wait, dry-run, or when stopping before commit. Sends shortMessage via --publish-message, else
+      first line of --version-description, else a default.
+      <options: public|private>
+
+  --publish-message=<value>
+      Revision note (shortMessage) for POST …/publish when using --publish; max 500 characters. Overrides the default and
+      --version-description.
+
+  --rollback
+      After preview (pending-approval), POST …/rollback instead of commit (implies --no-commit).
+
+  --strict
+      Require catalog version ids (--version or spec info.version) to satisfy strict SemVer 2.0 parsing. Without this
+      flag, loose semver is normalized when possible and non-semver labels are forwarded with a warning.
+
+  --version=<value>
+      Catalog revision version id (prefer SemVer 2.0). With --create-or-map-project, defaults to info.version from
+      OpenAPI/AsyncAPI when omitted. Required for other project strategies. Without --strict, invalid strict semver is
+      normalized or forwarded with a warning.
+
+  --version-description=<value>
+      Optional version description forwarded in import metadata.
+
+  --visibility=<option>
+      Optional visibility metadata when creating a project: private or public (default: private).
+      <options: private|public>
+
+  --yes
+      Non-interactive guard for CI scripts (recommended with create-if-missing flags; import itself does not prompt).
 
 SEE ALSO
   objectified import jobs
