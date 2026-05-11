@@ -173,6 +173,8 @@ interface JobState {
     dryRun?: boolean;
     /** True when import was run in incremental mode (skip failures, commit as we go). */
     incrementalMode?: boolean;
+    /** True when import exited early because the catalog version line already existed (`skipDuplicateVersions`). */
+    skippedDuplicateVersion?: boolean;
     classes: Array<{ name: string; status: 'success' | 'warning' | 'failed' }>;
     verification?: {
       passed: boolean;
