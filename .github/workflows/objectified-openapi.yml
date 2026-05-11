@@ -1,0 +1,33 @@
+name: objectified-openapi
+
+on:
+  push:
+    paths:
+      - "objectified-rest/openapi.*"
+  pull_request:
+    paths:
+      - "objectified-rest/openapi.*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      OBJECTIFIED_API_KEY: ${{ secrets.OBJECTIFIED_API_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Enable Corepack and set Yarn to 4.12.0
+        run: corepack enable && corepack prepare yarn@4.12.0 --activate
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Build CLI and Push
+        run: |
+          cd objectified-cli
+          yarn install
+          yarn build
+          ./run.sh --tenant=objectified import spec ../objectified-rest/openapi.yaml --create-or-map-project --publish=public --poll=1000 --skip-duplicate-versions

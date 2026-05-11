@@ -29,7 +29,7 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install Objectified UI dependencies
+      - name: Install Objectified CLI dependencies
         run: |
           cd objectified-cli
           yarn install
@@ -46,7 +46,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
           NODE_ENV: test
 
-      - name: Build Objectified UI
+      - name: Build Objectified CLI
         run: |
           cd objectified-cli
           yarn build
