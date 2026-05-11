@@ -169,6 +169,11 @@ export default class ImportSpec extends BaseCommand {
         "Forward dry_run in import options (validate/analyze without persisting; server-defined).",
       default: false,
     }),
+    "skip-duplicate-versions": Flags.boolean({
+      description:
+        "Forward skip_duplicate_versions in import options: if the catalog version line already exists for the target project, complete successfully without re-importing classes (idempotent no-op).",
+      default: false,
+    }),
     "no-wait": Flags.boolean({
       description:
         "Start the job and print the job id immediately without polling or finalize calls (CI stitching).",
@@ -530,6 +535,7 @@ export default class ImportSpec extends BaseCommand {
     const commit = !rollback && this.flags.commit !== false;
 
     const dryRun = this.flags["dry-run"] === true;
+    const skipDuplicateVersions = this.flags["skip-duplicate-versions"] === true;
     const noWait = this.flags["no-wait"] === true;
     const pollIntervalMs = typeof this.flags.poll === "number" ? this.flags.poll : undefined;
     if (pollIntervalMs !== undefined && noWait) {
@@ -541,8 +547,16 @@ export default class ImportSpec extends BaseCommand {
 
     const documentBase64 = bytes.toString("base64");
 
+    const importOptions =
+      dryRun || skipDuplicateVersions
+        ? {
+            ...(dryRun ? { dry_run: true as const } : {}),
+            ...(skipDuplicateVersions ? { skip_duplicate_versions: true as const } : {}),
+          }
+        : undefined;
+
     this.importProgress(
-      `Submitting import job: POST /v1/tenants/${tenant}/imports with the specification as base64 (${String(documentBase64.length)} encoded characters)${dryRun ? "; dry_run=true (server validates without persisting per API contract)" : ""}${noWait ? "; --no-wait will return as soon as the job is accepted" : ""}.`,
+      `Submitting import job: POST /v1/tenants/${tenant}/imports with the specification as base64 (${String(documentBase64.length)} encoded characters)${dryRun ? "; dry_run=true (server validates without persisting per API contract)" : ""}${skipDuplicateVersions ? "; skip_duplicate_versions=true (no-op when that catalog version line already exists)" : ""}${noWait ? "; --no-wait will return as soon as the job is accepted" : ""}.`,
     );
 
     const accepted: SpecImportJobAccepted = await this.api.startSpecImportJson(tenant, {
@@ -555,7 +569,7 @@ export default class ImportSpec extends BaseCommand {
             typeof verDescRaw === "string" && verDescRaw.trim() !== "" ? verDescRaw.trim() : null,
         },
         existing_project_id: resolved.existingProjectId ?? null,
-        options: dryRun ? { dry_run: true } : undefined,
+        options: importOptions,
       },
       document_base64: documentBase64,
       filename: kind.filenameForRequest ?? undefined,

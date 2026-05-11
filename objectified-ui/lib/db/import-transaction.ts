@@ -219,6 +219,24 @@ export async function getLatestVersionUuidForProjectTx(
   return row?.id ? (row.id as string) : null;
 }
 
+/** Existing revision row id (`versions.id`) for a catalog version line (`versions.version_id`). */
+export async function getVersionUuidForCatalogVersionLineTx(
+  client: PoolClient,
+  projectId: string,
+  catalogVersionId: string
+): Promise<string | null> {
+  const vid = catalogVersionId?.trim();
+  if (!vid) return null;
+  const result = await client.query(
+    `SELECT id FROM odb.versions
+     WHERE project_id = $1 AND version_id = $2 AND deleted_at IS NULL
+     LIMIT 1`,
+    [projectId, vid]
+  );
+  const row = result.rows[0];
+  return row?.id ? (row.id as string) : null;
+}
+
 /** Property library rows for reuse when importing another revision into the same project. */
 export async function listProjectLibraryPropertiesTx(
   client: PoolClient,

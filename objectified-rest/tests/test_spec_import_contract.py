@@ -251,6 +251,13 @@ def test_commit_returns_501_when_pending_approval(spec_import_pending_worker):
     assert r.status_code == 501
 
 
+def test_spec_import_options_accepts_skip_duplicate_versions():
+    from app.models import SpecImportOptions
+
+    assert SpecImportOptions().skip_duplicate_versions is False
+    assert SpecImportOptions(skip_duplicate_versions=True).skip_duplicate_versions is True
+
+
 def test_resolve_spec_import_worker_argv_env_json(monkeypatch):
     monkeypatch.setenv("SPEC_IMPORT_WORKER_ARGV", '["/bin/true"]')
     from app.spec_import_engine import resolve_spec_import_worker_argv

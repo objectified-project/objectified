@@ -11166,6 +11166,11 @@ components:
           type: boolean
           title: Create Relationships
           default: false
+        skip_duplicate_versions:
+          type: boolean
+          title: Skip Duplicate Versions
+          description: When true, if the target catalog version line already exists in the project, complete successfully without re-importing (idempotent no-op).
+          default: false
       additionalProperties: false
       type: object
       title: SpecImportOptions

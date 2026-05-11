@@ -15,6 +15,7 @@ import {
   addPropertyToClassTx,
   getClassesWithPropertiesAndTagsTx,
   getLatestVersionUuidForProjectTx,
+  getVersionUuidForCatalogVersionLineTx,
   listProjectLibraryPropertiesTx,
 } from './import-transaction';
 import { ImportSourceKind, getImporter, NormalizedClass, NormalizedProperty } from '../importers';
@@ -100,6 +101,11 @@ export interface ImportJobInput {
     dryRun?: boolean;
     /** When true, commit each class separately and skip failures (no single transaction). */
     incrementalMode?: boolean;
+    /**
+     * When true, if the catalog version line already exists for the project, finish successfully
+     * without importing classes again (REST/CLI idempotency).
+     */
+    skipDuplicateVersions?: boolean;
   };
   /** When set, project creation is skipped and a new version is imported into this catalog project. */
   existingProjectId?: string;
@@ -110,6 +116,10 @@ export interface ImportJobInput {
     path: string;
     blobSha?: string | null;
   };
+}
+
+function isDuplicateCatalogVersionLineError(message: string | undefined): boolean {
+  return Boolean(message && message.includes('A version with this ID already exists in this project'));
 }
 
 /** Merge OpenAPI/Swagger `document.info` into project description + projects.metadata (all import entry points). */
@@ -833,7 +843,38 @@ export async function startImport(input: ImportJobInput) {
             { maxAttempts: 3, initialDelayMs: 500, label: 'createVersion' }
           )
         );
-        if (!resVer.success) throw new Error(resVer.error || 'Failed to create version');
+        if (!resVer.success) {
+          const verErr = resVer.error || 'Failed to create version';
+          if (input.options.skipDuplicateVersions === true && isDuplicateCatalogVersionLineError(verErr)) {
+            const existingUuid = await getVersionUuidForCatalogVersionLineTx(
+              client!,
+              projectId,
+              input.version.versionId
+            );
+            if (!existingUuid) throw new Error(verErr);
+            emit(
+              job,
+              'info',
+              'DUPLICATE_VERSION_SKIPPED',
+              `Catalog version "${input.version.versionId}" already exists for this project; skipping import.`,
+              { projectId, versionRecordId: existingUuid }
+            );
+            job.result = { projectId, versionId: existingUuid };
+            setProgress(job, 'finalizing', 3, 3, 'Skipped — version already exists');
+            job.state = 'completed';
+            job.percent = 100;
+            if (job.summary) {
+              job.summary.totalTime = Date.now() - startTime;
+              job.summary.incrementalMode = true;
+              job.summary.skippedDuplicateVersion = true;
+            }
+            emit(job, 'info', 'IMPORT_SKIPPED_NOOP', 'Import finished without changes (duplicate catalog version line).', job.result);
+            await releaseClient(client!);
+            job.transactionClient = undefined;
+            return;
+          }
+          throw new Error(verErr);
+        }
         const versionId = resVer.version.id as string;
         emit(job, 'info', 'VERSION_CREATED', `Created version: ${input.version.versionId}`, {
           versionId,
@@ -973,7 +1014,42 @@ export async function startImport(input: ImportJobInput) {
           { maxAttempts: 3, initialDelayMs: 500, label: 'createVersion' }
         )
       );
-      if (!resVer.success) throw new Error(resVer.error || 'Failed to create version');
+      if (!resVer.success) {
+        const verErr = resVer.error || 'Failed to create version';
+        if (input.options.skipDuplicateVersions === true && isDuplicateCatalogVersionLineError(verErr)) {
+          const existingUuid = await getVersionUuidForCatalogVersionLineTx(
+            client!,
+            projectId,
+            input.version.versionId
+          );
+          if (!existingUuid) throw new Error(verErr);
+          if (job.transactionPending) {
+            await rollbackTransaction(client!);
+            job.transactionPending = false;
+            emit(job, 'info', 'TRANSACTION_ROLLED_BACK', 'Transaction rolled back after duplicate-version skip');
+          }
+          emit(
+            job,
+            'info',
+            'DUPLICATE_VERSION_SKIPPED',
+            `Catalog version "${input.version.versionId}" already exists for this project; skipping import.`,
+            { projectId, versionRecordId: existingUuid }
+          );
+          job.result = { projectId, versionId: existingUuid };
+          setProgress(job, 'finalizing', 3, 3, 'Skipped — version already exists');
+          job.state = 'completed';
+          job.percent = 100;
+          if (job.summary) {
+            job.summary.totalTime = Date.now() - startTime;
+            job.summary.skippedDuplicateVersion = true;
+          }
+          emit(job, 'info', 'IMPORT_SKIPPED_NOOP', 'Import finished without changes (duplicate catalog version line).', job.result);
+          await releaseClient(client!);
+          job.transactionClient = undefined;
+          return;
+        }
+        throw new Error(verErr);
+      }
       const versionId = resVer.version.id as string;
       emit(job, 'info', 'VERSION_CREATED', `Created version: ${input.version.versionId}`, {
         versionId,

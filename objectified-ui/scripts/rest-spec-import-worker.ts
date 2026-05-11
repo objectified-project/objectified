@@ -89,6 +89,7 @@ function optionsFromMeta(meta: Payload["metadata"]): ImportJobInput["options"] {
       | Record<string, Record<string, string>>
       | undefined,
     generateExamples: Boolean(o.generate_examples ?? o.generateExamples),
+    skipDuplicateVersions: Boolean(o.skip_duplicate_versions ?? o.skipDuplicateVersions),
   };
 }
 

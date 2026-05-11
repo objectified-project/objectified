@@ -1316,8 +1316,9 @@ USAGE
     <value>] [--json] [--color] [--profile <value>] [--tenant <value>] [-q] [--verbose] [--map-project <value> |
     --create-project | --create-or-map-project | --existing-project-id <value>] [--project-name <value>] [--project-slug
     <value>] [--version <value>] [--project-description <value>] [--version-description <value>] [--domain <value>]
-    [--visibility private|public] [--yes] [--format <value>] [--filename <value>] [--strict] [--dry-run] [--no-wait]
-    [--poll <value>] [--commit] [--rollback] [--publish public|private] [--publish-message <value>]
+    [--visibility private|public] [--yes] [--format <value>] [--filename <value>] [--strict] [--dry-run]
+    [--skip-duplicate-versions] [--no-wait] [--poll <value>] [--commit] [--rollback] [--publish public|private]
+    [--publish-message <value>]
 
 ARGUMENTS
   PATH  Path to the spec file, or `-` to read raw bytes from stdin.
@@ -1441,6 +1442,10 @@ OTHER
 
   --rollback
       After preview (pending-approval), POST …/rollback instead of commit (implies --no-commit).
+
+  --skip-duplicate-versions
+      Forward skip_duplicate_versions in import options: if the catalog version line already exists for the target
+      project, complete successfully without re-importing classes (idempotent no-op).
 
   --strict
       Require catalog version ids (--version or spec info.version) to satisfy strict SemVer 2.0 parsing. Without this

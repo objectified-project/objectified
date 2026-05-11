@@ -216,6 +216,13 @@ class SpecImportOptions(BaseModel):
     ] = None
     auto_layout: bool = False
     create_relationships: bool = False
+    skip_duplicate_versions: bool = Field(
+        False,
+        description=(
+            "When true, if the target catalog version line already exists in the project, "
+            "complete successfully without re-importing (idempotent no-op)."
+        ),
+    )
 
 
 class SpecImportStartMetadata(BaseModel):

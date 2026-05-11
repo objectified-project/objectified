@@ -1993,6 +1993,11 @@ export type SpecImportOptions = {
      * Create Relationships
      */
     create_relationships?: boolean;
+    /**
+     * Skip Duplicate Versions
+     * When true, if the target catalog version line already exists in the project, complete successfully without re-importing (idempotent no-op).
+     */
+    skip_duplicate_versions?: boolean;
 };
 
 /**
