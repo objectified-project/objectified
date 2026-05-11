@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Layout · Unified Workspace</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html, body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .sidebar-light { background: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%); box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06); }
+    .sidebar-dark  { background: linear-gradient(180deg, #1c1917 0%, #0c0a09 100%); box-shadow: 4px 0 18px rgba(2, 6, 23, 0.32); }
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(245, 158, 11, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(245, 158, 11, 0.08) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .dark .grid-bg {
+      background-image:
+        linear-gradient(rgba(245, 158, 11, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(245, 158, 11, 0.08) 1px, transparent 1px);
+    }
+    .m-get  { background:#dcfce7; color:#166534; }
+    .m-post { background:#fef3c7; color:#92400e; }
+    .m-put  { background:#dbeafe; color:#1e40af; }
+    .m-del  { background:#fee2e2; color:#991b1b; }
+    .dark .m-get  { background: rgba(34,197,94,.16); color:#86efac; }
+    .dark .m-post { background: rgba(245,158,11,.16); color:#fcd34d; }
+    .dark .m-put  { background: rgba(59,130,246,.16); color:#93c5fd; }
+    .dark .m-del  { background: rgba(239,68,68,.16); color:#fca5a5; }
+    .palette-overlay { backdrop-filter: blur(6px); }
+    .lens-pill { transition: all .15s ease; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-amber-50 via-white to-rose-50 dark:from-stone-950 dark:via-stone-900 dark:to-stone-950 text-gray-900 dark:text-gray-100">
+
+  <!-- Top app bar -->
+  <div class="h-12 border-b border-amber-200 dark:border-stone-700 bg-white/90 dark:bg-stone-900/90 backdrop-blur flex items-center justify-between px-4 relative z-10">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center"><i data-lucide="sparkles" class="w-4 h-4 text-white"></i></div>
+      <span class="text-sm font-semibold">Objectified</span><span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">acme-platform</span><span class="text-xs text-gray-400">/</span>
+      <span class="text-sm text-gray-600 dark:text-gray-300">customers</span>
+      <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Concept · proposed layout</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <!-- ⌘K trigger -->
+      <button class="hidden md:inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-amber-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-xs text-gray-500 hover:text-amber-600">
+        <i data-lucide="search" class="w-3.5 h-3.5"></i>
+        <span>Jump to anything…</span>
+        <span class="mono text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-stone-700 text-amber-700 dark:text-amber-300">⌘K</span>
+      </button>
+      <a href="workspace-developer-tandem.html" class="hidden xl:inline text-xs text-gray-500 dark:text-gray-400 hover:text-amber-600">Workspace + Dev</a>
+      <a href="canvas-density-patterns.html" class="hidden lg:inline text-xs text-gray-500 dark:text-gray-400 hover:text-amber-600">Canvas density</a>
+      <a href="index.html" class="text-xs text-gray-500 dark:text-gray-400 hover:text-amber-600">← Concept overview</a>
+      <button id="themeBtn" class="w-8 h-8 rounded-md border border-amber-200 dark:border-stone-700 hover:bg-amber-100 dark:hover:bg-stone-700 flex items-center justify-center"><i data-lucide="sun-moon" class="w-4 h-4"></i></button>
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center text-white text-xs font-semibold">KS</div>
+    </div>
+  </div>
+
+  <div class="flex" style="height: calc(100vh - 48px);">
+
+    <!-- Left rail: project tree -->
+    <aside class="flex-shrink-0 sidebar-light dark:sidebar-dark border-r border-amber-200 dark:border-stone-700" style="width: 268px;">
+      <div class="overflow-auto h-full p-3">
+        <div class="px-2 py-1.5 flex items-center justify-between text-[0.65rem] uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400 font-semibold">
+          <span class="inline-flex items-center gap-1.5"><i data-lucide="folder-tree" class="w-3 h-3"></i> Project</span>
+          <button class="hover:text-amber-500"><i data-lucide="plus" class="w-3 h-3"></i></button>
+        </div>
+
+        <div class="text-[12px] mt-1 space-y-0.5">
+
+          <!-- Domain group: customers -->
+          <div class="px-2 py-1 rounded font-semibold text-amber-800 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/30 inline-flex items-center gap-1.5 w-full">
+            <i data-lucide="chevron-down" class="w-3 h-3"></i>
+            <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
+            <span class="flex-1 text-left">customers/</span>
+            <span class="text-[10px] mono text-amber-700 dark:text-amber-400">3·4</span>
+          </div>
+          <div class="pl-5 space-y-0.5">
+            <div class="px-1 py-0.5 text-stone-500 dark:text-stone-400 uppercase text-[9px] tracking-wider mt-1">Schemas</div>
+            <button class="flex items-center gap-1.5 w-full px-2 py-1 rounded bg-amber-200/60 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200">
+              <i data-lucide="box" class="w-3.5 h-3.5"></i><span class="mono flex-1 text-left">Customer</span><span class="text-[9px] text-amber-700 dark:text-amber-400">●</span>
+            </button>
+            <button class="flex items-center gap-1.5 w-full px-2 py-1 rounded hover:bg-amber-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300">
+              <i data-lucide="box" class="w-3.5 h-3.5"></i><span class="mono">Address</span>
+            </button>
+            <button class="flex items-center gap-1.5 w-full px-2 py-1 rounded hover:bg-amber-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300">
+              <i data-lucide="box" class="w-3.5 h-3.5"></i><span class="mono">ContactMethod</span>
+            </button>
+
+            <div class="px-1 py-0.5 text-stone-500 dark:text-stone-400 uppercase text-[9px] tracking-wider mt-2">Paths</div>
+            <button class="flex items-center gap-1.5 w-full px-2 py-1 rounded hover:bg-amber-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300">
+              <span class="text-[9px] mono px-1 rounded m-get">GET</span><span class="mono text-[11px]">/customers</span>
+            </button>
+            <button class="flex items-center gap-1.5 w-full px-2 py-1 rounded hover:bg-amber-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300">
+              <span class="text-[9px] mono px-1 rounded m-post">POST</span><span class="mono text-[11px]">/customers</span>
+            </button>
+            <button class="flex items-center gap-1.5 w-full px-2 py-1 rounded hover:bg-amber-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300">
+              <span class="text-[9px] mono px-1 rounded m-get">GET</span><span class="mono text-[11px]">/customers/{id}</span>
+            </button>
+            <button class="flex items-center gap-1.5 w-full px-2 py-1 rounded hover:bg-amber-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300">
+              <span class="text-[9px] mono px-1 rounded m-del">DEL</span><span class="mono text-[11px]">/customers/{id}</span>
+            </button>
+          </div>
+
+          <!-- Domain group: billing -->
+          <div class="px-2 py-1 mt-2 rounded inline-flex items-center gap-1.5 w-full text-stone-700 dark:text-stone-300 hover:bg-amber-100 dark:hover:bg-stone-800">
+            <i data-lucide="chevron-right" class="w-3 h-3"></i>
+            <i data-lucide="folder" class="w-3.5 h-3.5"></i>
+            <span class="flex-1 text-left">billing/</span>
+            <span class="text-[10px] mono text-stone-500">5·9</span>
+          </div>
+          <div class="px-2 py-1 rounded inline-flex items-center gap-1.5 w-full text-stone-700 dark:text-stone-300 hover:bg-amber-100 dark:hover:bg-stone-800">
+            <i data-lucide="chevron-right" class="w-3 h-3"></i>
+            <i data-lucide="folder" class="w-3.5 h-3.5"></i>
+            <span class="flex-1 text-left">webhooks/</span>
+            <span class="text-[10px] mono text-stone-500">2·3</span>
+          </div>
+          <div class="px-2 py-1 rounded inline-flex items-center gap-1.5 w-full text-stone-700 dark:text-stone-300 hover:bg-amber-100 dark:hover:bg-stone-800">
+            <i data-lucide="chevron-right" class="w-3 h-3"></i>
+            <i data-lucide="folder" class="w-3.5 h-3.5"></i>
+            <span class="flex-1 text-left">shared/</span>
+            <span class="text-[10px] mono text-stone-500">8</span>
+          </div>
+        </div>
+
+        <hr class="my-3 border-amber-500/15"/>
+        <div class="px-2 py-1 text-[0.65rem] uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400 font-semibold">Tools</div>
+        <div class="text-[12px] space-y-0.5">
+          <button class="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-amber-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300"><i data-lucide="search-code" class="w-3.5 h-3.5"></i> Find &amp; replace</button>
+          <button class="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-amber-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300"><i data-lucide="library" class="w-3.5 h-3.5"></i> Property library</button>
+          <button class="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-amber-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300"><i data-lucide="git-branch" class="w-3.5 h-3.5"></i> Branches</button>
+          <button class="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-amber-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300"><i data-lucide="terminal-square" class="w-3.5 h-3.5"></i> SDK playground</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center: canvas -->
+    <main class="flex-1 flex flex-col min-w-0">
+
+      <!-- Lens switcher / canvas toolbar -->
+      <div class="border-b border-amber-200 dark:border-stone-700 bg-white/80 dark:bg-stone-900/80 px-4 py-2 flex items-center gap-3">
+        <div class="inline-flex items-center rounded-lg border border-amber-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-0.5 text-xs">
+          <button class="lens-pill px-3 py-1 rounded-md inline-flex items-center gap-1.5 text-stone-600 dark:text-stone-300 hover:bg-amber-100 dark:hover:bg-stone-700">
+            <i data-lucide="box" class="w-3.5 h-3.5"></i> Schemas
+          </button>
+          <button class="lens-pill px-3 py-1 rounded-md inline-flex items-center gap-1.5 text-stone-600 dark:text-stone-300 hover:bg-amber-100 dark:hover:bg-stone-700">
+            <i data-lucide="route" class="w-3.5 h-3.5"></i> Paths
+          </button>
+          <button class="lens-pill px-3 py-1 rounded-md inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow">
+            <i data-lucide="git-graph" class="w-3.5 h-3.5"></i> Combined
+          </button>
+        </div>
+
+        <div class="text-xs text-stone-500 dark:text-stone-400 inline-flex items-center gap-2">
+          <i data-lucide="filter" class="w-3.5 h-3.5"></i>
+          <span>Domain:</span>
+          <span class="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 mono">customers/</span>
+        </div>
+
+        <div class="ml-auto flex items-center gap-1">
+          <button class="px-2 py-1 rounded text-xs border border-amber-200 dark:border-stone-700 hover:bg-amber-100 dark:hover:bg-stone-700 inline-flex items-center gap-1"><i data-lucide="layout-template" class="w-3.5 h-3.5"></i> Auto-layout</button>
+          <button class="px-2 py-1 rounded text-xs border border-amber-200 dark:border-stone-700 hover:bg-amber-100 dark:hover:bg-stone-700 inline-flex items-center gap-1"><i data-lucide="zoom-in" class="w-3.5 h-3.5"></i> 100%</button>
+          <button class="px-2 py-1 rounded text-xs border border-amber-200 dark:border-stone-700 hover:bg-amber-100 dark:hover:bg-stone-700 inline-flex items-center gap-1"><i data-lucide="code" class="w-3.5 h-3.5"></i> Open as code</button>
+          <button class="px-2 py-1 rounded text-xs bg-gradient-to-r from-amber-500 to-rose-500 text-white inline-flex items-center gap-1"><i data-lucide="play" class="w-3.5 h-3.5"></i> Mock &amp; preview</button>
+        </div>
+      </div>
+
+      <!-- Canvas area + palette overlay -->
+      <section class="flex-1 relative grid-bg overflow-auto">
+        <svg viewBox="0 0 980 620" class="w-full h-full">
+          <!-- Schema column header -->
+          <text x="170" y="32" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e" class="dark:fill-amber-300">Schemas</text>
+          <text x="780" y="32" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e" class="dark:fill-amber-300">Paths</text>
+          <line x1="490" y1="20" x2="490" y2="600" stroke="#fcd34d" stroke-dasharray="4 4" opacity="0.5"/>
+
+          <!-- Customer class card -->
+          <g>
+            <rect x="60" y="60" width="220" height="170" rx="10" fill="#ffffff" stroke="#f59e0b" stroke-width="2" class="dark:fill-stone-800"/>
+            <rect x="60" y="60" width="220" height="28" rx="10" fill="#fef3c7" class="dark:fill-amber-900/40"/>
+            <text x="74" y="78" font-size="12" font-weight="700" fill="#92400e" class="dark:fill-amber-200">Customer</text>
+            <text x="260" y="78" text-anchor="end" font-size="9" fill="#92400e" font-family="JetBrains Mono" class="dark:fill-amber-300">v2.1</text>
+            <text x="74" y="106" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">id : uuid</text>
+            <text x="74" y="124" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">workspace_id : uuid</text>
+            <text x="74" y="142" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">name : string</text>
+            <text x="74" y="160" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">email : email</text>
+            <text x="74" y="178" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">addresses : Address[]</text>
+            <text x="74" y="196" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">created_at : datetime</text>
+            <text x="74" y="216" font-size="9" fill="#9ca3af" font-style="italic">3 properties hidden</text>
+          </g>
+
+          <!-- Address class card -->
+          <g>
+            <rect x="60" y="270" width="220" height="120" rx="10" fill="#ffffff" stroke="#f59e0b" stroke-width="2" class="dark:fill-stone-800"/>
+            <rect x="60" y="270" width="220" height="28" rx="10" fill="#fef3c7" class="dark:fill-amber-900/40"/>
+            <text x="74" y="288" font-size="12" font-weight="700" fill="#92400e" class="dark:fill-amber-200">Address</text>
+            <text x="74" y="316" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">street : string</text>
+            <text x="74" y="334" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">city : string</text>
+            <text x="74" y="352" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">postal : string</text>
+            <text x="74" y="370" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">country : iso3166</text>
+          </g>
+
+          <!-- ContactMethod class card -->
+          <g>
+            <rect x="60" y="420" width="220" height="92" rx="10" fill="#ffffff" stroke="#f59e0b" stroke-width="2" class="dark:fill-stone-800"/>
+            <rect x="60" y="420" width="220" height="28" rx="10" fill="#fef3c7" class="dark:fill-amber-900/40"/>
+            <text x="74" y="438" font-size="12" font-weight="700" fill="#92400e" class="dark:fill-amber-200">ContactMethod</text>
+            <text x="74" y="466" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">kind : email | sms</text>
+            <text x="74" y="484" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">value : string</text>
+          </g>
+
+          <!-- Schema-to-schema edge (Customer → Address) -->
+          <path d="M280 180 C 320 180 320 300 280 300" stroke="#fbbf24" stroke-width="1.5" fill="none" stroke-dasharray="2 3"/>
+          <text x="305" y="232" font-size="9" fill="#92400e" class="dark:fill-amber-300">addresses[]</text>
+
+          <!-- Path lane: GET /customers (selected) -->
+          <g>
+            <rect x="540" y="60" width="380" height="56" rx="10" fill="#ffffff" stroke="#10b981" stroke-width="2.5" class="dark:fill-stone-800"/>
+            <rect x="540" y="60" width="64" height="56" rx="10" fill="#dcfce7" class="dark:fill-emerald-900/40"/>
+            <text x="572" y="93" text-anchor="middle" font-size="11" font-weight="700" fill="#065f46" font-family="JetBrains Mono" class="dark:fill-emerald-300">GET</text>
+            <text x="616" y="84" font-size="12" font-weight="600" fill="#1f2937" font-family="JetBrains Mono" class="dark:fill-stone-100">/customers</text>
+            <text x="616" y="102" font-size="9" fill="#6b7280">List customers · paginated · filterable</text>
+            <text x="900" y="84" text-anchor="end" font-size="9" font-family="JetBrains Mono" fill="#10b981">200·400·401</text>
+            <circle cx="540" cy="88" r="4" fill="#f59e0b"/>
+          </g>
+
+          <!-- POST /customers -->
+          <g>
+            <rect x="540" y="135" width="380" height="56" rx="10" fill="#ffffff" stroke="#d97706" stroke-width="2" class="dark:fill-stone-800"/>
+            <rect x="540" y="135" width="64" height="56" rx="10" fill="#fef3c7" class="dark:fill-amber-900/40"/>
+            <text x="572" y="168" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e" font-family="JetBrains Mono" class="dark:fill-amber-300">POST</text>
+            <text x="616" y="159" font-size="12" font-weight="600" fill="#1f2937" font-family="JetBrains Mono" class="dark:fill-stone-100">/customers</text>
+            <text x="616" y="177" font-size="9" fill="#6b7280">Create customer · validates with Customer schema</text>
+            <text x="900" y="159" text-anchor="end" font-size="9" font-family="JetBrains Mono" fill="#d97706">201·400·409</text>
+          </g>
+
+          <!-- GET /customers/{id} -->
+          <g>
+            <rect x="540" y="210" width="380" height="56" rx="10" fill="#ffffff" stroke="#10b981" stroke-width="2" class="dark:fill-stone-800"/>
+            <rect x="540" y="210" width="64" height="56" rx="10" fill="#dcfce7" class="dark:fill-emerald-900/40"/>
+            <text x="572" y="243" text-anchor="middle" font-size="11" font-weight="700" fill="#065f46" font-family="JetBrains Mono" class="dark:fill-emerald-300">GET</text>
+            <text x="616" y="234" font-size="12" font-weight="600" fill="#1f2937" font-family="JetBrains Mono" class="dark:fill-stone-100">/customers/{id}</text>
+            <text x="616" y="252" font-size="9" fill="#6b7280">Read one · returns Customer with addresses[]</text>
+            <text x="900" y="234" text-anchor="end" font-size="9" font-family="JetBrains Mono" fill="#10b981">200·404</text>
+          </g>
+
+          <!-- DEL /customers/{id} -->
+          <g>
+            <rect x="540" y="285" width="380" height="56" rx="10" fill="#ffffff" stroke="#ef4444" stroke-width="2" class="dark:fill-stone-800"/>
+            <rect x="540" y="285" width="64" height="56" rx="10" fill="#fee2e2" class="dark:fill-rose-900/40"/>
+            <text x="572" y="318" text-anchor="middle" font-size="11" font-weight="700" fill="#991b1b" font-family="JetBrains Mono" class="dark:fill-rose-300">DEL</text>
+            <text x="616" y="309" font-size="12" font-weight="600" fill="#1f2937" font-family="JetBrains Mono" class="dark:fill-stone-100">/customers/{id}</text>
+            <text x="616" y="327" font-size="9" fill="#6b7280">Cascades to Address, ContactMethod</text>
+            <text x="900" y="309" text-anchor="end" font-size="9" font-family="JetBrains Mono" fill="#ef4444">204·404·409</text>
+          </g>
+
+          <!-- Combined-lens edges: Customer → all 4 paths -->
+          <path d="M280 140 C 410 140 420 90 540 90" stroke="#f59e0b" stroke-width="2" fill="none" opacity="0.7"/>
+          <path d="M280 140 C 410 140 420 165 540 165" stroke="#f59e0b" stroke-width="2" fill="none" opacity="0.7"/>
+          <path d="M280 140 C 410 140 420 240 540 240" stroke="#f59e0b" stroke-width="2" fill="none" opacity="0.7"/>
+          <path d="M280 140 C 410 140 420 315 540 315" stroke="#f59e0b" stroke-width="2" fill="none" opacity="0.7"/>
+
+          <!-- Address → relevant paths (dashed = nested usage) -->
+          <path d="M280 320 C 410 320 420 240 540 240" stroke="#fb7185" stroke-width="1.5" fill="none" stroke-dasharray="3 3"/>
+          <path d="M280 320 C 410 320 420 315 540 315" stroke="#fb7185" stroke-width="1.5" fill="none" stroke-dasharray="3 3"/>
+
+          <!-- Legend -->
+          <g transform="translate(540 380)">
+            <rect width="380" height="80" rx="10" fill="#fffbeb" stroke="#fcd34d" class="dark:fill-amber-900/20 dark:stroke-amber-700"/>
+            <text x="14" y="22" font-size="10" font-weight="700" fill="#92400e" class="dark:fill-amber-300">Combined lens · edges show consumption</text>
+            <line x1="14" y1="38" x2="44" y2="38" stroke="#f59e0b" stroke-width="2"/>
+            <text x="52" y="42" font-size="10" fill="#1f2937" class="dark:fill-stone-200">direct schema in request/response</text>
+            <line x1="14" y1="58" x2="44" y2="58" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <text x="52" y="62" font-size="10" fill="#1f2937" class="dark:fill-stone-200">nested via parent class</text>
+          </g>
+
+          <!-- Selected indicator label for GET /customers -->
+          <g transform="translate(540 472)">
+            <rect width="380" height="120" rx="10" fill="#ffffff" stroke="#fcd34d" class="dark:fill-stone-800"/>
+            <text x="14" y="22" font-size="10" font-weight="700" fill="#92400e" class="dark:fill-amber-300">Adaptive inspector preview · selected: GET /customers</text>
+            <text x="14" y="44" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">response.200 → Customer[]</text>
+            <text x="14" y="62" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">query.workspace_id : uuid (required)</text>
+            <text x="14" y="80" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">query.cursor : string (opaque)</text>
+            <text x="14" y="98" font-size="10" font-family="JetBrains Mono" fill="#1f2937" class="dark:fill-stone-200">query.limit : int (1..100, default 25)</text>
+            <text x="14" y="114" font-size="9" fill="#9ca3af" font-style="italic">→ full controls in the right rail</text>
+          </g>
+        </svg>
+
+        <!-- ⌘K palette overlay -->
+        <div class="absolute top-6 left-1/2 -translate-x-1/2 w-[520px] max-w-[90%] palette-overlay">
+          <div class="rounded-2xl border border-amber-300 dark:border-amber-700 bg-white/95 dark:bg-stone-900/95 shadow-2xl overflow-hidden">
+            <div class="flex items-center gap-2 px-4 py-3 border-b border-amber-100 dark:border-stone-700">
+              <i data-lucide="search" class="w-4 h-4 text-amber-500"></i>
+              <input class="flex-1 bg-transparent outline-none text-sm" placeholder="Jump to anything…" value="customer" />
+              <span class="mono text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-stone-700 text-amber-700 dark:text-amber-300">esc</span>
+            </div>
+            <div class="max-h-72 overflow-auto text-sm">
+              <div class="px-3 py-1.5 text-[10px] uppercase tracking-wider text-stone-500">Schemas</div>
+              <div class="px-3 py-2 flex items-center gap-2 bg-amber-100/50 dark:bg-amber-900/30">
+                <i data-lucide="box" class="w-3.5 h-3.5 text-amber-600"></i>
+                <span class="mono">Customer</span>
+                <span class="text-xs text-stone-500 ml-auto">customers/customer.objschema.json</span>
+              </div>
+              <div class="px-3 py-2 flex items-center gap-2 hover:bg-amber-50 dark:hover:bg-stone-800">
+                <i data-lucide="box" class="w-3.5 h-3.5 text-stone-500"></i>
+                <span class="mono">CustomerEvent</span>
+                <span class="text-xs text-stone-500 ml-auto">webhooks/customer-event.objschema.json</span>
+              </div>
+              <div class="px-3 py-1.5 text-[10px] uppercase tracking-wider text-stone-500">Paths</div>
+              <div class="px-3 py-2 flex items-center gap-2 hover:bg-amber-50 dark:hover:bg-stone-800">
+                <span class="text-[10px] mono px-1 rounded m-get">GET</span>
+                <span class="mono text-xs">/customers</span>
+              </div>
+              <div class="px-3 py-2 flex items-center gap-2 hover:bg-amber-50 dark:hover:bg-stone-800">
+                <span class="text-[10px] mono px-1 rounded m-post">POST</span>
+                <span class="mono text-xs">/customers</span>
+              </div>
+              <div class="px-3 py-1.5 text-[10px] uppercase tracking-wider text-stone-500">Properties</div>
+              <div class="px-3 py-2 flex items-center gap-2 hover:bg-amber-50 dark:hover:bg-stone-800">
+                <i data-lucide="key" class="w-3.5 h-3.5 text-stone-500"></i>
+                <span class="mono text-xs">customer_id</span>
+                <span class="text-xs text-stone-500 ml-auto">used by 14 classes</span>
+              </div>
+              <div class="px-3 py-1.5 text-[10px] uppercase tracking-wider text-stone-500">Actions</div>
+              <div class="px-3 py-2 flex items-center gap-2 hover:bg-amber-50 dark:hover:bg-stone-800">
+                <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i>
+                <span>Find every path that consumes <span class="mono">Customer</span></span>
+                <span class="mono text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-stone-700 text-amber-700 dark:text-amber-300 ml-auto">⏎</span>
+              </div>
+            </div>
+            <div class="px-4 py-2 border-t border-amber-100 dark:border-stone-700 text-[10px] text-stone-500 flex items-center gap-3">
+              <span>↑↓ navigate</span><span>⏎ open</span><span>⌘⏎ open in split</span><span class="ml-auto">26 results</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Status bar -->
+      <div class="bg-gradient-to-r from-amber-500 to-rose-500 h-7 px-3 flex items-center gap-3 text-[11px] text-white flex-shrink-0">
+        <span class="flex items-center gap-1"><i data-lucide="folder" class="w-3 h-3"></i> acme-platform · customers/</span>
+        <span class="flex items-center gap-1"><i data-lucide="git-branch" class="w-3 h-3"></i> main</span>
+        <span class="flex items-center gap-1"><i data-lucide="git-graph" class="w-3 h-3"></i> Combined lens</span>
+        <span class="flex items-center gap-1"><i data-lucide="link" class="w-3 h-3"></i> 6 schema↔path links</span>
+        <span class="ml-auto">Selected: <span class="mono">GET /customers</span></span>
+        <span>OAS 3.1</span>
+      </div>
+    </main>
+
+    <!-- Right rail: adaptive inspector -->
+    <aside class="flex-shrink-0 border-l border-amber-200 dark:border-stone-700 bg-white/80 dark:bg-stone-900/80" style="width: 320px;">
+      <div class="overflow-auto h-full">
+
+        <div class="px-4 py-3 border-b border-amber-100 dark:border-stone-700">
+          <div class="text-[10px] uppercase tracking-wider text-stone-500 mb-1">Adaptive inspector</div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] mono px-1.5 py-0.5 rounded m-get">GET</span>
+            <span class="mono text-sm font-semibold">/customers</span>
+          </div>
+          <p class="text-xs text-stone-500 dark:text-stone-400 mt-1">Inspector adapts to whatever's selected — class, property, path, parameter, or response.</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="px-3 pt-3 flex gap-1 text-xs">
+          <button class="px-3 py-1.5 rounded-t-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 font-semibold">Overview</button>
+          <button class="px-3 py-1.5 text-stone-500 hover:text-amber-600">Request</button>
+          <button class="px-3 py-1.5 text-stone-500 hover:text-amber-600">Responses</button>
+          <button class="px-3 py-1.5 text-stone-500 hover:text-amber-600">Tests</button>
+        </div>
+
+        <div class="px-4 py-3 space-y-4 text-sm">
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-stone-500 mb-1">Summary</div>
+            <input class="w-full px-2 py-1.5 rounded border border-amber-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-sm" value="List customers"/>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-stone-500 mb-1">Operation ID</div>
+            <input class="w-full px-2 py-1.5 rounded border border-amber-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-sm mono" value="customers.list"/>
+          </div>
+
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-stone-500 mb-1 flex items-center justify-between">
+              <span>Consumes (schemas)</span>
+              <button class="text-amber-600 hover:underline text-[10px]">+ link</button>
+            </div>
+            <div class="space-y-1.5">
+              <div class="px-2 py-1.5 rounded border border-amber-200 dark:border-stone-700 bg-amber-50 dark:bg-stone-800 flex items-center gap-2">
+                <i data-lucide="box" class="w-3.5 h-3.5 text-amber-600"></i>
+                <span class="mono text-xs">Customer[]</span>
+                <span class="text-[10px] text-stone-500 ml-auto">response.200</span>
+              </div>
+              <div class="px-2 py-1.5 rounded border border-amber-200 dark:border-stone-700 bg-amber-50 dark:bg-stone-800 flex items-center gap-2">
+                <i data-lucide="box" class="w-3.5 h-3.5 text-amber-600"></i>
+                <span class="mono text-xs">Address</span>
+                <span class="text-[10px] text-stone-500 ml-auto">nested</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-stone-500 mb-1">Validation</div>
+            <div class="space-y-1 text-xs">
+              <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Spectral · 0 issues</div>
+              <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Pagination follows house style</div>
+              <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400"><i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Missing example for response.200</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-stone-500 mb-1">Quick actions</div>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button class="px-2 py-1.5 rounded border border-amber-200 dark:border-stone-700 hover:bg-amber-50 dark:hover:bg-stone-800 text-xs inline-flex items-center gap-1"><i data-lucide="play" class="w-3.5 h-3.5"></i> Try it</button>
+              <button class="px-2 py-1.5 rounded border border-amber-200 dark:border-stone-700 hover:bg-amber-50 dark:hover:bg-stone-800 text-xs inline-flex items-center gap-1"><i data-lucide="code" class="w-3.5 h-3.5"></i> View YAML</button>
+              <button class="px-2 py-1.5 rounded border border-amber-200 dark:border-stone-700 hover:bg-amber-50 dark:hover:bg-stone-800 text-xs inline-flex items-center gap-1"><i data-lucide="copy" class="w-3.5 h-3.5"></i> cURL</button>
+              <button class="px-2 py-1.5 rounded border border-amber-200 dark:border-stone-700 hover:bg-amber-50 dark:hover:bg-stone-800 text-xs inline-flex items-center gap-1"><i data-lucide="package" class="w-3.5 h-3.5"></i> SDK snippet</button>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50/60 dark:bg-rose-950/30 p-3 text-xs">
+            <div class="font-semibold text-rose-700 dark:text-rose-300 mb-1 flex items-center gap-1"><i data-lucide="info" class="w-3.5 h-3.5"></i> Why this layout</div>
+            <p class="text-stone-700 dark:text-stone-300">The inspector lives in one place regardless of what you select. Today, switching between editing a class and editing a path means switching whole sections — here it just means clicking a different node.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const themeKey = 'new-layout-mockup-theme';
+    const stored = localStorage.getItem(themeKey);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) document.documentElement.classList.add('dark');
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem(themeKey, document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    });
+    lucide.createIcons();
+  </script>
+</body>
+</html>
