@@ -6,6 +6,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## MCP
 - MCP service is now live
+- Updated MCP to search for data using vectorized data for speed
 
 ## CLI
 - **`objectified-cli`**: documented **spec import format parity** vs the dashboard Import dialog and repository scanner (`docs/CLI_SPEC_IMPORT_FORMAT_PARITY.md` in the repo); Vitest guards examples and `import spec --help`; cross-links Epic [#3328](https://github.com/KenSuenobu/objectified-commercial/issues/3328) (#3332).
