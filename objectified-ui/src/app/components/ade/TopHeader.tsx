@@ -71,6 +71,7 @@ const TopHeader = () => {
   const [userTenants, setUserTenants] = useState<TenantRow[]>([]);
   const [adminTenantIds, setAdminTenantIds] = useState<Set<string>>(new Set());
   const [isSwitchingTenant, setIsSwitchingTenant] = useState(false);
+  const [tenantSearchQuery, setTenantSearchQuery] = useState('');
   const menuRef = useRef<HTMLDivElement | null>(null);
   const tenantMenuRef = useRef<HTMLDivElement | null>(null);
   const { data: session, update } = useSession();
@@ -134,6 +135,16 @@ const TopHeader = () => {
     };
     loadTenants();
   }, [session, currentUserId, currentTenantId]);
+
+  useEffect(() => {
+    if (!tenantMenuOpen) setTenantSearchQuery('');
+  }, [tenantMenuOpen]);
+
+  const filteredTenants = React.useMemo(() => {
+    const q = tenantSearchQuery.trim().toLowerCase();
+    if (!q) return userTenants;
+    return userTenants.filter((t) => t.name.toLowerCase().includes(q));
+  }, [userTenants, tenantSearchQuery]);
 
   const handleSelectTenant = async (tenantId: string) => {
     if (tenantId === currentTenantId || isSwitchingTenant) return;
@@ -233,40 +244,58 @@ const TopHeader = () => {
             <div
               role="menu"
               aria-label="Your tenants"
-              className="absolute right-0 z-[2001] mt-2 max-h-[min(70vh,24rem)] min-w-[260px] overflow-y-auto rounded-lg bg-white p-1 shadow-lg shadow-slate-900/15 dark:bg-slate-800 dark:shadow-gray-900/50"
+              className="absolute right-0 z-[2001] mt-2 flex max-h-[min(70vh,24rem)] min-w-[260px] flex-col overflow-hidden rounded-lg bg-white shadow-lg shadow-slate-900/15 dark:bg-slate-800 dark:shadow-gray-900/50"
             >
-              {userTenants.map((t) => {
-                const isCurrent = t.id === currentTenantId;
-                const isAdmin = adminTenantIds.has(t.id);
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="menuitem"
-                    disabled={isSwitchingTenant || isCurrent}
-                    onClick={() => handleSelectTenant(t.id)}
-                    className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm transition-colors ${
-                      isCurrent
-                        ? 'cursor-default bg-indigo-50 font-medium text-indigo-900 dark:bg-indigo-950/50 dark:text-indigo-100'
-                        : 'cursor-pointer text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
-                    } ${isSwitchingTenant && !isCurrent ? 'opacity-50' : ''}`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{t.name}</span>
-                    {isAdmin && (
-                      <span
-                        className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
-                        title="You are an administrator of this tenant"
+              <div className="shrink-0 border-b border-gray-200 p-2 dark:border-gray-600">
+                <input
+                  type="search"
+                  autoComplete="off"
+                  value={tenantSearchQuery}
+                  onChange={(e) => setTenantSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="Search tenants…"
+                  aria-label="Filter tenants"
+                  className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+                />
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
+                {filteredTenants.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No matching tenants</div>
+                ) : (
+                  filteredTenants.map((t) => {
+                    const isCurrent = t.id === currentTenantId;
+                    const isAdmin = adminTenantIds.has(t.id);
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        role="menuitem"
+                        disabled={isSwitchingTenant || isCurrent}
+                        onClick={() => handleSelectTenant(t.id)}
+                        className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm transition-colors ${
+                          isCurrent
+                            ? 'cursor-default bg-indigo-50 font-medium text-indigo-900 dark:bg-indigo-950/50 dark:text-indigo-100'
+                            : 'cursor-pointer text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                        } ${isSwitchingTenant && !isCurrent ? 'opacity-50' : ''}`}
                       >
-                        <Shield className="h-3.5 w-3.5" aria-hidden />
-                        Admin
-                      </span>
-                    )}
-                    {isCurrent && (
-                      <Check className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
-                    )}
-                  </button>
-                );
-              })}
+                        <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                        {isAdmin && (
+                          <span
+                            className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+                            title="You are an administrator of this tenant"
+                          >
+                            <Shield className="h-3.5 w-3.5" aria-hidden />
+                            Admin
+                          </span>
+                        )}
+                        {isCurrent && (
+                          <Check className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </div>
           )}
         </div>

@@ -37,6 +37,7 @@ import {
 import { StudioSyncStatusChips } from './StudioSyncStatusChips';
 import { DraftLockHeaderChip } from './DraftLockHeaderChip';
 import { FEATURE_GITLIKE } from '@lib/feature-flags';
+import { SearchableSelectContent } from './SearchableSelectContent';
 
 interface Project {
   id: string;
@@ -135,6 +136,14 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   const [isLoadingVersions, setIsLoadingVersions] = React.useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
   const [deprecatedRevisionOpen, setDeprecatedRevisionOpen] = React.useState(false);
+
+  const [projectSelectOpen, setProjectSelectOpen] = React.useState(false);
+  const [projectSearchQuery, setProjectSearchQuery] = React.useState('');
+  const projectSearchInputRef = React.useRef<HTMLInputElement>(null);
+
+  const [versionSelectOpen, setVersionSelectOpen] = React.useState(false);
+  const [versionSearchQuery, setVersionSearchQuery] = React.useState('');
+  const versionSearchInputRef = React.useRef<HTMLInputElement>(null);
 
   /** Refs for Radix onValueChange guards (latest context ids without extra render loops). */
   const selectedProjectIdRef = React.useRef(selectedProjectId);
@@ -235,6 +244,27 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     const match = versions.find((v) => String(v.id) === String(selectedVersionId));
     return match !== undefined ? String(match.id) : undefined;
   }, [selectedVersionId, versions]);
+
+  const filteredProjectsForSelect = React.useMemo(() => {
+    const q = projectSearchQuery.trim().toLowerCase();
+    if (!q) return projects;
+    return projects.filter((p) => p.name.toLowerCase().includes(q));
+  }, [projects, projectSearchQuery]);
+
+  const filteredVersionsForSelect = React.useMemo(() => {
+    const q = versionSearchQuery.trim().toLowerCase();
+    if (!q) return versions;
+    return versions.filter((v) => {
+      const label = formatVersionSelectorLabel(v);
+      return (
+        label.toLowerCase().includes(q) || String(v.version_id).toLowerCase().includes(q)
+      );
+    });
+  }, [versions, versionSearchQuery]);
+
+  React.useEffect(() => {
+    setVersionSearchQuery('');
+  }, [selectedProjectId]);
 
   const selectedVersion = React.useMemo(() => {
     if (!selectedVersionId) return null;
@@ -480,6 +510,11 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
         {/* Project Selector — Radix Select aligned with DatabaseHeader; value/handler from context only */}
         <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
           <Select.Root
+            open={projectSelectOpen}
+            onOpenChange={(open) => {
+              setProjectSelectOpen(open);
+              if (!open) setProjectSearchQuery('');
+            }}
             value={projectSelectValue}
             onValueChange={handleProjectChange}
             disabled={isLoadingProjects || !currentTenantId}
@@ -503,30 +538,33 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
               </Select.Icon>
             </Select.Trigger>
             <Select.Portal>
-              <Select.Content
-                className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]"
-                position="popper"
-                sideOffset={5}
+              <SearchableSelectContent
+                isOpen={projectSelectOpen}
+                searchQuery={projectSearchQuery}
+                onSearchChange={setProjectSearchQuery}
+                searchPlaceholder="Search projects…"
+                searchAriaLabel="Filter projects"
+                inputRef={projectSearchInputRef}
               >
-                <Select.Viewport className="p-1">
-                  {projects.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No projects available</div>
-                  ) : (
-                    projects.map((project) => (
-                      <Select.Item
-                        key={project.id}
-                        value={String(project.id)}
-                        className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30"
-                      >
-                        <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                          <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
-                        </Select.ItemIndicator>
-                        <Select.ItemText>{project.name}</Select.ItemText>
-                      </Select.Item>
-                    ))
-                  )}
-                </Select.Viewport>
-              </Select.Content>
+                {projects.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No projects available</div>
+                ) : filteredProjectsForSelect.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No matching projects</div>
+                ) : (
+                  filteredProjectsForSelect.map((project) => (
+                    <Select.Item
+                      key={project.id}
+                      value={String(project.id)}
+                      className="relative flex cursor-pointer items-center rounded-md px-8 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 data-[highlighted]:bg-gray-100 data-[state=checked]:bg-indigo-50 dark:text-gray-300 dark:hover:bg-gray-700 dark:data-[highlighted]:bg-gray-700 dark:data-[state=checked]:bg-indigo-900/30"
+                    >
+                      <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                        <Check className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                      </Select.ItemIndicator>
+                      <Select.ItemText>{project.name}</Select.ItemText>
+                    </Select.Item>
+                  ))
+                )}
+              </SearchableSelectContent>
             </Select.Portal>
           </Select.Root>
         </div>
@@ -535,6 +573,11 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
         <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
           <Select.Root
             key={selectedProjectId || 'no-project'}
+            open={versionSelectOpen}
+            onOpenChange={(open) => {
+              setVersionSelectOpen(open);
+              if (!open) setVersionSearchQuery('');
+            }}
             value={versionSelectValue}
             onValueChange={handleVersionChange}
             disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
@@ -558,32 +601,33 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
               </Select.Icon>
             </Select.Trigger>
             <Select.Portal>
-              <Select.Content
-                className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]"
-                position="popper"
-                sideOffset={5}
+              <SearchableSelectContent
+                isOpen={versionSelectOpen}
+                searchQuery={versionSearchQuery}
+                onSearchChange={setVersionSearchQuery}
+                searchPlaceholder="Search versions…"
+                searchAriaLabel="Filter versions"
+                inputRef={versionSearchInputRef}
               >
-                <Select.Viewport className="p-1">
-                  {versions.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No versions available</div>
-                  ) : (
-                    versions.map((version) => (
-                      <Select.Item
-                        key={version.id}
-                        value={String(version.id)}
-                        className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30"
-                      >
-                        <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                          <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
-                        </Select.ItemIndicator>
-                        <Select.ItemText>
-                          {formatVersionSelectorLabel(version)}
-                        </Select.ItemText>
-                      </Select.Item>
-                    ))
-                  )}
-                </Select.Viewport>
-              </Select.Content>
+                {versions.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No versions available</div>
+                ) : filteredVersionsForSelect.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No matching versions</div>
+                ) : (
+                  filteredVersionsForSelect.map((version) => (
+                    <Select.Item
+                      key={version.id}
+                      value={String(version.id)}
+                      className="relative flex cursor-pointer items-center rounded-md px-8 py-2 text-sm text-gray-700 outline-none hover:bg-gray-100 data-[highlighted]:bg-gray-100 data-[state=checked]:bg-indigo-50 dark:text-gray-300 dark:hover:bg-gray-700 dark:data-[highlighted]:bg-gray-700 dark:data-[state=checked]:bg-indigo-900/30"
+                    >
+                      <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                        <Check className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                      </Select.ItemIndicator>
+                      <Select.ItemText>{formatVersionSelectorLabel(version)}</Select.ItemText>
+                    </Select.Item>
+                  ))
+                )}
+              </SearchableSelectContent>
             </Select.Portal>
           </Select.Root>
         </div>
