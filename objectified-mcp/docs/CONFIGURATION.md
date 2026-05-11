@@ -16,6 +16,11 @@ Runtime configuration is loaded from the environment by [`Settings`](../src/obje
 | **`OBJECTIFIED_MCP_DATABASE_POOL_MAX_SIZE`** | No | `10` | Integer **1–256**; must be **≥** `DATABASE_POOL_MIN_SIZE`. |
 | **`OBJECTIFIED_MCP_DATABASE_POOL_TIMEOUT`** | No | `30` | Seconds to wait for a pool connection; **> 0** and **≤ 600**. |
 | **`OBJECTIFIED_MCP_OPENAPI_MAX_JSON_BYTES`** | No | `2097152` | Max UTF-8 size for exported OpenAPI JSON/YAML payloads (**1024–100_000_000**). |
+| **`OBJECTIFIED_MCP_OPENAI_API_KEY`** | No | — | Secret for **`spec.search_semantic`** query embeddings (`Bearer` to **`OBJECTIFIED_MCP_OPENAI_EMBEDDING_URL`**). When unset, calling **`spec.search_semantic`** fails fast. |
+| **`OBJECTIFIED_MCP_OPENAI_EMBEDDING_URL`** | No | `https://api.openai.com/v1/embeddings` | OpenAI-compatible embeddings endpoint (POST JSON `model`, `input`, `dimensions`). |
+| **`OBJECTIFIED_MCP_OPENAI_EMBEDDING_MODEL`** | No | `text-embedding-3-small` | Passed through to the embeddings API as **`model`**. |
+| **`OBJECTIFIED_MCP_OPENAI_EMBEDDING_DIMENSIONS`** | No | `1536` | Must match **`odb.versions.mcp_public_embedding`** (`vector(1536)` migration). |
+| **`OBJECTIFIED_MCP_OPENAI_EMBEDDING_TIMEOUT_S`** | No | `60` | HTTP timeout for embedding requests (**> 0**, **≤ 600**). |
 
 ## Related files
 

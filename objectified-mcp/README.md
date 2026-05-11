@@ -51,10 +51,12 @@ Running **`uv run objectified-mcp serve`** without **`--transport`** loads setti
 |------|---------|
 | **`ping`** | Service id, package version, UTC timestamp, Postgres reachability (`db_ok` / `db_error`). |
 | **`spec.list`** | Cursor-paginated list of published specs. Anonymous: public catalog only. With **`Authorization: Bearer`**, merges in-scope public rows and in-scope **private** revisions for the key’s tenant. Optional **`tenant_id`** / **`project_id`**, **`limit`** (default 50, max 100), **`cursor`** / **`next_cursor`**. |
+| **`project.list`** | Cursor-paginated distinct projects (**`tenant_id`**, **`project_id`**, **`title`**, latest **`updated_at`**) visible to the caller; anonymous uses the public catalog only; with Bearer, same merge rules as **`spec.list`**. Optional filters and pagination match **`spec.list`**. |
 | **`spec.list_my_specs`** | Same response shape as **`spec.list`**, but **requires** a valid API key; rejects anonymous callers. Optional audit logging for private reads. |
 | **`spec.describe`** | Metadata for one revision UUID (`id`, `title`, `version`, `description`, `owner`, `tags`, `updated_at`). Anonymous: public only; with Bearer, includes in-scope private revisions. |
-| **`spec.search`** | Keyword search over **public** specs (title, description, tags). Requires non-empty **`q`**; ranked results; cursor pagination. |
-| **`spec.list_tags`** | Distinct public tag names with counts; sorted by count; short **in-memory** cache (60s). |
+| **`spec.search`** | Postgres **full-text** search (`plainto_tsquery`) over **public** specs (title, description, version label, tags via `mcp_public_doc_tsv`). Requires non-empty **`q`**; ranked via `ts_rank_cd`; cursor pagination. |
+| **`spec.search_semantic`** | Cosine similarity (`pgvector`) over **public** specs with **`mcp_public_embedding`** set. Embeds **`q`** via OpenAI-compatible **`OBJECTIFIED_MCP_OPENAI_API_KEY`**; same pagination shape as **`spec.search`**. Rows without embeddings are skipped until backfilled. |
+| **`spec.list_tags`** | Distinct public tag names with spec counts; sorted by count then tag; cursor pagination (**`limit`** default 50, max 100, **`next_cursor`**). |
 | **`spec.get_openapi`** | Full generated OpenAPI **JSON** for a revision UUID (same visibility rules as describe). Size capped by **`OBJECTIFIED_MCP_OPENAPI_MAX_JSON_BYTES`**. |
 | **`spec.export_yaml`** | Same as **`spec.get_openapi`** but **YAML** text field; same cap semantics. |
 | **`spec.list_operations`** | Compact index of HTTP operations (`path`, `method`, `operation_id`, summary, tags). |

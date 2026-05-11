@@ -18,6 +18,7 @@ from objectified_mcp.http_credential_middleware import StashHttpBearerInToolCont
 from objectified_mcp.logging_config import configure_logging
 from objectified_mcp.mcp_auth import McpAuthContext, require_mcp_auth, resolve_optional_mcp_auth
 from objectified_mcp.ping_tool import build_ping_response
+from objectified_mcp.project_list_tool import build_project_list_response
 from objectified_mcp.settings import get_settings
 from objectified_mcp.spec_describe_component_tool import build_spec_describe_component_response
 from objectified_mcp.spec_describe_operation_tool import build_spec_describe_operation_response
@@ -29,6 +30,7 @@ from objectified_mcp.spec_list_operations_tool import build_spec_list_operations
 from objectified_mcp.spec_list_tags_tool import build_spec_list_tags_response
 from objectified_mcp.spec_list_tool import build_spec_list_response
 from objectified_mcp.spec_search_tool import build_spec_search_response
+from objectified_mcp.spec_semantic_search_tool import build_spec_semantic_search_response
 
 _log = structlog.get_logger(__name__)
 
@@ -92,6 +94,38 @@ async def spec_list(
     pool = get_db_pool(ctx)
     auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
     return await build_spec_list_response(
+        pool,
+        tenant_id=tenant_id,
+        project_id=project_id,
+        limit=limit,
+        cursor=cursor,
+        auth_ctx=auth_ctx,
+    )
+
+
+@mcp.tool(
+    name="project.list",
+    description=(
+        "List distinct projects (tenant + project) that have at least one published spec revision the "
+        "caller can see. Anonymous: derived from the public catalog (odb.mcp_v_public_specs). "
+        "With Authorization: Bearer <MCP API key>, merges in-scope public rows plus in-scope private "
+        "published revisions for the key's tenant (same scope rules as spec.list). "
+        "Each item: tenant_id, project_id, title, updated_at (UTC Z; latest revision activity in scope). "
+        "Optional filters: tenant_id, project_id (UUID strings). limit defaults to 50, capped at 100. "
+        "Pass next_cursor from the previous response for the next page."
+    ),
+)
+async def project_list(
+    ctx: Context,
+    tenant_id: str | None = None,
+    project_id: str | None = None,
+    limit: int | None = None,
+    cursor: str | None = None,
+    headers: dict[str, str] = CurrentHeaders(),
+) -> dict[str, Any]:
+    pool = get_db_pool(ctx)
+    auth_ctx = await resolve_optional_mcp_auth(ctx, pool, headers=headers)
+    return await build_project_list_response(
         pool,
         tenant_id=tenant_id,
         project_id=project_id,
@@ -292,10 +326,11 @@ async def spec_describe_operation(
 @mcp.tool(
     name="spec.search",
     description=(
-        "Search published public OpenAPI specs by keyword over title, description, and tag names "
-        "(ILIKE, case-insensitive). Required q must be non-empty after trimming. "
-        "Results are ranked (title prefix > title contains > description > tag match). "
-        "limit defaults to 50, capped at 100. Pass next_cursor from the previous response for the next page."
+        "Search published public OpenAPI specs with Postgres full-text search (english config) over "
+        "project title, revision description, version label, and tag names (maintained in "
+        "odb.versions.mcp_public_doc_tsv). Required q must be non-empty after trimming and is passed "
+        "to plainto_tsquery. Results use ts_rank_cd with cursor pagination: limit defaults to 50, "
+        "capped at 100; pass next_cursor from the previous response for the next page."
     ),
 )
 async def spec_search(
@@ -309,13 +344,44 @@ async def spec_search(
 
 
 @mcp.tool(
+    name="spec.search_semantic",
+    description=(
+        "Semantic search over published **public** specs that have **mcp_public_embedding** populated "
+        "(pgvector cosine distance vs OpenAI-compatible query embeddings). Requires "
+        "OBJECTIFIED_MCP_OPENAI_API_KEY. Uses the same pagination shape as spec.search (items, has_more, "
+        "next_cursor). Rows without embeddings are omitted until backfilled."
+    ),
+)
+async def spec_search_semantic(
+    ctx: Context,
+    q: str,
+    limit: int | None = None,
+    cursor: str | None = None,
+) -> dict[str, Any]:
+    pool = get_db_pool(ctx)
+    settings = get_settings()
+    return await build_spec_semantic_search_response(
+        pool,
+        settings=settings,
+        q=q,
+        limit=limit,
+        cursor=cursor,
+    )
+
+
+@mcp.tool(
     name="spec.list_tags",
     description=(
         "Distinct version-tag names across published public OpenAPI specs with counts of specs "
         "that expose each tag (via odb.mcp_v_public_specs). Sorted by count descending, "
-        "then tag name ascending. Response is cached in-memory for 60 seconds."
+        "then tag name ascending. Cursor pagination: limit defaults to 50, capped at 100; "
+        "pass next_cursor from the previous response for the next page."
     ),
 )
-async def spec_list_tags(ctx: Context) -> list[dict[str, Any]]:
+async def spec_list_tags(
+    ctx: Context,
+    limit: int | None = None,
+    cursor: str | None = None,
+) -> dict[str, Any]:
     pool = get_db_pool(ctx)
-    return await build_spec_list_tags_response(pool)
+    return await build_spec_list_tags_response(pool, limit=limit, cursor=cursor)

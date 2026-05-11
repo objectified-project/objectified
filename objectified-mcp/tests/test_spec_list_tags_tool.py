@@ -7,9 +7,12 @@ import pytest
 from psycopg_pool import AsyncConnectionPool
 
 from objectified_mcp.spec_list_tags_tool import (
-    LIST_TAGS_CACHE_TTL_SEC,
+    MAX_PAGE_SIZE,
+    InvalidSpecListTagsCursorError,
+    _clamp_limit,
     build_spec_list_tags_response,
-    reset_spec_list_tags_cache_for_tests,
+    decode_spec_list_tags_cursor,
+    encode_spec_list_tags_cursor,
 )
 
 
@@ -30,110 +33,71 @@ def _pool_mock_for_fetch(rows: list[dict[str, object]]) -> tuple[MagicMock, Magi
     return pool, cur
 
 
-@pytest.fixture(autouse=True)
-def _clear_tags_cache() -> None:
-    reset_spec_list_tags_cache_for_tests()
-    yield
-    reset_spec_list_tags_cache_for_tests()
+def test_encode_decode_spec_list_tags_cursor_roundtrips() -> None:
+    c = encode_spec_list_tags_cursor(42, "beta")
+    assert "=" not in c
+    out = decode_spec_list_tags_cursor(c)
+    assert out == (42, "beta")
 
 
-def test_build_spec_list_tags_response_maps_rows() -> None:
+def test_decode_spec_list_tags_cursor_none() -> None:
+    assert decode_spec_list_tags_cursor(None) is None
+
+
+def test_decode_spec_list_tags_cursor_blank_raises() -> None:
+    with pytest.raises(InvalidSpecListTagsCursorError):
+        decode_spec_list_tags_cursor("")
+
+
+def test_clamp_limit() -> None:
+    assert _clamp_limit(None) == 50
+    assert _clamp_limit(100) == 100
+    assert _clamp_limit(500) == MAX_PAGE_SIZE
+    with pytest.raises(ValueError):
+        _clamp_limit(0)
+
+
+def test_build_spec_list_tags_response_first_page() -> None:
     rows = [
         {"tag": "stable", "cnt": 5},
         {"tag": "beta", "cnt": 2},
     ]
     pool, _ = _pool_mock_for_fetch(rows)
 
-    async def run() -> list[dict[str, object]]:
-        return await build_spec_list_tags_response(pool)
+    async def run() -> dict[str, object]:
+        return await build_spec_list_tags_response(pool, limit=10)
 
     out = asyncio.run(run())
-    assert out == [{"tag": "stable", "count": 5}, {"tag": "beta", "count": 2}]
+    assert out["has_more"] is False
+    assert out["next_cursor"] is None
+    assert out["items"] == [{"tag": "stable", "count": 5}, {"tag": "beta", "count": 2}]
+
+
+def test_build_spec_list_tags_response_has_more_and_cursor() -> None:
+    rows = [
+        {"tag": "a", "cnt": 3},
+        {"tag": "b", "cnt": 3},
+        {"tag": "c", "cnt": 1},
+    ]
+    pool, _ = _pool_mock_for_fetch(rows)
+
+    async def run() -> dict[str, object]:
+        return await build_spec_list_tags_response(pool, limit=2)
+
+    out = asyncio.run(run())
+    assert out["has_more"] is True
+    assert out["items"] == [{"tag": "a", "count": 3}, {"tag": "b", "count": 3}]
+    assert out["next_cursor"] is not None
 
 
 def test_build_spec_list_tags_response_empty() -> None:
     pool, _ = _pool_mock_for_fetch([])
 
-    async def run() -> list[dict[str, object]]:
+    async def run() -> dict[str, object]:
         return await build_spec_list_tags_response(pool)
 
     out = asyncio.run(run())
-    assert out == []
-
-
-def test_cache_returns_second_call_without_extra_db_hit(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls = {"n": 0}
-
-    async def fake_fetch(_pool: AsyncConnectionPool) -> list[dict[str, object]]:
-        calls["n"] += 1
-        return [{"tag": "a", "count": 1}]
-
-    monkeypatch.setattr(
-        "objectified_mcp.spec_list_tags_tool._fetch_tag_counts",
-        fake_fetch,
-    )
-
-    pool = MagicMock(spec=AsyncConnectionPool)
-
-    async def run() -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-        first = await build_spec_list_tags_response(pool)
-        second = await build_spec_list_tags_response(pool)
-        return first, second
-
-    first, second = asyncio.run(run())
-    assert first == second == [{"tag": "a", "count": 1}]
-    assert calls["n"] == 1
-
-
-def test_cache_expires_after_ttl(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls = {"n": 0}
-
-    async def fake_fetch(_pool: AsyncConnectionPool) -> list[dict[str, object]]:
-        calls["n"] += 1
-        return [{"tag": "x", "count": calls["n"]}]
-
-    monkeypatch.setattr(
-        "objectified_mcp.spec_list_tags_tool._fetch_tag_counts",
-        fake_fetch,
-    )
-
-    t = {"v": 0.0}
-    monkeypatch.setattr("objectified_mcp.spec_list_tags_tool.time.monotonic", lambda: t["v"])
-
-    pool = MagicMock(spec=AsyncConnectionPool)
-
-    async def run() -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-        first = await build_spec_list_tags_response(pool)
-        t["v"] += LIST_TAGS_CACHE_TTL_SEC + 0.001
-        second = await build_spec_list_tags_response(pool)
-        return first, second
-
-    first, second = asyncio.run(run())
-    assert first == [{"tag": "x", "count": 1}]
-    assert second == [{"tag": "x", "count": 2}]
-    assert calls["n"] == 2
-
-
-def test_cache_mutation_does_not_corrupt_cached_value(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_fetch(_pool: AsyncConnectionPool) -> list[dict[str, object]]:
-        return [{"tag": "stable", "count": 10}]
-
-    monkeypatch.setattr(
-        "objectified_mcp.spec_list_tags_tool._fetch_tag_counts",
-        fake_fetch,
-    )
-
-    pool = MagicMock(spec=AsyncConnectionPool)
-
-    async def run() -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-        first = await build_spec_list_tags_response(pool)
-        first[0]["count"] = 999  # mutate the returned copy
-        second = await build_spec_list_tags_response(pool)
-        return first, second
-
-    first, second = asyncio.run(run())
-    assert first == [{"tag": "stable", "count": 999}]
-    assert second == [{"tag": "stable", "count": 10}]  # cache is unaffected
+    assert out == {"items": [], "has_more": False, "next_cursor": None}
 
 
 def test_spec_list_tags_tool_registered_on_mcp() -> None:

@@ -48,6 +48,32 @@ class Settings(BaseSettings):
             "spec.export_yaml (YAML text); 413-style limit."
         ),
     )
+    openai_api_key: SecretStr | None = Field(
+        default=None,
+        description="Bearer token for OpenAI-compatible /v1/embeddings (spec.search_semantic query vectors).",
+    )
+    openai_embedding_url: str = Field(
+        default="https://api.openai.com/v1/embeddings",
+        min_length=8,
+        description="HTTP endpoint for embedding requests.",
+    )
+    openai_embedding_model: str = Field(
+        default="text-embedding-3-small",
+        min_length=1,
+        description="Embedding model name passed to the embeddings API.",
+    )
+    openai_embedding_dimensions: int = Field(
+        default=1536,
+        ge=8,
+        le=3072,
+        description="Vector width; must match odb.versions.mcp_public_embedding and the model output.",
+    )
+    openai_embedding_timeout_s: float = Field(
+        default=60.0,
+        gt=0,
+        le=600.0,
+        description="HTTP client timeout for embedding requests.",
+    )
 
     @model_validator(mode="after")
     def pool_size_bounds(self) -> Self:

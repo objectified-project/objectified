@@ -1,4 +1,4 @@
-"""MCP ``spec.search`` tool: keyword search over public specs (#3007)."""
+"""MCP ``spec.search`` tool: full-text search over public specs (#3007)."""
 
 from __future__ import annotations
 
@@ -25,19 +25,6 @@ def _utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
-
-
-def escape_ilike_fragment(raw: str) -> str:
-    """Escape ``\\``, ``%``, and ``_`` for use inside ILIKE patterns with ``ESCAPE '\\'``."""
-    return raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def normalize_search_query(q: str) -> str:
-    """Strip leading/trailing whitespace; reject empty queries."""
-    s = str(q).strip()
-    if not s:
-        raise ValueError("q must be a non-empty search string.")
-    return s
 
 
 def encode_spec_search_cursor(rank_score: int, updated_at: datetime, spec_id: UUID) -> str:
@@ -131,7 +118,7 @@ def _row_out(row: dict[str, Any]) -> dict[str, Any]:
 
 
 _SEARCH_QUERY = """
-WITH pre AS (
+WITH hit AS (
   SELECT
     s.id,
     s.tenant_id,
@@ -141,19 +128,10 @@ WITH pre AS (
     s.description,
     s.tags,
     s.updated_at,
-    tm.tag_match
+    ts_rank_cd(v.mcp_public_doc_tsv, plainto_tsquery('english', %(q)s)) AS rank_raw
   FROM odb.mcp_v_public_specs AS s
-  CROSS JOIN LATERAL (
-    SELECT EXISTS (
-      SELECT 1
-      FROM unnest(s.tags) AS tag
-      WHERE tag ILIKE %(contains)s ESCAPE '\\'
-    ) AS tag_match
-  ) AS tm
-  WHERE
-    s.title ILIKE %(contains)s ESCAPE '\\'
-    OR COALESCE(s.description, '') ILIKE %(contains)s ESCAPE '\\'
-    OR tm.tag_match
+  INNER JOIN odb.versions v ON v.id = s.id
+  WHERE v.mcp_public_doc_tsv @@ plainto_tsquery('english', %(q)s)
 ),
 ranked AS (
   SELECT
@@ -165,19 +143,11 @@ ranked AS (
     description,
     tags,
     updated_at,
-    (
-      CASE
-        WHEN title ILIKE %(prefix)s ESCAPE '\\' THEN 1000
-        WHEN title ILIKE %(contains)s ESCAPE '\\' THEN 600
-        ELSE 0
-      END
-      + CASE
-          WHEN COALESCE(description, '') ILIKE %(contains)s ESCAPE '\\' THEN 200
-          ELSE 0
-        END
-      + CASE WHEN tag_match THEN 100 ELSE 0 END
-    )::integer AS rank_score
-  FROM pre
+    GREATEST(
+      1,
+      LEAST(2147483647, ROUND((rank_raw::numeric) * 1000000)::integer)
+    ) AS rank_score
+  FROM hit
 )
 SELECT id, tenant_id, project_id, title, version, description, tags, updated_at, rank_score
 FROM ranked
@@ -194,6 +164,14 @@ LIMIT %(lim)s
 """
 
 
+def normalize_search_query(q: str) -> str:
+    """Strip leading/trailing whitespace; reject empty queries."""
+    s = str(q).strip()
+    if not s:
+        raise ValueError("q must be a non-empty search string.")
+    return s
+
+
 async def build_spec_search_response(
     pool: AsyncConnectionPool,
     *,
@@ -201,11 +179,8 @@ async def build_spec_search_response(
     limit: int | None = None,
     cursor: str | None = None,
 ) -> dict[str, Any]:
-    """Return ranked ``items``, ``has_more``, and ``next_cursor`` for keyword search."""
+    """Return ranked ``items``, ``has_more``, and ``next_cursor`` (Postgres full-text)."""
     query_text = normalize_search_query(q)
-    escaped = escape_ilike_fragment(query_text)
-    prefix = f"{escaped}%"
-    contains = f"%{escaped}%"
 
     lim = _clamp_limit(limit)
     decoded = decode_spec_search_cursor(cursor)
@@ -215,8 +190,7 @@ async def build_spec_search_response(
     cur_id = decoded[2] if decoded else None
 
     params: dict[str, Any] = {
-        "prefix": prefix,
-        "contains": contains,
+        "q": query_text,
         "has_cursor": has_cursor,
         "cur_rank": cur_rank,
         "cur_ts": cur_ts,

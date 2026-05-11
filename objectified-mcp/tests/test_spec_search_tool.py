@@ -15,7 +15,6 @@ from objectified_mcp.spec_search_tool import (
     build_spec_search_response,
     decode_spec_search_cursor,
     encode_spec_search_cursor,
-    escape_ilike_fragment,
     normalize_search_query,
 )
 
@@ -56,10 +55,6 @@ def _pool_mock_for_fetch(rows: list[dict[str, object]]) -> tuple[MagicMock, Magi
     conn_cm.__aexit__.return_value = None
     pool.connection = MagicMock(return_value=conn_cm)
     return pool, cur
-
-
-def test_escape_ilike_fragment_escapes_metacharacters() -> None:
-    assert escape_ilike_fragment(r"a\%_") == r"a\\\%\_"
 
 
 def test_normalize_search_query_strips_and_rejects_empty() -> None:
@@ -121,21 +116,7 @@ def test_build_spec_search_response_clamps_limit(limit_in: int | None, expected_
     asyncio.run(run())
     _sql, params = cur.execute.await_args.args
     assert params["lim"] == expected_fetch_limit
-    assert params["prefix"] == "pay%"
-    assert params["contains"] == "%pay%"
-
-
-def test_build_spec_search_response_sql_patterns_escape_percent() -> None:
-    rows = [_sample_row()]
-    pool, cur = _pool_mock_for_fetch(rows)
-
-    async def run() -> None:
-        await build_spec_search_response(pool, q="100%")
-
-    asyncio.run(run())
-    _sql, params = cur.execute.await_args.args
-    assert params["prefix"] == r"100\%%"
-    assert params["contains"] == r"%100\%%"
+    assert params["q"] == "pay"
 
 
 def test_build_spec_search_response_has_more_and_next_cursor() -> None:
