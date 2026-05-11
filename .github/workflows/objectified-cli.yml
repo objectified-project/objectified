@@ -37,7 +37,7 @@ jobs:
       - name: Run validation tests
         run: |
           cd objectified-cli
-          yarn test --ci
+          yarn test
         env:
           TEST_POSTGRES_DB: objectified_test
           POSTGRES_HOST: localhost
