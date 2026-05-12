@@ -299,7 +299,11 @@ export async function PUT(
     const { data, error, status } = await handleRestResponse(response, 'Failed to update version');
 
     if (error) {
-      return NextResponse.json({ success: false, error }, { status });
+      const errRes = NextResponse.json({ success: false, error }, { status });
+      if (restEtag) {
+        errRes.headers.set('ETag', restEtag);
+      }
+      return errRes;
     }
 
     const res = NextResponse.json({ success: true, version: data });

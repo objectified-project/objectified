@@ -222,11 +222,19 @@ export function createObjVfs(options?: CreateObjVfsOptions) {
 
     if (res.status === 412) {
       let serverNotesJson: string | null = null;
+      const conflictUri = `obj://project/${projectId}/version/${versionId}/version-notes.json`;
       try {
         const fresh = await fetchVersionForNotes(fetchFn, projectId, versionId);
         serverNotesJson = fresh.text;
+        setCache(conflictUri, fresh.text, fresh.etag);
       } catch {
         serverNotesJson = null;
+        if (etagOut) {
+          const existing = cache.get(conflictUri);
+          if (existing) {
+            cache.set(conflictUri, { ...existing, etag: etagOut });
+          }
+        }
       }
       const localContent = content;
       return {

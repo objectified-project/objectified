@@ -1705,9 +1705,10 @@ async def update_version(
     project_id: str,
     version_record_id: str,
     http_request: Request,
+    response: Response,
     payload: VersionUpdateRequest,
     auth_data: Dict[str, Any] = Depends(validate_authentication)
-) -> JSONResponse:
+) -> VersionSchema:
     """
     Update an existing version.
 
@@ -1853,10 +1854,8 @@ async def update_version(
             )
 
         vs = VersionSchema(**version)
-        return JSONResponse(
-            content=vs.model_dump(mode="json", by_alias=True),
-            headers={"ETag": _strong_etag_for_revision(str(version["id"]))},
-        )
+        response.headers["ETag"] = _strong_etag_for_revision(str(version["id"]))
+        return vs
     except HTTPException:
         raise
     except CommitPolicyViolation as pe:
