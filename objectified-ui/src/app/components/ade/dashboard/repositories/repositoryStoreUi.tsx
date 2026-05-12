@@ -11,6 +11,14 @@ import { RepositoryRowMenu } from './RepositoryRowMenu';
 export type RepositoryProvider = 'github' | 'gitlab' | 'bitbucket' | 'public_url';
 export type RepositoryStatus = 'pending' | 'scanning' | 'ready' | 'error' | 'archived';
 
+/** One finished (or failed) scan line when `GET …/repositories/{id}` exposes `recent_scans`. */
+export type RecentRepositoryScanRow = {
+  branch: string;
+  /** ISO timestamp shown in the list (e.g. job finished_at). */
+  finished_at: string;
+  failed: boolean;
+};
+
 export interface DashboardRepository {
   id: string;
   name: string;
@@ -21,6 +29,8 @@ export interface DashboardRepository {
   visibility?: 'public' | 'private';
   status: RepositoryStatus;
   last_scanned_at?: string | null;
+  /** Scan job history for the Recent scans list; omitted or empty until REST exposes it. */
+  recent_scans?: RecentRepositoryScanRow[];
   total_files?: number | null;
   importable_count?: number | null;
   /** Git remote branches (GitHub list-branches at registration); null if unknown. */
@@ -48,6 +58,24 @@ function normalizeStatus(s: unknown): RepositoryStatus {
   return 'ready';
 }
 
+function parseRecentScansFromApi(v: unknown): RecentRepositoryScanRow[] {
+  if (!Array.isArray(v) || v.length === 0) return [];
+  const out: RecentRepositoryScanRow[] = [];
+  for (const item of v) {
+    if (!item || typeof item !== 'object') continue;
+    const r = item as Record<string, unknown>;
+    const branch = String(r.branch ?? r.ref ?? r.default_branch ?? '').trim() || 'main';
+    const rawAt = r.finished_at ?? r.completed_at ?? r.ended_at ?? r.created_at ?? r.started_at;
+    if (rawAt == null) continue;
+    const iso = String(rawAt).trim();
+    if (!iso) continue;
+    const st = String(r.status ?? r.outcome ?? '').toLowerCase();
+    const failed = st === 'failed' || st === 'error';
+    out.push({ branch, finished_at: iso, failed });
+  }
+  return out;
+}
+
 /** Parse a repository object from the REST / Next API (list or detail). */
 export function dashboardRepositoryFromApi(x: unknown): DashboardRepository | null {
   if (!x || typeof x !== 'object') return null;
@@ -66,7 +94,13 @@ export function dashboardRepositoryFromApi(x: unknown): DashboardRepository | nu
     default_branch: String(o.default_branch ?? 'main'),
     visibility,
     status: normalizeStatus(o.status),
-    last_scanned_at: o.last_scanned_at != null ? String(o.last_scanned_at) : null,
+    last_scanned_at: (() => {
+      const v = o.last_scanned_at ?? (o as { lastScannedAt?: unknown }).lastScannedAt;
+      if (v == null) return null;
+      const s = String(v).trim();
+      return s === '' ? null : s;
+    })(),
+    recent_scans: parseRecentScansFromApi(o.recent_scans),
     total_files: typeof o.total_files === 'number' ? o.total_files : null,
     importable_count: typeof o.importable_count === 'number' ? o.importable_count : null,
     branch_count: typeof o.branch_count === 'number' ? o.branch_count : null,

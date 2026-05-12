@@ -331,7 +331,7 @@ export function RepositoryDetailClient() {
     if (!currentTenantId || !id || !scanning) return;
     const timer = window.setInterval(() => {
       void load({ silent: true });
-    }, 10_000);
+    }, 5_000);
     return () => window.clearInterval(timer);
   }, [currentTenantId, id, scanning, load]);
 
@@ -364,6 +364,8 @@ export function RepositoryDetailClient() {
     if (!repo || typeof repo.importable_count !== 'number') return null;
     return estimatedImportableMixForRepo(repo.importable_count, repo.id);
   }, [repo]);
+
+  const recentScanRows = useMemo(() => repo?.recent_scans ?? [], [repo]);
 
   const webUrl = useMemo(() => {
     if (!repo?.clone_url) return null;
@@ -582,9 +584,9 @@ export function RepositoryDetailClient() {
             as scan jobs and import history are exposed through the API.
           </p>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 lg:col-span-2">
-              <div className="mb-3 flex items-center justify-between">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
+            <div className="flex min-h-48 flex-col rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 lg:col-span-2 lg:h-full lg:min-h-0">
+              <div className="mb-3 flex shrink-0 items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Recent scans</h3>
                 <button
                   type="button"
@@ -594,34 +596,39 @@ export function RepositoryDetailClient() {
                   View scan history →
                 </button>
               </div>
-              <div className="space-y-2">
-                {repo.last_scanned_at ? (
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 text-sm dark:border-gray-700">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          'h-2 w-2 shrink-0 rounded-full',
-                          repo.status === 'error' ? 'bg-rose-500' : 'bg-emerald-500'
-                        )}
-                      />
-                      <span>{repo.default_branch}</span>
-                      <span className="font-mono text-xs text-gray-500 dark:text-gray-400">—</span>
+              {recentScanRows.length === 0 ? (
+                <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-2 py-6">
+                  <p className="m-0 text-center text-sm leading-normal text-gray-900 dark:text-gray-100">
+                    No recent scans
+                  </p>
+                </div>
+              ) : (
+                <div className="min-h-0 flex-1 space-y-2">
+                  {recentScanRows.map((row) => (
+                    <div
+                      key={`${row.branch}:${row.finished_at}`}
+                      className="flex items-center justify-between border-b border-gray-100 pb-2 text-sm dark:border-gray-700"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            'h-2 w-2 shrink-0 rounded-full',
+                            row.failed ? 'bg-rose-500' : 'bg-emerald-500'
+                          )}
+                        />
+                        <span>{row.branch}</span>
+                        <span className="font-mono text-xs text-gray-500 dark:text-gray-400">—</span>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatLastScan(row.finished_at, row.failed)}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatLastScan(repo.last_scanned_at, repo.status === 'error')}
-                    </div>
-                  </div>
-                ) : null}
-                <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                  Each row will represent one indexing pass: branch or tag name, resolved commit SHA, file add/remove
-                  counts, duration, and outcome. Data will come from background workers writing scan job rows linked to{' '}
-                  <span className="font-mono text-xs">tenant_repositories.id</span>.
-                  {!repo.last_scanned_at ? ' Nothing is listed yet because that pipeline is not exposed to the UI.' : ''}
-                </p>
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+            <div className="flex flex-col rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 lg:h-full">
               <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Importable mix</h3>
               <p className="mb-2 text-xs leading-snug text-gray-500 dark:text-gray-400">
                 {IMPORTABLE_ESTIMATE_DISCLAIMER}

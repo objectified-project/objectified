@@ -79,13 +79,14 @@ export default function RepositoriesPage() {
     }
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
     if (!currentTenantId) {
       setRepos([]);
-      setLoading(false);
+      if (!silent) setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const res = await fetch("/api/repositories", { credentials: "include" });
       const data = await res.json().catch(() => ({}));
@@ -97,16 +98,31 @@ export default function RepositoriesPage() {
       setRepos(dashboardRepositoriesFromListPayload(data));
     } catch (e) {
       console.error(e);
-      setRepos([]);
-      toast.error("Could not load repositories.");
+      if (!silent) {
+        setRepos([]);
+        toast.error("Could not load repositories.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [currentTenantId]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const anyScanning = useMemo(
+    () => repos.some((r) => r.status === "scanning"),
+    [repos],
+  );
+
+  useEffect(() => {
+    if (!currentTenantId || !anyScanning) return;
+    const timer = window.setInterval(() => {
+      void load({ silent: true });
+    }, 5_000);
+    return () => window.clearInterval(timer);
+  }, [currentTenantId, anyScanning, load]);
 
   const filtered = useMemo(() => {
     let list = repos.slice();
