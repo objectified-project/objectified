@@ -82,9 +82,7 @@ def decode_project_list_cursor(raw: str | None) -> tuple[datetime, UUID, UUID] |
         raise InvalidProjectListCursorError("Invalid project.list cursor (bad timestamp).") from exc
 
     if parsed_at.tzinfo is None:
-        raise InvalidProjectListCursorError(
-            "Invalid project.list cursor (timestamp must include timezone offset)."
-        )
+        raise InvalidProjectListCursorError("Invalid project.list cursor (timestamp must include timezone offset).")
 
     try:
         tenant_uuid = UUID(e_raw.strip())

@@ -85,3 +85,25 @@ def test_get_preferences_reads_db(jwt_session):
         r = client.get("/v1/users/me/preferences")
     assert r.status_code == 200
     assert r.json() == {"preferences": {"developerModeEnabled": True}}
+
+
+def test_put_preferences_accepts_editor_keymap_vim(jwt_session):
+    with patch("app.users_preferences_routes.db") as m:
+        m.merge_user_preferences.return_value = {"editorKeymap": "vim"}
+        r = client.put("/v1/users/me/preferences", json={"editorKeymap": "vim"})
+    assert r.status_code == 200
+    assert r.json()["preferences"]["editorKeymap"] == "vim"
+    m.merge_user_preferences.assert_called_once()
+
+
+def test_put_preferences_accepts_editor_keymap_vscode(jwt_session):
+    with patch("app.users_preferences_routes.db") as m:
+        m.merge_user_preferences.return_value = {"editorKeymap": "vscode"}
+        r = client.put("/v1/users/me/preferences", json={"editorKeymap": "vscode"})
+    assert r.status_code == 200
+    assert r.json()["preferences"]["editorKeymap"] == "vscode"
+
+
+def test_put_preferences_rejects_invalid_editor_keymap(jwt_session):
+    r = client.put("/v1/users/me/preferences", json={"editorKeymap": "emacs"})
+    assert r.status_code == 422
