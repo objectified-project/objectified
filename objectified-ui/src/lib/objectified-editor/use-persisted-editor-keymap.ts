@@ -54,6 +54,7 @@ export function usePersistedEditorKeymap(enabled: boolean): {
 
   useEffect(() => {
     if (!enabled) {
+      setHydrated(true);
       return;
     }
     let cancelled = false;

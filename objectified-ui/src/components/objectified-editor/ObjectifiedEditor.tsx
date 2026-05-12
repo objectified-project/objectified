@@ -123,16 +123,22 @@ export function ObjectifiedEditor({
     if (effectiveKeymap !== 'vim') return;
 
     let cancelled = false;
-    void import('monaco-vim').then(({ initVimMode }) => {
-      if (cancelled) return;
-      vimDisposableRef.current = initVimMode(ed, host) as { dispose: () => void };
-    });
+    void import('monaco-vim')
+      .then(({ initVimMode }) => {
+        if (cancelled) return;
+        vimDisposableRef.current = initVimMode(ed, host) as { dispose: () => void };
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // If monaco-vim fails to load (network/bundle error), silently fall back to VS Code keymap.
+        void setKeymap('vscode');
+      });
 
     return () => {
       cancelled = true;
       disposeVim();
     };
-  }, [effectiveKeymap, hydrated, disposeVim, editorMountId]);
+  }, [effectiveKeymap, hydrated, disposeVim, editorMountId, setKeymap]);
 
   useEffect(() => {
     return () => disposeVim();
@@ -159,6 +165,7 @@ export function ObjectifiedEditor({
             onValueChange={(v) => {
               if (v === 'vscode' || v === 'vim') void setKeymap(v);
             }}
+            aria-label="Editor keymap"
             className="inline-flex rounded-md border border-slate-200 p-0.5 dark:border-slate-600"
           >
             <ToggleGroup.Item

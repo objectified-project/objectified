@@ -64,4 +64,48 @@ describe('usePersistedEditorKeymap', () => {
       }),
     );
   });
+
+  it('sets hydrated to true immediately when enabled transitions to false', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ preferences: { editorKeymap: 'vim' } }),
+    });
+
+    let enabled = true;
+    const { result, rerender } = renderHook(() => usePersistedEditorKeymap(enabled));
+
+    // Wait until hydrated from the server fetch.
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    // Transition enabled → false; hydrated should remain/become true immediately.
+    act(() => {
+      enabled = false;
+      rerender();
+    });
+
+    expect(result.current.hydrated).toBe(true);
+  });
+
+  it('re-hydrates when enabled transitions from false to true', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ preferences: { editorKeymap: 'vim' } }),
+    });
+
+    let enabled = false;
+    const { result, rerender } = renderHook(() => usePersistedEditorKeymap(enabled));
+
+    // Initially disabled → immediately hydrated.
+    expect(result.current.hydrated).toBe(true);
+
+    // Transition to enabled → should fetch and re-hydrate.
+    act(() => {
+      enabled = true;
+      rerender();
+    });
+
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    expect(result.current.keymap).toBe('vim');
+  });
 });
+
