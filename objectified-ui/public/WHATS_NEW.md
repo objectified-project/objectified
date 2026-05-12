@@ -62,6 +62,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Projects list includes a **Show deleted** switch; when on, soft-deleted projects appear with a **Deleted** badge and **Restore** or **permanent delete** in the row menu (#2981).
 
 ## Studio
+- **Developer Mode (foundation)**: Pro-gated **Developer Mode** preference with server-side entitlement (`GET /v1/entitlements/developer-mode`), persisted user settings (`PUT /v1/users/me/preferences`), **SSR-hydrated** toggle in the studio chrome and **Profile**, free-tier **Pro upsell** dialog, and authenticated telemetry `developer_mode.toggled` with `from` / `to` (`POST /api/v1/telemetry/events`) (#3343).
 - **Schema Metrics** includes **Canvas layout intelligence**: analyzes the live ReactFlow graph (strongly connected components, hubs, hierarchy roots, weakly connected islands), recommends **Top→Bottom** vs **Left→Right** auto-layout, adds matching **Suggestions**, and optional **AI narrative** via Ollama (`canvas_layout_recommendations`) (#623).
 - Property **Examples** (Advanced Constraints) supports **Generate example with AI** (Ollama): adds a realistic JSON example from the property name, optional description, schema snapshot, and nested member hints on class properties (#622).
 - **Paths** operation **Docs** tab supports **Generate summary & description** (Ollama): drafts OpenAPI **summary** and Markdown **description** from the HTTP method, path template, path parameters, and optional operationId (#621).

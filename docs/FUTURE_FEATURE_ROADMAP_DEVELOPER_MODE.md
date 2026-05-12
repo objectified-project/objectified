@@ -31,7 +31,6 @@ Tickets were created from this roadmap with structured descriptions (problem, sc
 
 | ID | Issue |
 |----|------:|
-| 1.1 | [#3343](https://github.com/KenSuenobu/objectified-commercial/issues/3343) |
 | 1.2 | [#3344](https://github.com/KenSuenobu/objectified-commercial/issues/3344) |
 | 1.3 | [#3345](https://github.com/KenSuenobu/objectified-commercial/issues/3345) |
 | 1.4 | [#3346](https://github.com/KenSuenobu/objectified-commercial/issues/3346) |

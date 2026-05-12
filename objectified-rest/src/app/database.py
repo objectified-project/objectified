@@ -7207,6 +7207,74 @@ class Database:
         """
         return self.execute_query(query, tuple(params))
 
+    def get_user_entitlements_row(self, user_id: str) -> Optional[Dict[str, Any]]:
+        rows = self.execute_query(
+            """
+            SELECT plan_code, license_id::text AS license_id
+            FROM odb.user_entitlements
+            WHERE user_id = %s
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        return rows[0] if rows else None
+
+    def is_developer_mode_entitled(self, user_id: str, row: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Developer Mode is a paid capability: free-tier rows (plan_code = free, no license) are excluded.
+        Users with no entitlements row are treated as not entitled (strict gate).
+        """
+        r = row if row is not None else self.get_user_entitlements_row(user_id)
+        if not r:
+            return False
+        pc = (r.get("plan_code") or "").strip().lower()
+        if pc != "free":
+            return True
+        lic = r.get("license_id")
+        return lic is not None and str(lic).strip() != ""
+
+    def get_user_preferences(self, user_id: str) -> Dict[str, Any]:
+        rows = self.execute_query(
+            """
+            SELECT COALESCE(preferences, '{}'::jsonb) AS preferences
+            FROM odb.users
+            WHERE id = %s AND deleted_at IS NULL
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        if not rows:
+            return {}
+        raw = rows[0].get("preferences")
+        if isinstance(raw, dict):
+            return raw
+        if isinstance(raw, str):
+            try:
+                parsed = json.loads(raw)
+                return parsed if isinstance(parsed, dict) else {}
+            except Exception:
+                return {}
+        return {}
+
+    def merge_user_preferences(self, user_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Shallow-merge top-level keys into odb.users.preferences (jsonb ||).
+        """
+        rows = self.execute_query(
+            """
+            UPDATE odb.users
+            SET preferences = COALESCE(preferences, '{}'::jsonb) || %s::jsonb,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s AND deleted_at IS NULL
+            RETURNING preferences
+            """,
+            (Json(patch), user_id),
+        )
+        if not rows:
+            raise ValueError("user not found or deleted")
+        out = rows[0].get("preferences")
+        return out if isinstance(out, dict) else {}
+
 
 # Global database instance
 db = Database()

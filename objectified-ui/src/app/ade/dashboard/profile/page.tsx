@@ -23,6 +23,7 @@ import {
   dashboardMainClass,
   dashboardPanelClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
+import { DeveloperModePreferenceControl } from '@/app/components/ade/DeveloperModePreferenceControl';
 import { cn } from '../../../../../lib/utils';
 
 const Profile = () => {
@@ -293,6 +294,8 @@ const Profile = () => {
             </Button>
           </CardFooter>
         </Card>
+
+        <DeveloperModePreferenceControl layout="profile" />
 
         {/* Security card */}
         <Card className={cn(dashboardPanelClass, 'shadow-none overflow-hidden')}>
