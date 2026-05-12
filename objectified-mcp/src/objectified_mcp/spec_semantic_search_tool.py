@@ -27,6 +27,7 @@ def _clamp_limit(limit: int | None) -> int:
         raise ValueError(f"limit must be at least 1, got {limit}.")
     return min(limit, MAX_PAGE_SIZE)
 
+
 _SEMANTIC_SEARCH_QUERY = """
 WITH scored AS (
   SELECT
@@ -104,9 +105,7 @@ def _row_out(row: dict[str, Any]) -> dict[str, Any]:
 async def _fetch_query_embedding(settings: Settings, q: str) -> list[float]:
     key = settings.openai_api_key
     if key is None:
-        raise ValueError(
-            "spec.search_semantic requires OBJECTIFIED_MCP_OPENAI_API_KEY for query embeddings."
-        )
+        raise ValueError("spec.search_semantic requires OBJECTIFIED_MCP_OPENAI_API_KEY for query embeddings.")
 
     payload: dict[str, Any] = {
         "model": settings.openai_embedding_model,

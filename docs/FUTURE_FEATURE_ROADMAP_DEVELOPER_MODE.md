@@ -31,7 +31,6 @@ Tickets were created from this roadmap with structured descriptions (problem, sc
 
 | ID | Issue |
 |----|------:|
-| 1.2 | [#3344](https://github.com/KenSuenobu/objectified-commercial/issues/3344) |
 | 1.3 | [#3345](https://github.com/KenSuenobu/objectified-commercial/issues/3345) |
 | 1.4 | [#3346](https://github.com/KenSuenobu/objectified-commercial/issues/3346) |
 | 1.5 | [#3347](https://github.com/KenSuenobu/objectified-commercial/issues/3347) |
@@ -136,7 +135,7 @@ Adds a per-user "Developer Mode" preference, surfaced in profile settings and as
 
 ### 1.2 — Editor shell & theming
 
-Embeds Monaco Editor as a reusable React component (`<ObjectifiedEditor>`) that respects Objectified's design tokens. Light/dark themes are derived from the existing Tailwind palette so the editor never visually clashes with the chrome. Key bindings default to VS Code (familiar) with an opt-in Vim mode via `monaco-vim`.
+**Shipped (#3344):** Reusable `<ObjectifiedEditor>` (`objectified-ui/src/components/objectified-editor/`) — lazy Monaco (`next/dynamic`), Tailwind/CSS-variable-driven themes, VS Code vs Vim (`monaco-vim`) with `editorKeymap` in `PUT /v1/users/me/preferences`, and a documented **`onSave`** contract for VFS writers (⌘/Ctrl+S).
 
 ```
   ┌──────────────────────────────────────────────────────────┐

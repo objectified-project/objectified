@@ -13698,6 +13698,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"monaco-vim@npm:^0.4.4":
+  version: 0.4.4
+  resolution: "monaco-vim@npm:0.4.4"
+  peerDependencies:
+    monaco-editor: "*"
+  checksum: 10c0/3e3d01d73e4bf576097b2379f4afc5700dbc4dd009db00e3e08e922f84fc79ab38dddc34e750c91cc783536e4854cec94a21dc7f577e4ce1b7a41b84c7ab491c
+  languageName: node
+  linkType: hard
+
 "motion-dom@npm:^12.38.0":
   version: 12.38.0
   resolution: "motion-dom@npm:12.38.0"
@@ -14325,6 +14334,7 @@ __metadata:
     lucide-react: "npm:^0.577.0"
     mermaid: "npm:^11.14.0"
     monaco-editor: "npm:^0.55.1"
+    monaco-vim: "npm:^0.4.4"
     mustache: "npm:^4.2.0"
     next: "npm:^16.2.3"
     next-auth: "npm:^4.24.14"
