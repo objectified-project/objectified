@@ -2,7 +2,7 @@
 
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { ChevronRight, ChevronDown, FileJson, Folder } from 'lucide-react';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 
 export type VirtualTreeFileNode = {
   kind: 'file';
@@ -84,6 +84,8 @@ export function DeveloperModeVirtualFileTree({
 
   const [focusIndex, setFocusIndex] = useState(0);
 
+  const treeRef = useRef<HTMLUListElement>(null);
+
   const safeFocusIndex = Math.min(Math.max(0, focusIndex), Math.max(0, rows.length - 1));
 
   const setFolderOpen = useCallback((folderId: string, open: boolean) => {
@@ -103,6 +105,9 @@ export function DeveloperModeVirtualFileTree({
     if (row?.type === 'file') {
       onSelectFile(row.id);
     }
+    // Move DOM focus to the inner button for this row so keyboard events are correct.
+    const btn = treeRef.current?.querySelector<HTMLElement>(`[data-row-index="${i}"]`);
+    btn?.focus();
   }, [rows, onSelectFile]);
 
   const onTreeKeyDown = useCallback(
@@ -158,13 +163,14 @@ export function DeveloperModeVirtualFileTree({
         aria-expanded={r.expanded}
         aria-selected={false}
         aria-level={r.depth + 1}
-        tabIndex={index === safeFocusIndex ? 0 : -1}
         className="outline-none"
       >
         <Collapsible.Root open={r.expanded} onOpenChange={(open) => setFolderOpen(r.id, open)}>
           <Collapsible.Trigger asChild>
             <button
               type="button"
+              data-row-index={index}
+              tabIndex={index === safeFocusIndex ? 0 : -1}
               className="flex w-full items-center gap-1 rounded-md px-1 py-0.5 text-left text-xs text-slate-600 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-cyan-500/40 dark:text-slate-300 dark:hover:bg-slate-800/80"
               style={{ paddingLeft: `${r.depth * 12 + 4}px` }}
               onFocus={() => setFocusIndex(index)}
@@ -187,11 +193,12 @@ export function DeveloperModeVirtualFileTree({
         role="treeitem"
         aria-selected={selected}
         aria-level={r.depth + 1}
-        tabIndex={index === safeFocusIndex ? 0 : -1}
         className="outline-none"
       >
         <button
           type="button"
+          data-row-index={index}
+          tabIndex={index === safeFocusIndex ? 0 : -1}
           className={`flex w-full items-center gap-1 rounded-md px-1 py-0.5 text-left text-xs focus-visible:ring-2 focus-visible:ring-cyan-500/40 ${
             selected
               ? 'bg-cyan-500/20 font-medium text-slate-900 dark:bg-cyan-500/25 dark:text-slate-100'
@@ -225,6 +232,7 @@ export function DeveloperModeVirtualFileTree({
         Files
       </div>
       <ul
+        ref={treeRef}
         role="tree"
         aria-label={ariaLabel}
         tabIndex={-1}

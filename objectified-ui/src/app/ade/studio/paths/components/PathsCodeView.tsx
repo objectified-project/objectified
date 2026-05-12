@@ -186,13 +186,29 @@ export default function PathsCodeView({ refreshKey }: PathsCodeViewProps) {
     }
   }, [mergedSpecJson, codeFormat]);
 
+  const pathsMarkers = useMemo(
+    () => markersForParsedText(pathsDisplay, codeFormat),
+    [pathsDisplay, codeFormat],
+  );
+  const mergedMarkers = useMemo(
+    () => markersForParsedText(mergedDisplay, codeFormat),
+    [mergedDisplay, codeFormat],
+  );
+
+  // Refs so the debounced timers always apply the latest computed markers
+  // without re-running the effects on every render.
+  const pathsMarkersRef = useRef(pathsMarkers);
+  pathsMarkersRef.current = pathsMarkers;
+  const mergedMarkersRef = useRef(mergedMarkers);
+  mergedMarkersRef.current = mergedMarkers;
+
   useEffect(() => {
     if (pathsParseTimerRef.current) clearTimeout(pathsParseTimerRef.current);
     pathsParseTimerRef.current = setTimeout(() => {
       const editorInst = pathsEditorRef.current;
       const model = editorInst?.getModel();
       if (!model || !monacoRef.current) return;
-      monacoRef.current.editor.setModelMarkers(model, 'paths-code-parse', markersForParsedText(pathsDisplay, codeFormat));
+      monacoRef.current.editor.setModelMarkers(model, 'paths-code-parse', pathsMarkersRef.current);
     }, 320);
     return () => {
       if (pathsParseTimerRef.current) clearTimeout(pathsParseTimerRef.current);
@@ -205,21 +221,12 @@ export default function PathsCodeView({ refreshKey }: PathsCodeViewProps) {
       const editorInst = mergedEditorRef.current;
       const model = editorInst?.getModel();
       if (!model || !monacoRef.current) return;
-      monacoRef.current.editor.setModelMarkers(model, 'paths-code-parse', markersForParsedText(mergedDisplay, codeFormat));
+      monacoRef.current.editor.setModelMarkers(model, 'paths-code-parse', mergedMarkersRef.current);
     }, 320);
     return () => {
       if (mergedParseTimerRef.current) clearTimeout(mergedParseTimerRef.current);
     };
   }, [mergedDisplay, codeFormat]);
-
-  const pathsMarkers = useMemo(
-    () => markersForParsedText(pathsDisplay, codeFormat),
-    [pathsDisplay, codeFormat],
-  );
-  const mergedMarkers = useMemo(
-    () => markersForParsedText(mergedDisplay, codeFormat),
-    [mergedDisplay, codeFormat],
-  );
 
   const diagnosticSummary = useMemo(
     () =>
