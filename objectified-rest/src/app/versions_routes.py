@@ -116,6 +116,33 @@ def _strong_etag_for_revision(revision_id: str) -> str:
     return f'"{str(revision_id).strip()}"'
 
 
+def _if_match_precondition_ok(revision_id: str, if_match: Optional[str]) -> bool:
+    """
+    RFC 9110 §13.1.1: apply the request if any listed entity-tag matches the current
+    representation, or if the value is ``*`` (resource exists). When ``If-Match`` is
+    absent, the caller treats this as ``True`` (no precondition).
+    """
+    if not if_match or not str(if_match).strip():
+        return True
+    header = str(if_match).strip()
+    if header == "*":
+        return True
+    rid = str(revision_id).strip().lower()
+    for raw in header.split(","):
+        token = raw.strip()
+        if not token:
+            continue
+        if token == "*":
+            return True
+        if token.startswith("W/"):
+            token = token[2:].strip()
+        if len(token) >= 2 and token[0] == '"' and token[-1] == '"':
+            token = token[1:-1]
+        if token.strip().lower() == rid:
+            return True
+    return False
+
+
 def _if_none_match_matches_revision(revision_id: str, if_none_match: Optional[str]) -> bool:
     """
     True when If-None-Match lists this revision's strong ETag, or when the
@@ -1677,7 +1704,9 @@ async def update_version(
     tenant_slug: str,
     project_id: str,
     version_record_id: str,
-    request: VersionUpdateRequest,
+    http_request: Request,
+    response: Response,
+    payload: VersionUpdateRequest,
     auth_data: Dict[str, Any] = Depends(validate_authentication)
 ) -> VersionSchema:
     """
@@ -1690,7 +1719,7 @@ async def update_version(
         tenant_slug: The tenant slug
         project_id: The project ID
         version_record_id: The version record ID
-        request: Version update data
+        payload: Version update data
         auth_data: Authentication data (injected by dependency)
 
     Returns:
@@ -1711,11 +1740,19 @@ async def update_version(
             detail=f"Version not found in project: {project_id}"
         )
 
+    if_match = http_request.headers.get("if-match") or http_request.headers.get("If-Match")
+    if if_match and not _if_match_precondition_ok(str(existing["id"]), if_match):
+        raise HTTPException(
+            status_code=412,
+            detail="The revision was modified elsewhere. Reload the latest copy before saving.",
+            headers={"ETag": _strong_etag_for_revision(str(existing["id"]))},
+        )
+
     try:
         proj_row = db.get_project_by_id(project_id, auth_data["tenant_id"])
         limits = effective_commit_policy(auth_data["tenant_id"], proj_row.get("metadata") if proj_row else None)
         try:
-            enforce_max_commit_payload(request, limits)
+            enforce_max_commit_payload(payload, limits)
         except CommitPolicyViolation as pe:
             raise commit_policy_http_exception(pe) from pe
 
@@ -1730,39 +1767,39 @@ async def update_version(
                     status_code=403,
                     detail="Archived revisions are read-only (#739). Tenant admins may update lifecycle or revision lock only.",
                 )
-            if request.enabled is not None and request.enabled != existing.get("enabled"):
+            if payload.enabled is not None and payload.enabled != existing.get("enabled"):
                 raise HTTPException(
                     status_code=403,
                     detail="Cannot change enabled on an archived revision.",
                 )
             note_keys_block = {"short_message", "changelog"}
-            if request.model_fields_set & note_keys_block:
+            if payload.model_fields_set & note_keys_block:
                 raise HTTPException(
                     status_code=403,
                     detail="Cannot edit version notes on an archived revision.",
                 )
 
         updates: Dict[str, Any] = {}
-        if request.enabled is not None:
-            updates["enabled"] = request.enabled
+        if payload.enabled is not None:
+            updates["enabled"] = payload.enabled
 
-        if "revision_locked" in request.model_fields_set:
+        if "revision_locked" in payload.model_fields_set:
             uid_lock = get_authenticated_user_id(auth_data)
             if not uid_lock or not db.is_user_tenant_admin(auth_data["tenant_id"], uid_lock):
                 raise HTTPException(
                     status_code=403,
                     detail="Only tenant administrators can lock or unlock revisions",
                 )
-            updates["revision_locked"] = bool(request.revision_locked)
+            updates["revision_locked"] = bool(payload.revision_locked)
 
         note_keys = {"short_message", "changelog"}
-        if request.model_fields_set & note_keys:
+        if payload.model_fields_set & note_keys:
             merged_sm = existing.get("description")
             merged_cl = existing.get("change_log")
-            if "short_message" in request.model_fields_set:
-                merged_sm = request.short_message
-            if "changelog" in request.model_fields_set:
-                merged_cl = request.changelog
+            if "short_message" in payload.model_fields_set:
+                merged_sm = payload.short_message
+            if "changelog" in payload.model_fields_set:
+                merged_cl = payload.changelog
             try:
                 merged_sm, merged_cl = validate_version_notes(
                     merged_sm,
@@ -1772,12 +1809,12 @@ async def update_version(
                 )
             except CommitPolicyViolation as pe:
                 raise commit_policy_http_exception(pe) from pe
-            if "short_message" in request.model_fields_set:
+            if "short_message" in payload.model_fields_set:
                 updates["description"] = merged_sm
-            if "changelog" in request.model_fields_set:
+            if "changelog" in payload.model_fields_set:
                 updates["change_log"] = merged_cl
 
-        if "metadata" in request.model_fields_set and request.metadata is not None:
+        if "metadata" in payload.model_fields_set and payload.metadata is not None:
             if existing.get("published"):
                 uid_meta = get_authenticated_user_id(auth_data)
                 if not uid_meta or not db.is_user_tenant_admin(
@@ -1787,7 +1824,7 @@ async def update_version(
                         status_code=403,
                         detail="Only tenant administrators can update revision metadata on published versions",
                     )
-            updates["metadata"] = request.metadata
+            updates["metadata"] = payload.metadata
 
         # Update version
         version = db.update_version(
@@ -1803,7 +1840,7 @@ async def update_version(
                 detail=f"Version not found: {version_record_id}"
             )
 
-        if "revision_locked" in request.model_fields_set:
+        if "revision_locked" in payload.model_fields_set:
             uid_audit = get_authenticated_user_id(auth_data)
             db.insert_version_protection_audit(
                 auth_data["tenant_id"],
@@ -1813,10 +1850,12 @@ async def update_version(
                 "version",
                 version_record_id,
                 "policy_change",
-                {"revision_locked": bool(request.revision_locked)},
+                {"revision_locked": bool(payload.revision_locked)},
             )
 
-        return VersionSchema(**version)
+        vs = VersionSchema(**version)
+        response.headers["ETag"] = _strong_etag_for_revision(str(version["id"]))
+        return vs
     except HTTPException:
         raise
     except CommitPolicyViolation as pe:
