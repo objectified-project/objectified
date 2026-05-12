@@ -143,3 +143,77 @@ def test_helpers_if_none_match_wildcard():
     assert _if_none_match_matches_revision(rid, '"other", *')
     assert _if_none_match_matches_revision(rid, '*, "other"')
     assert not _if_none_match_matches_revision(rid, "")
+
+
+def test_helpers_if_match_precondition_ok():
+    from app.versions_routes import _if_match_precondition_ok
+
+    rid = "rev-1"
+    assert _if_match_precondition_ok(rid, None)
+    assert _if_match_precondition_ok(rid, "")
+    assert _if_match_precondition_ok(rid, "*")
+    assert _if_match_precondition_ok(rid, '"rev-1"')
+    assert _if_match_precondition_ok(rid, '"REV-1"')
+    assert not _if_match_precondition_ok(rid, '"other"')
+
+
+def _version_row_put(**overrides):
+    base = {
+        "id": "rev-1",
+        "project_id": "proj-1",
+        "creator_id": "test-user-id",
+        "version_id": "1.0.0",
+        "description": None,
+        "change_log": None,
+        "visibility": "private",
+        "published": False,
+        "published_at": None,
+        "enabled": True,
+        "parent_version_id": None,
+        "merge_parent_version_id": None,
+        "forked_from_revision_id": None,
+        "upstream_project_id": None,
+        "revision_locked": False,
+        "metadata": None,
+        "created_at": None,
+        "updated_at": None,
+        "creator_name": None,
+        "creator_email": None,
+        "project_name": "P",
+        "project_slug": "p",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_put_version_if_match_stale_returns_412():
+    row = _version_row_put()
+    with patch("app.versions_routes.db") as mdb:
+        mdb.get_version_by_id.return_value = row
+        r = client.put(
+            "/v1/versions/tn/proj-1/rev-1",
+            headers={"If-Match": '"stale-id"'},
+            json={"short_message": "hello"},
+        )
+    assert r.status_code == 412
+    assert r.headers.get("etag") == '"rev-1"'
+    assert "modified" in r.json()["detail"].lower()
+
+
+def test_put_version_if_match_ok_returns_json_with_etag():
+    row = _version_row_put()
+    updated = _version_row_put(description="hello")
+    with patch("app.versions_routes.db") as mdb:
+        mdb.get_version_by_id.return_value = row
+        mdb.get_project_by_id.return_value = {"metadata": None}
+        mdb.is_user_tenant_admin.return_value = False
+        mdb.update_version.return_value = updated
+        r = client.put(
+            "/v1/versions/tn/proj-1/rev-1",
+            headers={"If-Match": '"rev-1"'},
+            json={"short_message": "hello"},
+        )
+    assert r.status_code == 200
+    assert r.headers.get("etag") == '"rev-1"'
+    assert r.json()["id"] == "rev-1"
+    assert r.json().get("shortMessage") == "hello"

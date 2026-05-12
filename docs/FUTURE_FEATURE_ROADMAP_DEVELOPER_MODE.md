@@ -31,7 +31,6 @@ Tickets were created from this roadmap with structured descriptions (problem, sc
 
 | ID | Issue |
 |----|------:|
-| 1.3 | [#3345](https://github.com/KenSuenobu/objectified-commercial/issues/3345) |
 | 1.4 | [#3346](https://github.com/KenSuenobu/objectified-commercial/issues/3346) |
 | 1.5 | [#3347](https://github.com/KenSuenobu/objectified-commercial/issues/3347) |
 | 2.1 | [#3348](https://github.com/KenSuenobu/objectified-commercial/issues/3348) |
@@ -99,7 +98,7 @@ Tickets were created from this roadmap with structured descriptions (problem, sc
 |------|----------------------------------------|----------------------------------------------------------------------------------------|---------------------------------------------------|----------|
 | 1.1  | Developer Mode entitlement & toggle    | Per-user toggle gated by Pro entitlement; persisted server-side.                       | `enhancement`, `developer-mode`, `mvp`, `ui`      | No       |
 | 1.2  | Editor shell & theming                 | Monaco host wired into the Objectified chrome; light/dark; font + key-binding presets. | `enhancement`, `developer-mode`, `mvp`, `ui`      | Yes      |
-| 1.3  | Virtual project filesystem             | A read/write `obj://` filesystem that maps classes, paths, libraries to virtual files. | `enhancement`, `developer-mode`, `mvp`, `rest`    | Yes      |
+| 1.3  | Virtual project filesystem             | **Shipped (#3345):** `obj://` client VFS (`readFile` / `writeFile` / `stat` / `watch` / `list`), debounced writes, `If-Match` on `PUT /v1/versions/...`, Radix conflict dialog; first binding `…/version-notes.json` → version API. Class/OpenAPI tree bindings follow in later tickets. | `enhancement`, `developer-mode`, `mvp`, `rest`    | Yes      |
 | 1.4  | Developer-mode chrome (rail, tabs, status bar) | Left rail nav, file tree, breadcrumbs, tab bar, status bar — adapted from existing Designer chrome. | `enhancement`, `developer-mode`, `mvp`, `ui` | No       |
 | 1.5  | Telemetry & feature flag wiring        | Track adoption, error rates, command usage; flag for staged rollout.                  | `enhancement`, `developer-mode`, `mvp`, `analytics` | Yes    |
 
@@ -161,7 +160,7 @@ Adds a per-user "Developer Mode" preference, surfaced in profile settings and as
 
 ### 1.3 — Virtual project filesystem
 
-Introduces an in-app `obj://` virtual filesystem that maps Objectified entities to addressable file URIs (`obj://customers/customer.objschema.json`, `obj://openapi.yaml`). The VFS is the canonical source the editor reads from and writes back to; it sits in front of the existing REST endpoints and translates writes into the appropriate PATCH/POST calls.
+**Shipped (#3345):** Introduces the in-app `obj://` layer as the canonical address space for Developer Mode editors. The first concrete binding is `obj://project/{projectId}/version/{versionId}/version-notes.json`, which maps revision short message + changelog to `GET`/`PUT` via the Next.js `/api/versions` proxy with **debounced (~500 ms) coalesced writes**, **ETag + `If-Match`** (REST returns **412** when the revision id no longer matches), and a Radix **`ObjVfsConflictDialog`** with reload / overwrite / diff. Additional virtual paths (`obj://openapi.yaml`, per-class `.objschema.json`, paths YAML, etc.) build on the same module.
 
 ```
    Editor model              VFS layer                REST API

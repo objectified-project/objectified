@@ -262,11 +262,39 @@ export async function PUT(
       current_tenant_id: tenantId,
     });
 
+    const ifMatch = request.headers.get('if-match') ?? request.headers.get('If-Match');
+    const fetchHeaders: Record<string, string> = { ...headers };
+    if (ifMatch) {
+      fetchHeaders['If-Match'] = ifMatch;
+    }
+
     const response = await fetch(`${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}/${versionId}`, {
       method: 'PUT',
-      headers,
+      headers: fetchHeaders,
       body: JSON.stringify(updateData),
     });
+
+    const restEtag = response.headers.get('ETag') ?? response.headers.get('etag');
+
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type');
+      let message = 'Failed to update version';
+      if (contentType?.includes('application/json')) {
+        const errJson = (await response.json().catch(() => null)) as { detail?: unknown; error?: string } | null;
+        if (errJson && typeof errJson.detail === 'string') {
+          message = errJson.detail;
+        } else if (errJson?.error) {
+          message = errJson.error;
+        }
+      } else {
+        message = (await response.text().catch(() => '')) || message;
+      }
+      const res = NextResponse.json({ success: false, error: message }, { status: response.status });
+      if (restEtag) {
+        res.headers.set('ETag', restEtag);
+      }
+      return res;
+    }
 
     const { data, error, status } = await handleRestResponse(response, 'Failed to update version');
 
@@ -274,7 +302,11 @@ export async function PUT(
       return NextResponse.json({ success: false, error }, { status });
     }
 
-    return NextResponse.json({ success: true, version: data });
+    const res = NextResponse.json({ success: true, version: data });
+    if (restEtag) {
+      res.headers.set('ETag', restEtag);
+    }
+    return res;
   } catch (error) {
     console.error('Error updating version:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
