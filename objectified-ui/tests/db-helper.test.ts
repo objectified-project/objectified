@@ -938,6 +938,46 @@ describe('Database Helper - Class Property Functions', () => {
     expect(properties.length).toBe(2);
   });
 
+  test('getPropertiesForClassesBatch returns properties grouped by class_id', async () => {
+    const { getPropertiesForClassesBatch } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValue({
+      rows: [
+        {
+          id: 'cp-a',
+          class_id: 'class-1',
+          property_id: null,
+          name: 'pet',
+          description: null,
+          data: JSON.stringify({ $ref: '#/components/schemas/Missing' }),
+          parent_id: null,
+          property_source_id: null,
+          property_source_name: null,
+        },
+        {
+          id: 'cp-b',
+          class_id: 'class-2',
+          property_id: null,
+          name: 'id',
+          description: null,
+          data: JSON.stringify({ type: 'string' }),
+          parent_id: null,
+          property_source_id: null,
+          property_source_name: null,
+        },
+      ],
+    });
+
+    const result = await getPropertiesForClassesBatch(['class-1', 'class-2']);
+    const byClass = JSON.parse(result) as Record<string, unknown[]>;
+
+    expect(byClass['class-1']).toHaveLength(1);
+    expect(byClass['class-2']).toHaveLength(1);
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockQuery.mock.calls[0][0]).toContain('ANY($1::uuid[])');
+    expect(mockQuery.mock.calls[0][1]).toEqual([['class-1', 'class-2']]);
+  });
+
   test('addPropertyToClass should add property', async () => {
     const { addPropertyToClass } = await import('../lib/db/helper');
 

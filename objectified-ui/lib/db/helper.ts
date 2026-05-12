@@ -2024,6 +2024,39 @@ export async function getPropertiesForClass(classId: string) {
   }
 }
 
+/**
+ * Fetch class_properties for many classes in one query (Studio sidebar $ref warnings).
+ * Returns JSON: `Record<classId, rows[]>` with the same row shape as {@link getPropertiesForClass}.
+ */
+export async function getPropertiesForClassesBatch(classIds: string[]) {
+  try {
+    const unique = [...new Set(classIds.filter(Boolean))];
+    if (unique.length === 0) {
+      return JSON.stringify({});
+    }
+    const result = await connectionPool.query(
+      `SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
+              p.id as property_source_id, p.name as property_source_name
+       FROM odb.class_properties cp
+       LEFT JOIN odb.properties p ON cp.property_id = p.id
+       WHERE cp.class_id = ANY($1::uuid[])
+       ORDER BY cp.class_id, cp.parent_id NULLS FIRST, cp.name ASC`,
+      [unique]
+    );
+
+    const byClass: Record<string, unknown[]> = {};
+    for (const row of result.rows) {
+      const cid = String((row as { class_id: string }).class_id);
+      if (!byClass[cid]) byClass[cid] = [];
+      byClass[cid].push(row);
+    }
+    return JSON.stringify(byClass);
+  } catch (error: any) {
+    console.error('Error batch-fetching class properties:', error);
+    return JSON.stringify({});
+  }
+}
+
 export async function addPropertyToClass(classId: string, propertyId: string | null, name: string, description: string | null, data: any, parentId: string | null = null) {
   try {
     if (!name || name.trim().length === 0) {

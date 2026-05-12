@@ -54,6 +54,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Introduces undelete for soft deleted projects
 - Updates Projects page to improve layout and display
 - Updates Designer and Paths top header to allow for projects and versions to be filtered
+- Optimized loading of class properties to be batched instead of singular when loading the canvas
 
 ## Dashboard
 - **Published Versions**: opening a **private** revision’s OpenAPI, Swagger UI, Arazzo, or JSON Schema link **reuses an API key saved in this browser** for the current tenant when present, so you are not prompted every time; otherwise the key dialog appears, with optional **remember** and a **clear saved key** control (#3132).

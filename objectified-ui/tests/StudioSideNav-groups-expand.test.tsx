@@ -10,7 +10,7 @@ import '@testing-library/jest-dom';
 import StudioSideNav from '../src/app/components/ade/studio/StudioSideNav';
 
 jest.mock('../lib/db/helper', () => ({
-  getPropertiesForClass: jest.fn().mockResolvedValue('[]'),
+  getPropertiesForClassesBatch: jest.fn().mockResolvedValue('{}'),
 }));
 
 describe('StudioSideNav Groups expand/collapse', () => {

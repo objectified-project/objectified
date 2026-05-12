@@ -1,10 +1,10 @@
 // SideNav.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Search, Plus, Pencil, Trash2, FileX, Upload, Library, ChevronDown, ChevronUp, ChevronRight, Eye, EyeOff, Boxes, ListTree, Layers, Bot } from 'lucide-react';
-import { getPropertiesForClass } from '../../../../../lib/db/helper';
+import { getPropertiesForClassesBatch } from '../../../../../lib/db/helper';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 import SidebarDensityToggle from '@/app/components/sidebar/SidebarDensityToggle';
 import { sidebarTheme, useSidebarTokens } from '@/app/components/sidebar/sidebar-theme';
@@ -197,7 +197,14 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
     });
   };
 
-  // Compute dangling $ref warnings when classes change
+  /** Stable across parent re-renders that replace the `classes` array reference without semantic change. */
+  const classListFingerprint = useMemo(
+    () =>
+      `${selectedVersionId ?? ''}\n${classes.map((c) => `${c.id}\t${c.name}`).sort().join('\n')}`,
+    [classes, selectedVersionId]
+  );
+
+  // Compute dangling $ref warnings when classes change (one batched server action per update).
   React.useEffect(() => {
     const computeWarnings = async () => {
       if (!selectedVersionId || classes.length === 0) {
@@ -206,30 +213,41 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
       }
       const nameSet = new Set(classes.map((c) => c.name));
       const warnings: Record<string, boolean> = {};
-      for (const cls of classes) {
-        try {
-          const res = await getPropertiesForClass(cls.id);
-          const props = JSON.parse(res);
-          let hasDangling = false;
-          for (const p of props) {
-            const d = typeof p.data === 'string' ? JSON.parse(p.data) : p.data;
-            if (!d) continue;
-            const ref = d.$ref || (d.type === 'array' && d.items?.$ref);
-            if (ref) {
-              const parts = String(ref).split('/');
-              const refName = parts[parts.length - 1] || String(ref);
-              if (!nameSet.has(refName)) { hasDangling = true; break; }
+      try {
+        const res = await getPropertiesForClassesBatch(classes.map((c) => c.id));
+        const byClass = JSON.parse(res) as Record<string, Array<{ data?: unknown }> | undefined>;
+        for (const cls of classes) {
+          try {
+            const props = byClass[cls.id] ?? [];
+            let hasDangling = false;
+            for (const p of props) {
+              const d = typeof p.data === 'string' ? JSON.parse(p.data) : p.data;
+              if (!d) continue;
+              const ref = d.$ref || (d.type === 'array' && d.items?.$ref);
+              if (ref) {
+                const parts = String(ref).split('/');
+                const refName = parts[parts.length - 1] || String(ref);
+                if (!nameSet.has(refName)) {
+                  hasDangling = true;
+                  break;
+                }
+              }
             }
+            warnings[cls.id] = hasDangling;
+          } catch {
+            warnings[cls.id] = false;
           }
-          warnings[cls.id] = hasDangling;
-        } catch (e) {
-          warnings[cls.id] = false;
         }
+        setClassWarnings(warnings);
+      } catch {
+        setClassWarnings({});
       }
-      setClassWarnings(warnings);
     };
-    computeWarnings();
-  }, [classes, selectedVersionId, refreshKey]);
+    void computeWarnings();
+    // `classListFingerprint` encodes `selectedVersionId` and class id/name lines; listing `classes`
+    // would re-run whenever the parent passes a new array reference (same canvas), restoring POST spam.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fingerprint-based deps
+  }, [classListFingerprint, refreshKey]);
 
   const handleTabChange = (newValue: string) => {
     setCurrentTab(newValue as 'classes' | 'properties' | 'groups');
