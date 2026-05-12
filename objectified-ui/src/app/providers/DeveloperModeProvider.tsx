@@ -52,7 +52,12 @@ export function DeveloperModeProvider({ initial, children }: Props) {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          const msg = typeof err?.error === 'string' ? err.error : 'Failed to save preference';
+          const msg =
+            typeof err?.detail === 'string'
+              ? err.detail
+              : typeof err?.error === 'string'
+              ? err.error
+              : 'Failed to save preference';
           return { ok: false as const, error: msg };
         }
         setLocal(next);
