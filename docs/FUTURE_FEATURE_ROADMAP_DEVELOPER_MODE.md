@@ -31,7 +31,6 @@ Tickets were created from this roadmap with structured descriptions (problem, sc
 
 | ID | Issue |
 |----|------:|
-| 1.4 | [#3346](https://github.com/KenSuenobu/objectified-commercial/issues/3346) |
 | 1.5 | [#3347](https://github.com/KenSuenobu/objectified-commercial/issues/3347) |
 | 2.1 | [#3348](https://github.com/KenSuenobu/objectified-commercial/issues/3348) |
 | 2.2 | [#3349](https://github.com/KenSuenobu/objectified-commercial/issues/3349) |
@@ -99,7 +98,7 @@ Tickets were created from this roadmap with structured descriptions (problem, sc
 | 1.1  | Developer Mode entitlement & toggle    | Per-user toggle gated by Pro entitlement; persisted server-side.                       | `enhancement`, `developer-mode`, `mvp`, `ui`      | No       |
 | 1.2  | Editor shell & theming                 | Monaco host wired into the Objectified chrome; light/dark; font + key-binding presets. | `enhancement`, `developer-mode`, `mvp`, `ui`      | Yes      |
 | 1.3  | Virtual project filesystem             | **Shipped (#3345):** `obj://` client VFS (`readFile` / `writeFile` / `stat` / `watch` / `list`), debounced writes, `If-Match` on `PUT /v1/versions/...`, Radix conflict dialog; first binding `…/version-notes.json` → version API. Class/OpenAPI tree bindings follow in later tickets. | `enhancement`, `developer-mode`, `mvp`, `rest`    | Yes      |
-| 1.4  | Developer-mode chrome (rail, tabs, status bar) | Left rail nav, file tree, breadcrumbs, tab bar, status bar — adapted from existing Designer chrome. | `enhancement`, `developer-mode`, `mvp`, `ui` | No       |
+| 1.4  | Developer-mode chrome (rail, tabs, status bar) | **Shipped (#3346):** Left rail (Studio routes), Radix Collapsible + ARIA tree virtual files, sortable tabs (reorder, dirty indicator, middle-click and ⌘W close), breadcrumbs, status bar with aggregated diagnostic counts from Monaco markers (parse / future LSP+Spectral); wired on Paths code view when Developer Mode is on. | `enhancement`, `developer-mode`, `mvp`, `ui` | No       |
 | 1.5  | Telemetry & feature flag wiring        | Track adoption, error rates, command usage; flag for staged rollout.                  | `enhancement`, `developer-mode`, `mvp`, `analytics` | Yes    |
 
 ### 1.1 — Developer Mode entitlement & toggle
