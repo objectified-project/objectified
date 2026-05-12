@@ -4,7 +4,7 @@ Current-user preferences (session-scoped, JWT-only writes).
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,12 +15,16 @@ from .database import db
 router = APIRouter(prefix="/v1/users", tags=["users"])
 
 
+EditorKeymap = Literal["vscode", "vim"]
+
+
 class UserPreferencesPatch(BaseModel):
     """Subset of keys accepted on PUT; extend as new preferences ship."""
 
     model_config = ConfigDict(populate_by_name=True)
 
     developer_mode_enabled: bool | None = Field(default=None, alias="developerModeEnabled")
+    editor_keymap: EditorKeymap | None = Field(default=None, alias="editorKeymap")
 
 
 def _effective_user_id(session: Dict[str, Any]) -> str:
