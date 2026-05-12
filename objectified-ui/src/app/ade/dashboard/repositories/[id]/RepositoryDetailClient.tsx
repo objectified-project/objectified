@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  Download,
   GitBranch,
   Github,
   Globe,
@@ -37,7 +36,6 @@ import { cn } from '@lib/utils';
 import {
   type DashboardRepository,
   type RepositoryStatus,
-  IMPORTABLE_ESTIMATE_DISCLAIMER,
   RepositoryKpiCard,
   dashboardRepositoryFromApi,
   estimatedImportableMixForRepo,
@@ -485,15 +483,6 @@ export function RepositoryDetailClient() {
                     <SelectItem value={repo.default_branch}>{repo.default_branch}</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="gap-1.5 bg-indigo-600 hover:bg-indigo-700"
-                  onClick={() => toast.message('Import starts from indexed files once the files API exists.')}
-                >
-                  <Download className="h-3.5 w-3.5" aria-hidden />
-                  Import file…
-                </Button>
               </div>
             </div>
 
@@ -505,14 +494,13 @@ export function RepositoryDetailClient() {
                 valuePending={repo.status === 'scanning'}
               />
               <RepositoryKpiCard
-                label="Importable"
+                label="IMPORTABLE ESTIMATE"
                 value={importable != null ? importable.toLocaleString() : '—'}
                 subtitle={
                   importable != null && importableMix
                     ? `Estimated mix from this repo’s total: OpenAPI ${importableMix.openapi.toLocaleString()}, Arazzo ${importableMix.arazzo.toLocaleString()}, JSON Schema ${importableMix.jsonSchema.toLocaleString()}. Split is a placeholder until indexed paths return real per-kind tallies.`
                     : '`importable_count` is null until detection runs and persists per-repo totals.'
                 }
-                footnote={importable != null ? IMPORTABLE_ESTIMATE_DISCLAIMER : undefined}
                 valueClassName={
                   importable != null ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500'
                 }
@@ -630,9 +618,6 @@ export function RepositoryDetailClient() {
 
             <div className="flex flex-col rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 lg:h-full">
               <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Importable mix</h3>
-              <p className="mb-2 text-xs leading-snug text-gray-500 dark:text-gray-400">
-                {IMPORTABLE_ESTIMATE_DISCLAIMER}
-              </p>
               <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-200">
                 <li className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-2">

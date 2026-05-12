@@ -176,9 +176,6 @@ export function formatEstimatedImportableMixInline(mix: EstimatedImportableMix):
   return `OpenAPI ${mix.openapi} · Arazzo ${mix.arazzo} · JSON Schema ${mix.jsonSchema}`;
 }
 
-export const IMPORTABLE_ESTIMATE_DISCLAIMER =
-  'This is an estimated count of the importable files - actual count may vary.';
-
 /** Summary metric card — label + value; `subtitle` is shown as a hover tooltip only. */
 export function RepositoryKpiCard({
   label,
@@ -209,7 +206,9 @@ export function RepositoryKpiCard({
           aria-busy={valuePending}
           tabIndex={0}
         >
-          <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</p>
+          <p className="break-words text-[10px] uppercase leading-tight tracking-wider text-gray-500 dark:text-gray-400">
+            {label}
+          </p>
           <div
             className={cn(
               'mt-1',

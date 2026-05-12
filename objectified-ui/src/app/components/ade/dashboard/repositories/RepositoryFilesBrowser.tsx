@@ -12,7 +12,7 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
@@ -58,6 +58,15 @@ const PRESET_OPTIONS: { value: string; label: string }[] = [
   { value: 'sql_ddl', label: 'SQL DDL (*.sql, *.ddl)' },
   { value: 'custom', label: 'Custom — specify glob below' },
 ];
+
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 function formatBytes(n: number | null | undefined): string {
   if (n == null || n < 0) return '—';
@@ -143,15 +152,9 @@ export function RepositoryFilesBrowser({
   const [draftSkipVendor, setDraftSkipVendor] = useState(true);
   const [draftIncludeHidden, setDraftIncludeHidden] = useState(false);
 
-  const [applied, setApplied] = useState({
-    preset: 'all',
-    glob: '',
-    regex: '',
-    hideNonImportable: true,
-    skipVendor: true,
-    includeHidden: false,
-    offset: 0,
-  });
+  const [pageOffset, setPageOffset] = useState(0);
+  const debouncedGlob = useDebounced(draftGlob, 200);
+  const debouncedRegex = useDebounced(draftRegex, 200);
 
   const [data, setData] = useState<FilesApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -167,6 +170,7 @@ export function RepositoryFilesBrowser({
   useEffect(() => {
     setBranch(defaultBranch);
     setBranches((prev) => (prev.includes(defaultBranch) ? prev : [...prev, defaultBranch]));
+    setPageOffset(0);
   }, [defaultBranch]);
 
   const pageSize = 50;
@@ -181,23 +185,23 @@ export function RepositoryFilesBrowser({
       const branchForReq = opts?.deepLink?.branch ?? branch;
       qs.set('branch', branchForReq);
       qs.set('limit', String(pageSize));
-      qs.set('offset', String(opts?.deepLink ? 0 : applied.offset));
+      qs.set('offset', String(opts?.deepLink ? 0 : pageOffset));
 
       if (opts?.deepLink?.path) {
         qs.set('regex', `^${escapeRegexPath(opts.deepLink.path)}$`);
         qs.set('hide_non_importable', 'false');
-        qs.set('skip_vendor', applied.skipVendor ? 'true' : 'false');
-        qs.set('include_hidden', applied.includeHidden ? 'true' : 'false');
+        qs.set('skip_vendor', draftSkipVendor ? 'true' : 'false');
+        qs.set('include_hidden', draftIncludeHidden ? 'true' : 'false');
       } else {
-        if (applied.regex.trim()) {
-          qs.set('regex', applied.regex.trim());
+        if (debouncedRegex.trim()) {
+          qs.set('regex', debouncedRegex.trim());
         } else {
-          if (applied.preset) qs.set('preset', applied.preset);
-          if (applied.glob.trim()) qs.set('glob', applied.glob.trim());
+          if (draftPreset) qs.set('preset', draftPreset);
+          if (debouncedGlob.trim()) qs.set('glob', debouncedGlob.trim());
         }
-        qs.set('hide_non_importable', applied.hideNonImportable ? 'true' : 'false');
-        qs.set('skip_vendor', applied.skipVendor ? 'true' : 'false');
-        qs.set('include_hidden', applied.includeHidden ? 'true' : 'false');
+        qs.set('hide_non_importable', draftHideNonImportable ? 'true' : 'false');
+        qs.set('skip_vendor', draftSkipVendor ? 'true' : 'false');
+        qs.set('include_hidden', draftIncludeHidden ? 'true' : 'false');
       }
 
       try {
@@ -235,8 +239,29 @@ export function RepositoryFilesBrowser({
         setLoading(false);
       }
     },
-    [repositoryId, branch, applied]
+    [
+      repositoryId,
+      branch,
+      pageOffset,
+      draftPreset,
+      debouncedGlob,
+      debouncedRegex,
+      draftHideNonImportable,
+      draftSkipVendor,
+      draftIncludeHidden,
+    ]
   );
+
+  useLayoutEffect(() => {
+    setPageOffset(0);
+  }, [
+    draftPreset,
+    debouncedGlob,
+    debouncedRegex,
+    draftHideNonImportable,
+    draftSkipVendor,
+    draftIncludeHidden,
+  ]);
 
   useEffect(() => {
     if (!filesDeepLink) {
@@ -301,18 +326,6 @@ export function RepositoryFilesBrowser({
     );
   }
 
-  const applyFilters = () => {
-    setApplied({
-      preset: draftPreset,
-      glob: draftGlob,
-      regex: draftRegex,
-      hideNonImportable: draftHideNonImportable,
-      skipVendor: draftSkipVendor,
-      includeHidden: draftIncludeHidden,
-      offset: 0,
-    });
-  };
-
   const resetFilters = () => {
     setDraftPreset('all');
     setDraftGlob('');
@@ -320,15 +333,7 @@ export function RepositoryFilesBrowser({
     setDraftHideNonImportable(true);
     setDraftSkipVendor(true);
     setDraftIncludeHidden(false);
-    setApplied({
-      preset: 'all',
-      glob: '',
-      regex: '',
-      hideNonImportable: true,
-      skipVendor: true,
-      includeHidden: false,
-      offset: 0,
-    });
+    setPageOffset(0);
   };
 
   const showingFrom = data ? data.offset + 1 : 0;
@@ -397,7 +402,7 @@ export function RepositoryFilesBrowser({
                         className="flex cursor-pointer items-center gap-2 px-3 py-2 outline-none hover:bg-gray-50 data-[highlighted]:bg-gray-50 dark:hover:bg-gray-700/50 dark:data-[highlighted]:bg-gray-700/50"
                         onSelect={() => {
                           setBranch(b);
-                          setApplied((o) => ({ ...o, offset: 0 }));
+                          setPageOffset(0);
                         }}
                       >
                         <Check
@@ -555,14 +560,6 @@ export function RepositoryFilesBrowser({
             <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={resetFilters}>
               Reset
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 bg-indigo-600 text-xs hover:bg-indigo-700"
-              onClick={applyFilters}
-            >
-              Apply filter
-            </Button>
           </div>
         </div>
       </div>
@@ -701,7 +698,7 @@ export function RepositoryFilesBrowser({
               size="sm"
               className="h-8 text-xs"
               disabled={!canPrev || loading}
-              onClick={() => setApplied((o) => ({ ...o, offset: Math.max(0, o.offset - pageSize) }))}
+              onClick={() => setPageOffset((o) => Math.max(0, o - pageSize))}
             >
               Prev
             </Button>
@@ -711,7 +708,7 @@ export function RepositoryFilesBrowser({
               size="sm"
               className="h-8 text-xs"
               disabled={!canNext || loading}
-              onClick={() => setApplied((o) => ({ ...o, offset: o.offset + pageSize }))}
+              onClick={() => setPageOffset((o) => o + pageSize)}
             >
               Next
             </Button>

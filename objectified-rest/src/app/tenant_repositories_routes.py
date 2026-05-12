@@ -235,14 +235,21 @@ async def list_tenant_repository_files(
 
     likes: List[str] = []
     if not rx:
-        pk = (preset or "").strip().lower()
-        if pk:
-            likes.extend(_preset_like_patterns(pk))
-        if glob:
+        # ``like_patterns`` are OR'd in SQL. Combining preset path patterns with user ``glob``
+        # would union matches (widen), so a custom glob could never narrow results while preset
+        # is ``all`` / ``openapi`` / etc. When ``glob`` is non-empty, path matching uses only
+        # those fragments; preset still affects nothing for path shape (``hide_non_importable``
+        # continues to restrict by detected kind when enabled).
+        glob_str = (glob or "").strip()
+        if glob_str:
             for piece in glob.split(","):
                 g = piece.strip()
                 if g:
                     likes.append(_glob_token_to_sql_like(g))
+        else:
+            pk = (preset or "").strip().lower()
+            if pk:
+                likes.extend(_preset_like_patterns(pk))
 
     raw = db.tenant_repository_files_stats_and_page(
         tenant_id,

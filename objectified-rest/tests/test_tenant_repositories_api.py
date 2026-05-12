@@ -256,6 +256,42 @@ def test_list_repository_files_ok():
     assert body["files"][0]["confidence"] == "filename"
 
 
+def test_list_repository_files_glob_without_preset_union():
+    """Non-empty ``glob`` must not be OR'd with preset patterns (that widened matches)."""
+    rid = _LIST_ROW["id"]
+    sample = {
+        "indexed_total": 10,
+        "match_count": 1,
+        "importable_match_count": 1,
+        "limit": 50,
+        "offset": 0,
+        "rows": [
+            {
+                "id": "990e8400-e29b-41d4-a716-446655440001",
+                "path": "services/api.yaml",
+                "name": "api.yaml",
+                "ext": "yaml",
+                "size_bytes": 100,
+                "blob_sha": "deadbeefcafe",
+                "detected_kind": "openapi-candidate",
+            },
+        ],
+    }
+    with patch("app.tenant_repositories_routes.db") as mdb:
+        mdb.get_tenant_repository.return_value = _LIST_ROW
+        mdb.tenant_repository_files_stats_and_page.return_value = sample
+        mdb.list_tenant_repository_file_branches.return_value = ["main"]
+        r = client.get(
+            f"/v1/tenants/acme/repositories/{rid}/files?branch=main&preset=all&glob=**/services/*.yaml"
+        )
+    assert r.status_code == 200
+    mdb.tenant_repository_files_stats_and_page.assert_called_once()
+    kwargs = mdb.tenant_repository_files_stats_and_page.call_args.kwargs
+    pats = kwargs.get("like_patterns") or []
+    assert len(pats) == 1
+    assert pats[0] == "%/services/%.yaml"
+
+
 def test_list_repository_files_not_found():
     with patch("app.tenant_repositories_routes.db") as mdb:
         mdb.get_tenant_repository.return_value = None

@@ -48,6 +48,8 @@ We continue to improve the platform based on your feedback with improvements and
 - Recent imports from repository metrics are now displayed
 - Imports tab now shows the previously imported files from the repository
 - Files in the imports tab now leads to the original file that was imported
+- Cleaned up UI for main page, removed redundant information
+- Search with regex and glob works as expected, and auto-refreshes when typing after a small delay
 
 ## UI
 - Adds the ability to view projects that were deleted (show deleted toggle)
