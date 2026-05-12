@@ -53,7 +53,6 @@ declare -a JOBS=(
   "detective:dashboard.html:index.html:lineage-graph.html:investigations.html:reconciliation.html"
   "import:dashboard.html:index.html:multi-source.html:transforms.html:approvals.html"
   "linting:quality-score.html:index.html:editor-validation.html:rule-config.html:breaking-changes.html"
-  "mdm:dashboard.html:index.html:golden-record.html:match-rules.html:steward-workspace.html"
 )
 
 for job in "${JOBS[@]}"; do

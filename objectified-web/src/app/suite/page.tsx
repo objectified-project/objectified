@@ -12,7 +12,7 @@ import { SuiteIcon } from "./icons";
 export const metadata: Metadata = {
   title: "The Objectified Suite — Coming Soon",
   description:
-    "Seventeen enterprise-grade suites coming to the Objectified platform — Academy, Analytics, Architect, Automation, Browser, Code Generation, Collaboration, Connect, Contracts, Data Insights, Database, Data Transform, Detective, Import, Linting, MDM, and Shield. Each ships with deep AI integration and is available for early access.",
+    "Sixteen enterprise-grade suites coming to the Objectified platform — Academy, Analytics, Architect, Automation, Browser, Code Generation, Collaboration, Connect, Contracts, Data Insights, Database, Data Transform, Detective, Import, Linting, and Shield. Each ships with deep AI integration and is available for early access.",
 };
 
 const TONE_CHIP_BG: Record<Tone, string> = {
@@ -52,7 +52,7 @@ export default function SuitePage() {
           </Reveal>
           <Reveal delay={0.12}>
             <p className="mb-6 font-display text-2xl italic text-zinc-700 dark:text-zinc-200 sm:text-3xl">
-              Seventeen enterprise suites. One platform.
+              Sixteen enterprise suites. One platform.
             </p>
           </Reveal>
           <Reveal delay={0.2}>

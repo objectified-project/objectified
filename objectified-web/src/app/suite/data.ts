@@ -610,7 +610,7 @@ export const SUITES: Suite[] = [
       { title: "Conflict resolver", description: "Configurable merge strategies and human-in-the-loop conflict workspace." },
     ],
     useCases: [
-      { audience: "Data engineers", scenario: "Sync golden records from Objectified MDM to your downstream warehouse." },
+      { audience: "Data engineers", scenario: "Sync versioned records from Objectified Database to your downstream warehouse." },
       { audience: "Integration teams", scenario: "Replace bespoke ETL scripts with versioned, reviewable mappings." },
       { audience: "Field engineers", scenario: "Push tenant-scoped data to customer systems via signed webhooks or files." },
     ],
@@ -1205,77 +1205,6 @@ export const SUITES: Suite[] = [
       { label: "Default rules", value: "150+" },
       { label: "Score grades", value: "A–F" },
       { label: "Validation latency", value: "≤ 50ms" },
-    ],
-  },
-
-  // ─────────────────────────────────────────────────────────────── MDM
-  {
-    slug: "mdm",
-    name: "MDM",
-    fullName: "Objectified Master Data Management",
-    category: "Governance · Golden Records",
-    tagline:
-      "Turn raw class instances into trusted, governed golden records.",
-    summary:
-      "MDM extends the Objectified Database with the governance, match/merge, stewardship, and distribution surfaces required to produce trusted golden records — the foundation every other suite reads from.",
-    tone: "amber",
-    icon: "Crown",
-    status: "coming-soon",
-    cover: "/suite/mdm-cover.png",
-    hub: "/suite/mdm-hub.png",
-    details: [
-      {
-        src: "/suite/mdm-detail-1.png",
-        alt: detailAlt("MDM", "Golden record"),
-        caption: "Golden record viewer with attribute-level provenance and survivorship.",
-      },
-      {
-        src: "/suite/mdm-detail-2.png",
-        alt: detailAlt("MDM", "Match rules"),
-        caption: "Match-rule editor with deterministic and probabilistic strategies.",
-      },
-      {
-        src: "/suite/mdm-detail-3.png",
-        alt: detailAlt("MDM", "Steward workspace"),
-        caption: "Steward workspace with merge candidates and case-style queue.",
-      },
-    ],
-    features: [
-      { title: "Domain governance", description: "Define MDM domains with attributes, sources, and survivorship rules." },
-      { title: "Match & merge", description: "Hybrid deterministic + probabilistic matching with side-by-side review." },
-      { title: "Stewardship workspace", description: "Case-style queue with merge candidates, dispositions, and SLAs." },
-      { title: "Hierarchies & xref", description: "Manage hierarchies and cross-references across systems and channels." },
-      { title: "DQ rules & profiling", description: "Define data-quality rules and continuously profile sources." },
-      { title: "Publish & subscribe", description: "Publish golden records as events to downstream subscribers." },
-    ],
-    useCases: [
-      { audience: "Customer 360 programs", scenario: "Build a single, trusted customer record across CRM, ERP, and product." },
-      { audience: "Reference data teams", scenario: "Govern shared reference data with versioning and approval flows." },
-      { audience: "M&A integration", scenario: "Reconcile overlapping records during acquisition without losing history." },
-    ],
-    enterprise: [
-      "ML-based matching tuned per domain with explainability",
-      "Per-attribute survivorship policies and tie-breakers",
-      "Auto-publish workflows with throttling and DLQ",
-      "Lineage view back to source systems and steward decisions",
-      "Multi-region data residency for golden record stores",
-    ],
-    ai: {
-      headline: "Match smarter, merge safer",
-      description:
-        "AI proposes merges with confidence scores, explains why each candidate matched, and learns from steward decisions to reduce queue depth over time.",
-      capabilities: [
-        "AI-suggested merges with confidence + explanation",
-        "Continual learning from steward dispositions",
-        "Anomaly detection on data quality drift",
-        "Natural-language queries over golden records",
-      ],
-    },
-    modules: ["dashboard", "domains", "sources", "profiling", "dq-rules", "match-rules", "merge-candidates", "steward-workspace", "stewardship-inbox", "approvals", "golden-record", "hierarchies", "reference-data", "lineage", "survivorship", "unmerge", "subscriptions", "publish-jobs", "quality-dashboard", "xref-map"],
-    highlights: [
-      { label: "Match strategies", value: "Deterministic + ML" },
-      { label: "Steward queue", value: "Case-style" },
-      { label: "Distribution", value: "Event-driven" },
     ],
   },
 ];

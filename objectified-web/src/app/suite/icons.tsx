@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  Crown,
   Database,
   FileCode,
   Globe,
@@ -20,7 +19,6 @@ import {
 
 const ICON_MAP = {
   BarChart3,
-  Crown,
   Database,
   FileCode,
   Globe,
