@@ -19,6 +19,7 @@ import { Input } from '@/app/components/ui/Input';
 import { cn } from '@lib/utils';
 import { RepositoryFileDetail } from '@/app/components/ade/dashboard/repositories/RepositoryFileDetail';
 import { RepositoryFileImportMapping } from '@/app/components/ade/dashboard/repositories/RepositoryFileImportMapping';
+import type { RepositoryFileStagedImportTarget } from '@/app/components/ade/dashboard/repositories/repositoryFileStagedImport';
 
 export type RepositoryFileApiRow = {
   id: string;
@@ -161,6 +162,26 @@ export function RepositoryFilesBrowser({
   const [error, setError] = useState<string | null>(null);
   const [detailFile, setDetailFile] = useState<RepositoryFileApiRow | null>(null);
   const [importFile, setImportFile] = useState<RepositoryFileApiRow | null>(null);
+  const [stagedImportTarget, setStagedImportTarget] = useState<RepositoryFileStagedImportTarget | null>(null);
+
+  const handleStagedImportTargetChange = useCallback(
+    (target: RepositoryFileStagedImportTarget | null) => {
+      setStagedImportTarget((prev) => {
+        if (target) return target;
+        if (!importFile) return prev;
+        if (
+          prev &&
+          prev.fileId === importFile.id &&
+          prev.repositoryId === repositoryId &&
+          prev.branch === branch
+        ) {
+          return null;
+        }
+        return prev;
+      });
+    },
+    [importFile, repositoryId, branch]
+  );
 
   const lastDeepLinkKeyDoneRef = useRef<string | null>(null);
   const onDeepLinkConsumedRef = useRef(onFilesDeepLinkConsumed);
@@ -171,6 +192,10 @@ export function RepositoryFilesBrowser({
     setBranches((prev) => (prev.includes(defaultBranch) ? prev : [...prev, defaultBranch]));
     setPageOffset(0);
   }, [defaultBranch]);
+
+  useEffect(() => {
+    setStagedImportTarget(null);
+  }, [branch, repositoryId]);
 
   const pageSize = 50;
 
@@ -295,9 +320,19 @@ export function RepositoryFilesBrowser({
         branch={branch}
         file={importFile}
         onBack={() => setImportFile(null)}
+        onStagedImportTargetChange={handleStagedImportTargetChange}
       />
     );
   }
+
+  const detailStagedImport =
+    detailFile &&
+    stagedImportTarget &&
+    stagedImportTarget.repositoryId === repositoryId &&
+    stagedImportTarget.fileId === detailFile.id &&
+    stagedImportTarget.branch === branch
+      ? stagedImportTarget
+      : null;
 
   if (detailFile) {
     return (
@@ -309,6 +344,8 @@ export function RepositoryFilesBrowser({
         githubWebBase={githubWebBase}
         onBack={() => setDetailFile(null)}
         onMapImport={() => setImportFile(detailFile)}
+        stagedImportTarget={detailStagedImport}
+        onContinueStagedImport={() => setImportFile(detailFile)}
       />
     );
   }

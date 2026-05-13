@@ -36,11 +36,41 @@ interface VerificationResult {
   }>;
 }
 
+interface RawImportSummary {
+  classesCreated?: number;
+  warnings?: number;
+  failed?: number;
+  propertiesCreated?: number;
+  pathsImported?: number;
+  totalTime?: number;
+  sourceName?: string;
+  projectName?: string;
+  projectId?: string;
+  versionId?: string;
+  dryRun?: boolean;
+  incrementalMode?: boolean;
+  classes?: Array<{
+    name: string;
+    status: 'success' | 'warning' | 'failed';
+  }>;
+  verification?: VerificationResult;
+}
+
+interface ImportStatusResponse {
+  state: string;
+  result?: {
+    projectId?: string;
+    versionId?: string;
+  };
+  summary?: RawImportSummary;
+}
+
 interface ImportSummary {
   success: number;
   warnings: number;
   failed: number;
   properties: number;
+  paths: number;
   totalTime?: number;
   sourceName?: string;
   projectName?: string;
@@ -66,18 +96,19 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const status = await getImportStatus(jobId);
+        const status = await getImportStatus(jobId) as ImportStatusResponse;
         setState(status.state);
 
         // Extract summary from status; use result for projectId/versionId when completed
-        const result = (status as any).result;
+        const result = status.result;
         if (status.summary) {
-          const rawSummary = status.summary as any;
+          const rawSummary = status.summary;
           setSummary({
             success: rawSummary.classesCreated ?? 0,
             warnings: rawSummary.warnings ?? 0,
             failed: rawSummary.failed ?? 0,
             properties: rawSummary.propertiesCreated ?? 0,
+            paths: rawSummary.pathsImported ?? 0,
             totalTime: rawSummary.totalTime,
             sourceName: rawSummary.sourceName,
             projectName: rawSummary.projectName,
@@ -85,7 +116,7 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
             versionId: result?.versionId ?? rawSummary.versionId,
             dryRun: rawSummary.dryRun === true,
             incrementalMode: rawSummary.incrementalMode === true,
-            schemas: rawSummary.classes?.map((c: any) => ({
+            schemas: rawSummary.classes?.map((c) => ({
               name: c.name,
               status: c.status
             })) || [],
@@ -231,20 +262,42 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
           )}
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        {/* Imported Counts */}
+        <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-3">
           <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center border border-green-200 dark:border-green-800">
             <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-              {summary?.success || 0}
+              {(summary?.success || 0).toLocaleString()}
             </div>
             <div className="text-sm text-green-700 dark:text-green-300 flex items-center justify-center gap-1 mt-1">
               <CheckCircle2 className="h-4 w-4" />
-              Success
+              Classes imported
             </div>
           </div>
+          <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4 text-center border border-indigo-200 dark:border-indigo-800">
+            <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+              {(summary?.properties || 0).toLocaleString()}
+            </div>
+            <div className="text-sm text-indigo-700 dark:text-indigo-300 flex items-center justify-center gap-1 mt-1">
+              <FileText className="h-4 w-4" />
+              Properties imported
+            </div>
+          </div>
+          <div className="bg-sky-50 dark:bg-sky-900/20 rounded-lg p-4 text-center border border-sky-200 dark:border-sky-800">
+            <div className="text-3xl font-bold text-sky-600 dark:text-sky-400">
+              {(summary?.paths || 0).toLocaleString()}
+            </div>
+            <div className="text-sm text-sky-700 dark:text-sky-300 flex items-center justify-center gap-1 mt-1">
+              <Plus className="h-4 w-4" />
+              Paths imported
+            </div>
+          </div>
+        </div>
+
+        {/* Import Health */}
+        <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2">
           <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 text-center border border-yellow-200 dark:border-yellow-800">
             <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
-              {summary?.warnings || 0}
+              {(summary?.warnings || 0).toLocaleString()}
             </div>
             <div className="text-sm text-yellow-700 dark:text-yellow-300 flex items-center justify-center gap-1 mt-1">
               <AlertTriangle className="h-4 w-4" />
@@ -253,7 +306,7 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
           </div>
           <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 text-center border border-red-200 dark:border-red-800">
             <div className="text-3xl font-bold text-red-600 dark:text-red-400">
-              {summary?.failed || 0}
+              {(summary?.failed || 0).toLocaleString()}
             </div>
             <div className="text-sm text-red-700 dark:text-red-300 flex items-center justify-center gap-1 mt-1">
               <XCircle className="h-4 w-4" />

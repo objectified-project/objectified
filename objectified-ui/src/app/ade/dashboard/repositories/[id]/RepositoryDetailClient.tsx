@@ -673,29 +673,29 @@ export function RepositoryDetailClient() {
             <table className="w-full text-sm">
               <thead className="border-b border-gray-200 text-[11px] uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:text-gray-400">
                 <tr>
-                  <th className="py-2 text-left font-semibold">File</th>
-                  <th className="text-left font-semibold">Project</th>
-                  <th className="text-left font-semibold">Version</th>
-                  <th className="text-left font-semibold">Imported by</th>
-                  <th className="text-left font-semibold">When</th>
+                  <th className="py-2 align-middle text-left font-semibold">File</th>
+                  <th className="py-2 align-middle text-left font-semibold">Project</th>
+                  <th className="py-2 align-middle text-left font-semibold">Version</th>
+                  <th className="py-2 align-middle text-left font-semibold">Imported by</th>
+                  <th className="py-2 align-middle text-left font-semibold">When</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {importsError ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-sm text-rose-600 dark:text-rose-400">
+                    <td colSpan={5} className="py-8 align-middle text-center text-sm text-rose-600 dark:text-rose-400">
                       {importsError}
                     </td>
                   </tr>
                 ) : importsLoading && repoImports.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                    <td colSpan={5} className="py-10 align-middle text-center text-sm text-gray-500 dark:text-gray-400">
                       Loading imports…
                     </td>
                   </tr>
                 ) : repoImports.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-10 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                    <td colSpan={5} className="py-10 align-middle text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                       No imports yet. Open the Files tab, select a spec, and complete a catalog import to record activity
                       here.
                     </td>
@@ -705,7 +705,7 @@ export function RepositoryDetailClient() {
                     const blob = shortBlobRef(row.blob_sha);
                     return (
                       <tr key={row.id}>
-                        <td className="max-w-[200px] py-2 align-top">
+                        <td className="max-w-[200px] py-2 align-middle">
                           <Link
                             href={repositoryImportedFileHref(id, row.path, row.branch)}
                             className="break-all font-mono text-xs text-indigo-600 hover:underline dark:text-indigo-400"
@@ -722,7 +722,7 @@ export function RepositoryDetailClient() {
                             </span>
                           )}
                         </td>
-                        <td className="align-top">
+                        <td className="py-2 align-middle">
                           <Link
                             href={`/ade/dashboard/versions?projectId=${encodeURIComponent(row.project_id)}`}
                             className="text-indigo-600 hover:underline dark:text-indigo-400"
@@ -730,13 +730,13 @@ export function RepositoryDetailClient() {
                             {row.project_name}
                           </Link>
                         </td>
-                        <td className="font-mono text-xs align-top text-gray-800 dark:text-gray-200">
+                        <td className="py-2 align-middle font-mono text-xs text-gray-800 dark:text-gray-200">
                           {row.catalog_version_label}
                         </td>
-                        <td className="align-top text-gray-700 dark:text-gray-300">
+                        <td className="py-2 align-middle text-gray-700 dark:text-gray-300">
                           {formatImportedByActor(row)}
                         </td>
-                        <td className="whitespace-nowrap align-top text-gray-600 dark:text-gray-400">
+                        <td className="whitespace-nowrap py-2 align-middle text-gray-600 dark:text-gray-400">
                           {formatRelativeWhen(row.created_at)}
                         </td>
                       </tr>
@@ -775,29 +775,29 @@ export function RepositoryDetailClient() {
             <table className="w-full text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-400">
                 <tr>
-                  <th className="px-4 py-2 text-left font-semibold">When</th>
-                  <th className="text-left font-semibold">File · blob</th>
-                  <th className="text-left font-semibold">Project · version</th>
-                  <th className="text-left font-semibold">Outcome</th>
-                  <th className="text-left font-semibold">By</th>
+                  <th className="px-4 py-2 align-middle text-left font-semibold">When</th>
+                  <th className="px-4 py-2 align-middle text-left font-semibold">File · blob</th>
+                  <th className="px-4 py-2 align-middle text-left font-semibold">Project · version</th>
+                  <th className="px-4 py-2 align-middle text-left font-semibold">Outcome</th>
+                  <th className="px-4 py-2 align-middle text-left font-semibold">By</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {importsError ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-rose-600 dark:text-rose-400">
+                    <td colSpan={5} className="px-4 py-12 align-middle text-center text-sm text-rose-600 dark:text-rose-400">
                       {importsError}
                     </td>
                   </tr>
                 ) : importsLoading && repoImports.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                    <td colSpan={5} className="px-4 py-12 align-middle text-center text-sm text-gray-500 dark:text-gray-400">
                       Loading imports…
                     </td>
                   </tr>
                 ) : repoImports.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                    <td colSpan={5} className="px-4 py-12 align-middle text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                       No imports recorded yet. Use the Files tab to open a specification and run an import.
                     </td>
                   </tr>
@@ -806,10 +806,10 @@ export function RepositoryDetailClient() {
                     const blob = shortBlobRef(row.blob_sha);
                     return (
                       <tr key={row.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-900/40">
-                        <td className="whitespace-nowrap px-4 py-2 align-top text-gray-600 dark:text-gray-400">
+                        <td className="whitespace-nowrap px-4 py-2 align-middle text-gray-600 dark:text-gray-400">
                           {formatRelativeWhen(row.created_at)}
                         </td>
-                        <td className="max-w-[240px] align-top">
+                        <td className="max-w-[240px] px-4 py-2 align-middle">
                           <Link
                             href={repositoryImportedFileHref(id, row.path, row.branch)}
                             className="break-all font-mono text-xs text-indigo-600 hover:underline dark:text-indigo-400"
@@ -820,7 +820,7 @@ export function RepositoryDetailClient() {
                             {blob ? `blob ${blob} · ${row.branch}` : row.branch}
                           </div>
                         </td>
-                        <td className="align-top">
+                        <td className="px-4 py-2 align-middle">
                           <Link
                             href={`/ade/dashboard/versions?projectId=${encodeURIComponent(row.project_id)}`}
                             className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
@@ -831,8 +831,8 @@ export function RepositoryDetailClient() {
                             v{row.catalog_version_label}
                           </div>
                         </td>
-                        <td className="align-top text-gray-700 dark:text-gray-300">Completed</td>
-                        <td className="align-top text-gray-700 dark:text-gray-300">{formatImportedByActor(row)}</td>
+                        <td className="px-4 py-2 align-middle text-gray-700 dark:text-gray-300">Completed</td>
+                        <td className="px-4 py-2 align-middle text-gray-700 dark:text-gray-300">{formatImportedByActor(row)}</td>
                       </tr>
                     );
                   })

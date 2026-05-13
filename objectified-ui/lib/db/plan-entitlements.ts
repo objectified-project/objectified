@@ -1,6 +1,7 @@
 'use server';
 
 const connectionPool = require('./db');
+import { entitlementLimitsFromLicenseSeats } from './entitlement-limits-from-license-seats';
 
 export type UserEntitlementRow = {
   plan_code: string;
@@ -15,12 +16,46 @@ type Queryable = { query: (text: string, params?: any[]) => Promise<any> };
 async function getEntitlements(userId: string, client?: Queryable): Promise<UserEntitlementRow | null> {
   const db = client ?? connectionPool;
   const result = await db.query(
-    `SELECT plan_code, max_tenants, max_projects, max_versions
-     FROM odb.user_entitlements WHERE user_id = $1`,
+    `SELECT
+       ue.plan_code,
+       ue.max_tenants,
+       ue.max_projects,
+       ue.max_versions,
+       ue.license_id,
+       l.seats AS license_seats
+     FROM odb.user_entitlements ue
+     LEFT JOIN odb.licenses l ON l.id = ue.license_id
+     WHERE ue.user_id = $1`,
     [userId]
   );
   if (result.rowCount === 0) return null;
-  return result.rows[0];
+  const row = result.rows[0] as {
+    plan_code: string;
+    max_tenants: number;
+    max_projects: number;
+    max_versions: number;
+    license_id: string | null;
+    license_seats: unknown;
+  };
+
+  // When a catalog license is assigned, quotas live on `licenses.seats` (JSONB). The mirrored
+  // columns on `user_entitlements` can lag; always prefer the joined license row for enforcement.
+  if (row.license_id != null && row.license_seats != null) {
+    const lim = entitlementLimitsFromLicenseSeats(row.license_seats);
+    return {
+      plan_code: row.plan_code,
+      max_tenants: lim.max_tenants,
+      max_projects: lim.max_projects,
+      max_versions: lim.max_versions,
+    };
+  }
+
+  return {
+    plan_code: row.plan_code,
+    max_tenants: row.max_tenants,
+    max_projects: row.max_projects,
+    max_versions: row.max_versions,
+  };
 }
 
 async function countProjectsForUser(userId: string, client?: Queryable): Promise<number> {
@@ -52,6 +87,7 @@ async function countVersionsForUser(userId: string, client?: Queryable): Promise
 export async function getPlanBlockMessageForNewProject(userId: string, client?: Queryable): Promise<string | null> {
   const ent = await getEntitlements(userId, client);
   if (!ent) return null;
+  if (ent.max_projects < 0) return null;
   const n = await countProjectsForUser(userId, client);
   if (n >= ent.max_projects) {
     return `Your ${ent.plan_code} plan allows up to ${ent.max_projects} project(s). Upgrade or remove a project to add another.`;
@@ -63,6 +99,7 @@ export async function getPlanBlockMessageForNewProject(userId: string, client?: 
 export async function getPlanBlockMessageForNewVersion(userId: string, client?: Queryable): Promise<string | null> {
   const ent = await getEntitlements(userId, client);
   if (!ent) return null;
+  if (ent.max_versions < 0) return null;
   const n = await countVersionsForUser(userId, client);
   if (n >= ent.max_versions) {
     return `Your ${ent.plan_code} plan allows up to ${ent.max_versions} version(s). Upgrade or remove a version to add another.`;

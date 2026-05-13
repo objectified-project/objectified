@@ -6,6 +6,8 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## Bug Fixes
 - Repositories: Visualize functionality has been restored
+- Imports: Race condition fixed in 3.0.1 specification imports
+- Licensing: Licensing fixes throughout
 
 ## MCP
 - MCP service is now live
@@ -43,7 +45,6 @@ We continue to improve the platform based on your feedback with improvements and
 - **`objectified-cli`**: shared output layer (`lib/output.ts`) with `this.output` on `BaseCommand` — tables (`cli-table3`), stable sorted JSON/YAML, ora spinners, stderr warnings/errors, and TTY / `--json` / `--quiet` / `--no-color` / `LANG=C` behavior; Vitest snapshots cover render modes (#3189).
 
 ## Import
-- Race condition fixed in 3.0.1 specification imports
 - Import supports Swagger 2.0 format
 - Adds the ability to import multiple versions of the same project 
 
@@ -57,6 +58,8 @@ We continue to improve the platform based on your feedback with improvements and
 - List mode now lines up the columns correctly vertically
 - Files list columns now show up vertically centered as expected in preview screen
 - Viewing an unimportable file (unrecognized) shows the contents of the file for viewing
+- Import summary now shows classes, properties, and path counts
+- Centers all fields in table rows
 
 ## UI
 - Adds the ability to view projects that were deleted (show deleted toggle)

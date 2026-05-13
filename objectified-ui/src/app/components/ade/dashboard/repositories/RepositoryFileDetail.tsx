@@ -8,6 +8,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   Check,
+  CheckCircle2,
   Download,
   ExternalLink,
   FileCode2,
@@ -32,6 +33,7 @@ import {
 } from '@lib/repository-file-spec-metadata';
 import { analyzeSpecification, type AnalysisResult } from '@/app/utils/openapi-analyzer';
 import { RepositoryFileSpecRelationshipFlow } from '@/app/components/ade/dashboard/repositories/RepositoryFileSpecRelationshipFlow';
+import type { RepositoryFileStagedImportTarget } from '@/app/components/ade/dashboard/repositories/repositoryFileStagedImport';
 
 /** Indexed file row from the repository files list API (subset used by file detail). */
 export type RepositoryFileDetailRow = {
@@ -808,6 +810,8 @@ export function RepositoryFileDetail({
   githubWebBase,
   onBack,
   onMapImport,
+  stagedImportTarget = null,
+  onContinueStagedImport,
 }: {
   repositoryId: string;
   repositoryName: string;
@@ -816,6 +820,9 @@ export function RepositoryFileDetail({
   githubWebBase: string | null;
   onBack: () => void;
   onMapImport: () => void;
+  /** When set for this file/branch, show Ready to Import (returned from Map & import staging). */
+  stagedImportTarget?: RepositoryFileStagedImportTarget | null;
+  onContinueStagedImport?: () => void;
 }) {
   const [tab, setTab] = useState<FileViewTab>('source');
   const [payload, setPayload] = useState<FileContentApi | null>(null);
@@ -984,6 +991,27 @@ export function RepositoryFileDetail({
       ? 'filename'
       : payload?.confidence ?? file.confidence;
 
+  const stagedImportApplies = useMemo(() => {
+    if (!stagedImportTarget) return false;
+    if (loading) return false;
+    const currentBlob = payload?.blob_sha ?? file.blob_sha ?? null;
+    const stagedBlob = stagedImportTarget.blobSha ?? null;
+    return stagedBlob === currentBlob;
+  }, [stagedImportTarget, loading, payload?.blob_sha, file.blob_sha]);
+
+  const stagedImportSummary = useMemo(() => {
+    if (!stagedImportTarget) return '';
+    if (stagedImportTarget.targetMode === 'existing' && stagedImportTarget.existingProject) {
+      const { name, slug } = stagedImportTarget.existingProject;
+      return `Mapped to ${name} (${slug})`;
+    }
+    if (stagedImportTarget.targetMode === 'new' && stagedImportTarget.newProject) {
+      const { name, slug } = stagedImportTarget.newProject;
+      return `New project: ${name} (${slug})`;
+    }
+    return '';
+  }, [stagedImportTarget]);
+
   return (
     <div className="space-y-6" aria-busy={loading}>
       <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
@@ -1000,6 +1028,37 @@ export function RepositoryFileDetail({
             <span className="text-gray-300 dark:text-gray-600">·</span>
             <span className="break-all font-mono text-gray-600 dark:text-gray-300">{file.path}</span>
           </div>
+          {stagedImportTarget && stagedImportApplies ? (
+            <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800 dark:bg-emerald-900/25">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <CheckCircle2
+                    className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                    aria-hidden
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">Ready to Import</p>
+                    {stagedImportSummary ? (
+                      <p className="mt-0.5 text-xs leading-relaxed text-emerald-800 dark:text-emerald-200/90">
+                        {stagedImportSummary}. Open Map &amp; import to run the catalog import.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                {onContinueStagedImport ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="shrink-0 gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                    onClick={onContinueStagedImport}
+                  >
+                    <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    Map &amp; import
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-start gap-4">
             <span className="inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white">
               <FileCode2 className="h-6 w-6" aria-hidden />

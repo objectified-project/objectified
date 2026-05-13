@@ -2,6 +2,7 @@
 
 const connectionPool = require('./db');
 const bcrypt = require('bcrypt');
+import { entitlementLimitsFromLicenseSeats } from './entitlement-limits-from-license-seats';
 
 // Helper to standardize error responses
 const errorResponse = (error: string) => JSON.stringify({ success: false, error });
@@ -982,6 +983,16 @@ export async function updateLicense(
       if (result.rowCount === 0) return errorResponse('License not found');
     }
 
+    if (updates.seats !== undefined) {
+      const lim = entitlementLimitsFromLicenseSeats(updates.seats);
+      await connectionPool.query(
+        `UPDATE odb.user_entitlements
+         SET max_tenants = $1, max_projects = $2, max_versions = $3
+         WHERE license_id = $4`,
+        [lim.max_tenants, lim.max_projects, lim.max_versions, licenseId]
+      );
+    }
+
     if (updates.featureFlagIds !== undefined) {
       await connectionPool.query(
         `DELETE FROM odb.license_feature_flags WHERE license_id = $1`, [licenseId]
@@ -1409,17 +1420,30 @@ export async function getUserLicense(userId: string) {
 export async function assignLicenseToUser(userId: string, licenseId: string) {
   try {
     const licenseResult = await connectionPool.query(
-      `SELECT license_type FROM odb.licenses WHERE id = $1`, [licenseId]
+      `SELECT license_type, seats FROM odb.licenses WHERE id = $1`,
+      [licenseId]
     );
     if (licenseResult.rowCount === 0) return errorResponse('License not found');
 
+    const lim = entitlementLimitsFromLicenseSeats(licenseResult.rows[0].seats);
+
     await connectionPool.query(
       `INSERT INTO odb.user_entitlements (user_id, plan_code, max_tenants, max_projects, max_versions, license_id)
-       VALUES ($1, $2, 1, 1, 3, $3)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (user_id) DO UPDATE
-         SET license_id = EXCLUDED.license_id,
-             plan_code  = EXCLUDED.plan_code`,
-      [userId, licenseResult.rows[0].license_type, licenseId]
+         SET license_id   = EXCLUDED.license_id,
+             plan_code    = EXCLUDED.plan_code,
+             max_tenants  = EXCLUDED.max_tenants,
+             max_projects = EXCLUDED.max_projects,
+             max_versions = EXCLUDED.max_versions`,
+      [
+        userId,
+        licenseResult.rows[0].license_type,
+        lim.max_tenants,
+        lim.max_projects,
+        lim.max_versions,
+        licenseId,
+      ]
     );
     return successResponse({ message: 'License assigned successfully' });
   } catch (error: any) {

@@ -57,6 +57,7 @@ import {
 import { PROJECT_DOMAIN_CATEGORY_NONE } from '@/app/utils/project-domain-categories';
 import type { ProjectOpenApiMetadata } from '@/app/utils/project-templates';
 import type { RepositoryFileDetailRow } from './RepositoryFileDetail';
+import type { RepositoryFileStagedImportTarget } from './repositoryFileStagedImport';
 
 type FileContentApi = {
   success?: boolean;
@@ -191,6 +192,7 @@ export function RepositoryFileImportMapping({
   branch,
   file,
   onBack,
+  onStagedImportTargetChange,
 }: {
   repositoryId: string;
   repositoryName: string;
@@ -199,6 +201,8 @@ export function RepositoryFileImportMapping({
   branch: string;
   file: RepositoryFileDetailRow;
   onBack: () => void;
+  /** Fired when the user has mapped this file to a project (or cleared mapping), while import has not started. */
+  onStagedImportTargetChange?: (target: RepositoryFileStagedImportTarget | null) => void;
 }) {
   const { data: session } = useSession();
   const currentTenantId = (session?.user as { current_tenant_id?: string } | undefined)?.current_tenant_id;
@@ -315,6 +319,59 @@ export function RepositoryFileImportMapping({
   useEffect(() => {
     void loadProjects();
   }, [loadProjects]);
+
+  const stagedImportTargetForParent = useMemo((): RepositoryFileStagedImportTarget | null => {
+    if (catalogImportPhase !== 'idle') return null;
+    if (importableVerdict.status !== 'importable' || loading || error || !payload) return null;
+
+    const blobSha = payload.blob_sha ?? file.blob_sha ?? null;
+    if (targetMode === 'existing' && stagedProject) {
+      return {
+        repositoryId,
+        fileId: file.id,
+        branch,
+        blobSha,
+        targetMode: 'existing',
+        existingProject: {
+          id: stagedProject.id,
+          name: stagedProject.name,
+          slug: stagedProject.slug,
+        },
+      };
+    }
+    if (targetMode === 'new' && stagedNewProject) {
+      return {
+        repositoryId,
+        fileId: file.id,
+        branch,
+        blobSha,
+        targetMode: 'new',
+        newProject: {
+          name: stagedNewProject.projectName.trim(),
+          slug: stagedNewProject.projectSlug.trim(),
+        },
+      };
+    }
+    return null;
+  }, [
+    catalogImportPhase,
+    importableVerdict.status,
+    loading,
+    error,
+    payload,
+    repositoryId,
+    file.id,
+    file.blob_sha,
+    branch,
+    targetMode,
+    stagedProject,
+    stagedNewProject,
+  ]);
+
+  useEffect(() => {
+    if (!onStagedImportTargetChange) return;
+    onStagedImportTargetChange(stagedImportTargetForParent);
+  }, [onStagedImportTargetChange, stagedImportTargetForParent]);
 
   const sourceRepoDisplay =
     repositoryFullName.trim() && !repositoryFullName.includes('://')
@@ -660,7 +717,18 @@ export function RepositoryFileImportMapping({
               <GitPullRequestArrow className="h-6 w-6" aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Map &amp; import</h2>
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Map &amp; import</h2>
+                {stagedImportTargetForParent ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200"
+                    data-testid="repository-file-ready-to-import-badge"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    Ready to Import
+                  </span>
+                ) : null}
+              </div>
               <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
                 Choose how{' '}
                 <span className="font-mono text-gray-700 dark:text-gray-200">{file.path}</span> from{' '}

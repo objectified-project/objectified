@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Award,
   Flag,
@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import {
   getAllLicenses,
-  getLicenseById,
   createLicense,
   updateLicense,
   deleteLicense,
@@ -107,6 +106,60 @@ const TYPE_COLORS: Record<string, string> = {
   sponsor: 'bg-amber-700 text-amber-100',
 };
 
+/** Canonical / common `licenses.seats` keys (JSONB). Custom keys are allowed. */
+const SEAT_LIMIT_PRESETS: { key: string; description: string }[] = [
+  { key: 'max_tenants', description: 'Maximum tenant workspaces' },
+  { key: 'max_users_per_tenant', description: 'Maximum users allowed per tenant' },
+  { key: 'max_projects', description: 'Maximum catalog projects' },
+  { key: 'max_versions', description: 'Maximum versions per project' },
+];
+
+type SeatEntryRow = { id: string; key: string; value: number; keySource: 'preset' | 'custom' };
+
+function newSeatRowId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function seatsRecordToRows(seats: Record<string, number>): SeatEntryRow[] {
+  return Object.entries(seats).map(([key, value]) => {
+    const preset = SEAT_LIMIT_PRESETS.some((p) => p.key === key);
+    return {
+      id: newSeatRowId(),
+      key,
+      value: Number.isFinite(Number(value)) ? Number(value) : 0,
+      keySource: preset ? 'preset' : 'custom',
+    };
+  });
+}
+
+function defaultSeatRows(): SeatEntryRow[] {
+  return [
+    { id: newSeatRowId(), key: 'max_tenants', value: 1, keySource: 'preset' },
+    { id: newSeatRowId(), key: 'max_users_per_tenant', value: 5, keySource: 'preset' },
+  ];
+}
+
+function buildSeatsFromRows(rows: SeatEntryRow[]): { ok: true; seats: Record<string, number> } | { ok: false; error: string } {
+  const out: Record<string, number> = {};
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const k = row.key.trim();
+    if (!k) {
+      return { ok: false, error: 'Every seat limit needs a key (pick a preset or enter a custom key).' };
+    }
+    if (seen.has(k)) {
+      return { ok: false, error: `Duplicate seat key "${k}". Each key can only appear once.` };
+    }
+    seen.add(k);
+    const n = row.value;
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+      return { ok: false, error: `Value for "${k}" must be a non-negative whole number.` };
+    }
+    out[k] = n;
+  }
+  return { ok: true, seats: out };
+}
+
 function Badge({ type }: { type: string }) {
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide ${TYPE_COLORS[type] ?? 'bg-gray-700 text-gray-200'}`}>
@@ -123,6 +176,166 @@ function PreviewBadge() {
   );
 }
 
+function LicenseSeatEntriesEditor({
+  rows,
+  onChange,
+}: {
+  rows: SeatEntryRow[];
+  onChange: (next: SeatEntryRow[]) => void;
+}) {
+  const presetKeySet = useMemo(() => new Set(SEAT_LIMIT_PRESETS.map((p) => p.key)), []);
+
+  const updateRow = useCallback(
+    (id: string, patch: Partial<SeatEntryRow>) => {
+      onChange(rows.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+    },
+    [rows, onChange]
+  );
+
+  const removeRow = useCallback(
+    (id: string) => {
+      onChange(rows.filter((x) => x.id !== id));
+    },
+    [rows, onChange]
+  );
+
+  const addRow = useCallback(() => {
+    const taken = new Set(rows.map((r) => r.key.trim()).filter(Boolean));
+    const nextPreset = SEAT_LIMIT_PRESETS.find((p) => !taken.has(p.key));
+    if (nextPreset) {
+      onChange([
+        ...rows,
+        { id: newSeatRowId(), key: nextPreset.key, value: 0, keySource: 'preset' },
+      ]);
+    } else {
+      onChange([...rows, { id: newSeatRowId(), key: '', value: 0, keySource: 'custom' }]);
+    }
+  }, [rows, onChange]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Seat limits (quotas)
+          </label>
+          <p className="mt-0.5 max-w-xl text-xs text-gray-500 dark:text-gray-400">
+            Stored as numeric key/value pairs on the license. Pick a preset or add a custom key. Feature access is
+            configured separately in <span className="font-medium text-gray-600 dark:text-gray-300">Included Feature Flags</span>{' '}
+            below.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={addRow}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-600 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-900 hover:bg-indigo-100 dark:border-indigo-500 dark:bg-indigo-950/60 dark:text-indigo-50 dark:hover:bg-indigo-900/80"
+        >
+          <Plus className="h-3.5 w-3.5 shrink-0 text-indigo-700 dark:text-indigo-200" aria-hidden />
+          Add limit
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {rows.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-400 px-3 py-6 text-center text-sm text-gray-500 dark:border-slate-600 dark:text-gray-400">
+            No seat limits yet. Click <span className="font-medium">Add limit</span> to add quotas.
+          </p>
+        ) : (
+          rows.map((row) => {
+            const takenByOther = (k: string) => rows.some((r) => r.id !== row.id && r.key.trim() === k);
+            const isPresetRow = row.keySource === 'preset' && presetKeySet.has(row.key);
+            const selectValue =
+              row.key.trim() === '' ? '' : isPresetRow ? row.key : '__custom__';
+
+            return (
+              <div
+                key={row.id}
+                className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-300 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/40"
+              >
+                <div className="min-w-[200px] flex-1 space-y-1">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Key
+                  </span>
+                  <select
+                    value={selectValue}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') {
+                        updateRow(row.id, { key: '', keySource: 'preset' });
+                      } else if (v === '__custom__') {
+                        updateRow(row.id, {
+                          keySource: 'custom',
+                          key: presetKeySet.has(row.key) ? '' : row.key,
+                        });
+                      } else {
+                        updateRow(row.id, { key: v, keySource: 'preset' });
+                      }
+                    }}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  >
+                    <option value="">Select a limit…</option>
+                    {SEAT_LIMIT_PRESETS.map((p) => (
+                      <option key={p.key} value={p.key} disabled={takenByOther(p.key)}>
+                        {p.key}
+                      </option>
+                    ))}
+                    <option value="__custom__">Custom key…</option>
+                  </select>
+                  {isPresetRow ? (
+                    <p className="text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                      {SEAT_LIMIT_PRESETS.find((p) => p.key === row.key)?.description}
+                    </p>
+                  ) : null}
+                </div>
+                {selectValue === '__custom__' ? (
+                  <div className="min-w-[160px] flex-1 space-y-1">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Custom key
+                    </span>
+                    <input
+                      value={row.keySource === 'custom' || !presetKeySet.has(row.key) ? row.key : ''}
+                      onChange={(e) =>
+                        updateRow(row.id, { key: e.target.value, keySource: 'custom' })
+                      }
+                      placeholder="e.g. max_branches"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    />
+                  </div>
+                ) : null}
+                <div className="w-28 space-y-1">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Value
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={Number.isFinite(row.value) ? row.value : 0}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      updateRow(row.id, { value: Number.isFinite(n) && n >= 0 ? n : 0 });
+                    }}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeRow(row.id)}
+                  className="mb-0.5 rounded-lg p-2 text-gray-500 hover:bg-red-900/20 hover:text-red-400 dark:text-gray-400"
+                  title="Remove this limit"
+                  aria-label="Remove seat limit row"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── License form ────────────────────────────────────────────────────────────
 
 interface LicenseFormProps {
@@ -136,15 +349,19 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
   const [name, setName] = useState(existing?.name ?? '');
   const [description, setDescription] = useState(existing?.description ?? '');
   const [licenseType, setLicenseType] = useState<'free' | 'paid' | 'sponsor'>(existing?.license_type ?? 'free');
-  const [seatsJson, setSeatsJson] = useState(
-    existing ? JSON.stringify(existing.seats, null, 2) : '{\n  "max_tenants": 1,\n  "max_users_per_tenant": 5\n}'
+  const [seatRows, setSeatRows] = useState<SeatEntryRow[]>(() =>
+    existing ? seatsRecordToRows(existing.seats) : defaultSeatRows()
   );
-  const [seatsError, setSeatsError] = useState('');
+  const [seatError, setSeatError] = useState('');
   const [selectedFlags, setSelectedFlags] = useState<Set<string>>(
     new Set(existing?.feature_flags.map(f => f.id) ?? [])
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setSeatError('');
+  }, [seatRows]);
 
   const toggleFlag = (id: string) => {
     setSelectedFlags(prev => {
@@ -154,22 +371,14 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
     });
   };
 
-  const validateSeats = (raw: string) => {
-    try {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
-      setSeatsError('');
-      return parsed;
-    } catch {
-      setSeatsError('Seats must be a valid JSON object (e.g. {"max_tenants": 1})');
-      return null;
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const seats = validateSeats(seatsJson);
-    if (!seats) return;
+    const built = buildSeatsFromRows(seatRows);
+    if (!built.ok) {
+      setSeatError(built.error);
+      return;
+    }
+    setSeatError('');
     if (!name.trim()) { setError('Name is required'); return; }
 
     setSaving(true);
@@ -179,10 +388,10 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
       if (existing) {
         res = await updateLicense(existing.id, {
           name: name.trim(), description: description || null,
-          licenseType, seats, featureFlagIds: [...selectedFlags],
+          licenseType, seats: built.seats, featureFlagIds: [...selectedFlags],
         });
       } else {
-        res = await createLicense(name.trim(), description || null, licenseType, seats, [...selectedFlags]);
+        res = await createLicense(name.trim(), description || null, licenseType, built.seats, [...selectedFlags]);
       }
       const data = JSON.parse(res);
       if (!data.success) { setError(data.error); return; }
@@ -195,7 +404,8 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
       {error && (
         <div className="flex items-start gap-2 p-3 bg-red-900/20 border border-red-700 rounded-lg text-red-400 text-sm">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{error}
@@ -238,15 +448,8 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
       </div>
 
       <div className="space-y-1">
-        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Seats (JSON)</label>
-        <p className="text-xs text-gray-500">Known keys: <code className="text-gray-400">max_tenants</code>, <code className="text-gray-400">max_users_per_tenant</code></p>
-        <textarea
-          value={seatsJson}
-          onChange={e => { setSeatsJson(e.target.value); validateSeats(e.target.value); }}
-          rows={4}
-          className={`w-full bg-white dark:bg-slate-900 border rounded-lg px-3 py-2 text-green-300 font-mono text-sm focus:outline-none resize-none ${seatsError ? 'border-red-600' : 'border-slate-300 dark:border-slate-700 focus:border-indigo-500'}`}
-        />
-        {seatsError && <p className="text-xs text-red-400">{seatsError}</p>}
+        <LicenseSeatEntriesEditor rows={seatRows} onChange={setSeatRows} />
+        {seatError && <p className="text-xs text-red-400">{seatError}</p>}
       </div>
 
       <div className="space-y-2">
@@ -282,8 +485,9 @@ function LicenseForm({ existing, allFlags, onSave, onCancel }: LicenseFormProps)
           </div>
         )}
       </div>
+      </div>
 
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="mt-4 flex shrink-0 justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
         <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 transition-colors">
           Cancel
         </button>
@@ -596,21 +800,24 @@ function Modal({
   onClose,
   children,
   fixedViewportHeight = false,
+  panelClassName,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   /** When true, dialog is exactly 90vh tall and only the body scrolls (stable layout). */
   fixedViewportHeight?: boolean;
+  /** Extra classes on the dialog panel (e.g. max width). */
+  panelClassName?: string;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div
         className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl w-full flex flex-col overflow-hidden ${
           fixedViewportHeight
-            ? 'max-w-3xl h-[90vh] max-h-[90vh]'
+            ? 'h-[90vh] max-h-[90vh] max-w-4xl'
             : 'max-w-2xl max-h-[90vh] overflow-y-auto'
-        }`}
+        } ${panelClassName ?? ''}`.trim()}
       >
         <div className="flex shrink-0 items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <h3 className="text-gray-900 dark:text-white font-semibold text-lg">{title}</h3>
@@ -892,10 +1099,20 @@ export default function LicenseManagementClient({
                           </div>
                         )}
 
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mt-3 mb-1">Seats JSON</p>
-                        <pre className="overflow-x-auto rounded-lg bg-slate-950 px-3 py-2 font-mono text-xs text-green-300 dark:bg-black/50">
-                          {JSON.stringify(lic.seats, null, 2)}
-                        </pre>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mt-3 mb-1.5">
+                          Seat limits
+                        </p>
+                        <dl className="grid gap-1.5 sm:grid-cols-2">
+                          {Object.entries(lic.seats).map(([k, v]) => (
+                            <div
+                              key={k}
+                              className="flex items-baseline justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-900/60"
+                            >
+                              <dt className="font-mono text-[11px] text-gray-600 dark:text-gray-400">{k}</dt>
+                              <dd className="text-sm font-semibold tabular-nums text-gray-900 dark:text-white">{v}</dd>
+                            </div>
+                          ))}
+                        </dl>
                       </div>
                     )}
                   </div>
@@ -1191,6 +1408,7 @@ export default function LicenseManagementClient({
       {/* ── License Modal ──────────────────────────────────────────────────── */}
       {licenseModal && (
         <Modal
+          fixedViewportHeight
           title={licenseModal === 'create' ? 'New License Plan' : `Edit — ${editingLicense?.name}`}
           onClose={() => setLicenseModal(null)}
         >

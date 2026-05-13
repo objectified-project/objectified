@@ -164,6 +164,7 @@ interface JobState {
   summary?: {
     classesCreated: number;
     propertiesCreated: number;
+    pathsImported: number;
     warnings: number;
     failed: number;
     totalTime?: number;
@@ -670,6 +671,7 @@ export async function startImport(input: ImportJobInput) {
     summary: {
       classesCreated: 0,
       propertiesCreated: 0,
+      pathsImported: 0,
       warnings: 0,
       failed: 0,
       sourceName: jobInput.project.name,
@@ -755,7 +757,12 @@ export async function startImport(input: ImportJobInput) {
         }
 
         emit(job, 'info', 'CREATING_PROPERTIES', `Would create ${propertyMap.size} unique properties in library`);
-        if (job.summary) job.summary.propertiesCreated = propertyMap.size;
+        if (job.summary) {
+          job.summary.propertiesCreated = propertyMap.size;
+          if (input.sourceKind === 'openapi' && input.document) {
+            job.summary.pathsImported = extractPaths(input.document).length;
+          }
+        }
 
         setProgress(job, 'creating-classes', 2 + norm.classes.length, 2);
         for (let i = 0; i < norm.classes.length; i++) {
@@ -931,6 +938,7 @@ export async function startImport(input: ImportJobInput) {
             emit(job, 'info', 'IMPORTING_PATHS', `Importing ${paths.length} path(s) and ${securitySchemes.length} security scheme(s)...`);
             const pathResult = await importOpenAPIPathsAndSecurity(versionId, paths, securitySchemes);
             if (pathResult.success) {
+              if (job.summary) job.summary.pathsImported = paths.length;
               emit(job, 'info', 'PATHS_IMPORTED', 'Paths and security schemes imported.');
             } else {
               emit(job, 'warn', 'PATHS_IMPORT_WARN', `Paths/security import had issues: ${pathResult.error}`);
@@ -1191,6 +1199,7 @@ export async function commitImport(jobId: string): Promise<{ success: boolean; e
         emit(job, 'info', 'IMPORTING_PATHS', `Importing ${paths.length} path(s) and ${securitySchemes.length} security scheme(s)...`);
         const pathResult = await importOpenAPIPathsAndSecurity(versionId, paths, securitySchemes);
         if (pathResult.success) {
+          if (job.summary) job.summary.pathsImported = paths.length;
           emit(job, 'info', 'PATHS_IMPORTED', 'Paths and security schemes imported.');
         } else {
           emit(job, 'warn', 'PATHS_IMPORT_WARN', `Paths/security import had issues: ${pathResult.error}`);
