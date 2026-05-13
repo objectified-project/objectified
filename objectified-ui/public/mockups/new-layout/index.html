@@ -64,8 +64,8 @@
       <div class="grid md:grid-cols-3 gap-5">
         <div class="rounded-xl border border-amber-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-6">
           <div class="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center mb-3"><i data-lucide="layout-grid" class="w-5 h-5 text-amber-600 dark:text-amber-300"></i></div>
-          <h3 class="font-semibold mb-1">One project tree</h3>
-          <p class="text-sm text-gray-600 dark:text-gray-300">Schemas and paths grouped by domain (e.g. <span class="mono">customers/</span>, <span class="mono">billing/</span>) instead of split by artifact type. The tree mirrors how teams actually file the work.</p>
+          <h3 class="font-semibold mb-1">Paths with nested context</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-300">In the sidebar, each path is a disclosure: expand to see operations, then the <strong class="text-stone-700 dark:text-stone-200">schemas</strong> that path uses—grouped per path, not flattened into the operations list. Domains still organize the tree.</p>
         </div>
         <div class="rounded-xl border border-amber-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-6">
           <div class="w-10 h-10 rounded-lg bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center mb-3"><i data-lucide="git-graph" class="w-5 h-5 text-rose-600 dark:text-rose-300"></i></div>
@@ -75,7 +75,7 @@
         <div class="rounded-xl border border-amber-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-6">
           <div class="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center mb-3"><i data-lucide="command" class="w-5 h-5 text-amber-600 dark:text-amber-300"></i></div>
           <h3 class="font-semibold mb-1">⌘K everywhere</h3>
-          <p class="text-sm text-gray-600 dark:text-gray-300">A first-class command palette: jump to any class, path, property, or action. Replaces nav-clicking for power users and is discoverable for everyone else.</p>
+          <p class="text-sm text-gray-600 dark:text-gray-300">A first-class command palette: <strong class="text-stone-700 dark:text-stone-200">schemas</strong> and <strong class="text-stone-700 dark:text-stone-200">paths</strong> as separate columns, then properties and actions. Jump to any class, path, property, or action without conflating types in one scroll.</p>
         </div>
       </div>
     </section>
@@ -144,18 +144,18 @@
       <div class="flex flex-col md:flex-row md:items-center gap-5">
         <div class="flex-1">
           <h2 class="text-2xl font-bold mb-2">Walk through the proposed workspace</h2>
-          <p class="text-gray-600 dark:text-gray-300">A working concept of the unified canvas, project tree, command palette, lens switcher, and adaptive inspector. Pair this with the <a href="../developer/index.html" class="text-amber-600 dark:text-amber-400 underline">Developer Mode mockups</a> to see the full vision.</p>
+          <p class="text-gray-600 dark:text-gray-300">A working concept of the unified canvas, project tree, command palette, lens switcher, and adaptive inspector. <strong class="text-stone-700 dark:text-stone-200">Workspace options</strong> (in the mockup) explain what ships in the baseline proposal versus companion experiments; <strong class="text-stone-700 dark:text-stone-200">view simplification</strong> is modeled on a dedicated settings page. The <a href="../developer/index.html" class="text-amber-600 dark:text-amber-400 underline">Developer Mode mockups</a> remain the place to explore code-first editing.</p>
         </div>
-        <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
-          <a href="workspace.html" class="px-5 py-3 rounded-lg bg-gradient-to-r from-amber-500 to-rose-500 text-white text-sm font-semibold inline-flex items-center justify-center gap-2 hover:from-amber-600 hover:to-rose-600 whitespace-nowrap">
-            Open the workspace concept <i data-lucide="arrow-right" class="w-4 h-4"></i>
-          </a>
-          <a href="canvas-density-patterns.html" class="px-5 py-3 rounded-lg border border-amber-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-sm font-semibold inline-flex items-center justify-center gap-2 hover:bg-amber-50 dark:hover:bg-stone-800 whitespace-nowrap">
-            Canvas density · combined patterns <i data-lucide="map" class="w-4 h-4 text-amber-600"></i>
-          </a>
-          <a href="workspace-developer-tandem.html" class="px-5 py-3 rounded-lg border border-cyan-300 dark:border-cyan-800 bg-cyan-50/80 dark:bg-cyan-950/40 text-sm font-semibold inline-flex items-center justify-center gap-2 hover:bg-cyan-100 dark:hover:bg-cyan-900/30 whitespace-nowrap">
-            Workspace + Developer tandem <i data-lucide="terminal" class="w-4 h-4 text-cyan-600"></i>
-          </a>
+        <div class="flex flex-col gap-3">
+          <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <a href="workspace.html" class="px-5 py-3 rounded-lg bg-gradient-to-r from-amber-500 to-rose-500 text-white text-sm font-semibold inline-flex items-center justify-center gap-2 hover:from-amber-600 hover:to-rose-600 whitespace-nowrap">
+              Open the workspace concept <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </a>
+            <a href="workspace-settings.html" class="px-5 py-3 rounded-lg border border-amber-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-sm font-semibold inline-flex items-center justify-center gap-2 hover:bg-amber-50 dark:hover:bg-stone-800 whitespace-nowrap">
+              Workspace settings · view simplification <i data-lucide="sliders-horizontal" class="w-4 h-4 text-amber-600"></i>
+            </a>
+          </div>
+          <p class="text-xs text-stone-500 dark:text-stone-400 sm:text-center">Companion experiments (not bundled with the baseline workspace story): <a href="canvas-density-patterns.html" class="text-amber-700 dark:text-amber-400 underline">canvas density lab</a> · <a href="workspace-developer-tandem.html" class="text-cyan-700 dark:text-cyan-400 underline">workspace + developer tandem</a></p>
         </div>
       </div>
     </section>
