@@ -4,34 +4,6 @@ This document captures potential new products for the Objectified enterprise sui
 
 ---
 
-Create a mockup in the objectified-ui /mockups directory that creates a new ReverseETL project in /mockups/reverse-etl as follows:
-### Objectified Reverse
-**Reverse ETL: outbound sync from objectified-db to operational destinations**
-
-Pushes data FROM objectified-db OUT to operational systems — CRMs (Salesforce, HubSpot), data warehouses (Snowflake, BigQuery, Redshift), marketing automation platforms, and custom REST endpoints. Closes the loop: objectified-db becomes both the canonical destination for incoming data AND the source of truth for downstream operational systems. An audience/segment builder lets users filter Class instances using a visual query interface to define which rows to sync (e.g., "all Customer instances where `tier = enterprise` and `last_activity_date > 30d`"). A field mapping editor maps objectified Class properties to destination system field names. Sync cadence is configurable per destination (real-time, hourly, daily). A delivery log shows per-row sync status, API rate limit consumption, and error classifications. Volume metering feeds into the `monetization/` billing model for usage-based pricing of outbound sync operations.
-
-- **DB Hooks:** `classes`, `class_properties`, `properties`, `tenants`, `api_keys`, `reverse_sync_destinations`, `reverse_sync_runs`, `load_jobs`
-- **Target Buyer:** RevOps teams, marketing operations, data engineering teams
-- **Enterprise Value:** ⭐⭐⭐⭐
-
-Update the /mockups/index.html page after implementing the mockup so the index is updated with the latest addition.
-
----
-
-Create a mockup in the objectified-ui /mockups directory that creates a new Wormhole project in /mockups/wormhole as follows:
-### Objectified Wormhole
-**Cross-tenant and cross-region data bridge**
-
-Enterprise product for moving objectified-db data between tenants, environments (dev → staging → production), or geographic regions with schema-version awareness and compliance-governed data residency controls. A wormhole map provides a visual topology of all configured source/destination environment pairs. A schema compatibility check validates that the source Class definition is compatible with the destination before transfer. A data residency policy editor enforces which data classes may cross region boundaries, with classification tags driving automatic allow/deny decisions. Bi-directional sync mode includes conflict resolution policies (source-wins, destination-wins, manual merge). All cross-boundary transfers are written to an immutable audit ledger with HMAC-signed manifests suitable for compliance reporting. Integrates with the `comply/` and `data-shield/` mockups for policy enforcement.
-
-- **DB Hooks:** `classes`, `class_properties`, `tenants`, `tenant_users`, `api_keys`, `versions`, `load_jobs`, `wormhole_bridges`, `wormhole_transfer_audit`
-- **Target Buyer:** Enterprise platform teams, multi-region deployments, regulated industries
-- **Enterprise Value:** ⭐⭐⭐⭐
-
-Update the /mockups/index.html page after implementing the mockup so the index is updated with the latest addition.
-
----
-
 ## Summary Matrix
 
 | Product | Directory | Category | Complexity | Enterprise Value |
