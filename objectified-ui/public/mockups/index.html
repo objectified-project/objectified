@@ -36,7 +36,7 @@
             <p class="text-[10px] text-gray-400 leading-none mt-0.5">Mockup Index</p>
           </div>
           <span class="hidden sm:flex items-center gap-1.5 ml-3 text-[11px] font-medium px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-700/50 mono">
-            54 projects · 607 screens
+            64 projects · 697 screens
           </span>
         </div>
         <button id="themeBtn" class="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center" title="Toggle theme">
@@ -207,7 +207,7 @@
           <i data-lucide="shield-check" class="w-3.5 h-3.5 text-orange-600 dark:text-orange-400"></i>
         </div>
         <h2 class="text-xs font-semibold text-orange-500 dark:text-orange-400 uppercase tracking-widest">Quality &amp; Governance</h2>
-        <span class="text-[10px] mono text-gray-400 ml-1">6 projects</span>
+        <span class="text-[10px] mono text-gray-400 ml-1">7 projects</span>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
 
@@ -269,6 +269,16 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-baseline gap-2"><span class="text-sm font-semibold">CAB</span><span class="text-[10px] mono text-gray-400">9 screens</span></div>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Multi-stage approval workflow for API changes: design → security → architecture → legal → release gate with SLA tracking and override audit logs.</p>
+          </div>
+        </a>
+
+        <a href="data-quality/index.html" class="mockup-card group flex items-start gap-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:border-orange-300 dark:hover:border-orange-600 hover:shadow-sm transition-all" data-search="data quality DQ rules gate completeness uniqueness referential integrity range regex quarantine cleanse reject SLA load pipeline validation">
+          <div class="w-9 h-9 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center flex-shrink-0">
+            <i data-lucide="list-checks" class="w-4 h-4 text-orange-600 dark:text-orange-400"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-baseline gap-2"><span class="text-sm font-semibold">Quality</span><span class="text-[10px] mono text-gray-400">9 screens</span></div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Schema-aware DQ gate for load pipelines. Rule builder with live validation stream, reject/quarantine/cleanse routing, quality score trends, pipeline gates, and SLA breach alerts.</p>
           </div>
         </a>
 
@@ -754,7 +764,7 @@
           </div>
           <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-100">Pipeline &amp; Orchestration</h2>
         </div>
-        <span class="text-[10px] mono text-gray-400">1 project</span>
+        <span class="text-[10px] mono text-gray-400">7 projects</span>
       </div>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
@@ -771,13 +781,142 @@
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Drag-and-drop DAG builder for multi-step data pipelines with DataFusion and Spark execution. Includes inline debugger, A/B test runner, and template library.</p>
         </a>
 
+        <a href="temporal/index.html" class="mockup-card group block rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-600 transition-all" data-search="temporal workflow orchestration fault tolerant saga compensating transaction etl activity worker heartbeat retry schedule cron event history replay data engineer sre platform">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="timer" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-sm font-semibold">Temporal</span><span class="text-[10px] mono text-gray-400">9 screens</span></div>
+              <p class="text-[10px] text-gray-400 leading-none mt-0.5 truncate">Fault-tolerant workflow orchestration</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Temporal.io-backed workflow orchestration for long-running data jobs. Saga patterns, compensating transactions, activity DAG designer, event history replay, worker registry, and cron schedules.</p>
+        </a>
+
+        <a href="job-scheduler/index.html" class="mockup-card group block rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 hover:shadow-md hover:border-cyan-300 dark:hover:border-cyan-600 transition-all" data-search="scheduler job dependency dag cron sla escalation on-call heatmap capacity run timeline p50 p95 p99 forge bulk cdc stream reverse etl data ops platform engineering">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="network" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-sm font-semibold">Scheduler</span><span class="text-[10px] mono text-gray-400">9 screens</span></div>
+              <p class="text-[10px] text-gray-400 leading-none mt-0.5 truncate">Central job dependency &amp; cron hub</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Visual DAG editor for cross-suite job dependencies. SLA tracking, on-call escalation policies, executor capacity heatmap, and P50/P95/P99 duration trend analysis.</p>
+        </a>
+
+        <a href="bulk/index.html" class="mockup-card group block rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all" data-search="bulk loader object store s3 gcs azure hdfs parquet avro orc delta lake csv jsonlines datafusion spark arrow flight chunk resume partition hash range time data engineer warehouse analytics">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-sky-500 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="database-zap" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-sm font-semibold">Bulk</span><span class="text-[10px] mono text-gray-400">9 screens</span></div>
+              <p class="text-[10px] text-gray-400 leading-none mt-0.5 truncate">Big data bulk loader for object stores</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Load Parquet, Avro, ORC, Delta Lake, CSV, and JSON Lines from S3, GCS, Azure, HDFS, or local uploads. Chunked resume, fanout execution, partition strategy, DataFusion &amp; Spark engines.</p>
+        </a>
+
+        <a href="stream/index.html" class="mockup-card group block rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 hover:shadow-md hover:border-green-300 dark:hover:border-green-600 transition-all" data-search="stream kafka kinesis pulsar mqtt real-time event schema-on-read schema-on-write micro-batch consumer group lag dlq dead letter replay field mapping topic avro protobuf json data engineer event-driven analytics">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-green-600 to-emerald-500 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="radio" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-sm font-semibold">Stream</span><span class="text-[10px] mono text-gray-400">9 screens</span></div>
+              <p class="text-[10px] text-gray-400 leading-none mt-0.5 truncate">Real-time streaming ingest</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Kafka, Kinesis, Pulsar, and MQTT into objectified-db. Schema-on-read &amp; write modes, micro-batching, per-partition lag monitoring, consumer group dashboard, and dead-letter queue.</p>
+        </a>
+
+        <a href="cdc/index.html" class="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-rose-300 dark:hover:border-rose-600 transition-all hover:-translate-y-0.5 hover:shadow-md">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-rose-600 to-fuchsia-500 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="waves" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-sm font-semibold">CDC</span><span class="text-[10px] mono text-gray-400">9 screens</span></div>
+              <p class="text-[10px] text-gray-400 leading-none mt-0.5 truncate">Change data capture</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Row-level change events from PostgreSQL WAL, MySQL binlog, MongoDB oplog, Oracle LogMiner &amp; SQL Server CDC. Debezium/Maxwell/PgLogical. Schema DDL handler, backfill manager, and lag monitor.</p>
+        </a>
+
+        <a href="file-gateway/index.html" class="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-yellow-300 dark:hover:border-yellow-600 transition-all hover:-translate-y-0.5 hover:shadow-md">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-yellow-500 to-amber-400 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="hard-drive-upload" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-sm font-semibold">File Gateway</span><span class="text-[10px] mono text-gray-400">9 screens</span></div>
+              <p class="text-[10px] text-gray-400 leading-none mt-0.5 truncate">Object store &amp; file system bridge</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Direct connections to S3, GCS, Azure Blob, SFTP, and NFS for structured file ingestion. Bucket monitoring, schema inference, format configurator, routing rules engine, deduplication, and plugin parsers for Excel, EDI, and fixed-width formats.</p>
+        </a>
+
       </div>
     </section>
 
-    <!-- Footer -->
+    <!-- Query, Discovery & Sync -->
+    <section class="mockup-section">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-100">🔍 Query, Discovery &amp; Sync</h2>
+          <p class="text-[10px] text-gray-400 mt-0.5">Virtual query federation, cross-source joins, and result materialization</p>
+        </div>
+        <span class="text-[10px] mono text-gray-400">3 projects</span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+
+        <a href="data-federate/index.html" class="mockup-card block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-purple-300 dark:hover:border-purple-600 transition-all hover:-translate-y-0.5 hover:shadow-md" data-search="data federate federation sql datafusion cross-source query virtual catalog">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="layers" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-sm font-semibold">Data Federate</span><span class="text-[10px] mono text-gray-400">9 screens</span></div>
+              <p class="text-[10px] text-gray-400 leading-none mt-0.5 truncate">Cross-source virtual query federation</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Run SQL across PostgreSQL, Snowflake, BigQuery, S3 Parquet, and objectified-db simultaneously using Apache DataFusion. Virtual catalog, schema mapper, query planner with pushdown analysis, saved queries, and result materialization into objectified Classes.</p>
+        </a>
+
+        <a href="delta-sync/index.html" class="mockup-card block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-lime-300 dark:hover:border-lime-700 transition-all hover:-translate-y-0.5 hover:shadow-md" data-search="delta sync watermark incremental differential replication OLTP upsert drift">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-lime-500 to-emerald-600 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="trending-up" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-sm font-semibold">DeltaSync</span><span class="text-[10px] mono text-gray-400">9 screens</span></div>
+              <p class="text-[10px] text-gray-400 leading-none mt-0.5 truncate">Watermark-based incremental sync</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Watermark registry tracking per-source high-water marks (timestamp, auto-ID, offset). Merge key config, drift detector, partition pruner, backfill planner, and per-table schedules for OLTP-to-analytics incremental replication.</p>
+        </a>
+
+        <a href="data-profile/index.html" class="mockup-card block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-violet-300 dark:hover:border-violet-600 transition-all hover:-translate-y-0.5 hover:shadow-md" data-search="data profile profiling column statistics PII schema inference quality anomaly wizard histogram cardinality">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="bar-chart-2" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-sm font-semibold">Data Profile</span><span class="text-[10px] mono text-gray-400">9 screens</span></div>
+              <p class="text-[10px] text-gray-400 leading-none mt-0.5 truncate">Pre-load data profiling &amp; schema inference</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">Column statistics, PII classifier, anomaly heatmap, and schema recommendation wizard. Samples datasets before loading to detect null rates, cardinality, value distributions, format patterns, and type recommendations for objectified Classes.</p>
+        </a>
+
+      </div>
+    </section>
     <footer class="pt-4 pb-8 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px] text-gray-400 mono">
       <span>objectified-ui · public/mockups</span>
-      <span>54 projects · 597 screens · static HTML · no build step</span>
+      <span>64 projects · 687 screens · static HTML · no build step</span>
     </footer>
 
   </main>
