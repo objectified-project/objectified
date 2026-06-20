@@ -14,7 +14,7 @@ When user invokes **create-issues**, refer to `docs/<roadmap-file>.md` as the de
 - Parent issues must be assigned using Relationships
 - Projects and Milestones need not apply
 
-## Phase 1: Create Issues
+## Create Issues
 
 - Create GitHub issues in order of requirements listed in `docs/<roadmap-file>.md`
 - Issues must contain:
@@ -28,4 +28,5 @@ When user invokes **create-issues**, refer to `docs/<roadmap-file>.md` as the de
   - MVP indicator (v1) release candidate where applicable
   - Labels indicating all of the appropriate pairings for the issue
 - Mark issue number in ROADMAP for each issue created for reference
+- Use ASCII drawings or Mermaid diagrams to illustrate changes or work
 

@@ -20,8 +20,9 @@ When user invokes **create-roadmap** with description, treat the description as 
 ## Phase 1: ROADMAP file
 
 - Review description, use web to clarify detail for features
+- Compare issues in GitHub that exist for this same feature while avoiding duplicate work
 - Create document outlining features that should be created for this roadmap to be implemented completely
-- Issue names are formatted: `<project>: <title of issue>`
+- Issue names are formatted: `<project>: [<epic number.issue number in epic>] <title of issue>`
 - Identify issues that must be created, noting:
   - Problem Statement
   - Solution/Scope - indicate sources when used

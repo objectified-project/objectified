@@ -17,11 +17,11 @@ When user invokes **update-roadmap** with description, treat the description as 
   - Detailed Issue Descriptions per issue, grouped by Epic
   - Work to be done in order it must be done
 
-## Phase 1: ROADMAP file
+## Work To Be Done
 
 - Review description, use web to clarify detail for features
 - Create document outlining features that should be created for this roadmap to be implemented completely
-- Issue names are formatted: `<project>: <title of issue>`
+- Issue names are formatted: `<project>: [<epic number.issue number in epic>] <title of issue>`
 - Identify issues that must be created, noting:
   - Problem Statement
   - Solution/Scope - indicate sources when used

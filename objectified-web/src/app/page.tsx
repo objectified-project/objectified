@@ -12,9 +12,14 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "./components/ui/Button";
-import { Aurora } from "./components/ui/Aurora";
 import { GlassCard, ToneChip, type Tone } from "./components/ui/GlassCard";
+import { FeatureCarousel } from "./components/ui/FeatureCarousel";
 import { Reveal, StaggerGroup, StaggerItem, CountUp } from "./components/motion/Reveal";
+import { SplitReveal } from "./components/motion/SplitReveal";
+import { Magnetic } from "./components/motion/Magnetic";
+import { Parallax } from "./components/motion/Parallax";
+import { Marquee } from "./components/motion/Marquee";
+import { HeroConstellation } from "./components/three/HeroConstellation";
 
 type HomeFeature = {
   icon: React.ReactNode;
@@ -95,66 +100,129 @@ const HOW_STEPS: { title: string; description: string; dotClass: string }[] = [
   },
 ];
 
+const MARQUEE_ITEMS = [
+  "OpenAPI 3.1.0",
+  "Visual Schema Canvas",
+  "Paths Designer",
+  "Enterprise Import",
+  "Code Generation",
+  "Version Control",
+  "AI-Powered Design",
+  "Mermaid · PlantUML",
+  "PNG · SVG · PDF",
+];
+
 export default function Home() {
   return (
     <div className="flex flex-col">
       {/* Hero */}
-      <section className="relative overflow-hidden border-b border-zinc-200/70 px-6 py-24 dark:border-zinc-800/70 sm:py-36">
-        <Aurora />
+      <section className="grain relative isolate flex min-h-[92vh] items-center overflow-hidden border-b border-zinc-200/70 px-6 pb-24 pt-28 dark:border-zinc-800/70">
+        <HeroConstellation />
+        <div
+          aria-hidden
+          className="bg-grid absolute inset-0 -z-20 opacity-70 [mask-image:radial-gradient(ellipse_at_center,#000_30%,transparent_75%)]"
+        />
+        <div aria-hidden className="hero-halo absolute inset-0 -z-20" />
+        <div
+          aria-hidden
+          className="absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-b from-transparent to-[var(--background)]"
+        />
+
         <div className="container relative mx-auto max-w-6xl">
-          <div className="mx-auto max-w-3xl text-center">
+          <div className="mx-auto max-w-4xl text-center">
             <Reveal>
-              <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-blue-50/80 px-4 py-2 text-sm font-medium text-blue-700 backdrop-blur animate-pulse-ring dark:border-blue-900/60 dark:bg-blue-950/50 dark:text-blue-300">
+              <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-blue-50/70 px-4 py-2 text-sm font-medium text-blue-700 backdrop-blur animate-pulse-ring dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
                 <Star className="h-4 w-4" />
-                Now in Public Beta
+                <span className="text-shimmer">Now in Public Beta</span>
               </div>
             </Reveal>
-            <Reveal delay={0.05}>
-              <h1 className="mb-8 text-5xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-6xl lg:text-7xl">
-                Design APIs &amp; Databases{" "}
-                <span className="display-accent">Visually</span>
-              </h1>
-            </Reveal>
+
+            <h1
+              className="mb-6 font-bold leading-[1.0] tracking-tight text-zinc-900 dark:text-zinc-50"
+              style={{ fontSize: "clamp(1.85rem, 6.6vw, 4.75rem)" }}
+            >
+              <SplitReveal
+                as="span"
+                text="Design APIs &amp; Databases"
+                className="block whitespace-nowrap"
+                immediate
+                duration={1}
+                stagger={0.07}
+              />
+              <SplitReveal
+                as="span"
+                text="Visually"
+                className="mt-1 block pb-2"
+                wordClassName="display-accent"
+                immediate
+                delay={0.55}
+                duration={1}
+              />
+            </h1>
+
             <Reveal delay={0.12}>
-              <p className="mb-6 font-display text-2xl italic text-zinc-700 dark:text-zinc-200 sm:text-3xl">
+              <p className="mb-6 font-display text-2xl italic tracking-tight text-zinc-700 dark:text-zinc-200 sm:text-3xl">
                 Your data: Designed, Defined, Discovered.
               </p>
             </Reveal>
             <Reveal delay={0.18}>
-              <p className="mb-12 text-lg leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-xl">
+              <p className="mx-auto mb-12 max-w-3xl text-balance text-lg leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-xl">
                 The modern platform for creating OpenAPI specifications and database schemas.
-                <br className="hidden sm:block" />
                 Design schemas on an interactive canvas, author API paths visually, import from anywhere,
                 and export production-ready specs.
               </p>
             </Reveal>
             <Reveal delay={0.24}>
               <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <a href="https://app.objectified.dev" target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="group">
-                    Launch App
-                    <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </Button>
-                </a>
-                <a href="https://browse.objectified.dev" target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" variant="outline">
-                    Browse APIs
-                  </Button>
-                </a>
-                <a href="https://www.youtube.com/@objectifieddev" target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" variant="outline">
-                    Watch Demo
-                  </Button>
-                </a>
+                <Magnetic>
+                  <a href="https://app.objectified.dev" target="_blank" rel="noopener noreferrer">
+                    <Button size="lg" className="group">
+                      Launch App
+                      <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </Button>
+                  </a>
+                </Magnetic>
+                <Magnetic strength={0.3}>
+                  <a href="https://browse.objectified.dev" target="_blank" rel="noopener noreferrer">
+                    <Button size="lg" variant="outline">
+                      Browse APIs
+                    </Button>
+                  </a>
+                </Magnetic>
+                <Magnetic strength={0.3}>
+                  <a href="https://www.youtube.com/@objectifieddev" target="_blank" rel="noopener noreferrer">
+                    <Button size="lg" variant="outline">
+                      Watch Demo
+                    </Button>
+                  </a>
+                </Magnetic>
               </div>
             </Reveal>
             <Reveal delay={0.32}>
+              <FeatureCarousel />
+            </Reveal>
+            <Reveal delay={0.4}>
               <p className="mt-6 text-sm text-zinc-500 dark:text-zinc-500">
                 No credit card required &middot; Free forever for personal use
               </p>
             </Reveal>
           </div>
         </div>
+      </section>
+
+      {/* Capability marquee */}
+      <section className="border-b border-zinc-200/70 py-8 dark:border-zinc-800/70">
+        <Marquee duration={36}>
+          {MARQUEE_ITEMS.map((item) => (
+            <span
+              key={item}
+              className="flex items-center gap-3 whitespace-nowrap text-lg font-medium tracking-tight text-zinc-400 dark:text-zinc-600"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-500/70" />
+              {item}
+            </span>
+          ))}
+        </Marquee>
       </section>
 
       {/* Features Overview */}
@@ -175,7 +243,7 @@ export default function Home() {
           <StaggerGroup className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {HOME_FEATURES.map((feature) => (
               <StaggerItem key={feature.title}>
-                <GlassCard className="h-full p-7">
+                <GlassCard className="shine-on-hover h-full p-7">
                   <ToneChip tone={feature.tone} className="mb-5">
                     {feature.icon}
                   </ToneChip>
@@ -192,18 +260,22 @@ export default function Home() {
 
           <Reveal delay={0.1}>
             <div className="mt-14 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href="/features">
-                <Button size="lg" variant="outline" className="group">
-                  See All Features
-                  <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </Link>
-              <Link href="/screenshots">
-                <Button size="lg" variant="outline" className="group">
-                  Product screenshots
-                  <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </Link>
+              <Magnetic strength={0.3}>
+                <Link href="/features">
+                  <Button size="lg" variant="outline" className="group">
+                    See All Features
+                    <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </Link>
+              </Magnetic>
+              <Magnetic strength={0.3}>
+                <Link href="/screenshots">
+                  <Button size="lg" variant="outline" className="group">
+                    Product screenshots
+                    <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </Link>
+              </Magnetic>
             </div>
           </Reveal>
         </div>
@@ -289,26 +361,40 @@ export default function Home() {
                     </li>
                   ))}
                 </ul>
-                <a href="https://browse.objectified.dev" target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="group">
-                    Browse Public APIs
-                    <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </Button>
-                </a>
+                <Magnetic>
+                  <a href="https://browse.objectified.dev" target="_blank" rel="noopener noreferrer">
+                    <Button size="lg" className="group">
+                      Browse Public APIs
+                      <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </Button>
+                  </a>
+                </Magnetic>
               </div>
             </Reveal>
             <Reveal delay={0.15}>
-              <GlassCard interactive={false} className="p-6" data-always="true">
-                <div className="relative aspect-video overflow-hidden rounded-lg ring-1 ring-black/10 dark:ring-white/10">
-                  <Image
-                    src="/browser-01.png"
-                    alt="Public API Browser — explore OpenAPI specifications"
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 1024px) 100vw, 50vw"
-                  />
-                </div>
-              </GlassCard>
+              <Parallax speed={28}>
+                <GlassCard interactive={false} className="overflow-hidden p-0" data-always="true">
+                  <div className="flex items-center gap-2 border-b border-zinc-200/80 bg-zinc-50/80 px-4 py-2.5 dark:border-zinc-800/80 dark:bg-zinc-900/80">
+                    <span className="h-3 w-3 rounded-full bg-red-400/80" aria-hidden />
+                    <span className="h-3 w-3 rounded-full bg-amber-400/80" aria-hidden />
+                    <span className="h-3 w-3 rounded-full bg-emerald-400/80" aria-hidden />
+                    <div className="ml-3 hidden flex-1 sm:block">
+                      <div className="inline-flex max-w-full items-center rounded-md bg-white/70 px-3 py-1 text-xs font-medium text-zinc-500 ring-1 ring-inset ring-zinc-200/80 dark:bg-zinc-950/60 dark:text-zinc-400 dark:ring-zinc-800/80">
+                        browse.objectified.dev
+                      </div>
+                    </div>
+                  </div>
+                  <div className="relative aspect-video overflow-hidden">
+                    <Image
+                      src="/browser-01.png"
+                      alt="Public API Browser — explore OpenAPI specifications"
+                      fill
+                      className="object-cover object-top"
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                    />
+                  </div>
+                </GlassCard>
+              </Parallax>
             </Reveal>
           </div>
         </div>
@@ -357,17 +443,21 @@ export default function Home() {
                   and ship their API specifications.
                 </p>
                 <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  <a href="https://app.objectified.dev" target="_blank" rel="noopener noreferrer">
-                    <Button size="lg" variant="secondary" className="bg-white text-blue-600 hover:bg-zinc-100">
-                      Launch App
-                      <ArrowRight className="ml-1 h-4 w-4" />
-                    </Button>
-                  </a>
-                  <a href="https://browse.objectified.dev" target="_blank" rel="noopener noreferrer">
-                    <Button size="lg" variant="ghost-glass" className="text-white">
-                      Browse Public APIs
-                    </Button>
-                  </a>
+                  <Magnetic>
+                    <a href="https://app.objectified.dev" target="_blank" rel="noopener noreferrer">
+                      <Button size="lg" variant="secondary" className="bg-white text-blue-600 hover:bg-zinc-100">
+                        Launch App
+                        <ArrowRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </a>
+                  </Magnetic>
+                  <Magnetic strength={0.3}>
+                    <a href="https://browse.objectified.dev" target="_blank" rel="noopener noreferrer">
+                      <Button size="lg" variant="ghost-glass" className="text-white">
+                        Browse Public APIs
+                      </Button>
+                    </a>
+                  </Magnetic>
                 </div>
               </div>
             </div>
