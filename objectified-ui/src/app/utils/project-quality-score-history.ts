@@ -3,7 +3,34 @@
  * Snapshots are appended when an import completes successfully (Import dialog).
  */
 
+import type { AnalysisIssue, AnalysisResult } from './openapi-analyzer';
+
 export type QualityLetterGrade = 'A' | 'B' | 'C' | 'D' | 'F';
+
+export type ProjectQualityReportSection = 'trend' | 'quality' | 'lint';
+
+export interface StoredQualityCategoryScore {
+  id: string;
+  label: string;
+  percent: number;
+  points: number;
+  maxPoints: number;
+}
+
+export interface StoredQualityIssue {
+  category: string;
+  message: string;
+  suggestion: string;
+  path: string;
+  severity: 'high' | 'medium' | 'low';
+}
+
+export interface StoredLintFinding {
+  type: 'error' | 'warning';
+  message: string;
+  path?: string;
+  severity: string;
+}
 
 export interface ProjectQualitySnapshot {
   recordedAt: string;
@@ -11,7 +38,16 @@ export interface ProjectQualitySnapshot {
   grade: QualityLetterGrade;
   /** Dedupes Strict Mode / duplicate effect runs for the same import job */
   importJobId?: string;
+  /** Weighted category breakdown from the import analysis */
+  categories?: StoredQualityCategoryScore[];
+  /** Quality score improvement suggestions */
+  issues?: StoredQualityIssue[];
+  /** Structural / validation lint findings (errors + warnings) */
+  lintFindings?: StoredLintFinding[];
 }
+
+const MAX_STORED_ISSUES = 80;
+const MAX_STORED_LINT = 80;
 
 interface StoreShape {
   byProject: Record<string, ProjectQualitySnapshot[]>;
@@ -79,6 +115,72 @@ function clampOverall(n: number): number {
   return Math.max(0, Math.min(100, Math.round(safeValue)));
 }
 
+function toStoredLintFinding(issue: AnalysisIssue, type: 'error' | 'warning'): StoredLintFinding {
+  return {
+    type,
+    message: issue.message,
+    ...(issue.path ? { path: issue.path } : {}),
+    severity: issue.severity,
+  };
+}
+
+/** Serializable quality + lint report extras from an import analysis. */
+export function buildQualitySnapshotReportExtras(
+  analysis: Pick<AnalysisResult, 'qualityScore' | 'errors' | 'warnings'>
+): Pick<ProjectQualitySnapshot, 'categories' | 'issues' | 'lintFindings'> {
+  const categories = Object.values(analysis.qualityScore.categories).map((cat) => ({
+    id: cat.id,
+    label: cat.label,
+    percent: cat.percent,
+    points: cat.points,
+    maxPoints: cat.maxPoints,
+  }));
+
+  const issues = (analysis.qualityScore.issues ?? []).slice(0, MAX_STORED_ISSUES).map((issue) => ({
+    category: issue.category,
+    message: issue.message,
+    suggestion: issue.suggestion,
+    path: issue.path,
+    severity: issue.severity,
+  }));
+
+  const lintFindings = [
+    ...analysis.errors.map((issue) => toStoredLintFinding(issue, 'error')),
+    ...analysis.warnings.map((issue) => toStoredLintFinding(issue, 'warning')),
+  ].slice(0, MAX_STORED_LINT);
+
+  return { categories, issues, lintFindings };
+}
+
+/** Latest snapshot that includes a stored report, or the latest snapshot overall. */
+export function getLatestProjectQualitySnapshotWithReport(
+  projectId: string
+): ProjectQualitySnapshot | null {
+  const history = getProjectQualityHistory(projectId);
+  if (history.length === 0) return null;
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const snap = history[i];
+    if (
+      snap.categories !== undefined ||
+      snap.issues !== undefined ||
+      snap.lintFindings !== undefined
+    ) {
+      return snap;
+    }
+  }
+  return history[history.length - 1];
+}
+
+export function snapshotHasQualityReport(snapshot: ProjectQualitySnapshot | null | undefined): boolean {
+  if (!snapshot) return false;
+  return snapshot.categories !== undefined || snapshot.issues !== undefined;
+}
+
+export function snapshotHasLintReport(snapshot: ProjectQualitySnapshot | null | undefined): boolean {
+  if (!snapshot) return false;
+  return snapshot.lintFindings !== undefined;
+}
+
 /**
  * Append a snapshot for a project. Keeps entries ordered by `recordedAt` ascending.
  * Skips if the last entry for this project has the same `importJobId`.
@@ -90,6 +192,9 @@ export function appendProjectQualitySnapshot(
     grade: QualityLetterGrade;
     importJobId?: string;
     recordedAt?: string;
+    categories?: StoredQualityCategoryScore[];
+    issues?: StoredQualityIssue[];
+    lintFindings?: StoredLintFinding[];
   }
 ): void {
   if (!projectId) return;
@@ -113,6 +218,9 @@ export function appendProjectQualitySnapshot(
     overall: clampOverall(payload.overall),
     grade: payload.grade,
     ...(payload.importJobId ? { importJobId: payload.importJobId } : {}),
+    ...(payload.categories !== undefined ? { categories: payload.categories } : {}),
+    ...(payload.issues !== undefined ? { issues: payload.issues } : {}),
+    ...(payload.lintFindings !== undefined ? { lintFindings: payload.lintFindings } : {}),
   };
 
   const next = [...prev, snap];

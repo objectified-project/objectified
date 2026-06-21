@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import {
   buildQualityTrendPoints,
   buildPortfolioQualitySeries,
+  buildQualitySnapshotReportExtras,
 } from '@/app/utils/project-quality-score-history';
 
 describe('project-quality-score-history', () => {
@@ -67,6 +68,81 @@ describe('project-quality-score-history', () => {
       appendProjectQualitySnapshot('p1', { overall: 80, grade: 'B', importJobId: 'job-x' });
       appendProjectQualitySnapshot('p1', { overall: 81, grade: 'B', importJobId: 'job-x' });
       expect(getProjectQualityHistory('p1')).toHaveLength(1);
+    });
+  });
+
+  describe('buildQualitySnapshotReportExtras', () => {
+    it('stores categories, quality issues, and lint findings', () => {
+      const extras = buildQualitySnapshotReportExtras({
+        qualityScore: {
+          overall: 72,
+          grade: 'B',
+          categories: {
+            designQuality: {
+              id: 'designQuality',
+              label: 'Design Quality',
+              description: 'Naming',
+              percent: 80,
+              maxPoints: 30,
+              points: 24,
+            },
+            documentation: {
+              id: 'documentation',
+              label: 'Documentation',
+              description: 'Docs',
+              percent: 50,
+              maxPoints: 20,
+              points: 10,
+            },
+            apiBestPractices: {
+              id: 'apiBestPractices',
+              label: 'API Best Practices',
+              description: 'Best',
+              percent: 60,
+              maxPoints: 25,
+              points: 15,
+            },
+            security: {
+              id: 'security',
+              label: 'Security',
+              description: 'Sec',
+              percent: 70,
+              maxPoints: 15,
+              points: 10,
+            },
+            performance: {
+              id: 'performance',
+              label: 'Performance',
+              description: 'Perf',
+              percent: 40,
+              maxPoints: 10,
+              points: 4,
+            },
+          },
+          completeness: 50,
+          consistency: 80,
+          bestPractices: 60,
+          security: 70,
+          performance: 40,
+          issues: [
+            {
+              category: 'documentation',
+              message: 'Missing description',
+              suggestion: 'Add a description',
+              path: 'info.title',
+              severity: 'medium',
+            },
+          ],
+        },
+        errors: [{ type: 'error', message: 'Invalid ref', path: '#/components/schemas/Foo', severity: 'high' }],
+        warnings: [{ type: 'warning', message: 'No servers', severity: 'low' }],
+      });
+
+      expect(extras.categories).toHaveLength(5);
+      expect(extras.issues).toHaveLength(1);
+      expect(extras.lintFindings).toHaveLength(2);
+      expect(extras.lintFindings?.[0].type).toBe('error');
+      expect(extras.lintFindings?.[1].type).toBe('warning');
     });
   });
 });

@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { createProject } from '@lib/db/helper';
 import { startImport, getImportStatus } from '@lib/db/import-actions';
-import { appendProjectQualitySnapshot } from '@/app/utils/project-quality-score-history';
+import { appendProjectQualitySnapshot, buildQualitySnapshotReportExtras } from '@/app/utils/project-quality-score-history';
 import { analyzeSpecification, type AnalysisResult } from '@/app/utils/openapi-analyzer';
 import { generateSlug } from '@/app/utils/slug';
 import ImportExecutionPanel from '@/app/components/ade/dashboard/ImportExecutionPanel';
@@ -479,6 +479,7 @@ export function RepositoryFileImportMapping({
           overall: catalogImportAnalysis.qualityScore.overall,
           grade: catalogImportAnalysis.qualityScore.grade,
           importJobId: catalogImportJobId,
+          ...buildQualitySnapshotReportExtras(catalogImportAnalysis),
         });
       } catch {
         // ignore

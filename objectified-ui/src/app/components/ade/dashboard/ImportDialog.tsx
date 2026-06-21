@@ -23,7 +23,7 @@ import SwaggerHubImportPanel from './SwaggerHubImportPanel';
 import PostmanImportPanel from './PostmanImportPanel';
 import { startImport, getImportStatus, rollbackImport } from '../../../../../lib/db/import-actions';
 import { generateSlug } from '../../../utils/slug';
-import { appendProjectQualitySnapshot } from '../../../utils/project-quality-score-history';
+import { appendProjectQualitySnapshot, buildQualitySnapshotReportExtras } from '../../../utils/project-quality-score-history';
 
 interface ImportDialogProps {
   open: boolean;
@@ -106,6 +106,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
           overall: analysisResult.qualityScore.overall,
           grade: analysisResult.qualityScore.grade,
           importJobId: jobId,
+          ...buildQualitySnapshotReportExtras(analysisResult),
         });
       } catch {
         // ignore

@@ -38,6 +38,7 @@ export interface ProjectsDashboardProjectCardProps {
   creatorInitials: string;
   shortProjectId: string;
   onOpenQualityHistory: () => void;
+  onOpenLintReport: () => void;
   onNavigateToVersions: () => void;
   actionsSlot: ReactNode;
 }
@@ -50,6 +51,7 @@ export function ProjectsDashboardProjectCard({
   creatorInitials,
   shortProjectId,
   onOpenQualityHistory,
+  onOpenLintReport,
   onNavigateToVersions,
   actionsSlot,
 }: ProjectsDashboardProjectCardProps) {
@@ -177,15 +179,21 @@ export function ProjectsDashboardProjectCard({
                 Lint
               </p>
               {lintLetter ? (
-                <span
+                <button
+                  type="button"
                   className={cn(
                     orbBase,
                     scoreOrbBorderClass(lintTier!.band),
-                    lintTier!.textClass
+                    lintTier!.textClass,
+                    'hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30'
                   )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenLintReport();
+                  }}
                 >
                   {lintLetter}
-                </span>
+                </button>
               ) : (
                 <span className={cn(orbBase, 'border-gray-300 text-gray-400 dark:border-gray-600')}>—</span>
               )}

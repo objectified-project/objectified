@@ -74,6 +74,7 @@ import { ProjectsDashboardProjectCard } from '../../../components/ade/dashboard/
 import {
   getProjectQualityHistory,
   buildPortfolioQualitySeries,
+  type ProjectQualityReportSection,
 } from '../../../utils/project-quality-score-history';
 import { getNumericScoreTier } from '../../../utils/numeric-score-tier';
 import { ProjectQualityTrendSparkline } from '../../../components/ade/dashboard/ProjectQualityTrendSparkline';
@@ -366,6 +367,7 @@ const Projects = () => {
   const [projectDomainCategoryId, setProjectDomainCategoryId] = useState(PROJECT_DOMAIN_CATEGORY_NONE);
   const [qualityHistoryEpoch, setQualityHistoryEpoch] = useState(0);
   const [qualityTrendProject, setQualityTrendProject] = useState<Project | null>(null);
+  const [qualityDialogSection, setQualityDialogSection] = useState<ProjectQualityReportSection>('trend');
   const [showDeleted, setShowDeleted] = useState(false);
   const [sortColumn, setSortColumn] = useState<ProjectsDashboardSortColumn>('name');
   const [sortDirection, setSortDirection] = useState<ProjectsDashboardSortDirection>('asc');
@@ -1029,7 +1031,14 @@ const Projects = () => {
                     avatarInitials={projectCardInitials(project.name)}
                     creatorInitials={projectCardInitials(project.creator_name)}
                     shortProjectId={formatShortProjectId(project.id)}
-                    onOpenQualityHistory={() => setQualityTrendProject(project)}
+                    onOpenQualityHistory={() => {
+                      setQualityDialogSection('quality');
+                      setQualityTrendProject(project);
+                    }}
+                    onOpenLintReport={() => {
+                      setQualityDialogSection('lint');
+                      setQualityTrendProject(project);
+                    }}
                     onNavigateToVersions={() =>
                       router.push(`/ade/dashboard/versions?projectId=${encodeURIComponent(project.id)}`)
                     }
@@ -1209,6 +1218,7 @@ const Projects = () => {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
+                              setQualityDialogSection('trend');
                               setQualityTrendProject(project);
                             }}
                             className="inline-flex max-w-full items-center gap-2 rounded-lg border border-transparent px-1 py-0.5 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-800 dark:hover:bg-indigo-950/40"
@@ -1393,12 +1403,19 @@ const Projects = () => {
       </Dialog>
 
       <ProjectQualityHistoryDialog
+        key={
+          qualityTrendProject
+            ? `${qualityTrendProject.id}:${qualityDialogSection}`
+            : 'project-quality-dialog-closed'
+        }
         open={qualityTrendProject !== null}
         onOpenChange={(open) => {
           if (!open) setQualityTrendProject(null);
         }}
         projectName={qualityTrendProject?.name ?? ''}
+        projectId={qualityTrendProject?.id ?? ''}
         history={qualityTrendProject ? projectQualityHistoryMap[qualityTrendProject.id] ?? [] : []}
+        initialSection={qualityDialogSection}
       />
 
       {/* New Import Dialog (Step 1 - Source Selection) */}
