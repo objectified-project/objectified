@@ -7,8 +7,12 @@
  * credentials and is intended for operators / break-glass use only.
  */
 
-import { Command } from "commander";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
+import { Command, CommanderError } from "commander";
+
+import { runInteractiveRepl } from "./lib/interactive/repl.js";
 import * as apikeys from "./commands/apikeys.js";
 import * as migrate from "./commands/migrate.js";
 import * as tenants from "./commands/tenants.js";
@@ -72,7 +76,13 @@ function parseExpiresDays(value: string | undefined): number | undefined {
   return n;
 }
 
-const program = new Command();
+function buildProgram(interactive: boolean): Command {
+  const program = new Command();
+
+  // In the REPL each command line builds a fresh program (so option state never
+  // leaks between lines); surface parse/help/version as thrown errors for the
+  // caller to handle instead of letting Commander call process.exit().
+  if (interactive) program.exitOverride();
 
 program
   .name("objectified-db")
@@ -337,21 +347,66 @@ apiKeysCmd
     );
   });
 
-async function main(): Promise<void> {
-  if (process.argv.slice(2).length === 0) {
-    program.outputHelp();
-    return;
-  }
-  await program.parseAsync(process.argv);
+// ──────────────────────── interactive (REPL) ─────────────────────
+program
+  .command("interactive")
+  .alias("repl")
+  .description("Start an interactive session (also the default when run with no command)")
+  .action(async () => {
+    await startRepl();
+  });
+
+  return program;
 }
 
-main().catch((err: unknown) => {
+function reportError(err: unknown): void {
   if (err instanceof CliError) {
     note(`objectified-db: ${err.message}`);
     if (err.hint) note(`  hint: ${err.hint}`);
-    process.exit(err.exitCode);
+    return;
   }
   const message = err instanceof Error ? err.message : String(err);
   note(`objectified-db: ${message}`);
-  process.exit(1);
+}
+
+/** Execute one REPL command line in a fresh program; never exits the process. */
+async function executeLine(argv: string[]): Promise<void> {
+  try {
+    await buildProgram(true).parseAsync(argv, { from: "user" });
+  } catch (err) {
+    // Commander already wrote help/version to stdout and parse errors to stderr.
+    if (err instanceof CommanderError) return;
+    reportError(err);
+  }
+}
+
+async function startRepl(): Promise<void> {
+  const color =
+    Boolean(process.stdout.isTTY) &&
+    (process.env.NO_COLOR === undefined || process.env.NO_COLOR === "");
+  await runInteractiveRepl({
+    binName: "objectified-db",
+    versionLabel: "0.1.0",
+    input: process.stdin,
+    output: process.stdout,
+    errorOutput: process.stderr,
+    isTTY: Boolean(process.stdin.isTTY),
+    color,
+    execute: executeLine,
+    historyFile: join(homedir(), ".objectified-db", "history"),
+  });
+}
+
+async function main(): Promise<void> {
+  // Run with no command → interactive session (TTY) or batch from stdin (pipe).
+  if (process.argv.slice(2).length === 0) {
+    await startRepl();
+    return;
+  }
+  await buildProgram(false).parseAsync(process.argv);
+}
+
+main().catch((err: unknown) => {
+  reportError(err);
+  process.exit(err instanceof CliError ? err.exitCode : 1);
 });
