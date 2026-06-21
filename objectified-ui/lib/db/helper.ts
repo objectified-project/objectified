@@ -1,6 +1,14 @@
 'use server';
 
 import { generateOpenApiSpec } from '@/app/utils/openapi';
+import { STUDIO_EXPORT_OPENAPI_VERSION } from '@/app/utils/openapi-versions';
+import { generatePathsForOpenAPI, type PathInfo } from '../utils/openapi-paths-generator';
+import { loadPathsForOpenAPIExport } from './helper-paths-export';
+import {
+  getSecuritySchemesForVersion,
+  securitySchemesToOpenAPI,
+} from './helper-security-schemes';
+import { getServersForVersion, serversToOpenAPI } from './helper-version-servers';
 import { isValidVersionBranchName } from '../version-branch-utils';
 import { isValidVersionTagName } from '../version-tag-utils';
 import { getPlanBlockMessageForNewProject, getPlanBlockMessageForNewVersion } from './plan-entitlements';
@@ -5564,23 +5572,114 @@ export async function importPrimitivesFromSchema(
   }
 }
 
-export async function buildOpenApiSpecJsonForVersion(
-  versionRow: { id: string; version_id: string; description?: string | null; project_id: string },
-  projectName: string | null
-): Promise<string> {
-  const classesResult = await getClassesForVersion(versionRow.id);
-  const classesData = JSON.parse(classesResult) as unknown[];
-  const classesWithProperties = await Promise.all(
-    classesData.map(async (cls: any) => {
-      const propsResult = await getPropertiesForClass(cls.id);
-      return { ...cls, properties: JSON.parse(propsResult) };
-    })
+export type BuildOpenApiSpecForVersionOptions = {
+  projectName?: string | null;
+  versionLabel?: string;
+  description?: string | null;
+  openapiVersion?: string;
+  metadata?: {
+    summary?: string;
+    termsOfService?: string;
+    contact?: { name?: string; url?: string; email?: string };
+    license?: { name?: string; identifier?: string; url?: string };
+  };
+};
+
+export type BuildOpenApiSpecForVersionResult = {
+  specJson: string;
+  pathsObject: Record<string, unknown>;
+};
+
+/**
+ * Single source of truth for OpenAPI export by version: schemas, paths, servers, and security schemes.
+ */
+export async function buildOpenApiSpecForVersion(
+  versionId: string,
+  options: BuildOpenApiSpecForVersionOptions = {}
+): Promise<BuildOpenApiSpecForVersionResult> {
+  const classesRaw = await getClassesWithPropertiesAndTags(versionId);
+  const classesWithProperties = JSON.parse(classesRaw);
+
+  let pathsObject: Record<string, unknown> = {};
+  try {
+    const pathsResult = await loadPathsForOpenAPIExport(versionId);
+    const pathsData = JSON.parse(pathsResult) as {
+      success?: boolean;
+      paths?: PathInfo[];
+      error?: string;
+    };
+    if (pathsData.success && pathsData.paths && pathsData.paths.length > 0) {
+      pathsObject = generatePathsForOpenAPI(pathsData.paths) as Record<string, unknown>;
+    } else if (pathsData.success) {
+      console.warn('[buildOpenApiSpecForVersion] Paths loaded successfully but array is empty');
+    } else {
+      console.error('[buildOpenApiSpecForVersion] Failed to load paths:', pathsData.error);
+    }
+  } catch (error) {
+    console.error('[buildOpenApiSpecForVersion] Exception while loading paths:', error);
+  }
+
+  let securitySchemes: Record<string, unknown> = {};
+  try {
+    const schemes = await getSecuritySchemesForVersion(versionId);
+    if (schemes.length > 0) {
+      securitySchemes = (await securitySchemesToOpenAPI(schemes)) as Record<string, unknown>;
+    }
+  } catch (error) {
+    console.error('[buildOpenApiSpecForVersion] Exception while loading security schemes:', error);
+  }
+
+  let servers: Array<{ url: string; description?: string }> = [];
+  try {
+    const serverList = await getServersForVersion(versionId);
+    if (serverList.length > 0) {
+      servers = await serversToOpenAPI(serverList);
+    }
+  } catch (error) {
+    console.error('[buildOpenApiSpecForVersion] Exception while loading servers:', error);
+  }
+
+  const hasSecuritySchemes = Object.keys(securitySchemes).length > 0;
+  const specJson = await generateOpenApiSpec(
+    classesWithProperties,
+    {
+      projectName: options.projectName ?? undefined,
+      version: options.versionLabel ?? '1.0.0',
+      description: options.description ?? undefined,
+      openapiVersion: options.openapiVersion ?? STUDIO_EXPORT_OPENAPI_VERSION,
+      servers: servers.length > 0 ? servers : undefined,
+      tags: [],
+      security: hasSecuritySchemes
+        ? Object.keys(securitySchemes).map((name) => ({ [name]: [] }))
+        : undefined,
+      externalDocs: undefined,
+      metadata: options.metadata,
+    },
+    pathsObject,
+    hasSecuritySchemes ? securitySchemes : undefined
   );
-  return generateOpenApiSpec(classesWithProperties, {
-    projectName: projectName ?? undefined,
-    version: versionRow.version_id,
-    description: versionRow.description || undefined,
+
+  return { specJson, pathsObject };
+}
+
+export async function buildOpenApiSpecJsonForVersion(
+  versionRow: {
+    id: string;
+    version_id: string;
+    description?: string | null;
+    shortMessage?: string | null;
+    project_id: string;
+  },
+  projectName: string | null,
+  metadata?: BuildOpenApiSpecForVersionOptions['metadata']
+): Promise<string> {
+  const { specJson } = await buildOpenApiSpecForVersion(versionRow.id, {
+    projectName,
+    versionLabel: versionRow.version_id,
+    description: versionRow.shortMessage || versionRow.description || undefined,
+    metadata,
   });
+  return specJson;
 }
 
 export async function assertProjectInTenant(projectId: string, tenantId: string): Promise<boolean> {

@@ -137,6 +137,7 @@ import {
   bulkApplyEditsToGroupClasses,
   pinTeamDefaultQuickSnapshot,
   deleteNamedCanvasLayout,
+  buildOpenApiSpecForVersion,
 } from '../../../../../lib/db/helper';
 import { expandClassesForGroupExport, downloadTextFile } from '@/app/utils/group-schema-export';
 import { mapEdgesForLayoutSave, mapNodesForLayoutSave } from '../lib/canvasLayoutPayload';
@@ -7703,9 +7704,10 @@ const StudioContent = () => {
         if (viewMode === 'code') {
           // Generate only the selected spec format
           if (codeDisplayFormat === 'openapi') {
-            const spec = await generateOpenApiSpec(classesWithProperties, {
+            if (!selectedVersionId) return;
+            const { specJson: spec } = await buildOpenApiSpecForVersion(selectedVersionId, {
               projectName: currentProject?.name,
-              version: currentVersion?.version_id,
+              versionLabel: currentVersion?.version_id,
               description: projectDescriptionForOpenApiPreview(currentProject),
               metadata: coerceProjectMetadataRecord((currentProject as { metadata?: unknown })?.metadata),
             });

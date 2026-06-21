@@ -15,10 +15,8 @@ import {
   coerceProjectMetadataRecord,
   projectDescriptionForOpenApiPreview,
 } from '../lib/coerce-project-metadata';
-import { generateOpenApiSpec } from '../../../utils/openapi';
-import { STUDIO_EXPORT_OPENAPI_VERSION } from '../../../utils/openapi-versions';
-import { validateOpenAPIExport } from '../../../utils/openapi-export-validation-server';
 import type { OpenAPIExportValidationResult } from '../../../utils/openapi-export-validation';
+import { validateOpenAPIExport } from '../../../utils/openapi-export-validation-server';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,15 +33,9 @@ import { generateGraphQLSchema } from '../../../utils/graphql';
 import { generateSQL, SQLDialect } from '../../../utils/sql-generator';
 import { generateAsyncAPISpec } from '../../../utils/asyncapi-generator';
 import {
+  buildOpenApiSpecForVersion,
   getClassesWithPropertiesAndTags,
 } from '../../../../../lib/db/helper';
-import { loadPathsForOpenAPIExport } from '../../../../../lib/db/helper-paths-export';
-import {
-  getSecuritySchemesForVersion,
-  securitySchemesToOpenAPI,
-} from '../../../../../lib/db/helper-security-schemes';
-import { getServersForVersion, serversToOpenAPI } from '../../../../../lib/db/helper-version-servers';
-import { generatePathsForOpenAPI, type PathInfo } from '../../../../../lib/utils/openapi-paths-generator';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -237,81 +229,17 @@ export default function CodePage() {
         const result = await getClassesWithPropertiesAndTags(selectedVersionId);
         const classesWithProperties: ClassWithProperties[] = JSON.parse(result);
 
-        // Load paths for OpenAPI export
-        let pathsObject: Record<string, unknown> = {};
-        try {
-          console.log('[Code Tab] Loading paths for version:', selectedVersionId);
-          const pathsResult = await loadPathsForOpenAPIExport(selectedVersionId);
-          console.log('[Code Tab] Raw paths result:', pathsResult);
-
-          const pathsData = JSON.parse(pathsResult);
-          console.log('[Code Tab] Parsed paths data:', pathsData);
-
-          if (pathsData.success && pathsData.paths && pathsData.paths.length > 0) {
-            console.log(`[Code Tab] Found ${pathsData.paths.length} paths`);
-            console.log('[Code Tab] Path details:', pathsData.paths.map((p: any) => ({
-              pathname: p.pathname,
-              operationCount: p.operations?.length || 0,
-              operations: p.operations?.map((op: any) => op.operation) || []
-            })));
-            const pathInfos: PathInfo[] = pathsData.paths;
-            pathsObject = generatePathsForOpenAPI(pathInfos) as Record<string, unknown>;
-            console.log(`[Code Tab] Generated ${Object.keys(pathsObject).length} OpenAPI path entries`);
-            console.log('[Code Tab] Generated path keys:', Object.keys(pathsObject));
-            console.log('[Code Tab] Sample path content:', Object.keys(pathsObject).length > 0 ? JSON.stringify(Object.values(pathsObject)[0]).substring(0, 200) : 'none');
-          } else if (pathsData.success) {
-            console.warn('[Code Tab] Paths loaded successfully but array is empty');
-            console.warn('[Code Tab] To add paths: Navigate to the Paths tab and create paths with operations');
-          } else {
-            console.error('[Code Tab] Failed to load paths:', pathsData.error);
-          }
-        } catch (pathsError) {
-          console.error('[Code Tab] Exception while loading paths:', pathsError);
-          if (pathsError instanceof Error) {
-            console.error('[Code Tab] Error stack:', pathsError.stack);
-          }
-        }
-
-        // Load security schemes (API Key header/query/cookie)
-        let securitySchemes: Record<string, unknown> = {};
-        try {
-          const schemes = await getSecuritySchemesForVersion(selectedVersionId);
-          if (schemes.length > 0) {
-            securitySchemes = (await securitySchemesToOpenAPI(schemes)) as Record<string, unknown>;
-          }
-        } catch (schemesError) {
-          console.error('[Code Tab] Exception while loading security schemes:', schemesError);
-        }
-
-        // Load servers (multiple server definitions: url, description)
-        let servers: Array<{ url: string; description?: string }> = [];
-        try {
-          const serverList = await getServersForVersion(selectedVersionId);
-          if (serverList.length > 0) {
-            servers = await serversToOpenAPI(serverList);
-          }
-        } catch (serversError) {
-          console.error('[Code Tab] Exception while loading servers:', serversError);
-        }
-
         const currentProject = projects.find(p => p.id === selectedProjectId);
         const currentVersion = versions.find(v => v.id === selectedVersionId);
         const versionNote = currentVersion ? getVersionRevisionNote(currentVersion) : '';
 
-        // Generate all specs (#424: include tags, security, externalDocs when available)
-        const hasSecuritySchemes = Object.keys(securitySchemes).length > 0;
-        const openApiContent = await generateOpenApiSpec(classesWithProperties, {
+        const { specJson: openApiContent } = await buildOpenApiSpecForVersion(selectedVersionId, {
           projectName: currentProject?.name || 'API',
-          version: currentVersion?.version_id || '1.0.0',
+          versionLabel: currentVersion?.version_id || '1.0.0',
           description:
             projectDescriptionForOpenApiPreview(currentProject) || versionNote || undefined,
-          openapiVersion: STUDIO_EXPORT_OPENAPI_VERSION,
-          servers: servers.length > 0 ? servers : undefined,
-          tags: [], // Top-level tags; can be populated from version/project when available
-          security: hasSecuritySchemes ? Object.keys(securitySchemes).map((name) => ({ [name]: [] })) : undefined,
-          externalDocs: undefined, // Version/project externalDocs when available
           metadata: coerceProjectMetadataRecord((currentProject as { metadata?: unknown })?.metadata),
-        }, pathsObject, hasSecuritySchemes ? securitySchemes : undefined);
+        });
         setOpenApiSpec(openApiContent);
 
         const arazzoContent = await generateArazzoSpec(classesWithProperties, {

@@ -64,11 +64,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useDialog } from '../../../components/providers/DialogProvider';
 import {
   deleteVersion,
+  buildOpenApiSpecJsonForVersion,
   getClassesForVersion,
   getPropertiesForClass,
   getTenantsAdministratedByUser
 } from '../../../../../lib/db/helper';
-import { generateOpenApiSpec } from '../../../utils/openapi';
+import { coerceProjectMetadataRecord } from '@/app/ade/studio/lib/coerce-project-metadata';
 import YAML from 'yaml';
 import { Markdown } from '@/app/components/ui/Markdown';
 import { diffLines, Change } from 'diff';
@@ -1475,14 +1476,12 @@ const Versions = () => {
   const handleViewOpenApi = async (version: Version) => {
     setViewingVersion(version); setShowOpenApiDialog(true); setIsLoadingSpec(true); setOpenApiFormat('json');
     try {
-      const classesResult = await getClassesForVersion(version.id);
-      const classesData = JSON.parse(classesResult);
-      const classesWithProperties = await Promise.all(classesData.map(async (cls: any) => {
-        const propsResult = await getPropertiesForClass(cls.id);
-        return { ...cls, properties: JSON.parse(propsResult) };
-      }));
       const project = projects.find(p => p.id === version.project_id);
-      const spec = await generateOpenApiSpec(classesWithProperties, { projectName: project?.name, version: version.version_id, description: version.shortMessage || undefined });
+      const spec = await buildOpenApiSpecJsonForVersion(
+        version,
+        project?.name ?? null,
+        coerceProjectMetadataRecord((project as { metadata?: unknown })?.metadata)
+      );
       setOpenApiSpec(spec);
     } catch (error) { setOpenApiSpec(JSON.stringify({ openapi: '3.1.0', info: { title: 'Error Loading Spec', version: version.version_id }, components: { schemas: {} } }, null, 2)); }
     finally { setIsLoadingSpec(false); }
@@ -1511,14 +1510,12 @@ const Versions = () => {
   const loadVersionSpec = async (versionId: string): Promise<string> => {
     const version = versions.find(v => v.id === versionId);
     if (!version) throw new Error('Version not found');
-    const classesResult = await getClassesForVersion(version.id);
-    const classesData = JSON.parse(classesResult);
-    const classesWithProperties = await Promise.all(classesData.map(async (cls: any) => {
-      const propsResult = await getPropertiesForClass(cls.id);
-      return { ...cls, properties: JSON.parse(propsResult) };
-    }));
     const project = projects.find(p => p.id === version.project_id);
-    return generateOpenApiSpec(classesWithProperties, { projectName: project?.name, version: version.version_id, description: version.shortMessage || undefined });
+    return buildOpenApiSpecJsonForVersion(
+      version,
+      project?.name ?? null,
+      coerceProjectMetadataRecord((project as { metadata?: unknown })?.metadata)
+    );
   };
 
   const runCompareBetween = async (baseId: string, targetId: string) => {
