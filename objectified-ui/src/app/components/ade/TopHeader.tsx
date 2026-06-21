@@ -8,7 +8,6 @@ import { usePathname } from 'next/navigation';
 import { ChevronDown, Check, Shield } from 'lucide-react';
 import WhatsNewDialog from './WhatsNewDialog';
 import ThemeSelector from './ThemeSelector';
-import { DeveloperModePreferenceControl } from './DeveloperModePreferenceControl';
 import { useTheme } from '../../providers/ThemeProvider';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import { getTenantsForUser, getTenantsAdministratedByUser } from '../../../../lib/db/helper';
@@ -216,8 +215,6 @@ const TopHeader = () => {
           })}
         </ul>
       </nav>
-
-      <DeveloperModePreferenceControl layout="toolbar" />
 
       {/* Tenant switcher */}
       {userTenants.length > 0 && (
