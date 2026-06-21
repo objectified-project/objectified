@@ -69,6 +69,124 @@ function detectFormat(root: Record<string, unknown>): RepositorySpecFormat {
   return 'unknown';
 }
 
+function looksLikeJsonSchemaRoot(root: Record<string, unknown>): boolean {
+  if (root.$schema != null || root.$id != null || root.$defs != null || root.definitions != null) {
+    return true;
+  }
+  const t = root.type;
+  return typeof t === 'string' || (Array.isArray(t) && t.every((x) => typeof x === 'string'));
+}
+
+function looksLikeGraphqlSdl(content: string): boolean {
+  const t = content.trim();
+  if (!t || t.startsWith('{') || t.startsWith('[')) return false;
+  return /\b(type|schema|enum|interface|input|scalar|union|directive)\b/.test(t);
+}
+
+function detectFormatForMetadata(root: Record<string, unknown>, content: string): RepositorySpecFormat {
+  const fmt = detectFormat(root);
+  if (fmt !== 'unknown') return fmt;
+  if (looksLikeJsonSchemaRoot(root)) return 'json_schema';
+  if (looksLikeGraphqlSdl(content)) return 'graphql';
+  return 'unknown';
+}
+
+function specContextFromRoot(root: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of ['openapi', 'swagger', 'asyncapi', 'arazzo', '$schema', '$id'] as const) {
+    if (root[key] !== undefined) out[key] = root[key];
+  }
+  return out;
+}
+
+export type RepositorySpecOriginalMetadata = {
+  parseError: string | null;
+  format: RepositorySpecFormat;
+  /** Where metadata lives in the document, e.g. `info` or root fields. */
+  sectionLabel: string;
+  /** Untouched metadata object from the parsed file. */
+  payload: Record<string, unknown> | null;
+  /** Spec dialect/version keys copied from the document root for context. */
+  specContext: Record<string, unknown>;
+  /** Root-level external docs when present (OpenAPI-style). */
+  externalDocs: Record<string, unknown> | null;
+};
+
+/** Raw metadata block from a repository spec file for read-only reference in the import UI. */
+export function extractRepositorySpecOriginalMetadata(
+  content: string,
+  path: string
+): RepositorySpecOriginalMetadata {
+  const parsed = parseRoot(content, path);
+  if ('error' in parsed) {
+    return {
+      parseError: parsed.error,
+      format: 'unknown',
+      sectionLabel: '—',
+      payload: null,
+      specContext: {},
+      externalDocs: null,
+    };
+  }
+
+  const root = parsed.root;
+  const fmt = detectFormatForMetadata(root, content);
+  const specContext = specContextFromRoot(root);
+  const externalDocs =
+    root.externalDocs && typeof root.externalDocs === 'object' && !Array.isArray(root.externalDocs)
+      ? (root.externalDocs as Record<string, unknown>)
+      : null;
+
+  if (fmt === 'openapi' || fmt === 'swagger2' || fmt === 'asyncapi' || fmt === 'arazzo') {
+    const info =
+      root.info && typeof root.info === 'object' && !Array.isArray(root.info)
+        ? (root.info as Record<string, unknown>)
+        : null;
+    return {
+      parseError: null,
+      format: fmt,
+      sectionLabel: 'info',
+      payload: info,
+      specContext,
+      externalDocs,
+    };
+  }
+
+  if (fmt === 'json_schema') {
+    const payload: Record<string, unknown> = {};
+    for (const key of [
+      'title',
+      'description',
+      'version',
+      'summary',
+      'termsOfService',
+      'contact',
+      'license',
+      'externalDocs',
+      'type',
+    ]) {
+      if (root[key] !== undefined) payload[key] = root[key];
+    }
+    return {
+      parseError: null,
+      format: fmt,
+      sectionLabel: 'root',
+      payload: Object.keys(payload).length ? payload : null,
+      specContext,
+      externalDocs: externalDocs ?? null,
+    };
+  }
+
+  return {
+    parseError: null,
+    format: fmt,
+    sectionLabel: fmt === 'graphql' ? 'SDL' : '—',
+    payload: null,
+    specContext,
+    externalDocs: null,
+  };
+}
+
 function licenseFromOpenApi3(lic: unknown): { name: string; identifier: string; url: string } {
   if (!lic || typeof lic !== 'object' || Array.isArray(lic)) {
     return { name: '', identifier: '', url: '' };

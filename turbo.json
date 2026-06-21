@@ -10,6 +10,18 @@
       "cache": false,
       "persistent": true
     },
-    "lint": {}
+    "lint": {},
+    "cli:build": {
+      "cache": false,
+      "dependsOn": ["^cli:build"]
+    },
+    "cli:test": {
+      "cache": true,
+      "dependsOn": ["cli:build"]
+    },
+    "cli:lint": {
+      "cache": true,
+      "dependsOn": ["cli:build"]
+    }
   }
 }

@@ -1,0 +1,17 @@
+arazzo: 1.0.0
+info:
+  title: Checkout Flow
+  version: 1.0.0
+  summary: Example workflow for CLI docs and tests
+sourceDescriptions:
+  - name: openapi
+    url: https://example.test/openapi.json
+    type: openapi
+workflows:
+  - workflowId: checkout
+    summary: Checkout cart and pay
+    steps:
+      - stepId: createCart
+        operationId: createCart
+      - stepId: submitPayment
+        operationId: createPayment

@@ -56,6 +56,7 @@ import {
 } from '@/app/components/ade/dashboard/projects/CreateProjectManualFormFields';
 import { PROJECT_DOMAIN_CATEGORY_NONE } from '@/app/utils/project-domain-categories';
 import type { ProjectOpenApiMetadata } from '@/app/utils/project-templates';
+import RepositoryImportSpecMetadataPanel from './RepositoryImportSpecMetadataPanel';
 import type { RepositoryFileDetailRow } from './RepositoryFileDetail';
 import type { RepositoryFileStagedImportTarget } from './repositoryFileStagedImport';
 
@@ -90,6 +91,8 @@ function suggestedRuleFromPath(path: string, title: string | null): string {
 type TargetMode = 'existing' | 'new';
 
 type ImportFlowStep = 'mapping' | 'newProjectDraft';
+
+type NewProjectDialogView = 'form' | 'metadata';
 
 function createProjectFormFromSpecDraft(d: RepositorySpecProjectDraft): CreateProjectManualFormModel {
   return {
@@ -225,6 +228,7 @@ export function RepositoryFileImportMapping({
   }));
   /** Confirmed via “Map to This Project” in the dialog; project row is created when the user clicks Import. */
   const [stagedNewProject, setStagedNewProject] = useState<CreateProjectManualFormModel | null>(null);
+  const [newProjectDialogView, setNewProjectDialogView] = useState<NewProjectDialogView>('form');
   const [importSubmitting, setImportSubmitting] = useState(false);
 
   type CatalogImportPhase = 'idle' | 'executing' | 'summary';
@@ -393,6 +397,7 @@ export function RepositoryFileImportMapping({
 
   const openNewProjectDialog = (prefill: CreateProjectManualFormModel | null) => {
     setNewProjectForm(prefill ? { ...prefill } : { ...EMPTY_CREATE_PROJECT_MANUAL_FORM });
+    setNewProjectDialogView('form');
     setFlowStep('newProjectDraft');
   };
 
@@ -643,6 +648,7 @@ export function RepositoryFileImportMapping({
 
   const closeNewProjectDraft = () => {
     setFlowStep('mapping');
+    setNewProjectDialogView('form');
   };
 
   if (catalogImportPhase === 'executing' && catalogImportJobId) {
@@ -1192,36 +1198,89 @@ export function RepositoryFileImportMapping({
           aria-describedby={undefined}
         >
           <DialogHeader className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <span className="rounded-lg bg-gradient-to-br from-purple-100 to-indigo-100 p-1.5 dark:from-purple-900/30 dark:to-indigo-900/30">
-                <FolderOpen className="h-5 w-5 text-purple-600 dark:text-purple-400" aria-hidden />
-              </span>
-              Create New Project
-            </DialogTitle>
-            <DialogDescription className="text-left text-sm text-gray-600 dark:text-gray-400">
-              Same manual form as Projects → New Project. Fill from scratch, copy fields from this specification, or
-              clear and start over. Click <span className="font-medium">Map to This Project</span> to lock in this
-              mapping; the catalog project is created later when you click Import on the previous screen. Cancel closes
-              without saving the mapping.
-            </DialogDescription>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <span className="rounded-lg bg-gradient-to-br from-purple-100 to-indigo-100 p-1.5 dark:from-purple-900/30 dark:to-indigo-900/30">
+                    <FolderOpen className="h-5 w-5 text-purple-600 dark:text-purple-400" aria-hidden />
+                  </span>
+                  Create New Project
+                </DialogTitle>
+                <DialogDescription className="text-left text-sm text-gray-600 dark:text-gray-400">
+                  Same manual form as Projects → New Project. Fill from scratch, copy fields from this specification,
+                  or clear and start over. Click <span className="font-medium">Map to This Project</span> to lock in
+                  this mapping; the catalog project is created later when you click Import on the previous screen.
+                  Cancel closes without saving the mapping.
+                </DialogDescription>
+              </div>
+              <div
+                className="flex shrink-0 items-center gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-700"
+                role="tablist"
+                aria-label="Create project view"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={newProjectDialogView === 'form'}
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                    newProjectDialogView === 'form'
+                      ? 'bg-white text-indigo-600 shadow-sm dark:bg-gray-600 dark:text-indigo-400'
+                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                  )}
+                  onClick={() => setNewProjectDialogView('form')}
+                >
+                  Form
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={newProjectDialogView === 'metadata'}
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                    newProjectDialogView === 'metadata'
+                      ? 'bg-white text-indigo-600 shadow-sm dark:bg-gray-600 dark:text-indigo-400'
+                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                  )}
+                  onClick={() => setNewProjectDialogView('metadata')}
+                >
+                  Metadata
+                </button>
+              </div>
+            </div>
           </DialogHeader>
 
-          <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-6 py-3 dark:border-gray-700">
-            <Button type="button" variant="outline" size="sm" onClick={copyNewProjectFormFromSpecification}>
-              Copy from specification
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={clearNewProjectForm}>
-              Clear form
-            </Button>
-          </div>
+          {newProjectDialogView === 'form' ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-6 py-3 dark:border-gray-700">
+              <Button type="button" variant="outline" size="sm" onClick={copyNewProjectFormFromSpecification}>
+                Copy from specification
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={clearNewProjectForm}>
+                Clear form
+              </Button>
+            </div>
+          ) : null}
 
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-            <CreateProjectManualFormFields
-              fieldIdPrefix="repo-import-new-project-"
-              model={newProjectForm}
-              onChange={(patch) => setNewProjectForm((prev) => ({ ...prev, ...patch }))}
-              showStartTemplatePicker={false}
-            />
+            {newProjectDialogView === 'form' ? (
+              <CreateProjectManualFormFields
+                fieldIdPrefix="repo-import-new-project-"
+                model={newProjectForm}
+                onChange={(patch) => setNewProjectForm((prev) => ({ ...prev, ...patch }))}
+                showStartTemplatePicker={false}
+              />
+            ) : typeof payload?.content === 'string' ? (
+              <RepositoryImportSpecMetadataPanel
+                content={payload.content}
+                path={file.path}
+                specMetadata={specMetadata}
+                truncated={payload.truncated === true}
+              />
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Load the repository file to view original metadata.
+              </p>
+            )}
           </div>
 
           <DialogFooter className="flex flex-col-reverse gap-2 border-t border-gray-200 px-6 py-4 sm:flex-row sm:justify-end dark:border-gray-700">

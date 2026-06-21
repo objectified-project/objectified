@@ -1,6 +1,0 @@
-dist
-coverage
-.yarn
-node_modules
-oclif.manifest.json
-src/generated
