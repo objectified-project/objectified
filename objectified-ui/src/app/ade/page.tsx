@@ -14,6 +14,7 @@ import {
   Store,
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { BROWSE_APP_URL } from '../../../lib/app-urls';
 
 // Import version from package.json
 import packageJson from '../../../package.json';
@@ -71,7 +72,7 @@ const Ade = () => {
       name: 'Browser',
       description: 'Browse and explore published schemas',
       icon: <Globe className="w-8 h-8" />,
-      href: 'https://browse.objectified.dev/',
+      href: BROWSE_APP_URL,
       enabled: true,
       color: 'text-cyan-600 dark:text-cyan-400',
       gradient: 'from-cyan-500 to-blue-600',
