@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from pydantic import ValidationError
 
 from .auth import get_authenticated_user_id, validate_authentication
@@ -159,9 +159,13 @@ async def cancel_spec_import_job(
     tenant_slug: str,
     job_id: str,
     auth_data: Dict[str, Any] = Depends(validate_authentication),
-) -> None:
+) -> Response:
+    # NB: return a Response (not `-> None`) — under `from __future__ import annotations`
+    # FastAPI evaluates a `None` return annotation to NoneType and asserts that a 204
+    # cannot carry a body. Mirrors the draft-lock release routes.
     _ = auth_data
     await engine_cancel_spec_import_job(tenant_slug, job_id)
+    return Response(status_code=204)
 
 
 @router.post(
