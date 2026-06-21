@@ -1,30 +1,29 @@
-# objectified-db: runs schema-evolution-manager (sem) to apply migrations
-FROM ruby:3.2-slim
+# objectified-db: TypeScript CLI (migrate + admin commands)
+FROM node:20-bookworm-slim AS build
 
-# Install git (for clone), postgresql-client (for psql used by sem-apply), and ensure UTF-8
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    postgresql-client \
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# UTF-8 for sem-apply (see docs/UTF8_DATABASE_SETUP.md)
-ENV LANG=en_US.UTF-8 \
-    LC_ALL=en_US.UTF-8
-
-# Install schema-evolution-manager from GitHub
-ARG SEM_VERSION=0.9.57
-RUN git clone --depth 1 --branch "${SEM_VERSION}" \
-    https://github.com/mbryzek/schema-evolution-manager.git /tmp/schema-evolution-manager \
-    && cd /tmp/schema-evolution-manager \
-    && ./install.sh /opt/sem \
-    && cd / \
-    && rm -rf /tmp/schema-evolution-manager
-
-ENV PATH="/opt/sem/bin:${PATH}"
-
-# Application scripts (sem-apply runs from this directory)
 WORKDIR /app
-COPY scripts/ /app/scripts/
 
-# Run sem-apply with URL from POSTGRES_* (database name defaults to objectified)
-ENTRYPOINT ["/bin/sh", "-c", "sem-apply --url \"postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB:-objectified}\""]
+COPY package.json tsconfig.json ./
+COPY src ./src
+
+RUN npm install && npm run build
+
+FROM node:20-bookworm-slim
+
+ENV LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    NODE_ENV=production
+
+WORKDIR /app
+
+COPY package.json ./
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
+COPY scripts ./scripts/
+
+# Default: apply pending migrations (override with users, tenants, ping, etc.)
+ENTRYPOINT ["node", "dist/cli.js"]
+CMD ["migrate"]

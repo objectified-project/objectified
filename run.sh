@@ -2,7 +2,7 @@
 #
 # Start script for the suite
 
-cd objectified-db ; sem-apply
+cd objectified-db ; objectified-db migrate
 cd ..
 yarn install
 yarn dev

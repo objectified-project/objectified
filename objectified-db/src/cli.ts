@@ -10,6 +10,7 @@
 import { Command } from "commander";
 
 import * as apikeys from "./commands/apikeys.js";
+import * as migrate from "./commands/migrate.js";
 import * as tenants from "./commands/tenants.js";
 import * as users from "./commands/users.js";
 import { type ConnectionOptions, describeConnection, withClient } from "./db.js";
@@ -99,6 +100,37 @@ program
       await client.query("SELECT 1");
       printRecord(modeOf(g), { status: "ok", target: describeConnection(connectionOf(g)) });
     });
+  });
+
+const migrateCmd = program
+  .command("migrate")
+  .description("Apply pending SQL migrations from scripts/ (SEM-compatible tracking)")
+  .option("--scripts-dir <path>", "Directory containing *.sql migrations (default: package scripts/)")
+  .option("--dry-run", "Print pending scripts without applying them", false)
+  .action(async (opts, cmd: Command) => {
+    const g = cmd.optsWithGlobals() as GlobalOpts;
+    await withClient(connectionOf(g), (client) =>
+      migrate.runMigrateApply(
+        client,
+        { scriptsDir: opts.scriptsDir, dryRun: Boolean(opts.dryRun) },
+        modeOf(g),
+      ),
+    );
+  });
+
+migrateCmd
+  .command("status")
+  .description("List applied and pending migration scripts")
+  .option("--scripts-dir <path>", "Directory containing *.sql migrations (default: package scripts/)")
+  .action(async (opts, cmd: Command) => {
+    const g = cmd.optsWithGlobals() as GlobalOpts;
+    await withClient(connectionOf(g), (client) =>
+      migrate.runMigrateStatus(
+        client,
+        { scriptsDir: opts.scriptsDir },
+        modeOf(g),
+      ),
+    );
   });
 
 // ───────────────────────────── users ─────────────────────────────

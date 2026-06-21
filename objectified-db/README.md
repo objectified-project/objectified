@@ -2,9 +2,10 @@
 
 Database migrations **and** the `objectified-db` admin CLI for the Objectified platform.
 
-- **Migrations** — SQL scripts in [`scripts/`](./scripts) applied by
-  [schema-evolution-manager](https://github.com/mbryzek/schema-evolution-manager) (see the
-  [`Dockerfile`](./Dockerfile) and [`docs/README.md`](./docs/README.md)).
+- **Migrations** — SQL scripts in [`scripts/`](./scripts) applied by the CLI
+  `objectified-db migrate` (compatible with
+  [schema-evolution-manager](https://github.com/mbryzek/schema-evolution-manager)
+  tracking in `schema_evolution_manager.scripts`). See the [`Dockerfile`](./Dockerfile).
 - **Admin CLI** — a direct-to-database tool for privileged operations (users, tenants,
   membership, API keys), documented below.
 
@@ -60,6 +61,9 @@ required for destructive operations when there is no TTY).
 ```
 objectified-db ping                         Verify the database connection
 
+migrate [--dry-run] [--scripts-dir <path>]  Apply pending SQL migrations
+migrate status [--scripts-dir <path>]       List applied / pending migrations
+
 users create   --name --email (--password | --password-stdin | --random-password)
                                             [--unverified] [--disabled]
 users list     [--all]
@@ -83,9 +87,29 @@ Soft-delete is the default for `delete`/`revoke` (`deleted_at` set, row disabled
 removes the row. References accept either a UUID id or the natural key (user email, tenant
 slug, API-key prefix).
 
+### Docker
+
+The image runs the compiled CLI. By default it applies migrations:
+
+```bash
+docker run --rm \
+  -e POSTGRES_HOST=db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=secret \
+  -e POSTGRES_DB=objectified \
+  objectified-db:latest
+
+# Other subcommands
+docker run --rm -e POSTGRES_HOST=db ... objectified-db:latest migrate status
+docker run --rm -e POSTGRES_HOST=db ... objectified-db:latest ping
+```
+
 ### Examples
 
 ```bash
+# Apply pending migrations
+objectified-db migrate
+objectified-db migrate status
+objectified-db migrate --dry-run
+
 # Create a user with a generated password (printed once)
 objectified-db users create --name "Ada Lovelace" --email ada@example.com --random-password
 
