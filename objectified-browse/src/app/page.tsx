@@ -3,19 +3,17 @@ import {
   getRecentlyPublishedVersions,
   getMostVersionedProjects,
   getNewestTenants,
-  getDirectoryStats,
 } from '../../lib/db/helper';
 import { HomeClient } from './HomeClient';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  const [tenants, recentVersions, popularProjects, newestTenants, stats] = await Promise.all([
+  const [tenants, recentVersions, popularProjects, newestTenants] = await Promise.all([
     getPublicTenants(),
     getRecentlyPublishedVersions(8),
     getMostVersionedProjects(8),
     getNewestTenants(8),
-    getDirectoryStats(),
   ]);
 
   return (
@@ -24,7 +22,6 @@ export default async function Home() {
       recentVersions={recentVersions}
       popularProjects={popularProjects}
       newestTenants={newestTenants}
-      stats={stats}
     />
   );
 }

@@ -5,8 +5,9 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useTheme, specThemes, SpecTheme, Theme } from './ThemeProvider';
+import { DirectoryStatPills, type DirectoryStats } from './DirectoryStatPills';
 
-export function Navbar() {
+export function Navbar({ stats }: { stats: DirectoryStats }) {
   const pathname = usePathname();
   const { theme, specTheme, setTheme, setSpecTheme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
@@ -29,9 +30,9 @@ export function Navbar() {
 
   return (
     <nav className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-950/85 dark:supports-[backdrop-filter]:bg-zinc-950/70">
-      <div className="mx-auto flex h-14 max-w-[1480px] items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-14 max-w-[1480px] items-center gap-3 px-4 sm:px-6 lg:gap-4 lg:px-8">
         {/* Left: Logo + Nav */}
-        <div className="flex items-center gap-8">
+        <div className="flex min-w-0 shrink-0 items-center gap-6 lg:gap-8">
           <Link href="/" className="flex items-center gap-2 shrink-0" aria-label="Objectified home">
             <div className="flex h-9 items-center justify-center relative">
               <Image
@@ -73,8 +74,10 @@ export function Navbar() {
           </div>
         </div>
 
+        <DirectoryStatPills stats={stats} className="hidden min-w-0 flex-1 lg:flex" />
+
         {/* Right: Search trigger + Tutorials + Login + Settings */}
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {/* Search trigger (cmd+k) */}
           <Link
             href="/search"
@@ -188,6 +191,9 @@ export function Navbar() {
             )}
           </div>
         </div>
+      </div>
+      <div className="border-t border-zinc-200/80 px-4 py-2 dark:border-zinc-800/80 lg:hidden">
+        <DirectoryStatPills stats={stats} />
       </div>
     </nav>
   );

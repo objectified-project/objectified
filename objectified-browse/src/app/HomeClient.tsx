@@ -39,18 +39,11 @@ interface PopularProject {
   latest_published_at?: string;
 }
 
-interface DirectoryStats {
-  tenant_count: number;
-  project_count: number;
-  version_count: number;
-}
-
 interface HomeClientProps {
   tenants: Tenant[];
   recentVersions: RecentVersion[];
   popularProjects: PopularProject[];
   newestTenants: Tenant[];
-  stats: DirectoryStats;
 }
 
 function relativeTime(iso?: string): string | undefined {
@@ -80,7 +73,6 @@ export function HomeClient({
   recentVersions,
   popularProjects,
   newestTenants,
-  stats,
 }: HomeClientProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -140,14 +132,6 @@ export function HomeClient({
                 Search
               </button>
             </form>
-
-            <div className="mx-auto mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-[13px] text-zinc-500 dark:text-zinc-400">
-              <Stat label="Organizations" value={stats.tenant_count} />
-              <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-700">&middot;</span>
-              <Stat label="Projects" value={stats.project_count} />
-              <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-700">&middot;</span>
-              <Stat label="Published versions" value={stats.version_count} />
-            </div>
           </div>
         </AppShell>
       </section>
@@ -322,16 +306,5 @@ export function HomeClient({
         </div>
       </AppShell>
     </>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <span className="inline-flex items-baseline gap-1.5">
-      <strong className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-        {value.toLocaleString()}
-      </strong>
-      <span>{label}</span>
-    </span>
   );
 }

@@ -2,15 +2,22 @@
 
 import { Navbar } from './Navbar';
 import { ThemeProvider } from './ThemeProvider';
+import type { DirectoryStats } from './DirectoryStatPills';
 
-export function ClientLayout({ children }: { children: React.ReactNode }) {
+export function ClientLayout({
+  children,
+  stats,
+}: {
+  children: React.ReactNode;
+  stats: DirectoryStats;
+}) {
   return (
     <ThemeProvider>
       <a href="#main" className="skip-link">
         Skip to content
       </a>
       <div className="flex min-h-screen flex-col bg-[var(--background)] text-[var(--foreground)]">
-        <Navbar />
+        <Navbar stats={stats} />
         <main id="main" className="flex-1">
           {children}
         </main>
