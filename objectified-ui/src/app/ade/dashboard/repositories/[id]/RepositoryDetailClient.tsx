@@ -37,10 +37,12 @@ import {
   type DashboardRepository,
   type RepositoryStatus,
   RepositoryKpiCard,
+  REPOSITORY_STATUS_POLL_MS,
   dashboardRepositoryFromApi,
   estimatedImportableMixForRepo,
   formatLastScan,
   repoInitials,
+  repositoryStatusNeedsPolling,
 } from '@/app/components/ade/dashboard/repositories/repositoryStoreUi';
 import { RepositoryFilesBrowser } from '@/app/components/ade/dashboard/repositories/RepositoryFilesBrowser';
 
@@ -323,15 +325,15 @@ export function RepositoryDetailClient() {
     return () => window.removeEventListener('focus', onFocus);
   }, [repo, id, tab, fetchImports]);
 
-  const scanning = repo?.status === 'scanning';
+  const awaitingReady = repositoryStatusNeedsPolling(repo?.status);
 
   useEffect(() => {
-    if (!currentTenantId || !id || !scanning) return;
+    if (!currentTenantId || !id || !awaitingReady) return;
     const timer = window.setInterval(() => {
       void load({ silent: true });
-    }, 5_000);
+    }, REPOSITORY_STATUS_POLL_MS);
     return () => window.clearInterval(timer);
-  }, [currentTenantId, id, scanning, load]);
+  }, [currentTenantId, id, awaitingReady, load]);
 
   const performRemoveRepository = async () => {
     if (!id) return;

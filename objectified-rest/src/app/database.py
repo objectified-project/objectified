@@ -760,16 +760,19 @@ class Database:
         return None
 
     def count_tenants_for_user(self, user_id: str) -> int:
-        """Count enabled, non-deleted tenants the user belongs to."""
+        """Count enabled, non-deleted tenants the user belongs to (member or administrator)."""
         query = """
-            SELECT COUNT(*)::int AS c
+            SELECT COUNT(DISTINCT t.id)::int AS c
             FROM odb.tenants t
-            INNER JOIN odb.tenant_users tu ON tu.tenant_id = t.id
-            WHERE tu.user_id = %s
-              AND t.deleted_at IS NULL
+            INNER JOIN (
+                SELECT tenant_id FROM odb.tenant_users WHERE user_id = %s::uuid
+                UNION
+                SELECT tenant_id FROM odb.tenant_administrators WHERE user_id = %s::uuid
+            ) access ON access.tenant_id = t.id
+            WHERE t.deleted_at IS NULL
               AND t.enabled IS TRUE
         """
-        rows = self.execute_query(query, (user_id,))
+        rows = self.execute_query(query, (user_id, user_id))
         if not rows:
             return 0
         c = rows[0].get("c")
@@ -786,14 +789,18 @@ class Database:
             SELECT t.id::text AS id, t.slug, t.name,
                    CASE WHEN ta.user_id IS NOT NULL THEN 'admin' ELSE 'member' END AS role
             FROM odb.tenants t
-            INNER JOIN odb.tenant_users tu ON tu.tenant_id = t.id AND tu.user_id = %s
+            INNER JOIN (
+                SELECT tenant_id, user_id FROM odb.tenant_users WHERE user_id = %s::uuid
+                UNION
+                SELECT tenant_id, user_id FROM odb.tenant_administrators WHERE user_id = %s::uuid
+            ) access ON access.tenant_id = t.id AND access.user_id = %s::uuid
             LEFT JOIN odb.tenant_administrators ta
-              ON ta.tenant_id = t.id AND ta.user_id = tu.user_id
+              ON ta.tenant_id = t.id AND ta.user_id = access.user_id
             WHERE t.deleted_at IS NULL AND t.enabled IS TRUE
             ORDER BY t.slug ASC
             LIMIT %s OFFSET %s
         """
-        return self.execute_query(query, (user_id, limit, offset))
+        return self.execute_query(query, (user_id, user_id, user_id, limit, offset))
 
     def get_tenant_row_by_slug(self, slug: str) -> Optional[Dict[str, Any]]:
         """Return tenant id/slug/name/created_at if slug exists and is active."""
@@ -2517,9 +2524,43 @@ class Database:
         """True if user is a tenant administrator."""
         q = """
             SELECT 1 FROM odb.tenant_administrators
-            WHERE tenant_id = %s AND user_id = %s LIMIT 1
+            WHERE tenant_id = %s::uuid AND user_id = %s::uuid LIMIT 1
         """
         return bool(self.execute_query(q, (tenant_id, user_id)))
+
+    def get_active_tenant_auth_row(self, tenant_slug: str) -> Optional[Dict[str, Any]]:
+        """Resolve a non-deleted tenant slug to id/slug/name for auth checks."""
+        query = """
+            SELECT id::text AS tenant_id, slug AS tenant_slug, name AS tenant_name
+            FROM odb.tenants
+            WHERE slug = %s AND deleted_at IS NULL
+            LIMIT 1
+        """
+        rows = self.execute_query(query, (tenant_slug,))
+        return rows[0] if rows else None
+
+    def user_has_tenant_access(self, user_id: str, tenant_id: str) -> bool:
+        """
+        True when the user is a tenant member or tenant administrator.
+
+        Administrators must be able to call tenant-scoped REST routes even if a legacy
+        row is missing from ``tenant_users`` (UI treats ``tenant_administrators`` as authoritative).
+        """
+        member_q = """
+            SELECT 1
+            FROM odb.tenant_users
+            WHERE user_id = %s::uuid AND tenant_id = %s::uuid
+            LIMIT 1
+        """
+        if self.execute_query(member_q, (user_id, tenant_id)):
+            return True
+        admin_q = """
+            SELECT 1
+            FROM odb.tenant_administrators
+            WHERE user_id = %s::uuid AND tenant_id = %s::uuid
+            LIMIT 1
+        """
+        return bool(self.execute_query(admin_q, (user_id, tenant_id)))
 
     def insert_version_protection_audit(
         self,

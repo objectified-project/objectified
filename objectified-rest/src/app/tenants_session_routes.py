@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
-from .auth import validate_session_credentials
+from .auth import normalize_user_id, validate_session_credentials
 from .database import db
 from .models import TenantInfoResponse, TenantMembershipSchema, TenantsMeResponse
 
@@ -45,15 +45,10 @@ def _authorize_tenant_access_row(tenant_slug: str, session: Dict[str, Any]) -> D
         user_id = session.get("user_id")
         if not user_id:
             raise HTTPException(status_code=401, detail="Missing user identifier")
-        access = db.execute_query(
-            """
-            SELECT 1 FROM odb.tenant_users
-            WHERE user_id = %s AND tenant_id = %s
-            LIMIT 1
-            """,
-            (str(user_id), tenant_id),
-        )
-        if not access:
+        uid = normalize_user_id(user_id)
+        if not uid:
+            raise HTTPException(status_code=401, detail="Missing user identifier")
+        if not db.user_has_tenant_access(uid, tenant_id):
             raise HTTPException(
                 status_code=403,
                 detail=f"No access to tenant: {tenant_slug}",

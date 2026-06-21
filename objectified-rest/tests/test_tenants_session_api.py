@@ -62,7 +62,7 @@ def test_head_tenant_access_ok():
     }
     with patch("app.tenants_session_routes.db") as m:
         m.get_tenant_row_by_slug.return_value = tenant_row
-        m.execute_query.return_value = [{"?column?": 1}]
+        m.user_has_tenant_access.return_value = True
         r = client.head("/v1/tenants/acme")
     assert r.status_code == 200
     assert (r.text or "") == ""
@@ -79,7 +79,7 @@ def test_head_tenant_access_forbidden():
     tenant_row = {"id": _TENANT_ID, "slug": "other", "name": "Other", "created_at": None}
     with patch("app.tenants_session_routes.db") as m:
         m.get_tenant_row_by_slug.return_value = tenant_row
-        m.execute_query.return_value = []
+        m.user_has_tenant_access.return_value = False
         r = client.head("/v1/tenants/other")
     assert r.status_code == 403
 
@@ -99,7 +99,7 @@ def test_get_tenant_info_ok():
     }
     with patch("app.tenants_session_routes.db") as m:
         m.get_tenant_row_by_slug.return_value = tenant_row
-        m.execute_query.return_value = [{"?column?": 1}]
+        m.user_has_tenant_access.return_value = True
         m.get_tenant_usage_stats.return_value = stats
         r = client.get("/v1/tenants/acme")
     assert r.status_code == 200
@@ -113,7 +113,7 @@ def test_get_tenant_info_forbidden():
     tenant_row = {"id": _TENANT_ID, "slug": "other", "name": "Other", "created_at": None}
     with patch("app.tenants_session_routes.db") as m:
         m.get_tenant_row_by_slug.return_value = tenant_row
-        m.execute_query.return_value = []
+        m.user_has_tenant_access.return_value = False
         r = client.get("/v1/tenants/other")
     assert r.status_code == 403
 

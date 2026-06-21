@@ -11,6 +11,13 @@ import { RepositoryRowMenu } from './RepositoryRowMenu';
 export type RepositoryProvider = 'github' | 'gitlab' | 'bitbucket' | 'public_url';
 export type RepositoryStatus = 'pending' | 'scanning' | 'ready' | 'error' | 'archived';
 
+/** Refresh repository list/detail while registration or scan is still in progress. */
+export const REPOSITORY_STATUS_POLL_MS = 2_000;
+
+export function repositoryStatusNeedsPolling(status: RepositoryStatus | undefined): boolean {
+  return status === 'pending' || status === 'scanning';
+}
+
 /** One finished (or failed) scan line when `GET …/repositories/{id}` exposes `recent_scans`. */
 export type RecentRepositoryScanRow = {
   branch: string;

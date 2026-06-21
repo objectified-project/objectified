@@ -160,7 +160,16 @@ export async function getRecentActivity(userId: string, limit: number = 10) {
 
 export async function getTenantsForUser(userId: string) {
   const result = await connectionPool.query(
-    'SELECT a.* FROM odb.tenants a, odb.tenant_users b WHERE b.user_id = $1 AND a.id = b.tenant_id', [userId]);
+    `SELECT DISTINCT a.*
+     FROM odb.tenants a
+     INNER JOIN (
+       SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1
+       UNION
+       SELECT tenant_id FROM odb.tenant_administrators WHERE user_id = $1
+     ) access ON access.tenant_id = a.id
+     WHERE a.deleted_at IS NULL`,
+    [userId]
+  );
   return JSON.stringify(result.rows);
 }
 
@@ -174,9 +183,12 @@ export async function getTenantById(tenantId: string) {
 
 export async function getTenantsAdministratedByUser(userId: string) {
   const result = await connectionPool.query(
-    `SELECT a.id, a.tenant_id, a.user_id, b.name, b.email FROM odb.tenant_administrators a, odb.users b 
-     WHERE b.id = a.user_id AND a.tenant_id IN (SELECT tenant_id FROM odb.tenant_administrators WHERE user_id = $1)`,
-    [userId]);
+    `SELECT ta.id, ta.tenant_id, ta.user_id, u.name, u.email
+     FROM odb.tenant_administrators ta
+     INNER JOIN odb.users u ON u.id = ta.user_id
+     WHERE ta.user_id = $1`,
+    [userId]
+  );
   return JSON.stringify(result.rows);
 }
 

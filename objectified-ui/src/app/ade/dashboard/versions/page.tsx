@@ -598,8 +598,10 @@ const Versions = () => {
         if (isAdmin) { if (!cancelled) setEffectiveIsAdmin(true); return; }
         if (!currentUserId || !currentTenantId) { if (!cancelled) setEffectiveIsAdmin(false); return; }
         const res = await getTenantsAdministratedByUser(currentUserId);
-        const rows = JSON.parse(res) as Array<{ tenant_id: string }>;
-        const isAdminForTenant = rows.some(r => r.tenant_id === currentTenantId);
+        const rows = JSON.parse(res) as Array<{ tenant_id: string; user_id: string }>;
+        const isAdminForTenant = rows.some(
+          (r) => r.tenant_id === currentTenantId && r.user_id === currentUserId
+        );
         if (!cancelled) setEffectiveIsAdmin(isAdminForTenant);
       } catch { if (!cancelled) setEffectiveIsAdmin(false); }
     };
@@ -3267,7 +3269,14 @@ const Versions = () => {
                 <tr key={version.id} className={dashboardTrHoverClass}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <div className="text-sm font-bold text-gray-900 dark:text-white font-mono">v{version.version_id}</div>
+                      <button
+                        type="button"
+                        onClick={() => void handleRowAction('view', version)}
+                        className="text-sm font-bold font-mono text-indigo-600 hover:text-indigo-800 hover:underline dark:text-indigo-400 dark:hover:text-indigo-300"
+                        title="View spec"
+                      >
+                        v{version.version_id}
+                      </button>
                       {revisionLifecycleBadge(version.lifecycle)}
                       {version.published && <div title="Published" className="p-1 bg-blue-100 dark:bg-blue-900/30 rounded"><Lock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /></div>}
                       {version.revisionLocked && (

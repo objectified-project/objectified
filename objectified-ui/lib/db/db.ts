@@ -1,5 +1,12 @@
 const { Pool } = require('pg');
 
+if (!process.env.DATABASE_URL && process.env.NODE_ENV !== 'production') {
+  console.warn(
+    '[objectified-ui/db] DATABASE_URL is not set; using libpq/POSTGRES_* defaults. ' +
+      'Set DATABASE_URL to the same value as objectified-rest/.env so tenant membership matches the REST API.'
+  );
+}
+
 const connectionPool = new Pool({
   connectionString: process.env.DATABASE_URL || '',
   user: process.env.POSTGRES_USER,

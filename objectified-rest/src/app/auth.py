@@ -5,6 +5,7 @@ Supports both JWT tokens (from NextAuth) and API keys for authentication.
 """
 
 import logging
+import uuid
 import jwt
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, Header
@@ -59,9 +60,22 @@ def decode_jwt(token: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def normalize_user_id(value: Any) -> Optional[str]:
+    """Return canonical UUID string for DB lookups, or None when invalid."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return str(uuid.UUID(text))
+    except ValueError:
+        return None
+
+
 def get_user_tenants(user_id: str) -> list[Dict[str, Any]]:
     """
-    Get all tenants that a user belongs to.
+    Get all tenants that a user belongs to (member or administrator).
 
     Args:
         user_id: The user's ID
@@ -69,61 +83,56 @@ def get_user_tenants(user_id: str) -> list[Dict[str, Any]]:
     Returns:
         List of tenant dictionaries with id, slug, and name
     """
+    uid = normalize_user_id(user_id)
+    if not uid:
+        return []
     query = """
-        SELECT t.id, t.slug, t.name
+        SELECT DISTINCT t.id, t.slug, t.name
         FROM odb.tenants t
-        JOIN odb.tenant_users tu ON t.id = tu.tenant_id
-        WHERE tu.user_id = %s AND t.deleted_at IS NULL
+        INNER JOIN (
+            SELECT tenant_id FROM odb.tenant_users WHERE user_id = %s::uuid
+            UNION
+            SELECT tenant_id FROM odb.tenant_administrators WHERE user_id = %s::uuid
+        ) access ON access.tenant_id = t.id
+        WHERE t.deleted_at IS NULL
+        ORDER BY t.slug ASC
     """
-    return db.execute_query(query, (user_id,))
+    return db.execute_query(query, (uid, uid))
 
 
 def validate_user_tenant_access(user_id: str, tenant_slug: str) -> Optional[Dict[str, Any]]:
     """
     Validate that a user has access to a specific tenant.
 
-    Logic:
-    1. Look up the tenant by slug to get the tenant_id
-    2. Check if user_id + tenant_id exists in odb.tenant_users
-    3. Return tenant info if access is valid, None otherwise
+    Access is granted for ``tenant_users`` membership or ``tenant_administrators`` role.
 
     Args:
         user_id: The user's ID from JWT
         tenant_slug: The tenant slug from the URL
 
     Returns:
-        Tenant information if user has access, None otherwise
+        Tenant information if user has access, None if tenant missing or access denied
     """
-    # First, get the tenant_id from the slug
-    tenant_query = """
-        SELECT id as tenant_id, slug as tenant_slug, name as tenant_name
-        FROM odb.tenants
-        WHERE slug = %s AND deleted_at IS NULL
-        LIMIT 1
-    """
-    tenant_results = db.execute_query(tenant_query, (tenant_slug,))
-
-    if not tenant_results:
-        logger.warning(f"Tenant not found: {tenant_slug}")
+    uid = normalize_user_id(user_id)
+    if not uid:
+        logger.warning("validate_user_tenant_access: invalid user_id=%r", user_id)
         return None
 
-    tenant = tenant_results[0]
-    tenant_id = tenant['tenant_id']
-
-    # Now check if user has access to this tenant via tenant_users
-    access_query = """
-        SELECT 1
-        FROM odb.tenant_users
-        WHERE user_id = %s AND tenant_id = %s
-        LIMIT 1
-    """
-    access_results = db.execute_query(access_query, (user_id, tenant_id))
-
-    if not access_results:
-        logger.warning(f"User {user_id} does not have access to tenant {tenant_id}")
+    tenant = db.get_active_tenant_auth_row(tenant_slug)
+    if not tenant:
+        logger.warning("Tenant not found: %s", tenant_slug)
         return None
 
-    logger.debug(f"validate_user_tenant_access called with user_id={user_id}, tenant_slug={tenant_slug} - Authorized")
+    tenant_id = tenant["tenant_id"]
+    if not db.user_has_tenant_access(uid, tenant_id):
+        logger.warning("User %s does not have access to tenant %s", uid, tenant_id)
+        return None
+
+    logger.debug(
+        "validate_user_tenant_access called with user_id=%s, tenant_slug=%s - Authorized",
+        uid,
+        tenant_slug,
+    )
     return tenant
 
 
@@ -165,7 +174,13 @@ def validate_authentication(
                     detail="Invalid JWT token: missing user identifier"
                 )
 
-            # Validate user has access to the tenant
+            tenant_row = db.get_active_tenant_auth_row(tenant_slug)
+            if not tenant_row:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Tenant not found: {tenant_slug}",
+                )
+
             tenant_data = validate_user_tenant_access(user_id, tenant_slug)
 
             if not tenant_data:
@@ -314,6 +329,8 @@ def resolve_optional_tenant_member_auth(
                 detail="Invalid JWT token: missing user identifier",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        if not db.get_active_tenant_auth_row(tenant_slug):
+            raise HTTPException(status_code=404, detail=f"Tenant not found: {tenant_slug}")
         tenant_data = validate_user_tenant_access(user_id, tenant_slug)
         if not tenant_data:
             raise HTTPException(

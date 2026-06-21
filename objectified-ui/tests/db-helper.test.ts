@@ -1189,7 +1189,7 @@ describe('Database Helper - Advanced Tenant Functions', () => {
     mockQuery.mockClear();
   });
 
-  test('getTenantsAdministratedByUser should return admin tenants', async () => {
+  test('getTenantsAdministratedByUser should return only the requested user admin rows', async () => {
     const { getTenantsAdministratedByUser } = await import('../lib/db/helper');
 
     mockQuery.mockResolvedValue({
@@ -1201,7 +1201,13 @@ describe('Database Helper - Advanced Tenant Functions', () => {
     const result = await getTenantsAdministratedByUser('user-1');
     const admins = JSON.parse(result);
 
-    expect(admins.length).toBeGreaterThanOrEqual(0);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE ta.user_id = $1'),
+      ['user-1']
+    );
+    expect(admins).toEqual([
+      { id: 'admin-1', tenant_id: 'tenant-1', user_id: 'user-1', name: 'Admin User', email: 'admin@example.com' }
+    ]);
   });
 });
 

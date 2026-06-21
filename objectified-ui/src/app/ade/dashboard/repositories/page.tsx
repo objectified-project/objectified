@@ -44,9 +44,11 @@ import {
   RepositoryIndexSnapshot,
   dashboardRepositoriesFromListPayload,
   formatLastScan,
+  REPOSITORY_STATUS_POLL_MS,
   repoInitials,
   repositoryStatusClass,
   repositoryStatusLabel,
+  repositoryStatusNeedsPolling,
 } from "@/app/components/ade/dashboard/repositories/repositoryStoreUi";
 import { RepositoryRowMenu } from "@/app/components/ade/dashboard/repositories/RepositoryRowMenu";
 
@@ -111,18 +113,18 @@ export default function RepositoriesPage() {
     void load();
   }, [load]);
 
-  const anyScanning = useMemo(
-    () => repos.some((r) => r.status === "scanning"),
+  const anyPendingOrScanning = useMemo(
+    () => repos.some((r) => repositoryStatusNeedsPolling(r.status)),
     [repos],
   );
 
   useEffect(() => {
-    if (!currentTenantId || !anyScanning) return;
+    if (!currentTenantId || !anyPendingOrScanning) return;
     const timer = window.setInterval(() => {
       void load({ silent: true });
-    }, 5_000);
+    }, REPOSITORY_STATUS_POLL_MS);
     return () => window.clearInterval(timer);
-  }, [currentTenantId, anyScanning, load]);
+  }, [currentTenantId, anyPendingOrScanning, load]);
 
   const filtered = useMemo(() => {
     let list = repos.slice();
