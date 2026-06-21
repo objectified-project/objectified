@@ -484,7 +484,18 @@ const Tenants = () => {
                   <tr key={tenant.id} className={`${dashboardTrHoverClass} ${tenant.id === currentTenantId ? 'bg-indigo-50/80 dark:bg-indigo-950/30' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        <div className="text-sm font-semibold text-gray-900 dark:text-white">{tenant.name}</div>
+                        {tenant.id !== currentTenantId ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSelectTenant(tenant)}
+                            className="text-sm font-semibold text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-left cursor-pointer"
+                            title="Select tenant"
+                          >
+                            {tenant.name}
+                          </button>
+                        ) : (
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white">{tenant.name}</div>
+                        )}
                         {tenant.id === currentTenantId && (
                           <span className="inline-flex px-2.5 py-1 text-xs font-bold rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 text-white shadow-sm">Current</span>
                         )}
