@@ -126,6 +126,7 @@ import {
   dashboardTrHoverClass,
 } from '@/app/components/ade/dashboard/dashboardScreenClasses';
 import { FEATURE_GITLIKE } from '@lib/feature-flags';
+import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import {
   sortVersionsDashboardRows,
   type VersionsDashboardSortColumn,
@@ -134,6 +135,35 @@ import {
 
 /** Radix Select cannot use empty string as a value; maps to no successor in metadata. */
 const SUCCESSOR_SELECT_NONE = '__none__';
+
+const SPEC_JSON_YAML_TOGGLE_ITEM_CLASS =
+  'px-3 py-2 text-xs font-semibold rounded-md transition-all duration-200 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-400 hover:text-gray-900 dark:hover:text-white';
+
+function SpecJsonYamlToggle({
+  value,
+  onChange,
+}: {
+  value: 'json' | 'yaml';
+  onChange: (format: 'json' | 'yaml') => void;
+}) {
+  return (
+    <ToggleGroup.Root
+      type="single"
+      value={value}
+      onValueChange={(next) => {
+        if (next) onChange(next as 'json' | 'yaml');
+      }}
+      className="inline-flex shrink-0 items-center rounded-lg bg-gray-100 p-1 dark:bg-gray-700/50"
+    >
+      <ToggleGroup.Item value="json" className={SPEC_JSON_YAML_TOGGLE_ITEM_CLASS}>
+        JSON
+      </ToggleGroup.Item>
+      <ToggleGroup.Item value="yaml" className={SPEC_JSON_YAML_TOGGLE_ITEM_CLASS}>
+        YAML
+      </ToggleGroup.Item>
+    </ToggleGroup.Root>
+  );
+}
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -4127,17 +4157,18 @@ const Versions = () => {
       {/* OpenAPI Viewer Dialog */}
       <Dialog open={showOpenApiDialog} onOpenChange={setShowOpenApiDialog}>
         <DialogContent className="max-w-4xl max-h-[80vh]" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <div>
-                <div>OpenAPI 3.1.0 Specification</div>
-                {viewingVersion && <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-normal">{projects.find(p => p.id === viewingVersion.project_id)?.name} - v{viewingVersion.version_id}</div>}
+          <DialogHeader className="space-y-0">
+            <div className="flex items-start justify-between gap-4 pr-8">
+              <div className="min-w-0">
+                <DialogTitle>OpenAPI 3.1.0 Specification</DialogTitle>
+                {viewingVersion && (
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {projects.find(p => p.id === viewingVersion.project_id)?.name} - v{viewingVersion.version_id}
+                  </p>
+                )}
               </div>
-              <div className="flex gap-1 border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
-                <button onClick={() => setOpenApiFormat('json')} className={`px-3 py-1 text-xs font-medium ${openApiFormat === 'json' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>JSON</button>
-                <button onClick={() => setOpenApiFormat('yaml')} className={`px-3 py-1 text-xs font-medium border-l border-gray-300 dark:border-gray-600 ${openApiFormat === 'yaml' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>YAML</button>
-              </div>
-            </DialogTitle>
+              <SpecJsonYamlToggle value={openApiFormat} onChange={setOpenApiFormat} />
+            </div>
           </DialogHeader>
           <div className="h-[60vh]">
             {isLoadingSpec ? (
@@ -4182,10 +4213,7 @@ const Versions = () => {
                     <button onClick={() => setDiffViewMode('overlay')} className={`px-2 py-1 text-xs ${diffViewMode === 'overlay' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>Overlay</button>
                     <button onClick={() => setDiffViewMode('side-by-side')} className={`px-2 py-1 text-xs border-l border-gray-300 dark:border-gray-600 ${diffViewMode === 'side-by-side' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>Side-by-Side</button>
                   </div>
-                  <div className="flex border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
-                    <button onClick={() => handleCompareFormatChange('json')} className={`px-2 py-1 text-xs ${compareFormat === 'json' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>JSON</button>
-                    <button onClick={() => handleCompareFormatChange('yaml')} className={`px-2 py-1 text-xs border-l border-gray-300 dark:border-gray-600 ${compareFormat === 'yaml' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>YAML</button>
-                  </div>
+                  <SpecJsonYamlToggle value={compareFormat} onChange={handleCompareFormatChange} />
                 </div>
               )}
               {diffResult.length > 0 && activeCompareTab === 'canvas' && (
