@@ -44,13 +44,22 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy necessary files from builder
-COPY --from=builder /app/public ./public
+# Copy standalone output, then place static assets and public files next to server.js
 COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/.next/static /tmp/_next_static
+COPY --from=builder /app/public /tmp/public
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+
+RUN SERVER="$(find /app -maxdepth 3 -name server.js ! -path '*/node_modules/*' | head -1)" && \
+    APP_DIR="$(dirname "$SERVER")" && \
+    mkdir -p "$APP_DIR/.next" && \
+    cp -r /tmp/_next_static "$APP_DIR/.next/static" && \
+    cp -r /tmp/public "$APP_DIR/public" && \
+    rm -rf /tmp/_next_static /tmp/public && \
+    chmod +x /docker-entrypoint.sh
 
 # Set ownership to non-root user
-RUN chown -R nextjs:nodejs /app
+RUN chown -R nextjs:nodejs /app /docker-entrypoint.sh
 
 # Switch to non-root user
 USER nextjs
@@ -62,6 +71,6 @@ EXPOSE 3000
 ENV HOSTNAME="0.0.0.0"
 ENV PORT=3000
 
-# Start the application (standalone uses server.js)
-CMD ["node", "server.js"]
+# Start the application from the standalone package directory
+ENTRYPOINT ["/docker-entrypoint.sh"]
 
