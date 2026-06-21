@@ -1,0 +1,11 @@
+node_modules
+dist
+src
+test
+*.ts
+*.tsbuildinfo
+package.json
+tsconfig.json
+vitest.config.ts
+README.md
+docs

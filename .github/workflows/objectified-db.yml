@@ -5,14 +5,49 @@ on:
     branches: [ main ]
     paths:
       - 'objectified-db/**'
+      - '.github/workflows/objectified-db.yml'
+      - 'yarn.lock'
+      - 'package.json'
+  pull_request:
+    paths:
+      - 'objectified-db/**'
+      - '.github/workflows/objectified-db.yml'
+      - 'yarn.lock'
+      - 'package.json'
   workflow_dispatch:
 
 env:
   IMAGE_NAME: objectified-db
 
 jobs:
+  cli:
+    name: Build and test objectified-db CLI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack and set Yarn to 4.12.0
+        run: corepack enable && corepack prepare yarn@4.12.0 --activate
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build objectified-db CLI
+        run: yarn workspace objectified-db build
+
+      - name: Run objectified-db tests
+        run: yarn workspace objectified-db test
+
   build-and-push:
     name: Build and push objectified-db image
+    # Image build/push only on direct pushes to main (never on PRs).
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     env:
       DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}

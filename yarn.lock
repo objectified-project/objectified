@@ -8306,6 +8306,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"commander@npm:^13.0.0":
+  version: 13.1.0
+  resolution: "commander@npm:13.1.0"
+  checksum: 10c0/7b8c5544bba704fbe84b7cab2e043df8586d5c114a4c5b607f83ae5060708940ed0b5bd5838cf8ce27539cde265c1cbd59ce3c8c6b017ed3eec8943e3a415164
+  languageName: node
+  linkType: hard
+
 "commander@npm:^8.3.0":
   version: 8.3.0
   resolution: "commander@npm:8.3.0"
@@ -14314,6 +14321,24 @@ __metadata:
     yaml: "npm:^2.8.4"
   bin:
     objectified: ./bin/run.js
+  languageName: unknown
+  linkType: soft
+
+"objectified-db@workspace:objectified-db":
+  version: 0.0.0-use.local
+  resolution: "objectified-db@workspace:objectified-db"
+  dependencies:
+    "@types/bcrypt": "npm:^6.0.0"
+    "@types/node": "npm:^22.10.0"
+    "@types/pg": "npm:^8.20.0"
+    bcrypt: "npm:^6.0.0"
+    commander: "npm:^13.0.0"
+    pg: "npm:^8.20.0"
+    tsx: "npm:^4.21.0"
+    typescript: "npm:^5.9.3"
+    vitest: "npm:^3.2.4"
+  bin:
+    objectified-db: ./dist/cli.js
   languageName: unknown
   linkType: soft
 
