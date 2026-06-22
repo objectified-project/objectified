@@ -23,7 +23,7 @@ import { withRetry } from '../retry';
 import { permanentDeleteProject } from './helper';
 import { extractPaths, extractSecuritySchemes } from '../../src/app/utils/openapi-import';
 import { importOpenAPIPathsAndSecurity } from './import-openapi-paths-security';
-import { recordTenantRepositoryImport } from './repository-import-metrics';
+import { recordTenantRepositoryImport, upsertRepositoryImportSpec } from './repository-import-metrics';
 import { mergeOpenApiDocumentIntoCatalogTargets } from '../rest-spec-import-merge';
 
 export type ImportJobState = 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
@@ -115,6 +115,10 @@ export interface ImportJobInput {
     branch: string;
     path: string;
     blobSha?: string | null;
+    /** Explicit importer format override used for this file, when forced (source descriptor, RAR-1.3). */
+    formatOverride?: string | null;
+    /** MIME type used to read the file, when known (source descriptor, RAR-1.3). */
+    contentType?: string | null;
   };
 }
 
@@ -201,21 +205,41 @@ async function recordRepositoryImportMetricIfApplicable(job: JobState): Promise<
   const projectId = job.result?.projectId;
   const versionUuid = job.result?.versionId;
   if (!projectId || !versionUuid) return;
+  const repositorySource = {
+    repositoryId: src.repositoryId.trim(),
+    branch: src.branch,
+    path: src.path,
+    blobSha: src.blobSha ?? null,
+  };
   try {
     await recordTenantRepositoryImport({
       tenantId: job.input.tenantId,
-      repositorySource: {
-        repositoryId: src.repositoryId.trim(),
-        branch: src.branch,
-        path: src.path,
-        blobSha: src.blobSha ?? null,
-      },
+      repositorySource,
       projectId,
       versionUuid,
       importedByUserId: job.input.userId,
     });
   } catch (err) {
     console.error('[import-helper] recordTenantRepositoryImport failed:', err);
+  }
+  // Persist the exact import spec alongside the audit row (RAR-1.2) so a future
+  // auto-refresh replays the user's original options instead of importer
+  // defaults. Keyed on (repository_id, branch, path): re-importing the same file
+  // updates the row rather than duplicating it. Best-effort, like the audit row —
+  // a capture failure must not fail an otherwise-successful import.
+  try {
+    await upsertRepositoryImportSpec({
+      tenantId: job.input.tenantId,
+      repositorySource,
+      projectId,
+      sourceKind: job.input.sourceKind,
+      options: job.input.options as unknown as Record<string, unknown>,
+      formatOverride: src.formatOverride ?? null,
+      contentType: src.contentType ?? null,
+      createdByUserId: job.input.userId,
+    });
+  } catch (err) {
+    console.error('[import-helper] upsertRepositoryImportSpec failed:', err);
   }
 }
 

@@ -47,6 +47,84 @@ export async function recordTenantRepositoryImport(params: {
   return res.rowCount === 1;
 }
 
+/**
+ * Persist (insert or refresh) the import specification for a repository file so a
+ * later auto-refresh can replay the user's original request instead of importer
+ * defaults (RAR-1.2). Keyed on the imported-file lineage
+ * `(repository_id, branch, path)`: a repeat import of the same file updates the
+ * existing row in place rather than inserting a duplicate.
+ *
+ * The insert is guarded by a subquery so a row is written only when the
+ * repository belongs to the given tenant. `options` is the full SpecImportOptions
+ * payload and is stored verbatim in `options_json`.
+ *
+ * @returns true when a row was written (repository belonged to the tenant), false otherwise.
+ */
+export async function upsertRepositoryImportSpec(params: {
+  tenantId: string;
+  repositorySource: RepositoryImportSourceInput;
+  projectId: string;
+  sourceKind: string;
+  options: Record<string, unknown>;
+  formatOverride?: string | null;
+  contentType?: string | null;
+  specSchemaVersion?: number;
+  createdByUserId?: string | null;
+}): Promise<boolean> {
+  const {
+    tenantId,
+    repositorySource,
+    projectId,
+    sourceKind,
+    options,
+    formatOverride,
+    contentType,
+    specSchemaVersion,
+    createdByUserId,
+  } = params;
+  const repoId = repositorySource.repositoryId.trim();
+  if (!repoId) return false;
+
+  const res = await connectionPool.query(
+    `INSERT INTO odb.repository_import_spec (
+       tenant_id, repository_id, branch, path, project_id,
+       source_kind, format_override, content_type,
+       options_json, spec_schema_version, created_by
+     )
+     SELECT $1::uuid, $2::uuid, $3, $4, $5::uuid,
+            $6, $7, $8,
+            $9::jsonb, $10, $11::uuid
+     FROM odb.tenant_repositories tr
+     WHERE tr.id = $2::uuid AND tr.tenant_id = $1::uuid AND tr.deleted_at IS NULL
+     ON CONFLICT ON CONSTRAINT uq_repository_import_spec_repo_branch_path
+     DO UPDATE SET
+       tenant_id = EXCLUDED.tenant_id,
+       project_id = EXCLUDED.project_id,
+       source_kind = EXCLUDED.source_kind,
+       format_override = EXCLUDED.format_override,
+       content_type = EXCLUDED.content_type,
+       options_json = EXCLUDED.options_json,
+       spec_schema_version = EXCLUDED.spec_schema_version,
+       created_by = EXCLUDED.created_by,
+       updated_at = CURRENT_TIMESTAMP
+     RETURNING id`,
+    [
+      tenantId,
+      repoId,
+      repositorySource.branch,
+      repositorySource.path,
+      projectId,
+      sourceKind,
+      formatOverride ?? null,
+      contentType ?? null,
+      JSON.stringify(options ?? {}),
+      specSchemaVersion ?? 1,
+      createdByUserId ?? null,
+    ]
+  );
+  return res.rowCount === 1;
+}
+
 export type TenantRepositoryImportRow = {
   id: string;
   path: string;
