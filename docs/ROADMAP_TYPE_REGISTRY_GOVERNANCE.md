@@ -235,7 +235,7 @@ erDiagram
 | 1.1 #3446 | Consolidate registry into `objectified-db` (remove separate DB) | Rip out the `objectified-types-db` provisioning shipped earlier; registry lives in `odb` | `type-registry`,`types-db`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-db, objectified-rest |
 | 1.2 #3447 | Extend `odb.primitives` (namespace, `$id`, `$ref`, draft 2020-12) | Migration adding namespace/`base_uri`/`schema_id`/`draft`/`source`/`refs` columns to `odb.primitives` | `type-registry`,`types-db`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-db |
 | 1.3 #3448 | ~~Import provenance & property binding~~ **DONE** | `odb.primitive_imports` provenance table + `report` JSON; `class_properties.primitive_id`/`primitive_ref` binding read by the Designer | `type-registry`,`types-db`,`import`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-db |
-| 1.4 #3449 | Seed core system primitives (`std/v0`) | Seed primitives + std types (date, uuid, money, …) as system-wide `is_system` rows | `type-registry`,`registry`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-db, objectified-rest |
+| 1.4 #3449 | ~~Seed core system primitives (`std/v0`)~~ **DONE** | Seed primitives + std types (date, uuid, money, …) as system-wide `is_system` rows | `type-registry`,`registry`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-db, objectified-rest |
 
 ### Issue 1.1 — Consolidate registry into `objectified-db` (remove separate DB)
 - **Problem.** An earlier iteration provisioned a **separate** `objectified-types-db` database
@@ -292,7 +292,17 @@ erDiagram
 - **Parallelism/Dependencies.** Depends on 1.2; parallel with 1.4.
 - **Technical Stack.** PostgreSQL, JSONB; ordinary same-database foreign keys.
 
-### Issue 1.4 — Seed core system primitives (`std/v0`)
+### Issue 1.4 — Seed core system primitives (`std/v0`) ✅ DONE (#3449)
+- **Delivered.** Migration `objectified-db/scripts/20260622-240000.sql` seeds the `std/v0/primitives`
+  (string, number, integer, boolean, null, array, object) and `std/v0/types` (date, date-time,
+  time, uuid, email, uri, decimal, currency-code, money) namespaces as system-wide
+  `is_system`/`is_public` rows in `odb.primitives`, with the #3447 registry columns populated
+  (`namespace`, `base_uri`, `schema_id` = `$id`, `draft` = 2020-12, `source` = human) and relative
+  `$ref` chains recorded in `refs` (`date` → `../primitives/string` + `format: date`; `money` →
+  `./decimal`, `./currency-code`). Verified end-to-end against Postgres: 0 unresolved refs, `money`/
+  `date` match the canonical schemas, and re-running the seed is idempotent
+  (`ON CONFLICT (tenant_id, category, name) DO NOTHING`). DB-free structural tests in
+  `objectified-db/test/primitives-std-seed.test.ts`.
 - **Problem.** Tenants need a baseline of core types available to all.
 - **Solution/Scope.** Seed `std/v0/primitives` (string, number, integer, boolean, null, array,
   object) and `std/v0/types` (date, date-time, uuid, email, uri, decimal, currency-code, money,
