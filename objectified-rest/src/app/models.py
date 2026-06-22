@@ -2256,6 +2256,81 @@ class WorkflowAuditPageResponse(BaseModel):
     pagination: WorkflowAuditPaginationOut
 
 
+# ==================== Repository refresh history (RAR-5.3, #3534) ====================
+
+
+class RefreshHistoryEntryOut(BaseModel):
+    """One refresh-cycle audit row, projected from ``odb.workflow_audit`` (RAR-5.3).
+
+    Hoists the refresh-specific facets the cycle stored in the audit row's ``detail``
+    JSONB — trigger, file lineage, decision, outcome, and the version / change-report
+    links — to first-class fields so the refresh history is self-describing. The raw
+    ``detail`` is preserved for any extra context.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    repository_id: Optional[str] = Field(None, serialization_alias="repositoryId")
+    branch: Optional[str] = None
+    path: Optional[str] = None
+    trigger: Optional[str] = Field(
+        None, description="scheduled | manual | webhook"
+    )
+    decision: Optional[str] = Field(
+        None, description="RAR-2.2 freshness reason code, when known."
+    )
+    outcome: Optional[str] = Field(
+        None, description="new-version | unchanged | diverged | failed"
+    )
+    project_id: Optional[str] = Field(None, serialization_alias="projectId")
+    version_id: Optional[str] = Field(None, serialization_alias="versionId")
+    parent_version_id: Optional[str] = Field(
+        None, serialization_alias="parentVersionId"
+    )
+    change_report_id: Optional[str] = Field(
+        None,
+        serialization_alias="changeReportId",
+        description="Change report documenting the refresh diff (RAR-4.3), when any.",
+    )
+    source_commit_sha: Optional[str] = Field(
+        None, serialization_alias="sourceCommitSha"
+    )
+    actor_id: Optional[str] = Field(None, serialization_alias="actorId")
+    detail: Optional[Dict[str, Any]] = None
+    created_at: str = Field(serialization_alias="createdAt")
+
+
+class RefreshHistoryPaginationOut(BaseModel):
+    """Offset pagination metadata for the refresh-history list."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    limit: int
+    total: int
+    offset: int
+    has_more: bool = Field(serialization_alias="hasMore")
+    next_offset: Optional[int] = Field(
+        None,
+        serialization_alias="nextOffset",
+        description="Pass as offset for the next page when hasMore is true.",
+    )
+
+
+class RefreshHistoryPageResponse(BaseModel):
+    """Stable JSON envelope for GET .../repositories/{id}/refresh-history (RAR-5.3)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    schema_version: int = Field(
+        default=1,
+        serialization_alias="schemaVersion",
+        description="Bumped only when item or pagination shape changes incompatibly.",
+    )
+    items: List[RefreshHistoryEntryOut]
+    pagination: RefreshHistoryPaginationOut
+
+
 # ==================== OpenAPI semantic change report (CR-01, #2699) ====================
 
 
