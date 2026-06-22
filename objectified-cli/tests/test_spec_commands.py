@@ -108,14 +108,13 @@ def test_spec_export_writes_file(httpx_mock: object, tmp_path: Path) -> None:
 
 def test_spec_export_stdout_document_and_stderr_metadata(httpx_mock: object) -> None:
     """--output - writes document to stdout and human metadata to stderr."""
-    for _ in range(2):
-        httpx_mock.add_response(
-            url=f"http://localhost:8000/project-versions/{_VERSION_ID}",
-            json=_VERSION,
-        )
     httpx_mock.add_response(
-        url=f"http://localhost:8000/projects/{_PROJECT_ID}",
+        url=f"http://localhost:8000/v1/projects/acme-corp/{_PROJECT_ID}",
         json=_PROJECT,
+    )
+    httpx_mock.add_response(
+        url=f"http://localhost:8000/v1/versions/acme-corp/{_PROJECT_ID}/{_VERSION_ID}",
+        json=_VERSION,
     )
     _mock_browse_openapi_export(httpx_mock)
     result = runner.invoke(
@@ -165,10 +164,7 @@ def test_spec_export_allows_slug_scope_without_api_key(
     """Public browse export works without API key when tenant/project/version are slugs."""
     monkeypatch.delenv("OBJECTIFIED_API_KEY", raising=False)
     httpx_mock.add_response(
-        url=(
-            "http://localhost:8000/browse/tenants/acme-corp/projects/payments-api"
-            "/versions/1.0.0/spec?format=openapi"
-        ),
+        url="http://localhost:8000/v1/schema/acme-corp/payments-api/1.0.0",
         content=_OPENAPI_JSON,
         headers={"Content-Type": "application/json", "ETag": '"export-etag-1"'},
     )
@@ -222,7 +218,7 @@ def test_spec_export_json_metadata_on_stdout_when_output_is_file(
     payload = json.loads(result.stdout.strip())
     assert payload["etag"] == '"export-etag-1"'
     assert payload["format"] == "openapi"
-    assert payload["source_openapi_version"] == "3.1.0"
+    assert "source_openapi_version" not in payload
 
 
 def test_spec_export_json_metadata_on_stderr_when_output_is_stdout(httpx_mock: object) -> None:
@@ -256,8 +252,7 @@ def test_spec_export_yaml_query(httpx_mock: object, tmp_path: Path) -> None:
     yaml_body = b"openapi: 3.2.0\n"
     httpx_mock.add_response(
         url=(
-            "http://localhost:8000/browse/tenants/acme-corp/projects/payments-api"
-            "/versions/1.0.0/spec?format=arazzo&accept=yaml"
+            "http://localhost:8000/v1/arazzo/acme-corp/payments-api/1.0.0?accept=yaml"
         ),
         content=yaml_body,
         headers={"Content-Type": "application/yaml", "ETag": '"arazzo-etag"'},
@@ -289,10 +284,7 @@ def test_spec_export_maps_api_error_to_usage(httpx_mock: object, tmp_path: Path)
     """404 browse responses exit with usage code."""
     _mock_project_version_scope(httpx_mock)
     httpx_mock.add_response(
-        url=(
-            "http://localhost:8000/browse/tenants/acme-corp/projects/payments-api"
-            "/versions/1.0.0/spec?format=openapi"
-        ),
+        url="http://localhost:8000/v1/schema/acme-corp/payments-api/1.0.0",
         status_code=404,
         json={"message": "Not found", "code": 404},
     )

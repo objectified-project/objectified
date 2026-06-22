@@ -186,7 +186,7 @@ def test_resolve_import_result_async_extracts_result(
     httpx_mock.add_response(
         url=f"http://localhost:8000/v1/tenants/{_TENANT_SLUG}/imports/job-1",
         json={
-            "status": "completed",
+            "state": "completed",
             "job_id": "job-1",
             "result": {"project_id": "p", "errors": []},
         },

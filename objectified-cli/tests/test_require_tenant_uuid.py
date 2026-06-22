@@ -27,8 +27,23 @@ def test_require_tenant_uuid_exits_when_tenant_missing() -> None:
     assert exc_info.value.exit_code == EXIT_USAGE
 
 
-def test_require_tenant_uuid_returns_configured_uuid() -> None:
+def test_require_tenant_uuid_returns_configured_uuid(httpx_mock: object) -> None:
     tenant_uuid = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    # A configured UUID is resolved to a slug via GET /v1/tenants/me, then
+    # the tenant record is fetched to confirm the id.
+    httpx_mock.add_response(
+        url="http://localhost:8000/v1/tenants/me?offset=0&limit=200",
+        json={
+            "total": 1,
+            "offset": 0,
+            "limit": 200,
+            "items": [{"id": str(tenant_uuid), "slug": "acme", "name": "Acme"}],
+        },
+    )
+    httpx_mock.add_response(
+        url="http://localhost:8000/v1/tenants/acme",
+        json={"id": str(tenant_uuid), "slug": "acme", "name": "Acme"},
+    )
     resolved = require_tenant_uuid(
         _settings(api_key="obj_test", tenant_id=str(tenant_uuid)),
         _client(),

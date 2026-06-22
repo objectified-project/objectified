@@ -227,10 +227,6 @@ def test_paths_show_by_pathname(httpx_mock: object) -> None:
 def test_paths_show_json_mode(httpx_mock: object) -> None:
     """paths show --json returns path and operations payloads."""
     httpx_mock.add_response(
-        url=f"http://localhost:8000/v1/versions/acme-corp/{_PROJECT_ID}/{_VERSION_ID}",
-        json=_VERSION,
-    )
-    httpx_mock.add_response(
         url=f"http://localhost:8000/v1/paths/acme-corp/{_VERSION_ID}/{_PATH_ID}",
         json=_PATH,
     )
@@ -314,10 +310,6 @@ def test_operations_show_by_operation_id(httpx_mock: object) -> None:
 def test_operations_show_json_mode(httpx_mock: object) -> None:
     """operations show --json emits enriched operation detail."""
     httpx_mock.add_response(
-        url=f"http://localhost:8000/v1/versions/acme-corp/{_PROJECT_ID}/{_VERSION_ID}",
-        json=_VERSION,
-    )
-    httpx_mock.add_response(
         url=f"http://localhost:8000/v1/paths/acme-corp/{_VERSION_ID}",
         json={"total": 1, "offset": 0, "limit": 50, "items": [_PATH]},
     )
@@ -392,7 +384,7 @@ def test_paths_list_missing_project_exits_usage(httpx_mock: object) -> None:
     )
 
     assert result.exit_code == EXIT_USAGE
-    assert "Project not found" in result.stderr
+    assert "404" in result.stderr
 
 
 def test_paths_list_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:

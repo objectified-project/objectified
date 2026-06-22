@@ -201,7 +201,9 @@ def test_rest_client_post_success(httpx_mock: object) -> None:
         json={"job_id": "abc123"},
     )
     client = RestClient(_settings())
-    response = client.post("/imports/openapi", json={"spec": "..."})
+    response = client.post(
+        "/v1/tenants/acme-corp/imports/upload", json={"spec": "..."}
+    )
     assert response.status_code == 202
     assert response.json()["job_id"] == "abc123"
 
@@ -215,7 +217,7 @@ def test_rest_client_post_sends_api_key_header(httpx_mock: object) -> None:
         match_headers={API_KEY_HEADER: "post-key"},
     )
     client = RestClient(_settings(api_key="post-key"))
-    response = client.post("/imports/openapi", json={})
+    response = client.post("/v1/tenants/acme-corp/imports/upload", json={})
     assert response.status_code == 200
 
 
@@ -242,7 +244,7 @@ def test_rest_client_post_exits_on_4xx(httpx_mock: object) -> None:
     )
     client = RestClient(_settings())
     with pytest.raises(typer.Exit):
-        client.post("/imports/openapi", json={})
+        client.post("/v1/tenants/acme-corp/imports/upload", json={})
 
 
 def test_rest_client_post_exits_on_connection_error(httpx_mock: object) -> None:
@@ -250,7 +252,7 @@ def test_rest_client_post_exits_on_connection_error(httpx_mock: object) -> None:
     httpx_mock.add_exception(httpx.ConnectError("refused"))
     client = RestClient(_settings())
     with pytest.raises(typer.Exit):
-        client.post("/imports/openapi", json={})
+        client.post("/v1/tenants/acme-corp/imports/upload", json={})
 
 
 def test_rest_client_delete_success(httpx_mock: object) -> None:

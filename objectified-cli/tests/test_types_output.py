@@ -69,11 +69,6 @@ def test_types_show_by_uuid(httpx_mock: object) -> None:
 
 def test_types_show_not_found(httpx_mock: object) -> None:
     httpx_mock.add_response(
-        url="http://localhost:8000/v1/primitives/acme-corp/missing-type",
-        status_code=404,
-        json={"code": 404, "message": "not found"},
-    )
-    httpx_mock.add_response(
         url="http://localhost:8000/v1/primitives/acme-corp",
         json={"total": 0, "items": []},
     )

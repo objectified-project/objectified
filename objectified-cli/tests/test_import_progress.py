@@ -76,38 +76,40 @@ def test_import_progress_enabled_yields_status() -> None:
 
 
 def test_wait_for_import_job_returns_completed_payload(httpx_mock: object) -> None:
-    """Poll loop stops on completed status and returns the final JSON body."""
+    """Poll loop stops on completed state and returns the final JSON body."""
     httpx_mock.add_response(
         url="http://localhost:8000/v1/tenants/acme-corp/imports/job-1",
-        json={"status": "running", "job_id": "job-1"},
+        json={"state": "running", "job_id": "job-1"},
     )
     httpx_mock.add_response(
         url="http://localhost:8000/v1/tenants/acme-corp/imports/job-1",
-        json={"status": "completed", "job_id": "job-1", "project_id": "p1"},
+        json={"state": "completed", "job_id": "job-1", "project_id": "p1"},
     )
     client = RestClient(CliSettings(), timeout=30.0)
     result = wait_for_import_job(
         client,
+        "acme-corp",
         "job-1",
         poll_interval=0.01,
         timeout=5.0,
         no_progress=True,
         sleep=lambda _seconds: None,
     )
-    assert result["status"] == "completed"
+    assert result["state"] == "completed"
     assert result["project_id"] == "p1"
 
 
 def test_wait_for_import_job_failed_exits_error(httpx_mock: object) -> None:
-    """Failed terminal status prints to stderr and exits 1."""
+    """Failed terminal state prints to stderr and exits 1."""
     httpx_mock.add_response(
-        url="http://localhost:8000/imports/job-2",
-        json={"status": "failed", "message": "parse error"},
+        url="http://localhost:8000/v1/tenants/acme-corp/imports/job-2",
+        json={"state": "failed", "summary": {"message": "parse error"}},
     )
     client = RestClient(CliSettings(), timeout=30.0)
     with pytest.raises(typer.Exit) as exc_info:
         wait_for_import_job(
             client,
+            "acme-corp",
             "job-2",
             no_progress=True,
             sleep=lambda _seconds: None,
@@ -131,6 +133,7 @@ def test_wait_for_import_job_timeout_exits_error() -> None:
     with pytest.raises(typer.Exit) as exc_info:
         wait_for_import_job(
             client,
+            "acme-corp",
             "job-3",
             timeout=1.0,
             poll_interval=0.5,
@@ -147,8 +150,8 @@ def test_wait_for_import_job_enables_progress_unless_disabled(
 ) -> None:
     """Poll loop enables the stderr spinner unless --no-progress is set."""
     httpx_mock.add_response(
-        url="http://localhost:8000/imports/job-4",
-        json={"status": "completed"},
+        url="http://localhost:8000/v1/tenants/acme-corp/imports/job-4",
+        json={"state": "completed"},
     )
     client = RestClient(CliSettings(), timeout=30.0)
     with patch("objectified_cli.import_.jobs.import_progress") as mock_progress:
@@ -156,6 +159,7 @@ def test_wait_for_import_job_enables_progress_unless_disabled(
         mock_progress.return_value.__exit__.return_value = None
         wait_for_import_job(
             client,
+            "acme-corp",
             "job-4",
             no_progress=False,
             sleep=lambda _seconds: None,
@@ -163,14 +167,15 @@ def test_wait_for_import_job_enables_progress_unless_disabled(
         mock_progress.assert_called_once_with(enabled=True)
 
     httpx_mock.add_response(
-        url="http://localhost:8000/imports/job-5",
-        json={"status": "completed"},
+        url="http://localhost:8000/v1/tenants/acme-corp/imports/job-5",
+        json={"state": "completed"},
     )
     with patch("objectified_cli.import_.jobs.import_progress") as mock_progress:
         mock_progress.return_value.__enter__.return_value = None
         mock_progress.return_value.__exit__.return_value = None
         wait_for_import_job(
             client,
+            "acme-corp",
             "job-5",
             no_progress=True,
             sleep=lambda _seconds: None,

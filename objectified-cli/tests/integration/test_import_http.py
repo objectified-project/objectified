@@ -18,49 +18,58 @@ def test_import_openapi_sync_200_completes(
     httpx_mock: object,
     tmp_path: Path,
     runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
     write_openapi_spec: Callable[[Path], Path],
     import_result: dict,
+    job_id: str,
 ) -> None:
-    """POST /imports/openapi returning 200 completes without polling."""
+    """A 202 upload that polls straight to a completed job emits the ImportResult."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     spec_path = write_openapi_spec(tmp_path / "petstore.json")
     httpx_mock.add_response(
         url="http://localhost:8000/v1/tenants/acme-corp/imports/upload",
         method="POST",
-        status_code=200,
-        json=import_result,
+        status_code=202,
+        json={"job_id": job_id, "state": "pending"},
+    )
+    httpx_mock.add_response(
+        url=f"http://localhost:8000/v1/tenants/acme-corp/imports/{job_id}",
+        json={"state": "completed", "job_id": job_id, "result": import_result},
     )
 
-    result = runner.invoke(app, ["import", "openapi", str(spec_path)])
+    result = runner.invoke(app, ["--no-progress", "import", "openapi", str(spec_path)])
 
     assert result.exit_code == 0
     assert "Import completed." in result.stdout
     assert "Integration Pet Store" in result.stdout
-    assert len(httpx_mock.get_requests()) == 1
+    assert len(httpx_mock.get_requests()) == 2
 
 
 def test_import_openapi_async_202_polls_running_to_completed(
     httpx_mock: object,
     tmp_path: Path,
     runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
     write_openapi_spec: Callable[[Path], Path],
     import_result: dict,
     job_id: str,
 ) -> None:
-    """202 accept polls GET /imports/{job_id} through running until completed."""
+    """202 accept polls GET /v1/tenants/{slug}/imports/{job_id} through running until completed."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     spec_path = write_openapi_spec(tmp_path / "petstore.json")
     httpx_mock.add_response(
         url="http://localhost:8000/v1/tenants/acme-corp/imports/upload",
         method="POST",
         status_code=202,
-        json={"job_id": job_id, "status": "pending"},
+        json={"job_id": job_id, "state": "pending"},
     )
     httpx_mock.add_response(
-        url=f"http://localhost:8000/imports/{job_id}",
-        json={"status": "running", "job_id": job_id},
+        url=f"http://localhost:8000/v1/tenants/acme-corp/imports/{job_id}",
+        json={"state": "running", "job_id": job_id},
     )
     httpx_mock.add_response(
-        url=f"http://localhost:8000/imports/{job_id}",
-        json={"status": "completed", "job_id": job_id, "result": import_result},
+        url=f"http://localhost:8000/v1/tenants/acme-corp/imports/{job_id}",
+        json={"state": "completed", "job_id": job_id, "result": import_result},
     )
 
     result = runner.invoke(
@@ -79,9 +88,11 @@ def test_import_openapi_post_422_exits_usage(
     httpx_mock: object,
     tmp_path: Path,
     runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
     write_openapi_spec: Callable[[Path], Path],
 ) -> None:
     """422 validation on upload maps to EXIT_USAGE and prints field details."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     spec_path = write_openapi_spec(tmp_path / "petstore.json")
     httpx_mock.add_response(
         url="http://localhost:8000/v1/tenants/acme-corp/imports/upload",
@@ -115,24 +126,26 @@ def test_import_openapi_async_failed_job_exits_error(
     httpx_mock: object,
     tmp_path: Path,
     runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
     write_openapi_spec: Callable[[Path], Path],
     strip_ansi: Callable[[str], str],
     job_id: str,
 ) -> None:
-    """Terminal failed job status exits EXIT_ERROR without printing Import completed."""
+    """Terminal failed job state exits EXIT_ERROR without printing Import completed."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     spec_path = write_openapi_spec(tmp_path / "petstore.json")
     httpx_mock.add_response(
         url="http://localhost:8000/v1/tenants/acme-corp/imports/upload",
         method="POST",
         status_code=202,
-        json={"job_id": job_id, "status": "pending"},
+        json={"job_id": job_id, "state": "pending"},
     )
     httpx_mock.add_response(
-        url=f"http://localhost:8000/imports/{job_id}",
+        url=f"http://localhost:8000/v1/tenants/acme-corp/imports/{job_id}",
         json={
-            "status": "failed",
+            "state": "failed",
             "job_id": job_id,
-            "message": "OpenAPI parse error at paths./pets",
+            "summary": {"message": "OpenAPI parse error at paths./pets"},
         },
     )
 
@@ -150,22 +163,24 @@ def test_import_openapi_async_timeout_exits_error(
     httpx_mock: object,
     tmp_path: Path,
     runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
     write_openapi_spec: Callable[[Path], Path],
     strip_ansi: Callable[[str], str],
     job_id: str,
 ) -> None:
     """Poll loop timeout exits EXIT_ERROR when the job never completes."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     spec_path = write_openapi_spec(tmp_path / "petstore.json")
     httpx_mock.add_response(
         url="http://localhost:8000/v1/tenants/acme-corp/imports/upload",
         method="POST",
         status_code=202,
-        json={"job_id": job_id, "status": "pending"},
+        json={"job_id": job_id, "state": "pending"},
     )
     httpx_mock.add_response(
-        url=f"http://localhost:8000/imports/{job_id}",
+        url=f"http://localhost:8000/v1/tenants/acme-corp/imports/{job_id}",
         method="GET",
-        json={"status": "running", "job_id": job_id},
+        json={"state": "running", "job_id": job_id},
     )
 
     result = runner.invoke(
@@ -181,16 +196,18 @@ def test_import_openapi_no_wait_skips_poll(
     httpx_mock: object,
     tmp_path: Path,
     runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
     write_openapi_spec: Callable[[Path], Path],
     job_id: str,
 ) -> None:
-    """--no-wait returns the 202 accept body without GET /imports/{job_id}."""
+    """--no-wait returns the 202 accept body without polling the job endpoint."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     spec_path = write_openapi_spec(tmp_path / "petstore.json")
     httpx_mock.add_response(
         url="http://localhost:8000/v1/tenants/acme-corp/imports/upload",
         method="POST",
         status_code=202,
-        json={"job_id": job_id, "status": "pending"},
+        json={"job_id": job_id, "state": "pending"},
     )
 
     result = runner.invoke(
