@@ -537,6 +537,52 @@ def repository_import_spec_read_from_row(
     )
 
 
+# Synthetic ``source_kind`` the REST layer stamps on a repository auto-refresh
+# import (REPO-12.1). It is not a real importer kind: when the spec-import worker
+# sees it, the actual importer kind, options, and parsing come from the stored
+# import spec carried in ``SpecImportStartMetadata.repository_import_spec`` rather
+# than the request metadata (RAR-4.1).
+REPOSITORY_AUTO_IMPORT_SOURCE_KIND = "repository_auto_import"
+
+
+class SpecImportStoredSpec(BaseModel):
+    """Stored import spec carried into the worker for a repository auto-refresh (RAR-4.1).
+
+    A repository auto-refresh re-imports a file the user already imported, and must
+    replay that original request rather than fall back to importer defaults. This
+    model carries the captured spec (RAR-1.1/1.2) and its source descriptor
+    (RAR-1.3) to the spec-import worker so it routes, parses, and applies options
+    identically to the first run.
+
+    ``options`` is the verbatim options blob persisted at first import (the worker's
+    camelCase option shape), passed through untouched — not re-validated into the
+    lossy :class:`SpecImportOptions` subset — so advanced options (class prefixes,
+    type mappings, …) survive the round-trip to the worker.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_kind: str = Field(
+        description="Importer discriminator used at first import (for example openapi-3, arazzo).",
+    )
+    format_override: Optional[str] = Field(
+        default=None,
+        description="Resolved spec format the importer routed on (RAR-1.3); drives format detection on refresh.",
+    )
+    content_type: Optional[str] = Field(
+        default=None,
+        description="MIME type the document was read as at first import (RAR-1.3); drives parsing on refresh.",
+    )
+    options: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Verbatim options blob persisted at first import, replayed as-is.",
+    )
+    spec_schema_version: int = Field(
+        default=REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION,
+        description="Envelope version of the stored spec (RAR-1.4).",
+    )
+
+
 class SpecImportStartMetadata(BaseModel):
     """Shared metadata for JSON-base64 and multipart upload flows."""
 
@@ -545,7 +591,10 @@ class SpecImportStartMetadata(BaseModel):
     source_kind: str = Field(
         description=(
             "Importer discriminator (for example openapi-3, asyncapi-2, protobuf). "
-            "Supported values match product import kinds."
+            "Supported values match product import kinds. The synthetic value "
+            f"'{REPOSITORY_AUTO_IMPORT_SOURCE_KIND}' marks a repository auto-refresh, "
+            "in which case the importer kind/options/parsing come from "
+            "'repository_import_spec' rather than this metadata (RAR-4.1)."
         )
     )
     project: SpecImportProjectTarget
@@ -555,6 +604,13 @@ class SpecImportStartMetadata(BaseModel):
         description="When set, skip project creation and attach the job to this catalog project id.",
     )
     options: SpecImportOptions = Field(default_factory=SpecImportOptions)
+    repository_import_spec: Optional[SpecImportStoredSpec] = Field(
+        default=None,
+        description=(
+            "Stored import spec for a repository auto-refresh; required and consulted "
+            f"only when source_kind is '{REPOSITORY_AUTO_IMPORT_SOURCE_KIND}' (RAR-4.1)."
+        ),
+    )
 
 
 class SpecImportStartJsonRequest(BaseModel):
