@@ -6998,6 +6998,79 @@ class Database:
             return None
         return load_repository_import_options(row).model_dump()
 
+    def get_repository_import_spec_by_id(
+        self, tenant_id: str, spec_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Return one persisted import spec by its row id, scoped to a tenant (RAR-1.5).
+
+        Backs the ``GET …/repository-imports/{id}/spec`` read endpoint. The
+        ``tenant_id`` predicate enforces tenant isolation: a spec belonging to
+        another tenant resolves to ``None`` (a 404 at the route) rather than
+        leaking across tenants.
+
+        Args:
+            tenant_id: Owning tenant id (scopes the lookup).
+            spec_id: ``odb.repository_import_spec`` row id.
+
+        Returns:
+            The stored row as a dict, or None when no spec matches in the tenant.
+        """
+        query = """
+            SELECT id, tenant_id, repository_id, branch, path, project_id,
+                   source_kind, format_override, content_type,
+                   options_json, spec_schema_version, created_by,
+                   created_at, updated_at
+            FROM odb.repository_import_spec
+            WHERE tenant_id = %s::uuid
+              AND id = %s::uuid
+        """
+        results = self.execute_query(query, (tenant_id, spec_id))
+        return results[0] if results else None
+
+    def get_repository_import_spec_by_path(
+        self,
+        tenant_id: str,
+        repository_id: str,
+        path: str,
+        branch: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Return the latest persisted import spec for a repository file path (RAR-1.5).
+
+        Backs the ``?path=`` lookup variant of the read endpoint. The table keeps
+        exactly one row per ``(repository_id, branch, path)`` lineage; when
+        ``branch`` is given the lookup is exact, and when it is omitted the most
+        recently updated row across branches for that ``(repository_id, path)`` is
+        returned. The ``tenant_id`` predicate scopes the lookup so a path under
+        another tenant's repository resolves to ``None``.
+
+        Args:
+            tenant_id: Owning tenant id (scopes the lookup).
+            repository_id: Source repository id.
+            path: Repository-relative file path (lineage key).
+            branch: Branch to match exactly; when None, the latest across branches.
+
+        Returns:
+            The stored row as a dict, or None when no spec matches.
+        """
+        select = """
+            SELECT id, tenant_id, repository_id, branch, path, project_id,
+                   source_kind, format_override, content_type,
+                   options_json, spec_schema_version, created_by,
+                   created_at, updated_at
+            FROM odb.repository_import_spec
+            WHERE tenant_id = %s::uuid
+              AND repository_id = %s::uuid
+              AND path = %s
+        """
+        if branch is not None:
+            query = select + "  AND branch = %s\n            ORDER BY updated_at DESC\n            LIMIT 1"
+            params: tuple = (tenant_id, repository_id, path, branch)
+        else:
+            query = select + "            ORDER BY updated_at DESC\n            LIMIT 1"
+            params = (tenant_id, repository_id, path)
+        results = self.execute_query(query, params)
+        return results[0] if results else None
+
     def get_public_browse_directory_stats(self) -> Dict[str, int]:
         """Counts for tenants/projects/versions with published public revisions (browse directory)."""
         query = """

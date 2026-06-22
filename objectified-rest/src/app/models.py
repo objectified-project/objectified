@@ -411,6 +411,67 @@ def load_repository_import_options(
     return SpecImportOptions.model_validate(migrated)
 
 
+class RepositoryImportSpecRead(BaseModel):
+    """Current-shape import spec returned by the read endpoint (RAR-1.5).
+
+    The response surface for ``GET …/repository-imports/{id}/spec`` (and its
+    ``?path=`` lookup variant). It exposes the captured source descriptor and the
+    full ``SpecImportOptions`` payload, upgraded on read to the current envelope
+    shape, so the refresh worker, the UI status surface, and the CLI can replay
+    the user's original import request. ``spec_schema_version`` always reports the
+    current envelope version because ``options`` has already been migrated forward.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    spec_schema_version: int = Field(
+        default=REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION,
+        description="Current envelope version the returned options conform to.",
+    )
+    source_kind: str = Field(
+        description="Importer discriminator (for example openapi-3, arazzo).",
+    )
+    format_override: Optional[str] = Field(
+        default=None,
+        description="Explicit format override (the importer --format flag), when the user forced one.",
+    )
+    content_type: Optional[str] = Field(
+        default=None,
+        description="MIME type used to read the file (for example application/yaml), when known.",
+    )
+    options: SpecImportOptions = Field(
+        default_factory=SpecImportOptions,
+        description="Full SpecImportOptions payload, upgraded to the current shape.",
+    )
+
+
+def repository_import_spec_read_from_row(
+    row: Optional[Dict[str, Any]],
+) -> RepositoryImportSpecRead:
+    """Build a :class:`RepositoryImportSpecRead` from a stored spec row.
+
+    Reuses :func:`load_repository_import_options` to migrate the persisted
+    ``options_json`` blob forward, then surfaces the source descriptor columns
+    verbatim. ``spec_schema_version`` is reported as the current envelope version
+    because the options have been upgraded on read.
+
+    Args:
+        row: A ``odb.repository_import_spec`` row as a dict.
+
+    Returns:
+        The current-shape read model for the endpoint response.
+    """
+    options = load_repository_import_options(row)
+    row = row or {}
+    return RepositoryImportSpecRead(
+        spec_schema_version=REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION,
+        source_kind=str(row.get("source_kind") or ""),
+        format_override=row.get("format_override"),
+        content_type=row.get("content_type"),
+        options=options,
+    )
+
+
 class SpecImportStartMetadata(BaseModel):
     """Shared metadata for JSON-base64 and multipart upload flows."""
 
