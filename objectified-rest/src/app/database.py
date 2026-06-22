@@ -6737,8 +6737,9 @@ class Database:
                     cursor.executemany(
                         """
                         INSERT INTO odb.tenant_repository_files (
-                            repository_id, branch, path, name, ext, size_bytes, blob_sha, detected_kind
-                        ) VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s)
+                            repository_id, branch, path, name, ext, size_bytes, blob_sha,
+                            detected_kind, commit_sha, committed_at
+                        ) VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s::timestamptz)
                         """,
                         [
                             (
@@ -6750,6 +6751,8 @@ class Database:
                                 f.get("size_bytes"),
                                 f.get("blob_sha"),
                                 f.get("detected_kind"),
+                                f.get("commit_sha"),
+                                f.get("committed_at"),
                             )
                             for f in files
                         ],
@@ -6872,6 +6875,13 @@ class Database:
         The insert is guarded by a subquery so a row is only written when the
         repository belongs to the given tenant.
 
+        Freshness signals (RAR-2.1) — ``last_imported_commit_sha``,
+        ``last_imported_committed_at``, ``last_imported_blob_sha`` — are copied from
+        the matching indexed ``tenant_repository_files`` row via a LEFT JOIN, so the
+        spec records the repository's observed recency for the file at import time.
+        When no scan row matches the lineage the anchors are stored as ``NULL`` and
+        the newer-than comparator (RAR-2.2) falls back to checksum-only gating.
+
         Args:
             tenant_id: Owning tenant id.
             repository_id: Source repository id (must belong to ``tenant_id``).
@@ -6897,12 +6907,16 @@ class Database:
             INSERT INTO odb.repository_import_spec (
                 tenant_id, repository_id, branch, path, project_id,
                 source_kind, format_override, content_type,
-                options_json, spec_schema_version, created_by
+                options_json, spec_schema_version, created_by,
+                last_imported_commit_sha, last_imported_committed_at, last_imported_blob_sha
             )
             SELECT %s::uuid, %s::uuid, %s, %s, %s::uuid,
                    %s, %s, %s,
-                   %s::jsonb, %s, %s::uuid
+                   %s::jsonb, %s, %s::uuid,
+                   trf.commit_sha, trf.committed_at, trf.blob_sha
             FROM odb.tenant_repositories tr
+            LEFT JOIN odb.tenant_repository_files trf
+                ON trf.repository_id = tr.id AND trf.branch = %s AND trf.path = %s
             WHERE tr.id = %s::uuid AND tr.tenant_id = %s::uuid AND tr.deleted_at IS NULL
             ON CONFLICT ON CONSTRAINT uq_repository_import_spec_repo_branch_path
             DO UPDATE SET
@@ -6914,16 +6928,21 @@ class Database:
                 options_json = EXCLUDED.options_json,
                 spec_schema_version = EXCLUDED.spec_schema_version,
                 created_by = EXCLUDED.created_by,
+                last_imported_commit_sha = EXCLUDED.last_imported_commit_sha,
+                last_imported_committed_at = EXCLUDED.last_imported_committed_at,
+                last_imported_blob_sha = EXCLUDED.last_imported_blob_sha,
                 updated_at = CURRENT_TIMESTAMP
             RETURNING id, tenant_id, repository_id, branch, path, project_id,
                       source_kind, format_override, content_type,
                       options_json, spec_schema_version, created_by,
-                      created_at, updated_at
+                      last_imported_commit_sha, last_imported_committed_at,
+                      last_imported_blob_sha, created_at, updated_at
         """
         params = (
             tenant_id, repository_id, branch, path, project_id,
             source_kind, format_override, content_type,
             json.dumps(options or {}), spec_schema_version, created_by,
+            branch, path,
             repository_id, tenant_id,
         )
         conn = self.connect()
@@ -6960,7 +6979,8 @@ class Database:
             SELECT id, tenant_id, repository_id, branch, path, project_id,
                    source_kind, format_override, content_type,
                    options_json, spec_schema_version, created_by,
-                   created_at, updated_at
+                   last_imported_commit_sha, last_imported_committed_at,
+                   last_imported_blob_sha, created_at, updated_at
             FROM odb.repository_import_spec
             WHERE tenant_id = %s::uuid
               AND repository_id = %s::uuid
@@ -7019,7 +7039,8 @@ class Database:
             SELECT id, tenant_id, repository_id, branch, path, project_id,
                    source_kind, format_override, content_type,
                    options_json, spec_schema_version, created_by,
-                   created_at, updated_at
+                   last_imported_commit_sha, last_imported_committed_at,
+                   last_imported_blob_sha, created_at, updated_at
             FROM odb.repository_import_spec
             WHERE tenant_id = %s::uuid
               AND id = %s::uuid
@@ -7056,7 +7077,8 @@ class Database:
             SELECT id, tenant_id, repository_id, branch, path, project_id,
                    source_kind, format_override, content_type,
                    options_json, spec_schema_version, created_by,
-                   created_at, updated_at
+                   last_imported_commit_sha, last_imported_committed_at,
+                   last_imported_blob_sha, created_at, updated_at
             FROM odb.repository_import_spec
             WHERE tenant_id = %s::uuid
               AND repository_id = %s::uuid

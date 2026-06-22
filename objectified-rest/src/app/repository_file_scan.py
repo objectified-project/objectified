@@ -129,6 +129,15 @@ def fetch_github_tree_blobs(owner: str, repo: str, branch: str, access_token: Op
         if not tree_sha:
             raise ValueError("GitHub response missing tree sha for branch")
 
+        # Branch tip commit recency (RAR-2.1): the branch API already returns the
+        # tip commit SHA and its committed-at date; capture them here so the scan
+        # can stamp every indexed file with a comparable "newer-than" anchor.
+        # Granularity is branch-tip (one value per scan), which the newer-than
+        # comparator (RAR-2.2) pairs with content-checksum idempotency.
+        tip_commit_sha = str(tip.get("sha") or "")[:64] or None
+        committer = inner.get("committer") if isinstance(inner.get("committer"), dict) else {}
+        tip_committed_at = (committer.get("date") or "").strip() or None
+
         tr = client.get(
             f"https://api.github.com/repos/{owner_q}/{repo_q}/git/trees/{tree_sha}?recursive=1",
             headers=headers,
@@ -170,6 +179,8 @@ def fetch_github_tree_blobs(owner: str, repo: str, branch: str, access_token: Op
                     "size_bytes": size_i,
                     "blob_sha": sha,
                     "detected_kind": kind,
+                    "commit_sha": tip_commit_sha,
+                    "committed_at": tip_committed_at,
                 }
             )
         return out

@@ -161,4 +161,26 @@ describe('upsertRepositoryImportSpec (RAR-1.2, #3513)', () => {
     expect(params[6]).toBeNull(); // format_override
     expect(params[7]).toBeNull(); // content_type
   });
+
+  // RAR-2.1 (#3518): the spec records freshness anchors copied from the matching
+  // indexed tenant_repository_files row via a LEFT JOIN on (repository, branch, path),
+  // so a future auto-refresh can gate "newer-than" re-imports.
+  test('captures the freshness signal at import via the file-row JOIN', async () => {
+    const { upsertRepositoryImportSpec } = require('../lib/db/repository-import-metrics');
+
+    await upsertRepositoryImportSpec(BASE_PARAMS);
+
+    const [sql] = mockQuery.mock.calls[0];
+    // Anchors are written from the matching scan row, not bound as parameters.
+    expect(sql).toContain('LEFT JOIN odb.tenant_repository_files trf');
+    expect(sql).toContain('trf.commit_sha, trf.committed_at, trf.blob_sha');
+    expect(sql).toContain('last_imported_commit_sha');
+    expect(sql).toContain('last_imported_committed_at');
+    expect(sql).toContain('last_imported_blob_sha');
+    expect(sql).toContain('last_imported_commit_sha = EXCLUDED.last_imported_commit_sha');
+    // The JOIN reuses the branch ($3) and path ($4) bind parameters.
+    const [, params] = mockQuery.mock.calls[0];
+    expect(params[2]).toBe('main'); // branch reused by JOIN
+    expect(params[3]).toBe('specs/petstore.yaml'); // path reused by JOIN
+  });
 });

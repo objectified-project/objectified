@@ -58,6 +58,14 @@ export async function recordTenantRepositoryImport(params: {
  * repository belongs to the given tenant. `options` is the full SpecImportOptions
  * payload and is stored verbatim in `options_json`.
  *
+ * Freshness signals (RAR-2.1) — `last_imported_commit_sha`,
+ * `last_imported_committed_at`, `last_imported_blob_sha` — are copied from the
+ * matching indexed `tenant_repository_files` row via a LEFT JOIN, so the spec
+ * records the repository's observed recency for the file at import time. A later
+ * auto-refresh compares the repository's current state against these anchors to
+ * gate "newer-than" re-imports (RAR-2.2). When no scan row matches the lineage the
+ * anchors are stored as NULL and the comparator falls back to checksum-only gating.
+ *
  * @returns true when a row was written (repository belonged to the tenant), false otherwise.
  */
 export async function upsertRepositoryImportSpec(params: {
@@ -89,12 +97,16 @@ export async function upsertRepositoryImportSpec(params: {
     `INSERT INTO odb.repository_import_spec (
        tenant_id, repository_id, branch, path, project_id,
        source_kind, format_override, content_type,
-       options_json, spec_schema_version, created_by
+       options_json, spec_schema_version, created_by,
+       last_imported_commit_sha, last_imported_committed_at, last_imported_blob_sha
      )
      SELECT $1::uuid, $2::uuid, $3, $4, $5::uuid,
             $6, $7, $8,
-            $9::jsonb, $10, $11::uuid
+            $9::jsonb, $10, $11::uuid,
+            trf.commit_sha, trf.committed_at, trf.blob_sha
      FROM odb.tenant_repositories tr
+     LEFT JOIN odb.tenant_repository_files trf
+       ON trf.repository_id = tr.id AND trf.branch = $3 AND trf.path = $4
      WHERE tr.id = $2::uuid AND tr.tenant_id = $1::uuid AND tr.deleted_at IS NULL
      ON CONFLICT ON CONSTRAINT uq_repository_import_spec_repo_branch_path
      DO UPDATE SET
@@ -106,6 +118,9 @@ export async function upsertRepositoryImportSpec(params: {
        options_json = EXCLUDED.options_json,
        spec_schema_version = EXCLUDED.spec_schema_version,
        created_by = EXCLUDED.created_by,
+       last_imported_commit_sha = EXCLUDED.last_imported_commit_sha,
+       last_imported_committed_at = EXCLUDED.last_imported_committed_at,
+       last_imported_blob_sha = EXCLUDED.last_imported_blob_sha,
        updated_at = CURRENT_TIMESTAMP
      RETURNING id`,
     [

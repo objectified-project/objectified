@@ -120,7 +120,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | RAR-EPIC-4 | #3509 | RAR-EPIC-5 | #3510 | RAR-EPIC-6 | #3511 |
 | ~~RAR-1.1~~ ✅ | ~~#3512~~ | ~~RAR-1.2~~ ✅ | ~~#3513~~ | ~~RAR-1.3~~ ✅ | ~~#3514~~ |
 | ~~RAR-1.4~~ ✅ | ~~#3515~~ | ~~RAR-1.5~~ ✅ | ~~#3516~~ | RAR-1.6 | #3517 |
-| RAR-2.1 | #3518 | RAR-2.2 | #3519 | RAR-2.3 | #3520 |
+| ~~RAR-2.1~~ ✅ | ~~#3518~~ | RAR-2.2 | #3519 | RAR-2.3 | #3520 |
 | RAR-2.4 | #3521 | RAR-3.1 | #3522 | RAR-3.2 | #3523 |
 | RAR-3.3 | #3524 | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
 | RAR-4.1 | #3527 | RAR-4.2 | #3528 | RAR-4.3 | #3529 |
@@ -246,7 +246,7 @@ Re-import only files genuinely newer than what's already in the system.
 
 | ID | Title | Summary | Labels | Parallel | MVP | Cmplx | Modules |
 |----|-------|---------|--------|----------|-----|-------|---------|
-| RAR-2.1 | Capture freshness signal at import | Store source commit SHA + committed-at + blob_sha as `last_imported_*` | `enhancement`,`mvp`,`import`,`repository`,`data-model` | Y | Y | M | objectified-db, objectified-rest |
+| ~~RAR-2.1~~ ✅ **Done** (#3518) | Capture freshness signal at import | Store source commit SHA + committed-at + blob_sha as `last_imported_*` | `enhancement`,`mvp`,`import`,`repository`,`data-model` | Y | Y | M | objectified-db, objectified-rest |
 | RAR-2.2 | "Newer-than" comparator | Re-import only when remote commit is newer than last imported | `enhancement`,`mvp`,`import`,`repository` | N | Y | M | objectified-rest |
 | RAR-2.3 | Per-file refresh state machine | up-to-date / stale / refreshing / failed / diverged | `enhancement`,`mvp`,`import`,`repository` | Y | Y | M | objectified-rest, objectified-ui |
 | RAR-2.4 | Checksum idempotency guard | Suppress no-op refreshes when content unchanged despite newer commit | `enhancement`,`mvp`,`import` | Y | Y | S | objectified-rest |
@@ -260,6 +260,17 @@ wholesale DELETE/INSERT (`database.py replace_tenant_repository_files`) so per-f
 provider tree/commit API already used in `repository_file_scan.py`.
 **Acceptance criteria.** Every import records the three signals; exposed via RAR-1.5.
 **Dependencies.** Parallel with EPIC-1. **Parallel = Y.**
+
+**Status: ✅ Done (#3518).** Migration `objectified-db/scripts/20260621-130000.sql` adds the branch
+tip recency columns `commit_sha` / `committed_at` to `odb.tenant_repository_files` and the import
+anchor columns `last_imported_commit_sha` / `last_imported_committed_at` / `last_imported_blob_sha`
+to `odb.repository_import_spec`. The scan (`repository_file_scan.py`) captures the branch tip commit
+SHA + committed-at already returned by the provider branch API and stamps every indexed file row.
+Both spec-write sites — `database.py upsert_repository_import_spec` (Python) and
+`repository-import-metrics.ts upsertRepositoryImportSpec` (the live dashboard path) — copy the
+indexed row's `blob_sha` / `commit_sha` / `committed_at` into the `last_imported_*` anchors via a
+LEFT JOIN, so every import records the three signals. The RAR-1.5 read model
+(`RepositoryImportSpecRead`) surfaces them. Newer-than gating on these anchors is RAR-2.2.
 
 ### RAR-2.2 — "Newer-than" comparator
 
