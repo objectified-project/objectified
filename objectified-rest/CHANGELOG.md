@@ -5,6 +5,18 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-06-22
+
+### Added
+- **Primitive import provenance & property binding (#3448)** — every
+  `POST /v1/primitives/{tenant}/import` now records an auditable provenance row in the new
+  `odb.primitive_imports` table (source kind, options, and a JSON outcome report with
+  imported/skipped/errors) and marks imported primitives `source='imported'`. New read
+  endpoints `GET /v1/primitives/{tenant}/imports` and `GET /v1/primitives/{tenant}/imports/{id}`
+  expose the history and its report. Class properties gained a `primitive_id` foreign key to
+  `odb.primitives` plus a stored `primitive_ref`, surfaced on the Designer read path so a bound
+  property reloads its `$ref`; bindings are carried through class and version copies.
+
 ## [1.0.7] - 2026-06-22
 
 ### Removed

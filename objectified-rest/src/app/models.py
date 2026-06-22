@@ -123,6 +123,7 @@ class PrimitiveSchema(BaseModel):
     is_system: bool = False
     is_public: bool = False
     usage_count: int = 0
+    source: str = 'human'  # Provenance: 'human' (authored in-app) or 'imported' (#3448)
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
     enabled: bool = True
@@ -160,6 +161,29 @@ class PrimitiveImportRequest(BaseModel):
     schema: Dict[str, Any]  # Full JSON Schema document
     import_all: bool = False  # If True, import all definitions; if False, select specific ones
     selected_definitions: Optional[List[str]] = None  # List of definition keys to import
+    # Provenance metadata recorded on the import record (#3448).
+    source_kind: str = 'json-schema'  # 'json-schema' | 'type-def-bundle' | 'openapi'
+    source_label: Optional[str] = None  # Human label / filename / URL of the source
+    target_namespace: Optional[str] = None  # Registry namespace imported into, if any
+
+    class Config:
+        from_attributes = True
+
+
+class PrimitiveImportRecord(BaseModel):
+    """Provenance record for a single primitive import (#3448)."""
+    id: str
+    tenant_id: str
+    source_kind: str
+    source_label: Optional[str] = None
+    target_namespace: Optional[str] = None
+    options: Dict[str, Any] = {}
+    report: Dict[str, Any] = {}
+    imported_count: int = 0
+    skipped_count: int = 0
+    error_count: int = 0
+    imported_by: Optional[str] = None
+    created_at: Optional[Union[datetime, str]] = None
 
     class Config:
         from_attributes = True

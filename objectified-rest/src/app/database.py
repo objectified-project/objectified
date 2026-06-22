@@ -183,6 +183,7 @@ class Database:
         """Get all properties for a specific class."""
         query = """
             SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
+                   cp.primitive_id, cp.primitive_ref,
                    p.id as property_source_id, p.name as property_source_name, p.data as property_source_data
             FROM odb.class_properties cp
             LEFT JOIN odb.properties p ON cp.property_id = p.id
@@ -215,6 +216,7 @@ class Database:
         placeholders = ','.join(['%s'] * len(class_ids))
         properties_query = f"""
             SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
+                   cp.primitive_id, cp.primitive_ref,
                    p.id as property_source_id, p.name as property_source_name, p.data as property_source_data
             FROM odb.class_properties cp
             LEFT JOIN odb.properties p ON cp.property_id = p.id
@@ -292,6 +294,7 @@ class Database:
         # Query 2: Get all properties for this class
         properties_query = """
             SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
+                   cp.primitive_id, cp.primitive_ref,
                    p.id as property_source_id, p.name as property_source_name, p.data as property_source_data
             FROM odb.class_properties cp
             LEFT JOIN odb.properties p ON cp.property_id = p.id
@@ -501,31 +504,42 @@ class Database:
         name: str,
         description: Optional[str],
         data: Dict[str, Any],
-        parent_id: Optional[str] = None
+        parent_id: Optional[str] = None,
+        primitive_id: Optional[str] = None,
+        primitive_ref: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Add a property to a class."""
+        """Add a property to a class.
+
+        Args:
+            primitive_id: Optional FK to the odb.primitives row this property is bound
+                to (the resolved target of a registry $ref). Read by the Designer (#3448).
+            primitive_ref: Optional registry $ref string persisted alongside primitive_id.
+        """
         import json
-        
+
         if not name or not name.strip():
             raise ValueError('Property name is required')
-        
+
         # Validate: either property_id must be set, or data must contain $ref
         has_ref = data and (data.get('$ref') or (data.get('type') == 'array' and data.get('items', {}).get('$ref')))
         if not property_id and not has_ref:
             raise ValueError('Property must have either a library reference (property_id) or a schema $ref')
-        
+
         query = """
-            INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING id, class_id, property_id, name, description, data, parent_id
+            INSERT INTO odb.class_properties
+                (class_id, property_id, name, description, data, parent_id, primitive_id, primitive_ref)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, class_id, property_id, name, description, data, parent_id,
+                      primitive_id, primitive_ref
         """
-        
+
         conn = self.connect()
         try:
             with conn.cursor() as cursor:
                 cursor.execute(
                     query,
-                    (class_id, property_id, name.strip(), description, json.dumps(data), parent_id)
+                    (class_id, property_id, name.strip(), description, json.dumps(data),
+                     parent_id, primitive_id, primitive_ref)
                 )
                 result = cursor.fetchone()
                 conn.commit()
@@ -578,21 +592,29 @@ class Database:
         if 'data' in updates and updates['data'] is not None:
             update_fields.append("data = %s")
             params.append(json.dumps(updates['data']))
-        
+        # Property→primitive binding (#3448). These accept None so a binding can be cleared.
+        if 'primitive_id' in updates:
+            update_fields.append("primitive_id = %s")
+            params.append(updates['primitive_id'])
+        if 'primitive_ref' in updates:
+            update_fields.append("primitive_ref = %s")
+            params.append(updates['primitive_ref'])
+
         if not update_fields:
             # Nothing to update, return current property
             return self.execute_query(
-                "SELECT id, class_id, property_id, name, description, data, parent_id FROM odb.class_properties WHERE id = %s",
+                "SELECT id, class_id, property_id, name, description, data, parent_id, primitive_id, primitive_ref FROM odb.class_properties WHERE id = %s",
                 (class_property_id,)
             )[0] if self.execute_query("SELECT id FROM odb.class_properties WHERE id = %s", (class_property_id,)) else None
-        
+
         params.append(class_property_id)
-        
+
         query = f"""
             UPDATE odb.class_properties
             SET {', '.join(update_fields)}
             WHERE id = %s
-            RETURNING id, class_id, property_id, name, description, data, parent_id
+            RETURNING id, class_id, property_id, name, description, data, parent_id,
+                      primitive_id, primitive_ref
         """
         
         conn = self.connect()
@@ -1109,7 +1131,7 @@ class Database:
         """Get all primitives for a specific tenant."""
         query = """
             SELECT id, tenant_id, name, description, category, schema, tags,
-                   created_by, is_system, is_public, usage_count,
+                   created_by, is_system, is_public, usage_count, source,
                    created_at, updated_at
             FROM odb.primitives
             WHERE tenant_id = %s
@@ -1127,7 +1149,7 @@ class Database:
         """Get a specific primitive by ID, ensuring it belongs to the tenant."""
         query = """
             SELECT id, tenant_id, name, description, category, schema, tags,
-                   created_by, is_system, is_public, usage_count,
+                   created_by, is_system, is_public, usage_count, source,
                    created_at, updated_at
             FROM odb.primitives
             WHERE id = %s AND tenant_id = %s
@@ -1143,15 +1165,21 @@ class Database:
         schema: Dict[str, Any],
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
-        created_by: Optional[str] = None
+        created_by: Optional[str] = None,
+        source: str = 'human'
     ) -> Dict[str, Any]:
-        """Create a new primitive."""
+        """Create a new primitive.
+
+        Args:
+            source: Provenance of the primitive — 'human' (authored in-app, default)
+                or 'imported' (created by an import). Stored on odb.primitives.source.
+        """
         query = """
             INSERT INTO odb.primitives
-            (tenant_id, name, description, category, schema, tags, created_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (tenant_id, name, description, category, schema, tags, created_by, source)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, tenant_id, name, description, category, schema, tags,
-                      created_by, is_system, is_public, usage_count,
+                      created_by, is_system, is_public, usage_count, source,
                       created_at, updated_at
         """
 
@@ -1163,7 +1191,7 @@ class Database:
             with conn.cursor() as cursor:
                 cursor.execute(
                     query,
-                    (tenant_id, name, description, category, schema_json, tags or [], created_by)
+                    (tenant_id, name, description, category, schema_json, tags or [], created_by, source)
                 )
                 result = cursor.fetchone()
                 conn.commit()
@@ -1211,7 +1239,7 @@ class Database:
             SET {', '.join(update_fields)}
             WHERE id = %s AND tenant_id = %s
             RETURNING id, tenant_id, name, description, category, schema, tags,
-                      created_by, is_system, is_public, usage_count,
+                      created_by, is_system, is_public, usage_count, source,
                       created_at, updated_at
         """
 
@@ -1252,6 +1280,96 @@ class Database:
                 conn.commit()
         except Exception:
             pass  # Don't fail if we can't increment usage
+
+    # ==================== Primitive Import Provenance (#3448) ====================
+
+    def create_primitive_import(
+        self,
+        tenant_id: str,
+        report: Dict[str, Any],
+        source_kind: str = 'json-schema',
+        source_label: Optional[str] = None,
+        target_namespace: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None,
+        imported_count: int = 0,
+        skipped_count: int = 0,
+        error_count: int = 0,
+        imported_by: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Record an auditable provenance row for a primitive import.
+
+        Args:
+            tenant_id: The tenant the import ran for.
+            report: The import outcome report (imported/skipped/errors lists + counts).
+            source_kind: Shape of the source document — one of 'json-schema',
+                'type-def-bundle', 'openapi'.
+            source_label: Optional human label (filename / URL) of the source.
+            target_namespace: Optional registry namespace imported into.
+            options: Import options echoed back for reproducibility.
+            imported_count/skipped_count/error_count: Outcome tallies.
+            imported_by: The authenticated user id (None for API-key auth).
+
+        Returns:
+            The persisted provenance row.
+        """
+        import json
+
+        query = """
+            INSERT INTO odb.primitive_imports
+            (tenant_id, source_kind, source_label, target_namespace, options, report,
+             imported_count, skipped_count, error_count, imported_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, tenant_id, source_kind, source_label, target_namespace,
+                      options, report, imported_count, skipped_count, error_count,
+                      imported_by, created_at
+        """
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    query,
+                    (
+                        tenant_id, source_kind, source_label, target_namespace,
+                        json.dumps(options or {}), json.dumps(report),
+                        imported_count, skipped_count, error_count, imported_by
+                    )
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def get_primitive_imports(
+        self, tenant_id: str, limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """List primitive import provenance records for a tenant, newest first."""
+        query = """
+            SELECT id, tenant_id, source_kind, source_label, target_namespace,
+                   options, report, imported_count, skipped_count, error_count,
+                   imported_by, created_at
+            FROM odb.primitive_imports
+            WHERE tenant_id = %s
+            ORDER BY created_at DESC
+            LIMIT %s
+        """
+        return self.execute_query(query, (tenant_id, limit))
+
+    def get_primitive_import_by_id(
+        self, import_id: str, tenant_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get a single primitive import provenance record scoped to the tenant."""
+        query = """
+            SELECT id, tenant_id, source_kind, source_label, target_namespace,
+                   options, report, imported_count, skipped_count, error_count,
+                   imported_by, created_at
+            FROM odb.primitive_imports
+            WHERE id = %s AND tenant_id = %s
+        """
+        results = self.execute_query(query, (import_id, tenant_id))
+        return results[0] if results else None
 
     # ==================== Project CRUD Operations ====================
     # NOTE: queries below select `change_report_template_version_id`, which requires
@@ -1950,8 +2068,8 @@ class Database:
                     if original:
                         original_class_id = original["id"]
                         cursor.execute("""
-                            INSERT INTO odb.class_properties (class_id, property_id, name, description, data)
-                            SELECT %s, property_id, name, description, data
+                            INSERT INTO odb.class_properties (class_id, property_id, name, description, data, primitive_id, primitive_ref)
+                            SELECT %s, property_id, name, description, data, primitive_id, primitive_ref
                             FROM odb.class_properties
                             WHERE class_id = %s AND parent_id IS NULL
                         """, (new_class_id, original_class_id))
@@ -3119,8 +3237,8 @@ class Database:
 
                         # Copy class properties (simple copy without nested property mapping for now)
                         cursor.execute("""
-                            INSERT INTO odb.class_properties (class_id, property_id, name, description, data)
-                            SELECT %s, property_id, name, description, data
+                            INSERT INTO odb.class_properties (class_id, property_id, name, description, data, primitive_id, primitive_ref)
+                            SELECT %s, property_id, name, description, data, primitive_id, primitive_ref
                             FROM odb.class_properties
                             WHERE class_id = %s AND parent_id IS NULL
                         """, (new_class_id, original_class_id))
@@ -4857,7 +4975,7 @@ class Database:
     ) -> None:
         cursor.execute(
             """
-            SELECT id, property_id, name, description, data, parent_id
+            SELECT id, property_id, name, description, data, parent_id, primitive_id, primitive_ref
             FROM odb.class_properties
             WHERE class_id = %s
             """,
@@ -4886,8 +5004,9 @@ class Database:
                     new_parent = old_to_new.get(str(prop["parent_id"]))
                 cursor.execute(
                     """
-                    INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    INSERT INTO odb.class_properties
+                        (class_id, property_id, name, description, data, parent_id, primitive_id, primitive_ref)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
                     (
@@ -4897,6 +5016,8 @@ class Database:
                         prop["description"],
                         prop["data"],
                         new_parent,
+                        prop.get("primitive_id"),
+                        prop.get("primitive_ref"),
                     ),
                 )
                 new_id = cursor.fetchone()["id"]
