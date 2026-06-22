@@ -536,6 +536,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/primitives/health:
+    get:
+      tags:
+      - primitives
+      summary: Registry Health
+      description: "Health/ping for the Primitives type-registry layer (#3450).\n\n\
+        Reports whether the registry's storage backend — the shared\n``objectified-db``\
+        \ connection backing ``odb.primitives`` — is reachable.\nLike the global ``/health``\
+        \ endpoint this is intentionally anonymous so\nmonitors can probe the registry\
+        \ layer without credentials; every data\naccess endpoint below remains authenticated\
+        \ and tenant-scoped.\n\nRegistered before ``GET /{tenant_slug}`` so the literal\
+        \ ``health`` path is\nmatched here rather than being captured as a tenant\
+        \ slug.\n\nReturns:\n    Registry health: overall ``status``, the ``objectified-db``\n\
+        \    ``connection`` state, and whether the ``odb.primitives`` storage table\n\
+        \    is present. On failure ``status`` is ``unhealthy`` and ``error`` carries\n\
+        \    the driver message; the endpoint itself still responds 200 so the probe\n\
+        \    is always reachable (mirrors the global ``/health`` contract)."
+      operationId: registry_health_v1_primitives_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistryHealthResponse'
   /v1/primitives/{tenant_slug}:
     get:
       tags:
@@ -642,6 +667,122 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PrimitiveSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/primitives/{tenant_slug}/imports:
+    get:
+      tags:
+      - primitives
+      summary: List Primitive Imports
+      description: "List primitive import provenance records for a tenant, newest\
+        \ first (#3448).\n\nRegistered before GET /{tenant_slug}/{primitive_id} so\
+        \ the literal `imports`\npath is not captured as a primitive id.\n\nArgs:\n\
+        \    tenant_slug: The tenant slug\n    limit: Maximum number of records to\
+        \ return\n    auth_data: Authentication data (injected by dependency)\n\n\
+        Returns:\n    The tenant's import provenance records."
+      operationId: list_primitive_imports_v1_primitives__tenant_slug__imports_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          description: Max number of records to return
+          default: 50
+          title: Limit
+        description: Max number of records to return
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PrimitiveImportRecord'
+                title: Response List Primitive Imports V1 Primitives  Tenant Slug  Imports
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/primitives/{tenant_slug}/imports/{import_id}:
+    get:
+      tags:
+      - primitives
+      summary: Get Primitive Import
+      description: "Get a single primitive import provenance record, including its\
+        \ report JSON (#3448).\n\nArgs:\n    tenant_slug: The tenant slug\n    import_id:\
+        \ The import provenance record id\n    auth_data: Authentication data (injected\
+        \ by dependency)\n\nReturns:\n    The provenance record with its full options/report\
+        \ payload."
+      operationId: get_primitive_import_v1_primitives__tenant_slug__imports__import_id__get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: import_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Import Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrimitiveImportRecord'
         '422':
           description: Validation Error
           content:
@@ -823,7 +964,8 @@ paths:
         \ JWT, the created_by field will be set to the authenticated user.\n\nArgs:\n\
         \    tenant_slug: The tenant slug\n    request: Import request with JSON Schema\
         \ document\n    auth_data: Authentication data (injected by dependency)\n\n\
-        Returns:\n    Summary of imported primitives"
+        Returns:\n    Summary of imported primitives plus the id of the recorded provenance\
+        \ row."
       operationId: import_primitives_v1_primitives__tenant_slug__import_post
       parameters:
       - name: tenant_slug
@@ -10334,6 +10476,68 @@ components:
       - schema
       title: PrimitiveCreateRequest
       description: Request model for creating a primitive.
+    PrimitiveImportRecord:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        source_kind:
+          type: string
+          title: Source Kind
+        source_label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Label
+        target_namespace:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Namespace
+        options:
+          additionalProperties: true
+          type: object
+          title: Options
+          default: {}
+        report:
+          additionalProperties: true
+          type: object
+          title: Report
+          default: {}
+        imported_count:
+          type: integer
+          title: Imported Count
+          default: 0
+        skipped_count:
+          type: integer
+          title: Skipped Count
+          default: 0
+        error_count:
+          type: integer
+          title: Error Count
+          default: 0
+        imported_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Imported By
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Created At
+      type: object
+      required:
+      - id
+      - tenant_id
+      - source_kind
+      title: PrimitiveImportRecord
+      description: Provenance record for a single primitive import (#3448).
     PrimitiveImportRequest:
       properties:
         schema:
@@ -10351,6 +10555,20 @@ components:
             type: array
           - type: 'null'
           title: Selected Definitions
+        source_kind:
+          type: string
+          title: Source Kind
+          default: json-schema
+        source_label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Label
+        target_namespace:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Namespace
       type: object
       required:
       - schema
@@ -10403,6 +10621,10 @@ components:
           type: integer
           title: Usage Count
           default: 0
+        source:
+          type: string
+          title: Source
+          default: human
         created_at:
           anyOf:
           - type: string
@@ -11074,6 +11296,42 @@ components:
         Values are the stable wire/display codes (kebab-case) surfaced to the UI and
 
         the sweep; they match the states in the roadmap state diagram.'
+    RegistryHealthResponse:
+      properties:
+        status:
+          type: string
+          title: Status
+        service:
+          type: string
+          title: Service
+          default: primitives-registry
+        database:
+          type: string
+          title: Database
+          default: objectified-db
+        connection:
+          type: string
+          title: Connection
+        storage_present:
+          type: boolean
+          title: Storage Present
+          default: false
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+      type: object
+      required:
+      - status
+      - connection
+      title: RegistryHealthResponse
+      description: 'Health/ping response for the Primitives type-registry layer (#3450).
+
+
+        Reports whether the registry''s storage backend — the shared
+
+        ``objectified-db`` connection backing ``odb.primitives`` — is reachable.'
     RepositoryImportSpecRead:
       properties:
         spec_schema_version:

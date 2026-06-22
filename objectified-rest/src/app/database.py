@@ -1127,6 +1127,32 @@ class Database:
         """
         return self.execute_query(query, (path_operation_id,))
 
+    def registry_ping(self) -> Dict[str, Any]:
+        """Probe the Primitives type-registry storage backend (#3450).
+
+        The registry lives in the existing ``objectified-db`` database, backed
+        by the ``odb.primitives`` table (see ROADMAP_TYPE_REGISTRY_GOVERNANCE.md
+        §1a — single database, no separate registry DB). This runs a single
+        lightweight query that both confirms the shared connection is actually
+        live (not merely an object that claims to be open) and reports whether
+        the registry's storage table is present.
+
+        Returns:
+            A dict with:
+              - ``connection``: ``"connected"`` when the query succeeds.
+              - ``storage_present``: ``True`` when ``odb.primitives`` exists.
+
+        Raises:
+            Exception: Propagated from the driver when the objectified-db
+            connection cannot be established or the probe query fails, so the
+            caller can report an unhealthy registry layer.
+        """
+        rows = self.execute_query(
+            "SELECT to_regclass('odb.primitives') IS NOT NULL AS storage_present"
+        )
+        storage_present = bool(rows and rows[0].get("storage_present"))
+        return {"connection": "connected", "storage_present": storage_present}
+
     def get_primitives_for_tenant(self, tenant_id: str, category: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all primitives for a specific tenant."""
         query = """

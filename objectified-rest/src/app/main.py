@@ -321,6 +321,7 @@ async def root():
             "jsonschema_spec": "/v1/json/{tenant-slug}/{project-slug}/{version-slug}",
             "class_jsonschema_spec": "/v1/json/{tenant-slug}/{project-slug}/{version-slug}/{class-name}",
             "primitives": {
+                "health": "/v1/primitives/health",
                 "list": "/v1/primitives/{tenant-slug}",
                 "get": "/v1/primitives/{tenant-slug}/{primitive-id}",
                 "create": "POST /v1/primitives/{tenant-slug}",
