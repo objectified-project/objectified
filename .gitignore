@@ -6,3 +6,5 @@ node_modules/
 .DS_Store
 __pycache__
 objectified-ui/package-lock.json
+.env
+
