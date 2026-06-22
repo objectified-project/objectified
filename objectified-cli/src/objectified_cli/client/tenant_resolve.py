@@ -8,7 +8,7 @@ import typer
 
 from objectified_cli.client import api_paths
 from objectified_cli.client.http import RestClient
-from objectified_cli.client.tenant_scope import normalize_tenant_ref, require_tenant_slug
+from objectified_cli.client.tenant_scope import require_tenant_slug
 from objectified_cli.config import CliSettings
 from objectified_cli.exit_codes import EXIT_USAGE
 

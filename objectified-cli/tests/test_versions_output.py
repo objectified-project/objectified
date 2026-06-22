@@ -1,4 +1,16 @@
-"""Integration tests for versions list/get output modes."""
+"""Integration tests for ``versions list`` / ``versions get`` output modes.
+
+These exercise the real command surface in ``commands/versions.py``:
+
+- ``versions list`` optionally takes ``--project-id``. With it, the command
+  reads one project's versions (``GET /v1/versions/{tenant}/{project_id}``) plus
+  that project's record (``GET /v1/projects/{tenant}/{project_id}``). Without it,
+  it lists every project (``GET /v1/projects/{tenant}``) and each project's
+  versions. JSON mode emits ``{"total", "items"}``. There is no pagination /
+  ``--all`` / ``--limit`` flag.
+- ``versions get`` requires ``--project-id`` and a version-id argument and reads
+  ``GET /v1/versions/{tenant}/{project_id}/{version_id}``.
+"""
 
 from __future__ import annotations
 
@@ -20,36 +32,46 @@ _API_KEY_ENV = {
 _PROJECT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 _VERSION_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
 
-_PROJECTS_PAYLOAD = [
-    {
-        "id": _PROJECT_ID,
-        "name": "Payments API",
-        "slug": "payments-api",
-        "enabled": True,
-    },
-]
+_PROJECT_RECORD = {
+    "id": _PROJECT_ID,
+    "name": "Payments API",
+    "slug": "payments-api",
+    "enabled": True,
+}
 
-_VERSIONS_PAYLOAD = [
-    {
-        "id": _VERSION_ID,
-        "project_id": _PROJECT_ID,
-        "version": "1.0.0",
-        "slug": "v1-0-0",
-        "source": "manual",
-        "data": {"description": "Initial release"},
-        "enabled": True,
-    },
-]
+_PROJECTS_PAYLOAD = [_PROJECT_RECORD]
+
+_VERSION_RECORD = {
+    "id": _VERSION_ID,
+    "project_id": _PROJECT_ID,
+    "version": "1.0.0",
+    "slug": "v1-0-0",
+    "source": "manual",
+    "data": {"description": "Initial release"},
+    "enabled": True,
+}
+
+_VERSIONS_PAYLOAD = [_VERSION_RECORD]
 
 
 def _mock_projects_lookup(httpx_mock: object) -> None:
+    """Mock the all-projects listing used by the unfiltered ``list`` path."""
     httpx_mock.add_response(
         url="http://localhost:8000/v1/projects/acme-corp",
         json=_PROJECTS_PAYLOAD,
     )
 
 
+def _mock_project_record(httpx_mock: object) -> None:
+    """Mock the single-project record fetched by ``list --project-id``."""
+    httpx_mock.add_response(
+        url=f"http://localhost:8000/v1/projects/acme-corp/{_PROJECT_ID}",
+        json=_PROJECT_RECORD,
+    )
+
+
 def _mock_versions_for_project(httpx_mock: object) -> None:
+    """Mock one project's versions listing."""
     httpx_mock.add_response(
         url=f"http://localhost:8000/v1/versions/acme-corp/{_PROJECT_ID}",
         json=_VERSIONS_PAYLOAD,
@@ -83,12 +105,9 @@ def test_versions_list_human_table(httpx_mock: object) -> None:
 
 
 def test_versions_list_with_project_id_filter(httpx_mock: object) -> None:
-    """--project-id passes project_id as a query parameter to the API."""
-    httpx_mock.add_response(
-        url=f"http://localhost:8000/project-versions?project_id={_PROJECT_ID}&offset=0&limit=50",
-        json=_LIST_PAYLOAD,
-    )
-    _mock_projects_lookup(httpx_mock)
+    """--project-id reads one project's versions plus that project's record."""
+    _mock_versions_for_project(httpx_mock)
+    _mock_project_record(httpx_mock)
     result = runner.invoke(
         app,
         ["versions", "list", "--project-id", _PROJECT_ID],
@@ -102,11 +121,9 @@ def test_versions_list_with_project_id_filter(httpx_mock: object) -> None:
 
 
 def test_versions_list_with_project_id_filter_json(httpx_mock: object) -> None:
-    """--json --project-id emits a JSON envelope filtered by the given project."""
-    httpx_mock.add_response(
-        url=f"http://localhost:8000/project-versions?project_id={_PROJECT_ID}&offset=0&limit=50",
-        json=_LIST_PAYLOAD,
-    )
+    """--json --project-id emits a JSON envelope filtered to the given project."""
+    _mock_versions_for_project(httpx_mock)
+    _mock_project_record(httpx_mock)
     result = runner.invoke(
         app,
         ["--json", "versions", "list", "--project-id", _PROJECT_ID],
@@ -124,203 +141,57 @@ def test_versions_list_rejects_invalid_project_uuid() -> None:
     assert result.exit_code == EXIT_USAGE
 
 
-def test_versions_get_json_mode(httpx_mock: object) -> None:
-    """--json versions get prints raw API JSON."""
-    httpx_mock.add_response(
-        url=f"http://localhost:8000/project-versions/{_VERSION_ID}",
-        json=_GET_PAYLOAD,
-    )
-    result = runner.invoke(
-        app,
-        ["--json", "versions", "get", _VERSION_ID],
-        env=_API_KEY_ENV,
-    )
-    assert result.exit_code == EXIT_SUCCESS
-    assert json.loads(result.stdout.strip()) == _GET_PAYLOAD
-
-
-def test_versions_get_human_table(httpx_mock: object) -> None:
-    """Default versions get renders field/value rows including project_id."""
-    httpx_mock.add_response(
-        url=f"http://localhost:8000/project-versions/{_VERSION_ID}",
-        json=_GET_PAYLOAD,
-    )
-    result = runner.invoke(app, ["versions", "get", _VERSION_ID], env=_API_KEY_ENV)
-    assert result.exit_code == EXIT_SUCCESS
-    assert "1.0.0" in result.stdout
-    assert "Field" in result.stdout
-    assert result.stdout.strip().startswith("{") is False
-
-
-def test_versions_get_rejects_invalid_uuid() -> None:
-    """versions get fails fast when version id is not a UUID."""
-    result = runner.invoke(app, ["versions", "get", "not-a-uuid"])
-    assert result.exit_code == EXIT_USAGE
-
-
 def test_versions_list_sends_api_key_header(httpx_mock: object) -> None:
-    """RestClient forwards OBJECTIFIED_API_KEY as X-API-Key."""
-    httpx_mock.add_response(
-        url="http://localhost:8000/project-versions?offset=0&limit=10",
-        json=_LIST_PAYLOAD,
-    )
+    """RestClient forwards OBJECTIFIED_API_KEY as X-API-Key on the list path."""
     _mock_projects_lookup(httpx_mock)
-    result = runner.invoke(
-        app,
-        ["versions", "list", "--limit", "10"],
-        env=_API_KEY_ENV,
-    )
+    _mock_versions_for_project(httpx_mock)
+    result = runner.invoke(app, ["versions", "list"], env=_API_KEY_ENV)
     assert result.exit_code == EXIT_SUCCESS
     request = httpx_mock.get_requests()[0]
     assert request.headers["X-API-Key"] == "obj_test_key"
 
 
-# ---------------------------------------------------------------------------
-# --all flag (multi-page fetching)
-# ---------------------------------------------------------------------------
-
-_PAGE_1_PAYLOAD = {
-    "total": 3,
-    "offset": 0,
-    "limit": 2,
-    "items": [
-        {
-            "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-            "project_id": _PROJECT_ID,
-            "version": "1.0.0",
-            "slug": "v1-0-0",
-            "source": "manual",
-            "data": {},
-            "enabled": True,
-        },
-        {
-            "id": "ffffffff-ffff-4fff-8fff-ffffffffffff",
-            "project_id": _PROJECT_ID,
-            "version": "1.1.0",
-            "slug": "v1-1-0",
-            "source": "manual",
-            "data": {},
-            "enabled": True,
-        },
-    ],
-}
-
-_PAGE_2_PAYLOAD = {
-    "total": 3,
-    "offset": 2,
-    "limit": 2,
-    "items": [
-        {
-            "id": "11111111-1111-4111-8111-111111111111",
-            "project_id": _PROJECT_ID,
-            "version": "2.0.0",
-            "slug": "v2-0-0",
-            "source": "import",
-            "data": {},
-            "enabled": True,
-        },
-    ],
-}
-
-
-def test_versions_list_all_fetches_multiple_pages(httpx_mock: object) -> None:
-    """--all issues multiple requests to collect all pages."""
+def test_versions_get_json_mode(httpx_mock: object) -> None:
+    """--json versions get prints the raw API record."""
     httpx_mock.add_response(
-        url="http://localhost:8000/project-versions?offset=0&limit=2",
-        json=_PAGE_1_PAYLOAD,
+        url=f"http://localhost:8000/v1/versions/acme-corp/{_PROJECT_ID}/{_VERSION_ID}",
+        json=_VERSION_RECORD,
     )
-    httpx_mock.add_response(
-        url="http://localhost:8000/project-versions?offset=2&limit=2",
-        json=_PAGE_2_PAYLOAD,
-    )
-    _mock_projects_lookup(httpx_mock)
     result = runner.invoke(
         app,
-        ["versions", "list", "--limit", "2", "--all"],
+        ["--json", "versions", "get", "--project-id", _PROJECT_ID, _VERSION_ID],
+        env=_API_KEY_ENV,
+    )
+    assert result.exit_code == EXIT_SUCCESS
+    assert json.loads(result.stdout.strip()) == _VERSION_RECORD
+
+
+def test_versions_get_human_table(httpx_mock: object) -> None:
+    """Default versions get renders field/value rows including the version."""
+    httpx_mock.add_response(
+        url=f"http://localhost:8000/v1/versions/acme-corp/{_PROJECT_ID}/{_VERSION_ID}",
+        json=_VERSION_RECORD,
+    )
+    result = runner.invoke(
+        app,
+        ["versions", "get", "--project-id", _PROJECT_ID, _VERSION_ID],
         env=_API_KEY_ENV,
     )
     assert result.exit_code == EXIT_SUCCESS
     assert "1.0.0" in result.stdout
-    assert "1.1.0" in result.stdout
-    assert "2.0.0" in result.stdout
-    assert "Showing 3 of 3" in result.stdout
+    assert "Version" in result.stdout
+    assert result.stdout.strip().startswith("{") is False
 
 
-def test_versions_list_all_json_mode(httpx_mock: object) -> None:
-    """--all --json emits a combined JSON envelope with all items."""
-    httpx_mock.add_response(
-        url="http://localhost:8000/project-versions?offset=0&limit=2",
-        json=_PAGE_1_PAYLOAD,
-    )
-    httpx_mock.add_response(
-        url="http://localhost:8000/project-versions?offset=2&limit=2",
-        json=_PAGE_2_PAYLOAD,
-    )
+def test_versions_get_rejects_invalid_uuid() -> None:
+    """versions get fails fast when the version id is not a UUID."""
     result = runner.invoke(
-        app,
-        ["--json", "versions", "list", "--limit", "2", "--all"],
-        env=_API_KEY_ENV,
+        app, ["versions", "get", "--project-id", _PROJECT_ID, "not-a-uuid"]
     )
-    assert result.exit_code == EXIT_SUCCESS
-    payload = json.loads(result.stdout.strip())
-    assert payload["total"] == 3
-    assert len(payload["items"]) == 3
-    slugs = [item["slug"] for item in payload["items"]]
-    assert slugs == ["v1-0-0", "v1-1-0", "v2-0-0"]
+    assert result.exit_code == EXIT_USAGE
 
 
-def test_versions_list_without_all_stops_after_first_page(httpx_mock: object) -> None:
-    """Without --all, only one page is fetched even when total > limit."""
-    httpx_mock.add_response(
-        url="http://localhost:8000/project-versions?offset=0&limit=2",
-        json=_PAGE_1_PAYLOAD,
-    )
-    _mock_projects_lookup(httpx_mock)
-    result = runner.invoke(
-        app,
-        ["versions", "list", "--limit", "2"],
-        env=_API_KEY_ENV,
-    )
-    assert result.exit_code == EXIT_SUCCESS
-    assert "1.0.0" in result.stdout
-    assert "1.1.0" in result.stdout
-    version_list_requests = [
-        request
-        for request in httpx_mock.get_requests()
-        if request.url.path == "/project-versions"
-    ]
-    assert len(version_list_requests) == 1
-
-
-def test_versions_list_all_with_project_id_filter(httpx_mock: object) -> None:
-    """--all --project-id combines pagination with the project filter."""
-    page1 = {
-        "total": 2,
-        "offset": 0,
-        "limit": 1,
-        "items": [_PAGE_1_PAYLOAD["items"][0]],
-    }
-    page2 = {
-        "total": 2,
-        "offset": 1,
-        "limit": 1,
-        "items": [_PAGE_1_PAYLOAD["items"][1]],
-    }
-    httpx_mock.add_response(
-        url=f"http://localhost:8000/project-versions?project_id={_PROJECT_ID}&offset=0&limit=1",
-        json=page1,
-    )
-    httpx_mock.add_response(
-        url=f"http://localhost:8000/project-versions?project_id={_PROJECT_ID}&offset=1&limit=1",
-        json=page2,
-    )
-    _mock_projects_lookup(httpx_mock)
-    result = runner.invoke(
-        app,
-        ["versions", "list", "--project-id", _PROJECT_ID, "--limit", "1", "--all"],
-        env=_API_KEY_ENV,
-    )
-    assert result.exit_code == EXIT_SUCCESS
-    assert "1.0.0" in result.stdout
-    assert "1.1.0" in result.stdout
-    assert "Showing 2 of 2" in result.stdout
+def test_versions_get_requires_project_id() -> None:
+    """versions get without --project-id is a usage error (option is required)."""
+    result = runner.invoke(app, ["versions", "get", _VERSION_ID])
+    assert result.exit_code == EXIT_USAGE

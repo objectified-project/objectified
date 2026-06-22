@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from objectified_cli.exit_codes import EXIT_ERROR, EXIT_SUCCESS, EXIT_USAGE
+from objectified_cli.exit_codes import EXIT_SUCCESS, EXIT_USAGE
 from objectified_cli.main import app
 
 pytestmark = pytest.mark.usefixtures("api_key_env")
@@ -72,7 +72,7 @@ def _mock_project_version_scope(httpx_mock: object) -> None:
 
 def _mock_browse_openapi_export(httpx_mock: object) -> None:
     httpx_mock.add_response(
-        url=f"http://localhost:8000/v1/schema/acme-corp/payments-api/1.0.0",
+        url="http://localhost:8000/v1/schema/acme-corp/payments-api/1.0.0",
         content=_OPENAPI_JSON,
         headers={
             "Content-Type": "application/json",
