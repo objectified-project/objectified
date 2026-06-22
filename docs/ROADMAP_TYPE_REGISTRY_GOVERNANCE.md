@@ -220,12 +220,19 @@ erDiagram
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |---|---|---|---|:---:|:---:|---|---|
-| 1.1 #3446 | Provision separate registry database & connection | Stand up `objectified-types-db` + connection/pool config | `type-registry`,`types-db`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-db, objectified-rest |
+| 1.1 #3446 | ~~Provision separate registry database & connection~~ ✅ **Done** | Stand up `objectified-types-db` + connection/pool config | `type-registry`,`types-db`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-db, objectified-rest |
 | 1.2 #3447 | Core registry schema (namespaces, types, refs) | Migrations for `type_namespace`, `type_definition`, `type_ref` | `type-registry`,`types-db`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-db |
 | 1.3 #3448 | Import & binding tables | `type_import` records + property↔type binding link model | `type-registry`,`types-db`,`import`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-db |
 | 1.4 #3449 | Seed core system types (`std/v0`) | Seed 8 primitives + std types (date, uuid, money, …) as system-core | `type-registry`,`registry`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-db, objectified-rest |
 
-### Issue 1.1 — Provision separate registry database & connection
+### Issue 1.1 — Provision separate registry database & connection ✅ Done (#3446)
+- **Delivered.** Separate logical database `objectified-types-db` (its own `otr` schema)
+  provisioned on the core Postgres instance. `objectified-db` gained a `registry` command
+  group (`provision` / `migrate` / `migrate status` / `ping`) with an independent
+  `registry-scripts/` migration directory; docker-compose adds a `types-migrate` service that
+  self-provisions and migrates it. `objectified-rest` connects to it independently
+  (`registry_database.py`, `OBJECTIFIED_TYPES_DB` / `OBJECTIFIED_TYPES_DB_URL`) and `GET /health`
+  reports its status. Existing `/v1/primitives` (`odb.primitives`) is untouched.
 - **Problem.** The registry must live in its own database (`objectified-types-db`), separate
   from `objectified-db`, per the Settings mockup and conversation.
 - **Solution/Scope.** Add the new database (docker-compose service + env), a dedicated

@@ -64,6 +64,14 @@ objectified-db ping                         Verify the database connection
 migrate [--dry-run] [--scripts-dir <path>]  Apply pending SQL migrations
 migrate status [--scripts-dir <path>]       List applied / pending migrations
 
+registry provision [--registry-database <name>]
+                                            Create the registry database if absent
+registry migrate [--dry-run] [--registry-database <name>] [--scripts-dir <path>]
+                                            Provision (if needed) + apply registry migrations
+registry migrate status [--registry-database <name>] [--scripts-dir <path>]
+                                            List applied / pending registry migrations
+registry ping [--registry-database <name>]  Verify the registry database connection
+
 users create   --name --email (--password | --password-stdin | --random-password)
                                             [--unverified] [--disabled]
 users list     [--all]
@@ -110,6 +118,13 @@ objectified-db migrate
 objectified-db migrate status
 objectified-db migrate --dry-run
 
+# Stand up the separate type-registry database (objectified-types-db) and migrate it.
+# Reuses the same connection flags/env; only the database name differs
+# (override with --registry-database or OBJECTIFIED_TYPES_DB).
+objectified-db registry migrate          # provisions the DB (if absent) then applies registry-scripts/
+objectified-db registry migrate status
+objectified-db registry ping
+
 # Create a user with a generated password (printed once)
 objectified-db users create --name "Ada Lovelace" --email ada@example.com --random-password
 
@@ -129,7 +144,23 @@ objectified-db --yes api-keys revoke sk_265e18808...
 
 ### Notes
 
-- All tables are addressed in the `odb` schema (`odb.users`, `odb.tenants`, `odb.api_keys`, …),
-  matching `objectified-rest`.
+- All core tables are addressed in the `odb` schema (`odb.users`, `odb.tenants`, `odb.api_keys`,
+  …), matching `objectified-rest`.
 - `api-keys create` writes `created_by_user_id` when the column exists and transparently falls
   back for older databases (same behavior as the REST service).
+
+### Type registry database (`objectified-types-db`)
+
+The JSON Schema type registry lives in a **separate database** so its namespaces, type
+definitions, and `$ref` edges never share tables with the core ADE schema (`odb`). Registry
+tables are created in the `otr` schema by migrations under
+[`registry-scripts/`](./registry-scripts), tracked independently from the core
+[`scripts/`](./scripts) (each database keeps its own `schema_evolution_manager.scripts`).
+
+- `registry migrate` connects to the **same** Postgres server using the global connection
+  flags/env, then provisions the registry database (issuing `CREATE DATABASE` from the
+  `postgres` maintenance database if absent) and applies pending registry migrations.
+- The registry database name resolves from `--registry-database` → `OBJECTIFIED_TYPES_DB`
+  env → `objectified-types-db` (default). To place the registry on a *different* server, set
+  `OBJECTIFIED_TYPES_DB_URL` to a full connection string.
+- This is ticket #3446 (foundation); the registry entity tables arrive in #3447.

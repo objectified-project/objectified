@@ -9,6 +9,7 @@ import logging
 import yaml
 
 from .database import db, Database
+from .registry_database import registry_db
 from .openapi_generator import generate_openapi_spec, generate_class_openapi_spec
 from .arazzo_generator import generate_arazzo_spec, generate_class_arazzo_spec
 from .jsonschema_generator import generate_jsonschema_spec, generate_class_jsonschema_spec
@@ -146,6 +147,21 @@ async def startup_event():
                 "change report system template seed failed with unexpected error: %s", e
             )
     validate_webhook_signing_key()
+
+    # Connect to the separate type-registry database (objectified-types-db, #3446).
+    # Non-fatal: the registry DB is provisioned independently (objectified-db registry
+    # migrate / types-migrate), so a missing/unreachable registry must not block startup
+    # of the core service. The /health endpoint reports its live status.
+    try:
+        registry_db.connect()
+        _startup_log.info("type-registry database connected")
+    except Exception as e:
+        _startup_log.warning(
+            "type-registry database not connected (provision with `objectified-db registry "
+            "migrate`): %s",
+            e,
+        )
+
     # Log data API routes so we can confirm POST /v1/data/{tenant_slug}/records is registered
     for route in app.routes:
         if hasattr(route, "path") and "data" in route.path and hasattr(route, "methods"):
@@ -261,6 +277,7 @@ async def shutdown_event():
             pass
         _repository_refresh_task = None
     db.close()
+    registry_db.close()
 
 
 def validate_private_access(version: Dict[str, Any], tenant_slug: str, api_key: Optional[str]) -> None:
@@ -925,11 +942,32 @@ async def get_class_jsonschema_spec(
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint.
+
+    Reports the core database and the separate type-registry database
+    (objectified-types-db, #3446) independently. Overall status is ``healthy`` only when
+    the core database is reachable; the registry is reported but does not, on its own,
+    make the service unhealthy (it is provisioned separately).
+    """
+    result: dict = {}
+
     try:
-        # Try to connect to database
         db.connect()
-        return {"status": "healthy", "database": "connected"}
+        result["database"] = "connected"
+        core_ok = True
     except Exception as e:
-        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+        result["database"] = "disconnected"
+        result["error"] = str(e)
+        core_ok = False
+
+    # Independent connection — a registry failure never masks core health and vice versa.
+    try:
+        registry_db.ping()
+        result["registry_database"] = "connected"
+    except Exception as e:
+        result["registry_database"] = "disconnected"
+        result["registry_error"] = str(e)
+
+    result["status"] = "healthy" if core_ok else "unhealthy"
+    return result
 
