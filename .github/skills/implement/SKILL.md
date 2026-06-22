@@ -5,7 +5,7 @@ description: Fetches the GitHub Issue for the current repo, implements the work 
 
 # Implement (`/implement <number>`)
 
-When user invokes **implement** with issue number, treat number as **GitHub issue** in **current repository** (e.g. `KenSuenobu/objectified`). Follow workflow end to end unless user terminates or environment blocks (auth, permissions, missing `gh`, etc.).
+When user invokes **implement** with issue number, treat number as **GitHub issue** in **current repository**. Follow workflow end to end unless user terminates or environment blocks (auth, permissions, missing `gh`, etc.).
 
 ## Guidelines
 
@@ -88,7 +88,7 @@ Run package-specific tests the issue touches, per READMEs.
 ## Phase 6: Note Work
 
 - Mark ticket complete in **ROADMAP** and REMOVE ITS ENTRY FROM THE ISSUES TABLE matching the issue number if applicable.
-- Bump semver versions in corresponding projects where appropriate.
+- Bump semver versions in modified projects.
 
 ## Phase 7: Commit, Push, Pull Request
 
