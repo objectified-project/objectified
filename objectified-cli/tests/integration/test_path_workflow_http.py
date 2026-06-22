@@ -61,57 +61,32 @@ _OPERATION = {
     },
 }
 
-_ARAZZO_IMPORT_RESULT = {
-    "project_id": _PROJECT_ID,
-    "version_id": _VERSION_ID,
-    "project": _PROJECT,
-    "version": _VERSION,
-    "created": {
-        "schemas": 0,
-        "properties": 0,
-        "project_properties": 0,
-        "version_schemas": 0,
-        "workflows_created": 1,
-        "steps_created": 2,
-    },
-    "warnings": [],
-    "errors": [],
-}
-
-
 def _mock_project_version_scope(httpx_mock: object) -> None:
     httpx_mock.add_response(
-        url="http://localhost:8000/v1/projects/acme-corp",
-        json={"total": 1, "offset": 0, "limit": 200, "items": [_PROJECT]},
+        url="http://localhost:8000/v1/projects/acme-corp/by-slug/payments-api",
+        json=_PROJECT,
     )
     httpx_mock.add_response(
         url=(
-            "http://localhost:8000/project-versions"
-            f"?project_id={_PROJECT_ID}&offset=0&limit=50"
+            f"http://localhost:8000/v1/versions/acme-corp/{_PROJECT_ID}"
+            "/by-version/1.0.0"
         ),
-        json={"total": 1, "offset": 0, "limit": 50, "items": [_VERSION]},
+        json=_VERSION,
     )
 
 
-def test_import_arazzo_from_fixture_sync_200(
-    httpx_mock: object,
+def test_import_arazzo_not_supported_exits_usage(
     runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Import reads the checkout.arazzo.yaml fixture and completes on HTTP 200."""
+    """Arazzo import is not exposed on the /v1 REST API and exits EXIT_USAGE."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     fixture = _FIXTURES / "checkout.arazzo.yaml"
-    httpx_mock.add_response(
-        url="http://localhost:8000/v1/tenants/acme-corp/imports/upload",
-        method="POST",
-        status_code=200,
-        json=_ARAZZO_IMPORT_RESULT,
-    )
 
     result = runner.invoke(app, ["import", "arazzo", str(fixture)])
 
-    assert result.exit_code == EXIT_SUCCESS
-    assert "Import completed." in result.stdout
-    assert "Created entities" in result.stdout
-    assert "Workflows" in result.stdout
+    assert result.exit_code == EXIT_USAGE
+    assert "not supported via the /v1 REST API" in result.stderr
 
 
 def test_path_workflow_inspect_and_export(
@@ -126,13 +101,13 @@ def test_path_workflow_inspect_and_export(
 
     _mock_project_version_scope(httpx_mock)
     httpx_mock.add_response(
-        url=f"http://localhost:8000/versions/{_VERSION_ID}/paths?offset=0&limit=50",
+        url=f"http://localhost:8000/v1/paths/acme-corp/{_VERSION_ID}",
         json={"total": 1, "offset": 0, "limit": 50, "items": [_PATH]},
     )
     httpx_mock.add_response(
         url=(
-            f"http://localhost:8000/versions/{_VERSION_ID}/paths/{_PATH_ID}/operations"
-            "?offset=0&limit=50"
+            f"http://localhost:8000/v1/paths/acme-corp/{_VERSION_ID}"
+            f"/{_PATH_ID}/operations"
         ),
         json={"total": 1, "offset": 0, "limit": 50, "items": [_OPERATION]},
     )
@@ -145,22 +120,15 @@ def test_path_workflow_inspect_and_export(
 
     _mock_project_version_scope(httpx_mock)
     httpx_mock.add_response(
-        url=f"http://localhost:8000/projects/{_PROJECT_ID}",
+        url=f"http://localhost:8000/v1/projects/acme-corp/{_PROJECT_ID}",
         json=_PROJECT,
     )
     httpx_mock.add_response(
-        url=f"http://localhost:8000/project-versions/{_VERSION_ID}",
+        url=f"http://localhost:8000/v1/versions/acme-corp/{_PROJECT_ID}/{_VERSION_ID}",
         json=_VERSION,
     )
     httpx_mock.add_response(
-        url=f"http://localhost:8000/versions/{_VERSION_ID}/import-fidelity-diff",
-        status_code=404,
-    )
-    httpx_mock.add_response(
-        url=(
-            "http://localhost:8000/browse/tenants/acme-corp/projects/payments-api"
-            "/versions/1.0.0/spec?format=openapi"
-        ),
+        url="http://localhost:8000/v1/schema/acme-corp/payments-api/1.0.0",
         content=reconstructed,
         headers={"Content-Type": "application/json", "ETag": '"fixture-etag"'},
     )
@@ -185,11 +153,16 @@ def test_path_workflow_inspect_and_export(
     assert json.loads(out_file.read_text(encoding="utf-8"))["info"]["title"] == "Payments API"
 
 
-def test_paths_list_404_maps_to_usage(httpx_mock: object, runner: CliRunner) -> None:
+def test_paths_list_404_maps_to_usage(
+    httpx_mock: object,
+    runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """HTTP 404 on paths list maps to EXIT_USAGE (4xx client error)."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     _mock_project_version_scope(httpx_mock)
     httpx_mock.add_response(
-        url=f"http://localhost:8000/versions/{_VERSION_ID}/paths?offset=0&limit=50",
+        url=f"http://localhost:8000/v1/paths/acme-corp/{_VERSION_ID}",
         status_code=404,
         json={"code": 404, "message": "Version not found", "details": {}},
     )

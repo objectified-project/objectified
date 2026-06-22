@@ -78,9 +78,9 @@ def document_bytes_from_spec(spec: dict[str, Any], *, filename: str | None = Non
     """Serialize a parsed JSON spec to bytes for upload."""
     name = (filename or "import.json").lower()
     if name.endswith((".yaml", ".yml")):
-        from yaml12 import dump as yaml_dump
+        from yaml12 import format_yaml
 
-        return yaml_dump(spec).encode("utf-8")
+        return format_yaml(spec).encode("utf-8")
     return json.dumps(spec, indent=2).encode("utf-8")
 
 

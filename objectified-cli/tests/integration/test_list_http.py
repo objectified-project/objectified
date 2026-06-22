@@ -33,8 +33,13 @@ _LIST_PAYLOAD = {
 }
 
 
-def test_projects_list_sync_200(httpx_mock: object, runner: CliRunner) -> None:
-    """GET /projects returns paginated items without live network."""
+def test_projects_list_sync_200(
+    httpx_mock: object,
+    runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GET /v1/projects/{tenant} returns paginated items without live network."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     httpx_mock.add_response(
         url="http://localhost:8000/v1/projects/acme-corp",
         json=_LIST_PAYLOAD,
@@ -48,8 +53,13 @@ def test_projects_list_sync_200(httpx_mock: object, runner: CliRunner) -> None:
     assert len(httpx_mock.get_requests()) == 1
 
 
-def test_projects_list_422_exits_usage(httpx_mock: object, runner: CliRunner) -> None:
-    """422 on list (e.g. limit too high) maps to EXIT_USAGE."""
+def test_projects_list_422_exits_usage(
+    httpx_mock: object,
+    runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A server 422 on the list endpoint maps to EXIT_USAGE."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     httpx_mock.add_response(
         url="http://localhost:8000/v1/projects/acme-corp",
         status_code=422,
@@ -66,15 +76,20 @@ def test_projects_list_422_exits_usage(httpx_mock: object, runner: CliRunner) ->
         },
     )
 
-    result = runner.invoke(app, ["projects", "list", "--limit", "9999"])
+    result = runner.invoke(app, ["projects", "list"])
 
     assert result.exit_code == EXIT_USAGE
     assert "HTTP 422" in result.stderr
     assert "limit" in result.stderr.lower()
 
 
-def test_projects_list_json_mode(httpx_mock: object, runner: CliRunner) -> None:
+def test_projects_list_json_mode(
+    httpx_mock: object,
+    runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """--json projects list emits the API envelope on stdout."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     httpx_mock.add_response(
         url="http://localhost:8000/v1/projects/acme-corp",
         json=_LIST_PAYLOAD,
@@ -87,8 +102,13 @@ def test_projects_list_json_mode(httpx_mock: object, runner: CliRunner) -> None:
     assert payload == {"total": 1, "items": _LIST_PAYLOAD["items"]}
 
 
-def test_schemas_list_sync_200(httpx_mock: object, runner: CliRunner) -> None:
-    """GET /schemas list succeeds with mocked pagination response."""
+def test_schemas_list_sync_200(
+    httpx_mock: object,
+    runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GET /v1/classes/{tenant} list succeeds with mocked pagination response."""
+    monkeypatch.setenv("OBJECTIFIED_TENANT_ID", "acme-corp")
     httpx_mock.add_response(
         url="http://localhost:8000/v1/classes/acme-corp",
         json={

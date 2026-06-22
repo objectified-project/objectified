@@ -4,13 +4,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import pytest
-import typer
 
 from objectified_cli.client.http import RestClient
 from objectified_cli.client.project_version_resolve import resolve_project_uuid, resolve_version_uuid
 from objectified_cli.config import CliSettings
-from objectified_cli.exit_codes import EXIT_USAGE
 
 _PROJECT_ID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 _VERSION_ID = UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")

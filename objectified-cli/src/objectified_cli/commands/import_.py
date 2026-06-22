@@ -35,7 +35,6 @@ from objectified_cli.import_.detect import (
     detect_document_kind,
     looks_like_json_schema_type,
     resolve_auto_import_command,
-    type_library_importer_message,
     unrecognized_auto_import_message,
     wrong_importer_message,
 )
@@ -44,19 +43,7 @@ from objectified_cli.import_.source import (
     load_import_document,
 )
 from objectified_cli.import_.json_schema import (
-    JsonSchemaStructureError,
     JsonSchemaTarget,
-    detect_target,
-    infer_name,
-    load_json_schema_file,
-    source_basename,
-    validate_json_schema_structure,
-    validate_json_schema_type_structure,
-)
-from objectified_cli.import_.arazzo import (
-    ArazzoStructureError,
-    load_arazzo_file,
-    validate_arazzo_structure,
 )
 from objectified_cli.import_.openapi import (
     OpenApiStructureError,
@@ -75,12 +62,6 @@ from objectified_cli.import_.publish import (
 from objectified_cli.import_.source import is_local_file_source
 from objectified_cli.import_.upload import (
     apply_info_overrides,
-    build_arazzo_import_body,
-    build_arazzo_multipart_upload,
-    build_json_schema_import_body,
-    build_json_schema_type_import_body,
-    build_openapi_import_body,
-    build_openapi_multipart_upload,
     import_result_has_errors,
     resolve_import_result,
 )
@@ -88,7 +69,6 @@ from objectified_cli.help_util import group_callback_without_subcommand
 from objectified_cli.output import (
     emit_import_job_accepted,
     emit_import_result,
-    emit_json_schema_type_import_result,
     json_mode_from_context,
     merge_import_warnings,
 )

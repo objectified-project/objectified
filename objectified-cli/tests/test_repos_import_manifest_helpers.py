@@ -147,7 +147,7 @@ def test_build_local_manifest_batch_items_new_project(
     monkeypatch.setenv("OBJECTIFIED_BASE_URL", "http://localhost:8000")
 
     httpx_mock.add_response(
-        url="http://localhost:8000/v1/projects/acme-corp",
+        url="http://localhost:8000/projects?offset=0&limit=50",
         json={"items": [], "total": 0, "offset": 0, "limit": 50},
     )
     httpx_mock.add_response(
@@ -197,7 +197,7 @@ def test_build_local_manifest_batch_items_existing_version(
     monkeypatch.setenv("OBJECTIFIED_BASE_URL", "http://localhost:8000")
 
     httpx_mock.add_response(
-        url="http://localhost:8000/v1/projects/acme-corp",
+        url="http://localhost:8000/projects?offset=0&limit=50",
         json={
             "items": [
                 {
@@ -271,7 +271,7 @@ def test_build_local_manifest_batch_items_glob_match(
     monkeypatch.setenv("OBJECTIFIED_BASE_URL", "http://localhost:8000")
 
     httpx_mock.add_response(
-        url="http://localhost:8000/v1/projects/acme-corp",
+        url="http://localhost:8000/projects?offset=0&limit=50",
         json={"items": [], "total": 0, "offset": 0, "limit": 50},
     )
     httpx_mock.add_response(

@@ -11,7 +11,7 @@ from objectified_cli.client import api_paths
 from objectified_cli.client.http import RestClient
 from objectified_cli.client.project_version_resolve import resolve_project_uuid, resolve_version_uuid
 from objectified_cli.client.tenant_scope import require_tenant_slug
-from objectified_cli.config import CliSettings, require_api_key
+from objectified_cli.config import require_api_key
 
 
 def tier2_client(ctx: typer.Context) -> RestClient:

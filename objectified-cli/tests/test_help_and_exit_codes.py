@@ -49,7 +49,6 @@ def test_bare_objectified_prints_concise_help_and_exits_zero() -> None:
     assert "import" in result.stdout
     assert "arazzo" in result.stdout
     assert "paths" in result.stdout
-    assert "workflows" in result.stdout
     assert "spec" in result.stdout
     assert "json-schema" in result.stdout
     assert "json-schema-type" in result.stdout
@@ -65,12 +64,12 @@ def test_command_directory_lists_all_top_level_groups() -> None:
     """The command catalog includes every Typer group registered on the root app."""
     catalog = build_command_directory()
     for name in (
+        "auth",
         "config",
         "doctor",
         "health",
         "help",
         "import",
-        "list-api-keys",
         "operations",
         "paths",
         "projects",
@@ -79,7 +78,6 @@ def test_command_directory_lists_all_top_level_groups() -> None:
         "schemas",
         "types",
         "versions",
-        "workflows",
         "spec",
     ):
         assert name in catalog
@@ -133,15 +131,14 @@ def test_health_subcommand_help_exits_zero() -> None:
 
 _COMMAND_GROUPS: tuple[tuple[str, str], ...] = (
     ("config", "Show or change saved defaults"),
-    ("repos", "List and manage tenant Git repositories"),
+    ("repos", "List tenant Git repositories and inspect repository files"),
     ("projects", "List and fetch tenant projects"),
     ("properties", "List and fetch tenant properties"),
     ("schemas", "List and fetch tenant schemas"),
-    ("types", "Browse and manage the JSON Schema type library"),
+    ("types", "Browse tenant JSON Schema primitive types"),
     ("versions", "List and fetch project versions"),
     ("paths", "List and inspect OpenAPI path templates"),
     ("operations", "Inspect OpenAPI operations"),
-    ("workflows", "List and inspect Arazzo workflows"),
     ("spec", "Export reconstructed OpenAPI/Arazzo specs"),
     (
         "import",
@@ -208,9 +205,6 @@ _ALL_COMMAND_PATHS: tuple[list[str], ...] = (
     ["paths", "show"],
     ["operations"],
     ["operations", "show"],
-    ["workflows"],
-    ["workflows", "list"],
-    ["workflows", "show"],
     ["spec"],
     ["spec", "export"],
     ["spec", "download-original"],
@@ -329,6 +323,7 @@ def test_global_api_key_overrides_env(httpx_mock: object) -> None:
     env = {
         "OBJECTIFIED_API_KEY": "env_key",
         "OBJECTIFIED_BASE_URL": "http://localhost:8000",
+        "OBJECTIFIED_TENANT_ID": "acme-corp",
     }
     result = runner.invoke(
         app,
