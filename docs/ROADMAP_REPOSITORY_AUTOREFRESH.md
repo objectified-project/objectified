@@ -124,7 +124,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | ~~RAR-2.4~~ ✅ | ~~#3521~~ | ~~RAR-3.1~~ ✅ | ~~#3522~~ | ~~RAR-3.2~~ ✅ | ~~#3523~~ |
 | ~~RAR-3.3~~ ✅ | ~~#3524~~ | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
 | ~~RAR-4.1~~ ✅ | ~~#3527~~ | ~~RAR-4.2~~ ✅ | ~~#3528~~ | ~~RAR-4.3~~ ✅ | ~~#3529~~ |
-| RAR-4.4 | #3530 | RAR-4.5 | #3531 | RAR-5.1 | #3532 |
+| ~~RAR-4.4~~ ✅ | ~~#3530~~ | RAR-4.5 | #3531 | RAR-5.1 | #3532 |
 | RAR-5.2 | #3533 | RAR-5.3 | #3534 | RAR-5.4 | #3535 |
 | RAR-5.5 | #3536 | RAR-5.6 | #3537 | RAR-6.1 | #3538 |
 | RAR-6.2 | #3539 | RAR-6.3 | #3540 | RAR-6.4 | #3541 |
@@ -490,7 +490,7 @@ Replay the original spec; version + protect.
 | ~~RAR-4.1~~ ✅ **Done** (#3527) | Re-import worker applies stored spec | Worker re-runs import with stored options, not defaults | `enhancement`,`mvp`,`import`,`repository`,`rest` | N | Y | L | objectified-ui (worker), objectified-rest |
 | ~~RAR-4.2~~ ✅ **Done** (#3528) | Version creation on refresh with provenance | New version links prior version + source commit | `enhancement`,`mvp`,`import`,`repository`,`versions` | N | Y | M | objectified-rest, objectified-db |
 | ~~RAR-4.3~~ ✅ **Done** (#3529) | Change report on refresh (dry-run reuse) | Produce diff/change report for each refresh | `enhancement`,`mvp`,`import` | Y | Y | M | objectified-ui, objectified-rest |
-| RAR-4.4 | Manual-edit divergence guard | Hold (don't clobber) if version edited since import | `enhancement`,`mvp`,`import`,`repository` | N | Y | L | objectified-rest |
+| ~~RAR-4.4~~ ✅ **Done** (#3530) | Manual-edit divergence guard | Hold (don't clobber) if version edited since import | `enhancement`,`mvp`,`import`,`repository` | N | Y | L | objectified-rest |
 | RAR-4.5 | Per-repo/file conflict policy | overwrite / hold-for-review / new-branch on divergence | `enhancement`,`import`,`repository` | Y | N | M | objectified-rest, objectified-ui |
 
 ### RAR-4.1 — Re-import worker applies stored spec
@@ -536,6 +536,21 @@ can override.
 **Acceptance criteria.** A post-import manual edit blocks silent overwrite; the file is marked
 `diverged` and a notification fires; default policy is hold-not-clobber.
 **Dependencies.** Depends RAR-2.3, RAR-4.2. **Parallel = N.**
+
+**Status of 4.4: ✅ Done (#3530).** New pure module `app/repository_divergence_guard.py` exposes
+`evaluate_divergence(...)` (and a raw-content `guard_divergence(...)` wrapper plus a
+`compute_content_checksum(...)` helper) returning a `DivergenceDecision` `{diverged, should_hold,
+reason, policy}`. It compares the post-import snapshot checksum against the current version's content
+checksum: equal → apply (`UNCHANGED`); different → divergence detected (`MANUAL_EDIT`) and, under the
+default hold-not-clobber `DivergencePolicy.HOLD`, `should_hold=True` so the overwrite is blocked and
+the file flagged `diverged` (the `diverged` axis `compute_refresh_status` already overlays, RAR-2.3); a
+missing snapshot fails open (`NO_BASELINE`); a missing current content with a snapshot present holds.
+The RAR-4.5 `OVERWRITE` policy still *reports* divergence (`diverged=True`) but permits the clobber
+(`should_hold=False`). Like RAR-2.2/2.4 the module is pure and DB-free; capturing the post-import
+snapshot at import time, persisting the `diverged` flag, and firing the RAR-5.4 notification on a HOLD
+is the EPIC-4 dispatcher's job (mirroring how RAR-4.1/4.2/4.3 deferred their persistence and wiring).
+DB-free fixtures (`tests/test_repository_divergence_guard.py`) cover all three acceptance criteria, the
+decision table, the policy override, the fail-open/missing-current edges, and the checksum helper.
 
 ### RAR-4.2 / 4.3 / 4.5
 - **4.2** extend REPO-12.3 provenance to record `parent_version_id` + `source_commit_sha` on refresh.
