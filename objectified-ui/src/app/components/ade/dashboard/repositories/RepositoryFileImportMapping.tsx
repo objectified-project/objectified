@@ -20,6 +20,7 @@ import { generateSlug } from '@/app/utils/slug';
 import ImportExecutionPanel from '@/app/components/ade/dashboard/ImportExecutionPanel';
 import ImportCompletePanel from '@/app/components/ade/dashboard/ImportCompletePanel';
 import type { ImportOptions } from '@/app/components/ade/dashboard/PreviewPanel';
+import { ImportOptionsForm } from '@/app/components/ade/dashboard/ImportOptionsForm';
 import { Button } from '@/app/components/ui/Button';
 import {
   Dialog,
@@ -240,6 +241,19 @@ export function RepositoryFileImportMapping({
   const [catalogImportSucceeded, setCatalogImportSucceeded] = useState(false);
   const dryRunRef = useRef(false);
 
+  // User-adjustable import options for this file. Initialized from the spec
+  // analysis once the file content loads and editable via the Import options card.
+  // Persisted with the import (RAR-1.2) so an auto-refresh can replay them.
+  const [importOptions, setImportOptions] = useState<ImportOptions | null>(null);
+  const importOptionsFilePathRef = useRef<string | null>(null);
+
+  const updateImportOption = useCallback(
+    <K extends keyof ImportOptions>(key: K, value: ImportOptions[K]) => {
+      setImportOptions((prev) => (prev ? { ...prev, [key]: value } : prev));
+    },
+    []
+  );
+
   const specMetadata = useMemo(
     () => parseRepositoryFileSpecMetadata(payload?.content ?? '', file.path),
     [payload?.content, file.path]
@@ -262,6 +276,33 @@ export function RepositoryFileImportMapping({
 
   const specVersionLabel = specMetadata.version?.trim() || null;
   const willCreateLabel = specVersionLabel ? `v${specVersionLabel}` : 'v… (set info.version in the spec)';
+
+  // Initialize the editable import options from the spec analysis once per loaded
+  // file. Re-analyzing only when the file path changes preserves the user's edits
+  // across unrelated re-renders.
+  useEffect(() => {
+    const content = payload?.content;
+    if (importableVerdict.status !== 'importable' || typeof content !== 'string' || !content.trim()) {
+      return;
+    }
+    if (importOptionsFilePathRef.current === file.path) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const analysis = await analyzeSpecification(content, analysisFilenameForRepoImport(file.path));
+        if (cancelled) return;
+        importOptionsFilePathRef.current = file.path;
+        setImportOptions(defaultImportOptionsFromAnalysis(analysis));
+      } catch {
+        // Parsing problems are already surfaced via importableVerdict; leave options unset.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [payload?.content, file.path, importableVerdict.status]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -544,16 +585,18 @@ export function RepositoryFileImportMapping({
           return;
         }
 
-        const importOptions = defaultImportOptionsFromAnalysis(analysis);
+        // Use the user-edited options when available, falling back to the spec
+        // defaults (e.g. if the file was submitted before analysis finished).
+        const effectiveOptions: ImportOptions = importOptions ?? defaultImportOptionsFromAnalysis(analysis);
         if (targetMode === 'existing' && stagedProject) {
-          importOptions.projectName = stagedProject.name;
-          importOptions.projectSlug = stagedProject.slug;
+          effectiveOptions.projectName = stagedProject.name;
+          effectiveOptions.projectSlug = stagedProject.slug;
         } else if (newProjectFormSnapshot) {
-          importOptions.projectName = newProjectFormSnapshot.projectName.trim();
-          importOptions.projectSlug = newProjectFormSnapshot.projectSlug.trim();
+          effectiveOptions.projectName = newProjectFormSnapshot.projectName.trim();
+          effectiveOptions.projectSlug = newProjectFormSnapshot.projectSlug.trim();
         }
 
-        dryRunRef.current = Boolean(importOptions.dryRun);
+        dryRunRef.current = Boolean(effectiveOptions.dryRun);
 
         const document = analysis.document;
         const sourceKind = analysis.format === 'arazzo' ? 'arazzo' : 'openapi';
@@ -570,38 +613,38 @@ export function RepositoryFileImportMapping({
             blobSha: payload?.blob_sha ?? file.blob_sha ?? null,
           },
           project: {
-            name: importOptions.projectName || (document?.info?.title || 'New Project'),
+            name: effectiveOptions.projectName || (document?.info?.title || 'New Project'),
             slug:
-              importOptions.projectSlug ||
+              effectiveOptions.projectSlug ||
               generateSlug(document?.info?.title || 'new-project') ||
               'imported-project',
             description: document?.info?.description || null,
           },
           version: {
-            versionId: importOptions.targetVersion || (document?.info?.version || '1.0.0'),
+            versionId: effectiveOptions.targetVersion || (document?.info?.version || '1.0.0'),
             description: 'Imported from OpenAPI specification',
           },
           options: {
-            selectedSchemas: importOptions.selectedSchemas,
-            applyNamingConvention: importOptions.applyNamingConvention ?? true,
-            classNamingConvention: importOptions.classNamingConvention ?? 'PascalCase',
-            propertyNamingConvention: importOptions.propertyNamingConvention ?? 'camelCase',
-            classNameMap: importOptions.classNameMap,
-            classPrefix: (importOptions.classPrefix ?? '').trim() || undefined,
-            classSuffix: (importOptions.classSuffix ?? '').trim() || undefined,
-            typeMapping: importOptions.typeMapping,
-            defaultValues: importOptions.defaultValues,
-            requiredOverrides: importOptions.requiredOverrides,
-            descriptionOverrides: importOptions.descriptionOverrides,
-            generateExamples: importOptions.generateExamples ?? false,
-            dryRun: importOptions.dryRun ?? false,
-            incrementalMode: importOptions.incrementalMode ?? false,
+            selectedSchemas: effectiveOptions.selectedSchemas,
+            applyNamingConvention: effectiveOptions.applyNamingConvention ?? true,
+            classNamingConvention: effectiveOptions.classNamingConvention ?? 'PascalCase',
+            propertyNamingConvention: effectiveOptions.propertyNamingConvention ?? 'camelCase',
+            classNameMap: effectiveOptions.classNameMap,
+            classPrefix: (effectiveOptions.classPrefix ?? '').trim() || undefined,
+            classSuffix: (effectiveOptions.classSuffix ?? '').trim() || undefined,
+            typeMapping: effectiveOptions.typeMapping,
+            defaultValues: effectiveOptions.defaultValues,
+            requiredOverrides: effectiveOptions.requiredOverrides,
+            descriptionOverrides: effectiveOptions.descriptionOverrides,
+            generateExamples: effectiveOptions.generateExamples ?? false,
+            dryRun: effectiveOptions.dryRun ?? false,
+            incrementalMode: effectiveOptions.incrementalMode ?? false,
           },
           existingProjectId: catalogProjectId,
         });
 
         setCatalogImportJobId(job.jobId);
-        setCatalogImportSchemas(importOptions.selectedSchemas);
+        setCatalogImportSchemas(effectiveOptions.selectedSchemas);
         setCatalogImportAnalysis(analysis);
         setCatalogImportExecutionComplete(false);
         setCatalogImportSucceeded(false);
@@ -1050,6 +1093,28 @@ export function RepositoryFileImportMapping({
                     </label>
                   </div>
                 </>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+              <h3 className="mb-1 text-sm font-semibold text-gray-900 dark:text-gray-100">Import options</h3>
+              <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                How classes and properties are named and generated when this file is imported. These options are saved
+                with the import and replayed when the file is auto-refreshed.
+              </p>
+              {loading ? (
+                <div className="space-y-3" aria-hidden>
+                  <Skeleton className="h-10 w-full rounded-md" />
+                  <Skeleton className="h-10 w-full rounded-md" />
+                </div>
+              ) : importOptions ? (
+                <div className="flex flex-col gap-2" data-testid="repository-import-options">
+                  <ImportOptionsForm options={importOptions} onOptionChange={updateImportOption} />
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Load an importable spec (OpenAPI, Swagger, JSON Schema, Arazzo, GraphQL SDL) to adjust import options.
+                </p>
               )}
             </div>
 
