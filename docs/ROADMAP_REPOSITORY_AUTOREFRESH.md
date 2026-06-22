@@ -123,7 +123,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | ~~RAR-2.1~~ ✅ | ~~#3518~~ | ~~RAR-2.2~~ ✅ | ~~#3519~~ | ~~RAR-2.3~~ ✅ | ~~#3520~~ |
 | ~~RAR-2.4~~ ✅ | ~~#3521~~ | ~~RAR-3.1~~ ✅ | ~~#3522~~ | ~~RAR-3.2~~ ✅ | ~~#3523~~ |
 | ~~RAR-3.3~~ ✅ | ~~#3524~~ | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
-| RAR-4.1 | #3527 | RAR-4.2 | #3528 | RAR-4.3 | #3529 |
+| ~~RAR-4.1~~ ✅ | ~~#3527~~ | RAR-4.2 | #3528 | RAR-4.3 | #3529 |
 | RAR-4.4 | #3530 | RAR-4.5 | #3531 | RAR-5.1 | #3532 |
 | RAR-5.2 | #3533 | RAR-5.3 | #3534 | RAR-5.4 | #3535 |
 | RAR-5.5 | #3536 | RAR-5.6 | #3537 | RAR-6.1 | #3538 |
@@ -504,6 +504,18 @@ source descriptor (RAR-1.3).
 mapping) re-imports with the **same** options on refresh; golden-fixture test asserts byte-identical
 option application vs the original run.
 **Dependencies.** Depends RAR-1.2, RAR-3.2. **Parallel = N.**
+
+**Status: ✅ Done (#3527).** The spec-import worker now resolves its importer input through the pure,
+reusable `objectified-ui/lib/repository-auto-refresh-import.ts`. When `source_kind ==
+'repository_auto_import'` it hydrates the importer kind, options, and document parsing from the stored
+import spec carried in the metadata instead of importer defaults: options come from the verbatim
+captured blob (RAR-1.2), and the source descriptor (RAR-1.3) drives routing (`format_override` →
+importer kind) and parsing (`content_type` → JSON/YAML). On the REST side `SpecImportStartMetadata`
+gained an optional `repository_import_spec` (`SpecImportStoredSpec`), and
+`app/repository_refresh_executor.py` maps an enqueued RAR-3.2 refresh job row into that worker
+metadata. A golden-fixture test (`tests/repository-auto-refresh-worker.test.ts`) asserts byte-identical
+option application vs the original run; Python unit tests pin the row→metadata hydration. The OpenAPI
+contract is regenerated.
 
 ### RAR-4.4 — Manual-edit divergence guard
 

@@ -8287,6 +8287,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - tenant-repositories
+      summary: Update Tenant Repository
+      description: 'Patch mutable repository settings (RAR-3.3 auto-refresh toggle,
+        #3524).
+
+
+        Applies only the fields present in the request body. Currently the per-repo
+
+        ``auto_refresh_enabled`` opt-out: when set to False the auto-refresh sweep
+        skips
+
+        this repository (manual "Refresh Now" is unaffected). Returns the updated
+
+        repository record. 404 when the repository does not belong to the tenant.'
+      operationId: update_tenant_repository_v1_tenants__tenant_slug__repositories__repository_id__patch
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: repository_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Repository Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantRepositoryUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantRepositoryGetResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     delete:
       tags:
       - tenant-repositories
@@ -10637,6 +10703,22 @@ components:
       type: object
       title: PushWebhookSubscriptionUpdateRequest
       description: Update URL, active flag, and/or rotate signing secret (#2587).
+    RefreshStatus:
+      type: string
+      enum:
+      - up-to-date
+      - stale
+      - refreshing
+      - failed
+      - diverged
+      title: RefreshStatus
+      description: 'The materialized refresh state of a single imported repository
+        file.
+
+
+        Values are the stable wire/display codes (kebab-case) surfaced to the UI and
+
+        the sweep; they match the states in the roadmap state diagram.'
     RepositoryImportSpecRead:
       properties:
         spec_schema_version:
@@ -10665,6 +10747,36 @@ components:
         options:
           $ref: '#/components/schemas/SpecImportOptions'
           description: Full SpecImportOptions payload, upgraded to the current shape.
+        last_imported_commit_sha:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Imported Commit Sha
+          description: Branch tip commit SHA observed for this file at import time
+            (RAR-2.1).
+        last_imported_committed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Last Imported Committed At
+          description: Committed-at timestamp of the file at import time. A later
+            auto-refresh compares the remote committed_at against this anchor to gate
+            newer-than re-imports (RAR-2.1/RAR-2.2).
+        last_imported_blob_sha:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Imported Blob Sha
+          description: Blob SHA of the file content at import time (RAR-2.1).
+        refresh_status:
+          $ref: '#/components/schemas/RefreshStatus'
+          description: 'Materialized per-file refresh state (RAR-2.3): one of up-to-date
+            / stale / refreshing / failed / diverged. Derived from the current scan
+            recency vs the last_imported_* anchors, overlaid with any in-flight refresh,
+            last-attempt failure, or divergence hold.'
+          default: up-to-date
       additionalProperties: false
       type: object
       required:
@@ -11432,7 +11544,10 @@ components:
           type: string
           title: Source Kind
           description: Importer discriminator (for example openapi-3, asyncapi-2,
-            protobuf). Supported values match product import kinds.
+            protobuf). Supported values match product import kinds. The synthetic
+            value 'repository_auto_import' marks a repository auto-refresh, in which
+            case the importer kind/options/parsing come from 'repository_import_spec'
+            rather than this metadata (RAR-4.1).
         project:
           $ref: '#/components/schemas/SpecImportProjectTarget'
         version:
@@ -11446,6 +11561,12 @@ components:
             catalog project id.
         options:
           $ref: '#/components/schemas/SpecImportOptions'
+        repository_import_spec:
+          anyOf:
+          - $ref: '#/components/schemas/SpecImportStoredSpec'
+          - type: 'null'
+          description: Stored import spec for a repository auto-refresh; required
+            and consulted only when source_kind is 'repository_auto_import' (RAR-4.1).
       additionalProperties: false
       type: object
       required:
@@ -11454,6 +11575,66 @@ components:
       - version
       title: SpecImportStartMetadata
       description: Shared metadata for JSON-base64 and multipart upload flows.
+    SpecImportStoredSpec:
+      properties:
+        source_kind:
+          type: string
+          title: Source Kind
+          description: Importer discriminator used at first import (for example openapi-3,
+            arazzo).
+        format_override:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Format Override
+          description: Resolved spec format the importer routed on (RAR-1.3); drives
+            format detection on refresh.
+        content_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Content Type
+          description: MIME type the document was read as at first import (RAR-1.3);
+            drives parsing on refresh.
+        options:
+          additionalProperties: true
+          type: object
+          title: Options
+          description: Verbatim options blob persisted at first import, replayed as-is.
+        spec_schema_version:
+          type: integer
+          title: Spec Schema Version
+          description: Envelope version of the stored spec (RAR-1.4).
+          default: 1
+      additionalProperties: false
+      type: object
+      required:
+      - source_kind
+      title: SpecImportStoredSpec
+      description: 'Stored import spec carried into the worker for a repository auto-refresh
+        (RAR-4.1).
+
+
+        A repository auto-refresh re-imports a file the user already imported, and
+        must
+
+        replay that original request rather than fall back to importer defaults. This
+
+        model carries the captured spec (RAR-1.1/1.2) and its source descriptor
+
+        (RAR-1.3) to the spec-import worker so it routes, parses, and applies options
+
+        identically to the first run.
+
+
+        ``options`` is the verbatim options blob persisted at first import (the worker''s
+
+        camelCase option shape), passed through untouched — not re-validated into
+        the
+
+        lossy :class:`SpecImportOptions` subset — so advanced options (class prefixes,
+
+        type mappings, …) survive the round-trip to the worker.'
     SpecImportVersionTarget:
       properties:
         version_id:
@@ -11918,6 +12099,10 @@ components:
           - type: integer
           - type: 'null'
           title: Branch Count
+        auto_refresh_enabled:
+          type: boolean
+          title: Auto Refresh Enabled
+          default: true
         created_at:
           anyOf:
           - type: string
@@ -11939,6 +12124,24 @@ components:
       title: TenantRepositoryRecord
       description: Single repository row returned to the UI (snake_case keys for the
         dashboard).
+    TenantRepositoryUpdate:
+      properties:
+        autoRefreshEnabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Autorefreshenabled
+      type: object
+      title: TenantRepositoryUpdate
+      description: 'Dashboard: patch mutable settings on a registered repository (RAR-3.3).
+
+
+        Only fields present in the request body are applied. Currently the per-repo
+
+        auto-refresh toggle (``auto_refresh_enabled``); accepts both the snake_case
+        and
+
+        camelCase spellings so the UI can send either.'
     TenantsMeResponse:
       properties:
         items:
