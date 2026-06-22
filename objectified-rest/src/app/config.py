@@ -40,6 +40,25 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Repository auto-refresh cadence (RAR-3.1, #3522). Per-repo cadence is stored
+    # in odb.tenant_repositories.refresh_interval_seconds; these set the default
+    # applied when a repo has no explicit value and the global minimum floor that
+    # clamps sub-floor per-repo values at read time.
+    refresh_default_interval_seconds: int = Field(
+        default=300,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_REFRESH_DEFAULT_INTERVAL",
+            "refresh_default_interval_seconds",
+        ),
+    )
+    refresh_min_interval_seconds: int = Field(
+        default=60,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_REFRESH_MIN_INTERVAL",
+            "refresh_min_interval_seconds",
+        ),
+    )
+
     @property
     def effective_database_url(self) -> str:
         """Get the database URL, preferring DATABASE_URL over building from components."""

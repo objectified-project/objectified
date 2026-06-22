@@ -121,7 +121,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | ~~RAR-1.1~~ ✅ | ~~#3512~~ | ~~RAR-1.2~~ ✅ | ~~#3513~~ | ~~RAR-1.3~~ ✅ | ~~#3514~~ |
 | ~~RAR-1.4~~ ✅ | ~~#3515~~ | ~~RAR-1.5~~ ✅ | ~~#3516~~ | RAR-1.6 | #3517 |
 | ~~RAR-2.1~~ ✅ | ~~#3518~~ | ~~RAR-2.2~~ ✅ | ~~#3519~~ | ~~RAR-2.3~~ ✅ | ~~#3520~~ |
-| ~~RAR-2.4~~ ✅ | ~~#3521~~ | RAR-3.1 | #3522 | RAR-3.2 | #3523 |
+| ~~RAR-2.4~~ ✅ | ~~#3521~~ | ~~RAR-3.1~~ ✅ | ~~#3522~~ | RAR-3.2 | #3523 |
 | RAR-3.3 | #3524 | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
 | RAR-4.1 | #3527 | RAR-4.2 | #3528 | RAR-4.3 | #3529 |
 | RAR-4.4 | #3530 | RAR-4.5 | #3531 | RAR-5.1 | #3532 |
@@ -362,7 +362,7 @@ Refresh "after a few minutes," configurable, safe under load.
 
 | ID | Title | Summary | Labels | Parallel | MVP | Cmplx | Modules |
 |----|-------|---------|--------|----------|-----|-------|---------|
-| RAR-3.1 | Configurable refresh cadence | Replace hardcoded 5s; per-repo interval (default ~5 min, min bound) | `enhancement`,`mvp`,`import`,`repository`,`automation` | N | Y | M | objectified-rest, objectified-db |
+| ~~RAR-3.1~~ ✅ **Done** (#3522) | Configurable refresh cadence | Replace hardcoded 5s; per-repo interval (default ~5 min, min bound) | `enhancement`,`mvp`,`import`,`repository`,`automation` | N | Y | M | objectified-rest, objectified-db |
 | RAR-3.2 | Refresh sweep → enqueue stale files | Periodic worker enqueues re-import jobs for stale, newer files | `enhancement`,`mvp`,`import`,`repository`,`automation` | N | Y | L | objectified-rest |
 | RAR-3.3 | Enable/disable auto-refresh (per-repo + global kill switch) | Toggle, with global env override | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-rest, objectified-ui |
 | RAR-3.4 | Refresh backoff + auto-pause (extend REPO-4.5) | Pause a repo's refresh after N consecutive failures | `enhancement`,`import`,`repository`,`automation` | Y | N | M | objectified-rest |
@@ -378,6 +378,25 @@ plus a global `OBJECTIFIED_REFRESH_MIN_INTERVAL` env floor. The sweep reads due 
 **Acceptance criteria.** Interval configurable per repo and globally; values below the floor are
 clamped with a warning; default behaves as ~5-minute refresh.
 **Dependencies.** Blocks RAR-3.2. **Parallel = N.**
+
+**Status: ✅ Done (#3522).** Migration `objectified-db/scripts/20260621-140000.sql` adds
+`refresh_interval_seconds` (`INTEGER NOT NULL DEFAULT 300`, with a named
+`ck_tenant_repositories_refresh_interval_positive` CHECK > 0) and the `last_refreshed_at` anchor to
+`odb.tenant_repositories`. `config.py` adds the global knobs `OBJECTIFIED_REFRESH_DEFAULT_INTERVAL`
+(300) and `OBJECTIFIED_REFRESH_MIN_INTERVAL` (60s floor). New pure module
+`objectified-rest/src/app/repository_refresh_cadence.py` holds the policy: `resolve_refresh_interval`
+applies the default and clamps sub-floor values up to the floor (logging a WARNING when it clamps;
+the floor itself can never drop below 1s), and `is_repository_due` decides whether a repo is due from
+its `last_refreshed_at` + effective interval (`now - last_refreshed_at >= interval`; never-refreshed →
+due; accepts datetime/ISO/naive-as-UTC). `database.py` exposes the sweep primitives the RAR-3.2 worker
+will iterate: `list_due_repositories` (DB-side `now()` due selection with the floor applied via
+`GREATEST(refresh_interval_seconds, floor)`, NULLS-first fair ordering, scannable-status filter),
+`mark_repository_refreshed` (advance the anchor each tick), and `set_repository_refresh_interval`
+(per-repo setter that persists the clamped value); the two repo read queries now surface the cadence
+columns. Tests: `tests/test_repository_refresh_cadence.py` (default/clamp/warning/floor + due-boundary
++ input-shape + config knobs) and the static migration guard
+`tests/test_repository_refresh_cadence_migration.py`. The periodic worker that calls these primitives
+(and advances `last_refreshed_at` each tick) is RAR-3.2; the per-repo UI toggle is RAR-3.3.
 
 ### RAR-3.2 — Refresh sweep → enqueue stale files
 
