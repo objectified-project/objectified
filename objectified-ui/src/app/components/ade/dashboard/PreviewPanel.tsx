@@ -26,6 +26,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/Collapsible';
+import { ImportOptionsForm } from './ImportOptionsForm';
 
 interface PreviewPanelProps {
   analysis: AnalysisResult;
@@ -1505,80 +1506,8 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
             </div>
           </div>
 
-          {/* Naming convention enforcement (#581) */}
-          <div className="col-span-4 flex flex-col gap-3 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={importOptions.applyNamingConvention ?? true}
-                onChange={(e) => handleOptionChange('applyNamingConvention', e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700"
-              />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Apply naming convention
-              </span>
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Convert class and property names to match your chosen conventions (e.g. PascalCase for classes, camelCase for properties).
-            </p>
-            {(importOptions.applyNamingConvention ?? true) && (
-              <div className="flex flex-wrap gap-4 pl-6">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Classes</label>
-                  <select
-                    value={importOptions.classNamingConvention ?? 'PascalCase'}
-                    onChange={(e) => handleOptionChange('classNamingConvention', e.target.value as ImportNamingConvention)}
-                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="PascalCase">PascalCase</option>
-                    <option value="camelCase">camelCase</option>
-                    <option value="snake_case">snake_case</option>
-                    <option value="kebab-case">kebab-case</option>
-                    <option value="none">None (keep original)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Properties</label>
-                  <select
-                    value={importOptions.propertyNamingConvention ?? 'camelCase'}
-                    onChange={(e) => handleOptionChange('propertyNamingConvention', e.target.value as ImportNamingConvention)}
-                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="PascalCase">PascalCase</option>
-                    <option value="camelCase">camelCase</option>
-                    <option value="snake_case">snake_case</option>
-                    <option value="kebab-case">kebab-case</option>
-                    <option value="none">None (keep original)</option>
-                  </select>
-                </div>
-              </div>
-            )}
-            <div className="flex flex-wrap gap-4 pl-6 pt-2 border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
-              <div className="flex-1 min-w-[140px]">
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Class name prefix</label>
-                <input
-                  type="text"
-                  value={importOptions.classPrefix ?? ''}
-                  onChange={(e) => handleOptionChange('classPrefix', e.target.value)}
-                  placeholder="e.g. Api"
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                />
-              </div>
-              <div className="flex-1 min-w-[140px]">
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Class name suffix</label>
-                <input
-                  type="text"
-                  value={importOptions.classSuffix ?? ''}
-                  onChange={(e) => handleOptionChange('classSuffix', e.target.value)}
-                  placeholder="e.g. Dto"
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                />
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 pl-6 mt-1">
-              Prefix and suffix are applied to every imported class name (e.g. Api + User + Dto → ApiUserDto).
-            </p>
-          </div>
+          {/* Naming convention enforcement (#581) — shared ImportOptionsForm */}
+          <ImportOptionsForm options={importOptions} onOptionChange={handleOptionChange} sections={['naming']} />
 
           {/* Property mapping: type mapping, default values, required override, description override (#757, #758, #759, #760) */}
           {(externalTypeKeys.length > 0 || requiredOverrideRows.length > 0 || descriptionOverrideRows.length > 0) && (
@@ -1842,59 +1771,8 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
             </div>
           )}
 
-          {/* Generate examples for properties without examples (#761) */}
-          <div className="col-span-4 flex items-start gap-3 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={importOptions.generateExamples ?? false}
-                onChange={(e) => handleOptionChange('generateExamples', e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700"
-              />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Generate examples
-              </span>
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Auto-generate example values for properties that don&apos;t have one (string, number, date, etc.).
-            </p>
-          </div>
-
-          {/* Dry run: preview without committing */}
-          <div className="col-span-4 flex items-start gap-3 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={importOptions.dryRun ?? false}
-                onChange={(e) => handleOptionChange('dryRun', e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700"
-              />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Dry run (preview only)
-              </span>
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Simulate the import and show what would be created. No project or data is saved.
-            </p>
-          </div>
-
-          {/* Incremental mode: skip failures */}
-          <div className="col-span-4 flex items-start gap-3 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={importOptions.incrementalMode ?? false}
-                onChange={(e) => handleOptionChange('incrementalMode', e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700"
-              />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Incremental mode (skip failures)
-              </span>
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Import all available classes and skip any that fail. Changes are saved as each class is imported; no single transaction.
-            </p>
-          </div>
+          {/* Generate examples / dry run / incremental mode — shared ImportOptionsForm */}
+          <ImportOptionsForm options={importOptions} onOptionChange={handleOptionChange} sections={['flags']} />
         </div>
       </div>
     </div>
