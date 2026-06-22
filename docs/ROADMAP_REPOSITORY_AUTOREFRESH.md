@@ -121,7 +121,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | ~~RAR-1.1~~ ✅ | ~~#3512~~ | ~~RAR-1.2~~ ✅ | ~~#3513~~ | ~~RAR-1.3~~ ✅ | ~~#3514~~ |
 | ~~RAR-1.4~~ ✅ | ~~#3515~~ | ~~RAR-1.5~~ ✅ | ~~#3516~~ | RAR-1.6 | #3517 |
 | ~~RAR-2.1~~ ✅ | ~~#3518~~ | ~~RAR-2.2~~ ✅ | ~~#3519~~ | ~~RAR-2.3~~ ✅ | ~~#3520~~ |
-| ~~RAR-2.4~~ ✅ | ~~#3521~~ | ~~RAR-3.1~~ ✅ | ~~#3522~~ | RAR-3.2 | #3523 |
+| ~~RAR-2.4~~ ✅ | ~~#3521~~ | ~~RAR-3.1~~ ✅ | ~~#3522~~ | ~~RAR-3.2~~ ✅ | ~~#3523~~ |
 | RAR-3.3 | #3524 | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
 | RAR-4.1 | #3527 | RAR-4.2 | #3528 | RAR-4.3 | #3529 |
 | RAR-4.4 | #3530 | RAR-4.5 | #3531 | RAR-5.1 | #3532 |
@@ -363,7 +363,7 @@ Refresh "after a few minutes," configurable, safe under load.
 | ID | Title | Summary | Labels | Parallel | MVP | Cmplx | Modules |
 |----|-------|---------|--------|----------|-----|-------|---------|
 | ~~RAR-3.1~~ ✅ **Done** (#3522) | Configurable refresh cadence | Replace hardcoded 5s; per-repo interval (default ~5 min, min bound) | `enhancement`,`mvp`,`import`,`repository`,`automation` | N | Y | M | objectified-rest, objectified-db |
-| RAR-3.2 | Refresh sweep → enqueue stale files | Periodic worker enqueues re-import jobs for stale, newer files | `enhancement`,`mvp`,`import`,`repository`,`automation` | N | Y | L | objectified-rest |
+| ~~RAR-3.2~~ ✅ **Done** (#3523) | Refresh sweep → enqueue stale files | Periodic worker enqueues re-import jobs for stale, newer files | `enhancement`,`mvp`,`import`,`repository`,`automation` | N | Y | L | objectified-rest |
 | RAR-3.3 | Enable/disable auto-refresh (per-repo + global kill switch) | Toggle, with global env override | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-rest, objectified-ui |
 | RAR-3.4 | Refresh backoff + auto-pause (extend REPO-4.5) | Pause a repo's refresh after N consecutive failures | `enhancement`,`import`,`repository`,`automation` | Y | N | M | objectified-rest |
 | RAR-3.5 | Per-tenant refresh quotas / fairness (extend REPO-4.6) | Bound refresh jobs per tenant per window | `enhancement`,`import`,`repository` | Y | N | M | objectified-rest |
@@ -420,6 +420,31 @@ flowchart TD
 **Acceptance criteria.** Only stale+newer files enqueue; each job carries the stored spec; per-repo
 single-flight; `last_refreshed_at` advanced each tick.
 **Dependencies.** Depends RAR-2.2, RAR-3.1, RAR-1.5; blocks EPIC-4. **Parallel = N.**
+
+**Status: ✅ Done (#3523).** Migration `objectified-db/scripts/20260621-150000.sql` adds the
+Postgres-backed hand-off queue `odb.tenant_repository_refresh_jobs`: each row snapshots the stored
+import spec (project, source descriptor, full `options_json`) plus the remote freshness signals
+(`remote_commit_sha` / `remote_committed_at` / `remote_blob_sha`) and the `refresh_reason`, so the
+EPIC-4 executor can replay the original request even if the spec row later changes. A partial unique
+index `uq_tenant_repo_refresh_jobs_active_lineage` enforces file-level single-flight (one active
+job per `(repository_id, branch, path)`). New module
+`objectified-rest/src/app/repository_refresh_sweep.py` is the sweep:
+`process_repository_refresh_sweep` iterates `list_due_repositories` (RAR-3.1), serializes each repo
+behind a Postgres **session advisory lock**
+(`try_acquire_repository_refresh_lock` / `release_repository_refresh_lock`,
+`pg_try_advisory_lock(hashtext('repo-refresh:'||id))`), rescans only the branches that have a stored
+spec via the reused REPO-2 walker (`repository_file_scan.scan_repository_branch_into_index`, factored
+out of the one-shot scan job for reuse), evaluates each indexed file with the RAR-2.2 newer-than
+comparator, and enqueues a spec-faithful re-import for every **stale + newer** file via
+`enqueue_repository_refresh_job` (idempotent on the lineage index). `last_refreshed_at` advances for
+every locked repo each tick — even on a rescan failure — so a broken repo cannot monopolize the
+sweep. The worker is wired into `main.py` as `_repository_refresh_sweep`, ticking on the
+`OBJECTIFIED_REFRESH_MIN_INTERVAL` floor and deferring the actual per-repo cadence to the DB-side due
+selection. Content-checksum idempotency (RAR-2.4) is deferred to the EPIC-4 executor, which downloads
+the file content the sweep does not. Tests: `tests/test_repository_refresh_sweep.py` (stale-only
+enqueue, spec snapshot carried, lock-held skip, anchor advanced on success/empty/failure, idempotent
+no-double-count, multi-branch) and the static migration guard
+`tests/test_repository_refresh_jobs_migration.py`.
 
 ### RAR-3.3 / 3.4 / 3.5
 - **3.3** per-repo `auto_refresh_enabled` + a global kill switch (ops safety).
