@@ -118,7 +118,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 |----|-------|----|-------|----|-------|
 | RAR-EPIC-1 | #3506 | RAR-EPIC-2 | #3507 | RAR-EPIC-3 | #3508 |
 | RAR-EPIC-4 | #3509 | RAR-EPIC-5 | #3510 | RAR-EPIC-6 | #3511 |
-| ~~RAR-1.1~~ ✅ | ~~#3512~~ | RAR-1.2 | #3513 | RAR-1.3 | #3514 |
+| ~~RAR-1.1~~ ✅ | ~~#3512~~ | ~~RAR-1.2~~ ✅ | ~~#3513~~ | RAR-1.3 | #3514 |
 | RAR-1.4 | #3515 | RAR-1.5 | #3516 | RAR-1.6 | #3517 |
 | RAR-2.1 | #3518 | RAR-2.2 | #3519 | RAR-2.3 | #3520 |
 | RAR-2.4 | #3521 | RAR-3.1 | #3522 | RAR-3.2 | #3523 |
@@ -139,7 +139,7 @@ Persist exactly what the user asked for at import time so it can be replayed.
 | ID | Title | Summary | Labels | Parallel | MVP | Cmplx | Modules |
 |----|-------|---------|--------|----------|-----|-------|---------|
 | ~~RAR-1.1~~ ✅ **Done** (#3512) | `repository_import_spec` data model | New table storing the full import spec keyed to an imported file | `enhancement`,`mvp`,`import`,`repository`,`data-model` | N | Y | M | objectified-db, objectified-rest |
-| RAR-1.2 | Persist `SpecImportOptions` at import time | Write the options blob on every successful import (manual + auto) | `enhancement`,`mvp`,`import`,`repository`,`rest` | N | Y | M | objectified-rest, objectified-ui |
+| ~~RAR-1.2~~ ✅ **Done** (#3513) | Persist `SpecImportOptions` at import time | Write the options blob on every successful import (manual + auto) | `enhancement`,`mvp`,`import`,`repository`,`rest` | N | Y | M | objectified-rest, objectified-ui |
 | RAR-1.3 | Capture source descriptor | Store kind, filename, `--format` override, content-type used | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-rest |
 | RAR-1.4 | Versioned spec envelope (`spec_schema_version`) | Forward-compatible envelope so stored specs survive option changes | `enhancement`,`mvp`,`import`,`data-model` | Y | Y | S | objectified-rest |
 | RAR-1.5 | REST: read stored import spec | `GET …/repository-imports/{id}/spec` returns the captured spec | `enhancement`,`mvp`,`import`,`rest` | Y | Y | S | objectified-rest |
@@ -201,6 +201,14 @@ site so capture is atomic with the audit row.
 **Acceptance criteria.** Manual import and existing auto-import both write a spec row; re-import of the
 same path updates it; unit + integration tests assert persisted == submitted.
 **Dependencies.** Depends RAR-1.1. **Parallel = N.**
+
+**Status: ✅ Done (#3513).** `repository-import-metrics.ts` gains `upsertRepositoryImportSpec`
+(idempotent on the `(repository_id, branch, path)` unique constraint, tenant-guarded); `import-helper.ts`
+calls it from the shared post-success metric step, so both the manual and the REPO-12 auto-import path
+capture the submitted options atomically with the audit row. Capture is best-effort — a failure logs but
+never fails the import. Source-descriptor slots (`format_override`, `content_type`) are threaded through
+as nullable and fully populated by RAR-1.3. Unit tests assert the lossless options round-trip and idempotent
+upsert; an integration test drives a full import and asserts persisted == submitted.
 
 ### RAR-1.3 / 1.4 / 1.5 / 1.6
 - **1.3** persist the source descriptor (kind/filename/format/content-type) — needed so replay sniffs
