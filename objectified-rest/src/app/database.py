@@ -6003,6 +6003,27 @@ class Database:
         """
         return self.execute_query(q, (tenant_id,))
 
+    def list_active_push_webhook_subscription_ids(self, tenant_id: str) -> List[str]:
+        """Return the ids of every active (non-deleted) push-webhook subscription for a tenant.
+
+        Used by the refresh-notification fan-out (RAR-5.4) to enqueue one delivery
+        per subscribed channel. Inactive and soft-deleted subscriptions are excluded
+        so a notification is never queued for a channel that cannot receive it.
+
+        Args:
+            tenant_id: Owning tenant id.
+
+        Returns:
+            A list of subscription id strings (possibly empty), newest first.
+        """
+        q = """
+            SELECT id
+            FROM odb.push_webhook_subscriptions
+            WHERE tenant_id = %s::uuid AND active = true AND deleted_at IS NULL
+            ORDER BY created_at DESC
+        """
+        return [str(row["id"]) for row in self.execute_query(q, (tenant_id,))]
+
     def get_push_webhook_subscription(
         self, tenant_id: str, subscription_id: str
     ) -> Optional[Dict[str, Any]]:

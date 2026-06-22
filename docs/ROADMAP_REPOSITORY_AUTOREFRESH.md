@@ -125,7 +125,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | ~~RAR-3.3~~ ✅ | ~~#3524~~ | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
 | ~~RAR-4.1~~ ✅ | ~~#3527~~ | ~~RAR-4.2~~ ✅ | ~~#3528~~ | ~~RAR-4.3~~ ✅ | ~~#3529~~ |
 | ~~RAR-4.4~~ ✅ | ~~#3530~~ | RAR-4.5 | #3531 | ~~RAR-5.1~~ ✅ | ~~#3532~~ |
-| ~~RAR-5.2~~ ✅ | ~~#3533~~ | ~~RAR-5.3~~ ✅ | ~~#3534~~ | RAR-5.4 | #3535 |
+| ~~RAR-5.2~~ ✅ | ~~#3533~~ | ~~RAR-5.3~~ ✅ | ~~#3534~~ | ~~RAR-5.4~~ ✅ | ~~#3535~~ |
 | RAR-5.5 | #3536 | RAR-5.6 | #3537 | RAR-6.1 | #3538 |
 | RAR-6.2 | #3539 | RAR-6.3 | #3540 | RAR-6.4 | #3541 |
 | RAR-6.5 | #3542 | | | | |
@@ -610,7 +610,7 @@ wiring.
 | ~~RAR-5.1~~ ✅ **Done** (#3532) | Per-file refresh status UI | Specs tab shows status, last-refreshed, next-due, divergence | `enhancement`,`mvp`,`import`,`repository`,`ui` | Y | Y | M | objectified-ui |
 | ~~RAR-5.2~~ ✅ **Done** (#3533) | "Refresh Now" one-shot (extend REPO-9.5) | Manual spec-faithful refresh per file/repo | `enhancement`,`mvp`,`import`,`repository`,`ui` | Y | Y | S | objectified-ui, objectified-rest |
 | ~~RAR-5.3~~ ✅ **Done** (#3534) | Refresh history + change-report linking (extend REPO-12.6) | Audit each refresh cycle with diff link | `enhancement`,`mvp`,`import`,`repository` | Y | Y | M | objectified-rest |
-| RAR-5.4 | Refresh notifications (extend REPO-12.5) | Notify on new version / divergence / failure | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-rest |
+| ~~RAR-5.4~~ ✅ **Done** (#3535) | Refresh notifications (extend REPO-12.5) | Notify on new version / divergence / failure | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-rest |
 | RAR-5.5 | Dashboard widget: stale specs / refresh activity (extend REPO-11) | At-a-glance refresh health | `enhancement`,`import`,`repository`,`dashboard` | Y | N | M | objectified-ui |
 | RAR-5.6 | CLI `objectified repository refresh` + status | Trigger / inspect refresh from CLI | `enhancement`,`import`,`cli` | Y | N | M | objectified-cli |
 
@@ -684,6 +684,31 @@ the dispatcher's job, mirroring how RAR-4.1/4.2/4.3/4.4 deferred their wiring. T
 lineage capture, enum guarding, and the DAO SQL contract for per-repo/per-file query) and
 `tests/test_repository_refresh_history_api.py` (per-repo + per-file query, filter forwarding, 404,
 detail→field projection, pagination).
+
+**Status (5.4): ✅ Done (#3535).** New objectified-rest module
+`app/repository_refresh_notifications.py` turns the three *interesting* refresh outcomes into
+notifications delivered over the **existing** push-webhook channels (`odb.push_webhook_subscriptions` /
+`push_webhook_delivery_events`, #2587/#2588) — extending REPO-12.5 (#2954) failure notifications to the
+auto-refresh loop. Only `new-version` (RAR-4.2), `diverged` (RAR-4.4 hold), and `failed` outcomes fire,
+each under a namespaced event type (`repository.refresh.new_version` / `.diverged` / `.failed`); an
+`unchanged` no-op (RAR-2.4) is intentionally **silent** so the channels stay quiet in the common case.
+The module reuses the `RefreshOutcome` / `RefreshTrigger` vocabulary and the lineage/link facets from the
+RAR-5.3 audit module, so a notification a stakeholder receives and a history row a reviewer reads describe
+the same cycle in the same terms. **Preferences are honored**: `RefreshNotificationPreferences` gives each
+notifiable outcome an independent toggle (all on by default, mirroring REPO-12.5's `auto_import_failed` /
+`auto_import_breaking` defaults), parsed tolerantly from a stored blob (`from_mapping` accepts the
+`user_settings.notifications.repository` aliases and **fails open** on partial/malformed data); a muted
+outcome enqueues nothing. **Links** are carried in every payload: a deep-link to the review action
+(`reviewHref`, mirroring the RAR-5.1 `repositorySpecReviewHref` convention) plus the `versionId` /
+`changeReportId` (RAR-4.2/4.3) that resolve the change report. Fan-out enqueues one delivery per active
+tenant subscription (new DAO `list_active_push_webhook_subscription_ids`) and is **best-effort** — a
+per-subscription enqueue failure is logged and skipped and the function never raises, so a notification
+problem cannot break the refresh it describes (**no migration; objectified-rest only**). Invoking
+`notify_refresh_outcome(...)` from the EPIC-4 refresh dispatcher (after the version + change report land)
+is the dispatcher's job, mirroring how RAR-4.x and RAR-5.3 deferred their wiring. Tests:
+`tests/test_repository_refresh_notifications.py` (notifiability rule, per-outcome + per-toggle gating,
+preference parsing incl. aliases / partial / null, payload assembly + review-href encoding, fan-out across
+subscriptions, silent/muted/no-subscription short-circuits, best-effort skip-on-error, and enum guarding).
 
 ---
 
