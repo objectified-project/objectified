@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, Field, AliasChoices, ConfigDict, model_validator
-from typing import Optional, Dict, Any, List, Union, Literal
+from typing import Callable, Optional, Dict, Any, List, Union, Literal
 
 
 class TagSchema(BaseModel):
@@ -274,6 +274,141 @@ class RepositoryImportSpec(BaseModel):
     created_by: Optional[str] = None
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
+
+
+# --- Versioned spec envelope upgrade path (RAR-1.4, #3515) -------------------
+#
+# A persisted import spec is a forward-compatible envelope:
+# ``{ spec_schema_version, options }``. When the ``SpecImportOptions`` shape
+# changes (a renamed or dropped field, a new default), the envelope version is
+# bumped and a single-step upgrader is registered below so that *reads* of an
+# older row migrate the stored ``options`` blob forward to the current shape
+# before it is validated. Without this, a raw blob with no version marker — or
+# one written under an older shape — would be impossible to interpret safely and
+# would break replay of old imports.
+#
+# An upgrader migrates an ``options`` dict from version N to version N+1. The
+# registry is keyed by the *source* version N; ``upgrade_repository_import_options``
+# walks it one step at a time up to ``REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION``.
+RepositoryImportOptionsUpgrader = Callable[[Dict[str, Any]], Dict[str, Any]]
+
+
+def _upgrade_repository_import_options_v0_to_v1(
+    options: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Migrate a pre-envelope (version 0) options blob to the version 1 shape.
+
+    Version 0 is the legacy "raw ``options_json`` blob with no ``spec_schema_version``
+    marker" described in the ticket: a spec persisted before the versioned
+    envelope existed (or one whose marker is missing/``NULL``). It may carry keys
+    that are no longer part of ``SpecImportOptions``. This upgrader keeps only the
+    keys the current model recognizes, so the result validates under the
+    ``extra="forbid"`` model; fields absent from the legacy blob fall back to
+    their current defaults at validation time.
+
+    Args:
+        options: The legacy version-0 options dictionary.
+
+    Returns:
+        A new dictionary containing only keys valid for the version-1 shape.
+    """
+    known_fields = set(SpecImportOptions.model_fields.keys())
+    return {key: value for key, value in options.items() if key in known_fields}
+
+
+# Single-step upgraders keyed by the source envelope version they migrate *from*.
+# To add a v1 -> v2 migration: bump ``REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION`` to
+# 2 and register ``1: _upgrade_..._v1_to_v2`` here. No read site changes.
+_REPOSITORY_IMPORT_OPTIONS_UPGRADERS: Dict[int, RepositoryImportOptionsUpgrader] = {
+    0: _upgrade_repository_import_options_v0_to_v1,
+}
+
+
+def upgrade_repository_import_options(
+    options: Optional[Dict[str, Any]],
+    from_version: Optional[int],
+) -> Dict[str, Any]:
+    """Migrate a stored options dict forward to the current envelope shape.
+
+    Applies the registered single-step upgraders in order, starting at
+    ``from_version`` and stopping at ``REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION``.
+    A missing/``None`` version is treated as the unversioned legacy shape
+    (version 0). When ``from_version`` already equals the current version the
+    options are returned as a shallow copy, untouched.
+
+    Args:
+        options: The stored options dictionary (may be ``None`` or empty).
+        from_version: The envelope version the options were stored under;
+            ``None`` is interpreted as version 0 (legacy, unmarked).
+
+    Returns:
+        The options dictionary migrated to the current envelope shape.
+
+    Raises:
+        ValueError: If ``from_version`` is newer than this code understands
+            (a downgrade), or if no upgrader is registered for an intermediate
+            version (a gap in the migration chain).
+    """
+    version = 0 if from_version is None else int(from_version)
+    if version > REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION:
+        raise ValueError(
+            "Stored import spec envelope version "
+            f"{version} is newer than the supported version "
+            f"{REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION}; cannot downgrade."
+        )
+
+    migrated: Dict[str, Any] = dict(options or {})
+    while version < REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION:
+        upgrader = _REPOSITORY_IMPORT_OPTIONS_UPGRADERS.get(version)
+        if upgrader is None:
+            raise ValueError(
+                "No upgrader registered for repository import options envelope "
+                f"version {version}; cannot migrate to version "
+                f"{REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION}."
+            )
+        migrated = upgrader(migrated)
+        version += 1
+    return migrated
+
+
+def load_repository_import_options(
+    envelope: Optional[Dict[str, Any]],
+) -> SpecImportOptions:
+    """Read a stored import-spec envelope and return current-shape options.
+
+    This is the read entry point for persisted specs: it pulls the stored
+    options blob and ``spec_schema_version`` out of a DAO row (or any
+    envelope-shaped dict), migrates the blob forward with
+    ``upgrade_repository_import_options``, and validates it into a current
+    ``SpecImportOptions``. Repository auto-refresh uses it to replay the user's
+    original request regardless of when the spec was written.
+
+    The options blob is read from ``options_json`` (the DAO/JSONB column name)
+    or, failing that, ``options`` (the model field name); a JSON-encoded string
+    is decoded transparently for cursors that return JSONB as text.
+
+    Args:
+        envelope: A stored import-spec row or envelope dict, or ``None``.
+
+    Returns:
+        A validated, current-shape ``SpecImportOptions`` (defaults when the
+        envelope is ``None`` or carries no options).
+    """
+    if not envelope:
+        return SpecImportOptions()
+
+    raw = envelope.get("options_json")
+    if raw is None:
+        raw = envelope.get("options")
+    if isinstance(raw, str):
+        import json
+
+        raw = json.loads(raw) if raw.strip() else {}
+    if raw is None:
+        raw = {}
+
+    migrated = upgrade_repository_import_options(raw, envelope.get("spec_schema_version"))
+    return SpecImportOptions.model_validate(migrated)
 
 
 class SpecImportStartMetadata(BaseModel):

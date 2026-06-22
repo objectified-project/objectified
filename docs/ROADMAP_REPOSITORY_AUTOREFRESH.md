@@ -119,7 +119,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | RAR-EPIC-1 | #3506 | RAR-EPIC-2 | #3507 | RAR-EPIC-3 | #3508 |
 | RAR-EPIC-4 | #3509 | RAR-EPIC-5 | #3510 | RAR-EPIC-6 | #3511 |
 | ~~RAR-1.1~~ ✅ | ~~#3512~~ | ~~RAR-1.2~~ ✅ | ~~#3513~~ | ~~RAR-1.3~~ ✅ | ~~#3514~~ |
-| RAR-1.4 | #3515 | RAR-1.5 | #3516 | RAR-1.6 | #3517 |
+| ~~RAR-1.4~~ ✅ | ~~#3515~~ | RAR-1.5 | #3516 | RAR-1.6 | #3517 |
 | RAR-2.1 | #3518 | RAR-2.2 | #3519 | RAR-2.3 | #3520 |
 | RAR-2.4 | #3521 | RAR-3.1 | #3522 | RAR-3.2 | #3523 |
 | RAR-3.3 | #3524 | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
@@ -141,7 +141,7 @@ Persist exactly what the user asked for at import time so it can be replayed.
 | ~~RAR-1.1~~ ✅ **Done** (#3512) | `repository_import_spec` data model | New table storing the full import spec keyed to an imported file | `enhancement`,`mvp`,`import`,`repository`,`data-model` | N | Y | M | objectified-db, objectified-rest |
 | ~~RAR-1.2~~ ✅ **Done** (#3513) | Persist `SpecImportOptions` at import time | Write the options blob on every successful import (manual + auto) | `enhancement`,`mvp`,`import`,`repository`,`rest` | N | Y | M | objectified-rest, objectified-ui |
 | ~~RAR-1.3~~ ✅ **Done** (#3514) | Capture source descriptor | Store kind, filename, `--format` override, content-type used | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-ui |
-| RAR-1.4 | Versioned spec envelope (`spec_schema_version`) | Forward-compatible envelope so stored specs survive option changes | `enhancement`,`mvp`,`import`,`data-model` | Y | Y | S | objectified-rest |
+| ~~RAR-1.4~~ ✅ **Done** (#3515) | Versioned spec envelope (`spec_schema_version`) | Forward-compatible envelope so stored specs survive option changes | `enhancement`,`mvp`,`import`,`data-model` | Y | Y | S | objectified-rest |
 | RAR-1.5 | REST: read stored import spec | `GET …/repository-imports/{id}/spec` returns the captured spec | `enhancement`,`mvp`,`import`,`rest` | Y | Y | S | objectified-rest |
 | RAR-1.6 | Backfill best-effort specs for historical imports | Migration seeds a default spec for pre-existing imports | `enhancement`,`import`,`repository`,`data-model` | Y | N | M | objectified-db, objectified-rest |
 

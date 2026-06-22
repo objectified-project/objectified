@@ -6970,6 +6970,34 @@ class Database:
         results = self.execute_query(query, (tenant_id, repository_id, branch, path))
         return results[0] if results else None
 
+    def get_repository_import_options(
+        self, tenant_id: str, repository_id: str, branch: str, path: str
+    ) -> Optional[Dict[str, Any]]:
+        """Return the stored import options for one file, migrated to the current shape.
+
+        Reads the persisted envelope and applies the versioned upgrade path
+        (RAR-1.4): if the row's ``spec_schema_version`` is older than the current
+        envelope version, the stored ``options_json`` blob is migrated forward so
+        the caller always receives a current-shape options dictionary, regardless
+        of when the spec was written. Used by repository auto-refresh to replay
+        the user's original request.
+
+        Args:
+            tenant_id: Owning tenant id (scopes the lookup).
+            repository_id: Source repository id.
+            branch: Branch the file was imported from.
+            path: Repository-relative file path (lineage key).
+
+        Returns:
+            The current-shape options as a dict, or None when no spec exists.
+        """
+        from .models import load_repository_import_options
+
+        row = self.get_repository_import_spec(tenant_id, repository_id, branch, path)
+        if row is None:
+            return None
+        return load_repository_import_options(row).model_dump()
+
     def get_public_browse_directory_stats(self) -> Dict[str, int]:
         """Counts for tenants/projects/versions with published public revisions (browse directory)."""
         query = """
