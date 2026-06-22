@@ -205,6 +205,37 @@ describe('Import-time spec capture (RAR-1.2, #3513)', () => {
     expect(mockUpsertRepositoryImportSpec).not.toHaveBeenCalled();
   });
 
+  test('the source descriptor (format/content-type) is forwarded to capture (RAR-1.3)', async () => {
+    const input = repositoryImportInput();
+    input.repositorySource = {
+      ...input.repositorySource,
+      formatOverride: 'swagger',
+      contentType: 'application/json',
+    } as typeof input.repositorySource;
+
+    const helper = await import('../lib/db/import-helper');
+    const { jobId } = await helper.startImport(input);
+
+    const status = await runImportToCompletion(helper, jobId);
+    expect(status.state).toBe('completed');
+
+    expect(mockUpsertRepositoryImportSpec).toHaveBeenCalledTimes(1);
+    const arg = mockUpsertRepositoryImportSpec.mock.calls[0][0] as any;
+    expect(arg.formatOverride).toBe('swagger');
+    expect(arg.contentType).toBe('application/json');
+  });
+
+  test('a missing source descriptor is captured as null (RAR-1.3)', async () => {
+    const helper = await import('../lib/db/import-helper');
+    const { jobId } = await helper.startImport(repositoryImportInput());
+
+    await runImportToCompletion(helper, jobId);
+
+    const arg = mockUpsertRepositoryImportSpec.mock.calls[0][0] as any;
+    expect(arg.formatOverride).toBeNull();
+    expect(arg.contentType).toBeNull();
+  });
+
   test('a spec-capture failure does not fail the import', async () => {
     mockUpsertRepositoryImportSpec.mockRejectedValueOnce(new Error('db down') as never);
 
