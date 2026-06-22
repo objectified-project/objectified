@@ -1509,6 +1509,7 @@ class Database:
                    v.forked_from_revision_id, v.upstream_project_id,
                    v.revision_locked, v.metadata,
                    v.commit_author, v.commit_message, v.external_ref,
+                   v.source_commit_sha, v.source_committed_at,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1573,6 +1574,7 @@ class Database:
                    v.forked_from_revision_id, v.upstream_project_id,
                    v.revision_locked, v.metadata,
                    v.commit_author, v.commit_message, v.external_ref,
+                   v.source_commit_sha, v.source_committed_at,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1602,6 +1604,7 @@ class Database:
                    v.forked_from_revision_id, v.upstream_project_id,
                    v.revision_locked, v.metadata,
                    v.commit_author, v.commit_message, v.external_ref,
+                   v.source_commit_sha, v.source_committed_at,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1725,17 +1728,26 @@ class Database:
         commit_author: Optional[str] = None,
         commit_message: Optional[str] = None,
         external_ref: Optional[str] = None,
+        source_commit_sha: Optional[str] = None,
+        source_committed_at: Optional[Any] = None,
     ) -> Dict[str, Any]:
-        """Create a new version."""
+        """Create a new version.
+
+        ``source_commit_sha`` / ``source_committed_at`` record RAR-4.2 refresh
+        provenance: the repository source commit that produced this revision. Both
+        default to ``None`` for hand-authored / non-repository revisions.
+        """
         query = """
             INSERT INTO odb.versions
             (project_id, creator_id, version_id, description, change_log,
-             commit_author, commit_message, external_ref)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+             commit_author, commit_message, external_ref,
+             source_commit_sha, source_committed_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, project_id, creator_id, version_id, description,
                       change_log, visibility, published, published_at,
                       enabled, parent_version_id, merge_parent_version_id,
                       commit_author, commit_message, external_ref,
+                      source_commit_sha, source_committed_at,
                       created_at, updated_at
         """
 
@@ -1753,11 +1765,88 @@ class Database:
                         commit_author,
                         commit_message,
                         external_ref,
+                        source_commit_sha,
+                        source_committed_at,
                     ),
                 )
                 result = cursor.fetchone()
                 conn.commit()
                 return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def apply_version_refresh_provenance(
+        self,
+        version_record_id: str,
+        tenant_id: str,
+        *,
+        parent_version_id: Optional[str] = None,
+        source_commit_sha: Optional[str] = None,
+        source_committed_at: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Stamp RAR-4.2 refresh provenance onto an existing version row.
+
+        A repository auto-refresh creates the new version through the import worker;
+        this records the refresh lineage on that row afterwards: the prior version it
+        supersedes (``parent_version_id``) and the source commit that triggered it
+        (``source_commit_sha`` + ``source_committed_at``). The update is tenant-scoped
+        via the owning project so a refresh cannot stamp another tenant's version.
+
+        Only non-``None`` arguments are written; passing ``None`` leaves the existing
+        column untouched (so a parent already set by the importer is preserved when a
+        caller stamps only the commit signals).
+
+        Args:
+            version_record_id: The version row id (``versions.id``) to stamp.
+            tenant_id: The tenant that must own the version's project.
+            parent_version_id: Prior version this refresh supersedes; the new
+                version's linear parent.
+            source_commit_sha: Repository source commit SHA that triggered the refresh.
+            source_committed_at: Commit timestamp of ``source_commit_sha``.
+
+        Returns:
+            The updated version row (via :meth:`get_version_by_id`), or ``None`` when
+            no version matches the id within the tenant.
+        """
+        sets: List[str] = []
+        params: List[Any] = []
+        if parent_version_id is not None:
+            sets.append("parent_version_id = %s")
+            params.append(parent_version_id)
+        if source_commit_sha is not None:
+            sets.append("source_commit_sha = %s")
+            params.append(source_commit_sha)
+        if source_committed_at is not None:
+            sets.append("source_committed_at = %s")
+            params.append(source_committed_at)
+
+        if not sets:
+            # Nothing to record — return the current row unchanged.
+            return self.get_version_by_id(version_record_id, tenant_id)
+
+        sets.append("updated_at = CURRENT_TIMESTAMP")
+        query = f"""
+            UPDATE odb.versions v
+            SET {", ".join(sets)}
+            FROM odb.projects p
+            WHERE v.id = %s
+              AND v.project_id = p.id
+              AND p.tenant_id = %s
+              AND v.deleted_at IS NULL
+            RETURNING v.id
+        """
+        params.extend([version_record_id, tenant_id])
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, tuple(params))
+                row = cursor.fetchone()
+                conn.commit()
+                if not row:
+                    return None
+                return self.get_version_by_id(version_record_id, tenant_id)
         except Exception as e:
             conn.rollback()
             raise e
@@ -2007,6 +2096,7 @@ class Database:
             RETURNING v.id, v.project_id, v.creator_id, v.version_id, v.description,
                       v.change_log, v.visibility, v.published, v.published_at, v.published_immutable,
                       v.enabled, v.commit_author, v.commit_message, v.external_ref,
+                      v.source_commit_sha, v.source_committed_at,
                       v.created_at, v.updated_at
         """
         conn = self.connect()
@@ -2507,6 +2597,7 @@ class Database:
             RETURNING v.id, v.project_id, v.creator_id, v.version_id, v.description,
                       v.change_log, v.visibility, v.published, v.published_at, v.published_immutable,
                       v.enabled, v.commit_author, v.commit_message, v.external_ref,
+                      v.source_commit_sha, v.source_committed_at,
                       v.created_at, v.updated_at
         """
         conn = self.connect()
@@ -5003,9 +5094,14 @@ class Database:
         source_version_id: Optional[str],
         branch_row: Optional[Dict[str, Any]],
         client_base_revision_id: str,
+        source_commit_sha: Optional[str] = None,
+        source_committed_at: Optional[Any] = None,
     ) -> Tuple[Dict[str, Any], int]:
         """
         Insert version (optional parent), copy classes from source, advance branch tip under lock.
+
+        ``source_commit_sha`` / ``source_committed_at`` record RAR-4.2 refresh
+        provenance on the new revision (the repository source commit that produced it).
         Returns (full version row from get_version_by_id, copied_class_count).
         """
         base = (client_base_revision_id or "").strip()
@@ -5069,8 +5165,9 @@ class Database:
                     """
                     INSERT INTO odb.versions
                     (project_id, creator_id, version_id, description, change_log,
-                     commit_author, commit_message, external_ref, parent_version_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     commit_author, commit_message, external_ref, parent_version_id,
+                     source_commit_sha, source_committed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
                     (
@@ -5083,6 +5180,8 @@ class Database:
                         commit_message,
                         external_ref,
                         parent_version_id,
+                        source_commit_sha,
+                        source_committed_at,
                     ),
                 )
                 row = cursor.fetchone()

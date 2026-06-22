@@ -22,6 +22,7 @@ from typing import Any, Dict, Mapping, Optional
 from .models import (
     REPOSITORY_AUTO_IMPORT_SOURCE_KIND,
     REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION,
+    RepositoryRefreshProvenance,
     SpecImportProjectTarget,
     SpecImportStartMetadata,
     SpecImportStoredSpec,
@@ -102,27 +103,67 @@ def build_stored_spec_from_refresh_job(job_row: Mapping[str, Any]) -> SpecImport
     )
 
 
+def _clean_str(raw: Any) -> Optional[str]:
+    """Return a stripped non-empty string, or ``None`` for blank/missing values."""
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return text or None
+
+
+def build_refresh_provenance_from_job(
+    job_row: Mapping[str, Any],
+    *,
+    parent_version_id: Optional[str] = None,
+) -> RepositoryRefreshProvenance:
+    """Build the RAR-4.2 refresh provenance for a version from a refresh job row.
+
+    The RAR-3.2 sweep snapshots the remote freshness signals that triggered the
+    refresh on the ``odb.tenant_repository_refresh_jobs`` row
+    (``remote_commit_sha`` / ``remote_committed_at``). This maps them onto the
+    provenance recorded on the new version, plus the prior version it supersedes.
+
+    Args:
+        job_row: The enqueued refresh job row carrying the remote freshness signals.
+        parent_version_id: The prior version (versions.id) the refresh supersedes,
+            resolved by the caller; the new version's linear parent. ``None`` when
+            the refresh produces the first revision in the project.
+
+    Returns:
+        The :class:`RepositoryRefreshProvenance` to carry into version creation.
+    """
+    return RepositoryRefreshProvenance(
+        parent_version_id=_clean_str(parent_version_id),
+        source_commit_sha=_clean_str(job_row.get("remote_commit_sha")),
+        source_committed_at=job_row.get("remote_committed_at"),
+    )
+
+
 def build_auto_refresh_import_metadata(
     job_row: Mapping[str, Any],
     *,
     project: SpecImportProjectTarget,
     version: SpecImportVersionTarget,
     existing_project_id: Optional[str] = None,
+    parent_version_id: Optional[str] = None,
 ) -> SpecImportStartMetadata:
-    """Build worker metadata for a repository auto-refresh re-import (RAR-4.1).
+    """Build worker metadata for a repository auto-refresh re-import (RAR-4.1/4.2).
 
     Stamps the synthetic ``repository_auto_import`` source kind and attaches the
-    stored spec snapshot so the worker hydrates kind/options/parsing from it. The
-    catalog target (project/version) is supplied by the caller because version
-    creation and provenance for a refresh are owned by RAR-4.2; this function only
-    makes the import spec-faithful.
+    stored spec snapshot so the worker hydrates kind/options/parsing from it
+    (RAR-4.1), plus the refresh provenance (prior version + source commit) recorded
+    on the new version (RAR-4.2). The catalog target (project/version) is supplied
+    by the caller.
 
     Args:
-        job_row: The enqueued refresh job row carrying the stored spec snapshot.
+        job_row: The enqueued refresh job row carrying the stored spec snapshot and
+            the remote freshness signals.
         project: The catalog project target the refresh imports into.
         version: The target catalog revision for the refresh.
         existing_project_id: When set, attach to this existing catalog project id
             instead of creating one (the usual case for a refresh).
+        parent_version_id: The prior version (versions.id) the refresh supersedes,
+            recorded as the new version's parent in the refresh provenance.
 
     Returns:
         The :class:`SpecImportStartMetadata` for :func:`schedule_spec_import`.
@@ -133,4 +174,7 @@ def build_auto_refresh_import_metadata(
         version=version,
         existing_project_id=existing_project_id,
         repository_import_spec=build_stored_spec_from_refresh_job(job_row),
+        refresh_provenance=build_refresh_provenance_from_job(
+            job_row, parent_version_id=parent_version_id
+        ),
     )

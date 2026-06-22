@@ -10798,6 +10798,50 @@ components:
         the
 
         current envelope version because ``options`` has already been migrated forward.'
+    RepositoryRefreshProvenance:
+      properties:
+        parent_version_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Parent Version Id
+          description: Prior version (versions.id) this refresh supersedes; the new
+            version's linear parent.
+        source_commit_sha:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Commit Sha
+          description: Repository source commit SHA that triggered the refresh.
+        source_committed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Source Committed At
+          description: Commit timestamp of source_commit_sha.
+      additionalProperties: false
+      type: object
+      title: RepositoryRefreshProvenance
+      description: 'Provenance for a version created by a repository auto-refresh
+        (RAR-4.2, #3528).
+
+
+        A refresh re-imports a changed file and creates a NEW catalog version. That
+
+        version must be traceable back to the prior version it supersedes
+
+        (``parent_version_id``) and to the exact source commit that triggered the
+
+        refresh (``source_commit_sha`` + ``source_committed_at``). The RAR-3.2 sweep
+
+        captures the commit signals on the ``odb.tenant_repository_refresh_jobs``
+        row;
+
+        this model carries them from the executor through to version creation so they
+
+        land on the new ``odb.versions`` row.'
     RequestBodyContentTypeRequest:
       properties:
         media_type:
@@ -11567,6 +11611,13 @@ components:
           - type: 'null'
           description: Stored import spec for a repository auto-refresh; required
             and consulted only when source_kind is 'repository_auto_import' (RAR-4.1).
+        refresh_provenance:
+          anyOf:
+          - $ref: '#/components/schemas/RepositoryRefreshProvenance'
+          - type: 'null'
+          description: Refresh lineage (prior version + source commit) recorded on
+            the version a repository auto-refresh creates; set only when source_kind
+            is 'repository_auto_import' (RAR-4.2).
       additionalProperties: false
       type: object
       required:
@@ -12769,6 +12820,21 @@ components:
           - type: string
           - type: 'null'
           title: Source Version Id
+        sourceCommitSha:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sourcecommitsha
+          description: Repository source commit SHA that triggered this revision (RAR-4.2
+            refresh provenance); recorded for repository auto-refresh imports.
+        sourceCommittedAt:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Sourcecommittedat
+          description: Commit timestamp of source_commit_sha (RAR-4.2 refresh provenance).
         bump_strategy:
           anyOf:
           - type: string
@@ -13129,6 +13195,21 @@ components:
           - type: string
           - type: 'null'
           title: Merge Parent Version Id
+        sourceCommitSha:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sourcecommitsha
+          description: Repository source commit SHA that triggered this revision (RAR-4.2
+            refresh provenance); NULL for hand-authored revisions.
+        sourceCommittedAt:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Sourcecommittedat
+          description: Commit timestamp of source_commit_sha (RAR-4.2 refresh provenance).
         forkedFromRevisionId:
           anyOf:
           - type: string

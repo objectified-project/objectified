@@ -583,6 +583,34 @@ class SpecImportStoredSpec(BaseModel):
     )
 
 
+class RepositoryRefreshProvenance(BaseModel):
+    """Provenance for a version created by a repository auto-refresh (RAR-4.2, #3528).
+
+    A refresh re-imports a changed file and creates a NEW catalog version. That
+    version must be traceable back to the prior version it supersedes
+    (``parent_version_id``) and to the exact source commit that triggered the
+    refresh (``source_commit_sha`` + ``source_committed_at``). The RAR-3.2 sweep
+    captures the commit signals on the ``odb.tenant_repository_refresh_jobs`` row;
+    this model carries them from the executor through to version creation so they
+    land on the new ``odb.versions`` row.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    parent_version_id: Optional[str] = Field(
+        default=None,
+        description="Prior version (versions.id) this refresh supersedes; the new version's linear parent.",
+    )
+    source_commit_sha: Optional[str] = Field(
+        default=None,
+        description="Repository source commit SHA that triggered the refresh.",
+    )
+    source_committed_at: Optional[Union[datetime, str]] = Field(
+        default=None,
+        description="Commit timestamp of source_commit_sha.",
+    )
+
+
 class SpecImportStartMetadata(BaseModel):
     """Shared metadata for JSON-base64 and multipart upload flows."""
 
@@ -609,6 +637,14 @@ class SpecImportStartMetadata(BaseModel):
         description=(
             "Stored import spec for a repository auto-refresh; required and consulted "
             f"only when source_kind is '{REPOSITORY_AUTO_IMPORT_SOURCE_KIND}' (RAR-4.1)."
+        ),
+    )
+    refresh_provenance: Optional[RepositoryRefreshProvenance] = Field(
+        default=None,
+        description=(
+            "Refresh lineage (prior version + source commit) recorded on the version a "
+            f"repository auto-refresh creates; set only when source_kind is "
+            f"'{REPOSITORY_AUTO_IMPORT_SOURCE_KIND}' (RAR-4.2)."
         ),
     )
 
@@ -844,6 +880,21 @@ class VersionSchema(BaseModel):
     enabled: bool = True
     parent_version_id: Optional[str] = None
     merge_parent_version_id: Optional[str] = None
+    source_commit_sha: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("sourceCommitSha", "source_commit_sha"),
+        serialization_alias="sourceCommitSha",
+        description=(
+            "Repository source commit SHA that triggered this revision "
+            "(RAR-4.2 refresh provenance); NULL for hand-authored revisions."
+        ),
+    )
+    source_committed_at: Optional[Union[datetime, str]] = Field(
+        default=None,
+        validation_alias=AliasChoices("sourceCommittedAt", "source_committed_at"),
+        serialization_alias="sourceCommittedAt",
+        description="Commit timestamp of source_commit_sha (RAR-4.2 refresh provenance).",
+    )
     forked_from_revision_id: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("forkedFromRevisionId", "forked_from_revision_id"),
@@ -940,6 +991,19 @@ class VersionCreateRequest(BaseModel):
         description="Named branch to advance; required when the project has multiple branches.",
     )
     source_version_id: Optional[str] = None  # Copy classes from this version
+    source_commit_sha: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("sourceCommitSha", "source_commit_sha"),
+        description=(
+            "Repository source commit SHA that triggered this revision "
+            "(RAR-4.2 refresh provenance); recorded for repository auto-refresh imports."
+        ),
+    )
+    source_committed_at: Optional[Union[datetime, str]] = Field(
+        default=None,
+        validation_alias=AliasChoices("sourceCommittedAt", "source_committed_at"),
+        description="Commit timestamp of source_commit_sha (RAR-4.2 refresh provenance).",
+    )
     bump_strategy: Optional[str] = None  # 'patch' or 'minor' for auto-versioning
     override_published_immutability: bool = Field(
         default=False,
