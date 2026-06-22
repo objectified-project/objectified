@@ -45,7 +45,7 @@ Before implementing net-new registry mechanics, account for what is **already li
 | UI proxy | `/api/primitives/*` | ✅ **Done** — closed as duplicate (#3455) |
 | Management UI | `/ade/dashboard/primitives` — stats, table, CRUD, import dialog | ✅ Nav done (#3466 closed); overview/import are **partial** — extend, don't rebuild |
 | Designer | `PrimitiveSelector` — merges primitive schema onto property | No persisted `$ref` binding (#3475); picker lacks namespace tabs (#3474) |
-| Validation | AJV in `PrimitiveEditorDialog` (client) | REST persist not strictly validated (#3452) |
+| Validation | AJV in `PrimitiveEditorDialog` (client) | ✅ **Done** — REST persist strictly validated against draft 2020-12 with field-level errors (#3452) |
 | Scope | `is_system` immutability, tenant rows | No namespace visibility or core→tenant `$ref` rules (#3453) |
 
 **Tickets closed as duplicates:** #3455 (UI proxy), #3466 (Governance nav). All other #3446–#3481
@@ -326,7 +326,7 @@ enforcement, plus the `objectified-ui` proxy + typed client.
 |---|---|---|---|:---:|:---:|---|---|
 | 2.1 #3450 ✅ | Registry service skeleton + auth/scoping | **DONE** — registry health/ping (`GET /v1/primitives/health`) over the `objectified-db` connection; existing tenant/scope auth confirmed, clients unaffected | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
 | 2.2 #3451 ✅ | Namespace CRUD API | **DONE** — `GET/POST/PUT /v1/types/{tenant_slug}/namespaces` over `odb.type_namespaces`; tenant-admin writes, system-core read-only, type counts joined from `odb.primitives` | `type-registry`,`registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
-| 2.3 #3452 | Type definition CRUD + draft 2020-12 validation | CRUD types; validate `json_schema` against draft 2020-12 | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
+| 2.3 #3452 ✅ | Type definition CRUD + draft 2020-12 validation | **DONE** — strict JSON Schema draft 2020-12 meta-validation on primitive create/update/import (`app/schema_validation.py`), field-level 422 errors, stable derived `$id` (`schema_id`) + stamped `draft` persisted to `odb.primitives` | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
 | 2.4 #3453 | Scope & visibility enforcement | System-core vs tenant access + ref-direction rules | `type-registry`,`governance`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-rest |
 | 2.5 #3454 | Registry coverage/stats endpoint | Counts by scope, imported, unresolved (for dashboard KPIs) | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | S | objectified-rest |
 | 2.6 #3455 | ~~UI proxy routes + typed client~~ | **CLOSED — duplicate** (`/api/primitives/*` shipped) | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | N | Y | S | objectified-ui |

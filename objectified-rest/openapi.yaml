@@ -10634,6 +10634,16 @@ components:
             type: array
           - type: 'null'
           title: Tags
+        namespace:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Namespace
+        base_uri:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base Uri
       type: object
       required:
       - name
@@ -10790,6 +10800,25 @@ components:
           type: string
           title: Source
           default: human
+        schema_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Schema Id
+        draft:
+          type: string
+          title: Draft
+          default: 2020-12
+        namespace:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Namespace
+        base_uri:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base Uri
         created_at:
           anyOf:
           - type: string
@@ -10847,6 +10876,21 @@ components:
             type: array
           - type: 'null'
           title: Tags
+        enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Enabled
+        namespace:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Namespace
+        base_uri:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base Uri
       type: object
       title: PrimitiveUpdateRequest
       description: Request model for updating a primitive.

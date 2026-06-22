@@ -124,6 +124,13 @@ class PrimitiveSchema(BaseModel):
     is_public: bool = False
     usage_count: int = 0
     source: str = 'human'  # Provenance: 'human' (authored in-app) or 'imported' (#3448)
+    # JSON Schema 2020-12 registry identity (#3452). schema_id is the computed/stored
+    # `$id`; draft is the dialect (default '2020-12'); namespace/base_uri locate it in
+    # the registry. Optional so legacy flat primitives (no `$id`) still round-trip.
+    schema_id: Optional[str] = None
+    draft: str = '2020-12'
+    namespace: Optional[str] = None
+    base_uri: Optional[str] = None
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
     enabled: bool = True
@@ -139,6 +146,11 @@ class PrimitiveCreateRequest(BaseModel):
     category: str
     schema: Dict[str, Any]
     tags: Optional[List[str]] = None
+    # Optional registry placement (#3452). When omitted, the `$id` is derived from a
+    # stable tenant-default base URI; when provided, the primitive's `$id` is computed
+    # against this namespace / base URI.
+    namespace: Optional[str] = None
+    base_uri: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -151,6 +163,10 @@ class PrimitiveUpdateRequest(BaseModel):
     category: Optional[str] = None
     schema: Optional[Dict[str, Any]] = None
     tags: Optional[List[str]] = None
+    enabled: Optional[bool] = None
+    # Registry placement may be re-pinned on update (#3452); see PrimitiveCreateRequest.
+    namespace: Optional[str] = None
+    base_uri: Optional[str] = None
 
     class Config:
         from_attributes = True

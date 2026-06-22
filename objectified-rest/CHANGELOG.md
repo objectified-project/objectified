@@ -5,6 +5,24 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.11] - 2026-06-22
+
+### Added
+- **Type definition draft 2020-12 validation (#3452)** — the Primitives create, update, and
+  import endpoints now strictly validate the supplied `schema` against the JSON Schema
+  **draft 2020-12 meta-schema** server-side (new `app/schema_validation.py`, backed by the
+  `jsonschema` library). An invalid schema is rejected at the REST boundary with HTTP 422 and a
+  structured, field-level `errors` list (`path` / `message` / `keyword`) instead of being
+  persisted. Valid types persist with a stable, derived JSON Schema `$id` (the
+  `odb.primitives.schema_id` column) — an author-declared `$id` is honored, otherwise it is
+  computed from the namespace base URI (or a stable tenant-default base) plus a url-safe slug of
+  the name — and a stamped `draft` (default `2020-12`, read from `$schema`). The stored schema
+  document is stamped with its `$id`/`$schema` so it is self-describing. `PrimitiveCreateRequest`/
+  `PrimitiveUpdateRequest` gained optional `namespace`/`base_uri` placement fields (and `enabled`
+  on update); `PrimitiveSchema` now exposes `schema_id`/`draft`/`namespace`/`base_uri`. The import
+  path runs the same validator per `$defs` definition, recording invalid definitions in the import
+  report (`error: "invalid_schema"` with `details`) without blocking the valid ones.
+
 ## [1.0.10] - 2026-06-22
 
 ### Added
