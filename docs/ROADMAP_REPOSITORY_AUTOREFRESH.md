@@ -124,7 +124,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | ~~RAR-2.4~~ ✅ | ~~#3521~~ | ~~RAR-3.1~~ ✅ | ~~#3522~~ | ~~RAR-3.2~~ ✅ | ~~#3523~~ |
 | ~~RAR-3.3~~ ✅ | ~~#3524~~ | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
 | ~~RAR-4.1~~ ✅ | ~~#3527~~ | ~~RAR-4.2~~ ✅ | ~~#3528~~ | ~~RAR-4.3~~ ✅ | ~~#3529~~ |
-| ~~RAR-4.4~~ ✅ | ~~#3530~~ | RAR-4.5 | #3531 | RAR-5.1 | #3532 |
+| ~~RAR-4.4~~ ✅ | ~~#3530~~ | RAR-4.5 | #3531 | ~~RAR-5.1~~ ✅ | ~~#3532~~ |
 | RAR-5.2 | #3533 | RAR-5.3 | #3534 | RAR-5.4 | #3535 |
 | RAR-5.5 | #3536 | RAR-5.6 | #3537 | RAR-6.1 | #3538 |
 | RAR-6.2 | #3539 | RAR-6.3 | #3540 | RAR-6.4 | #3541 |
@@ -607,7 +607,7 @@ wiring.
 
 | ID | Title | Summary | Labels | Parallel | MVP | Cmplx | Modules |
 |----|-------|---------|--------|----------|-----|-------|---------|
-| RAR-5.1 | Per-file refresh status UI | Specs tab shows status, last-refreshed, next-due, divergence | `enhancement`,`mvp`,`import`,`repository`,`ui` | Y | Y | M | objectified-ui |
+| ~~RAR-5.1~~ ✅ **Done** (#3532) | Per-file refresh status UI | Specs tab shows status, last-refreshed, next-due, divergence | `enhancement`,`mvp`,`import`,`repository`,`ui` | Y | Y | M | objectified-ui |
 | RAR-5.2 | "Refresh Now" one-shot (extend REPO-9.5) | Manual spec-faithful refresh per file/repo | `enhancement`,`mvp`,`import`,`repository`,`ui` | Y | Y | S | objectified-ui, objectified-rest |
 | RAR-5.3 | Refresh history + change-report linking (extend REPO-12.6) | Audit each refresh cycle with diff link | `enhancement`,`mvp`,`import`,`repository` | Y | Y | M | objectified-rest |
 | RAR-5.4 | Refresh notifications (extend REPO-12.5) | Notify on new version / divergence / failure | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-rest |
@@ -617,6 +617,30 @@ wiring.
 (Detailed descriptions follow the same Problem / Solution / Acceptance / Dependencies pattern; 5.1–5.4
 are MVP, 5.5–5.6 are v2. Each reuses an existing surface — Specs tab, Import Now, REPO-12 audit,
 REPO-12.5 notifications, REPO-11 widgets — so scope is "extend," not "build new.")
+
+**Status (5.1): ✅ Done (#3532).** The repository detail page gains a **Specs** tab listing one row
+per imported-file lineage with its materialized refresh state, last-refreshed, and next-due. New UI
+pure module `objectified-ui/src/app/components/ade/dashboard/repositories/repository-refresh-status.ts`
+is a faithful TypeScript port of the REST `compute_refresh_status` (RAR-2.3) + `evaluate_refresh`
+(RAR-2.2): the UI sources the per-file signals directly from Postgres rather than proxying the Python
+read endpoint, so the port keeps the chip in lock-step with the server's state machine (recency axis +
+operational precedence `refreshing > diverged > failed > stale > up-to-date`). It also derives next-due
+from the RAR-3.1 cadence (`repo last_refreshed_at + refresh_interval_seconds`, or "Paused" when
+auto-refresh is off / "Due now" when never swept). New DAO
+`listTenantRepositoryRefreshSpecs` (`lib/db/repository-import-metrics.ts`) joins each
+`repository_import_spec` lineage to the RAR-2.1 import anchors, the current `tenant_repository_files`
+recency, the RAR-3.2 `tenant_repository_refresh_jobs` queue (deriving `is_refreshing` from an
+active job and `last_refresh_failed` from the latest finished job), and the per-repo cadence; exposed
+read-only and tenant-scoped at `GET /api/repositories/{id}/refresh-specs`. `RepositorySpecsTab.tsx`
+renders the table reusing the RAR-2.3 chip helper; **diverged files are visually distinct (purple row
+tint + warning chip) and link to the review action** (the file's diff view on the Files tab). The
+`diverged` axis has no persisted column yet — the RAR-4.4 divergence guard's hold flag awaits its
+dispatcher wiring — so the UI defaults it to false and is forward-compatible: the diverged rendering
+path is fully implemented and unit-tested, ready to light up when the signal lands. Tests:
+`tests/unit/repository-refresh-status.test.ts` (RAR-2.2/2.3 parity + cadence),
+`tests/repository-refresh-specs-dao.test.ts` (SQL contract: tenant/repo scoping, limit clamp, joined
+signals), and `tests/RepositorySpecsTab.test.tsx` (status/last-refreshed/next-due rendering, diverged
+distinctness + review link, error/empty states).
 
 ---
 
