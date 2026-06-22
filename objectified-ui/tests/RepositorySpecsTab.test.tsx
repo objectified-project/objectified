@@ -8,10 +8,11 @@
  */
 
 import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import {
+  REPO_REFRESH_KEY,
   RepositorySpecsTab,
   RepositorySpecsTable,
   formatNextDue,
@@ -120,6 +121,71 @@ describe('RepositorySpecsTable', () => {
     render(<RepositorySpecsTable repositoryId="repo-1" specs={[]} now={NOW} />);
     expect(screen.getByText(/No imported specs yet/i)).toBeInTheDocument();
   });
+
+  test('per-repo and per-file Refresh actions fire their callbacks (RAR-5.2)', () => {
+    const onRefreshRepo = jest.fn();
+    const onRefreshFile = jest.fn();
+    const spec = makeSpec();
+    render(
+      <RepositorySpecsTable
+        repositoryId="repo-1"
+        specs={[spec]}
+        now={NOW}
+        onRefreshRepo={onRefreshRepo}
+        onRefreshFile={onRefreshFile}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('repository-refresh-all'));
+    expect(onRefreshRepo).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId('repository-refresh-file'));
+    expect(onRefreshFile).toHaveBeenCalledWith(spec);
+  });
+
+  test('a busy refresh disables every refresh button (no double-fire)', () => {
+    render(
+      <RepositorySpecsTable
+        repositoryId="repo-1"
+        specs={[makeSpec()]}
+        now={NOW}
+        busyKey={REPO_REFRESH_KEY}
+        onRefreshRepo={jest.fn()}
+        onRefreshFile={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId('repository-refresh-all')).toBeDisabled();
+    expect(screen.getByTestId('repository-refresh-file')).toBeDisabled();
+  });
+
+  test('the per-repo button is hidden when there are no specs', () => {
+    render(
+      <RepositorySpecsTable
+        repositoryId="repo-1"
+        specs={[]}
+        now={NOW}
+        onRefreshRepo={jest.fn()}
+        onRefreshFile={jest.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('repository-refresh-all')).not.toBeInTheDocument();
+  });
+
+  test('renders the refresh notice when supplied', () => {
+    render(
+      <RepositorySpecsTable
+        repositoryId="repo-1"
+        specs={[makeSpec()]}
+        now={NOW}
+        notice={{ kind: 'success', text: 'Already up to date — nothing to refresh.' }}
+        onRefreshRepo={jest.fn()}
+        onRefreshFile={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId('repository-refresh-notice')).toHaveTextContent(
+      /Already up to date/i,
+    );
+  });
 });
 
 describe('RepositorySpecsTab (fetching wrapper)', () => {
@@ -150,5 +216,54 @@ describe('RepositorySpecsTab (fetching wrapper)', () => {
 
     render(<RepositorySpecsTab repositoryId="repo-1" />);
     await waitFor(() => expect(screen.getByText('boom')).toBeInTheDocument());
+  });
+
+  test('Refresh now POSTs to the refresh endpoint and reports the result (RAR-5.2)', async () => {
+    const fetchMock = jest
+      .fn()
+      // initial load
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, specs: [makeSpec()] }) })
+      // POST /refresh
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, enqueued: 2, skipped: 0 }) })
+      // reload after refresh
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, specs: [makeSpec()] }) });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<RepositorySpecsTab repositoryId="repo-1" />);
+    await waitFor(() => expect(screen.getByTestId('repository-refresh-all')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('repository-refresh-all'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('repository-refresh-notice')).toHaveTextContent(
+        /Refresh queued for 2 files/i,
+      ),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/repositories/repo-1/refresh',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  test('an up-to-date single-file refresh reports the no-op (freshness gate)', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, specs: [makeSpec()] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, enqueued: 0, skipped: 1 }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, specs: [makeSpec()] }) });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<RepositorySpecsTab repositoryId="repo-1" />);
+    await waitFor(() => expect(screen.getByTestId('repository-refresh-file')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('repository-refresh-file'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('repository-refresh-notice')).toHaveTextContent(
+        /Already up to date/i,
+      ),
+    );
+    const body = JSON.parse((fetchMock.mock.calls[1][1] as { body: string }).body);
+    expect(body).toEqual({ path: 'specs/petstore.yaml', branch: 'main' });
   });
 });

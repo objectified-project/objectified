@@ -13778,6 +13778,101 @@
         }
       }
     },
+    "/v1/tenants/{tenant_slug}/repositories/{repository_id}/refresh": {
+      "post": {
+        "tags": [
+          "tenant-repositories"
+        ],
+        "summary": "Refresh Tenant Repository Now",
+        "description": "Trigger a one-shot manual \"Refresh Now\" (RAR-5.2, #3533).\n\nRuns the same spec-faithful re-import path as the periodic sweep (RAR-4.1) for\na single file or the whole repository, on demand. It uses the stored import\nspec (not defaults), honors the RAR-2.2 freshness gate (only files newer than\nthe last import enqueue) and the RAR-4.4 divergence guard (applied downstream\nby the executor), and works even when scheduled auto-refresh is disabled \u2014\nthe cadence and the ``auto_refresh_enabled`` / kill-switch gates are\ndeliberately bypassed.\n\nRequest body (all optional): ``path`` for a single file, ``branch`` to scope a\nbranch; omit both to refresh every branch that has a stored spec.\n\nArgs:\n    tenant_slug: Tenant slug from the path (scoping comes from the token).\n    repository_id: The repository to refresh.\n    payload: Optional ``path`` / ``branch`` selectors.\n    auth_data: Authenticated principal; supplies the tenant scope.\n\nReturns:\n    Counts of jobs enqueued / skipped and the branches evaluated.\n\nRaises:\n    HTTPException: 404 when the repository does not belong to the tenant.",
+        "operationId": "refresh_tenant_repository_now_v1_tenants__tenant_slug__repositories__repository_id__refresh_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "repository_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Repository Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepositoryRefreshNowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositoryRefreshNowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",
@@ -17105,6 +17200,67 @@
         ],
         "title": "RepositoryImportSpecRead",
         "description": "Current-shape import spec returned by the read endpoint (RAR-1.5).\n\nThe response surface for ``GET \u2026/repository-imports/{id}/spec`` (and its\n``?path=`` lookup variant). It exposes the captured source descriptor and the\nfull ``SpecImportOptions`` payload, upgraded on read to the current envelope\nshape, so the refresh worker, the UI status surface, and the CLI can replay\nthe user's original import request. ``spec_schema_version`` always reports the\ncurrent envelope version because ``options`` has already been migrated forward."
+      },
+      "RepositoryRefreshNowRequest": {
+        "properties": {
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          }
+        },
+        "type": "object",
+        "title": "RepositoryRefreshNowRequest",
+        "description": "Dashboard: trigger a one-shot manual \"Refresh Now\" (RAR-5.2, #3533).\n\nBoth fields are optional and accept snake_case or camelCase so the UI can\nsend either:\n\n- omit both \u2192 refresh the whole repository (every branch with a stored spec);\n- ``branch`` only \u2192 refresh that branch;\n- ``path`` (with or without ``branch``) \u2192 refresh that single file."
+      },
+      "RepositoryRefreshNowResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "enqueued": {
+            "type": "integer",
+            "title": "Enqueued"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "branches": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Branches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enqueued",
+          "skipped",
+          "branches"
+        ],
+        "title": "RepositoryRefreshNowResponse",
+        "description": "Result of a one-shot manual refresh (RAR-5.2)."
       },
       "RepositoryRefreshProvenance": {
         "properties": {

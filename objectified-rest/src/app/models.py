@@ -2507,6 +2507,34 @@ class TenantRepositoryUpdate(BaseModel):
     )
 
 
+class RepositoryRefreshNowRequest(BaseModel):
+    """Dashboard: trigger a one-shot manual "Refresh Now" (RAR-5.2, #3533).
+
+    Both fields are optional and accept snake_case or camelCase so the UI can
+    send either:
+
+    - omit both → refresh the whole repository (every branch with a stored spec);
+    - ``branch`` only → refresh that branch;
+    - ``path`` (with or without ``branch``) → refresh that single file.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    path: Optional[str] = Field(None)
+    branch: Optional[str] = Field(None)
+
+
+class RepositoryRefreshNowResponse(BaseModel):
+    """Result of a one-shot manual refresh (RAR-5.2)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    enqueued: int
+    skipped: int
+    branches: List[str]
+
+
 class TenantRepositoriesListResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

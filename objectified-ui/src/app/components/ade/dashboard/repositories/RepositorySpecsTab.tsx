@@ -1,12 +1,20 @@
 'use client';
 
 /**
- * Repository detail "Specs" tab — per-file refresh status (RAR-5.1, #3532).
+ * Repository detail "Specs" tab — per-file refresh status (RAR-5.1, #3532) and
+ * one-shot "Refresh Now" (RAR-5.2, #3533).
  *
  * Lists every imported-file lineage for the repository with its materialized
  * refresh state (RAR-2.3), last-refreshed time, next-due time (RAR-3.1 cadence),
  * and a divergence indicator (RAR-4.4). Diverged files are rendered visually
  * distinct and link to the review action (the file's diff view on the Files tab).
+ *
+ * Each row carries a per-file "Refresh" action and the table header a per-repo
+ * "Refresh now" action. Both POST `/api/repositories/{id}/refresh`, which runs
+ * the spec-faithful re-import path on demand — using the stored import spec, the
+ * freshness gate, and the divergence guard — even when scheduled auto-refresh is
+ * off. The freshness gate means refreshing an up-to-date file is a no-op, which
+ * the success notice reports.
  *
  * Data comes from `GET /api/repositories/{id}/refresh-specs`; the status is
  * derived on the client with `computeRefreshStatus`, the same logic the REST
@@ -19,7 +27,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '@lib/utils';
 import {
   getRefreshStatusPresentation,
@@ -103,6 +111,51 @@ export function formatNextDue(nextDue: Date | 'due' | null, now: number = Date.n
   return `in ${Math.floor(sec / 86400)}d`;
 }
 
+/** Busy-key sentinel identifying the per-repo ("Refresh now") action. */
+export const REPO_REFRESH_KEY = '__repo__';
+
+/** A transient feedback notice shown after a refresh action. */
+export type RefreshNotice = { kind: 'success' | 'error'; text: string };
+
+/**
+ * Small "Refresh now"/"Refresh" button used at the repo and file level. Shows a
+ * spinner and disables itself while its own action is in flight, and stays
+ * disabled while any other refresh action runs so a user cannot double-fire.
+ */
+function RefreshNowButton({
+  label,
+  busy,
+  disabled,
+  onClick,
+  testId,
+  ariaLabel,
+}: {
+  label: string;
+  busy: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  testId: string;
+  ariaLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={onClick}
+      disabled={disabled || busy}
+      aria-label={ariaLabel}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+        'border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800/60 dark:text-indigo-300 dark:hover:bg-indigo-950/40',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+      )}
+    >
+      <RefreshCw className={cn('h-3.5 w-3.5 shrink-0', busy && 'animate-spin')} aria-hidden />
+      {label}
+    </button>
+  );
+}
+
 /** A single refresh-status chip for a spec row. */
 function RefreshStatusChip({ status }: { status: string }) {
   const presentation = getRefreshStatusPresentation(status);
@@ -130,19 +183,60 @@ export function RepositorySpecsTable({
   repositoryId,
   specs,
   now,
+  busyKey = null,
+  notice = null,
+  onRefreshRepo,
+  onRefreshFile,
 }: {
   repositoryId: string;
   specs: RepositoryRefreshSpec[];
   now: number;
+  /** Key of the in-flight refresh: {@link REPO_REFRESH_KEY} or a spec id; null when idle. */
+  busyKey?: string | null;
+  /** Transient feedback from the last refresh action. */
+  notice?: RefreshNotice | null;
+  /** Trigger a whole-repository refresh; omit to hide the per-repo button. */
+  onRefreshRepo?: () => void;
+  /** Trigger a single-file refresh; omit to hide the per-file buttons. */
+  onRefreshFile?: (spec: RepositoryRefreshSpec) => void;
 }) {
+  const anyBusy = busyKey !== null;
+  const showActions = typeof onRefreshFile === 'function';
+  const columnCount = showActions ? 5 : 4;
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Imported specs</h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Per-file auto-refresh status, last refresh, and next due.
-        </p>
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Imported specs</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Per-file auto-refresh status, last refresh, and next due.
+          </p>
+        </div>
+        {onRefreshRepo && specs.length > 0 ? (
+          <RefreshNowButton
+            label="Refresh now"
+            testId="repository-refresh-all"
+            ariaLabel="Refresh all imported specs in this repository now"
+            busy={busyKey === REPO_REFRESH_KEY}
+            disabled={anyBusy}
+            onClick={onRefreshRepo}
+          />
+        ) : null}
       </div>
+      {notice ? (
+        <div
+          data-testid="repository-refresh-notice"
+          role="status"
+          className={cn(
+            'border-b px-4 py-2 text-xs',
+            notice.kind === 'success'
+              ? 'border-emerald-200 bg-emerald-50/70 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300'
+              : 'border-rose-200 bg-rose-50/70 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300',
+          )}
+        >
+          {notice.text}
+        </div>
+      ) : null}
       <table className="w-full text-sm">
         <thead className="border-b border-gray-200 bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-400">
           <tr>
@@ -150,13 +244,16 @@ export function RepositorySpecsTable({
             <th className="px-4 py-2 align-middle text-left font-semibold">Status</th>
             <th className="px-4 py-2 align-middle text-left font-semibold">Last refreshed</th>
             <th className="px-4 py-2 align-middle text-left font-semibold">Next due</th>
+            {showActions ? (
+              <th className="px-4 py-2 align-middle text-right font-semibold">Actions</th>
+            ) : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
           {specs.length === 0 ? (
             <tr>
               <td
-                colSpan={4}
+                colSpan={columnCount}
                 className="px-4 py-12 align-middle text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400"
               >
                 No imported specs yet. Open the Files tab, import a specification, and its
@@ -231,6 +328,18 @@ export function RepositorySpecsTable({
                   <td className="whitespace-nowrap px-4 py-2 align-middle text-gray-600 dark:text-gray-400">
                     {formatNextDue(nextDue, now)}
                   </td>
+                  {showActions ? (
+                    <td className="whitespace-nowrap px-4 py-2 align-middle text-right">
+                      <RefreshNowButton
+                        label="Refresh"
+                        testId="repository-refresh-file"
+                        ariaLabel={`Refresh ${spec.path} now`}
+                        busy={busyKey === spec.id}
+                        disabled={anyBusy}
+                        onClick={() => onRefreshFile?.(spec)}
+                      />
+                    </td>
+                  ) : null}
                 </tr>
               );
             })
@@ -252,6 +361,10 @@ export function RepositorySpecsTab({ repositoryId }: { repositoryId: string }) {
   const [specs, setSpecs] = useState<RepositoryRefreshSpec[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which refresh action is in flight (REPO_REFRESH_KEY or a spec id), and the
+  // last action's feedback notice.
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [notice, setNotice] = useState<RefreshNotice | null>(null);
   // Capture a single render-stable clock for relative-time formatting so the
   // table stays pure (no Date.now() during render).
   const [now] = useState<number>(() => Date.now());
@@ -286,6 +399,61 @@ export function RepositorySpecsTab({ repositoryId }: { repositoryId: string }) {
     void fetchSpecs();
   }, [fetchSpecs]);
 
+  // Trigger a one-shot refresh (whole-repo when body is empty, single file when
+  // path/branch are given), then re-load the rows so statuses update.
+  const runRefresh = useCallback(
+    async (busy: string, body: { path?: string; branch?: string }) => {
+      if (!repositoryId || busyKey !== null) return;
+      setBusyKey(busy);
+      setNotice(null);
+      try {
+        const res = await fetch(`/api/repositories/${encodeURIComponent(repositoryId)}/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          success?: boolean;
+          enqueued?: number;
+          skipped?: number;
+          error?: string;
+        };
+        if (!res.ok || data.success !== true) {
+          throw new Error(typeof data.error === 'string' ? data.error : res.statusText);
+        }
+        const enqueued = Number(data.enqueued ?? 0);
+        setNotice({
+          kind: 'success',
+          text:
+            enqueued > 0
+              ? `Refresh queued for ${enqueued} file${enqueued === 1 ? '' : 's'}.`
+              : 'Already up to date — nothing to refresh.',
+        });
+        await fetchSpecs();
+      } catch (e) {
+        setNotice({
+          kind: 'error',
+          text: e instanceof Error ? e.message : 'Could not start the refresh',
+        });
+      } finally {
+        setBusyKey(null);
+      }
+    },
+    [repositoryId, busyKey, fetchSpecs],
+  );
+
+  const handleRefreshRepo = useCallback(() => {
+    void runRefresh(REPO_REFRESH_KEY, {});
+  }, [runRefresh]);
+
+  const handleRefreshFile = useCallback(
+    (spec: RepositoryRefreshSpec) => {
+      void runRefresh(spec.id, { path: spec.path, branch: spec.branch });
+    },
+    [runRefresh],
+  );
+
   if (error) {
     return (
       <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-6 text-sm text-rose-700 dark:border-rose-800/50 dark:bg-rose-950/30 dark:text-rose-300">
@@ -303,5 +471,15 @@ export function RepositorySpecsTab({ repositoryId }: { repositoryId: string }) {
     );
   }
 
-  return <RepositorySpecsTable repositoryId={repositoryId} specs={specs} now={now} />;
+  return (
+    <RepositorySpecsTable
+      repositoryId={repositoryId}
+      specs={specs}
+      now={now}
+      busyKey={busyKey}
+      notice={notice}
+      onRefreshRepo={handleRefreshRepo}
+      onRefreshFile={handleRefreshFile}
+    />
+  );
 }

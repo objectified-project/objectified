@@ -21,6 +21,8 @@ from .database import db
 from .models import (
     RepositoryImportSpecRead,
     repository_import_spec_read_from_row,
+    RepositoryRefreshNowRequest,
+    RepositoryRefreshNowResponse,
     TenantRepositoryCreate,
     TenantRepositoryCreateResponse,
     TenantRepositoryFileContentResponse,
@@ -629,6 +631,67 @@ async def update_tenant_repository(
     if not row:
         raise HTTPException(status_code=404, detail="repository not found")
     return TenantRepositoryGetResponse(success=True, repository=_row_to_record(row))
+
+
+@router.post(
+    "/{tenant_slug}/repositories/{repository_id}/refresh",
+    response_model=RepositoryRefreshNowResponse,
+)
+async def refresh_tenant_repository_now(
+    tenant_slug: str,
+    repository_id: uuid.UUID,
+    payload: RepositoryRefreshNowRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RepositoryRefreshNowResponse:
+    """Trigger a one-shot manual "Refresh Now" (RAR-5.2, #3533).
+
+    Runs the same spec-faithful re-import path as the periodic sweep (RAR-4.1) for
+    a single file or the whole repository, on demand. It uses the stored import
+    spec (not defaults), honors the RAR-2.2 freshness gate (only files newer than
+    the last import enqueue) and the RAR-4.4 divergence guard (applied downstream
+    by the executor), and works even when scheduled auto-refresh is disabled —
+    the cadence and the ``auto_refresh_enabled`` / kill-switch gates are
+    deliberately bypassed.
+
+    Request body (all optional): ``path`` for a single file, ``branch`` to scope a
+    branch; omit both to refresh every branch that has a stored spec.
+
+    Args:
+        tenant_slug: Tenant slug from the path (scoping comes from the token).
+        repository_id: The repository to refresh.
+        payload: Optional ``path`` / ``branch`` selectors.
+        auth_data: Authenticated principal; supplies the tenant scope.
+
+    Returns:
+        Counts of jobs enqueued / skipped and the branches evaluated.
+
+    Raises:
+        HTTPException: 404 when the repository does not belong to the tenant.
+    """
+    _ = tenant_slug
+    tenant_id = str(auth_data["tenant_id"])
+
+    path_value = payload.path.strip() if payload.path else None
+    branch_value = payload.branch.strip() if payload.branch else None
+
+    from .repository_manual_refresh import refresh_repository_now
+
+    result = refresh_repository_now(
+        db,
+        tenant_id=tenant_id,
+        repository_id=str(repository_id),
+        branch=branch_value or None,
+        path=path_value or None,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="repository not found")
+
+    return RepositoryRefreshNowResponse(
+        success=True,
+        enqueued=result.enqueued,
+        skipped=result.skipped,
+        branches=result.branches,
+    )
 
 
 @router.delete("/{tenant_slug}/repositories/{repository_id}")
