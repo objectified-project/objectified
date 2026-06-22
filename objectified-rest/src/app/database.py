@@ -1154,14 +1154,30 @@ class Database:
         return {"connection": "connected", "storage_present": storage_present}
 
     def get_primitives_for_tenant(self, tenant_id: str, category: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Get all primitives for a specific tenant."""
+        """List the primitives a tenant may read: system-core ∪ the tenant's own (#3453).
+
+        Read scope is ``is_system = true`` (shared system-core types, visible to every
+        tenant) unioned with ``tenant_id = <caller>`` (the tenant's private types). A
+        different tenant's private types are never returned, so Tenant A cannot read
+        Tenant B's custom types. System-core types are seeded per tenant, so a tenant
+        that already owns a core row would otherwise see it twice; ``DISTINCT ON
+        (category, name)`` collapses those, preferring the caller's own row.
+
+        Args:
+            tenant_id: The caller's tenant id (scopes visibility).
+            category: Optional category filter.
+
+        Returns:
+            The visible primitives, ordered by category then name.
+        """
         query = """
-            SELECT id, tenant_id, name, description, category, schema, tags,
+            SELECT DISTINCT ON (category, name)
+                   id, tenant_id, name, description, category, schema, tags,
                    created_by, is_system, is_public, usage_count, source,
                    schema_id, draft, namespace, base_uri,
                    created_at, updated_at
             FROM odb.primitives
-            WHERE tenant_id = %s
+            WHERE (tenant_id = %s OR is_system = true)
         """
         params = [tenant_id]
 
@@ -1169,18 +1185,34 @@ class Database:
             query += " AND category = %s"
             params.append(category)
 
-        query += " ORDER BY category, name"
+        # Within each (category, name) group prefer the caller's own row over a
+        # foreign system-core copy; the leading keys satisfy DISTINCT ON.
+        query += " ORDER BY category, name, (tenant_id = %s) DESC"
+        params.append(tenant_id)
         return self.execute_query(query, tuple(params))
 
     def get_primitive_by_id(self, primitive_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
-        """Get a specific primitive by ID, ensuring it belongs to the tenant."""
+        """Get a primitive by ID within the tenant's read scope: system-core ∪ own (#3453).
+
+        Returns the row when it is the tenant's own or a shared system-core type; a
+        different tenant's private type resolves to ``None`` (cross-tenant isolation).
+        System-core rows are read-only — the route layer rejects writes to them — so
+        returning one here for a read does not grant write access.
+
+        Args:
+            primitive_id: The primitive id.
+            tenant_id: The caller's tenant id (scopes visibility).
+
+        Returns:
+            The primitive row, or None when missing or not visible to the tenant.
+        """
         query = """
             SELECT id, tenant_id, name, description, category, schema, tags,
                    created_by, is_system, is_public, usage_count, source,
                    schema_id, draft, namespace, base_uri,
                    created_at, updated_at
             FROM odb.primitives
-            WHERE id = %s AND tenant_id = %s
+            WHERE id = %s AND (tenant_id = %s OR is_system = true)
         """
         results = self.execute_query(query, (primitive_id, tenant_id))
         return results[0] if results else None
