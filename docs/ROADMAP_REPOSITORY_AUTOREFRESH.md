@@ -125,7 +125,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | ~~RAR-3.3~~ ✅ | ~~#3524~~ | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
 | ~~RAR-4.1~~ ✅ | ~~#3527~~ | ~~RAR-4.2~~ ✅ | ~~#3528~~ | ~~RAR-4.3~~ ✅ | ~~#3529~~ |
 | ~~RAR-4.4~~ ✅ | ~~#3530~~ | RAR-4.5 | #3531 | ~~RAR-5.1~~ ✅ | ~~#3532~~ |
-| ~~RAR-5.2~~ ✅ | ~~#3533~~ | RAR-5.3 | #3534 | RAR-5.4 | #3535 |
+| ~~RAR-5.2~~ ✅ | ~~#3533~~ | ~~RAR-5.3~~ ✅ | ~~#3534~~ | RAR-5.4 | #3535 |
 | RAR-5.5 | #3536 | RAR-5.6 | #3537 | RAR-6.1 | #3538 |
 | RAR-6.2 | #3539 | RAR-6.3 | #3540 | RAR-6.4 | #3541 |
 | RAR-6.5 | #3542 | | | | |
@@ -609,7 +609,7 @@ wiring.
 |----|-------|---------|--------|----------|-----|-------|---------|
 | ~~RAR-5.1~~ ✅ **Done** (#3532) | Per-file refresh status UI | Specs tab shows status, last-refreshed, next-due, divergence | `enhancement`,`mvp`,`import`,`repository`,`ui` | Y | Y | M | objectified-ui |
 | ~~RAR-5.2~~ ✅ **Done** (#3533) | "Refresh Now" one-shot (extend REPO-9.5) | Manual spec-faithful refresh per file/repo | `enhancement`,`mvp`,`import`,`repository`,`ui` | Y | Y | S | objectified-ui, objectified-rest |
-| RAR-5.3 | Refresh history + change-report linking (extend REPO-12.6) | Audit each refresh cycle with diff link | `enhancement`,`mvp`,`import`,`repository` | Y | Y | M | objectified-rest |
+| ~~RAR-5.3~~ ✅ **Done** (#3534) | Refresh history + change-report linking (extend REPO-12.6) | Audit each refresh cycle with diff link | `enhancement`,`mvp`,`import`,`repository` | Y | Y | M | objectified-rest |
 | RAR-5.4 | Refresh notifications (extend REPO-12.5) | Notify on new version / divergence / failure | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-rest |
 | RAR-5.5 | Dashboard widget: stale specs / refresh activity (extend REPO-11) | At-a-glance refresh health | `enhancement`,`import`,`repository`,`dashboard` | Y | N | M | objectified-ui |
 | RAR-5.6 | CLI `objectified repository refresh` + status | Trigger / inspect refresh from CLI | `enhancement`,`import`,`cli` | Y | N | M | objectified-cli |
@@ -660,6 +660,30 @@ every branch with a stored spec. The OpenAPI contract is regenerated. Tests:
 no-op, branch scoping, cadence/opt-out bypass, unknown-repo 404, per-branch fault isolation) and
 additions to `tests/RepositorySpecsTab.test.tsx` (button wiring, busy-disable, hidden-when-empty,
 success/no-op notices, POST payload).
+
+**Status (5.3): ✅ Done (#3534).** New objectified-rest module `app/repository_refresh_audit.py`
+records one audit row per refresh **cycle** into the REPO-12.6 (#2944) `odb.workflow_audit` ledger
+under the dedicated action `repository.refresh.cycle`, carrying the refresh facets — `trigger`
+(`scheduled` / `manual` / `webhook`), the file lineage (`repositoryId` / `branch` / `path`), the
+RAR-2.2 freshness `decision`, the four-valued `outcome` (`new-version` / `unchanged` / `diverged` /
+`failed`, derived by `derive_outcome(...)`), and the version + change-report links (`versionId` /
+`parentVersionId` / `changeReportId`, RAR-4.2/4.3) — in the row's `detail` JSONB, so the existing
+ledger schema is reused unchanged (**no migration; objectified-rest only**). The `workflow_audit.outcome`
+*column* keeps its `success` / `failure` semantics (only a `failed` cycle is a `failure`; a held
+divergence or a no-op is a successful cycle), while the rich outcome lives in `detail.outcome`. Recording
+is best-effort (never raises) and guards that `trigger` / `outcome` are the proper enums so a free-form
+string can never corrupt the ledger. The history is **queryable per repo and per file** via new
+tenant-scoped DAOs `search_repository_refresh_audit` / `count_repository_refresh_audit` (filtering the
+ledger on the action plus the `detail->>'repositoryId'` / `detail->>'path'` / `branch` / `trigger` /
+`outcome` JSONB keys and a `createdAt` range), exposed read-only at
+`GET /v1/tenants/{slug}/repositories/{id}/refresh-history` (newest-first, offset-paginated; `?path=` for
+per-file history; 404 on a cross-tenant repo). The OpenAPI contract is regenerated. Invoking
+`record_refresh_cycle(...)` from the EPIC-4 refresh dispatcher (after the version + change report land) is
+the dispatcher's job, mirroring how RAR-4.1/4.2/4.3/4.4 deferred their wiring. Tests:
+`tests/test_repository_refresh_audit.py` (outcome derivation, detail assembly, column/detail outcome split,
+lineage capture, enum guarding, and the DAO SQL contract for per-repo/per-file query) and
+`tests/test_repository_refresh_history_api.py` (per-repo + per-file query, filter forwarding, 404,
+detail→field projection, pagination).
 
 ---
 

@@ -2879,6 +2879,125 @@ class Database:
             params.append(offset)
         return self.execute_query(q, tuple(params))
 
+    def _refresh_audit_filter_clauses(
+        self,
+        tenant_id: str,
+        *,
+        repository_id: Optional[str] = None,
+        branch: Optional[str] = None,
+        path: Optional[str] = None,
+        trigger: Optional[str] = None,
+        outcome: Optional[str] = None,
+        since=None,
+        until=None,
+    ) -> Tuple[str, List[Any]]:
+        """Build WHERE fragment + params for refresh-cycle history queries (RAR-5.3).
+
+        Filters the shared ``odb.workflow_audit`` ledger down to the dedicated
+        refresh-cycle action and, when supplied, the per-repo / per-file lineage and
+        the refresh facets carried in the ``detail`` JSONB (see
+        :mod:`repository_refresh_audit`). ``repository_id`` + ``path`` make the
+        history queryable per repo and per file.
+        """
+        from .repository_refresh_audit import REFRESH_CYCLE_ACTION
+
+        clauses = ["wa.tenant_id = %s", "wa.action = %s"]
+        params: List[Any] = [tenant_id, REFRESH_CYCLE_ACTION]
+        if repository_id is not None:
+            clauses.append("wa.detail->>'repositoryId' = %s")
+            params.append(str(repository_id))
+        if branch is not None:
+            clauses.append("wa.detail->>'branch' = %s")
+            params.append(str(branch))
+        if path is not None:
+            clauses.append("wa.detail->>'path' = %s")
+            params.append(str(path))
+        if trigger is not None:
+            clauses.append("wa.detail->>'trigger' = %s")
+            params.append(str(trigger))
+        if outcome is not None:
+            clauses.append("wa.detail->>'outcome' = %s")
+            params.append(str(outcome))
+        if since is not None:
+            clauses.append("wa.created_at >= %s")
+            params.append(since)
+        if until is not None:
+            clauses.append("wa.created_at <= %s")
+            params.append(until)
+        return " AND ".join(clauses), params
+
+    def count_repository_refresh_audit(
+        self,
+        tenant_id: str,
+        *,
+        repository_id: Optional[str] = None,
+        branch: Optional[str] = None,
+        path: Optional[str] = None,
+        trigger: Optional[str] = None,
+        outcome: Optional[str] = None,
+        since=None,
+        until=None,
+    ) -> int:
+        """Count refresh-cycle audit rows matching the filters (RAR-5.3)."""
+        where_sql, params = self._refresh_audit_filter_clauses(
+            tenant_id,
+            repository_id=repository_id,
+            branch=branch,
+            path=path,
+            trigger=trigger,
+            outcome=outcome,
+            since=since,
+            until=until,
+        )
+        q = f"SELECT COUNT(*)::bigint AS cnt FROM odb.workflow_audit wa WHERE {where_sql}"
+        rows = self.execute_query(q, tuple(params))
+        if not rows:
+            return 0
+        return int(rows[0].get("cnt") or 0)
+
+    def search_repository_refresh_audit(
+        self,
+        tenant_id: str,
+        *,
+        repository_id: Optional[str] = None,
+        branch: Optional[str] = None,
+        path: Optional[str] = None,
+        trigger: Optional[str] = None,
+        outcome: Optional[str] = None,
+        since=None,
+        until=None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """Paginated refresh-cycle history, newest first (RAR-5.3).
+
+        Returns ``odb.workflow_audit`` rows stamped with the refresh-cycle action,
+        scoped to the tenant and optionally to a repository / branch / file path and
+        the refresh facets. ``repository_id`` makes the history queryable per repo;
+        adding ``path`` makes it queryable per file.
+        """
+        where_sql, params = self._refresh_audit_filter_clauses(
+            tenant_id,
+            repository_id=repository_id,
+            branch=branch,
+            path=path,
+            trigger=trigger,
+            outcome=outcome,
+            since=since,
+            until=until,
+        )
+        q = f"""
+            SELECT wa.id, wa.tenant_id, wa.project_id, wa.version_id, wa.action,
+                   wa.outcome, wa.actor_id, wa.detail, wa.created_at
+            FROM odb.workflow_audit wa
+            WHERE {where_sql}
+            ORDER BY wa.created_at DESC, wa.id DESC
+            LIMIT %s OFFSET %s
+        """
+        params.append(limit)
+        params.append(offset)
+        return self.execute_query(q, tuple(params))
+
     def delete_version(
         self, version_record_id: str, tenant_id: str, user_id: Optional[str]
     ) -> Tuple[bool, Optional[str]]:

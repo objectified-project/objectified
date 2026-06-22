@@ -13873,6 +13873,222 @@
         }
       }
     },
+    "/v1/tenants/{tenant_slug}/repositories/{repository_id}/refresh-history": {
+      "get": {
+        "tags": [
+          "tenant-repositories"
+        ],
+        "summary": "List Repository Refresh History",
+        "description": "List refresh-cycle audit history for a repository (RAR-5.3, #3534).\n\nEach refresh cycle records who/what triggered it, the freshness decision, the\noutcome (new-version / unchanged / diverged / failed), and the change-report and\nversion links. The history is queryable **per repo** (this endpoint) and **per\nfile** (add ``?path=``). Newest first.\n\nArgs:\n    tenant_slug: Tenant slug from the path (scoping comes from the token).\n    repository_id: The repository whose refresh history to list.\n    path: Optional file path for per-file history.\n    branch: Optional branch scope.\n    trigger: Optional trigger filter.\n    outcome: Optional outcome filter.\n    since: Optional inclusive ISO-8601 lower bound on ``createdAt``.\n    until: Optional inclusive ISO-8601 upper bound on ``createdAt``.\n    limit: Page size (1..200).\n    offset: Page offset.\n\nReturns:\n    A paginated, newest-first page of refresh-cycle entries.\n\nRaises:\n    HTTPException: 404 when the repository does not belong to the tenant.",
+        "operationId": "list_repository_refresh_history_v1_tenants__tenant_slug__repositories__repository_id__refresh_history_get",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "repository_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Repository Id"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to a single imported file (per-file history).",
+              "title": "Path"
+            },
+            "description": "Restrict to a single imported file (per-file history)."
+          },
+          {
+            "name": "branch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to a single branch.",
+              "title": "Branch"
+            },
+            "description": "Restrict to a single branch."
+          },
+          {
+            "name": "trigger",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by trigger: scheduled | manual | webhook.",
+              "title": "Trigger"
+            },
+            "description": "Filter by trigger: scheduled | manual | webhook."
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by outcome: new-version | unchanged | diverged | failed.",
+              "title": "Outcome"
+            },
+            "description": "Filter by outcome: new-version | unchanged | diverged | failed."
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive lower bound on createdAt (ISO 8601).",
+              "title": "Since"
+            },
+            "description": "Inclusive lower bound on createdAt (ISO 8601)."
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive upper bound on createdAt (ISO 8601).",
+              "title": "Until"
+            },
+            "description": "Inclusive upper bound on createdAt (ISO 8601)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshHistoryPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",
@@ -17093,6 +17309,241 @@
         "type": "object",
         "title": "PushWebhookSubscriptionUpdateRequest",
         "description": "Update URL, active flag, and/or rotate signing secret (#2587)."
+      },
+      "RefreshHistoryEntryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "repositoryId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repositoryid"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger",
+            "description": "scheduled | manual | webhook"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision",
+            "description": "RAR-2.2 freshness reason code, when known."
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome",
+            "description": "new-version | unchanged | diverged | failed"
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectid"
+          },
+          "versionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Versionid"
+          },
+          "parentVersionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentversionid"
+          },
+          "changeReportId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changereportid",
+            "description": "Change report documenting the refresh diff (RAR-4.3), when any."
+          },
+          "sourceCommitSha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcecommitsha"
+          },
+          "actorId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actorid"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "createdAt": {
+            "type": "string",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "createdAt"
+        ],
+        "title": "RefreshHistoryEntryOut",
+        "description": "One refresh-cycle audit row, projected from ``odb.workflow_audit`` (RAR-5.3).\n\nHoists the refresh-specific facets the cycle stored in the audit row's ``detail``\nJSONB \u2014 trigger, file lineage, decision, outcome, and the version / change-report\nlinks \u2014 to first-class fields so the refresh history is self-describing. The raw\n``detail`` is preserved for any extra context."
+      },
+      "RefreshHistoryPageResponse": {
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "title": "Schemaversion",
+            "description": "Bumped only when item or pagination shape changes incompatibly.",
+            "default": 1
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RefreshHistoryEntryOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/RefreshHistoryPaginationOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "title": "RefreshHistoryPageResponse",
+        "description": "Stable JSON envelope for GET .../repositories/{id}/refresh-history (RAR-5.3)."
+      },
+      "RefreshHistoryPaginationOut": {
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "hasMore": {
+            "type": "boolean",
+            "title": "Hasmore"
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextoffset",
+            "description": "Pass as offset for the next page when hasMore is true."
+          }
+        },
+        "type": "object",
+        "required": [
+          "limit",
+          "total",
+          "offset",
+          "hasMore"
+        ],
+        "title": "RefreshHistoryPaginationOut",
+        "description": "Offset pagination metadata for the refresh-history list."
       },
       "RefreshStatus": {
         "type": "string",

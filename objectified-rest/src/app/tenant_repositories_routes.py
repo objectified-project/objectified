@@ -13,12 +13,17 @@ from typing import Any, Dict, List, Optional
 
 _logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg2 import errors as pg_errors
 
 from .auth import get_authenticated_user_id, validate_authentication
 from .database import db
 from .models import (
+    RefreshHistoryEntryOut,
+    RefreshHistoryPageResponse,
+    RefreshHistoryPaginationOut,
     RepositoryImportSpecRead,
     repository_import_spec_read_from_row,
     RepositoryRefreshNowRequest,
@@ -33,6 +38,7 @@ from .models import (
     TenantRepositoryUpdate,
     TenantRepositoriesListResponse,
 )
+from .repository_refresh_audit import RefreshOutcome, RefreshTrigger
 from .repository_file_scan import _github_owner_repo, fetch_github_repository_file_text
 from .repository_validation import (
     fetch_github_repo_with_token,
@@ -692,6 +698,186 @@ async def refresh_tenant_repository_now(
         skipped=result.skipped,
         branches=result.branches,
     )
+
+
+_REFRESH_HISTORY_MAX_LIMIT = 200
+_REFRESH_HISTORY_DEFAULT_LIMIT = 50
+
+
+def _parse_history_datetime(label: str, raw: Optional[str]) -> Optional[datetime]:
+    """Parse an inclusive ISO-8601 bound, assuming UTC when no offset is given."""
+    if raw is None or str(raw).strip() == "":
+        return None
+    s = str(raw).strip().replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {label}: expected ISO 8601 datetime ({e})",
+        ) from e
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _normalize_enum_filter(
+    label: str, raw: Optional[str], enum_cls
+) -> Optional[str]:
+    """Validate an optional enum-valued filter against its allowed wire codes."""
+    if raw is None or str(raw).strip() == "":
+        return None
+    value = str(raw).strip()
+    allowed = {m.value for m in enum_cls}
+    if value not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {label}: expected one of {sorted(allowed)}",
+        )
+    return value
+
+
+def _refresh_audit_row_to_entry(row: Dict[str, Any]) -> RefreshHistoryEntryOut:
+    """Project one ``odb.workflow_audit`` refresh-cycle row to the wire entry."""
+    detail = row.get("detail")
+    if not isinstance(detail, dict):
+        detail = {}
+    ca = row.get("created_at")
+    if hasattr(ca, "isoformat"):
+        ca_s = ca.isoformat()
+    elif ca is None:
+        ca_s = ""
+    else:
+        ca_s = str(ca)
+    return RefreshHistoryEntryOut(
+        id=str(row["id"]),
+        repository_id=detail.get("repositoryId"),
+        branch=detail.get("branch"),
+        path=detail.get("path"),
+        trigger=detail.get("trigger"),
+        decision=detail.get("decision"),
+        outcome=detail.get("outcome"),
+        project_id=str(row["project_id"]) if row.get("project_id") is not None else None,
+        version_id=detail.get("versionId")
+        or (str(row["version_id"]) if row.get("version_id") is not None else None),
+        parent_version_id=detail.get("parentVersionId"),
+        change_report_id=detail.get("changeReportId"),
+        source_commit_sha=detail.get("sourceCommitSha"),
+        actor_id=str(row["actor_id"]) if row.get("actor_id") is not None else None,
+        detail=detail or None,
+        created_at=ca_s,
+    )
+
+
+@router.get(
+    "/{tenant_slug}/repositories/{repository_id}/refresh-history",
+    response_model=RefreshHistoryPageResponse,
+    response_model_by_alias=True,
+)
+async def list_repository_refresh_history(
+    tenant_slug: str,
+    repository_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    path: Optional[str] = Query(
+        None,
+        description="Restrict to a single imported file (per-file history).",
+    ),
+    branch: Optional[str] = Query(
+        None,
+        description="Restrict to a single branch.",
+    ),
+    trigger: Optional[str] = Query(
+        None,
+        description="Filter by trigger: scheduled | manual | webhook.",
+    ),
+    outcome: Optional[str] = Query(
+        None,
+        description="Filter by outcome: new-version | unchanged | diverged | failed.",
+    ),
+    since: Optional[str] = Query(
+        None,
+        description="Inclusive lower bound on createdAt (ISO 8601).",
+    ),
+    until: Optional[str] = Query(
+        None,
+        description="Inclusive upper bound on createdAt (ISO 8601).",
+    ),
+    limit: int = Query(_REFRESH_HISTORY_DEFAULT_LIMIT, ge=1, le=_REFRESH_HISTORY_MAX_LIMIT),
+    offset: int = Query(0, ge=0),
+) -> RefreshHistoryPageResponse:
+    """List refresh-cycle audit history for a repository (RAR-5.3, #3534).
+
+    Each refresh cycle records who/what triggered it, the freshness decision, the
+    outcome (new-version / unchanged / diverged / failed), and the change-report and
+    version links. The history is queryable **per repo** (this endpoint) and **per
+    file** (add ``?path=``). Newest first.
+
+    Args:
+        tenant_slug: Tenant slug from the path (scoping comes from the token).
+        repository_id: The repository whose refresh history to list.
+        path: Optional file path for per-file history.
+        branch: Optional branch scope.
+        trigger: Optional trigger filter.
+        outcome: Optional outcome filter.
+        since: Optional inclusive ISO-8601 lower bound on ``createdAt``.
+        until: Optional inclusive ISO-8601 upper bound on ``createdAt``.
+        limit: Page size (1..200).
+        offset: Page offset.
+
+    Returns:
+        A paginated, newest-first page of refresh-cycle entries.
+
+    Raises:
+        HTTPException: 404 when the repository does not belong to the tenant.
+    """
+    _ = tenant_slug
+    tenant_id = str(auth_data["tenant_id"])
+    rid = str(repository_id)
+
+    if not db.get_tenant_repository(tenant_id, rid):
+        raise HTTPException(status_code=404, detail="repository not found")
+
+    trigger_f = _normalize_enum_filter("trigger", trigger, RefreshTrigger)
+    outcome_f = _normalize_enum_filter("outcome", outcome, RefreshOutcome)
+    path_f = path.strip() if path and path.strip() else None
+    branch_f = branch.strip() if branch and branch.strip() else None
+    since_dt = _parse_history_datetime("since", since)
+    until_dt = _parse_history_datetime("until", until)
+
+    total = db.count_repository_refresh_audit(
+        tenant_id,
+        repository_id=rid,
+        branch=branch_f,
+        path=path_f,
+        trigger=trigger_f,
+        outcome=outcome_f,
+        since=since_dt,
+        until=until_dt,
+    )
+    rows = db.search_repository_refresh_audit(
+        tenant_id,
+        repository_id=rid,
+        branch=branch_f,
+        path=path_f,
+        trigger=trigger_f,
+        outcome=outcome_f,
+        since=since_dt,
+        until=until_dt,
+        limit=limit,
+        offset=offset,
+    )
+
+    has_more = offset + len(rows) < total
+    next_offset = (offset + len(rows)) if has_more else None
+    pagination = RefreshHistoryPaginationOut(
+        limit=limit,
+        total=total,
+        offset=offset,
+        has_more=has_more,
+        next_offset=next_offset,
+    )
+    items = [_refresh_audit_row_to_entry(r) for r in rows]
+    return RefreshHistoryPageResponse(items=items, pagination=pagination)
 
 
 @router.delete("/{tenant_slug}/repositories/{repository_id}")
