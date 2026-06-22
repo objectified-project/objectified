@@ -45,6 +45,7 @@ import {
   getRepositoryFileImportableVerdict,
   parseRepositoryFileSpecMetadata,
 } from '@lib/repository-file-spec-metadata';
+import { deriveRepositoryImportSourceDescriptor } from '@lib/repository-import-source-descriptor';
 import {
   projectDraftFromRepositorySpec,
   type RepositorySpecProjectDraft,
@@ -601,6 +602,13 @@ export function RepositoryFileImportMapping({
         const document = analysis.document;
         const sourceKind = analysis.format === 'arazzo' ? 'arazzo' : 'openapi';
 
+        // Capture the source descriptor the importer actually resolved (RAR-1.3)
+        // so a future auto-refresh routes/parses this file identically instead of
+        // re-sniffing from scratch. `path` already carries the filename and
+        // `sourceKind` the importer kind; this adds the resolved format + the
+        // content type the document was read as.
+        const sourceDescriptor = deriveRepositoryImportSourceDescriptor(analysis);
+
         const job = await startImport({
           tenantId: currentTenantId,
           userId: currentUserId,
@@ -611,6 +619,8 @@ export function RepositoryFileImportMapping({
             branch,
             path: file.path,
             blobSha: payload?.blob_sha ?? file.blob_sha ?? null,
+            formatOverride: sourceDescriptor.formatOverride,
+            contentType: sourceDescriptor.contentType,
           },
           project: {
             name: effectiveOptions.projectName || (document?.info?.title || 'New Project'),
