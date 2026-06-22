@@ -14,6 +14,7 @@ from .arazzo_generator import generate_arazzo_spec, generate_class_arazzo_spec
 from .jsonschema_generator import generate_jsonschema_spec, generate_class_jsonschema_spec
 from .models import OpenAPIResponse
 from .primitives_routes import router as primitives_router
+from .type_namespaces_routes import router as type_namespaces_router
 from .classes_routes import router as classes_router
 from .projects_routes import router as projects_router
 from .workflow_audit_routes import router as workflow_audit_router
@@ -95,6 +96,7 @@ app.add_middleware(
 app.include_router(browse_public_router)
 app.include_router(data_router)
 app.include_router(primitives_router)
+app.include_router(type_namespaces_router)
 app.include_router(classes_router)
 app.include_router(projects_router)
 app.include_router(compatibility_router)
@@ -328,6 +330,11 @@ async def root():
                 "update": "PUT /v1/primitives/{tenant-slug}/{primitive-id}",
                 "delete": "DELETE /v1/primitives/{tenant-slug}/{primitive-id}",
                 "import": "POST /v1/primitives/{tenant-slug}/import"
+            },
+            "type_namespaces": {
+                "list": "/v1/types/{tenant-slug}/namespaces",
+                "create": "POST /v1/types/{tenant-slug}/namespaces",
+                "update": "PUT /v1/types/{tenant-slug}/namespaces/{namespace-id}"
             },
             "paths": {
                 "list": "/v1/paths/{tenant-slug}/{version-id}",

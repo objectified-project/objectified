@@ -325,7 +325,7 @@ enforcement, plus the `objectified-ui` proxy + typed client.
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |---|---|---|---|:---:|:---:|---|---|
 | 2.1 #3450 ✅ | Registry service skeleton + auth/scoping | **DONE** — registry health/ping (`GET /v1/primitives/health`) over the `objectified-db` connection; existing tenant/scope auth confirmed, clients unaffected | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
-| 2.2 #3451 | Namespace CRUD API | Create/list/update namespaces with scope, base URI, version root | `type-registry`,`registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
+| 2.2 #3451 ✅ | Namespace CRUD API | **DONE** — `GET/POST/PUT /v1/types/{tenant_slug}/namespaces` over `odb.type_namespaces`; tenant-admin writes, system-core read-only, type counts joined from `odb.primitives` | `type-registry`,`registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
 | 2.3 #3452 | Type definition CRUD + draft 2020-12 validation | CRUD types; validate `json_schema` against draft 2020-12 | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
 | 2.4 #3453 | Scope & visibility enforcement | System-core vs tenant access + ref-direction rules | `type-registry`,`governance`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-rest |
 | 2.5 #3454 | Registry coverage/stats endpoint | Counts by scope, imported, unresolved (for dashboard KPIs) | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | S | objectified-rest |
@@ -352,6 +352,14 @@ enforcement, plus the `objectified-ui` proxy + typed client.
   namespaces are read-only to non-platform-admins.
 - **Parallelism/Dependencies.** Depends on 2.1; blocks 4.x, 5.6.
 - **Technical Stack.** FastAPI, Pydantic.
+- **Delivered.** Migration `objectified-db/scripts/20260622-250000.sql` adds `odb.type_namespaces`
+  (scope/base-uri/version-root/visibility/default), seeded with the `std/v0` system-core
+  namespaces; its `namespace`/`base_uri` mirror `odb.primitives`, which supplies each namespace's
+  type count. REST routes `GET/POST/PUT /v1/types/{tenant_slug}/namespaces`
+  (`type_namespaces_routes.py`) list system-core ∪ tenant namespaces, and create/update
+  tenant-owned namespaces (tenant-admin only; path immutable; base URI / version root derived from
+  the path). System-core namespaces are read-only via the API (no platform-admin role exposed →
+  403). DTOs in `models.py`; DAOs `Database.list/get/create/update_type_namespace()`.
 
 ### Issue 2.3 — Type definition CRUD + draft 2020-12 validation
 - **Problem.** Types must be created/edited with valid JSON Schema 2020-12.
