@@ -319,7 +319,9 @@ async def add_property_to_class(
             name=request['name'],
             description=request.get('description'),
             data=request['data'],
-            parent_id=request.get('parent_id')
+            parent_id=request.get('parent_id'),
+            primitive_id=request.get('primitive_id'),
+            primitive_ref=request.get('primitive_ref')
         )
 
         return property_data
@@ -390,6 +392,11 @@ async def update_class_property(
             updates['description'] = request['description']
         if 'data' in request:
             updates['data'] = request['data']
+        # Property→primitive binding (#3448). Present-but-None clears the binding.
+        if 'primitive_id' in request:
+            updates['primitive_id'] = request['primitive_id']
+        if 'primitive_ref' in request:
+            updates['primitive_ref'] = request['primitive_ref']
 
         property_data = db.update_class_property(
             class_property_id=class_property_id,

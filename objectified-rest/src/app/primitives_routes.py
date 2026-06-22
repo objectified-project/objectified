@@ -14,11 +14,15 @@ from .models import (
     PrimitiveSchema,
     PrimitiveCreateRequest,
     PrimitiveUpdateRequest,
-    PrimitiveImportRequest
+    PrimitiveImportRequest,
+    PrimitiveImportRecord
 )
 from .auth import validate_authentication, get_authenticated_user_id
 
 router = APIRouter(prefix="/v1/primitives", tags=["primitives"])
+
+# Allowed import source shapes — must match the odb.primitive_imports CHECK constraint.
+VALID_IMPORT_SOURCE_KINDS = {"json-schema", "type-def-bundle", "openapi"}
 
 
 def determine_category_from_schema(schema: Dict[str, Any]) -> str:
@@ -118,6 +122,56 @@ async def list_primitives(
     primitives = db.get_primitives_for_tenant(auth_data['tenant_id'], category)
 
     return [PrimitiveSchema(**p) for p in primitives]
+
+
+@router.get("/{tenant_slug}/imports")
+async def list_primitive_imports(
+    tenant_slug: str,
+    limit: int = Query(50, ge=1, le=500, description="Max number of records to return"),
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> List[PrimitiveImportRecord]:
+    """
+    List primitive import provenance records for a tenant, newest first (#3448).
+
+    Registered before GET /{tenant_slug}/{primitive_id} so the literal `imports`
+    path is not captured as a primitive id.
+
+    Args:
+        tenant_slug: The tenant slug
+        limit: Maximum number of records to return
+        auth_data: Authentication data (injected by dependency)
+
+    Returns:
+        The tenant's import provenance records.
+    """
+    records = db.get_primitive_imports(auth_data['tenant_id'], limit)
+    return [PrimitiveImportRecord(**r) for r in records]
+
+
+@router.get("/{tenant_slug}/imports/{import_id}")
+async def get_primitive_import(
+    tenant_slug: str,
+    import_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> PrimitiveImportRecord:
+    """
+    Get a single primitive import provenance record, including its report JSON (#3448).
+
+    Args:
+        tenant_slug: The tenant slug
+        import_id: The import provenance record id
+        auth_data: Authentication data (injected by dependency)
+
+    Returns:
+        The provenance record with its full options/report payload.
+    """
+    record = db.get_primitive_import_by_id(import_id, auth_data['tenant_id'])
+    if not record:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Import record not found: {import_id}"
+        )
+    return PrimitiveImportRecord(**record)
 
 
 @router.get("/{tenant_slug}/{primitive_id}")
@@ -340,8 +394,18 @@ async def import_primitives(
         auth_data: Authentication data (injected by dependency)
 
     Returns:
-        Summary of imported primitives
+        Summary of imported primitives plus the id of the recorded provenance row.
     """
+    # Validate the declared source shape against the persisted CHECK constraint.
+    if request.source_kind not in VALID_IMPORT_SOURCE_KINDS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Invalid source_kind '{request.source_kind}'. "
+                f"Expected one of: {', '.join(sorted(VALID_IMPORT_SOURCE_KINDS))}"
+            )
+        )
+
     # Extract definitions from schema
     definitions = {}
 
@@ -385,7 +449,8 @@ async def import_primitives(
             # Determine category from schema
             schema_type = determine_category_from_schema(def_schema)
 
-            # Create primitive - the full schema with all metadata is stored
+            # Create primitive - the full schema with all metadata is stored.
+            # source='imported' marks its provenance on odb.primitives (#3448).
             primitive = db.create_primitive(
                 tenant_id=auth_data['tenant_id'],
                 name=def_name,
@@ -393,7 +458,8 @@ async def import_primitives(
                 schema=def_schema,  # Full schema including x-license, x-links, $comment, examples, title, etc.
                 description=def_schema.get('description'),
                 tags=def_schema.get('tags', []),
-                created_by=created_by
+                created_by=created_by,
+                source='imported'
             )
             imported.append(primitive['name'])
         except Exception as e:
@@ -402,12 +468,42 @@ async def import_primitives(
             else:
                 errors.append({"name": def_name, "error": str(e)})
 
-    return {
-        "message": f"Import completed",
+    # Build the auditable report and persist a provenance record (#3448).
+    report = {
         "imported": imported,
         "skipped": skipped,
         "errors": errors,
         "total_imported": len(imported),
         "total_skipped": len(skipped),
-        "total_errors": len(errors)
+        "total_errors": len(errors),
+    }
+    options = {
+        "import_all": request.import_all,
+        "selected_definitions": request.selected_definitions,
+    }
+
+    import_id = None
+    try:
+        import_record = db.create_primitive_import(
+            tenant_id=auth_data['tenant_id'],
+            report=report,
+            source_kind=request.source_kind,
+            source_label=request.source_label,
+            target_namespace=request.target_namespace,
+            options=options,
+            imported_count=len(imported),
+            skipped_count=len(skipped),
+            error_count=len(errors),
+            imported_by=created_by,
+        )
+        import_id = str(import_record['id'])
+    except Exception as e:
+        # Provenance is best-effort: a failure here must not lose a successful import,
+        # but it is surfaced so the audit gap is visible.
+        errors.append({"name": "_provenance", "error": f"Failed to record import provenance: {e}"})
+
+    return {
+        "message": "Import completed",
+        "import_id": import_id,
+        **report,
     }

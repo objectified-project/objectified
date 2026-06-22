@@ -234,7 +234,7 @@ erDiagram
 |---|---|---|---|:---:|:---:|---|---|
 | 1.1 #3446 | Consolidate registry into `objectified-db` (remove separate DB) | Rip out the `objectified-types-db` provisioning shipped earlier; registry lives in `odb` | `type-registry`,`types-db`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-db, objectified-rest |
 | 1.2 #3447 | Extend `odb.primitives` (namespace, `$id`, `$ref`, draft 2020-12) | Migration adding namespace/`base_uri`/`schema_id`/`draft`/`source`/`refs` columns to `odb.primitives` | `type-registry`,`types-db`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-db |
-| 1.3 #3448 | Import provenance & property binding | Import-history reuse + property↔primitive binding column on `class_property` | `type-registry`,`types-db`,`import`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-db |
+| 1.3 #3448 | ~~Import provenance & property binding~~ **DONE** | `odb.primitive_imports` provenance table + `report` JSON; `class_properties.primitive_id`/`primitive_ref` binding read by the Designer | `type-registry`,`types-db`,`import`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-db |
 | 1.4 #3449 | Seed core system primitives (`std/v0`) | Seed primitives + std types (date, uuid, money, …) as system-wide `is_system` rows | `type-registry`,`registry`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-db, objectified-rest |
 
 ### Issue 1.1 — Consolidate registry into `objectified-db` (remove separate DB)
@@ -274,7 +274,12 @@ erDiagram
 - **Parallelism/Dependencies.** Depends on 1.1; blocks Epic 2/3/4.
 - **Technical Stack.** PostgreSQL, JSONB.
 
-### Issue 1.3 — Import provenance & property binding
+### Issue 1.3 — Import provenance & property binding ✅ DONE (#3448)
+- **Delivered.** `odb.primitive_imports` provenance table (source_kind, options/report JSONB,
+  attribution, tallies) written on every `/v1/primitives/{tenant}/import`, with read endpoints
+  `GET /v1/primitives/{tenant}/imports[/{id}]`; imported primitives marked `source='imported'`.
+  `odb.class_properties` extended with `primitive_id` (FK to `odb.primitives`) + `primitive_ref`,
+  surfaced on the Designer read path and carried through class/version copies.
 - **Problem.** Imports and property bindings need durable records — in the same database.
 - **Solution/Scope.** Reuse the existing import-history/attribution infrastructure (#2299/#2305)
   to record primitive imports (source_kind ∈ {json-schema, type-def-bundle, openapi}, target
