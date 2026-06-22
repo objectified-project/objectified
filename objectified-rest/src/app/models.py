@@ -271,6 +271,18 @@ class RepositoryImportSpec(BaseModel):
         default=REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION,
         description="Envelope version of the stored spec.",
     )
+    last_imported_commit_sha: Optional[str] = Field(
+        default=None,
+        description="Branch tip commit SHA observed for this file at import time (RAR-2.1).",
+    )
+    last_imported_committed_at: Optional[Union[datetime, str]] = Field(
+        default=None,
+        description="Committed-at timestamp of the file at import time; the newer-than anchor (RAR-2.1).",
+    )
+    last_imported_blob_sha: Optional[str] = Field(
+        default=None,
+        description="Blob SHA of the file content at import time (RAR-2.1).",
+    )
     created_by: Optional[str] = None
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
@@ -443,6 +455,22 @@ class RepositoryImportSpecRead(BaseModel):
         default_factory=SpecImportOptions,
         description="Full SpecImportOptions payload, upgraded to the current shape.",
     )
+    last_imported_commit_sha: Optional[str] = Field(
+        default=None,
+        description="Branch tip commit SHA observed for this file at import time (RAR-2.1).",
+    )
+    last_imported_committed_at: Optional[Union[datetime, str]] = Field(
+        default=None,
+        description=(
+            "Committed-at timestamp of the file at import time. A later auto-refresh "
+            "compares the remote committed_at against this anchor to gate newer-than "
+            "re-imports (RAR-2.1/RAR-2.2)."
+        ),
+    )
+    last_imported_blob_sha: Optional[str] = Field(
+        default=None,
+        description="Blob SHA of the file content at import time (RAR-2.1).",
+    )
 
 
 def repository_import_spec_read_from_row(
@@ -451,9 +479,10 @@ def repository_import_spec_read_from_row(
     """Build a :class:`RepositoryImportSpecRead` from a stored spec row.
 
     Reuses :func:`load_repository_import_options` to migrate the persisted
-    ``options_json`` blob forward, then surfaces the source descriptor columns
-    verbatim. ``spec_schema_version`` is reported as the current envelope version
-    because the options have been upgraded on read.
+    ``options_json`` blob forward, then surfaces the source descriptor and the
+    freshness anchor columns (RAR-2.1) verbatim. ``spec_schema_version`` is
+    reported as the current envelope version because the options have been
+    upgraded on read.
 
     Args:
         row: A ``odb.repository_import_spec`` row as a dict.
@@ -469,6 +498,9 @@ def repository_import_spec_read_from_row(
         format_override=row.get("format_override"),
         content_type=row.get("content_type"),
         options=options,
+        last_imported_commit_sha=row.get("last_imported_commit_sha"),
+        last_imported_committed_at=row.get("last_imported_committed_at"),
+        last_imported_blob_sha=row.get("last_imported_blob_sha"),
     )
 
 

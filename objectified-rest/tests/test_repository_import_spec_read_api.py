@@ -47,6 +47,9 @@ def _spec_row(**overrides):
         },
         "spec_schema_version": REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION,
         "created_by": _USER_ID,
+        "last_imported_commit_sha": "tipcommitsha1234",
+        "last_imported_committed_at": "2026-06-20T10:00:00Z",
+        "last_imported_blob_sha": "blobsha5678",
         "created_at": None,
         "updated_at": None,
     }
@@ -74,6 +77,10 @@ def test_read_spec_by_id_ok():
     assert body["options"]["apply_naming_convention"] is True
     assert body["options"]["class_naming_convention"] == "PascalCase"
     assert body["options"]["skip_duplicate_versions"] is True
+    # Freshness signals captured at import are exposed via RAR-1.5 (RAR-2.1, #3518).
+    assert body["last_imported_commit_sha"] == "tipcommitsha1234"
+    assert body["last_imported_committed_at"] == "2026-06-20T10:00:00Z"
+    assert body["last_imported_blob_sha"] == "blobsha5678"
     # Tenant scope comes from the auth token, not the path slug.
     mdb.get_repository_import_spec_by_id.assert_called_once_with(_TENANT_ID, _SPEC_ID)
     mdb.get_repository_import_spec_by_path.assert_not_called()
@@ -183,3 +190,21 @@ def test_read_spec_null_descriptor_fields_serialize():
     assert body["content_type"] is None
     # Defaulted options round-trip.
     assert body["options"]["apply_naming_convention"] is False
+
+
+def test_read_spec_null_freshness_signals_serialize():
+    # A spec captured before a scan recorded recency (or for a non-repository
+    # import) has NULL anchors; the read model must surface them as null (RAR-2.1).
+    row = _spec_row(
+        last_imported_commit_sha=None,
+        last_imported_committed_at=None,
+        last_imported_blob_sha=None,
+    )
+    with patch("app.tenant_repositories_routes.db") as mdb:
+        mdb.get_repository_import_spec_by_id.return_value = row
+        r = client.get(f"/v1/tenants/acme/repository-imports/{_SPEC_ID}/spec")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["last_imported_commit_sha"] is None
+    assert body["last_imported_committed_at"] is None
+    assert body["last_imported_blob_sha"] is None
