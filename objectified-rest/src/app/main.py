@@ -117,6 +117,7 @@ app.include_router(tenant_repositories_router)
 
 _webhook_delivery_task: asyncio.Task | None = None
 _repository_file_scan_task: asyncio.Task | None = None
+_repository_refresh_task: asyncio.Task | None = None
 
 
 @app.on_event("startup")
@@ -190,10 +191,46 @@ async def startup_event():
             except Exception:
                 log.exception("repository file scan sweep")
 
+    async def _repository_refresh_sweep() -> None:
+        """Periodically enqueue spec-faithful re-imports for stale files (RAR-3.2).
+
+        Ticks on the configured refresh floor (``OBJECTIFIED_REFRESH_MIN_INTERVAL``,
+        default 60s) and lets the per-repo cadence + due-selection in
+        ``list_due_repositories`` decide which repositories are actually processed
+        each tick, so the cheap floor cadence here never refreshes a repo more
+        often than its own ``refresh_interval_seconds`` allows.
+        """
+        from .config import settings
+
+        log = logging.getLogger(__name__)
+        tick_seconds = max(1, int(settings.refresh_min_interval_seconds))
+        while True:
+            await asyncio.sleep(tick_seconds)
+            try:
+
+                def _run_refresh() -> int:
+                    thread_db = Database()
+                    try:
+                        from .repository_refresh_sweep import (
+                            process_repository_refresh_sweep,
+                        )
+
+                        return process_repository_refresh_sweep(thread_db)
+                    finally:
+                        thread_db.close()
+
+                await asyncio.to_thread(_run_refresh)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("repository refresh sweep")
+
     global _webhook_delivery_task
     _webhook_delivery_task = asyncio.create_task(_webhook_delivery_sweep())
     global _repository_file_scan_task
     _repository_file_scan_task = asyncio.create_task(_repository_file_scan_sweep())
+    global _repository_refresh_task
+    _repository_refresh_task = asyncio.create_task(_repository_refresh_sweep())
 
 
 @app.on_event("shutdown")
@@ -215,6 +252,14 @@ async def shutdown_event():
         except asyncio.CancelledError:
             pass
         _repository_file_scan_task = None
+    global _repository_refresh_task
+    if _repository_refresh_task is not None:
+        _repository_refresh_task.cancel()
+        try:
+            await _repository_refresh_task
+        except asyncio.CancelledError:
+            pass
+        _repository_refresh_task = None
     db.close()
 
 

@@ -248,6 +248,71 @@ def fetch_github_repository_file_text(
     return text, truncated
 
 
+def scan_repository_branch_into_index(
+    db: Database, repo_row: Dict[str, Any], branch: str
+) -> Tuple[int, int]:
+    """Rescan one branch's Git tree and replace its indexed file rows (REPO-2 walker).
+
+    The shared core of the repository walk: resolve the GitHub owner/repo and a
+    linked-account token, fetch the branch tree (with the branch-tip recency
+    signals, RAR-2.1), persist every blob to ``odb.tenant_repository_files``, and
+    update the repository's file counts / status. Used both by the one-shot scan
+    job (``process_next_repository_file_scan_job``) and the periodic auto-refresh
+    sweep (RAR-3.2), so the two paths walk the tree identically.
+
+    Unlike the job path this raises on any error rather than recording job/repo
+    failure state; the caller owns failure bookkeeping.
+
+    Args:
+        db: Database handle.
+        repo_row: A ``tenant_repositories`` row (must include ``id``,
+            ``tenant_id``, ``provider``, ``visibility`` and the GitHub locators;
+            ``linked_account_id`` / ``created_by`` are used for private repos).
+        branch: The branch to rescan.
+
+    Returns:
+        ``(total_files, importable_count)`` for the rescanned branch.
+
+    Raises:
+        ValueError: For an unsupported provider, an unresolvable owner/repo, a
+            private repository with no token, or a GitHub API error.
+    """
+    tenant_id = str(repo_row["tenant_id"])
+    repository_id = str(repo_row["id"])
+
+    provider = str(repo_row.get("provider") or "").lower()
+    if provider != "github":
+        raise ValueError(f"file scan not implemented for provider: {provider}")
+
+    owner, repo = _github_owner_repo(repo_row)
+
+    token: Optional[str] = None
+    linked = repo_row.get("linked_account_id")
+    created_by = repo_row.get("created_by")
+    if linked and created_by:
+        oauth = db.get_external_auth_provider_for_user(str(linked), str(created_by))
+        if oauth and oauth.get("access_token"):
+            token = str(oauth["access_token"])
+
+    vis = str(repo_row.get("visibility") or "").lower()
+    if vis == "private" and not token:
+        raise ValueError("private repository requires a linked account token")
+
+    blobs = fetch_github_tree_blobs(owner, repo, branch, token)
+    importable = sum(1 for b in blobs if _importable_hint(b.get("detected_kind")))
+
+    db.replace_tenant_repository_files(repository_id, branch, blobs)
+    db.update_tenant_repository_after_file_scan(
+        tenant_id=tenant_id,
+        repository_id=repository_id,
+        total_files=len(blobs),
+        importable_count=importable,
+        status="ready",
+        touch_last_scanned_at=True,
+    )
+    return len(blobs), importable
+
+
 def _fail_job_and_repo(db: Database, tenant_id: str, repository_id: str, job_id: str, message: str) -> None:
     db.mark_repository_file_scan_job_failed(job_id, message)
     db.update_tenant_repository_after_file_scan(
@@ -279,44 +344,15 @@ def process_next_repository_file_scan_job(db: Database) -> int:
             db.mark_repository_file_scan_job_failed(job_id, "repository row missing")
             return 1
 
-        provider = str(repo_row.get("provider") or "").lower()
-        if provider != "github":
-            _fail_job_and_repo(db, tenant_id, repository_id, job_id, f"file scan not implemented for provider: {provider}")
-            return 1
-
-        owner, repo = _github_owner_repo(repo_row)
-
-        token: Optional[str] = None
-        linked = repo_row.get("linked_account_id")
-        created_by = repo_row.get("created_by")
-        if linked and created_by:
-            oauth = db.get_external_auth_provider_for_user(str(linked), str(created_by))
-            if oauth and oauth.get("access_token"):
-                token = str(oauth["access_token"])
-
-        vis = str(repo_row.get("visibility") or "").lower()
-        if vis == "private" and not token:
-            _fail_job_and_repo(db, tenant_id, repository_id, job_id, "private repository requires a linked account token")
-            return 1
-
-        blobs = fetch_github_tree_blobs(owner, repo, branch, token)
-        importable = sum(1 for b in blobs if _importable_hint(b.get("detected_kind")))
-
-        db.replace_tenant_repository_files(repository_id, branch, blobs)
-        db.update_tenant_repository_after_file_scan(
-            tenant_id=tenant_id,
-            repository_id=repository_id,
-            total_files=len(blobs),
-            importable_count=importable,
-            status="ready",
-            touch_last_scanned_at=True,
-        )
+        # Unsupported provider / private-without-token / GitHub errors all raise
+        # ValueError from the shared walker and are recorded by the except below.
+        total, importable = scan_repository_branch_into_index(db, repo_row, branch)
         db.mark_repository_file_scan_job_succeeded(job_id)
         _logger.info(
             "repository file scan succeeded repository_id=%s branch=%s files=%s importable_hints=%s",
             repository_id,
             branch,
-            len(blobs),
+            total,
             importable,
         )
     except Exception as exc:

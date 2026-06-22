@@ -6607,6 +6607,218 @@ class Database:
             conn.rollback()
             raise e
 
+    def try_acquire_repository_refresh_lock(self, repository_id: str) -> bool:
+        """Try to take the per-repo auto-refresh advisory lock (RAR-3.2).
+
+        Per-repo single-flight for the refresh sweep is enforced with a Postgres
+        **session** advisory lock keyed on the repository id, so two workers (or
+        two overlapping sweep ticks) never rescan and enqueue for the same repo at
+        once. The lock is held on this :class:`Database`'s connection until
+        :meth:`release_repository_refresh_lock` is called (or the connection
+        closes); ``pg_try_advisory_lock`` is non-blocking, returning False
+        immediately when another session holds it so the sweep can move on.
+
+        Because the lock is session-scoped (not transaction-scoped), the
+        ``execute_query`` commit here does not release it — acquire and release
+        must run on the same connection, which the single-``Database``-per-tick
+        sweep guarantees.
+
+        Args:
+            repository_id: The repository to serialize refreshes for.
+
+        Returns:
+            True when the lock was acquired, False when another session holds it.
+        """
+        rows = self.execute_query(
+            "SELECT pg_try_advisory_lock(hashtext(%s)) AS locked",
+            (f"repo-refresh:{repository_id}",),
+        )
+        return bool(rows and rows[0].get("locked"))
+
+    def release_repository_refresh_lock(self, repository_id: str) -> None:
+        """Release the per-repo auto-refresh advisory lock (RAR-3.2).
+
+        Counterpart to :meth:`try_acquire_repository_refresh_lock`; must run on the
+        same connection that acquired the lock. Safe to call even if the lock was
+        not held (Postgres returns False and logs a warning, which is harmless).
+
+        Args:
+            repository_id: The repository whose lock to release.
+        """
+        self.execute_query(
+            "SELECT pg_advisory_unlock(hashtext(%s)) AS unlocked",
+            (f"repo-refresh:{repository_id}",),
+        )
+
+    def list_repository_import_spec_branches(self, repository_id: str) -> List[str]:
+        """Distinct branches that have a stored import spec for this repository (RAR-3.2).
+
+        The refresh sweep only needs to rescan branches that actually have
+        imported files to refresh; a repository with no captured spec yields an
+        empty list and the sweep skips the (rate-limited) GitHub walk entirely.
+
+        Args:
+            repository_id: The repository to inspect.
+
+        Returns:
+            Distinct branch names with at least one stored import spec, sorted.
+        """
+        q = """
+            SELECT DISTINCT branch
+            FROM odb.repository_import_spec
+            WHERE repository_id = %s::uuid
+            ORDER BY branch ASC
+        """
+        rows = self.execute_query(q, (repository_id,))
+        return [str(r["branch"]) for r in rows if r.get("branch")]
+
+    def list_repository_refresh_candidates(
+        self, repository_id: str, branch: str
+    ) -> List[Dict[str, Any]]:
+        """Stored specs joined to their current indexed file, for one branch (RAR-3.2).
+
+        Returns one row per imported-file lineage that still exists in the latest
+        scan index, pairing the stored import spec (project, source descriptor,
+        options, and the ``last_imported_*`` recency anchors from RAR-2.1) with the
+        file's current remote freshness signals (``remote_committed_at`` /
+        ``remote_blob_sha`` / ``remote_commit_sha``) from the just-completed
+        rescan. The sweep feeds each row to the RAR-2.2 newer-than comparator to
+        decide whether to enqueue a re-import.
+
+        The join is an INNER join on ``tenant_repository_files`` so a spec whose
+        file no longer exists upstream (deleted file) is *not* a refresh candidate
+        — handling deletions is out of scope here.
+
+        Args:
+            repository_id: The repository to scan candidates for.
+            branch: The branch whose files were just re-indexed.
+
+        Returns:
+            Candidate rows with the spec fields and the current remote signals.
+        """
+        q = """
+            SELECT s.id AS import_spec_id, s.tenant_id, s.repository_id, s.branch, s.path,
+                   s.project_id, s.source_kind, s.format_override, s.content_type,
+                   s.options_json, s.spec_schema_version, s.created_by,
+                   s.last_imported_commit_sha, s.last_imported_committed_at,
+                   s.last_imported_blob_sha,
+                   trf.commit_sha AS remote_commit_sha,
+                   trf.committed_at AS remote_committed_at,
+                   trf.blob_sha AS remote_blob_sha
+            FROM odb.repository_import_spec s
+            INNER JOIN odb.tenant_repository_files trf
+              ON trf.repository_id = s.repository_id
+             AND trf.branch = s.branch
+             AND trf.path = s.path
+            WHERE s.repository_id = %s::uuid AND s.branch = %s
+            ORDER BY s.path ASC
+        """
+        return self.execute_query(q, (repository_id, branch))
+
+    def enqueue_repository_refresh_job(
+        self,
+        *,
+        tenant_id: str,
+        repository_id: str,
+        branch: str,
+        path: str,
+        import_spec_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        source_kind: Optional[str] = None,
+        format_override: Optional[str] = None,
+        content_type: Optional[str] = None,
+        options_json: Optional[Any] = None,
+        spec_schema_version: int = 1,
+        created_by: Optional[str] = None,
+        remote_commit_sha: Optional[str] = None,
+        remote_committed_at: Optional[Any] = None,
+        remote_blob_sha: Optional[str] = None,
+        refresh_reason: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Enqueue one spec-faithful re-import job for the EPIC-4 worker (RAR-3.2).
+
+        Inserts a row into ``odb.tenant_repository_refresh_jobs`` carrying a
+        self-contained snapshot of the stored import spec (so the executor replays
+        the user's original request even if the spec row later changes) plus the
+        remote freshness signals that triggered it. The insert is idempotent at the
+        file-lineage level via the partial unique index
+        (``uq_tenant_repo_refresh_jobs_active_lineage``): if an active
+        (queued/running) job already exists for ``(repository_id, branch, path)``
+        the insert is a no-op and ``None`` is returned, so a repeated sweep tick
+        never duplicates work.
+
+        Args:
+            tenant_id: Owning tenant id.
+            repository_id: Source repository id.
+            branch: Branch the file lives on.
+            path: Repository-relative file path (lineage key).
+            import_spec_id: Back-reference to the source spec row, if known.
+            project_id: Catalog project the original import targeted.
+            source_kind: Importer discriminator (for example ``openapi-3``).
+            format_override: Explicit importer ``--format`` override, if any.
+            content_type: MIME type used to read the file, if known.
+            options_json: Snapshot of the full ``SpecImportOptions`` payload.
+            spec_schema_version: Envelope version of the captured spec.
+            created_by: User id that initiated the original import, if known.
+            remote_commit_sha: Branch-tip commit SHA observed at sweep time.
+            remote_committed_at: Committed-at of the observed commit.
+            remote_blob_sha: Blob SHA of the file at sweep time.
+            refresh_reason: Stable RAR-2.2 ``RefreshReason`` code for the enqueue.
+
+        Returns:
+            The inserted job row as a dict, or ``None`` when an active job already
+            existed for the lineage (idempotent no-op).
+        """
+        import json
+
+        if isinstance(options_json, str):
+            options_text = options_json if options_json.strip() else "{}"
+        else:
+            options_text = json.dumps(options_json or {})
+
+        q = """
+            INSERT INTO odb.tenant_repository_refresh_jobs (
+                tenant_id, repository_id, import_spec_id, branch, path,
+                project_id, source_kind, format_override, content_type,
+                options_json, spec_schema_version, created_by,
+                remote_commit_sha, remote_committed_at, remote_blob_sha, refresh_reason
+            )
+            VALUES (
+                %s::uuid, %s::uuid, %s::uuid, %s, %s,
+                %s::uuid, %s, %s, %s,
+                %s::jsonb, %s, %s::uuid,
+                %s, %s::timestamptz, %s, %s
+            )
+            ON CONFLICT (repository_id, branch, path)
+                WHERE status IN ('queued', 'running')
+            DO NOTHING
+            RETURNING id, tenant_id, repository_id, import_spec_id, branch, path,
+                      project_id, source_kind, format_override, content_type,
+                      options_json, spec_schema_version, created_by,
+                      remote_commit_sha, remote_committed_at, remote_blob_sha,
+                      refresh_reason, status, created_at
+        """
+        params = (
+            tenant_id, repository_id,
+            (str(import_spec_id) if import_spec_id else None),
+            branch, path,
+            (str(project_id) if project_id else None),
+            source_kind, format_override, content_type,
+            options_text, spec_schema_version,
+            (str(created_by) if created_by else None),
+            remote_commit_sha, remote_committed_at, remote_blob_sha, refresh_reason,
+        )
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, params)
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row) if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
+
     def list_tenant_repository_file_branches(self, tenant_id: str, repository_id: str) -> List[str]:
         """Distinct branch names that have indexed file rows for this repository."""
         q = """
