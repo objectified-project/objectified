@@ -324,7 +324,7 @@ enforcement, plus the `objectified-ui` proxy + typed client.
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |---|---|---|---|:---:|:---:|---|---|
-| 2.1 #3450 | Registry service skeleton + auth/scoping | Registry surface over the extended `odb.primitives`, tenant/scope auth, DB wiring | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
+| 2.1 #3450 ✅ | Registry service skeleton + auth/scoping | **DONE** — registry health/ping (`GET /v1/primitives/health`) over the `objectified-db` connection; existing tenant/scope auth confirmed, clients unaffected | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
 | 2.2 #3451 | Namespace CRUD API | Create/list/update namespaces with scope, base URI, version root | `type-registry`,`registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
 | 2.3 #3452 | Type definition CRUD + draft 2020-12 validation | CRUD types; validate `json_schema` against draft 2020-12 | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
 | 2.4 #3453 | Scope & visibility enforcement | System-core vs tenant access + ref-direction rules | `type-registry`,`governance`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-rest |

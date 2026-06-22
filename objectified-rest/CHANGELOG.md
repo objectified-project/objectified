@@ -5,6 +5,17 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] - 2026-06-22
+
+### Added
+- **Type-registry service skeleton + health (#3450)** — added an anonymous
+  registry-layer health/ping endpoint `GET /v1/primitives/health` that reports the
+  `objectified-db` connection status backing the registry's `odb.primitives` storage
+  (overall `status`, `connection`, and whether the storage table is present). The existing
+  tenant-scoped primitive CRUD/import endpoints are unchanged and remain authenticated, so
+  current clients are unaffected. Backed by a new `Database.registry_ping()` probe and a
+  `RegistryHealthResponse` model.
+
 ## [1.0.8] - 2026-06-22
 
 ### Added

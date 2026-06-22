@@ -170,6 +170,23 @@ class PrimitiveImportRequest(BaseModel):
         from_attributes = True
 
 
+class RegistryHealthResponse(BaseModel):
+    """Health/ping response for the Primitives type-registry layer (#3450).
+
+    Reports whether the registry's storage backend — the shared
+    ``objectified-db`` connection backing ``odb.primitives`` — is reachable.
+    """
+    status: str  # 'healthy' | 'unhealthy'
+    service: str = 'primitives-registry'
+    database: str = 'objectified-db'
+    connection: str  # 'connected' | 'disconnected'
+    storage_present: bool = False  # whether the odb.primitives registry table is reachable
+    error: Optional[str] = None  # populated only when status == 'unhealthy'
+
+    class Config:
+        from_attributes = True
+
+
 class PrimitiveImportRecord(BaseModel):
     """Provenance record for a single primitive import (#3448)."""
     id: str

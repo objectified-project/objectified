@@ -15,7 +15,8 @@ from .models import (
     PrimitiveCreateRequest,
     PrimitiveUpdateRequest,
     PrimitiveImportRequest,
-    PrimitiveImportRecord
+    PrimitiveImportRecord,
+    RegistryHealthResponse
 )
 from .auth import validate_authentication, get_authenticated_user_id
 
@@ -23,6 +24,43 @@ router = APIRouter(prefix="/v1/primitives", tags=["primitives"])
 
 # Allowed import source shapes — must match the odb.primitive_imports CHECK constraint.
 VALID_IMPORT_SOURCE_KINDS = {"json-schema", "type-def-bundle", "openapi"}
+
+
+@router.get("/health", response_model=RegistryHealthResponse)
+async def registry_health() -> RegistryHealthResponse:
+    """
+    Health/ping for the Primitives type-registry layer (#3450).
+
+    Reports whether the registry's storage backend — the shared
+    ``objectified-db`` connection backing ``odb.primitives`` — is reachable.
+    Like the global ``/health`` endpoint this is intentionally anonymous so
+    monitors can probe the registry layer without credentials; every data
+    access endpoint below remains authenticated and tenant-scoped.
+
+    Registered before ``GET /{tenant_slug}`` so the literal ``health`` path is
+    matched here rather than being captured as a tenant slug.
+
+    Returns:
+        Registry health: overall ``status``, the ``objectified-db``
+        ``connection`` state, and whether the ``odb.primitives`` storage table
+        is present. On failure ``status`` is ``unhealthy`` and ``error`` carries
+        the driver message; the endpoint itself still responds 200 so the probe
+        is always reachable (mirrors the global ``/health`` contract).
+    """
+    try:
+        probe = db.registry_ping()
+        return RegistryHealthResponse(
+            status="healthy",
+            connection=probe["connection"],
+            storage_present=probe["storage_present"],
+        )
+    except Exception as e:
+        return RegistryHealthResponse(
+            status="unhealthy",
+            connection="disconnected",
+            storage_present=False,
+            error=str(e),
+        )
 
 
 def determine_category_from_schema(schema: Dict[str, Any]) -> str:
