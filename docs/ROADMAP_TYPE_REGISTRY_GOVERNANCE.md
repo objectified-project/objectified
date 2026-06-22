@@ -1,4 +1,4 @@
-# Objectified Type Registry (Atlas) — Governance Roadmap
+# Objectified Primitives — JSON Schema 2020-12 Governance Roadmap
 
 ## 1. Source Description
 
@@ -6,18 +6,39 @@
 > and governance setup but only for the JSON Schema types and schemas as discussed in this
 > conversation.
 
-This roadmap implements the **JSON Schema 2020-12 Type Registry** (codename **Atlas**) as a
-capability under **Control Panel → Governance** in `objectified-ui`. It is scoped *strictly*
-to JSON Schema **types and schemas** — the reusable type system, its storage, its reference
-resolution, its import surface, and the binding of object properties to types. It does **not**
+This roadmap extends the **Primitives** capability under **Control Panel → Governance** in
+`objectified-ui`. It is scoped *strictly* to JSON Schema **types and schemas** — reusable type
+definitions, namespace/`$ref` resolution, import surfaces, and property bindings. It does **not**
 cover the broader Authoring platform (Scribe/Slate), documentation, or marketing — those are
 tracked separately in `docs/ROADMAP_AUTHORING_PLATFORM.md`.
+
+**Codename:** Primitives (formerly Atlas). In-app label: **Primitives** (`/ade/dashboard/primitives`).
 
 **Design sources (built earlier this conversation):**
 - App-accurate, in-application mockups: `docs/planning/mockups/governance/` (+ its `README.md`,
   which sketches routes/entities) — the Type Registry rendered inside the real Control Panel
   shell under the Governance section.
-- Standalone product mockups: `docs/planning/mockups/types/` (codename Atlas, 11 screens).
+- Standalone product mockups: `docs/planning/mockups/types/` (legacy Atlas mockups — map to Primitives UI).
+
+---
+
+## 1b. Existing Primitives Baseline (shipped)
+
+Before implementing net-new registry mechanics, account for what is **already live**:
+
+| Layer | Implementation | Gap vs this roadmap |
+|---|---|---|
+| Storage | `odb.primitives` in **objectified-db** | No separate `objectified-types-db`; no `type_namespace` / `type_ref` |
+| System seed | 36 ISO-aligned system primitives (`20260124-140000.sql`) | Flat schemas; no `std/v0` namespace or composite `$ref` chains (`money` → `decimal`) |
+| REST | `/v1/primitives/{tenant_slug}` CRUD + `/import` from `$defs` | No namespaces, resolver, stats, or server-side draft 2020-12 gate |
+| UI proxy | `/api/primitives/*` | ✅ **Done** — closed as duplicate (#3455) |
+| Management UI | `/ade/dashboard/primitives` — stats, table, CRUD, import dialog | ✅ Nav done (#3466 closed); overview/import are **partial** — extend, don't rebuild |
+| Designer | `PrimitiveSelector` — merges primitive schema onto property | No persisted `$ref` binding (#3475); picker lacks namespace tabs (#3474) |
+| Validation | AJV in `PrimitiveEditorDialog` (client) | REST persist not strictly validated (#3452) |
+| Scope | `is_system` immutability, tenant rows | No namespace visibility or core→tenant `$ref` rules (#3453) |
+
+**Tickets closed as duplicates:** #3455 (UI proxy), #3466 (Governance nav). All other #3446–#3481
+issues remain open with scopes adjusted to **extend** Primitives toward full JSON Schema 2020-12 support.
 
 **What the registry must do (from the mockups & conversation):**
 - Store JSON Schema **draft 2020-12** types in a **separate database** (`objectified-types-db`),
@@ -150,11 +171,11 @@ relative `$ref` resolution**, so the core of this roadmap is net-new.
 
 | Label | Color | Description |
 |---|---|---|
-| `type-registry` | `#0E7490` | Objectified Type Registry (Atlas) — JSON Schema 2020-12 types |
+| `type-registry` | `#0E7490` | Objectified Primitives — JSON Schema 2020-12 types (extends `/ade/dashboard/primitives`) |
 | `types-db` | `#0B5563` | Separate type registry database (objectified-types-db) |
 | `roadmap-type-registry` | `#BFDADC` | ROADMAP_TYPE_REGISTRY_GOVERNANCE.md ticket pack |
 
-Issue naming: `Atlas: [<epic#.issue#>] <title>`.
+Issue naming: `Primitives: [<epic#.issue#>] <title>`.
 
 ---
 
@@ -267,7 +288,7 @@ enforcement, plus the `objectified-ui` proxy + typed client.
 | 2.3 #3452 | Type definition CRUD + draft 2020-12 validation | CRUD types; validate `json_schema` against draft 2020-12 | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
 | 2.4 #3453 | Scope & visibility enforcement | System-core vs tenant access + ref-direction rules | `type-registry`,`governance`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-rest |
 | 2.5 #3454 | Registry coverage/stats endpoint | Counts by scope, imported, unresolved (for dashboard KPIs) | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | S | objectified-rest |
-| 2.6 #3455 | UI proxy routes + typed client | `/api/types/*` proxies + client in objectified-ui | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | N | Y | S | objectified-ui |
+| 2.6 #3455 | ~~UI proxy routes + typed client~~ | **CLOSED — duplicate** (`/api/primitives/*` shipped) | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | N | Y | S | objectified-ui |
 
 ### Issue 2.1 — Registry service skeleton + auth/scoping
 - **Problem.** No service entrypoint exists for the registry DB.
@@ -480,8 +501,8 @@ The in-app surface under **Control Panel → Governance**, matching the `governa
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |---|---|---|---|:---:|:---:|---|---|
-| 5.1 #3466 | Governance nav entry + route group | Add Type Registry under Governance in DashboardSideNav | `type-registry`,`ui`,`governance`,`mvp`,`roadmap-type-registry` | N | Y | S | objectified-ui |
-| 5.2 #3467 | Type Registry overview page | KPIs, collections by scope, tabs, recent activity | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
+| 5.1 #3466 | ~~Governance nav entry + route group~~ | **CLOSED — duplicate** (`/ade/dashboard/primitives` in nav) | `type-registry`,`ui`,`governance`,`mvp`,`roadmap-type-registry` | N | Y | S | objectified-ui |
+| 5.2 #3467 | Enhance Primitives overview (registry KPIs) | Extend existing page: KPIs, namespace collections, activity | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
 | 5.3 #3468 | Type detail page | Schema, resolved refs, dependents, metadata | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
 | 5.4 #3469 | Import UI (wizard) | Source/options/review wired to Epic 4 | `type-registry`,`ui`,`import`,`mvp`,`roadmap-type-registry` | Y | Y | L | objectified-ui |
 | 5.5 #3470 | Reference Resolver UI | Graph + table, base, unresolved/circular | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
@@ -678,7 +699,9 @@ Governance controls around the registry: entitlements, publish gates, promotion,
 
 ## 13. MVP vs V2 Summary
 
-**MVP issues:** 1.1–1.4, 2.1–2.6, 3.1, 3.2, 3.4, 4.1–4.5, 5.1–5.7, 6.1–6.3, 7.1, 7.2, 7.4.
+**MVP issues (open):** 1.1–1.4, 2.1–2.5, 3.1, 3.2, 3.4, 4.1–4.5, 5.2–5.7, 6.1–6.3, 7.1, 7.2, 7.4.
+
+**Closed duplicates (shipped):** 2.6 (#3455 UI proxy), 5.1 (#3466 nav entry).
 
 **V2 issues:** 3.3, 4.6, 5.8, 6.4, 7.3, 7.5.
 
@@ -726,13 +749,13 @@ flowchart TB
 
 ## 15. Issue Count & Naming
 
-This roadmap defines **37 issues** across **7 epics** (31 MVP, 6 V2). Issues follow
-`Atlas: [<epic#.issue#>] <title>`, e.g.:
+This roadmap defines **37 issues** across **7 epics** (29 MVP open + 2 closed duplicates + 6 V2). Issues follow
+`Primitives: [<epic#.issue#>] <title>`, e.g.:
 
-- `Atlas: [1.1] Provision separate registry database & connection`
-- `Atlas: [3.1] Relative $ref resolution against import-source base`
-- `Atlas: [4.3] Type-definition bundle importer`
-- `Atlas: [6.1] Type picker component (Standard/Core/Tenant/Custom)`
+- `Primitives: [1.1] Provision separate registry database & connection`
+- `Primitives: [3.1] Relative $ref resolution against import-source base`
+- `Primitives: [4.3] Type-definition bundle importer`
+- `Primitives: [6.1] Type picker component (Standard/Core/Tenant/Custom)`
 
 Each epic should also get an umbrella `epic`-labeled issue. New labels to create:
 `type-registry`, `types-db`, `roadmap-type-registry` (reuse `governance`, `registry`, `rest`,
@@ -746,17 +769,21 @@ epic.
 
 **Epics:** #3439 (E1) · #3440 (E2) · #3441 (E3) · #3442 (E4) · #3443 (E5) · #3444 (E6) · #3445 (E7).
 
+**Renamed:** All child issues #3446–#3481 use the `Primitives:` prefix (formerly `Atlas:`).
+
+**Closed as duplicates of shipped Primitives:** #3455 (UI proxy), #3466 (nav entry).
+
 | Epic | Child issues (issue# → roadmap id) |
 |---|---|
 | #3439 E1 | #3446 (1.1) · #3447 (1.2) · #3448 (1.3) · #3449 (1.4) |
-| #3440 E2 | #3450 (2.1) · #3451 (2.2) · #3452 (2.3) · #3453 (2.4) · #3454 (2.5) · #3455 (2.6) |
+| #3440 E2 | #3450 (2.1) · #3451 (2.2) · #3452 (2.3) · #3453 (2.4) · #3454 (2.5) · ~~#3455 (2.6)~~ ✅ closed |
 | #3441 E3 | #3456 (3.1) · #3457 (3.2) · #3458 (3.3) · #3459 (3.4) |
 | #3442 E4 | #3460 (4.1) · #3461 (4.2) · #3462 (4.3) · #3463 (4.4) · #3464 (4.5) · #3465 (4.6) |
-| #3443 E5 | #3466 (5.1) · #3467 (5.2) · #3468 (5.3) · #3469 (5.4) · #3470 (5.5) · #3471 (5.6) · #3472 (5.7) · #3473 (5.8) |
+| #3443 E5 | ~~#3466 (5.1)~~ ✅ closed · #3467 (5.2) · #3468 (5.3) · #3469 (5.4) · #3470 (5.5) · #3471 (5.6) · #3472 (5.7) · #3473 (5.8) |
 | #3444 E6 | #3474 (6.1) · #3475 (6.2) · #3476 (6.3) · #3477 (6.4) |
 | #3445 E7 | #3478 (7.1) · #3479 (7.2) · #3480 (7.3) · #3481 (7.4) · #3482 (7.5) |
 
-**Totals:** 7 epics + 37 child issues = **44 GitHub issues** (31 MVP, 6 V2). Related existing
+**Totals:** 7 epics + 37 child issues = **44 GitHub issues** (29 MVP open, 2 closed duplicates, 6 V2). Related existing
 issues cross-linked per §4 (#624–636, #719–728, #2299/#2305/#2316, #739/#748).
 
 > **Next step:** validate this document, then run `/create-issues docs/ROADMAP_TYPE_REGISTRY_GOVERNANCE.md`
