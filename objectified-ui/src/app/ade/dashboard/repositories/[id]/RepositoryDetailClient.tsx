@@ -46,8 +46,9 @@ import {
   repositoryStatusNeedsPolling,
 } from '@/app/components/ade/dashboard/repositories/repositoryStoreUi';
 import { RepositoryFilesBrowser } from '@/app/components/ade/dashboard/repositories/RepositoryFilesBrowser';
+import { RepositorySpecsTab } from '@/app/components/ade/dashboard/repositories/RepositorySpecsTab';
 
-type RepoTab = 'preview' | 'files' | 'imports' | 'settings';
+type RepoTab = 'preview' | 'files' | 'specs' | 'imports' | 'settings';
 
 type RepositoryImportMetricApiRow = {
   id: string;
@@ -232,7 +233,7 @@ export function RepositoryDetailClient() {
       return;
     }
     const t = searchParams.get('tab');
-    if (t === 'files' || t === 'imports' || t === 'settings' || t === 'preview') {
+    if (t === 'files' || t === 'specs' || t === 'imports' || t === 'settings' || t === 'preview') {
       setTab(t as RepoTab);
     }
   }, [searchParams]);
@@ -591,6 +592,9 @@ export function RepositoryDetailClient() {
               <TabBtn active={tab === 'files'} onClick={() => setTab('files')} badge={filesTotal.toLocaleString()}>
                 Files
               </TabBtn>
+              <TabBtn active={tab === 'specs'} onClick={() => setTab('specs')}>
+                Specs
+              </TabBtn>
               <TabBtn active={tab === 'imports'} onClick={() => setTab('imports')}>
                 Imports
               </TabBtn>
@@ -798,6 +802,12 @@ export function RepositoryDetailClient() {
             filesDeepLink={filesDeepLink}
             onFilesDeepLinkConsumed={consumeFilesDeepLink}
           />
+        </div>
+      )}
+
+      {!loading && repo && tab === 'specs' && (
+        <div className="space-y-4 px-6 py-6">
+          <RepositorySpecsTab repositoryId={id} />
         </div>
       )}
 
