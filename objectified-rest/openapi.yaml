@@ -1012,6 +1012,171 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/types/{tenant_slug}/namespaces:
+    get:
+      tags:
+      - type-registry
+      summary: List Namespaces
+      description: "List namespaces visible to the tenant: system-core (``std/*``)\
+        \ plus the tenant's own.\n\nArgs:\n    tenant_slug: The tenant slug (caller\
+        \ scope comes from the authenticated token).\n    auth_data: Authentication\
+        \ data (injected by dependency).\n\nReturns:\n    Namespaces (system-core\
+        \ first, then alphabetical), each with its tenant-scoped type count."
+      operationId: list_namespaces_v1_types__tenant_slug__namespaces_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TypeNamespaceSchema'
+                title: Response List Namespaces V1 Types  Tenant Slug  Namespaces
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - type-registry
+      summary: Create Namespace
+      description: "Create a namespace.\n\nA tenant administrator may create a tenant-scoped\
+        \ namespace. Creating a system-core namespace\nrequires a platform admin,\
+        \ which this API does not expose, so ``scope='system'`` is rejected\nwith\
+        \ 403 — system namespaces are read-only here.\n\nArgs:\n    tenant_slug: The\
+        \ tenant slug.\n    request: Namespace creation data.\n    auth_data: Authentication\
+        \ data (injected by dependency).\n\nReturns:\n    The created namespace."
+      operationId: create_namespace_v1_types__tenant_slug__namespaces_post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TypeNamespaceCreateRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypeNamespaceSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/types/{tenant_slug}/namespaces/{namespace_id}:
+    put:
+      tags:
+      - type-registry
+      summary: Update Namespace
+      description: "Update a tenant namespace's base URI, version root, description,\
+        \ visibility, or default flag.\n\nThe namespace path itself is immutable (it\
+        \ links the namespace to its primitives). System-core\nnamespaces are read-only\
+        \ and return 403.\n\nArgs:\n    tenant_slug: The tenant slug.\n    namespace_id:\
+        \ The namespace row id.\n    request: Namespace update data.\n    auth_data:\
+        \ Authentication data (injected by dependency).\n\nReturns:\n    The updated\
+        \ namespace."
+      operationId: update_namespace_v1_types__tenant_slug__namespaces__namespace_id__put
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: namespace_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Namespace Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TypeNamespaceUpdateRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypeNamespaceSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/classes/{tenant_slug}:
     get:
       tags:
@@ -12882,6 +13047,171 @@ components:
       title: TenantsMeResponse
       description: Paginated list of tenants for the current principal (JWT user or
         API key tenant).
+    TypeNamespaceCreateRequest:
+      properties:
+        namespace:
+          type: string
+          title: Namespace
+        scope:
+          type: string
+          enum:
+          - system
+          - tenant
+          title: Scope
+          default: tenant
+        base_uri:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base Uri
+        version_root:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Version Root
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        is_public:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Public
+        is_default:
+          type: boolean
+          title: Is Default
+          default: false
+      type: object
+      required:
+      - namespace
+      title: TypeNamespaceCreateRequest
+      description: 'Request model for creating a namespace.
+
+
+        ``scope`` selects system-core vs tenant ownership; system namespaces require
+        a platform admin
+
+        (currently unavailable via the API, so they are effectively read-only). ``base_uri``
+        and
+
+        ``version_root`` are derived from the namespace path when omitted.'
+    TypeNamespaceSchema:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tenant Id
+        namespace:
+          type: string
+          title: Namespace
+        base_uri:
+          type: string
+          title: Base Uri
+        version_root:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Version Root
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        scope:
+          type: string
+          title: Scope
+        is_system:
+          type: boolean
+          title: Is System
+          default: false
+        is_public:
+          type: boolean
+          title: Is Public
+          default: false
+        is_default:
+          type: boolean
+          title: Is Default
+          default: false
+        type_count:
+          type: integer
+          title: Type Count
+          default: 0
+        created_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Created By
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Created At
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: string
+          - type: 'null'
+          title: Updated At
+      type: object
+      required:
+      - id
+      - namespace
+      - base_uri
+      - scope
+      title: TypeNamespaceSchema
+      description: 'A type-registry namespace: scope, base URI, version root, visibility,
+        and default flag.
+
+
+        ``scope`` is derived from ``is_system`` for the client. ``type_count`` is
+        the number of
+
+        primitives the caller''s tenant has in this namespace.'
+    TypeNamespaceUpdateRequest:
+      properties:
+        base_uri:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base Uri
+        version_root:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Version Root
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        is_public:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Public
+        is_default:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Default
+      type: object
+      title: TypeNamespaceUpdateRequest
+      description: 'Request model for updating a namespace. The namespace path is
+        immutable (it links the
+
+        namespace to its primitives); only base URI, version root, description, visibility,
+        and the
+
+        default flag may change.'
     ValidationError:
       properties:
         loc:

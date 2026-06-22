@@ -206,6 +206,64 @@ class PrimitiveImportRecord(BaseModel):
         from_attributes = True
 
 
+# ==================== Type-registry namespaces (#3451) ====================
+
+
+class TypeNamespaceSchema(BaseModel):
+    """A type-registry namespace: scope, base URI, version root, visibility, and default flag.
+
+    ``scope`` is derived from ``is_system`` for the client. ``type_count`` is the number of
+    primitives the caller's tenant has in this namespace.
+    """
+    id: str
+    tenant_id: Optional[str] = None  # None for system-core namespaces
+    namespace: str
+    base_uri: str
+    version_root: Optional[str] = None
+    description: Optional[str] = None
+    scope: str  # 'system' | 'tenant'
+    is_system: bool = False
+    is_public: bool = False
+    is_default: bool = False
+    type_count: int = 0
+    created_by: Optional[str] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TypeNamespaceCreateRequest(BaseModel):
+    """Request model for creating a namespace.
+
+    ``scope`` selects system-core vs tenant ownership; system namespaces require a platform admin
+    (currently unavailable via the API, so they are effectively read-only). ``base_uri`` and
+    ``version_root`` are derived from the namespace path when omitted.
+    """
+    namespace: str
+    scope: Literal["system", "tenant"] = "tenant"
+    base_uri: Optional[str] = None
+    version_root: Optional[str] = None
+    description: Optional[str] = None
+    is_public: Optional[bool] = None
+    is_default: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TypeNamespaceUpdateRequest(BaseModel):
+    """Request model for updating a namespace. The namespace path is immutable (it links the
+    namespace to its primitives); only base URI, version root, description, visibility, and the
+    default flag may change."""
+    base_uri: Optional[str] = None
+    version_root: Optional[str] = None
+    description: Optional[str] = None
+    is_public: Optional[bool] = None
+    is_default: Optional[bool] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ==================== Specification import job (CLI / REST contract) ====================
 #
 # Today the dashboard runs imports via Next.js server actions (see objectified-ui/lib/db/import-helper.ts).

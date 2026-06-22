@@ -5,6 +5,21 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.10] - 2026-06-22
+
+### Added
+- **Namespace CRUD API (#3451)** — added the type-registry namespace endpoints
+  `GET/POST/PUT /v1/types/{tenant_slug}/namespaces` over the existing `objectified-db`
+  connection. Namespaces (scope, base URI, version root, visibility, default) are persisted in
+  the new `odb.type_namespaces` table, whose `namespace`/`base_uri` columns mirror those on
+  `odb.primitives` (the type-count join key). `GET` lists system-core (`std/*`) namespaces plus
+  the caller tenant's own, each with its tenant-scoped type count. `POST`/`PUT` require a tenant
+  administrator and operate on tenant-owned namespaces only; the namespace path is immutable, and
+  base URI / version root are derived from the path when omitted. System-core namespaces are
+  platform-governed and read-only via the API (no platform-admin role is exposed), so creating or
+  modifying one returns 403. Backed by `TypeNamespaceSchema`/`TypeNamespaceCreateRequest`/
+  `TypeNamespaceUpdateRequest` models and `Database.list/get/create/update_type_namespace()` DAOs.
+
 ## [1.0.9] - 2026-06-22
 
 ### Added

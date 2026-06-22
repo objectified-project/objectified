@@ -1397,6 +1397,225 @@ class Database:
         results = self.execute_query(query, (import_id, tenant_id))
         return results[0] if results else None
 
+    # ==================== Type-registry Namespaces (#3451) ====================
+    #
+    # Namespaces are the durable scope/base-uri/version-root/visibility/default records of the
+    # type registry, stored in odb.type_namespaces. Their `namespace` column mirrors
+    # odb.primitives.namespace, which is the join key for a namespace's type count.
+
+    def list_type_namespaces(self, tenant_id: str) -> List[Dict[str, Any]]:
+        """List the namespaces visible to a tenant: system-core ∪ this tenant's own.
+
+        Each row carries a ``type_count``: the number of ``odb.primitives`` rows the caller's
+        tenant has in that namespace (system-core primitives are seeded per tenant, so the count
+        is correct from the caller's perspective for both scopes).
+
+        Args:
+            tenant_id: The caller's tenant id.
+
+        Returns:
+            Namespace rows (system-core first, then alphabetical), each with ``type_count``.
+        """
+        query = """
+            SELECT n.id, n.tenant_id, n.namespace, n.base_uri, n.version_root,
+                   n.description, n.is_system, n.is_public, n.is_default,
+                   n.created_by, n.created_at, n.updated_at,
+                   (SELECT COUNT(*) FROM odb.primitives p
+                     WHERE p.namespace = n.namespace AND p.tenant_id = %s::uuid) AS type_count
+            FROM odb.type_namespaces n
+            WHERE n.is_system = true OR n.tenant_id = %s::uuid
+            ORDER BY n.is_system DESC, n.namespace ASC
+        """
+        return self.execute_query(query, (tenant_id, tenant_id))
+
+    def get_type_namespace_by_id(
+        self, namespace_id: str, tenant_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get a single namespace visible to a tenant (system-core or its own), with type count.
+
+        Args:
+            namespace_id: The namespace row id.
+            tenant_id: The caller's tenant id (scopes visibility).
+
+        Returns:
+            The namespace row with ``type_count``, or None when missing/not visible.
+        """
+        query = """
+            SELECT n.id, n.tenant_id, n.namespace, n.base_uri, n.version_root,
+                   n.description, n.is_system, n.is_public, n.is_default,
+                   n.created_by, n.created_at, n.updated_at,
+                   (SELECT COUNT(*) FROM odb.primitives p
+                     WHERE p.namespace = n.namespace AND p.tenant_id = %s::uuid) AS type_count
+            FROM odb.type_namespaces n
+            WHERE n.id = %s::uuid AND (n.is_system = true OR n.tenant_id = %s::uuid)
+        """
+        results = self.execute_query(query, (tenant_id, namespace_id, tenant_id))
+        return results[0] if results else None
+
+    def get_type_namespace_by_path(
+        self, namespace: str, tenant_id: str, is_system: bool
+    ) -> Optional[Dict[str, Any]]:
+        """Look up a namespace by its path within a scope (for conflict detection).
+
+        Args:
+            namespace: The registry path (e.g. tenant/acme/v1/types).
+            tenant_id: The owning tenant id (ignored when is_system is True).
+            is_system: True to match a system-core path, False to match this tenant's path.
+
+        Returns:
+            The matching namespace row, or None.
+        """
+        if is_system:
+            query = """
+                SELECT id, tenant_id, namespace, base_uri, version_root, description,
+                       is_system, is_public, is_default, created_by, created_at, updated_at
+                FROM odb.type_namespaces
+                WHERE is_system = true AND namespace = %s
+            """
+            results = self.execute_query(query, (namespace,))
+        else:
+            query = """
+                SELECT id, tenant_id, namespace, base_uri, version_root, description,
+                       is_system, is_public, is_default, created_by, created_at, updated_at
+                FROM odb.type_namespaces
+                WHERE is_system = false AND tenant_id = %s::uuid AND namespace = %s
+            """
+            results = self.execute_query(query, (tenant_id, namespace))
+        return results[0] if results else None
+
+    def create_type_namespace(
+        self,
+        namespace: str,
+        base_uri: str,
+        *,
+        tenant_id: Optional[str],
+        version_root: Optional[str] = None,
+        description: Optional[str] = None,
+        is_system: bool = False,
+        is_public: bool = False,
+        is_default: bool = False,
+        created_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a namespace.
+
+        When ``is_default`` is True, any existing default in the same scope (system-core, or this
+        tenant) is cleared first so at most one default exists per scope — done in one transaction.
+
+        Args:
+            namespace: The registry path (unique within its scope).
+            base_uri: Base URL the namespace's relative $ref values resolve against.
+            tenant_id: Owning tenant id; None for a system-core namespace.
+            version_root: Version segment (e.g. v1); derived by the caller when omitted.
+            description: Optional human description.
+            is_system: True for a platform-curated system-core namespace.
+            is_public: True when visible to all tenants (always True for system-core).
+            is_default: True to make this the default namespace for its scope.
+            created_by: The authenticated user id (None for API-key auth).
+
+        Returns:
+            The persisted namespace row (with ``type_count`` of 0).
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                if is_default:
+                    self._clear_default_type_namespace(cursor, tenant_id, is_system)
+                cursor.execute(
+                    """
+                    INSERT INTO odb.type_namespaces
+                    (tenant_id, namespace, base_uri, version_root, description,
+                     is_system, is_public, is_default, created_by)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, tenant_id, namespace, base_uri, version_root, description,
+                              is_system, is_public, is_default, created_by, created_at, updated_at
+                    """,
+                    (
+                        tenant_id, namespace, base_uri, version_root, description,
+                        is_system, is_public, is_default, created_by,
+                    ),
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                result["type_count"] = 0
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_type_namespace(
+        self, namespace_id: str, tenant_id: str, updates: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update a namespace's mutable fields (base_uri, version_root, description, visibility,
+        default), ensuring it belongs to the tenant. The namespace path itself is immutable — it
+        links the namespace to its ``odb.primitives`` rows.
+
+        When ``is_default`` is set True, any existing default in the same scope is cleared first.
+
+        Args:
+            namespace_id: The namespace row id.
+            tenant_id: The owning tenant id (scopes the write).
+            updates: Subset of base_uri / version_root / description / is_public / is_default.
+
+        Returns:
+            The updated namespace row with ``type_count``, or None when not found for the tenant.
+        """
+        allowed = ("base_uri", "version_root", "description", "is_public", "is_default")
+        update_fields = []
+        params: List[Any] = []
+        for field in allowed:
+            if field in updates and updates[field] is not None:
+                update_fields.append(f"{field} = %s")
+                params.append(updates[field])
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                if updates.get("is_default") is True:
+                    self._clear_default_type_namespace(cursor, tenant_id, is_system=False)
+
+                if not update_fields:
+                    conn.commit()
+                    return self.get_type_namespace_by_id(namespace_id, tenant_id)
+
+                update_fields.append("updated_at = CURRENT_TIMESTAMP")
+                params.extend([namespace_id, tenant_id])
+                cursor.execute(
+                    f"""
+                    UPDATE odb.type_namespaces
+                    SET {', '.join(update_fields)}
+                    WHERE id = %s::uuid AND tenant_id = %s::uuid AND is_system = false
+                    RETURNING id
+                    """,
+                    tuple(params),
+                )
+                updated = cursor.fetchone()
+                conn.commit()
+                if not updated:
+                    return None
+                return self.get_type_namespace_by_id(namespace_id, tenant_id)
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    @staticmethod
+    def _clear_default_type_namespace(cursor, tenant_id: Optional[str], is_system: bool) -> None:
+        """Clear the current default namespace in a scope so a new default can be set.
+
+        Runs on the caller's open cursor/transaction. System-core and tenant scopes are disjoint:
+        system-core clears where is_system is true; a tenant clears its own rows.
+        """
+        if is_system:
+            cursor.execute(
+                "UPDATE odb.type_namespaces SET is_default = false "
+                "WHERE is_system = true AND is_default = true"
+            )
+        else:
+            cursor.execute(
+                "UPDATE odb.type_namespaces SET is_default = false "
+                "WHERE tenant_id = %s::uuid AND is_system = false AND is_default = true",
+                (tenant_id,),
+            )
+
     # ==================== Project CRUD Operations ====================
     # NOTE: queries below select `change_report_template_version_id`, which requires
     # migration 20260414-150000.sql. Ensure that migration is applied before deploying.
