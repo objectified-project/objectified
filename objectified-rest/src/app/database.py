@@ -7036,14 +7036,20 @@ class Database:
             The stored row as a dict, or None when no spec matches in the tenant.
         """
         query = """
-            SELECT id, tenant_id, repository_id, branch, path, project_id,
-                   source_kind, format_override, content_type,
-                   options_json, spec_schema_version, created_by,
-                   last_imported_commit_sha, last_imported_committed_at,
-                   last_imported_blob_sha, created_at, updated_at
-            FROM odb.repository_import_spec
-            WHERE tenant_id = %s::uuid
-              AND id = %s::uuid
+            SELECT s.id, s.tenant_id, s.repository_id, s.branch, s.path, s.project_id,
+                   s.source_kind, s.format_override, s.content_type,
+                   s.options_json, s.spec_schema_version, s.created_by,
+                   s.last_imported_commit_sha, s.last_imported_committed_at,
+                   s.last_imported_blob_sha, s.created_at, s.updated_at,
+                   trf.committed_at AS remote_committed_at,
+                   trf.blob_sha AS remote_blob_sha
+            FROM odb.repository_import_spec s
+            LEFT JOIN odb.tenant_repository_files trf
+              ON trf.repository_id = s.repository_id
+             AND trf.branch = s.branch
+             AND trf.path = s.path
+            WHERE s.tenant_id = %s::uuid
+              AND s.id = %s::uuid
         """
         results = self.execute_query(query, (tenant_id, spec_id))
         return results[0] if results else None
@@ -7074,21 +7080,27 @@ class Database:
             The stored row as a dict, or None when no spec matches.
         """
         select = """
-            SELECT id, tenant_id, repository_id, branch, path, project_id,
-                   source_kind, format_override, content_type,
-                   options_json, spec_schema_version, created_by,
-                   last_imported_commit_sha, last_imported_committed_at,
-                   last_imported_blob_sha, created_at, updated_at
-            FROM odb.repository_import_spec
-            WHERE tenant_id = %s::uuid
-              AND repository_id = %s::uuid
-              AND path = %s
+            SELECT s.id, s.tenant_id, s.repository_id, s.branch, s.path, s.project_id,
+                   s.source_kind, s.format_override, s.content_type,
+                   s.options_json, s.spec_schema_version, s.created_by,
+                   s.last_imported_commit_sha, s.last_imported_committed_at,
+                   s.last_imported_blob_sha, s.created_at, s.updated_at,
+                   trf.committed_at AS remote_committed_at,
+                   trf.blob_sha AS remote_blob_sha
+            FROM odb.repository_import_spec s
+            LEFT JOIN odb.tenant_repository_files trf
+              ON trf.repository_id = s.repository_id
+             AND trf.branch = s.branch
+             AND trf.path = s.path
+            WHERE s.tenant_id = %s::uuid
+              AND s.repository_id = %s::uuid
+              AND s.path = %s
         """
         if branch is not None:
-            query = select + "  AND branch = %s\n            ORDER BY updated_at DESC\n            LIMIT 1"
+            query = select + "  AND s.branch = %s\n            ORDER BY s.updated_at DESC\n            LIMIT 1"
             params: tuple = (tenant_id, repository_id, path, branch)
         else:
-            query = select + "            ORDER BY updated_at DESC\n            LIMIT 1"
+            query = select + "            ORDER BY s.updated_at DESC\n            LIMIT 1"
             params = (tenant_id, repository_id, path)
         results = self.execute_query(query, params)
         return results[0] if results else None

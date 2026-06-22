@@ -208,3 +208,49 @@ def test_read_spec_null_freshness_signals_serialize():
     assert body["last_imported_commit_sha"] is None
     assert body["last_imported_committed_at"] is None
     assert body["last_imported_blob_sha"] is None
+
+
+def test_read_spec_refresh_status_stale_when_remote_newer():
+    # A newer remote commit with changed content materializes as stale (RAR-2.3).
+    row = _spec_row(
+        last_imported_committed_at="2026-06-20T10:00:00Z",
+        last_imported_blob_sha="blob-old",
+        remote_committed_at="2026-06-21T10:00:00Z",
+        remote_blob_sha="blob-new",
+    )
+    with patch("app.tenant_repositories_routes.db") as mdb:
+        mdb.get_repository_import_spec_by_id.return_value = row
+        r = client.get(f"/v1/tenants/acme/repository-imports/{_SPEC_ID}/spec")
+    assert r.status_code == 200
+    assert r.json()["refresh_status"] == "stale"
+
+
+def test_read_spec_refresh_status_up_to_date_when_remote_matches():
+    # Same recency and content is the steady state -> up-to-date (RAR-2.3).
+    row = _spec_row(
+        last_imported_committed_at="2026-06-21T10:00:00Z",
+        last_imported_blob_sha="blob-x",
+        remote_committed_at="2026-06-21T10:00:00Z",
+        remote_blob_sha="blob-x",
+    )
+    with patch("app.tenant_repositories_routes.db") as mdb:
+        mdb.get_repository_import_spec_by_id.return_value = row
+        r = client.get(f"/v1/tenants/acme/repository-imports/{_SPEC_ID}/spec")
+    assert r.status_code == 200
+    assert r.json()["refresh_status"] == "up-to-date"
+
+
+def test_read_spec_refresh_status_diverged_overlay():
+    # A divergence hold (RAR-4.4) overlays the recency axis even when stale.
+    row = _spec_row(
+        last_imported_committed_at="2026-06-20T10:00:00Z",
+        last_imported_blob_sha="blob-old",
+        remote_committed_at="2026-06-21T10:00:00Z",
+        remote_blob_sha="blob-new",
+        diverged=True,
+    )
+    with patch("app.tenant_repositories_routes.db") as mdb:
+        mdb.get_repository_import_spec_by_id.return_value = row
+        r = client.get(f"/v1/tenants/acme/repository-imports/{_SPEC_ID}/spec")
+    assert r.status_code == 200
+    assert r.json()["refresh_status"] == "diverged"

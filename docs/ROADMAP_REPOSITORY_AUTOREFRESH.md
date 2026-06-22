@@ -120,7 +120,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | RAR-EPIC-4 | #3509 | RAR-EPIC-5 | #3510 | RAR-EPIC-6 | #3511 |
 | ~~RAR-1.1~~ ✅ | ~~#3512~~ | ~~RAR-1.2~~ ✅ | ~~#3513~~ | ~~RAR-1.3~~ ✅ | ~~#3514~~ |
 | ~~RAR-1.4~~ ✅ | ~~#3515~~ | ~~RAR-1.5~~ ✅ | ~~#3516~~ | RAR-1.6 | #3517 |
-| ~~RAR-2.1~~ ✅ | ~~#3518~~ | ~~RAR-2.2~~ ✅ | ~~#3519~~ | RAR-2.3 | #3520 |
+| ~~RAR-2.1~~ ✅ | ~~#3518~~ | ~~RAR-2.2~~ ✅ | ~~#3519~~ | ~~RAR-2.3~~ ✅ | ~~#3520~~ |
 | RAR-2.4 | #3521 | RAR-3.1 | #3522 | RAR-3.2 | #3523 |
 | RAR-3.3 | #3524 | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
 | RAR-4.1 | #3527 | RAR-4.2 | #3528 | RAR-4.3 | #3529 |
@@ -248,7 +248,7 @@ Re-import only files genuinely newer than what's already in the system.
 |----|-------|---------|--------|----------|-----|-------|---------|
 | ~~RAR-2.1~~ ✅ **Done** (#3518) | Capture freshness signal at import | Store source commit SHA + committed-at + blob_sha as `last_imported_*` | `enhancement`,`mvp`,`import`,`repository`,`data-model` | Y | Y | M | objectified-db, objectified-rest |
 | ~~RAR-2.2~~ ✅ **Done** (#3519) | "Newer-than" comparator | Re-import only when remote commit is newer than last imported | `enhancement`,`mvp`,`import`,`repository` | N | Y | M | objectified-rest |
-| RAR-2.3 | Per-file refresh state machine | up-to-date / stale / refreshing / failed / diverged | `enhancement`,`mvp`,`import`,`repository` | Y | Y | M | objectified-rest, objectified-ui |
+| ~~RAR-2.3~~ ✅ **Done** (#3520) | Per-file refresh state machine | up-to-date / stale / refreshing / failed / diverged | `enhancement`,`mvp`,`import`,`repository` | Y | Y | M | objectified-rest, objectified-ui |
 | RAR-2.4 | Checksum idempotency guard | Suppress no-op refreshes when content unchanged despite newer commit | `enhancement`,`mvp`,`import` | Y | Y | S | objectified-rest |
 
 ### RAR-2.1 — Capture freshness signal at import
@@ -312,6 +312,28 @@ worker is RAR-4.1.
   UI and the sweep.
 - **2.4** even when timestamp is newer, skip when `content_checksum` is unchanged (reuse REPO-8.3) to
   avoid empty version churn.
+
+**Status (2.3): ✅ Done (#3520).** New pure module
+`objectified-rest/src/app/repository_refresh_status.py` exposes the `RefreshStatus` enum
+(`up-to-date` / `stale` / `refreshing` / `failed` / `diverged`) and `compute_refresh_status(...)`,
+which materializes a file's state from two axes: the **recency** axis (delegated to the RAR-2.2
+`evaluate_refresh` comparator so the two modules cannot disagree about "newer" — `stale` exactly when
+the comparator would re-import, else `up-to-date`) and the **operational** axis supplied by sweep /
+divergence bookkeeping (`is_refreshing` → `refreshing`, `diverged` → `diverged` safety hold,
+`last_refresh_failed` → `failed`), with operational signals taking documented precedence over recency.
+The status is **derived on read** — the RAR-1.5 read DAOs (`get_repository_import_spec_by_id` /
+`_by_path`) now LEFT JOIN the current `odb.tenant_repository_files` row for `remote_committed_at` /
+`remote_blob_sha`, and `RepositoryImportSpecRead.refresh_status` computes from those vs the
+`last_imported_*` anchors — so it is recomputed automatically whenever a scan updates the remote
+recency columns or a finished refresh updates the anchors (no separate stored column to drift).
+objectified-ui adds the presentational chip helper
+`repository-refresh-status-chip-copy.ts` (label + tooltip + tone classes per state, mirroring the
+branch-divergence chip) for the status surface. Tests:
+`tests/test_repository_refresh_status.py` (recency axis, operational axis, precedence, reachability of
+all five states, stable wire codes), read-API coverage in `test_repository_import_spec_read_api.py`,
+and the UI unit test `tests/unit/repository-refresh-status-chip-copy.test.ts`. The `refreshing` /
+`failed` flags are populated when the sweep (RAR-3/RAR-4) lands and `diverged` by the manual-edit
+check (RAR-4.4).
 
 ---
 
