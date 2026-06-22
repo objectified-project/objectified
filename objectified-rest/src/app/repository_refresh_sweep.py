@@ -31,7 +31,7 @@ hammer the provider every tick.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, NamedTuple, Optional
 
 from .database import Database
 from .repository_file_scan import scan_repository_branch_into_index
@@ -40,18 +40,47 @@ from .repository_refresh_comparator import evaluate_refresh
 _logger = logging.getLogger(__name__)
 
 
-def _enqueue_stale_files_for_branch(
-    db: Database, repo_row: Dict[str, Any], branch: str
-) -> int:
+class BranchEnqueueResult(NamedTuple):
+    """Outcome of a single-branch rescan + enqueue pass.
+
+    Attributes:
+        enqueued: Number of refresh jobs actually inserted.
+        skipped: Candidates considered but not enqueued — either not newer than
+            the last import (RAR-2.2 freshness gate) or already covered by an
+            active (queued/running) job for the same lineage (idempotent no-op).
+    """
+
+    enqueued: int
+    skipped: int
+
+
+def enqueue_stale_files_for_branch(
+    db: Database,
+    repo_row: Dict[str, Any],
+    branch: str,
+    *,
+    path_filter: Optional[str] = None,
+) -> BranchEnqueueResult:
     """Rescan one branch and enqueue a re-import job per stale + newer file.
+
+    This is the shared core used by both the periodic auto-refresh sweep
+    (:func:`process_repository_refresh_sweep`) and the manual one-shot
+    "Refresh Now" path (RAR-5.2, ``repository_manual_refresh``). It always applies
+    the RAR-2.2 newer-than freshness gate, so a file is enqueued only when its
+    remote commit is genuinely newer than the last import; the divergence guard
+    (RAR-4.4) is applied later by the EPIC-4 executor when it processes the job.
 
     Args:
         db: Database handle.
         repo_row: The repository row (from ``get_tenant_repository``).
         branch: The branch to rescan and evaluate.
+        path_filter: When set, only the file at this repository-relative path is
+            considered (the rest of the branch's candidates are ignored). Used by
+            per-file "Refresh Now"; ``None`` evaluates every candidate on the
+            branch.
 
     Returns:
-        The number of refresh jobs enqueued for this branch.
+        A :class:`BranchEnqueueResult` with the enqueued and skipped counts.
     """
     repository_id = str(repo_row["id"])
     tenant_id = str(repo_row["tenant_id"])
@@ -60,7 +89,11 @@ def _enqueue_stale_files_for_branch(
     scan_repository_branch_into_index(db, repo_row, branch)
 
     enqueued = 0
+    skipped = 0
     for cand in db.list_repository_refresh_candidates(repository_id, branch):
+        if path_filter is not None and str(cand.get("path")) != path_filter:
+            continue
+
         decision = evaluate_refresh(
             remote_committed_at=cand.get("remote_committed_at"),
             last_imported_committed_at=cand.get("last_imported_committed_at"),
@@ -68,6 +101,8 @@ def _enqueue_stale_files_for_branch(
             last_imported_checksum=cand.get("last_imported_blob_sha"),
         )
         if not decision.should_refresh:
+            # Up-to-date / stale-guarded: honors the freshness gate (RAR-2.2).
+            skipped += 1
             continue
 
         job = db.enqueue_repository_refresh_job(
@@ -90,7 +125,10 @@ def _enqueue_stale_files_for_branch(
         )
         if job is not None:
             enqueued += 1
-    return enqueued
+        else:
+            # Active job already exists for this lineage (idempotent no-op).
+            skipped += 1
+    return BranchEnqueueResult(enqueued=enqueued, skipped=skipped)
 
 
 def _refresh_one_repository(db: Database, due_row: Dict[str, Any]) -> int:
@@ -121,7 +159,7 @@ def _refresh_one_repository(db: Database, due_row: Dict[str, Any]) -> int:
     enqueued = 0
     for branch in branches:
         try:
-            enqueued += _enqueue_stale_files_for_branch(db, repo_row, branch)
+            enqueued += enqueue_stale_files_for_branch(db, repo_row, branch).enqueued
         except Exception:
             # One bad branch (GitHub error, etc.) must not abort the others.
             _logger.exception(
