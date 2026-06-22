@@ -6453,7 +6453,8 @@ class Database:
         q = """
             SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
                    description, default_branch, visibility, status, created_at, updated_at,
-                   linked_account_id, last_scanned_at, total_files, importable_count, branch_count
+                   linked_account_id, last_scanned_at, total_files, importable_count, branch_count,
+                   refresh_interval_seconds, last_refreshed_at
             FROM odb.tenant_repositories
             WHERE tenant_id = %s::uuid AND deleted_at IS NULL
             ORDER BY created_at DESC
@@ -6464,13 +6465,147 @@ class Database:
         q = """
             SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
                    description, default_branch, visibility, status, created_at, updated_at,
-                   linked_account_id, last_scanned_at, total_files, importable_count, branch_count, created_by
+                   linked_account_id, last_scanned_at, total_files, importable_count, branch_count, created_by,
+                   refresh_interval_seconds, last_refreshed_at
             FROM odb.tenant_repositories
             WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
             LIMIT 1
         """
         rows = self.execute_query(q, (repository_id, tenant_id))
         return dict(rows[0]) if rows else None
+
+    def list_due_repositories(
+        self,
+        *,
+        floor_seconds: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return repositories due for an auto-refresh sweep tick (RAR-3.1).
+
+        A repository is due when it has never been refreshed
+        (``last_refreshed_at IS NULL``) or when at least its effective interval
+        has elapsed since the last tick. The effective interval is the per-repo
+        ``refresh_interval_seconds`` clamped up to the global floor, so a
+        too-aggressive per-repo cadence cannot defeat the floor. Soft-deleted
+        repositories and those not in a scannable ``ready``/``error`` state are
+        excluded. The recency comparison is done in the database against
+        ``now()`` so it does not depend on application clock skew.
+
+        The actual rescan + enqueue is the RAR-3.2 sweep; this is the
+        due-selection primitive it iterates.
+
+        Args:
+            floor_seconds: The global minimum interval; per-repo values below it
+                are treated as the floor. Defaults to
+                ``settings.refresh_min_interval_seconds`` when omitted.
+
+        Returns:
+            Repository rows due for refresh, oldest ``last_refreshed_at`` first
+            (NULLs — never refreshed — first) for fair scheduling.
+        """
+        from .config import settings
+        from .repository_refresh_cadence import DEFAULT_MIN_REFRESH_INTERVAL_SECONDS
+
+        floor = floor_seconds if floor_seconds is not None else settings.refresh_min_interval_seconds
+        if floor < 1:
+            floor = DEFAULT_MIN_REFRESH_INTERVAL_SECONDS
+
+        q = """
+            SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
+                   description, default_branch, visibility, status, created_at, updated_at,
+                   linked_account_id, last_scanned_at, total_files, importable_count, branch_count,
+                   refresh_interval_seconds, last_refreshed_at
+            FROM odb.tenant_repositories
+            WHERE deleted_at IS NULL
+              AND status IN ('ready', 'error')
+              AND (
+                last_refreshed_at IS NULL
+                OR last_refreshed_at <= now() - make_interval(
+                     secs => GREATEST(refresh_interval_seconds, %s)
+                   )
+              )
+            ORDER BY last_refreshed_at ASC NULLS FIRST, created_at ASC
+        """
+        return self.execute_query(q, (floor,))
+
+    def mark_repository_refreshed(self, repository_id: str) -> bool:
+        """Advance a repository's ``last_refreshed_at`` to now (RAR-3.1).
+
+        Called by the sweep at the end of each tick for a repository so the next
+        due check is measured from this moment. Returns True when a live row was
+        updated (False when the id is unknown or soft-deleted).
+
+        Args:
+            repository_id: The repository whose refresh anchor to advance.
+
+        Returns:
+            True when a row was updated.
+        """
+        q = """
+            UPDATE odb.tenant_repositories
+            SET last_refreshed_at = CURRENT_TIMESTAMP
+            WHERE id = %s::uuid AND deleted_at IS NULL
+            RETURNING id
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, (repository_id,))
+                row = cursor.fetchone()
+                conn.commit()
+                return bool(row)
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def set_repository_refresh_interval(
+        self,
+        tenant_id: str,
+        repository_id: str,
+        interval_seconds: Optional[int],
+    ) -> Optional[int]:
+        """Set a repository's per-repo refresh cadence, clamped to the floor (RAR-3.1).
+
+        The value is resolved through
+        :func:`repository_refresh_cadence.resolve_refresh_interval` first, so a
+        ``None``/non-positive value falls back to the configured default and a
+        sub-floor value is clamped up (with a warning). The clamped value is what
+        is persisted, so a later read needs no re-clamping.
+
+        Args:
+            tenant_id: Owning tenant id (scopes the update for isolation).
+            repository_id: The repository to update.
+            interval_seconds: The requested cadence in seconds, or None to reset
+                to the configured default.
+
+        Returns:
+            The effective (clamped) interval that was stored, or None when no
+            live repository matched the tenant + id.
+        """
+        from .config import settings
+        from .repository_refresh_cadence import resolve_refresh_interval
+
+        effective = resolve_refresh_interval(
+            interval_seconds,
+            floor_seconds=settings.refresh_min_interval_seconds,
+            default_seconds=settings.refresh_default_interval_seconds,
+        )
+        q = """
+            UPDATE odb.tenant_repositories
+            SET refresh_interval_seconds = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
+            RETURNING id
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, (effective, repository_id, tenant_id))
+                row = cursor.fetchone()
+                conn.commit()
+                return effective if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
 
     def list_tenant_repository_file_branches(self, tenant_id: str, repository_id: str) -> List[str]:
         """Distinct branch names that have indexed file rows for this repository."""
