@@ -1513,6 +1513,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/projects/domains:
+    get:
+      tags:
+      - projects
+      summary: List Project Domain Categories Global
+      description: 'Allowlist of ``domainCategory`` ids for project metadata.
+
+
+        Public read (CLI prefetch uses no credentials). Register before ``/{tenant_slug}``
+        so
+
+        ``/v1/projects/domains`` is not captured as a tenant slug.'
+      operationId: list_project_domain_categories_global_v1_projects_domains_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  items:
+                    type: string
+                  type: array
+                type: object
+                title: Response List Project Domain Categories Global V1 Projects
+                  Domains Get
+  /v1/projects/{tenant_slug}/domains:
+    get:
+      tags:
+      - projects
+      summary: List Project Domain Categories For Tenant
+      description: 'Same allowlist under the tenant-scoped URL shape expected by the
+        CLI.
+
+
+        Must be registered before ``/{tenant_slug}/{project_id}`` so the final segment
+
+        ``domains`` is not interpreted as a project UUID.'
+      operationId: list_project_domain_categories_for_tenant_v1_projects__tenant_slug__domains_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+                title: Response List Project Domain Categories For Tenant V1 Projects  Tenant
+                  Slug  Domains Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/projects/{tenant_slug}:
     get:
       tags:
@@ -7757,8 +7822,8 @@ paths:
       tags:
       - spec-import
       summary: List specification import jobs
-      description: Returns import jobs for this tenant held in this API process (in-memory;
-        restart clears the list). Use GET …/imports/{job_id} for full events.
+      description: Jobs tracked in this API process for the tenant (in-memory). After
+        restart the list is empty; use GET …/imports/{job_id} for full event history.
       operationId: list_spec_import_jobs_v1_tenants__tenant_slug__imports_get
       parameters:
       - name: tenant_slug
@@ -7839,15 +7904,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecImportJobAccepted'
-        '501':
-          description: Not Implemented — backend importer is not yet available.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
         '422':
           description: Validation Error
           content:
@@ -7900,15 +7956,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecImportJobAccepted'
-        '501':
-          description: Not Implemented — backend importer is not yet available.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
         '422':
           description: Validation Error
           content:
@@ -7957,15 +8004,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecImportJobStatus'
-        '501':
-          description: Not Implemented — backend importer is not yet available.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
         '422':
           description: Validation Error
           content:
@@ -8009,15 +8047,6 @@ paths:
       responses:
         '204':
           description: Successful Response
-        '501':
-          description: Not Implemented — backend importer is not yet available.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
         '422':
           description: Validation Error
           content:
@@ -8066,15 +8095,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecImportCommitResponse'
-        '501':
-          description: Not Implemented — backend importer is not yet available.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
         '422':
           description: Validation Error
           content:
@@ -8123,15 +8143,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SpecImportRollbackResponse'
-        '501':
-          description: Not Implemented — backend importer is not yet available.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
         '422':
           description: Validation Error
           content:
@@ -8504,6 +8515,91 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TenantRepositoryFileContentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/tenants/{tenant_slug}/repository-imports/{import_id}/spec:
+    get:
+      tags:
+      - tenant-repositories
+      summary: Read Repository Import Spec
+      description: "Read the stored import spec for an imported repository file (RAR-1.5).\n\
+        \nTwo lookup modes share this route, mirroring the ticket's\n``GET …/repository-imports/{id}/spec``\
+        \ plus ``?path=`` variant:\n\n- **By import id (default).** ``import_id``\
+        \ is the\n  ``odb.repository_import_spec`` row id; the spec for that file\
+        \ lineage is\n  returned. This is the \"read the spec for a file/import id\"\
+        \ path.\n- **By path (``?path=`` present).** ``import_id`` is reinterpreted\
+        \ as the\n  *repository* id and the latest spec for that repository / ``branch``\
+        \ /\n  ``path`` lineage is resolved. ``branch`` is optional: when omitted\
+        \ the most\n  recently updated spec across branches for that path is returned.\n\
+        \nIn both modes the lookup is scoped to the caller's tenant (from the auth\n\
+        token), so a spec belonging to another tenant returns 404 rather than\nleaking.\
+        \ The returned ``options`` blob is upgraded on read to the current\nenvelope\
+        \ shape (RAR-1.4), and ``spec_schema_version`` reports that current\nversion.\n\
+        \nArgs:\n    tenant_slug: Tenant slug from the path (scoping comes from the\
+        \ token).\n    import_id: Import-spec row id, or repository id when ``path``\
+        \ is given.\n    auth_data: Authenticated principal; supplies the tenant scope.\n\
+        \    path: Repository-relative file path for the ``?path=`` lookup variant.\n\
+        \    branch: Optional branch filter for the ``?path=`` lookup variant.\n\n\
+        Returns:\n    The current-shape import spec for the resolved file.\n\nRaises:\n\
+        \    HTTPException: 404 when no spec exists for the id/path within the tenant."
+      operationId: read_repository_import_spec_v1_tenants__tenant_slug__repository_imports__import_id__spec_get
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: import_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Import Id
+      - name: path
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Path
+      - name: branch
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Branch
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryImportSpecRead'
         '422':
           description: Validation Error
           content:
@@ -8987,7 +9083,7 @@ components:
       properties:
         file:
           type: string
-          contentMediaType: application/octet-stream
+          format: binary
           title: File
           description: Raw specification file bytes.
         metadata:
@@ -10541,6 +10637,55 @@ components:
       type: object
       title: PushWebhookSubscriptionUpdateRequest
       description: Update URL, active flag, and/or rotate signing secret (#2587).
+    RepositoryImportSpecRead:
+      properties:
+        spec_schema_version:
+          type: integer
+          title: Spec Schema Version
+          description: Current envelope version the returned options conform to.
+          default: 1
+        source_kind:
+          type: string
+          title: Source Kind
+          description: Importer discriminator (for example openapi-3, arazzo).
+        format_override:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Format Override
+          description: Explicit format override (the importer --format flag), when
+            the user forced one.
+        content_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Content Type
+          description: MIME type used to read the file (for example application/yaml),
+            when known.
+        options:
+          $ref: '#/components/schemas/SpecImportOptions'
+          description: Full SpecImportOptions payload, upgraded to the current shape.
+      additionalProperties: false
+      type: object
+      required:
+      - source_kind
+      title: RepositoryImportSpecRead
+      description: 'Current-shape import spec returned by the read endpoint (RAR-1.5).
+
+
+        The response surface for ``GET …/repository-imports/{id}/spec`` (and its
+
+        ``?path=`` lookup variant). It exposes the captured source descriptor and
+        the
+
+        full ``SpecImportOptions`` payload, upgraded on read to the current envelope
+
+        shape, so the refresh worker, the UI status surface, and the CLI can replay
+
+        the user''s original import request. ``spec_schema_version`` always reports
+        the
+
+        current envelope version because ``options`` has already been migrated forward.'
     RequestBodyContentTypeRequest:
       properties:
         media_type:
@@ -10922,7 +11067,6 @@ components:
         version_record_id:
           type: string
           title: Version Record Id
-      additionalProperties: false
       type: object
       required:
       - job_id
@@ -10979,13 +11123,68 @@ components:
           title: Status Path
           description: Relative URL path for GET …/imports/{job_id} until the job
             reaches a terminal state.
-      additionalProperties: false
       type: object
       required:
       - job_id
       - status_path
       title: SpecImportJobAccepted
       description: Returned when a job is accepted (HTTP 202).
+    SpecImportJobListItem:
+      properties:
+        job_id:
+          type: string
+          title: Job Id
+        state:
+          type: string
+          enum:
+          - queued
+          - running
+          - pending-approval
+          - committing
+          - completed
+          - failed
+          - canceled
+          - rolled-back
+          title: State
+        percent:
+          type: integer
+          maximum: 100.0
+          minimum: 0.0
+          title: Percent
+          default: 0
+        status_path:
+          type: string
+          title: Status Path
+          description: Relative URL for GET …/imports/{job_id}.
+        progress:
+          anyOf:
+          - $ref: '#/components/schemas/SpecImportProgress'
+          - type: 'null'
+        result:
+          anyOf:
+          - $ref: '#/components/schemas/SpecImportJobResult'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - job_id
+      - state
+      - status_path
+      title: SpecImportJobListItem
+      description: Summary row for GET …/imports (no full event log).
+    SpecImportJobListResponse:
+      properties:
+        jobs:
+          items:
+            $ref: '#/components/schemas/SpecImportJobListItem'
+          type: array
+          title: Jobs
+      additionalProperties: false
+      type: object
+      required:
+      - jobs
+      title: SpecImportJobListResponse
+      description: Tenant-scoped import jobs visible to this API process.
     SpecImportJobResult:
       properties:
         project_id:
@@ -11054,69 +11253,12 @@ components:
           anyOf:
           - $ref: '#/components/schemas/SpecImportJobResult'
           - type: 'null'
-      additionalProperties: false
       type: object
       required:
       - job_id
       - state
       title: SpecImportJobStatus
       description: Poll payload for an import job.
-    SpecImportJobListItem:
-      properties:
-        job_id:
-          type: string
-          title: Job Id
-        state:
-          type: string
-          enum:
-          - queued
-          - running
-          - pending-approval
-          - committing
-          - completed
-          - failed
-          - canceled
-          - rolled-back
-          title: State
-        percent:
-          type: integer
-          maximum: 100.0
-          minimum: 0.0
-          title: Percent
-          default: 0
-        status_path:
-          type: string
-          title: Status Path
-        progress:
-          anyOf:
-          - $ref: '#/components/schemas/SpecImportProgress'
-          - type: 'null'
-        result:
-          anyOf:
-          - $ref: '#/components/schemas/SpecImportJobResult'
-          - type: 'null'
-      additionalProperties: false
-      type: object
-      required:
-      - job_id
-      - state
-      - percent
-      - status_path
-      title: SpecImportJobListItem
-      description: Summary row for GET …/imports (no full event log).
-    SpecImportJobListResponse:
-      properties:
-        jobs:
-          items:
-            $ref: '#/components/schemas/SpecImportJobListItem'
-          type: array
-          title: Jobs
-      additionalProperties: false
-      type: object
-      required:
-      - jobs
-      title: SpecImportJobListResponse
-      description: Wrapper for tenant-scoped import job listing.
     SpecImportOptions:
       properties:
         selected_schemas:
@@ -11169,7 +11311,9 @@ components:
         skip_duplicate_versions:
           type: boolean
           title: Skip Duplicate Versions
-          description: When true, if the target catalog version line already exists in the project, complete successfully without re-importing (idempotent no-op).
+          description: When true, if the target catalog version line already exists
+            in the project, complete successfully without re-importing (idempotent
+            no-op).
           default: false
       additionalProperties: false
       type: object
@@ -11248,7 +11392,6 @@ components:
           - type: string
           - type: 'null'
           title: Version Record Id
-      additionalProperties: false
       type: object
       required:
       - job_id
@@ -11836,11 +11979,6 @@ components:
         type:
           type: string
           title: Error Type
-        input:
-          title: Input
-        ctx:
-          type: object
-          title: Context
       type: object
       required:
       - loc

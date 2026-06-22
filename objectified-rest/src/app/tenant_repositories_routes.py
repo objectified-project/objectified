@@ -19,6 +19,8 @@ from psycopg2 import errors as pg_errors
 from .auth import get_authenticated_user_id, validate_authentication
 from .database import db
 from .models import (
+    RepositoryImportSpecRead,
+    repository_import_spec_read_from_row,
     TenantRepositoryCreate,
     TenantRepositoryCreateResponse,
     TenantRepositoryFileContentResponse,
@@ -406,6 +408,69 @@ async def get_tenant_repository_file_content(
         content=text,
         truncated=truncated,
     )
+
+
+@router.get(
+    "/{tenant_slug}/repository-imports/{import_id}/spec",
+    response_model=RepositoryImportSpecRead,
+)
+async def read_repository_import_spec(
+    tenant_slug: str,
+    import_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    path: Optional[str] = None,
+    branch: Optional[str] = None,
+) -> RepositoryImportSpecRead:
+    """Read the stored import spec for an imported repository file (RAR-1.5).
+
+    Two lookup modes share this route, mirroring the ticket's
+    ``GET …/repository-imports/{id}/spec`` plus ``?path=`` variant:
+
+    - **By import id (default).** ``import_id`` is the
+      ``odb.repository_import_spec`` row id; the spec for that file lineage is
+      returned. This is the "read the spec for a file/import id" path.
+    - **By path (``?path=`` present).** ``import_id`` is reinterpreted as the
+      *repository* id and the latest spec for that repository / ``branch`` /
+      ``path`` lineage is resolved. ``branch`` is optional: when omitted the most
+      recently updated spec across branches for that path is returned.
+
+    In both modes the lookup is scoped to the caller's tenant (from the auth
+    token), so a spec belonging to another tenant returns 404 rather than
+    leaking. The returned ``options`` blob is upgraded on read to the current
+    envelope shape (RAR-1.4), and ``spec_schema_version`` reports that current
+    version.
+
+    Args:
+        tenant_slug: Tenant slug from the path (scoping comes from the token).
+        import_id: Import-spec row id, or repository id when ``path`` is given.
+        auth_data: Authenticated principal; supplies the tenant scope.
+        path: Repository-relative file path for the ``?path=`` lookup variant.
+        branch: Optional branch filter for the ``?path=`` lookup variant.
+
+    Returns:
+        The current-shape import spec for the resolved file.
+
+    Raises:
+        HTTPException: 404 when no spec exists for the id/path within the tenant.
+    """
+    _ = tenant_slug
+    tenant_id = str(auth_data["tenant_id"])
+
+    if path is not None:
+        path_value = path.strip()
+        if not path_value:
+            raise HTTPException(status_code=400, detail="path must not be empty")
+        branch_value = branch.strip() if branch is not None else None
+        row = db.get_repository_import_spec_by_path(
+            tenant_id, str(import_id), path_value, branch_value or None
+        )
+    else:
+        row = db.get_repository_import_spec_by_id(tenant_id, str(import_id))
+
+    if not row:
+        raise HTTPException(status_code=404, detail="import spec not found")
+
+    return repository_import_spec_read_from_row(row)
 
 
 @router.post("/{tenant_slug}/repositories", response_model=TenantRepositoryCreateResponse)
