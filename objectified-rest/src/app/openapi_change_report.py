@@ -551,3 +551,59 @@ def compute_openapi_change_report(
 ) -> Dict[str, Any]:
     """Alias for :func:`build_change_report` (explicit name for callers)."""
     return build_change_report(baseline_openapi, candidate_openapi)
+
+
+# Sections of a ChangeReportModel that represent a *substantive* change. ``warnings``
+# and ``skipped`` are diagnostic notes (e.g. an external $ref that could not be
+# followed) and are intentionally excluded: a refresh whose only output is a warning
+# carries no schema/property/reference/relationship/documentation delta and is still a
+# no-op for change-report purposes (RAR-4.3).
+_SUBSTANTIVE_LIST_SECTIONS = (
+    "properties",
+    "references",
+    "relationships",
+    "documentation",
+)
+
+
+def change_report_change_counts(change_model: Dict[str, Any]) -> Dict[str, int]:
+    """Count substantive changes in a ChangeReportModel, by section.
+
+    Args:
+        change_model: A ChangeReportModel dict as produced by :func:`build_change_report`.
+
+    Returns:
+        A dict with one entry per substantive section: ``schemasAdded``,
+        ``schemasRemoved``, ``schemasModified``, ``properties``, ``references``,
+        ``relationships`` and ``documentation``. Diagnostic ``warnings`` / ``skipped``
+        are not counted (see :data:`_SUBSTANTIVE_LIST_SECTIONS`).
+    """
+    schemas = change_model.get("schemas")
+    schemas = schemas if isinstance(schemas, dict) else {}
+
+    def _len(value: Any) -> int:
+        return len(value) if isinstance(value, list) else 0
+
+    counts = {
+        "schemasAdded": _len(schemas.get("added")),
+        "schemasRemoved": _len(schemas.get("removed")),
+        "schemasModified": _len(schemas.get("modified")),
+    }
+    for section in _SUBSTANTIVE_LIST_SECTIONS:
+        counts[section] = _len(change_model.get(section))
+    return counts
+
+
+def change_report_total_changes(change_model: Dict[str, Any]) -> int:
+    """Return the total number of substantive changes in a ChangeReportModel."""
+    return sum(change_report_change_counts(change_model).values())
+
+
+def change_report_is_noop(change_model: Dict[str, Any]) -> bool:
+    """Return ``True`` when a ChangeReportModel carries no substantive change.
+
+    A no-op report is one where the candidate and baseline are semantically identical
+    across every diffed section (schemas, properties, references, relationships,
+    documentation). Diagnostic warnings/skipped notes do not make a report non-no-op.
+    """
+    return change_report_total_changes(change_model) == 0

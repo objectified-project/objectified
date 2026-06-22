@@ -7,7 +7,12 @@ from fastapi.testclient import TestClient
 
 from app.auth import validate_authentication
 from app.main import app
-from app.openapi_change_report import build_change_report
+from app.openapi_change_report import (
+    build_change_report,
+    change_report_change_counts,
+    change_report_is_noop,
+    change_report_total_changes,
+)
 
 client = TestClient(app)
 
@@ -137,6 +142,45 @@ def test_deterministic_output():
     r1 = build_change_report(base, cand)
     r2 = build_change_report(base, cand)
     assert r1 == r2
+
+
+def test_change_report_is_noop_for_identical_documents():
+    base = _min_openapi()
+    base["components"]["schemas"]["S"] = {"type": "object"}
+    cand = copy.deepcopy(base)
+    report = build_change_report(base, cand)
+    assert change_report_is_noop(report) is True
+    assert change_report_total_changes(report) == 0
+    assert change_report_change_counts(report) == {
+        "schemasAdded": 0,
+        "schemasRemoved": 0,
+        "schemasModified": 0,
+        "properties": 0,
+        "references": 0,
+        "relationships": 0,
+        "documentation": 0,
+    }
+
+
+def test_change_report_warning_only_is_still_noop():
+    # An external $ref emits a warning but no substantive delta: still a no-op.
+    base = _min_openapi()
+    base["components"]["schemas"]["X"] = {"$ref": "http://example.com/other.json#/Foo"}
+    cand = copy.deepcopy(base)
+    report = build_change_report(base, cand)
+    assert report["warnings"]
+    assert change_report_is_noop(report) is True
+
+
+def test_change_report_counts_added_schema():
+    base = _min_openapi()
+    cand = copy.deepcopy(base)
+    cand["components"]["schemas"]["New"] = {"type": "boolean"}
+    report = build_change_report(base, cand)
+    assert change_report_is_noop(report) is False
+    counts = change_report_change_counts(report)
+    assert counts["schemasAdded"] == 1
+    assert change_report_total_changes(report) == 1
 
 
 def test_post_change_report_route():

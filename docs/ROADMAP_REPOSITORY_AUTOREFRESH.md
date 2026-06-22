@@ -123,7 +123,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | ~~RAR-2.1~~ ✅ | ~~#3518~~ | ~~RAR-2.2~~ ✅ | ~~#3519~~ | ~~RAR-2.3~~ ✅ | ~~#3520~~ |
 | ~~RAR-2.4~~ ✅ | ~~#3521~~ | ~~RAR-3.1~~ ✅ | ~~#3522~~ | ~~RAR-3.2~~ ✅ | ~~#3523~~ |
 | ~~RAR-3.3~~ ✅ | ~~#3524~~ | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
-| ~~RAR-4.1~~ ✅ | ~~#3527~~ | ~~RAR-4.2~~ ✅ | ~~#3528~~ | RAR-4.3 | #3529 |
+| ~~RAR-4.1~~ ✅ | ~~#3527~~ | ~~RAR-4.2~~ ✅ | ~~#3528~~ | ~~RAR-4.3~~ ✅ | ~~#3529~~ |
 | RAR-4.4 | #3530 | RAR-4.5 | #3531 | RAR-5.1 | #3532 |
 | RAR-5.2 | #3533 | RAR-5.3 | #3534 | RAR-5.4 | #3535 |
 | RAR-5.5 | #3536 | RAR-5.6 | #3537 | RAR-6.1 | #3538 |
@@ -489,7 +489,7 @@ Replay the original spec; version + protect.
 |----|-------|---------|--------|----------|-----|-------|---------|
 | ~~RAR-4.1~~ ✅ **Done** (#3527) | Re-import worker applies stored spec | Worker re-runs import with stored options, not defaults | `enhancement`,`mvp`,`import`,`repository`,`rest` | N | Y | L | objectified-ui (worker), objectified-rest |
 | ~~RAR-4.2~~ ✅ **Done** (#3528) | Version creation on refresh with provenance | New version links prior version + source commit | `enhancement`,`mvp`,`import`,`repository`,`versions` | N | Y | M | objectified-rest, objectified-db |
-| RAR-4.3 | Change report on refresh (dry-run reuse) | Produce diff/change report for each refresh | `enhancement`,`mvp`,`import` | Y | Y | M | objectified-ui, objectified-rest |
+| ~~RAR-4.3~~ ✅ **Done** (#3529) | Change report on refresh (dry-run reuse) | Produce diff/change report for each refresh | `enhancement`,`mvp`,`import` | Y | Y | M | objectified-ui, objectified-rest |
 | RAR-4.4 | Manual-edit divergence guard | Hold (don't clobber) if version edited since import | `enhancement`,`mvp`,`import`,`repository` | N | Y | L | objectified-rest |
 | RAR-4.5 | Per-repo/file conflict policy | overwrite / hold-for-review / new-branch on divergence | `enhancement`,`import`,`repository` | Y | N | M | objectified-rest, objectified-ui |
 
@@ -563,6 +563,28 @@ camelCase wire shape + create-request parsing + migration guard) and new provena
 normalization, metadata carriage). The OpenAPI contract is regenerated. Consuming the refresh queue and
 invoking the worker (which then carries this provenance onto the new version) is the EPIC-4 dispatcher's
 job, mirroring how RAR-2.2/2.4 deferred their wiring.
+
+**Status of 4.3: ✅ Done (#3529).** New objectified-rest module
+`app/repository_refresh_change_report.py` exposes the best-effort
+`generate_change_report_on_refresh(...)`, which reuses the publication change-report pipeline
+(`build_publication_change_report_render`) to diff the RAR-4.2 prior (parent) version against the new
+refresh version, persist the report against the new version via `insert_change_report_if_absent` (so the
+version always links to a report), and append a refresh-scoped `workflow_audit` row
+(`schema.refresh.change_report.generated`) carrying the baseline, per-section change counts, and the
+`noChanges` flag (RAR-5.3 reads this action). Unlike publish it diffs against the RAR-4.2 parent rather
+than the latest published ancestor and tolerates an unpublished candidate; a missing parent yields an
+initial-style empty-baseline report. **Zero-change refreshes are reported as no-ops** — the report row is
+still written and both the stored change model and the audit entry are flagged `noChanges: true`. A new
+`openapi_change_report` helper trio (`change_report_change_counts` / `change_report_total_changes` /
+`change_report_is_noop`) counts only *substantive* sections (schemas/properties/references/relationships/
+documentation), so a warning-only diff (e.g. an unfollowed external `$ref`) is still a no-op. On the UI,
+`lib/change-report-mustache-context.ts` gains `changeModelTotalChanges` / `isNoOpChangeModel` (mirroring the
+Python helpers, honoring the stamped `noChanges` flag) and a `noChangesSection` context field so the existing
+change-report rendering shows a "no changes" state on a no-op refresh. Tests:
+`tests/test_repository_refresh_change_report.py`, the no-op cases in `tests/test_openapi_change_report.py`, and
+the UI cases in `tests/change-report-mustache-context.test.ts`. Invoking this from the refresh dispatcher
+(after RAR-4.2 creates the version) is the EPIC-4 dispatcher's job, mirroring how RAR-4.1/4.2 deferred their
+wiring.
 
 ---
 

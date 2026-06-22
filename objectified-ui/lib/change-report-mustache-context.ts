@@ -34,6 +34,39 @@ function counts(cm: ChangeModelJson) {
 }
 
 /**
+ * Total number of *substantive* changes in a change model (schemas added/removed/
+ * modified plus property, reference, relationship, and documentation deltas).
+ *
+ * Diagnostic `warnings` / `skipped` notes are excluded, mirroring the objectified-rest
+ * `change_report_change_counts` helper, so a refresh whose only output is a warning is
+ * still treated as a no-op (RAR-4.3).
+ */
+export function changeModelTotalChanges(cm: ChangeModelJson): number {
+  const c = counts(cm);
+  return (
+    c.schemaCounts.added +
+    c.schemaCounts.removed +
+    c.schemaCounts.modified +
+    c.propertyCount +
+    c.referenceCount +
+    c.relationshipCount +
+    c.documentationCount
+  );
+}
+
+/**
+ * True when a change model carries no substantive change — a zero-change refresh that
+ * should render as a no-op. Honors an explicit `noChanges` flag stamped by the
+ * objectified-rest refresh pipeline, falling back to recomputing from the model.
+ */
+export function isNoOpChangeModel(cm: ChangeModelJson): boolean {
+  if (typeof cm.noChanges === 'boolean') {
+    return cm.noChanges;
+  }
+  return changeModelTotalChanges(cm) === 0;
+}
+
+/**
  * Build the merged Mustache context used by header, body, and footnote templates.
  */
 export function buildMustacheContext(
@@ -90,5 +123,6 @@ export function buildMustacheContext(
     documentationSection: documentation.length > 0,
     warningsSection: warnings.length > 0,
     skippedSection: skipped.length > 0,
+    noChangesSection: isNoOpChangeModel(cm),
   };
 }
