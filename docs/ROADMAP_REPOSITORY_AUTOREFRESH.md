@@ -121,7 +121,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | ~~RAR-1.1~~ ✅ | ~~#3512~~ | ~~RAR-1.2~~ ✅ | ~~#3513~~ | ~~RAR-1.3~~ ✅ | ~~#3514~~ |
 | ~~RAR-1.4~~ ✅ | ~~#3515~~ | ~~RAR-1.5~~ ✅ | ~~#3516~~ | RAR-1.6 | #3517 |
 | ~~RAR-2.1~~ ✅ | ~~#3518~~ | ~~RAR-2.2~~ ✅ | ~~#3519~~ | ~~RAR-2.3~~ ✅ | ~~#3520~~ |
-| RAR-2.4 | #3521 | RAR-3.1 | #3522 | RAR-3.2 | #3523 |
+| ~~RAR-2.4~~ ✅ | ~~#3521~~ | RAR-3.1 | #3522 | RAR-3.2 | #3523 |
 | RAR-3.3 | #3524 | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
 | RAR-4.1 | #3527 | RAR-4.2 | #3528 | RAR-4.3 | #3529 |
 | RAR-4.4 | #3530 | RAR-4.5 | #3531 | RAR-5.1 | #3532 |
@@ -249,7 +249,7 @@ Re-import only files genuinely newer than what's already in the system.
 | ~~RAR-2.1~~ ✅ **Done** (#3518) | Capture freshness signal at import | Store source commit SHA + committed-at + blob_sha as `last_imported_*` | `enhancement`,`mvp`,`import`,`repository`,`data-model` | Y | Y | M | objectified-db, objectified-rest |
 | ~~RAR-2.2~~ ✅ **Done** (#3519) | "Newer-than" comparator | Re-import only when remote commit is newer than last imported | `enhancement`,`mvp`,`import`,`repository` | N | Y | M | objectified-rest |
 | ~~RAR-2.3~~ ✅ **Done** (#3520) | Per-file refresh state machine | up-to-date / stale / refreshing / failed / diverged | `enhancement`,`mvp`,`import`,`repository` | Y | Y | M | objectified-rest, objectified-ui |
-| RAR-2.4 | Checksum idempotency guard | Suppress no-op refreshes when content unchanged despite newer commit | `enhancement`,`mvp`,`import` | Y | Y | S | objectified-rest |
+| ~~RAR-2.4~~ ✅ **Done** (#3521) | Checksum idempotency guard | Suppress no-op refreshes when content unchanged despite newer commit | `enhancement`,`mvp`,`import` | Y | Y | S | objectified-rest |
 
 ### RAR-2.1 — Capture freshness signal at import
 
@@ -334,6 +334,25 @@ all five states, stable wire codes), read-API coverage in `test_repository_impor
 and the UI unit test `tests/unit/repository-refresh-status-chip-copy.test.ts`. The `refreshing` /
 `failed` flags are populated when the sweep (RAR-3/RAR-4) lands and `diverged` by the manual-edit
 check (RAR-4.4).
+
+**Status (2.4): ✅ Done (#3521).** New pure module
+`objectified-rest/src/app/repository_checksum_idempotency.py` adds the second, finer gate that runs
+after the RAR-2.2 recency comparator. The comparator gates on `blob_sha`, but a newer commit can
+change the blob without changing the **spec content** (reformat, comment, header bump, no-op
+re-commit), which would churn empty versions. `evaluate_checksum_idempotency(...)` takes the RAR-2.2
+`RefreshDecision` plus the REPO-8.3 (#2933) **content checksum** and returns an `IdempotencyOutcome`
+(`RefreshAction` of `reimport` / `advance-anchor-only` / `skip`, an `IdempotencyReason`, and an
+`advance_committed_anchor` flag): newer commit + content changed → `reimport`; newer commit + content
+**unchanged** → `advance-anchor-only` marked `unchanged-checksum` (no version, but advance
+`last_imported_commit_sha` / `last_imported_committed_at` so the same commit is not re-seen as newer);
+older/equal → `skip` (stale guard); first import → `reimport`. When a content checksum is missing on
+either side it defers to the comparator's verdict verbatim. `guard_refresh(...)` is a convenience
+wrapper that runs the full RAR-2.2 + RAR-2.4 gate from the raw freshness signals.
+`tests/test_repository_checksum_idempotency.py` covers both acceptance criteria, the roadmap decision
+row, the cosmetic-blob-change churn case, the defer-on-missing-checksum behaviour, the no-timestamp
+fallback path, and stable wire codes (14 deterministic DB-free fixtures). Persisting the advanced
+anchor and the `unchanged-checksum` marker is the dispatcher's job (RAR-4.1), mirroring how RAR-2.2's
+wiring was deferred.
 
 ---
 
