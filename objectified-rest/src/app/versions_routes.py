@@ -1460,6 +1460,12 @@ async def create_version(
                 source_version_id=copy_source_id,
                 branch_row=branch_row,
                 client_base_revision_id=base,
+                source_commit_sha=_optional_commit_metadata_str(
+                    request.source_commit_sha,
+                    field_name="sourceCommitSha",
+                    max_length=_AUTHOR_OR_REF_MAX_CHARS,
+                ),
+                source_committed_at=request.source_committed_at,
             )
         except StaleHeadPushError as sh:
             stale_detail = _push_stale_head_detail(

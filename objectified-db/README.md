@@ -129,7 +129,32 @@ objectified-db --yes api-keys revoke sk_265e18808...
 
 ### Notes
 
-- All tables are addressed in the `odb` schema (`odb.users`, `odb.tenants`, `odb.api_keys`, …),
-  matching `objectified-rest`.
+- All core tables are addressed in the `odb` schema (`odb.users`, `odb.tenants`, `odb.api_keys`,
+  …), matching `objectified-rest`.
 - `api-keys create` writes `created_by_user_id` when the column exists and transparently falls
   back for older databases (same behavior as the REST service).
+
+### Type registry (extends `odb.primitives`)
+
+The JSON Schema type registry is **not** a separate database. It lives in this same
+`objectified-db` database, in the `odb` schema, by **extending the existing `odb.primitives`
+table in place**. Primitives are tenant-scoped (each row's `tenant_id`) **and** system-wide
+(`is_system` / `is_public`), so a tenant's own types and the shared `std/*` types compose across
+the tenant's projects with ordinary same-database foreign keys.
+
+Migration `20260622-230000.sql` adds these registry columns to `odb.primitives` (no new tables,
+no separate schema):
+
+| Column | Role |
+|--------|------|
+| `namespace` | Namespace path, e.g. `std/v0/types` (system-wide) or `tenant/<slug>/types` (tenant-owned) |
+| `base_uri` | Import-source base URL the relative `$ref` values resolve against (Epic 3) |
+| `schema_id` | The JSON Schema `$id` (namespace base + name) |
+| `draft` | JSON Schema dialect/draft, default `2020-12` |
+| `source` | Provenance: `human` or `imported` (`primitives_source_ck` check) |
+| `refs` | JSONB array of `$ref` edges: `[{relative_ref, resolved_target, status ∈ {resolved, unresolved, circular}}]` |
+
+The same migration drops the obsolete `otr` schema if an earlier build created it (the separate
+`objectified-types-db` design was reversed — see #3446). Tenant vs system scope reuses the
+existing `tenant_id` / `is_system` columns; the `std/v0` core system primitives are seeded in
+#3449; `$ref` resolution (`relative_ref` → `resolved_target`) is implemented in Epic 3.

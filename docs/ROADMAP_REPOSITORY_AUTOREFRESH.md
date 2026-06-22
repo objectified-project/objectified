@@ -121,11 +121,11 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | ~~RAR-1.1~~ ✅ | ~~#3512~~ | ~~RAR-1.2~~ ✅ | ~~#3513~~ | ~~RAR-1.3~~ ✅ | ~~#3514~~ |
 | ~~RAR-1.4~~ ✅ | ~~#3515~~ | ~~RAR-1.5~~ ✅ | ~~#3516~~ | RAR-1.6 | #3517 |
 | ~~RAR-2.1~~ ✅ | ~~#3518~~ | ~~RAR-2.2~~ ✅ | ~~#3519~~ | ~~RAR-2.3~~ ✅ | ~~#3520~~ |
-| ~~RAR-2.4~~ ✅ | ~~#3521~~ | ~~RAR-3.1~~ ✅ | ~~#3522~~ | RAR-3.2 | #3523 |
-| RAR-3.3 | #3524 | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
-| RAR-4.1 | #3527 | RAR-4.2 | #3528 | RAR-4.3 | #3529 |
-| RAR-4.4 | #3530 | RAR-4.5 | #3531 | RAR-5.1 | #3532 |
-| RAR-5.2 | #3533 | RAR-5.3 | #3534 | RAR-5.4 | #3535 |
+| ~~RAR-2.4~~ ✅ | ~~#3521~~ | ~~RAR-3.1~~ ✅ | ~~#3522~~ | ~~RAR-3.2~~ ✅ | ~~#3523~~ |
+| ~~RAR-3.3~~ ✅ | ~~#3524~~ | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
+| ~~RAR-4.1~~ ✅ | ~~#3527~~ | ~~RAR-4.2~~ ✅ | ~~#3528~~ | ~~RAR-4.3~~ ✅ | ~~#3529~~ |
+| ~~RAR-4.4~~ ✅ | ~~#3530~~ | RAR-4.5 | #3531 | ~~RAR-5.1~~ ✅ | ~~#3532~~ |
+| ~~RAR-5.2~~ ✅ | ~~#3533~~ | ~~RAR-5.3~~ ✅ | ~~#3534~~ | ~~RAR-5.4~~ ✅ | ~~#3535~~ |
 | RAR-5.5 | #3536 | RAR-5.6 | #3537 | RAR-6.1 | #3538 |
 | RAR-6.2 | #3539 | RAR-6.3 | #3540 | RAR-6.4 | #3541 |
 | RAR-6.5 | #3542 | | | | |
@@ -363,8 +363,8 @@ Refresh "after a few minutes," configurable, safe under load.
 | ID | Title | Summary | Labels | Parallel | MVP | Cmplx | Modules |
 |----|-------|---------|--------|----------|-----|-------|---------|
 | ~~RAR-3.1~~ ✅ **Done** (#3522) | Configurable refresh cadence | Replace hardcoded 5s; per-repo interval (default ~5 min, min bound) | `enhancement`,`mvp`,`import`,`repository`,`automation` | N | Y | M | objectified-rest, objectified-db |
-| RAR-3.2 | Refresh sweep → enqueue stale files | Periodic worker enqueues re-import jobs for stale, newer files | `enhancement`,`mvp`,`import`,`repository`,`automation` | N | Y | L | objectified-rest |
-| RAR-3.3 | Enable/disable auto-refresh (per-repo + global kill switch) | Toggle, with global env override | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-rest, objectified-ui |
+| ~~RAR-3.2~~ ✅ **Done** (#3523) | Refresh sweep → enqueue stale files | Periodic worker enqueues re-import jobs for stale, newer files | `enhancement`,`mvp`,`import`,`repository`,`automation` | N | Y | L | objectified-rest |
+| ~~RAR-3.3~~ ✅ **Done** (#3524) | Enable/disable auto-refresh (per-repo + global kill switch) | Toggle, with global env override | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-rest, objectified-ui |
 | RAR-3.4 | Refresh backoff + auto-pause (extend REPO-4.5) | Pause a repo's refresh after N consecutive failures | `enhancement`,`import`,`repository`,`automation` | Y | N | M | objectified-rest |
 | RAR-3.5 | Per-tenant refresh quotas / fairness (extend REPO-4.6) | Bound refresh jobs per tenant per window | `enhancement`,`import`,`repository` | Y | N | M | objectified-rest |
 
@@ -421,8 +421,61 @@ flowchart TD
 single-flight; `last_refreshed_at` advanced each tick.
 **Dependencies.** Depends RAR-2.2, RAR-3.1, RAR-1.5; blocks EPIC-4. **Parallel = N.**
 
-### RAR-3.3 / 3.4 / 3.5
-- **3.3** per-repo `auto_refresh_enabled` + a global kill switch (ops safety).
+**Status: ✅ Done (#3523).** Migration `objectified-db/scripts/20260621-150000.sql` adds the
+Postgres-backed hand-off queue `odb.tenant_repository_refresh_jobs`: each row snapshots the stored
+import spec (project, source descriptor, full `options_json`) plus the remote freshness signals
+(`remote_commit_sha` / `remote_committed_at` / `remote_blob_sha`) and the `refresh_reason`, so the
+EPIC-4 executor can replay the original request even if the spec row later changes. A partial unique
+index `uq_tenant_repo_refresh_jobs_active_lineage` enforces file-level single-flight (one active
+job per `(repository_id, branch, path)`). New module
+`objectified-rest/src/app/repository_refresh_sweep.py` is the sweep:
+`process_repository_refresh_sweep` iterates `list_due_repositories` (RAR-3.1), serializes each repo
+behind a Postgres **session advisory lock**
+(`try_acquire_repository_refresh_lock` / `release_repository_refresh_lock`,
+`pg_try_advisory_lock(hashtext('repo-refresh:'||id))`), rescans only the branches that have a stored
+spec via the reused REPO-2 walker (`repository_file_scan.scan_repository_branch_into_index`, factored
+out of the one-shot scan job for reuse), evaluates each indexed file with the RAR-2.2 newer-than
+comparator, and enqueues a spec-faithful re-import for every **stale + newer** file via
+`enqueue_repository_refresh_job` (idempotent on the lineage index). `last_refreshed_at` advances for
+every locked repo each tick — even on a rescan failure — so a broken repo cannot monopolize the
+sweep. The worker is wired into `main.py` as `_repository_refresh_sweep`, ticking on the
+`OBJECTIFIED_REFRESH_MIN_INTERVAL` floor and deferring the actual per-repo cadence to the DB-side due
+selection. Content-checksum idempotency (RAR-2.4) is deferred to the EPIC-4 executor, which downloads
+the file content the sweep does not. Tests: `tests/test_repository_refresh_sweep.py` (stale-only
+enqueue, spec snapshot carried, lock-held skip, anchor advanced on success/empty/failure, idempotent
+no-double-count, multi-branch) and the static migration guard
+`tests/test_repository_refresh_jobs_migration.py`.
+
+### RAR-3.3 — Enable/disable auto-refresh (per-repo + global kill switch)
+
+**Problem.** Auto-refresh must be controllable: a repo owner may want it off, and operators need a
+global kill switch for incident response.
+**Solution / scope.** Add `auto_refresh_enabled` per repo (default on) and a global
+`OBJECTIFIED_REFRESH_ENABLED` env override. The sweep skips repos where either is disabled.
+**Acceptance criteria.** Per-repo toggle persisted and surfaced in the UI; global kill switch halts all
+refresh sweeps; disabling does not affect manual "Refresh Now" (RAR-5.2).
+**Dependencies.** Parallel with RAR-3.1/3.2. **Parallel = Y.**
+
+**Status: ✅ Done (#3524).** Migration `objectified-db/scripts/20260622-120000.sql` adds
+`auto_refresh_enabled` (`BOOLEAN NOT NULL DEFAULT TRUE`) to `odb.tenant_repositories`, so existing
+repositories keep auto-refreshing. `config.py` adds the global kill switch `OBJECTIFIED_REFRESH_ENABLED`
+(`refresh_enabled`, default True). The **per-repo opt-out** is enforced in `database.py`
+`list_due_repositories`, which now filters `auto_refresh_enabled = TRUE` (so a disabled repo is never
+selected as due) and surfaces the column on the repo read queries; a new setter
+`set_repository_auto_refresh_enabled` persists the flag (tenant-scoped). The **global kill switch** is
+enforced in `repository_refresh_sweep.process_repository_refresh_sweep`, which short-circuits the whole
+tick (no lock, scan, enqueue, or anchor advance) when `settings.refresh_enabled` is False. Both gates
+are independent of manual "Refresh Now" (RAR-5.2), which does not run through the sweep. REST surfaces
+the flag on `TenantRepositoryRecord` and a new `PATCH /v1/tenants/{slug}/repositories/{id}` endpoint
+(`TenantRepositoryUpdate`) toggles it. The UI exposes an **Auto-refresh** Switch in the repository
+Settings tab (`RepositoryDetailClient`), which optimistically PATCHes via the Next route handler
+(`/api/repositories/[id]` PATCH) and reconciles to the server's returned value, rolling back on error.
+Tests: `tests/test_repository_refresh_sweep.py` adds the kill-switch halt/enabled cases,
+`tests/test_repository_auto_refresh_toggle_migration.py` guards the migration, and
+`tests/unit/repository-auto-refresh-toggle.test.ts` pins the UI flag parsing (explicit true/false,
+camelCase, default-on for older rows / null).
+
+### RAR-3.4 / 3.5
 - **3.4** (v2) extend REPO-4.5 backoff specifically to the refresh loop.
 - **3.5** (v2) per-tenant fairness so one busy tenant can't starve the sweep.
 
@@ -434,10 +487,10 @@ Replay the original spec; version + protect.
 
 | ID | Title | Summary | Labels | Parallel | MVP | Cmplx | Modules |
 |----|-------|---------|--------|----------|-----|-------|---------|
-| RAR-4.1 | Re-import worker applies stored spec | Worker re-runs import with stored options, not defaults | `enhancement`,`mvp`,`import`,`repository`,`rest` | N | Y | L | objectified-ui (worker), objectified-rest |
-| RAR-4.2 | Version creation on refresh with provenance | New version links prior version + source commit | `enhancement`,`mvp`,`import`,`repository`,`versions` | N | Y | M | objectified-rest, objectified-db |
-| RAR-4.3 | Change report on refresh (dry-run reuse) | Produce diff/change report for each refresh | `enhancement`,`mvp`,`import` | Y | Y | M | objectified-ui, objectified-rest |
-| RAR-4.4 | Manual-edit divergence guard | Hold (don't clobber) if version edited since import | `enhancement`,`mvp`,`import`,`repository` | N | Y | L | objectified-rest |
+| ~~RAR-4.1~~ ✅ **Done** (#3527) | Re-import worker applies stored spec | Worker re-runs import with stored options, not defaults | `enhancement`,`mvp`,`import`,`repository`,`rest` | N | Y | L | objectified-ui (worker), objectified-rest |
+| ~~RAR-4.2~~ ✅ **Done** (#3528) | Version creation on refresh with provenance | New version links prior version + source commit | `enhancement`,`mvp`,`import`,`repository`,`versions` | N | Y | M | objectified-rest, objectified-db |
+| ~~RAR-4.3~~ ✅ **Done** (#3529) | Change report on refresh (dry-run reuse) | Produce diff/change report for each refresh | `enhancement`,`mvp`,`import` | Y | Y | M | objectified-ui, objectified-rest |
+| ~~RAR-4.4~~ ✅ **Done** (#3530) | Manual-edit divergence guard | Hold (don't clobber) if version edited since import | `enhancement`,`mvp`,`import`,`repository` | N | Y | L | objectified-rest |
 | RAR-4.5 | Per-repo/file conflict policy | overwrite / hold-for-review / new-branch on divergence | `enhancement`,`import`,`repository` | Y | N | M | objectified-rest, objectified-ui |
 
 ### RAR-4.1 — Re-import worker applies stored spec
@@ -451,6 +504,18 @@ source descriptor (RAR-1.3).
 mapping) re-imports with the **same** options on refresh; golden-fixture test asserts byte-identical
 option application vs the original run.
 **Dependencies.** Depends RAR-1.2, RAR-3.2. **Parallel = N.**
+
+**Status: ✅ Done (#3527).** The spec-import worker now resolves its importer input through the pure,
+reusable `objectified-ui/lib/repository-auto-refresh-import.ts`. When `source_kind ==
+'repository_auto_import'` it hydrates the importer kind, options, and document parsing from the stored
+import spec carried in the metadata instead of importer defaults: options come from the verbatim
+captured blob (RAR-1.2), and the source descriptor (RAR-1.3) drives routing (`format_override` →
+importer kind) and parsing (`content_type` → JSON/YAML). On the REST side `SpecImportStartMetadata`
+gained an optional `repository_import_spec` (`SpecImportStoredSpec`), and
+`app/repository_refresh_executor.py` maps an enqueued RAR-3.2 refresh job row into that worker
+metadata. A golden-fixture test (`tests/repository-auto-refresh-worker.test.ts`) asserts byte-identical
+option application vs the original run; Python unit tests pin the row→metadata hydration. The OpenAPI
+contract is regenerated.
 
 ### RAR-4.4 — Manual-edit divergence guard
 
@@ -472,10 +537,69 @@ can override.
 `diverged` and a notification fires; default policy is hold-not-clobber.
 **Dependencies.** Depends RAR-2.3, RAR-4.2. **Parallel = N.**
 
+**Status of 4.4: ✅ Done (#3530).** New pure module `app/repository_divergence_guard.py` exposes
+`evaluate_divergence(...)` (and a raw-content `guard_divergence(...)` wrapper plus a
+`compute_content_checksum(...)` helper) returning a `DivergenceDecision` `{diverged, should_hold,
+reason, policy}`. It compares the post-import snapshot checksum against the current version's content
+checksum: equal → apply (`UNCHANGED`); different → divergence detected (`MANUAL_EDIT`) and, under the
+default hold-not-clobber `DivergencePolicy.HOLD`, `should_hold=True` so the overwrite is blocked and
+the file flagged `diverged` (the `diverged` axis `compute_refresh_status` already overlays, RAR-2.3); a
+missing snapshot fails open (`NO_BASELINE`); a missing current content with a snapshot present holds.
+The RAR-4.5 `OVERWRITE` policy still *reports* divergence (`diverged=True`) but permits the clobber
+(`should_hold=False`). Like RAR-2.2/2.4 the module is pure and DB-free; capturing the post-import
+snapshot at import time, persisting the `diverged` flag, and firing the RAR-5.4 notification on a HOLD
+is the EPIC-4 dispatcher's job (mirroring how RAR-4.1/4.2/4.3 deferred their persistence and wiring).
+DB-free fixtures (`tests/test_repository_divergence_guard.py`) cover all three acceptance criteria, the
+decision table, the policy override, the fail-open/missing-current edges, and the checksum helper.
+
 ### RAR-4.2 / 4.3 / 4.5
 - **4.2** extend REPO-12.3 provenance to record `parent_version_id` + `source_commit_sha` on refresh.
 - **4.3** reuse the publication change-report pipeline for a per-refresh diff.
 - **4.5** (v2) configurable divergence policy (overwrite / hold / branch).
+
+**Status of 4.2: ✅ Done (#3528).** Migration `objectified-db/scripts/20260622-130000.sql` extends the
+REPO-12.3 provenance on `odb.versions` with the refresh lineage tuple `source_commit_sha VARCHAR(64)`
++ `source_committed_at TIMESTAMPTZ` (the prior-version link `parent_version_id` already exists from
+20260409-140000.sql), plus a partial index on `source_commit_sha` for refresh audit/dedup. objectified-rest
+surfaces the tuple on the version API: `VersionSchema` gains `sourceCommitSha` / `sourceCommittedAt`
+(camelCase on the wire), the three full version read queries and the two version-update `RETURNING`
+clauses in `database.py` select the columns, and the `version_pull_payload` section filter folds them
+into the `lineage` section so headless/CI pulls can include/exclude them. Both version write paths persist
+the provenance — `create_version` and `create_version_push_transaction` accept and insert
+`source_commit_sha` / `source_committed_at`, and `VersionCreateRequest` accepts them — and a new
+tenant-scoped DAO `apply_version_refresh_provenance` stamps the lineage (parent + source commit) onto an
+already-created refresh version (only non-null fields are written, so a parent set by the importer is
+preserved). On the refresh path, `repository_refresh_executor.build_refresh_provenance_from_job` maps the
+RAR-3.2 job row's `remote_commit_sha` / `remote_committed_at` (+ the resolved prior version) into a
+`RepositoryRefreshProvenance`, now carried on the worker metadata (`SpecImportStartMetadata.refresh_provenance`)
+alongside the RAR-4.1 spec snapshot. Tests: `tests/test_version_refresh_provenance.py` (API surfacing +
+camelCase wire shape + create-request parsing + migration guard) and new provenance cases in
+`tests/test_repository_refresh_executor.py` (commit-signal mapping, first-revision null parent, blank
+normalization, metadata carriage). The OpenAPI contract is regenerated. Consuming the refresh queue and
+invoking the worker (which then carries this provenance onto the new version) is the EPIC-4 dispatcher's
+job, mirroring how RAR-2.2/2.4 deferred their wiring.
+
+**Status of 4.3: ✅ Done (#3529).** New objectified-rest module
+`app/repository_refresh_change_report.py` exposes the best-effort
+`generate_change_report_on_refresh(...)`, which reuses the publication change-report pipeline
+(`build_publication_change_report_render`) to diff the RAR-4.2 prior (parent) version against the new
+refresh version, persist the report against the new version via `insert_change_report_if_absent` (so the
+version always links to a report), and append a refresh-scoped `workflow_audit` row
+(`schema.refresh.change_report.generated`) carrying the baseline, per-section change counts, and the
+`noChanges` flag (RAR-5.3 reads this action). Unlike publish it diffs against the RAR-4.2 parent rather
+than the latest published ancestor and tolerates an unpublished candidate; a missing parent yields an
+initial-style empty-baseline report. **Zero-change refreshes are reported as no-ops** — the report row is
+still written and both the stored change model and the audit entry are flagged `noChanges: true`. A new
+`openapi_change_report` helper trio (`change_report_change_counts` / `change_report_total_changes` /
+`change_report_is_noop`) counts only *substantive* sections (schemas/properties/references/relationships/
+documentation), so a warning-only diff (e.g. an unfollowed external `$ref`) is still a no-op. On the UI,
+`lib/change-report-mustache-context.ts` gains `changeModelTotalChanges` / `isNoOpChangeModel` (mirroring the
+Python helpers, honoring the stamped `noChanges` flag) and a `noChangesSection` context field so the existing
+change-report rendering shows a "no changes" state on a no-op refresh. Tests:
+`tests/test_repository_refresh_change_report.py`, the no-op cases in `tests/test_openapi_change_report.py`, and
+the UI cases in `tests/change-report-mustache-context.test.ts`. Invoking this from the refresh dispatcher
+(after RAR-4.2 creates the version) is the EPIC-4 dispatcher's job, mirroring how RAR-4.1/4.2 deferred their
+wiring.
 
 ---
 
@@ -483,16 +607,108 @@ can override.
 
 | ID | Title | Summary | Labels | Parallel | MVP | Cmplx | Modules |
 |----|-------|---------|--------|----------|-----|-------|---------|
-| RAR-5.1 | Per-file refresh status UI | Specs tab shows status, last-refreshed, next-due, divergence | `enhancement`,`mvp`,`import`,`repository`,`ui` | Y | Y | M | objectified-ui |
-| RAR-5.2 | "Refresh Now" one-shot (extend REPO-9.5) | Manual spec-faithful refresh per file/repo | `enhancement`,`mvp`,`import`,`repository`,`ui` | Y | Y | S | objectified-ui, objectified-rest |
-| RAR-5.3 | Refresh history + change-report linking (extend REPO-12.6) | Audit each refresh cycle with diff link | `enhancement`,`mvp`,`import`,`repository` | Y | Y | M | objectified-rest |
-| RAR-5.4 | Refresh notifications (extend REPO-12.5) | Notify on new version / divergence / failure | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-rest |
+| ~~RAR-5.1~~ ✅ **Done** (#3532) | Per-file refresh status UI | Specs tab shows status, last-refreshed, next-due, divergence | `enhancement`,`mvp`,`import`,`repository`,`ui` | Y | Y | M | objectified-ui |
+| ~~RAR-5.2~~ ✅ **Done** (#3533) | "Refresh Now" one-shot (extend REPO-9.5) | Manual spec-faithful refresh per file/repo | `enhancement`,`mvp`,`import`,`repository`,`ui` | Y | Y | S | objectified-ui, objectified-rest |
+| ~~RAR-5.3~~ ✅ **Done** (#3534) | Refresh history + change-report linking (extend REPO-12.6) | Audit each refresh cycle with diff link | `enhancement`,`mvp`,`import`,`repository` | Y | Y | M | objectified-rest |
+| ~~RAR-5.4~~ ✅ **Done** (#3535) | Refresh notifications (extend REPO-12.5) | Notify on new version / divergence / failure | `enhancement`,`mvp`,`import`,`repository` | Y | Y | S | objectified-rest |
 | RAR-5.5 | Dashboard widget: stale specs / refresh activity (extend REPO-11) | At-a-glance refresh health | `enhancement`,`import`,`repository`,`dashboard` | Y | N | M | objectified-ui |
 | RAR-5.6 | CLI `objectified repository refresh` + status | Trigger / inspect refresh from CLI | `enhancement`,`import`,`cli` | Y | N | M | objectified-cli |
 
 (Detailed descriptions follow the same Problem / Solution / Acceptance / Dependencies pattern; 5.1–5.4
 are MVP, 5.5–5.6 are v2. Each reuses an existing surface — Specs tab, Import Now, REPO-12 audit,
 REPO-12.5 notifications, REPO-11 widgets — so scope is "extend," not "build new.")
+
+**Status (5.1): ✅ Done (#3532).** The repository detail page gains a **Specs** tab listing one row
+per imported-file lineage with its materialized refresh state, last-refreshed, and next-due. New UI
+pure module `objectified-ui/src/app/components/ade/dashboard/repositories/repository-refresh-status.ts`
+is a faithful TypeScript port of the REST `compute_refresh_status` (RAR-2.3) + `evaluate_refresh`
+(RAR-2.2): the UI sources the per-file signals directly from Postgres rather than proxying the Python
+read endpoint, so the port keeps the chip in lock-step with the server's state machine (recency axis +
+operational precedence `refreshing > diverged > failed > stale > up-to-date`). It also derives next-due
+from the RAR-3.1 cadence (`repo last_refreshed_at + refresh_interval_seconds`, or "Paused" when
+auto-refresh is off / "Due now" when never swept). New DAO
+`listTenantRepositoryRefreshSpecs` (`lib/db/repository-import-metrics.ts`) joins each
+`repository_import_spec` lineage to the RAR-2.1 import anchors, the current `tenant_repository_files`
+recency, the RAR-3.2 `tenant_repository_refresh_jobs` queue (deriving `is_refreshing` from an
+active job and `last_refresh_failed` from the latest finished job), and the per-repo cadence; exposed
+read-only and tenant-scoped at `GET /api/repositories/{id}/refresh-specs`. `RepositorySpecsTab.tsx`
+renders the table reusing the RAR-2.3 chip helper; **diverged files are visually distinct (purple row
+tint + warning chip) and link to the review action** (the file's diff view on the Files tab). The
+`diverged` axis has no persisted column yet — the RAR-4.4 divergence guard's hold flag awaits its
+dispatcher wiring — so the UI defaults it to false and is forward-compatible: the diverged rendering
+path is fully implemented and unit-tested, ready to light up when the signal lands. Tests:
+`tests/unit/repository-refresh-status.test.ts` (RAR-2.2/2.3 parity + cadence),
+`tests/repository-refresh-specs-dao.test.ts` (SQL contract: tenant/repo scoping, limit clamp, joined
+signals), and `tests/RepositorySpecsTab.test.tsx` (status/last-refreshed/next-due rendering, diverged
+distinctness + review link, error/empty states).
+
+**Status (5.2): ✅ Done (#3533).** The Specs tab gains a per-repo **Refresh now** button (header) and a
+per-file **Refresh** action (one per row); both POST `/api/repositories/{id}/refresh`, which proxies the
+new REST endpoint `POST /v1/tenants/{slug}/repositories/{id}/refresh`. New pure REST module
+`app/repository_manual_refresh.py` (`refresh_repository_now`) reuses the exact enqueue core of the
+RAR-3.2 sweep — refactored out as the shared, path-filterable
+`repository_refresh_sweep.enqueue_stale_files_for_branch` (returning enqueued/skipped counts) — so a
+manual refresh is **spec-faithful** (each job carries the stored `SpecImportOptions` snapshot, RAR-1.2,
+replayed by the RAR-4.1 executor, not defaults), **freshness-gated** (only files newer than the last
+import enqueue, RAR-2.2; an up-to-date file is a reported no-op), and **divergence-safe** (the job runs
+through the same EPIC-4 executor that applies the RAR-4.4 guard). Crucially it **bypasses the cadence and
+the auto-refresh opt-outs**: the manual path never consults due-selection, the per-repo
+`auto_refresh_enabled` flag (RAR-3.3), or the `OBJECTIFIED_REFRESH_ENABLED` kill switch, so it works even
+when scheduled auto-refresh is disabled. Per-file passes `path`+`branch`; per-repo (empty body) sweeps
+every branch with a stored spec. The OpenAPI contract is regenerated. Tests:
+`tests/test_repository_manual_refresh.py` (per-file/per-repo enqueue, stored-spec snapshot, freshness
+no-op, branch scoping, cadence/opt-out bypass, unknown-repo 404, per-branch fault isolation) and
+additions to `tests/RepositorySpecsTab.test.tsx` (button wiring, busy-disable, hidden-when-empty,
+success/no-op notices, POST payload).
+
+**Status (5.3): ✅ Done (#3534).** New objectified-rest module `app/repository_refresh_audit.py`
+records one audit row per refresh **cycle** into the REPO-12.6 (#2944) `odb.workflow_audit` ledger
+under the dedicated action `repository.refresh.cycle`, carrying the refresh facets — `trigger`
+(`scheduled` / `manual` / `webhook`), the file lineage (`repositoryId` / `branch` / `path`), the
+RAR-2.2 freshness `decision`, the four-valued `outcome` (`new-version` / `unchanged` / `diverged` /
+`failed`, derived by `derive_outcome(...)`), and the version + change-report links (`versionId` /
+`parentVersionId` / `changeReportId`, RAR-4.2/4.3) — in the row's `detail` JSONB, so the existing
+ledger schema is reused unchanged (**no migration; objectified-rest only**). The `workflow_audit.outcome`
+*column* keeps its `success` / `failure` semantics (only a `failed` cycle is a `failure`; a held
+divergence or a no-op is a successful cycle), while the rich outcome lives in `detail.outcome`. Recording
+is best-effort (never raises) and guards that `trigger` / `outcome` are the proper enums so a free-form
+string can never corrupt the ledger. The history is **queryable per repo and per file** via new
+tenant-scoped DAOs `search_repository_refresh_audit` / `count_repository_refresh_audit` (filtering the
+ledger on the action plus the `detail->>'repositoryId'` / `detail->>'path'` / `branch` / `trigger` /
+`outcome` JSONB keys and a `createdAt` range), exposed read-only at
+`GET /v1/tenants/{slug}/repositories/{id}/refresh-history` (newest-first, offset-paginated; `?path=` for
+per-file history; 404 on a cross-tenant repo). The OpenAPI contract is regenerated. Invoking
+`record_refresh_cycle(...)` from the EPIC-4 refresh dispatcher (after the version + change report land) is
+the dispatcher's job, mirroring how RAR-4.1/4.2/4.3/4.4 deferred their wiring. Tests:
+`tests/test_repository_refresh_audit.py` (outcome derivation, detail assembly, column/detail outcome split,
+lineage capture, enum guarding, and the DAO SQL contract for per-repo/per-file query) and
+`tests/test_repository_refresh_history_api.py` (per-repo + per-file query, filter forwarding, 404,
+detail→field projection, pagination).
+
+**Status (5.4): ✅ Done (#3535).** New objectified-rest module
+`app/repository_refresh_notifications.py` turns the three *interesting* refresh outcomes into
+notifications delivered over the **existing** push-webhook channels (`odb.push_webhook_subscriptions` /
+`push_webhook_delivery_events`, #2587/#2588) — extending REPO-12.5 (#2954) failure notifications to the
+auto-refresh loop. Only `new-version` (RAR-4.2), `diverged` (RAR-4.4 hold), and `failed` outcomes fire,
+each under a namespaced event type (`repository.refresh.new_version` / `.diverged` / `.failed`); an
+`unchanged` no-op (RAR-2.4) is intentionally **silent** so the channels stay quiet in the common case.
+The module reuses the `RefreshOutcome` / `RefreshTrigger` vocabulary and the lineage/link facets from the
+RAR-5.3 audit module, so a notification a stakeholder receives and a history row a reviewer reads describe
+the same cycle in the same terms. **Preferences are honored**: `RefreshNotificationPreferences` gives each
+notifiable outcome an independent toggle (all on by default, mirroring REPO-12.5's `auto_import_failed` /
+`auto_import_breaking` defaults), parsed tolerantly from a stored blob (`from_mapping` accepts the
+`user_settings.notifications.repository` aliases and **fails open** on partial/malformed data); a muted
+outcome enqueues nothing. **Links** are carried in every payload: a deep-link to the review action
+(`reviewHref`, mirroring the RAR-5.1 `repositorySpecReviewHref` convention) plus the `versionId` /
+`changeReportId` (RAR-4.2/4.3) that resolve the change report. Fan-out enqueues one delivery per active
+tenant subscription (new DAO `list_active_push_webhook_subscription_ids`) and is **best-effort** — a
+per-subscription enqueue failure is logged and skipped and the function never raises, so a notification
+problem cannot break the refresh it describes (**no migration; objectified-rest only**). Invoking
+`notify_refresh_outcome(...)` from the EPIC-4 refresh dispatcher (after the version + change report land)
+is the dispatcher's job, mirroring how RAR-4.x and RAR-5.3 deferred their wiring. Tests:
+`tests/test_repository_refresh_notifications.py` (notifiability rule, per-outcome + per-toggle gating,
+preference parsing incl. aliases / partial / null, payload assembly + review-href encoding, fan-out across
+subscriptions, silent/muted/no-subscription short-circuits, best-effort skip-on-error, and enum guarding).
 
 ---
 

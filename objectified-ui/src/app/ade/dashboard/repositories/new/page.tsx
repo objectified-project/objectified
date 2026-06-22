@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Globe, Link2, Lock, PlusCircle, Search } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Globe, Link2, Lock, PlusCircle, Search } from 'lucide-react';
 import { Button, buttonVariants } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
 import { Spinner } from '@/app/components/ui/Spinner';
@@ -74,6 +74,7 @@ export default function AddRepositoryPage() {
   const [selectedRemoteRepo, setSelectedRemoteRepo] = useState<RemoteRepo | null>(null);
   const [publicCloneUrl, setPublicCloneUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [urlTestLoading, setUrlTestLoading] = useState(false);
   const [urlTestResult, setUrlTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
@@ -105,6 +106,11 @@ export default function AddRepositoryPage() {
   useEffect(() => {
     setUrlTestResult(null);
   }, [publicCloneUrl]);
+
+  // Drop a stale failure message once the user changes what they're importing.
+  useEffect(() => {
+    setSubmitError(null);
+  }, [source, selectedAccountId, selectedRemoteRepo, publicCloneUrl]);
 
   const selectedAccount = useMemo(
     () => linkedAccounts.find((a) => a.id === selectedAccountId) ?? null,
@@ -252,6 +258,7 @@ export default function AddRepositoryPage() {
     }
     if (submitting) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const body =
         source === 'public_url'
@@ -270,7 +277,9 @@ export default function AddRepositoryPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 501) {
-        toast.message(typeof data.error === 'string' ? data.error : 'Repository API is not enabled yet.');
+        const message = typeof data.error === 'string' ? data.error : 'Repository API is not enabled yet.';
+        toast.message(message);
+        setSubmitError(message);
         return;
       }
       if (!res.ok) {
@@ -292,7 +301,9 @@ export default function AddRepositoryPage() {
       }
     } catch (e) {
       console.error(e);
-      toast.error(e instanceof Error ? e.message : 'Request failed.');
+      const message = e instanceof Error ? e.message : 'Request failed.';
+      toast.error(message);
+      setSubmitError(message);
     } finally {
       setSubmitting(false);
     }
@@ -579,6 +590,23 @@ export default function AddRepositoryPage() {
             ) : null}
           </div>
         )}
+
+        {submitError ? (
+          <div
+            className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-700/50 dark:bg-rose-900/20"
+            role="alert"
+            aria-live="assertive"
+          >
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-500 dark:text-rose-400" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-rose-900 dark:text-rose-100">Import failed</p>
+              <p className="mt-0.5 break-words text-sm text-rose-800 dark:text-rose-200">{submitError}</p>
+              <p className="mt-1 text-xs text-rose-700/80 dark:text-rose-300/80">
+                Fix the problem above and try again, or choose a different source.
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link

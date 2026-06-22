@@ -537,6 +537,80 @@ def repository_import_spec_read_from_row(
     )
 
 
+# Synthetic ``source_kind`` the REST layer stamps on a repository auto-refresh
+# import (REPO-12.1). It is not a real importer kind: when the spec-import worker
+# sees it, the actual importer kind, options, and parsing come from the stored
+# import spec carried in ``SpecImportStartMetadata.repository_import_spec`` rather
+# than the request metadata (RAR-4.1).
+REPOSITORY_AUTO_IMPORT_SOURCE_KIND = "repository_auto_import"
+
+
+class SpecImportStoredSpec(BaseModel):
+    """Stored import spec carried into the worker for a repository auto-refresh (RAR-4.1).
+
+    A repository auto-refresh re-imports a file the user already imported, and must
+    replay that original request rather than fall back to importer defaults. This
+    model carries the captured spec (RAR-1.1/1.2) and its source descriptor
+    (RAR-1.3) to the spec-import worker so it routes, parses, and applies options
+    identically to the first run.
+
+    ``options`` is the verbatim options blob persisted at first import (the worker's
+    camelCase option shape), passed through untouched — not re-validated into the
+    lossy :class:`SpecImportOptions` subset — so advanced options (class prefixes,
+    type mappings, …) survive the round-trip to the worker.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_kind: str = Field(
+        description="Importer discriminator used at first import (for example openapi-3, arazzo).",
+    )
+    format_override: Optional[str] = Field(
+        default=None,
+        description="Resolved spec format the importer routed on (RAR-1.3); drives format detection on refresh.",
+    )
+    content_type: Optional[str] = Field(
+        default=None,
+        description="MIME type the document was read as at first import (RAR-1.3); drives parsing on refresh.",
+    )
+    options: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Verbatim options blob persisted at first import, replayed as-is.",
+    )
+    spec_schema_version: int = Field(
+        default=REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION,
+        description="Envelope version of the stored spec (RAR-1.4).",
+    )
+
+
+class RepositoryRefreshProvenance(BaseModel):
+    """Provenance for a version created by a repository auto-refresh (RAR-4.2, #3528).
+
+    A refresh re-imports a changed file and creates a NEW catalog version. That
+    version must be traceable back to the prior version it supersedes
+    (``parent_version_id``) and to the exact source commit that triggered the
+    refresh (``source_commit_sha`` + ``source_committed_at``). The RAR-3.2 sweep
+    captures the commit signals on the ``odb.tenant_repository_refresh_jobs`` row;
+    this model carries them from the executor through to version creation so they
+    land on the new ``odb.versions`` row.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    parent_version_id: Optional[str] = Field(
+        default=None,
+        description="Prior version (versions.id) this refresh supersedes; the new version's linear parent.",
+    )
+    source_commit_sha: Optional[str] = Field(
+        default=None,
+        description="Repository source commit SHA that triggered the refresh.",
+    )
+    source_committed_at: Optional[Union[datetime, str]] = Field(
+        default=None,
+        description="Commit timestamp of source_commit_sha.",
+    )
+
+
 class SpecImportStartMetadata(BaseModel):
     """Shared metadata for JSON-base64 and multipart upload flows."""
 
@@ -545,7 +619,10 @@ class SpecImportStartMetadata(BaseModel):
     source_kind: str = Field(
         description=(
             "Importer discriminator (for example openapi-3, asyncapi-2, protobuf). "
-            "Supported values match product import kinds."
+            "Supported values match product import kinds. The synthetic value "
+            f"'{REPOSITORY_AUTO_IMPORT_SOURCE_KIND}' marks a repository auto-refresh, "
+            "in which case the importer kind/options/parsing come from "
+            "'repository_import_spec' rather than this metadata (RAR-4.1)."
         )
     )
     project: SpecImportProjectTarget
@@ -555,6 +632,21 @@ class SpecImportStartMetadata(BaseModel):
         description="When set, skip project creation and attach the job to this catalog project id.",
     )
     options: SpecImportOptions = Field(default_factory=SpecImportOptions)
+    repository_import_spec: Optional[SpecImportStoredSpec] = Field(
+        default=None,
+        description=(
+            "Stored import spec for a repository auto-refresh; required and consulted "
+            f"only when source_kind is '{REPOSITORY_AUTO_IMPORT_SOURCE_KIND}' (RAR-4.1)."
+        ),
+    )
+    refresh_provenance: Optional[RepositoryRefreshProvenance] = Field(
+        default=None,
+        description=(
+            "Refresh lineage (prior version + source commit) recorded on the version a "
+            f"repository auto-refresh creates; set only when source_kind is "
+            f"'{REPOSITORY_AUTO_IMPORT_SOURCE_KIND}' (RAR-4.2)."
+        ),
+    )
 
 
 class SpecImportStartJsonRequest(BaseModel):
@@ -788,6 +880,21 @@ class VersionSchema(BaseModel):
     enabled: bool = True
     parent_version_id: Optional[str] = None
     merge_parent_version_id: Optional[str] = None
+    source_commit_sha: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("sourceCommitSha", "source_commit_sha"),
+        serialization_alias="sourceCommitSha",
+        description=(
+            "Repository source commit SHA that triggered this revision "
+            "(RAR-4.2 refresh provenance); NULL for hand-authored revisions."
+        ),
+    )
+    source_committed_at: Optional[Union[datetime, str]] = Field(
+        default=None,
+        validation_alias=AliasChoices("sourceCommittedAt", "source_committed_at"),
+        serialization_alias="sourceCommittedAt",
+        description="Commit timestamp of source_commit_sha (RAR-4.2 refresh provenance).",
+    )
     forked_from_revision_id: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("forkedFromRevisionId", "forked_from_revision_id"),
@@ -884,6 +991,19 @@ class VersionCreateRequest(BaseModel):
         description="Named branch to advance; required when the project has multiple branches.",
     )
     source_version_id: Optional[str] = None  # Copy classes from this version
+    source_commit_sha: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("sourceCommitSha", "source_commit_sha"),
+        description=(
+            "Repository source commit SHA that triggered this revision "
+            "(RAR-4.2 refresh provenance); recorded for repository auto-refresh imports."
+        ),
+    )
+    source_committed_at: Optional[Union[datetime, str]] = Field(
+        default=None,
+        validation_alias=AliasChoices("sourceCommittedAt", "source_committed_at"),
+        description="Commit timestamp of source_commit_sha (RAR-4.2 refresh provenance).",
+    )
     bump_strategy: Optional[str] = None  # 'patch' or 'minor' for auto-versioning
     override_published_immutability: bool = Field(
         default=False,
@@ -2136,6 +2256,81 @@ class WorkflowAuditPageResponse(BaseModel):
     pagination: WorkflowAuditPaginationOut
 
 
+# ==================== Repository refresh history (RAR-5.3, #3534) ====================
+
+
+class RefreshHistoryEntryOut(BaseModel):
+    """One refresh-cycle audit row, projected from ``odb.workflow_audit`` (RAR-5.3).
+
+    Hoists the refresh-specific facets the cycle stored in the audit row's ``detail``
+    JSONB — trigger, file lineage, decision, outcome, and the version / change-report
+    links — to first-class fields so the refresh history is self-describing. The raw
+    ``detail`` is preserved for any extra context.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    repository_id: Optional[str] = Field(None, serialization_alias="repositoryId")
+    branch: Optional[str] = None
+    path: Optional[str] = None
+    trigger: Optional[str] = Field(
+        None, description="scheduled | manual | webhook"
+    )
+    decision: Optional[str] = Field(
+        None, description="RAR-2.2 freshness reason code, when known."
+    )
+    outcome: Optional[str] = Field(
+        None, description="new-version | unchanged | diverged | failed"
+    )
+    project_id: Optional[str] = Field(None, serialization_alias="projectId")
+    version_id: Optional[str] = Field(None, serialization_alias="versionId")
+    parent_version_id: Optional[str] = Field(
+        None, serialization_alias="parentVersionId"
+    )
+    change_report_id: Optional[str] = Field(
+        None,
+        serialization_alias="changeReportId",
+        description="Change report documenting the refresh diff (RAR-4.3), when any.",
+    )
+    source_commit_sha: Optional[str] = Field(
+        None, serialization_alias="sourceCommitSha"
+    )
+    actor_id: Optional[str] = Field(None, serialization_alias="actorId")
+    detail: Optional[Dict[str, Any]] = None
+    created_at: str = Field(serialization_alias="createdAt")
+
+
+class RefreshHistoryPaginationOut(BaseModel):
+    """Offset pagination metadata for the refresh-history list."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    limit: int
+    total: int
+    offset: int
+    has_more: bool = Field(serialization_alias="hasMore")
+    next_offset: Optional[int] = Field(
+        None,
+        serialization_alias="nextOffset",
+        description="Pass as offset for the next page when hasMore is true.",
+    )
+
+
+class RefreshHistoryPageResponse(BaseModel):
+    """Stable JSON envelope for GET .../repositories/{id}/refresh-history (RAR-5.3)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    schema_version: int = Field(
+        default=1,
+        serialization_alias="schemaVersion",
+        description="Bumped only when item or pagination shape changes incompatibly.",
+    )
+    items: List[RefreshHistoryEntryOut]
+    pagination: RefreshHistoryPaginationOut
+
+
 # ==================== OpenAPI semantic change report (CR-01, #2699) ====================
 
 
@@ -2363,8 +2558,56 @@ class TenantRepositoryRecord(BaseModel):
     total_files: Optional[int] = None
     importable_count: Optional[int] = None
     branch_count: Optional[int] = None
+    # Per-repo auto-refresh opt-out (RAR-3.3, #3524). True = sweep may refresh this
+    # repo on its cadence; False = the sweep skips it. Defaults to True for repos
+    # whose row predates the column.
+    auto_refresh_enabled: bool = True
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+
+class TenantRepositoryUpdate(BaseModel):
+    """Dashboard: patch mutable settings on a registered repository (RAR-3.3).
+
+    Only fields present in the request body are applied. Currently the per-repo
+    auto-refresh toggle (``auto_refresh_enabled``); accepts both the snake_case and
+    camelCase spellings so the UI can send either.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    auto_refresh_enabled: Optional[bool] = Field(
+        None,
+        validation_alias=AliasChoices("autoRefreshEnabled", "auto_refresh_enabled"),
+    )
+
+
+class RepositoryRefreshNowRequest(BaseModel):
+    """Dashboard: trigger a one-shot manual "Refresh Now" (RAR-5.2, #3533).
+
+    Both fields are optional and accept snake_case or camelCase so the UI can
+    send either:
+
+    - omit both → refresh the whole repository (every branch with a stored spec);
+    - ``branch`` only → refresh that branch;
+    - ``path`` (with or without ``branch``) → refresh that single file.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    path: Optional[str] = Field(None)
+    branch: Optional[str] = Field(None)
+
+
+class RepositoryRefreshNowResponse(BaseModel):
+    """Result of a one-shot manual refresh (RAR-5.2)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    enqueued: int
+    skipped: int
+    branches: List[str]
 
 
 class TenantRepositoriesListResponse(BaseModel):

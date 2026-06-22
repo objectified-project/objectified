@@ -18,7 +18,7 @@ import {
   Undo2
 } from 'lucide-react';
 import { getImportStatus, rollbackCompletedImport } from '../../../../../lib/db/import-actions';
-import { buildImportErrorReport, getImportErrorReportFilename, type ImportStatusForReport } from '../../../../../lib/db/import-error-report';
+import { buildImportErrorReport, getImportErrorReportFilename, type ImportErrorReport, type ImportStatusForReport } from '../../../../../lib/db/import-error-report';
 
 interface ImportCompletePanelProps {
   jobId: string;
@@ -88,6 +88,7 @@ interface ImportSummary {
 export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps) {
   const router = useRouter();
   const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const [report, setReport] = useState<ImportErrorReport | null>(null);
   const [state, setState] = useState<'completed' | 'failed' | 'canceled' | 'rolled-back' | string>('completed');
   const [loading, setLoading] = useState(true);
   const [isRollingBack, setIsRollingBack] = useState(false);
@@ -98,6 +99,14 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
       try {
         const status = await getImportStatus(jobId) as ImportStatusResponse;
         setState(status.state);
+
+        // Surface the same failures the downloadable report contains (errors,
+        // warnings, failed classes, verification mismatches) directly in the UI.
+        try {
+          setReport(buildImportErrorReport(status as unknown as ImportStatusForReport));
+        } catch (reportErr) {
+          console.error('Error building import error report:', reportErr);
+        }
 
         // Extract summary from status; use result for projectId/versionId when completed
         const result = status.result;
@@ -390,6 +399,89 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
           )}
         </div>
       </div>
+
+      {/* Failure details — the same errors/warnings carried in the downloadable report */}
+      {report && (report.errorsAndWarnings.length > 0 || report.failedClasses.length > 0) && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-red-200 dark:border-red-800 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Failure details</h3>
+          </div>
+
+          {report.failedClasses.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Failed classes ({report.failedClasses.length})
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {report.failedClasses.map((c, idx) => (
+                  <Badge key={idx} variant="error" className="flex items-center gap-1">
+                    <XCircle className="h-3 w-3" />
+                    {c.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {report.errorsAndWarnings.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Errors &amp; warnings ({report.errorsAndWarnings.length})
+              </h4>
+              <div className="space-y-2">
+                {[...report.errorsAndWarnings]
+                  .sort((a, b) => (a.level === b.level ? 0 : a.level === 'error' ? -1 : 1))
+                  .map((entry, idx) => {
+                    const isError = entry.level === 'error';
+                    return (
+                      <div
+                        key={idx}
+                        className={`rounded-lg border p-3 ${
+                          isError
+                            ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
+                            : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {isError ? (
+                            <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-yellow-600 dark:text-yellow-400" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant={isError ? 'error' : 'warning'} className="text-[10px] uppercase">
+                                {entry.level}
+                              </Badge>
+                              <span className="font-mono text-xs text-gray-500 dark:text-gray-400">{entry.code}</span>
+                            </div>
+                            <p
+                              className={`mt-1 text-sm break-words ${
+                                isError
+                                  ? 'text-red-800 dark:text-red-200'
+                                  : 'text-yellow-800 dark:text-yellow-200'
+                              }`}
+                            >
+                              {entry.message}
+                            </p>
+                            {entry.context != null && (
+                              <pre className="mt-2 max-h-40 overflow-auto rounded bg-gray-100 dark:bg-gray-900 p-2 text-[11px] text-gray-700 dark:text-gray-300">
+                                {typeof entry.context === 'string'
+                                  ? entry.context
+                                  : JSON.stringify(entry.context, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Imported Schemas */}
       {summary?.schemas && summary.schemas.length > 0 && (

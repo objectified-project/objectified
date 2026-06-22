@@ -13172,6 +13172,99 @@
           }
         }
       },
+      "patch": {
+        "tags": [
+          "tenant-repositories"
+        ],
+        "summary": "Update Tenant Repository",
+        "description": "Patch mutable repository settings (RAR-3.3 auto-refresh toggle, #3524).\n\nApplies only the fields present in the request body. Currently the per-repo\n``auto_refresh_enabled`` opt-out: when set to False the auto-refresh sweep skips\nthis repository (manual \"Refresh Now\" is unaffected). Returns the updated\nrepository record. 404 when the repository does not belong to the tenant.",
+        "operationId": "update_tenant_repository_v1_tenants__tenant_slug__repositories__repository_id__patch",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "repository_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Repository Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantRepositoryUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantRepositoryGetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "tenant-repositories"
@@ -13668,6 +13761,317 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RepositoryImportSpecRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenant_slug}/repositories/{repository_id}/refresh": {
+      "post": {
+        "tags": [
+          "tenant-repositories"
+        ],
+        "summary": "Refresh Tenant Repository Now",
+        "description": "Trigger a one-shot manual \"Refresh Now\" (RAR-5.2, #3533).\n\nRuns the same spec-faithful re-import path as the periodic sweep (RAR-4.1) for\na single file or the whole repository, on demand. It uses the stored import\nspec (not defaults), honors the RAR-2.2 freshness gate (only files newer than\nthe last import enqueue) and the RAR-4.4 divergence guard (applied downstream\nby the executor), and works even when scheduled auto-refresh is disabled \u2014\nthe cadence and the ``auto_refresh_enabled`` / kill-switch gates are\ndeliberately bypassed.\n\nRequest body (all optional): ``path`` for a single file, ``branch`` to scope a\nbranch; omit both to refresh every branch that has a stored spec.\n\nArgs:\n    tenant_slug: Tenant slug from the path (scoping comes from the token).\n    repository_id: The repository to refresh.\n    payload: Optional ``path`` / ``branch`` selectors.\n    auth_data: Authenticated principal; supplies the tenant scope.\n\nReturns:\n    Counts of jobs enqueued / skipped and the branches evaluated.\n\nRaises:\n    HTTPException: 404 when the repository does not belong to the tenant.",
+        "operationId": "refresh_tenant_repository_now_v1_tenants__tenant_slug__repositories__repository_id__refresh_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "repository_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Repository Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepositoryRefreshNowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositoryRefreshNowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenant_slug}/repositories/{repository_id}/refresh-history": {
+      "get": {
+        "tags": [
+          "tenant-repositories"
+        ],
+        "summary": "List Repository Refresh History",
+        "description": "List refresh-cycle audit history for a repository (RAR-5.3, #3534).\n\nEach refresh cycle records who/what triggered it, the freshness decision, the\noutcome (new-version / unchanged / diverged / failed), and the change-report and\nversion links. The history is queryable **per repo** (this endpoint) and **per\nfile** (add ``?path=``). Newest first.\n\nArgs:\n    tenant_slug: Tenant slug from the path (scoping comes from the token).\n    repository_id: The repository whose refresh history to list.\n    path: Optional file path for per-file history.\n    branch: Optional branch scope.\n    trigger: Optional trigger filter.\n    outcome: Optional outcome filter.\n    since: Optional inclusive ISO-8601 lower bound on ``createdAt``.\n    until: Optional inclusive ISO-8601 upper bound on ``createdAt``.\n    limit: Page size (1..200).\n    offset: Page offset.\n\nReturns:\n    A paginated, newest-first page of refresh-cycle entries.\n\nRaises:\n    HTTPException: 404 when the repository does not belong to the tenant.",
+        "operationId": "list_repository_refresh_history_v1_tenants__tenant_slug__repositories__repository_id__refresh_history_get",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "repository_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Repository Id"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to a single imported file (per-file history).",
+              "title": "Path"
+            },
+            "description": "Restrict to a single imported file (per-file history)."
+          },
+          {
+            "name": "branch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to a single branch.",
+              "title": "Branch"
+            },
+            "description": "Restrict to a single branch."
+          },
+          {
+            "name": "trigger",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by trigger: scheduled | manual | webhook.",
+              "title": "Trigger"
+            },
+            "description": "Filter by trigger: scheduled | manual | webhook."
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by outcome: new-version | unchanged | diverged | failed.",
+              "title": "Outcome"
+            },
+            "description": "Filter by outcome: new-version | unchanged | diverged | failed."
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive lower bound on createdAt (ISO 8601).",
+              "title": "Since"
+            },
+            "description": "Inclusive lower bound on createdAt (ISO 8601)."
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive upper bound on createdAt (ISO 8601).",
+              "title": "Until"
+            },
+            "description": "Inclusive upper bound on createdAt (ISO 8601)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshHistoryPageResponse"
                 }
               }
             }
@@ -16906,6 +17310,253 @@
         "title": "PushWebhookSubscriptionUpdateRequest",
         "description": "Update URL, active flag, and/or rotate signing secret (#2587)."
       },
+      "RefreshHistoryEntryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "repositoryId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repositoryid"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger",
+            "description": "scheduled | manual | webhook"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision",
+            "description": "RAR-2.2 freshness reason code, when known."
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome",
+            "description": "new-version | unchanged | diverged | failed"
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectid"
+          },
+          "versionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Versionid"
+          },
+          "parentVersionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentversionid"
+          },
+          "changeReportId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changereportid",
+            "description": "Change report documenting the refresh diff (RAR-4.3), when any."
+          },
+          "sourceCommitSha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcecommitsha"
+          },
+          "actorId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actorid"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "createdAt": {
+            "type": "string",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "createdAt"
+        ],
+        "title": "RefreshHistoryEntryOut",
+        "description": "One refresh-cycle audit row, projected from ``odb.workflow_audit`` (RAR-5.3).\n\nHoists the refresh-specific facets the cycle stored in the audit row's ``detail``\nJSONB \u2014 trigger, file lineage, decision, outcome, and the version / change-report\nlinks \u2014 to first-class fields so the refresh history is self-describing. The raw\n``detail`` is preserved for any extra context."
+      },
+      "RefreshHistoryPageResponse": {
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "title": "Schemaversion",
+            "description": "Bumped only when item or pagination shape changes incompatibly.",
+            "default": 1
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RefreshHistoryEntryOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/RefreshHistoryPaginationOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "title": "RefreshHistoryPageResponse",
+        "description": "Stable JSON envelope for GET .../repositories/{id}/refresh-history (RAR-5.3)."
+      },
+      "RefreshHistoryPaginationOut": {
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "hasMore": {
+            "type": "boolean",
+            "title": "Hasmore"
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextoffset",
+            "description": "Pass as offset for the next page when hasMore is true."
+          }
+        },
+        "type": "object",
+        "required": [
+          "limit",
+          "total",
+          "offset",
+          "hasMore"
+        ],
+        "title": "RefreshHistoryPaginationOut",
+        "description": "Offset pagination metadata for the refresh-history list."
+      },
+      "RefreshStatus": {
+        "type": "string",
+        "enum": [
+          "up-to-date",
+          "stale",
+          "refreshing",
+          "failed",
+          "diverged"
+        ],
+        "title": "RefreshStatus",
+        "description": "The materialized refresh state of a single imported repository file.\n\nValues are the stable wire/display codes (kebab-case) surfaced to the UI and\nthe sweep; they match the states in the roadmap state diagram."
+      },
       "RepositoryImportSpecRead": {
         "properties": {
           "spec_schema_version": {
@@ -16946,6 +17597,51 @@
           "options": {
             "$ref": "#/components/schemas/SpecImportOptions",
             "description": "Full SpecImportOptions payload, upgraded to the current shape."
+          },
+          "last_imported_commit_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Imported Commit Sha",
+            "description": "Branch tip commit SHA observed for this file at import time (RAR-2.1)."
+          },
+          "last_imported_committed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Imported Committed At",
+            "description": "Committed-at timestamp of the file at import time. A later auto-refresh compares the remote committed_at against this anchor to gate newer-than re-imports (RAR-2.1/RAR-2.2)."
+          },
+          "last_imported_blob_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Imported Blob Sha",
+            "description": "Blob SHA of the file content at import time (RAR-2.1)."
+          },
+          "refresh_status": {
+            "$ref": "#/components/schemas/RefreshStatus",
+            "description": "Materialized per-file refresh state (RAR-2.3): one of up-to-date / stale / refreshing / failed / diverged. Derived from the current scan recency vs the last_imported_* anchors, overlaid with any in-flight refresh, last-attempt failure, or divergence hold.",
+            "default": "up-to-date"
           }
         },
         "additionalProperties": false,
@@ -16955,6 +17651,115 @@
         ],
         "title": "RepositoryImportSpecRead",
         "description": "Current-shape import spec returned by the read endpoint (RAR-1.5).\n\nThe response surface for ``GET \u2026/repository-imports/{id}/spec`` (and its\n``?path=`` lookup variant). It exposes the captured source descriptor and the\nfull ``SpecImportOptions`` payload, upgraded on read to the current envelope\nshape, so the refresh worker, the UI status surface, and the CLI can replay\nthe user's original import request. ``spec_schema_version`` always reports the\ncurrent envelope version because ``options`` has already been migrated forward."
+      },
+      "RepositoryRefreshNowRequest": {
+        "properties": {
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          }
+        },
+        "type": "object",
+        "title": "RepositoryRefreshNowRequest",
+        "description": "Dashboard: trigger a one-shot manual \"Refresh Now\" (RAR-5.2, #3533).\n\nBoth fields are optional and accept snake_case or camelCase so the UI can\nsend either:\n\n- omit both \u2192 refresh the whole repository (every branch with a stored spec);\n- ``branch`` only \u2192 refresh that branch;\n- ``path`` (with or without ``branch``) \u2192 refresh that single file."
+      },
+      "RepositoryRefreshNowResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "enqueued": {
+            "type": "integer",
+            "title": "Enqueued"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "branches": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Branches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enqueued",
+          "skipped",
+          "branches"
+        ],
+        "title": "RepositoryRefreshNowResponse",
+        "description": "Result of a one-shot manual refresh (RAR-5.2)."
+      },
+      "RepositoryRefreshProvenance": {
+        "properties": {
+          "parent_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Version Id",
+            "description": "Prior version (versions.id) this refresh supersedes; the new version's linear parent."
+          },
+          "source_commit_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Commit Sha",
+            "description": "Repository source commit SHA that triggered the refresh."
+          },
+          "source_committed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Committed At",
+            "description": "Commit timestamp of source_commit_sha."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RepositoryRefreshProvenance",
+        "description": "Provenance for a version created by a repository auto-refresh (RAR-4.2, #3528).\n\nA refresh re-imports a changed file and creates a NEW catalog version. That\nversion must be traceable back to the prior version it supersedes\n(``parent_version_id``) and to the exact source commit that triggered the\nrefresh (``source_commit_sha`` + ``source_committed_at``). The RAR-3.2 sweep\ncaptures the commit signals on the ``odb.tenant_repository_refresh_jobs`` row;\nthis model carries them from the executor through to version creation so they\nland on the new ``odb.versions`` row."
       },
       "RequestBodyContentTypeRequest": {
         "properties": {
@@ -18146,7 +18951,7 @@
           "source_kind": {
             "type": "string",
             "title": "Source Kind",
-            "description": "Importer discriminator (for example openapi-3, asyncapi-2, protobuf). Supported values match product import kinds."
+            "description": "Importer discriminator (for example openapi-3, asyncapi-2, protobuf). Supported values match product import kinds. The synthetic value 'repository_auto_import' marks a repository auto-refresh, in which case the importer kind/options/parsing come from 'repository_import_spec' rather than this metadata (RAR-4.1)."
           },
           "project": {
             "$ref": "#/components/schemas/SpecImportProjectTarget"
@@ -18168,6 +18973,28 @@
           },
           "options": {
             "$ref": "#/components/schemas/SpecImportOptions"
+          },
+          "repository_import_spec": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpecImportStoredSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stored import spec for a repository auto-refresh; required and consulted only when source_kind is 'repository_auto_import' (RAR-4.1)."
+          },
+          "refresh_provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RepositoryRefreshProvenance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Refresh lineage (prior version + source commit) recorded on the version a repository auto-refresh creates; set only when source_kind is 'repository_auto_import' (RAR-4.2)."
           }
         },
         "additionalProperties": false,
@@ -18179,6 +19006,58 @@
         ],
         "title": "SpecImportStartMetadata",
         "description": "Shared metadata for JSON-base64 and multipart upload flows."
+      },
+      "SpecImportStoredSpec": {
+        "properties": {
+          "source_kind": {
+            "type": "string",
+            "title": "Source Kind",
+            "description": "Importer discriminator used at first import (for example openapi-3, arazzo)."
+          },
+          "format_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format Override",
+            "description": "Resolved spec format the importer routed on (RAR-1.3); drives format detection on refresh."
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type",
+            "description": "MIME type the document was read as at first import (RAR-1.3); drives parsing on refresh."
+          },
+          "options": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Options",
+            "description": "Verbatim options blob persisted at first import, replayed as-is."
+          },
+          "spec_schema_version": {
+            "type": "integer",
+            "title": "Spec Schema Version",
+            "description": "Envelope version of the stored spec (RAR-1.4).",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_kind"
+        ],
+        "title": "SpecImportStoredSpec",
+        "description": "Stored import spec carried into the worker for a repository auto-refresh (RAR-4.1).\n\nA repository auto-refresh re-imports a file the user already imported, and must\nreplay that original request rather than fall back to importer defaults. This\nmodel carries the captured spec (RAR-1.1/1.2) and its source descriptor\n(RAR-1.3) to the spec-import worker so it routes, parses, and applies options\nidentically to the first run.\n\n``options`` is the verbatim options blob persisted at first import (the worker's\ncamelCase option shape), passed through untouched \u2014 not re-validated into the\nlossy :class:`SpecImportOptions` subset \u2014 so advanced options (class prefixes,\ntype mappings, \u2026) survive the round-trip to the worker."
       },
       "SpecImportVersionTarget": {
         "properties": {
@@ -18926,6 +19805,11 @@
             ],
             "title": "Branch Count"
           },
+          "auto_refresh_enabled": {
+            "type": "boolean",
+            "title": "Auto Refresh Enabled",
+            "default": true
+          },
           "created_at": {
             "anyOf": [
               {
@@ -18960,6 +19844,24 @@
         ],
         "title": "TenantRepositoryRecord",
         "description": "Single repository row returned to the UI (snake_case keys for the dashboard)."
+      },
+      "TenantRepositoryUpdate": {
+        "properties": {
+          "autoRefreshEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autorefreshenabled"
+          }
+        },
+        "type": "object",
+        "title": "TenantRepositoryUpdate",
+        "description": "Dashboard: patch mutable settings on a registered repository (RAR-3.3).\n\nOnly fields present in the request body are applied. Currently the per-repo\nauto-refresh toggle (``auto_refresh_enabled``); accepts both the snake_case and\ncamelCase spellings so the UI can send either."
       },
       "TenantsMeResponse": {
         "properties": {
@@ -19969,6 +20871,34 @@
             ],
             "title": "Source Version Id"
           },
+          "sourceCommitSha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcecommitsha",
+            "description": "Repository source commit SHA that triggered this revision (RAR-4.2 refresh provenance); recorded for repository auto-refresh imports."
+          },
+          "sourceCommittedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcecommittedat",
+            "description": "Commit timestamp of source_commit_sha (RAR-4.2 refresh provenance)."
+          },
           "bump_strategy": {
             "anyOf": [
               {
@@ -20566,6 +21496,34 @@
               }
             ],
             "title": "Merge Parent Version Id"
+          },
+          "sourceCommitSha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcecommitsha",
+            "description": "Repository source commit SHA that triggered this revision (RAR-4.2 refresh provenance); NULL for hand-authored revisions."
+          },
+          "sourceCommittedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcecommittedat",
+            "description": "Commit timestamp of source_commit_sha (RAR-4.2 refresh provenance)."
           },
           "forkedFromRevisionId": {
             "anyOf": [

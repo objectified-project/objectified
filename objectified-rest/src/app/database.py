@@ -1509,6 +1509,7 @@ class Database:
                    v.forked_from_revision_id, v.upstream_project_id,
                    v.revision_locked, v.metadata,
                    v.commit_author, v.commit_message, v.external_ref,
+                   v.source_commit_sha, v.source_committed_at,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1573,6 +1574,7 @@ class Database:
                    v.forked_from_revision_id, v.upstream_project_id,
                    v.revision_locked, v.metadata,
                    v.commit_author, v.commit_message, v.external_ref,
+                   v.source_commit_sha, v.source_committed_at,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1602,6 +1604,7 @@ class Database:
                    v.forked_from_revision_id, v.upstream_project_id,
                    v.revision_locked, v.metadata,
                    v.commit_author, v.commit_message, v.external_ref,
+                   v.source_commit_sha, v.source_committed_at,
                    vf.version_id AS fork_source_version_string,
                    pf.name AS fork_source_project_name,
                    up.name AS upstream_project_name,
@@ -1725,17 +1728,26 @@ class Database:
         commit_author: Optional[str] = None,
         commit_message: Optional[str] = None,
         external_ref: Optional[str] = None,
+        source_commit_sha: Optional[str] = None,
+        source_committed_at: Optional[Any] = None,
     ) -> Dict[str, Any]:
-        """Create a new version."""
+        """Create a new version.
+
+        ``source_commit_sha`` / ``source_committed_at`` record RAR-4.2 refresh
+        provenance: the repository source commit that produced this revision. Both
+        default to ``None`` for hand-authored / non-repository revisions.
+        """
         query = """
             INSERT INTO odb.versions
             (project_id, creator_id, version_id, description, change_log,
-             commit_author, commit_message, external_ref)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+             commit_author, commit_message, external_ref,
+             source_commit_sha, source_committed_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, project_id, creator_id, version_id, description,
                       change_log, visibility, published, published_at,
                       enabled, parent_version_id, merge_parent_version_id,
                       commit_author, commit_message, external_ref,
+                      source_commit_sha, source_committed_at,
                       created_at, updated_at
         """
 
@@ -1753,11 +1765,88 @@ class Database:
                         commit_author,
                         commit_message,
                         external_ref,
+                        source_commit_sha,
+                        source_committed_at,
                     ),
                 )
                 result = cursor.fetchone()
                 conn.commit()
                 return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def apply_version_refresh_provenance(
+        self,
+        version_record_id: str,
+        tenant_id: str,
+        *,
+        parent_version_id: Optional[str] = None,
+        source_commit_sha: Optional[str] = None,
+        source_committed_at: Optional[Any] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Stamp RAR-4.2 refresh provenance onto an existing version row.
+
+        A repository auto-refresh creates the new version through the import worker;
+        this records the refresh lineage on that row afterwards: the prior version it
+        supersedes (``parent_version_id``) and the source commit that triggered it
+        (``source_commit_sha`` + ``source_committed_at``). The update is tenant-scoped
+        via the owning project so a refresh cannot stamp another tenant's version.
+
+        Only non-``None`` arguments are written; passing ``None`` leaves the existing
+        column untouched (so a parent already set by the importer is preserved when a
+        caller stamps only the commit signals).
+
+        Args:
+            version_record_id: The version row id (``versions.id``) to stamp.
+            tenant_id: The tenant that must own the version's project.
+            parent_version_id: Prior version this refresh supersedes; the new
+                version's linear parent.
+            source_commit_sha: Repository source commit SHA that triggered the refresh.
+            source_committed_at: Commit timestamp of ``source_commit_sha``.
+
+        Returns:
+            The updated version row (via :meth:`get_version_by_id`), or ``None`` when
+            no version matches the id within the tenant.
+        """
+        sets: List[str] = []
+        params: List[Any] = []
+        if parent_version_id is not None:
+            sets.append("parent_version_id = %s")
+            params.append(parent_version_id)
+        if source_commit_sha is not None:
+            sets.append("source_commit_sha = %s")
+            params.append(source_commit_sha)
+        if source_committed_at is not None:
+            sets.append("source_committed_at = %s")
+            params.append(source_committed_at)
+
+        if not sets:
+            # Nothing to record — return the current row unchanged.
+            return self.get_version_by_id(version_record_id, tenant_id)
+
+        sets.append("updated_at = CURRENT_TIMESTAMP")
+        query = f"""
+            UPDATE odb.versions v
+            SET {", ".join(sets)}
+            FROM odb.projects p
+            WHERE v.id = %s
+              AND v.project_id = p.id
+              AND p.tenant_id = %s
+              AND v.deleted_at IS NULL
+            RETURNING v.id
+        """
+        params.extend([version_record_id, tenant_id])
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, tuple(params))
+                row = cursor.fetchone()
+                conn.commit()
+                if not row:
+                    return None
+                return self.get_version_by_id(version_record_id, tenant_id)
         except Exception as e:
             conn.rollback()
             raise e
@@ -2007,6 +2096,7 @@ class Database:
             RETURNING v.id, v.project_id, v.creator_id, v.version_id, v.description,
                       v.change_log, v.visibility, v.published, v.published_at, v.published_immutable,
                       v.enabled, v.commit_author, v.commit_message, v.external_ref,
+                      v.source_commit_sha, v.source_committed_at,
                       v.created_at, v.updated_at
         """
         conn = self.connect()
@@ -2507,6 +2597,7 @@ class Database:
             RETURNING v.id, v.project_id, v.creator_id, v.version_id, v.description,
                       v.change_log, v.visibility, v.published, v.published_at, v.published_immutable,
                       v.enabled, v.commit_author, v.commit_message, v.external_ref,
+                      v.source_commit_sha, v.source_committed_at,
                       v.created_at, v.updated_at
         """
         conn = self.connect()
@@ -2786,6 +2877,125 @@ class Database:
         if not use_cursor:
             q += " OFFSET %s"
             params.append(offset)
+        return self.execute_query(q, tuple(params))
+
+    def _refresh_audit_filter_clauses(
+        self,
+        tenant_id: str,
+        *,
+        repository_id: Optional[str] = None,
+        branch: Optional[str] = None,
+        path: Optional[str] = None,
+        trigger: Optional[str] = None,
+        outcome: Optional[str] = None,
+        since=None,
+        until=None,
+    ) -> Tuple[str, List[Any]]:
+        """Build WHERE fragment + params for refresh-cycle history queries (RAR-5.3).
+
+        Filters the shared ``odb.workflow_audit`` ledger down to the dedicated
+        refresh-cycle action and, when supplied, the per-repo / per-file lineage and
+        the refresh facets carried in the ``detail`` JSONB (see
+        :mod:`repository_refresh_audit`). ``repository_id`` + ``path`` make the
+        history queryable per repo and per file.
+        """
+        from .repository_refresh_audit import REFRESH_CYCLE_ACTION
+
+        clauses = ["wa.tenant_id = %s", "wa.action = %s"]
+        params: List[Any] = [tenant_id, REFRESH_CYCLE_ACTION]
+        if repository_id is not None:
+            clauses.append("wa.detail->>'repositoryId' = %s")
+            params.append(str(repository_id))
+        if branch is not None:
+            clauses.append("wa.detail->>'branch' = %s")
+            params.append(str(branch))
+        if path is not None:
+            clauses.append("wa.detail->>'path' = %s")
+            params.append(str(path))
+        if trigger is not None:
+            clauses.append("wa.detail->>'trigger' = %s")
+            params.append(str(trigger))
+        if outcome is not None:
+            clauses.append("wa.detail->>'outcome' = %s")
+            params.append(str(outcome))
+        if since is not None:
+            clauses.append("wa.created_at >= %s")
+            params.append(since)
+        if until is not None:
+            clauses.append("wa.created_at <= %s")
+            params.append(until)
+        return " AND ".join(clauses), params
+
+    def count_repository_refresh_audit(
+        self,
+        tenant_id: str,
+        *,
+        repository_id: Optional[str] = None,
+        branch: Optional[str] = None,
+        path: Optional[str] = None,
+        trigger: Optional[str] = None,
+        outcome: Optional[str] = None,
+        since=None,
+        until=None,
+    ) -> int:
+        """Count refresh-cycle audit rows matching the filters (RAR-5.3)."""
+        where_sql, params = self._refresh_audit_filter_clauses(
+            tenant_id,
+            repository_id=repository_id,
+            branch=branch,
+            path=path,
+            trigger=trigger,
+            outcome=outcome,
+            since=since,
+            until=until,
+        )
+        q = f"SELECT COUNT(*)::bigint AS cnt FROM odb.workflow_audit wa WHERE {where_sql}"
+        rows = self.execute_query(q, tuple(params))
+        if not rows:
+            return 0
+        return int(rows[0].get("cnt") or 0)
+
+    def search_repository_refresh_audit(
+        self,
+        tenant_id: str,
+        *,
+        repository_id: Optional[str] = None,
+        branch: Optional[str] = None,
+        path: Optional[str] = None,
+        trigger: Optional[str] = None,
+        outcome: Optional[str] = None,
+        since=None,
+        until=None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """Paginated refresh-cycle history, newest first (RAR-5.3).
+
+        Returns ``odb.workflow_audit`` rows stamped with the refresh-cycle action,
+        scoped to the tenant and optionally to a repository / branch / file path and
+        the refresh facets. ``repository_id`` makes the history queryable per repo;
+        adding ``path`` makes it queryable per file.
+        """
+        where_sql, params = self._refresh_audit_filter_clauses(
+            tenant_id,
+            repository_id=repository_id,
+            branch=branch,
+            path=path,
+            trigger=trigger,
+            outcome=outcome,
+            since=since,
+            until=until,
+        )
+        q = f"""
+            SELECT wa.id, wa.tenant_id, wa.project_id, wa.version_id, wa.action,
+                   wa.outcome, wa.actor_id, wa.detail, wa.created_at
+            FROM odb.workflow_audit wa
+            WHERE {where_sql}
+            ORDER BY wa.created_at DESC, wa.id DESC
+            LIMIT %s OFFSET %s
+        """
+        params.append(limit)
+        params.append(offset)
         return self.execute_query(q, tuple(params))
 
     def delete_version(
@@ -5003,9 +5213,14 @@ class Database:
         source_version_id: Optional[str],
         branch_row: Optional[Dict[str, Any]],
         client_base_revision_id: str,
+        source_commit_sha: Optional[str] = None,
+        source_committed_at: Optional[Any] = None,
     ) -> Tuple[Dict[str, Any], int]:
         """
         Insert version (optional parent), copy classes from source, advance branch tip under lock.
+
+        ``source_commit_sha`` / ``source_committed_at`` record RAR-4.2 refresh
+        provenance on the new revision (the repository source commit that produced it).
         Returns (full version row from get_version_by_id, copied_class_count).
         """
         base = (client_base_revision_id or "").strip()
@@ -5069,8 +5284,9 @@ class Database:
                     """
                     INSERT INTO odb.versions
                     (project_id, creator_id, version_id, description, change_log,
-                     commit_author, commit_message, external_ref, parent_version_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     commit_author, commit_message, external_ref, parent_version_id,
+                     source_commit_sha, source_committed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
                     (
@@ -5083,6 +5299,8 @@ class Database:
                         commit_message,
                         external_ref,
                         parent_version_id,
+                        source_commit_sha,
+                        source_committed_at,
                     ),
                 )
                 row = cursor.fetchone()
@@ -5785,6 +6003,27 @@ class Database:
         """
         return self.execute_query(q, (tenant_id,))
 
+    def list_active_push_webhook_subscription_ids(self, tenant_id: str) -> List[str]:
+        """Return the ids of every active (non-deleted) push-webhook subscription for a tenant.
+
+        Used by the refresh-notification fan-out (RAR-5.4) to enqueue one delivery
+        per subscribed channel. Inactive and soft-deleted subscriptions are excluded
+        so a notification is never queued for a channel that cannot receive it.
+
+        Args:
+            tenant_id: Owning tenant id.
+
+        Returns:
+            A list of subscription id strings (possibly empty), newest first.
+        """
+        q = """
+            SELECT id
+            FROM odb.push_webhook_subscriptions
+            WHERE tenant_id = %s::uuid AND active = true AND deleted_at IS NULL
+            ORDER BY created_at DESC
+        """
+        return [str(row["id"]) for row in self.execute_query(q, (tenant_id,))]
+
     def get_push_webhook_subscription(
         self, tenant_id: str, subscription_id: str
     ) -> Optional[Dict[str, Any]]:
@@ -6454,7 +6693,7 @@ class Database:
             SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
                    description, default_branch, visibility, status, created_at, updated_at,
                    linked_account_id, last_scanned_at, total_files, importable_count, branch_count,
-                   refresh_interval_seconds, last_refreshed_at
+                   refresh_interval_seconds, last_refreshed_at, auto_refresh_enabled
             FROM odb.tenant_repositories
             WHERE tenant_id = %s::uuid AND deleted_at IS NULL
             ORDER BY created_at DESC
@@ -6466,7 +6705,7 @@ class Database:
             SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
                    description, default_branch, visibility, status, created_at, updated_at,
                    linked_account_id, last_scanned_at, total_files, importable_count, branch_count, created_by,
-                   refresh_interval_seconds, last_refreshed_at
+                   refresh_interval_seconds, last_refreshed_at, auto_refresh_enabled
             FROM odb.tenant_repositories
             WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
             LIMIT 1
@@ -6486,7 +6725,8 @@ class Database:
         has elapsed since the last tick. The effective interval is the per-repo
         ``refresh_interval_seconds`` clamped up to the global floor, so a
         too-aggressive per-repo cadence cannot defeat the floor. Soft-deleted
-        repositories and those not in a scannable ``ready``/``error`` state are
+        repositories, those not in a scannable ``ready``/``error`` state, and those
+        with ``auto_refresh_enabled = FALSE`` (the per-repo RAR-3.3 opt-out) are
         excluded. The recency comparison is done in the database against
         ``now()`` so it does not depend on application clock skew.
 
@@ -6513,10 +6753,11 @@ class Database:
             SELECT id, tenant_id, source, provider, clone_url, repository_full_name,
                    description, default_branch, visibility, status, created_at, updated_at,
                    linked_account_id, last_scanned_at, total_files, importable_count, branch_count,
-                   refresh_interval_seconds, last_refreshed_at
+                   refresh_interval_seconds, last_refreshed_at, auto_refresh_enabled
             FROM odb.tenant_repositories
             WHERE deleted_at IS NULL
               AND status IN ('ready', 'error')
+              AND auto_refresh_enabled = TRUE
               AND (
                 last_refreshed_at IS NULL
                 OR last_refreshed_at <= now() - make_interval(
@@ -6603,6 +6844,258 @@ class Database:
                 row = cursor.fetchone()
                 conn.commit()
                 return effective if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def set_repository_auto_refresh_enabled(
+        self,
+        tenant_id: str,
+        repository_id: str,
+        enabled: bool,
+    ) -> Optional[bool]:
+        """Set a repository's per-repo auto-refresh opt-out flag (RAR-3.3).
+
+        When ``enabled`` is False the refresh sweep's due-selection
+        (:meth:`list_due_repositories`) skips this repository, so it is never
+        auto-refreshed. The global ``OBJECTIFIED_REFRESH_ENABLED`` kill switch and
+        manual "Refresh Now" (RAR-5.2) are independent of this flag.
+
+        Args:
+            tenant_id: Owning tenant id (scopes the update for isolation).
+            repository_id: The repository to update.
+            enabled: True to allow auto-refresh, False to opt this repo out.
+
+        Returns:
+            The stored value (``enabled``) when a live repository matched the
+            tenant + id, or None when no row was updated.
+        """
+        q = """
+            UPDATE odb.tenant_repositories
+            SET auto_refresh_enabled = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
+            RETURNING id
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, (bool(enabled), repository_id, tenant_id))
+                row = cursor.fetchone()
+                conn.commit()
+                return bool(enabled) if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def try_acquire_repository_refresh_lock(self, repository_id: str) -> bool:
+        """Try to take the per-repo auto-refresh advisory lock (RAR-3.2).
+
+        Per-repo single-flight for the refresh sweep is enforced with a Postgres
+        **session** advisory lock keyed on the repository id, so two workers (or
+        two overlapping sweep ticks) never rescan and enqueue for the same repo at
+        once. The lock is held on this :class:`Database`'s connection until
+        :meth:`release_repository_refresh_lock` is called (or the connection
+        closes); ``pg_try_advisory_lock`` is non-blocking, returning False
+        immediately when another session holds it so the sweep can move on.
+
+        Because the lock is session-scoped (not transaction-scoped), the
+        ``execute_query`` commit here does not release it — acquire and release
+        must run on the same connection, which the single-``Database``-per-tick
+        sweep guarantees.
+
+        Args:
+            repository_id: The repository to serialize refreshes for.
+
+        Returns:
+            True when the lock was acquired, False when another session holds it.
+        """
+        rows = self.execute_query(
+            "SELECT pg_try_advisory_lock(hashtext(%s)) AS locked",
+            (f"repo-refresh:{repository_id}",),
+        )
+        return bool(rows and rows[0].get("locked"))
+
+    def release_repository_refresh_lock(self, repository_id: str) -> None:
+        """Release the per-repo auto-refresh advisory lock (RAR-3.2).
+
+        Counterpart to :meth:`try_acquire_repository_refresh_lock`; must run on the
+        same connection that acquired the lock. Safe to call even if the lock was
+        not held (Postgres returns False and logs a warning, which is harmless).
+
+        Args:
+            repository_id: The repository whose lock to release.
+        """
+        self.execute_query(
+            "SELECT pg_advisory_unlock(hashtext(%s)) AS unlocked",
+            (f"repo-refresh:{repository_id}",),
+        )
+
+    def list_repository_import_spec_branches(self, repository_id: str) -> List[str]:
+        """Distinct branches that have a stored import spec for this repository (RAR-3.2).
+
+        The refresh sweep only needs to rescan branches that actually have
+        imported files to refresh; a repository with no captured spec yields an
+        empty list and the sweep skips the (rate-limited) GitHub walk entirely.
+
+        Args:
+            repository_id: The repository to inspect.
+
+        Returns:
+            Distinct branch names with at least one stored import spec, sorted.
+        """
+        q = """
+            SELECT DISTINCT branch
+            FROM odb.repository_import_spec
+            WHERE repository_id = %s::uuid
+            ORDER BY branch ASC
+        """
+        rows = self.execute_query(q, (repository_id,))
+        return [str(r["branch"]) for r in rows if r.get("branch")]
+
+    def list_repository_refresh_candidates(
+        self, repository_id: str, branch: str
+    ) -> List[Dict[str, Any]]:
+        """Stored specs joined to their current indexed file, for one branch (RAR-3.2).
+
+        Returns one row per imported-file lineage that still exists in the latest
+        scan index, pairing the stored import spec (project, source descriptor,
+        options, and the ``last_imported_*`` recency anchors from RAR-2.1) with the
+        file's current remote freshness signals (``remote_committed_at`` /
+        ``remote_blob_sha`` / ``remote_commit_sha``) from the just-completed
+        rescan. The sweep feeds each row to the RAR-2.2 newer-than comparator to
+        decide whether to enqueue a re-import.
+
+        The join is an INNER join on ``tenant_repository_files`` so a spec whose
+        file no longer exists upstream (deleted file) is *not* a refresh candidate
+        — handling deletions is out of scope here.
+
+        Args:
+            repository_id: The repository to scan candidates for.
+            branch: The branch whose files were just re-indexed.
+
+        Returns:
+            Candidate rows with the spec fields and the current remote signals.
+        """
+        q = """
+            SELECT s.id AS import_spec_id, s.tenant_id, s.repository_id, s.branch, s.path,
+                   s.project_id, s.source_kind, s.format_override, s.content_type,
+                   s.options_json, s.spec_schema_version, s.created_by,
+                   s.last_imported_commit_sha, s.last_imported_committed_at,
+                   s.last_imported_blob_sha,
+                   trf.commit_sha AS remote_commit_sha,
+                   trf.committed_at AS remote_committed_at,
+                   trf.blob_sha AS remote_blob_sha
+            FROM odb.repository_import_spec s
+            INNER JOIN odb.tenant_repository_files trf
+              ON trf.repository_id = s.repository_id
+             AND trf.branch = s.branch
+             AND trf.path = s.path
+            WHERE s.repository_id = %s::uuid AND s.branch = %s
+            ORDER BY s.path ASC
+        """
+        return self.execute_query(q, (repository_id, branch))
+
+    def enqueue_repository_refresh_job(
+        self,
+        *,
+        tenant_id: str,
+        repository_id: str,
+        branch: str,
+        path: str,
+        import_spec_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        source_kind: Optional[str] = None,
+        format_override: Optional[str] = None,
+        content_type: Optional[str] = None,
+        options_json: Optional[Any] = None,
+        spec_schema_version: int = 1,
+        created_by: Optional[str] = None,
+        remote_commit_sha: Optional[str] = None,
+        remote_committed_at: Optional[Any] = None,
+        remote_blob_sha: Optional[str] = None,
+        refresh_reason: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Enqueue one spec-faithful re-import job for the EPIC-4 worker (RAR-3.2).
+
+        Inserts a row into ``odb.tenant_repository_refresh_jobs`` carrying a
+        self-contained snapshot of the stored import spec (so the executor replays
+        the user's original request even if the spec row later changes) plus the
+        remote freshness signals that triggered it. The insert is idempotent at the
+        file-lineage level via the partial unique index
+        (``uq_tenant_repo_refresh_jobs_active_lineage``): if an active
+        (queued/running) job already exists for ``(repository_id, branch, path)``
+        the insert is a no-op and ``None`` is returned, so a repeated sweep tick
+        never duplicates work.
+
+        Args:
+            tenant_id: Owning tenant id.
+            repository_id: Source repository id.
+            branch: Branch the file lives on.
+            path: Repository-relative file path (lineage key).
+            import_spec_id: Back-reference to the source spec row, if known.
+            project_id: Catalog project the original import targeted.
+            source_kind: Importer discriminator (for example ``openapi-3``).
+            format_override: Explicit importer ``--format`` override, if any.
+            content_type: MIME type used to read the file, if known.
+            options_json: Snapshot of the full ``SpecImportOptions`` payload.
+            spec_schema_version: Envelope version of the captured spec.
+            created_by: User id that initiated the original import, if known.
+            remote_commit_sha: Branch-tip commit SHA observed at sweep time.
+            remote_committed_at: Committed-at of the observed commit.
+            remote_blob_sha: Blob SHA of the file at sweep time.
+            refresh_reason: Stable RAR-2.2 ``RefreshReason`` code for the enqueue.
+
+        Returns:
+            The inserted job row as a dict, or ``None`` when an active job already
+            existed for the lineage (idempotent no-op).
+        """
+        import json
+
+        if isinstance(options_json, str):
+            options_text = options_json if options_json.strip() else "{}"
+        else:
+            options_text = json.dumps(options_json or {})
+
+        q = """
+            INSERT INTO odb.tenant_repository_refresh_jobs (
+                tenant_id, repository_id, import_spec_id, branch, path,
+                project_id, source_kind, format_override, content_type,
+                options_json, spec_schema_version, created_by,
+                remote_commit_sha, remote_committed_at, remote_blob_sha, refresh_reason
+            )
+            VALUES (
+                %s::uuid, %s::uuid, %s::uuid, %s, %s,
+                %s::uuid, %s, %s, %s,
+                %s::jsonb, %s, %s::uuid,
+                %s, %s::timestamptz, %s, %s
+            )
+            ON CONFLICT (repository_id, branch, path)
+                WHERE status IN ('queued', 'running')
+            DO NOTHING
+            RETURNING id, tenant_id, repository_id, import_spec_id, branch, path,
+                      project_id, source_kind, format_override, content_type,
+                      options_json, spec_schema_version, created_by,
+                      remote_commit_sha, remote_committed_at, remote_blob_sha,
+                      refresh_reason, status, created_at
+        """
+        params = (
+            tenant_id, repository_id,
+            (str(import_spec_id) if import_spec_id else None),
+            branch, path,
+            (str(project_id) if project_id else None),
+            source_kind, format_override, content_type,
+            options_text, spec_schema_version,
+            (str(created_by) if created_by else None),
+            remote_commit_sha, remote_committed_at, remote_blob_sha, refresh_reason,
+        )
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, params)
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row) if row else None
         except Exception as e:
             conn.rollback()
             raise e
