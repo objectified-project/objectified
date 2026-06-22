@@ -20,6 +20,7 @@ from app.models import (
 )
 from app.repository_refresh_executor import (
     build_auto_refresh_import_metadata,
+    build_refresh_provenance_from_job,
     build_stored_spec_from_refresh_job,
 )
 
@@ -126,3 +127,59 @@ def test_invalid_options_json_string_is_rejected():
         build_stored_spec_from_refresh_job(_refresh_job_row(options_json="not-json"))
     with pytest.raises(ValueError, match="JSON object"):
         build_stored_spec_from_refresh_job(_refresh_job_row(options_json="[1, 2, 3]"))
+
+
+# --- RAR-4.2: refresh provenance (#3528) -----------------------------------
+
+_COMMIT_SHA = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+_COMMITTED_AT = "2026-06-22T10:00:00Z"
+
+
+def test_provenance_maps_remote_commit_signals_and_parent():
+    """The new version's provenance carries the prior version + source commit."""
+    row = _refresh_job_row(
+        remote_commit_sha=_COMMIT_SHA, remote_committed_at=_COMMITTED_AT
+    )
+    prov = build_refresh_provenance_from_job(row, parent_version_id="prior-version-uuid")
+    assert prov.parent_version_id == "prior-version-uuid"
+    assert prov.source_commit_sha == _COMMIT_SHA
+    assert prov.source_committed_at == _COMMITTED_AT
+
+
+def test_provenance_first_revision_has_no_parent():
+    """A refresh producing the first revision in a project records a null parent."""
+    row = _refresh_job_row(
+        remote_commit_sha=_COMMIT_SHA, remote_committed_at=_COMMITTED_AT
+    )
+    prov = build_refresh_provenance_from_job(row, parent_version_id=None)
+    assert prov.parent_version_id is None
+    assert prov.source_commit_sha == _COMMIT_SHA
+
+
+def test_provenance_blanks_are_normalized_to_none():
+    """Blank/whitespace commit signals and parent collapse to None, not empty strings."""
+    row = _refresh_job_row(remote_commit_sha="   ", remote_committed_at=None)
+    prov = build_refresh_provenance_from_job(row, parent_version_id="  ")
+    assert prov.parent_version_id is None
+    assert prov.source_commit_sha is None
+    assert prov.source_committed_at is None
+
+
+def test_metadata_carries_refresh_provenance():
+    """build_auto_refresh_import_metadata attaches the RAR-4.2 provenance."""
+    row = _refresh_job_row(
+        remote_commit_sha=_COMMIT_SHA, remote_committed_at=_COMMITTED_AT
+    )
+    meta = build_auto_refresh_import_metadata(
+        row,
+        project=_project(),
+        version=_version(),
+        existing_project_id="proj-1",
+        parent_version_id="prior-version-uuid",
+    )
+    assert meta.refresh_provenance is not None
+    assert meta.refresh_provenance.parent_version_id == "prior-version-uuid"
+    assert meta.refresh_provenance.source_commit_sha == _COMMIT_SHA
+    assert meta.refresh_provenance.source_committed_at == _COMMITTED_AT
+    # The spec-faithful payload (RAR-4.1) is still present alongside provenance.
+    assert meta.repository_import_spec is not None

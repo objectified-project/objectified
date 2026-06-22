@@ -123,7 +123,7 @@ epic. Use this table to resolve any `RAR-*` reference below to its issue number.
 | ~~RAR-2.1~~ ✅ | ~~#3518~~ | ~~RAR-2.2~~ ✅ | ~~#3519~~ | ~~RAR-2.3~~ ✅ | ~~#3520~~ |
 | ~~RAR-2.4~~ ✅ | ~~#3521~~ | ~~RAR-3.1~~ ✅ | ~~#3522~~ | ~~RAR-3.2~~ ✅ | ~~#3523~~ |
 | ~~RAR-3.3~~ ✅ | ~~#3524~~ | RAR-3.4 | #3525 | RAR-3.5 | #3526 |
-| ~~RAR-4.1~~ ✅ | ~~#3527~~ | RAR-4.2 | #3528 | RAR-4.3 | #3529 |
+| ~~RAR-4.1~~ ✅ | ~~#3527~~ | ~~RAR-4.2~~ ✅ | ~~#3528~~ | RAR-4.3 | #3529 |
 | RAR-4.4 | #3530 | RAR-4.5 | #3531 | RAR-5.1 | #3532 |
 | RAR-5.2 | #3533 | RAR-5.3 | #3534 | RAR-5.4 | #3535 |
 | RAR-5.5 | #3536 | RAR-5.6 | #3537 | RAR-6.1 | #3538 |
@@ -487,8 +487,8 @@ Replay the original spec; version + protect.
 
 | ID | Title | Summary | Labels | Parallel | MVP | Cmplx | Modules |
 |----|-------|---------|--------|----------|-----|-------|---------|
-| RAR-4.1 | Re-import worker applies stored spec | Worker re-runs import with stored options, not defaults | `enhancement`,`mvp`,`import`,`repository`,`rest` | N | Y | L | objectified-ui (worker), objectified-rest |
-| RAR-4.2 | Version creation on refresh with provenance | New version links prior version + source commit | `enhancement`,`mvp`,`import`,`repository`,`versions` | N | Y | M | objectified-rest, objectified-db |
+| ~~RAR-4.1~~ ✅ **Done** (#3527) | Re-import worker applies stored spec | Worker re-runs import with stored options, not defaults | `enhancement`,`mvp`,`import`,`repository`,`rest` | N | Y | L | objectified-ui (worker), objectified-rest |
+| ~~RAR-4.2~~ ✅ **Done** (#3528) | Version creation on refresh with provenance | New version links prior version + source commit | `enhancement`,`mvp`,`import`,`repository`,`versions` | N | Y | M | objectified-rest, objectified-db |
 | RAR-4.3 | Change report on refresh (dry-run reuse) | Produce diff/change report for each refresh | `enhancement`,`mvp`,`import` | Y | Y | M | objectified-ui, objectified-rest |
 | RAR-4.4 | Manual-edit divergence guard | Hold (don't clobber) if version edited since import | `enhancement`,`mvp`,`import`,`repository` | N | Y | L | objectified-rest |
 | RAR-4.5 | Per-repo/file conflict policy | overwrite / hold-for-review / new-branch on divergence | `enhancement`,`import`,`repository` | Y | N | M | objectified-rest, objectified-ui |
@@ -541,6 +541,28 @@ can override.
 - **4.2** extend REPO-12.3 provenance to record `parent_version_id` + `source_commit_sha` on refresh.
 - **4.3** reuse the publication change-report pipeline for a per-refresh diff.
 - **4.5** (v2) configurable divergence policy (overwrite / hold / branch).
+
+**Status of 4.2: ✅ Done (#3528).** Migration `objectified-db/scripts/20260622-130000.sql` extends the
+REPO-12.3 provenance on `odb.versions` with the refresh lineage tuple `source_commit_sha VARCHAR(64)`
++ `source_committed_at TIMESTAMPTZ` (the prior-version link `parent_version_id` already exists from
+20260409-140000.sql), plus a partial index on `source_commit_sha` for refresh audit/dedup. objectified-rest
+surfaces the tuple on the version API: `VersionSchema` gains `sourceCommitSha` / `sourceCommittedAt`
+(camelCase on the wire), the three full version read queries and the two version-update `RETURNING`
+clauses in `database.py` select the columns, and the `version_pull_payload` section filter folds them
+into the `lineage` section so headless/CI pulls can include/exclude them. Both version write paths persist
+the provenance — `create_version` and `create_version_push_transaction` accept and insert
+`source_commit_sha` / `source_committed_at`, and `VersionCreateRequest` accepts them — and a new
+tenant-scoped DAO `apply_version_refresh_provenance` stamps the lineage (parent + source commit) onto an
+already-created refresh version (only non-null fields are written, so a parent set by the importer is
+preserved). On the refresh path, `repository_refresh_executor.build_refresh_provenance_from_job` maps the
+RAR-3.2 job row's `remote_commit_sha` / `remote_committed_at` (+ the resolved prior version) into a
+`RepositoryRefreshProvenance`, now carried on the worker metadata (`SpecImportStartMetadata.refresh_provenance`)
+alongside the RAR-4.1 spec snapshot. Tests: `tests/test_version_refresh_provenance.py` (API surfacing +
+camelCase wire shape + create-request parsing + migration guard) and new provenance cases in
+`tests/test_repository_refresh_executor.py` (commit-signal mapping, first-revision null parent, blank
+normalization, metadata carriage). The OpenAPI contract is regenerated. Consuming the refresh queue and
+invoking the worker (which then carries this provenance onto the new version) is the EPIC-4 dispatcher's
+job, mirroring how RAR-2.2/2.4 deferred their wiring.
 
 ---
 

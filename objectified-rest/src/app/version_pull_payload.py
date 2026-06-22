@@ -39,6 +39,8 @@ SECTION_FIELD_KEYS: dict[str, frozenset[str]] = {
             "forkSourceVersionLabel",
             "forkSourceProjectName",
             "upstreamProjectName",
+            "sourceCommitSha",
+            "sourceCommittedAt",
         }
     ),
     "governance": frozenset({"revisionLocked", "metadata", "lifecycle"}),
