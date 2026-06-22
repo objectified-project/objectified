@@ -19,11 +19,88 @@ from .models import (
     RegistryHealthResponse
 )
 from .auth import validate_authentication, get_authenticated_user_id
+from .schema_validation import (
+    SchemaValidationError,
+    validate_schema_document,
+    derive_base_uri,
+    derive_draft,
+    derive_schema_id,
+    stamp_identity,
+)
 
 router = APIRouter(prefix="/v1/primitives", tags=["primitives"])
 
 # Allowed import source shapes — must match the odb.primitive_imports CHECK constraint.
 VALID_IMPORT_SOURCE_KINDS = {"json-schema", "type-def-bundle", "openapi"}
+
+
+def _schema_validation_http_error(errors: List[Dict[str, str]]) -> HTTPException:
+    """Build the 422 response for a JSON Schema that fails draft 2020-12 validation (#3452).
+
+    Args:
+        errors: Field-level errors from ``schema_validation.validate_schema_document``.
+
+    Returns:
+        An ``HTTPException`` whose detail carries a human message plus the structured,
+        field-level ``errors`` list so clients can highlight the offending keywords.
+    """
+    return HTTPException(
+        status_code=422,
+        detail={
+            "message": "Schema is not a valid JSON Schema draft 2020-12 document",
+            "errors": errors,
+        },
+    )
+
+
+def resolve_primitive_identity(
+    schema: Dict[str, Any],
+    *,
+    name: str,
+    namespace: Optional[str],
+    base_uri: Optional[str],
+    tenant_slug: str,
+) -> Dict[str, Any]:
+    """Validate a schema and derive its persisted JSON Schema 2020-12 identity (#3452).
+
+    Shared by the create, update, and import paths so all three reject invalid schemas
+    identically and compute a stable ``$id`` the same way.
+
+    Args:
+        schema: The candidate JSON Schema document.
+        name: The primitive name (drives the derived ``$id`` leaf).
+        namespace: Optional registry namespace path.
+        base_uri: Optional explicit base URI (wins over ``namespace``).
+        tenant_slug: The tenant slug (used for the default base URI).
+
+    Returns:
+        A dict with ``schema`` (identity-stamped copy), ``schema_id``, ``draft``,
+        and ``base_uri``.
+
+    Raises:
+        SchemaValidationError: If ``schema`` is not a valid draft 2020-12 document,
+            or is a boolean schema (valid per spec, but a primitive needs an object
+            schema to carry a derived ``$id``).
+    """
+    if not isinstance(schema, dict):
+        raise SchemaValidationError(
+            [{"path": "(root)", "message": "Schema must be a JSON object", "keyword": "type"}]
+        )
+
+    errors = validate_schema_document(schema)
+    if errors:
+        raise SchemaValidationError(errors)
+
+    resolved_base = derive_base_uri(namespace, base_uri, tenant_slug)
+    schema_id = derive_schema_id(schema, name=name, base_uri=resolved_base)
+    draft = derive_draft(schema)
+    stamped = stamp_identity(schema, schema_id=schema_id, draft=draft)
+    return {
+        "schema": stamped,
+        "schema_id": schema_id,
+        "draft": draft,
+        "base_uri": resolved_base,
+    }
 
 
 @router.get("/health", response_model=RegistryHealthResponse)
@@ -263,6 +340,18 @@ async def create_primitive(
     Returns:
         The created primitive
     """
+    # Strict server-side draft 2020-12 validation + stable $id derivation (#3452).
+    try:
+        identity = resolve_primitive_identity(
+            request.schema,
+            name=request.name,
+            namespace=request.namespace,
+            base_uri=request.base_uri,
+            tenant_slug=tenant_slug,
+        )
+    except SchemaValidationError as e:
+        raise _schema_validation_http_error(e.errors)
+
     try:
         # Get user_id from auth data (will be None for API key auth)
         created_by = get_authenticated_user_id(auth_data)
@@ -272,13 +361,19 @@ async def create_primitive(
             tenant_id=auth_data['tenant_id'],
             name=request.name,
             category=request.category,
-            schema=request.schema,
+            schema=identity['schema'],
             description=request.description,
             tags=request.tags,
-            created_by=created_by
+            created_by=created_by,
+            schema_id=identity['schema_id'],
+            draft=identity['draft'],
+            namespace=request.namespace,
+            base_uri=identity['base_uri'],
         )
 
         return PrimitiveSchema(**primitive)
+    except HTTPException:
+        raise
     except Exception as e:
         # Check for unique constraint violation
         if "unique constraint" in str(e).lower():
@@ -325,22 +420,55 @@ async def update_primitive(
             detail="Cannot update system primitives"
         )
 
-    try:
-        # Build updates dict from request
-        updates = {}
-        if request.name is not None:
-            updates['name'] = request.name
-        if request.description is not None:
-            updates['description'] = request.description
-        if request.category is not None:
-            updates['category'] = request.category
-        if request.schema is not None:
-            updates['schema'] = request.schema
-        if request.tags is not None:
-            updates['tags'] = request.tags
-        if request.enabled is not None:
-            updates['enabled'] = request.enabled
+    # Build updates dict from request
+    updates = {}
+    if request.name is not None:
+        updates['name'] = request.name
+    if request.description is not None:
+        updates['description'] = request.description
+    if request.category is not None:
+        updates['category'] = request.category
+    if request.tags is not None:
+        updates['tags'] = request.tags
+    if request.enabled is not None:
+        updates['enabled'] = request.enabled
+    if request.namespace is not None:
+        updates['namespace'] = request.namespace
 
+    # Re-validate and re-derive the JSON Schema 2020-12 identity whenever the schema or
+    # its registry placement changes (#3452). Identity is computed against the effective
+    # (post-update) name and namespace/base_uri, falling back to the stored values.
+    identity_touched = (
+        request.schema is not None
+        or request.namespace is not None
+        or request.base_uri is not None
+        or request.name is not None
+    )
+    if identity_touched:
+        schema_doc = request.schema if request.schema is not None else existing['schema']
+        effective_name = request.name if request.name is not None else existing['name']
+        effective_namespace = (
+            request.namespace if request.namespace is not None else existing.get('namespace')
+        )
+        effective_base_uri = (
+            request.base_uri if request.base_uri is not None else existing.get('base_uri')
+        )
+        try:
+            identity = resolve_primitive_identity(
+                schema_doc,
+                name=effective_name,
+                namespace=effective_namespace,
+                base_uri=effective_base_uri,
+                tenant_slug=tenant_slug,
+            )
+        except SchemaValidationError as e:
+            raise _schema_validation_http_error(e.errors)
+        updates['schema'] = identity['schema']
+        updates['schema_id'] = identity['schema_id']
+        updates['draft'] = identity['draft']
+        updates['base_uri'] = identity['base_uri']
+
+    try:
         # Update primitive
         primitive = db.update_primitive(
             primitive_id,
@@ -355,6 +483,8 @@ async def update_primitive(
             )
 
         return PrimitiveSchema(**primitive)
+    except HTTPException:
+        raise
     except Exception as e:
         # Check for unique constraint violation
         if "unique constraint" in str(e).lower():
@@ -483,21 +613,40 @@ async def import_primitives(
     errors = []
 
     for def_name, def_schema in definitions.items():
+        # Each imported definition goes through the SAME draft 2020-12 validator and
+        # $id derivation as create/update (#3452). An invalid definition is rejected
+        # with its field-level errors and skipped; valid ones are not blocked by it.
+        try:
+            identity = resolve_primitive_identity(
+                def_schema,
+                name=def_name,
+                namespace=request.target_namespace,
+                base_uri=None,
+                tenant_slug=tenant_slug,
+            )
+        except SchemaValidationError as e:
+            errors.append({"name": def_name, "error": "invalid_schema", "details": e.errors})
+            continue
+
         try:
             # Determine category from schema
             schema_type = determine_category_from_schema(def_schema)
 
-            # Create primitive - the full schema with all metadata is stored.
-            # source='imported' marks its provenance on odb.primitives (#3448).
+            # Create primitive - the full (identity-stamped) schema with all metadata is
+            # stored. source='imported' marks its provenance on odb.primitives (#3448).
             primitive = db.create_primitive(
                 tenant_id=auth_data['tenant_id'],
                 name=def_name,
                 category=schema_type,
-                schema=def_schema,  # Full schema including x-license, x-links, $comment, examples, title, etc.
+                schema=identity['schema'],  # Full schema (x-license, $comment, examples, …) + stamped $id.
                 description=def_schema.get('description'),
                 tags=def_schema.get('tags', []),
                 created_by=created_by,
-                source='imported'
+                source='imported',
+                schema_id=identity['schema_id'],
+                draft=identity['draft'],
+                namespace=request.target_namespace,
+                base_uri=identity['base_uri'],
             )
             imported.append(primitive['name'])
         except Exception as e:

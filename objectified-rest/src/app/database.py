@@ -1158,6 +1158,7 @@ class Database:
         query = """
             SELECT id, tenant_id, name, description, category, schema, tags,
                    created_by, is_system, is_public, usage_count, source,
+                   schema_id, draft, namespace, base_uri,
                    created_at, updated_at
             FROM odb.primitives
             WHERE tenant_id = %s
@@ -1176,6 +1177,7 @@ class Database:
         query = """
             SELECT id, tenant_id, name, description, category, schema, tags,
                    created_by, is_system, is_public, usage_count, source,
+                   schema_id, draft, namespace, base_uri,
                    created_at, updated_at
             FROM odb.primitives
             WHERE id = %s AND tenant_id = %s
@@ -1192,20 +1194,30 @@ class Database:
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
         created_by: Optional[str] = None,
-        source: str = 'human'
+        source: str = 'human',
+        schema_id: Optional[str] = None,
+        draft: str = '2020-12',
+        namespace: Optional[str] = None,
+        base_uri: Optional[str] = None
     ) -> Dict[str, Any]:
         """Create a new primitive.
 
         Args:
             source: Provenance of the primitive — 'human' (authored in-app, default)
                 or 'imported' (created by an import). Stored on odb.primitives.source.
+            schema_id: The computed JSON Schema ``$id`` for the primitive (#3452).
+            draft: The JSON Schema dialect/draft, default '2020-12' (#3452).
+            namespace: Optional registry namespace path locating the primitive (#3452).
+            base_uri: Optional namespace base URI the ``$id`` was computed against (#3452).
         """
         query = """
             INSERT INTO odb.primitives
-            (tenant_id, name, description, category, schema, tags, created_by, source)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            (tenant_id, name, description, category, schema, tags, created_by, source,
+             schema_id, draft, namespace, base_uri)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, tenant_id, name, description, category, schema, tags,
                       created_by, is_system, is_public, usage_count, source,
+                      schema_id, draft, namespace, base_uri,
                       created_at, updated_at
         """
 
@@ -1217,7 +1229,8 @@ class Database:
             with conn.cursor() as cursor:
                 cursor.execute(
                     query,
-                    (tenant_id, name, description, category, schema_json, tags or [], created_by, source)
+                    (tenant_id, name, description, category, schema_json, tags or [],
+                     created_by, source, schema_id, draft, namespace, base_uri)
                 )
                 result = cursor.fetchone()
                 conn.commit()
@@ -1254,6 +1267,23 @@ class Database:
         if 'tags' in updates and updates['tags'] is not None:
             update_fields.append("tags = %s")
             params.append(updates['tags'])
+        if 'enabled' in updates and updates['enabled'] is not None:
+            update_fields.append("enabled = %s")
+            params.append(updates['enabled'])
+        # JSON Schema 2020-12 registry identity columns (#3452). Re-derived by the
+        # route whenever the schema or registry placement changes.
+        if 'schema_id' in updates and updates['schema_id'] is not None:
+            update_fields.append("schema_id = %s")
+            params.append(updates['schema_id'])
+        if 'draft' in updates and updates['draft'] is not None:
+            update_fields.append("draft = %s")
+            params.append(updates['draft'])
+        if 'namespace' in updates and updates['namespace'] is not None:
+            update_fields.append("namespace = %s")
+            params.append(updates['namespace'])
+        if 'base_uri' in updates and updates['base_uri'] is not None:
+            update_fields.append("base_uri = %s")
+            params.append(updates['base_uri'])
 
         if not update_fields:
             # Nothing to update, return current primitive
@@ -1266,6 +1296,7 @@ class Database:
             WHERE id = %s AND tenant_id = %s
             RETURNING id, tenant_id, name, description, category, schema, tags,
                       created_by, is_system, is_public, usage_count, source,
+                      schema_id, draft, namespace, base_uri,
                       created_at, updated_at
         """
 
