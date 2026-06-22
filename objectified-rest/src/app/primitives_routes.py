@@ -26,6 +26,13 @@ from .schema_validation import (
     derive_draft,
     derive_schema_id,
     stamp_identity,
+    REGISTRY_BASE_URL,
+)
+from .primitives_scope import (
+    ScopeViolationError,
+    enforce_ref_scope,
+    is_core_namespace,
+    tenant_segment_of,
 )
 
 router = APIRouter(prefix="/v1/primitives", tags=["primitives"])
@@ -53,6 +60,25 @@ def _schema_validation_http_error(errors: List[Dict[str, str]]) -> HTTPException
     )
 
 
+def _scope_violation_http_error(error: ScopeViolationError) -> HTTPException:
+    """Build the 422 response for a ``$ref`` that crosses a forbidden scope boundary (#3453).
+
+    Args:
+        error: The raised scope violation, carrying its per-ref ``violations`` list.
+
+    Returns:
+        An ``HTTPException`` whose detail carries a human message plus the
+        structured ``violations`` so clients can highlight the offending ``$ref``.
+    """
+    return HTTPException(
+        status_code=422,
+        detail={
+            "message": error.message,
+            "violations": error.violations,
+        },
+    )
+
+
 def resolve_primitive_identity(
     schema: Dict[str, Any],
     *,
@@ -60,6 +86,7 @@ def resolve_primitive_identity(
     namespace: Optional[str],
     base_uri: Optional[str],
     tenant_slug: str,
+    is_system: bool = False,
 ) -> Dict[str, Any]:
     """Validate a schema and derive its persisted JSON Schema 2020-12 identity (#3452).
 
@@ -72,6 +99,9 @@ def resolve_primitive_identity(
         namespace: Optional registry namespace path.
         base_uri: Optional explicit base URI (wins over ``namespace``).
         tenant_slug: The tenant slug (used for the default base URI).
+        is_system: Whether the primitive is system-core. Core types are held to the
+            stricter reference-direction rule (they may not ``$ref`` a tenant
+            namespace). A namespace under ``std/`` is also treated as core (#3453).
 
     Returns:
         A dict with ``schema`` (identity-stamped copy), ``schema_id``, ``draft``,
@@ -81,6 +111,8 @@ def resolve_primitive_identity(
         SchemaValidationError: If ``schema`` is not a valid draft 2020-12 document,
             or is a boolean schema (valid per spec, but a primitive needs an object
             schema to carry a derived ``$id``).
+        ScopeViolationError: If a ``$ref`` crosses a forbidden scope boundary
+            (core→tenant, or tenant→other-tenant) (#3453).
     """
     if not isinstance(schema, dict):
         raise SchemaValidationError(
@@ -94,6 +126,25 @@ def resolve_primitive_identity(
     resolved_base = derive_base_uri(namespace, base_uri, tenant_slug)
     schema_id = derive_schema_id(schema, name=name, base_uri=resolved_base)
     draft = derive_draft(schema)
+
+    # Centralized scope/visibility enforcement (#3453): a core type may not reference a
+    # tenant namespace, and a tenant type may not reference another tenant's namespace.
+    # Core-ness comes from the explicit flag or a std/* placement; the owning tenant is
+    # derived from the resolved base URI (e.g. .../types/tenant/acme/... -> tenant/acme).
+    base_path = (
+        resolved_base[len(REGISTRY_BASE_URL):]
+        if resolved_base.startswith(REGISTRY_BASE_URL)
+        else None
+    )
+    is_core = is_system or is_core_namespace(namespace) or is_core_namespace(base_path)
+    own_tenant_segment = None if is_core else tenant_segment_of(base_path)
+    enforce_ref_scope(
+        schema,
+        is_core=is_core,
+        base_uri=resolved_base,
+        own_tenant_segment=own_tenant_segment,
+    )
+
     stamped = stamp_identity(schema, schema_id=schema_id, draft=draft)
     return {
         "schema": stamped,
@@ -351,6 +402,8 @@ async def create_primitive(
         )
     except SchemaValidationError as e:
         raise _schema_validation_http_error(e.errors)
+    except ScopeViolationError as e:
+        raise _scope_violation_http_error(e)
 
     try:
         # Get user_id from auth data (will be None for API key auth)
@@ -463,6 +516,8 @@ async def update_primitive(
             )
         except SchemaValidationError as e:
             raise _schema_validation_http_error(e.errors)
+        except ScopeViolationError as e:
+            raise _scope_violation_http_error(e)
         updates['schema'] = identity['schema']
         updates['schema_id'] = identity['schema_id']
         updates['draft'] = identity['draft']
@@ -613,9 +668,10 @@ async def import_primitives(
     errors = []
 
     for def_name, def_schema in definitions.items():
-        # Each imported definition goes through the SAME draft 2020-12 validator and
-        # $id derivation as create/update (#3452). An invalid definition is rejected
-        # with its field-level errors and skipped; valid ones are not blocked by it.
+        # Each imported definition goes through the SAME draft 2020-12 validator,
+        # $id derivation, and scope enforcement as create/update (#3452, #3453). An
+        # invalid or scope-violating definition is rejected with its details and
+        # skipped; valid ones are not blocked by it.
         try:
             identity = resolve_primitive_identity(
                 def_schema,
@@ -626,6 +682,9 @@ async def import_primitives(
             )
         except SchemaValidationError as e:
             errors.append({"name": def_name, "error": "invalid_schema", "details": e.errors})
+            continue
+        except ScopeViolationError as e:
+            errors.append({"name": def_name, "error": "scope_violation", "details": e.violations})
             continue
 
         try:
