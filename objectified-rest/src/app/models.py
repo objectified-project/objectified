@@ -2,6 +2,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field, AliasChoices, ConfigDict, model_validator
 from typing import Callable, Optional, Dict, Any, List, Union, Literal
 
+from .repository_refresh_status import RefreshStatus, compute_refresh_status
+
 
 class TagSchema(BaseModel):
     """Pydantic model for a tag."""
@@ -471,6 +473,15 @@ class RepositoryImportSpecRead(BaseModel):
         default=None,
         description="Blob SHA of the file content at import time (RAR-2.1).",
     )
+    refresh_status: RefreshStatus = Field(
+        default=RefreshStatus.UP_TO_DATE,
+        description=(
+            "Materialized per-file refresh state (RAR-2.3): one of up-to-date / "
+            "stale / refreshing / failed / diverged. Derived from the current scan "
+            "recency vs the last_imported_* anchors, overlaid with any in-flight "
+            "refresh, last-attempt failure, or divergence hold."
+        ),
+    )
 
 
 def repository_import_spec_read_from_row(
@@ -484,14 +495,35 @@ def repository_import_spec_read_from_row(
     reported as the current envelope version because the options have been
     upgraded on read.
 
+    ``refresh_status`` (RAR-2.3) is materialized on read by comparing the current
+    scan recency for the file — the ``remote_committed_at`` / ``remote_blob_sha``
+    columns the read DAO joins from ``odb.tenant_repository_files`` — against the
+    ``last_imported_*`` anchors, overlaid with the operational flags
+    (``is_refreshing`` / ``last_refresh_failed`` / ``diverged``) carried on the
+    row when the sweep (RAR-3/RAR-4) and divergence check (RAR-4.4) populate them.
+    Deriving on read means the status is recomputed whenever its inputs change —
+    the scan refreshes the remote recency columns and a finished refresh updates
+    the anchors — so it is always current without a separate stored column.
+
     Args:
-        row: A ``odb.repository_import_spec`` row as a dict.
+        row: A ``odb.repository_import_spec`` row as a dict, optionally joined to
+            the current indexed file row (``remote_committed_at`` /
+            ``remote_blob_sha``) and any operational refresh flags.
 
     Returns:
         The current-shape read model for the endpoint response.
     """
     options = load_repository_import_options(row)
     row = row or {}
+    refresh_status = compute_refresh_status(
+        remote_committed_at=row.get("remote_committed_at"),
+        last_imported_committed_at=row.get("last_imported_committed_at"),
+        remote_checksum=row.get("remote_blob_sha"),
+        last_imported_checksum=row.get("last_imported_blob_sha"),
+        is_refreshing=bool(row.get("is_refreshing")),
+        last_refresh_failed=bool(row.get("last_refresh_failed")),
+        diverged=bool(row.get("diverged")),
+    )
     return RepositoryImportSpecRead(
         spec_schema_version=REPOSITORY_IMPORT_SPEC_SCHEMA_VERSION,
         source_kind=str(row.get("source_kind") or ""),
@@ -501,6 +533,7 @@ def repository_import_spec_read_from_row(
         last_imported_commit_sha=row.get("last_imported_commit_sha"),
         last_imported_committed_at=row.get("last_imported_committed_at"),
         last_imported_blob_sha=row.get("last_imported_blob_sha"),
+        refresh_status=refresh_status,
     )
 
 
