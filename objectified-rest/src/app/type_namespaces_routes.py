@@ -28,6 +28,8 @@ from .models import (
     TypeNamespaceCreateRequest,
     TypeNamespaceSchema,
     TypeNamespaceUpdateRequest,
+    TypeRegistrySettingsSchema,
+    TypeRegistrySettingsUpdateRequest,
 )
 from .type_resolver import STATUS_RESOLVED, STATUS_UNRESOLVED, reresolve_edges
 
@@ -268,6 +270,104 @@ async def update_namespace(
         raise HTTPException(status_code=404, detail=f"Namespace not found: {namespace_id}")
 
     return _to_schema(row)
+
+
+def _settings_to_schema(row: Dict[str, Any]) -> TypeRegistrySettingsSchema:
+    """Map a persisted ``odb.type_registry_settings`` row to its API model.
+
+    A persisted row is, by definition, not the defaults, so ``is_default`` is False.
+    """
+    return TypeRegistrySettingsSchema(
+        default_draft=row["default_draft"],
+        strict_validation=bool(row["strict_validation"]),
+        allow_annotation_keywords=bool(row["allow_annotation_keywords"]),
+        coerce_imported_drafts=bool(row["coerce_imported_drafts"]),
+        resolution_base_url=row["resolution_base_url"],
+        ref_style=row["ref_style"],
+        allow_remote_refs=bool(row["allow_remote_refs"]),
+        remote_host_allowlist=list(row.get("remote_host_allowlist") or []),
+        max_resolution_depth=int(row["max_resolution_depth"]),
+        circular_ref_policy=row["circular_ref_policy"],
+        default_import_scope=row["default_import_scope"],
+        default_target_namespace=row.get("default_target_namespace"),
+        rewrite_refs_on_import=bool(row["rewrite_refs_on_import"]),
+        accepted_formats=list(row.get("accepted_formats") or []),
+        dedupe_identical_types=bool(row["dedupe_identical_types"]),
+        validate_on_save=bool(row["validate_on_save"]),
+        block_publish_on_errors=bool(row["block_publish_on_errors"]),
+        core_publish_role=row["core_publish_role"],
+        is_default=False,
+        updated_by=str(row["updated_by"]) if row.get("updated_by") is not None else None,
+        created_at=row.get("created_at"),
+        updated_at=row.get("updated_at"),
+    )
+
+
+@router.get("/{tenant_slug}/settings", response_model=TypeRegistrySettingsSchema)
+async def get_registry_settings(
+    tenant_slug: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> TypeRegistrySettingsSchema:
+    """Return the tenant's type-registry settings (#3472).
+
+    Serves the saved row when one exists. A tenant that has never saved settings receives the
+    model defaults with ``is_default = true`` (a pure read never materializes a row), so the
+    Settings UI always has a complete, effective configuration to render.
+
+    Args:
+        tenant_slug: The tenant slug (caller scope comes from the authenticated token).
+        auth_data: Authentication data (injected by dependency).
+
+    Returns:
+        The tenant's effective type-registry settings.
+    """
+    row = db.get_type_registry_settings(auth_data["tenant_id"])
+    if not row:
+        # No saved row yet — return the defaults, flagged so the UI can show "using defaults".
+        return TypeRegistrySettingsSchema()
+    return _settings_to_schema(row)
+
+
+@router.put("/{tenant_slug}/settings", response_model=TypeRegistrySettingsSchema)
+async def update_registry_settings(
+    tenant_slug: str,
+    request: TypeRegistrySettingsUpdateRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> TypeRegistrySettingsSchema:
+    """Save the tenant's type-registry settings (#3472).
+
+    Tenant-administrator only. The request may be partial — omitted fields keep their current
+    persisted value (or the table default on the first save). Enum and range validation happens
+    on the request model, so an invalid value is rejected with 422 before the upsert. The saved
+    settings become the source of truth the resolver and the validation gate (#3479) read.
+
+    Args:
+        tenant_slug: The tenant slug.
+        request: The settings to persist (partial allowed).
+        auth_data: Authentication data (injected by dependency).
+
+    Returns:
+        The full persisted settings after the write.
+    """
+    tenant_id = auth_data["tenant_id"]
+    user_id = _assert_jwt_user(auth_data)
+    _assert_tenant_admin(tenant_id, user_id)
+
+    updates = request.model_dump(exclude_unset=True)
+
+    # A non-empty base URL is required when supplied; an empty string would break $ref resolution.
+    if "resolution_base_url" in updates:
+        base = (updates["resolution_base_url"] or "").strip()
+        if not base:
+            raise HTTPException(status_code=400, detail="resolution_base_url may not be empty")
+        updates["resolution_base_url"] = base
+
+    try:
+        row = db.upsert_type_registry_settings(tenant_id, updates, updated_by=user_id)
+    except Exception as e:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return _settings_to_schema(row)
 
 
 @router.post("/{tenant_slug}/resolve", response_model=ResolveResponse)
