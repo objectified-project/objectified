@@ -1,232 +1,298 @@
 /**
- * Tests for PrimitiveSelector Component
+ * Tests for the PrimitiveSelector type picker (#3474).
+ *
+ * Covers the scope-classification + `$ref` helpers and the rendered picker:
+ * Standard / Core / Tenant / Custom tabs, selecting `std/v0/types/date` emitting
+ * a stable `$ref`, tenant scoping, the bound-type chip, and legacy (namespace-less)
+ * primitives that bind by inline schema only.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import {
+  PrimitiveSelector,
+  classifyPrimitive,
+  buildTypeRef,
+  Primitive,
+} from '../src/app/components/ade/studio/PrimitiveSelector';
+import { PropertyFormData } from '../src/app/components/ade/studio/PropertyFormFields';
 
-// Mock the useDarkMode hook using src path
+// Mock the useDarkMode hook (same module the component imports via `@/`).
 jest.mock('../src/app/hooks/useDarkMode', () => ({
   useDarkMode: () => false,
 }));
 
-// Mock fetch
-const mockPrimitives = [
-  {
-    id: '1',
-    tenant_id: 'tenant-1',
-    name: 'Email Address',
-    description: 'A valid email address format',
-    category: 'string',
-    schema: {
-      type: 'string',
-      format: 'email',
-      pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
-    },
-    tags: ['email', 'contact'],
-    created_by: null,
-    is_system: true,
-    is_public: true,
-    usage_count: 42,
-    enabled: true,
-    created_at: '2026-01-22T10:00:00Z',
-    updated_at: '2026-01-22T10:00:00Z',
-  },
-  {
-    id: '2',
-    tenant_id: 'tenant-1',
-    name: 'Custom Phone Number',
-    description: 'Phone number format for US',
-    category: 'string',
-    schema: {
-      type: 'string',
-      pattern: '^\\+1\\d{10}$',
-      minLength: 12,
-      maxLength: 12,
-    },
-    tags: ['phone', 'contact'],
-    created_by: 'user-1',
-    is_system: false,
-    is_public: false,
-    usage_count: 5,
-    enabled: true,
-    created_at: '2026-01-22T11:00:00Z',
-    updated_at: '2026-01-22T11:00:00Z',
-  },
-  {
-    id: '3',
-    tenant_id: 'tenant-1',
-    name: 'Age',
-    description: 'A valid age (0-150)',
-    category: 'integer',
-    schema: {
-      type: 'integer',
-      minimum: 0,
-      maximum: 150,
-    },
-    tags: ['age', 'person'],
-    created_by: null,
-    is_system: true,
-    is_public: true,
-    usage_count: 20,
-    enabled: true,
-    created_at: '2026-01-22T10:00:00Z',
-    updated_at: '2026-01-22T10:00:00Z',
-  },
-];
+// Radix Dialog needs a few browser APIs jsdom does not implement.
+beforeAll(() => {
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+  if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = () => false;
+  }
+  if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = () => {};
+  }
+  if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = () => {};
+  }
+  Element.prototype.scrollIntoView = () => {};
+});
 
-// Simple mock for PrimitiveSelector tests
-describe('PrimitiveSelector Component', () => {
+// Helper to build a fully-populated Primitive with sensible defaults.
+const makePrimitive = (overrides: Partial<Primitive>): Primitive => ({
+  id: 'id-' + Math.random().toString(36).slice(2),
+  tenant_id: 'tenant-1',
+  name: 'thing',
+  description: 'A thing',
+  category: 'string',
+  schema: { type: 'string' },
+  tags: [],
+  created_by: null,
+  is_system: false,
+  is_public: false,
+  usage_count: 0,
+  enabled: true,
+  created_at: '2026-06-01T00:00:00Z',
+  updated_at: '2026-06-01T00:00:00Z',
+  namespace: null,
+  base_uri: null,
+  schema_id: null,
+  draft: '2020-12',
+  source: 'human',
+  refs: [],
+  ...overrides,
+});
+
+// A string-category type for each of the four scopes.
+const stdString = makePrimitive({
+  id: 'std-string',
+  name: 'string',
+  description: 'JSON Schema base string type.',
+  is_system: true,
+  is_public: true,
+  namespace: 'std/v0/primitives',
+  schema: { type: 'string' },
+});
+
+const coreDate = makePrimitive({
+  id: 'core-date',
+  name: 'date',
+  description: 'Calendar date (ISO 8601).',
+  is_system: true,
+  is_public: true,
+  namespace: 'std/v0/types',
+  schema: { type: 'string', format: 'date' },
+});
+
+const legacyEmail = makePrimitive({
+  id: 'legacy-email',
+  name: 'Email Address',
+  description: 'RFC 5322 email address.',
+  is_system: true,
+  is_public: true,
+  namespace: null, // legacy flat primitive — no stable $ref
+  schema: { type: 'string', format: 'email' },
+});
+
+const tenantSku = makePrimitive({
+  id: 'tenant-sku',
+  name: 'sku',
+  description: 'Stock keeping unit.',
+  is_system: false,
+  source: 'human',
+  namespace: 'tenant/acme/types',
+  schema: { type: 'string', pattern: '^[A-Z0-9-]+$' },
+});
+
+const customHumanName = makePrimitive({
+  id: 'custom-humanname',
+  name: 'HumanName',
+  description: 'Imported FHIR HumanName.',
+  is_system: false,
+  source: 'imported',
+  namespace: 'vendor/fhir/r4',
+  schema: { type: 'string' },
+});
+
+const ALL = [stdString, coreDate, legacyEmail, tenantSku, customHumanName];
+
+// Stateful harness so the bound-type chip reflects onChange updates.
+const Harness: React.FC<{
+  onChangeSpy?: (field: keyof PropertyFormData, value: unknown) => void;
+  onTypeBound?: jest.Mock;
+  initial?: PropertyFormData;
+}> = ({ onChangeSpy, onTypeBound, initial }) => {
+  const [formData, setFormData] = useState<PropertyFormData>(initial || {});
+  return (
+    <PrimitiveSelector
+      formData={formData}
+      onChange={(field, value) => {
+        onChangeSpy?.(field, value);
+        setFormData((prev) => ({ ...prev, [field]: value }));
+      }}
+      propertyType="string"
+      onTypeBound={onTypeBound}
+    />
+  );
+};
+
+const mockFetchOk = (primitives: Primitive[]) => {
+  (global.fetch as jest.Mock).mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, primitives }),
+  });
+};
+
+describe('classifyPrimitive', () => {
+  it('classifies system /primitives rows as standard', () => {
+    expect(classifyPrimitive(stdString)).toBe('standard');
+  });
+
+  it('classifies other system rows as core (incl. legacy flat ones)', () => {
+    expect(classifyPrimitive(coreDate)).toBe('core');
+    expect(classifyPrimitive(legacyEmail)).toBe('core');
+  });
+
+  it('classifies tenant-authored rows as tenant', () => {
+    expect(classifyPrimitive(tenantSku)).toBe('tenant');
+  });
+
+  it('classifies imported tenant rows as custom', () => {
+    expect(classifyPrimitive(customHumanName)).toBe('custom');
+  });
+});
+
+describe('buildTypeRef', () => {
+  it('joins namespace and name into a stable $ref', () => {
+    expect(buildTypeRef(coreDate)).toBe('std/v0/types/date');
+    expect(buildTypeRef(tenantSku)).toBe('tenant/acme/types/sku');
+    expect(buildTypeRef(customHumanName)).toBe('vendor/fhir/r4/HumanName');
+  });
+
+  it('tolerates trailing slashes on the namespace', () => {
+    expect(buildTypeRef(makePrimitive({ namespace: 'std/v0/types/', name: 'uuid' }))).toBe('std/v0/types/uuid');
+  });
+
+  it('returns null for primitives with no namespace', () => {
+    expect(buildTypeRef(legacyEmail)).toBeNull();
+  });
+});
+
+describe('PrimitiveSelector type picker', () => {
   beforeAll(() => {
     global.fetch = jest.fn();
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, primitives: mockPrimitives }),
-    });
+    mockFetchOk(ALL);
   });
 
-  it('should apply primitive format constraints correctly', () => {
-    const emailPrimitive = mockPrimitives[0];
-    expect(emailPrimitive.schema.format).toBe('email');
-    expect(emailPrimitive.schema.pattern).toBeDefined();
-    expect(emailPrimitive.is_system).toBe(true);
+  const openPicker = async () => {
+    fireEvent.click(screen.getByRole('button', { name: /select type/i }));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+  };
+
+  it('renders the four scope tabs when opened', async () => {
+    render(<Harness />);
+    await openPicker();
+
+    expect(await screen.findByRole('tab', { name: /standard/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /core system types/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /tenant types/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /custom · imported/i })).toBeInTheDocument();
   });
 
-  it('should distinguish between system and tenant primitives', () => {
-    const systemPrimitives = mockPrimitives.filter(p => p.is_system);
-    const tenantPrimitives = mockPrimitives.filter(p => !p.is_system);
-
-    expect(systemPrimitives.length).toBe(2);
-    expect(tenantPrimitives.length).toBe(1);
-    expect(tenantPrimitives[0].name).toBe('Custom Phone Number');
-  });
-
-  it('should filter primitives by category', () => {
-    const stringPrimitives = mockPrimitives.filter(p => p.category === 'string');
-    const integerPrimitives = mockPrimitives.filter(p => p.category === 'integer');
-
-    expect(stringPrimitives.length).toBe(2);
-    expect(integerPrimitives.length).toBe(1);
-  });
-
-  it('should apply numeric constraints from primitive', () => {
-    const agePrimitive = mockPrimitives.find(p => p.name === 'Age');
-    expect(agePrimitive?.schema.minimum).toBe(0);
-    expect(agePrimitive?.schema.maximum).toBe(150);
-    expect(agePrimitive?.category).toBe('integer');
-  });
-
-  it('should support searching by name', () => {
-    const searchQuery = 'phone';
-    const filtered = mockPrimitives.filter(p =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    expect(filtered.length).toBe(1);
-    expect(filtered[0].name).toBe('Custom Phone Number');
-  });
-
-  it('should support searching by tag', () => {
-    const searchQuery = 'contact';
-    const filtered = mockPrimitives.filter(p =>
-      p.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-
-    expect(filtered.length).toBe(2);
-  });
-
-  it('should fetch primitives with category filter', async () => {
-    await fetch('/api/primitives?category=string');
-
+  it('fetches primitives filtered by the property category', async () => {
+    render(<Harness />);
+    await openPicker();
     expect(global.fetch).toHaveBeenCalledWith('/api/primitives?category=string');
   });
 
-  it('should render constraint preview correctly', () => {
-    const emailPrimitive = mockPrimitives[0];
-    const schema = emailPrimitive.schema;
+  it('selecting std/v0/types/date sets the $ref on the property and emits a binding', async () => {
+    const onChangeSpy = jest.fn();
+    const onTypeBound = jest.fn();
+    render(<Harness onChangeSpy={onChangeSpy} onTypeBound={onTypeBound} />);
+    await openPicker();
 
-    const constraints: string[] = [];
-    if (schema.format) constraints.push(`format: ${schema.format}`);
-    if (schema.pattern) constraints.push(`pattern: ${schema.pattern}`);
+    // Core tab is the default landing tab and holds std/v0/types/date.
+    const dateRow = await screen.findByRole('button', { name: /std\/v0\/types\/date/i });
+    fireEvent.click(dateRow);
+    fireEvent.click(screen.getByRole('button', { name: /apply type/i }));
 
-    expect(constraints.join(', ')).toContain('format: email');
-    expect(constraints.join(', ')).toContain('pattern:');
+    await waitFor(() =>
+      expect(onChangeSpy).toHaveBeenCalledWith('$ref', 'std/v0/types/date'),
+    );
+    expect(onTypeBound).toHaveBeenCalledWith(
+      expect.objectContaining({ ref: 'std/v0/types/date' }),
+    );
   });
 
-  it('should sort primitives with tenant first', () => {
-    const sorted = [...mockPrimitives].sort((a, b) => {
-      if (a.is_system !== b.is_system) {
-        return a.is_system ? 1 : -1;
-      }
-      return a.name.localeCompare(b.name);
-    });
+  it('scopes tenant types under the Tenant tab and emits a tenant $ref', async () => {
+    const onChangeSpy = jest.fn();
+    render(<Harness onChangeSpy={onChangeSpy} />);
+    await openPicker();
 
-    // Tenant primitive should be first
-    expect(sorted[0].is_system).toBe(false);
-    expect(sorted[0].name).toBe('Custom Phone Number');
+    fireEvent.click(await screen.findByRole('tab', { name: /tenant types/i }));
+    const skuRow = await screen.findByRole('button', { name: /tenant\/acme\/types\/sku/i });
+    fireEvent.click(skuRow);
+    fireEvent.click(screen.getByRole('button', { name: /apply type/i }));
+
+    await waitFor(() =>
+      expect(onChangeSpy).toHaveBeenCalledWith('$ref', 'tenant/acme/types/sku'),
+    );
   });
 
-  it('should clear existing constraints when applying a primitive', () => {
-    // Simulate existing form data with various constraints
-    const existingFormData = {
-      title: 'My Field',
-      description: 'My description',
-      format: 'uuid',
-      pattern: '^[0-9]+$',
-      minLength: '5',
-      maxLength: '50',
-      minimum: '10',
-      maximum: '100',
-      enum: ['a', 'b', 'c'],
-    };
+  it('lists imported types under the Custom tab', async () => {
+    render(<Harness />);
+    await openPicker();
 
-    // The fields that should be cleared when applying a primitive
-    const fieldsToClear = [
-      'format',
-      'pattern',
-      'minLength',
-      'maxLength',
-      'minimum',
-      'maximum',
-      'minimumType',
-      'maximumType',
-      'multipleOf',
-      'minItems',
-      'maxItems',
-      'uniqueItems',
-      'enum',
-      'default',
-      'const',
-    ];
-
-    // Verify that when applying a primitive, all constraint fields get cleared
-    // (simulating what happens before applying new values)
-    fieldsToClear.forEach(field => {
-      expect(existingFormData).toBeDefined();
-    });
-
-    // Title and description should be preserved (not in the clear list)
-    expect(existingFormData.title).toBe('My Field');
-    expect(existingFormData.description).toBe('My description');
+    fireEvent.click(await screen.findByRole('tab', { name: /custom · imported/i }));
+    expect(await screen.findByRole('button', { name: /vendor\/fhir\/r4\/HumanName/i })).toBeInTheDocument();
   });
 
-  it('should apply only the constraints defined in the primitive schema', () => {
-    const phonePrimitive = mockPrimitives[1]; // Custom Phone Number
+  it('clears the $ref when binding a legacy primitive that has no namespace', async () => {
+    const onChangeSpy = jest.fn();
+    const onTypeBound = jest.fn();
+    render(<Harness onChangeSpy={onChangeSpy} onTypeBound={onTypeBound} />);
+    await openPicker();
 
-    // Verify this primitive only has pattern, minLength, maxLength
-    expect(phonePrimitive.schema.pattern).toBeDefined();
-    expect(phonePrimitive.schema.minLength).toBe(12);
-    expect(phonePrimitive.schema.maxLength).toBe(12);
+    // legacyEmail lives under Core (system, no namespace). It still applies its
+    // schema inline but records no stable $ref.
+    const emailRow = await screen.findByRole('button', { name: /Email Address/i });
+    fireEvent.click(emailRow);
+    fireEvent.click(screen.getByRole('button', { name: /apply type/i }));
 
-    // Verify it doesn't have format, minimum, maximum, etc.
-    expect(phonePrimitive.schema.format).toBeUndefined();
-    expect(phonePrimitive.schema.minimum).toBeUndefined();
-    expect(phonePrimitive.schema.maximum).toBeUndefined();
-    expect(phonePrimitive.schema.enum).toBeUndefined();
+    await waitFor(() => expect(onChangeSpy).toHaveBeenCalledWith('format', 'email'));
+    expect(onChangeSpy).toHaveBeenCalledWith('$ref', '');
+    expect(onTypeBound).not.toHaveBeenCalled();
+  });
+
+  it('shows a bound-type chip and clears the binding on demand', async () => {
+    const onChangeSpy = jest.fn();
+    render(<Harness onChangeSpy={onChangeSpy} initial={{ $ref: 'std/v0/types/date' }} />);
+
+    // The chip shows the current binding without opening the picker.
+    expect(screen.getByText('std/v0/types/date')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /change type/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /clear type binding/i }));
+    await waitFor(() => expect(onChangeSpy).toHaveBeenCalledWith('$ref', ''));
+  });
+
+  it('searches across namespaces within the active tab', async () => {
+    render(<Harness />);
+    await openPicker();
+
+    const search = await screen.findByPlaceholderText(/search standard & custom types/i);
+    // Core tab holds date + Email Address; searching the namespace narrows to date.
+    fireEvent.change(search, { target: { value: 'std/v0/types' } });
+
+    expect(await screen.findByRole('button', { name: /std\/v0\/types\/date/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Email Address/i })).not.toBeInTheDocument();
   });
 });
