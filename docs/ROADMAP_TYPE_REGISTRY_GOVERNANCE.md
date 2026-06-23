@@ -415,7 +415,7 @@ resolved  = api.objectified.dev/types/std/v0/primitives/string   ✓
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |---|---|---|---|:---:|:---:|---|---|
-| 3.1 #3456 | Relative `$ref` resolution against base | Resolve relative refs to absolute registry targets | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
+| 3.1 #3456 ✅ | Relative `$ref` resolution against base | **DONE** — `app/primitives_resolver.py` resolves each relative `$ref` against the source `base_uri` (`./`, `../`, cross-scope `../../std/...`) to an absolute registry URI, maps it to a primitive by `schema_id` within read scope (#3453), and persists `{relative_ref, resolved_target, status}` edges to `odb.primitives.refs` on create/update/import | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
 | 3.2 #3457 | Unresolved-reference detection & flags | Detect & persist unresolved refs (status on `type_ref`) | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-rest |
 | 3.3 #3458 | Circular-reference detection | Detect cycles (A→B→A) and flag | `type-registry`,`rest`,`roadmap-type-registry` | Y | N | M | objectified-rest |
 | 3.4 #3459 | Resolver API + dependency listing | `/resolve` + dependency edges for resolver UI | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-rest |

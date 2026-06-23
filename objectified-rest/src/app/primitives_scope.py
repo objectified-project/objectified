@@ -35,6 +35,7 @@ __all__ = [
     "iter_refs",
     "registry_namespace_of_ref",
     "tenant_segment_of",
+    "resolve_registry_uri",
     "is_core_namespace",
     "find_forbidden_refs",
     "enforce_ref_scope",
@@ -80,15 +81,42 @@ def iter_refs(node: Any) -> Iterator[str]:
             yield from iter_refs(item)
 
 
+def resolve_registry_uri(ref: str, base_uri: Optional[str]) -> Optional[str]:
+    """Resolve a ``$ref`` to its absolute registry URI, or ``None`` if it is not one.
+
+    A same-document fragment (``#/$defs/X``) targets the type itself and is never a
+    cross-type reference. A relative ``$ref`` is resolved against ``base_uri`` using
+    ordinary URL semantics (so ``./`` and ``../`` walk the namespace tree). Only refs
+    that land under :data:`app.schema_validation.REGISTRY_BASE_URL` are registry
+    targets; anything else (``https://json-schema.org/...``, vendor URLs) is external.
+    Any trailing fragment is dropped so a path-plus-anchor ref resolves by its path.
+
+    This is the single URL-resolution primitive shared by namespace classification
+    (#3453, :func:`registry_namespace_of_ref`) and reference resolution (#3456,
+    :func:`app.primitives_resolver.build_ref_edges`).
+
+    Args:
+        ref: The ``$ref`` value as written in the document.
+        base_uri: The base URI the owning type's relative refs resolve against.
+
+    Returns:
+        The absolute registry URI the ref targets (e.g.
+        ``https://api.objectified.dev/types/std/v0/primitives/string``), or ``None``
+        when the ref is a fragment or points outside the registry.
+    """
+    if not isinstance(ref, str) or not ref or ref.startswith("#"):
+        return None
+    absolute = urljoin(base_uri or "", ref)
+    if not absolute.startswith(REGISTRY_BASE_URL):
+        return None
+    return absolute.split("#", 1)[0]
+
+
 def registry_namespace_of_ref(ref: str, base_uri: Optional[str]) -> Optional[str]:
     """Resolve a ``$ref`` to its registry namespace path, or ``None`` if it is not one.
 
-    A same-document fragment (``#/$defs/X``) targets the type itself and is never a
-    cross-namespace reference. A relative ``$ref`` is resolved against ``base_uri``
-    using ordinary URL semantics (so ``../`` walks up the namespace tree). Only refs
-    that land under :data:`app.schema_validation.REGISTRY_BASE_URL` name a registry
-    namespace; anything else (``https://json-schema.org/...``, vendor URLs) is
-    external and out of scope.
+    A thin wrapper over :func:`resolve_registry_uri` that strips the registry root,
+    leaving the namespace-plus-leaf path used for scope classification.
 
     Args:
         ref: The ``$ref`` value as written in the document.
@@ -98,15 +126,10 @@ def registry_namespace_of_ref(ref: str, base_uri: Optional[str]) -> Optional[str
         The registry path the ref targets (e.g. ``tenant/acme/v1/types/money``),
         or ``None`` when the ref is a fragment or points outside the registry.
     """
-    if not isinstance(ref, str) or not ref or ref.startswith("#"):
+    absolute = resolve_registry_uri(ref, base_uri)
+    if absolute is None:
         return None
-    absolute = urljoin(base_uri or "", ref)
-    if not absolute.startswith(REGISTRY_BASE_URL):
-        return None
-    # Drop any fragment so a path-plus-anchor ref still classifies by its path.
-    path = absolute[len(REGISTRY_BASE_URL):]
-    path = path.split("#", 1)[0]
-    return path.strip("/")
+    return absolute[len(REGISTRY_BASE_URL):].strip("/")
 
 
 def tenant_segment_of(path: Optional[str]) -> Optional[str]:
