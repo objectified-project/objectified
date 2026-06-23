@@ -5,6 +5,22 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.13] - 2026-06-22
+
+### Added
+- **Resolver API + dependency listing (#3459)** — new `POST /v1/types/{tenant_slug}/resolve`
+  re-resolves every `$ref` dependency edge across the tenant's primitives against the *current*
+  registry state and returns the per-primitive dependency listing the resolver UI (#3470) and
+  Designer consume. Each stored edge's `resolved`/`unresolved` status is recomputed with the same
+  existence test as save-time resolution (#3456) — so a target created since the edge was last
+  computed now resolves and a deleted one now dangles — and the refreshed edges are persisted for
+  the tenant's own primitives whose status changed ("re-resolve updates statuses"). Each resolved
+  edge is enriched with its dependency target's id and name so the response is the dependency
+  graph. The top-level counts mirror the coverage KPIs of `GET …/unresolved` (#3457/#3454), plus
+  `reresolved_primitive_count` for how many primitives this pass updated. New `ResolveResponse` /
+  `ResolvedPrimitiveRefs` / `ResolvedRefEdge` models and `app/type_resolver.py` (pure edge
+  re-evaluation + dependency enrichment); system-core rows are listed but never written back.
+
 ## [1.0.12] - 2026-06-22
 
 ### Added

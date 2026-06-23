@@ -1231,6 +1231,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/types/{tenant_slug}/resolve:
+    post:
+      tags:
+      - type-registry
+      summary: Resolve Refs
+      description: "Re-resolve the tenant's ``$ref`` edges and return the dependency\
+        \ listing (#3459).\n\nThe resolver API for the UI and Designer (#3470). It\
+        \ walks every primitive visible to\nthe tenant (system-core ∪ own), re-evaluates\
+        \ each stored dependency edge's\nresolved/unresolved status against the *current*\
+        \ registry — so a target created since\nthe edge was last computed now resolves,\
+        \ and a deleted one now dangles — and persists\nthe refreshed edges for any\
+        \ of the tenant's own primitives whose status changed\n(\"re-resolve updates\
+        \ statuses\"). Each resolved edge is enriched with its dependency\ntarget's\
+        \ id and name so the response is the dependency graph the resolver UI lists.\n\
+        \nOnly primitives that carry at least one ``$ref`` edge appear in ``primitives``;\
+        \ the\nflat system-core seed (no refs) is omitted. System-core rows are read-only,\
+        \ so a status\nchange on one is reflected in the response but never written\
+        \ back.\n\nArgs:\n    tenant_slug: The tenant slug (caller scope comes from\
+        \ the authenticated token).\n    auth_data: Authentication data (injected\
+        \ by dependency).\n\nReturns:\n    ``ResolveResponse`` with tenant-wide edge\
+        \ counts, the number of primitives whose\n    stored statuses were updated\
+        \ by this pass, and the per-primitive dependency listing."
+      operationId: resolve_refs_v1_types__tenant_slug__resolve_post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/classes/{tenant_slug}:
     get:
       tags:
@@ -11811,6 +11870,152 @@ components:
       - media_type
       title: RequestBodyContentTypeRequest
       description: Request model for adding a content type to a request body.
+    ResolveResponse:
+      properties:
+        total_primitives:
+          type: integer
+          title: Total Primitives
+          default: 0
+        ref_count:
+          type: integer
+          title: Ref Count
+          default: 0
+        resolved_ref_count:
+          type: integer
+          title: Resolved Ref Count
+          default: 0
+        unresolved_ref_count:
+          type: integer
+          title: Unresolved Ref Count
+          default: 0
+        affected_primitive_count:
+          type: integer
+          title: Affected Primitive Count
+          default: 0
+        reresolved_primitive_count:
+          type: integer
+          title: Reresolved Primitive Count
+          default: 0
+        primitives:
+          items:
+            $ref: '#/components/schemas/ResolvedPrimitiveRefs'
+          type: array
+          title: Primitives
+          default: []
+      type: object
+      title: ResolveResponse
+      description: 'Result of a tenant-wide ``$ref`` re-resolution pass (#3459).
+
+
+        ``POST /v1/types/{tenant_slug}/resolve`` recomputes the resolved/unresolved
+        status
+
+        of every dependency edge across the tenant''s primitives against the current
+        registry
+
+        state, persists any edge whose status changed, and returns the per-primitive
+
+        dependency listing the resolver UI consumes (#3470). The top-level counts
+        mirror the
+
+        coverage KPIs of ``GET …/unresolved`` (#3457/#3454); ``reresolved_primitive_count``
+
+        is how many primitives had at least one edge status flip during this pass.'
+    ResolvedPrimitiveRefs:
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        schema_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Schema Id
+        namespace:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Namespace
+        base_uri:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base Uri
+        ref_count:
+          type: integer
+          title: Ref Count
+          default: 0
+        resolved_count:
+          type: integer
+          title: Resolved Count
+          default: 0
+        unresolved_count:
+          type: integer
+          title: Unresolved Count
+          default: 0
+        refs:
+          items:
+            $ref: '#/components/schemas/ResolvedRefEdge'
+          type: array
+          title: Refs
+          default: []
+      type: object
+      required:
+      - id
+      - name
+      title: ResolvedPrimitiveRefs
+      description: 'A primitive and its re-resolved dependency edges (#3459).
+
+
+        One row of the resolver UI table (#3470): the source primitive''s identity,
+        its
+
+        per-edge resolved/unresolved counts, and its dependency edges.'
+    ResolvedRefEdge:
+      properties:
+        relative_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Relative Ref
+        resolved_target:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resolved Target
+        status:
+          type: string
+          title: Status
+        target_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Id
+        target_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target Name
+      type: object
+      required:
+      - status
+      title: ResolvedRefEdge
+      description: 'One re-resolved ``$ref`` dependency edge of a primitive (#3459).
+
+
+        The persisted edge fields (``relative_ref`` / ``resolved_target`` / ``status``)
+
+        plus the resolved dependency target''s identity. ``target_id`` / ``target_name``
+
+        are populated only for a ``resolved`` edge (the primitive currently carrying
+        the
+
+        target ``$id`` within the caller''s read scope); they are ``None`` for an
+
+        ``unresolved`` edge whose target does not yet exist.'
     ResponseContentTypeRequest:
       properties:
         media_type:
