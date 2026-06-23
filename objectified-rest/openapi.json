@@ -1666,6 +1666,91 @@
         }
       }
     },
+    "/v1/primitives/{tenant_slug}/import/stage": {
+      "post": {
+        "tags": [
+          "primitives"
+        ],
+        "summary": "Stage Import",
+        "description": "Stage an import through the unified pipeline (#3460).\n\nThe single orchestration path for all source kinds and intake methods: it\nfetches the source (paste / file / url / git), parses it (JSON or YAML),\ndetects the candidate types it carries (json-schema / type-def-bundle /\nopenapi), records a provenance row on ``odb.primitive_imports`` marked\n``staged``, and returns the staged candidates.\n\nNothing is committed to the registry here \u2014 parsing into discrete types\n(#3461/#3462), ``$ref`` rewrite (#3463), and conflict/dedupe review (#3464)\noperate on the staged result in the subsequent pipeline stages. The legacy\n``POST /{tenant_slug}/import`` (paste, commit) remains supported alongside it.\n\nArgs:\n    tenant_slug: The tenant slug.\n    request: The staging request (source kind/method + a method locator).\n    auth_data: Authentication data (injected by dependency).\n\nReturns:\n    The staged result: detected candidates plus the recorded ``import_id``.\n\nRaises:\n    HTTPException: 400 for an invalid source kind/method or missing locator,\n        422 for an unparseable source, 502 for a fetch failure.",
+        "operationId": "stage_import_v1_primitives__tenant_slug__import_stage_post",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrimitiveImportStageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrimitiveImportStageResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/types/{tenant_slug}/namespaces": {
       "get": {
         "tags": [
@@ -16432,6 +16517,36 @@
         ],
         "title": "DataRecordUpdateBody"
       },
+      "GitSourceLocator": {
+        "properties": {
+          "repo_url": {
+            "type": "string",
+            "title": "Repo Url"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "repo_url",
+          "path"
+        ],
+        "title": "GitSourceLocator",
+        "description": "Locator for the ``git`` import method \u2014 a single file in a Git repository (#3460).\n\nMVP supports public ``github.com`` repositories; the file is fetched via the\nGitHub contents API."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -17098,6 +17213,155 @@
         ],
         "title": "PrimitiveImportRequest",
         "description": "Request model for importing primitives from JSON Schema."
+      },
+      "PrimitiveImportStageRequest": {
+        "properties": {
+          "source_kind": {
+            "type": "string",
+            "title": "Source Kind",
+            "default": "json-schema"
+          },
+          "source_method": {
+            "type": "string",
+            "title": "Source Method",
+            "default": "paste"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Label"
+          },
+          "target_namespace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Namespace"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "git": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GitSourceLocator"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "PrimitiveImportStageRequest",
+        "description": "Request to stage an import through the pipeline (#3460).\n\nThe pipeline accepts a source ``kind`` (json-schema / type-def-bundle / openapi)\nby one of four ``method``s (paste / file / url / git), fetches and parses it, and\nreturns a *staged* result \u2014 candidate types ready for parsing (#3461/#3462),\nref-rewrite (#3463), and review (#3464). Nothing is committed to the registry.\n\nLocator fields are method-specific: ``content`` carries paste/file text, ``url``\nthe http(s) source, and ``git`` the repository locator."
+      },
+      "PrimitiveImportStageResult": {
+        "properties": {
+          "import_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Import Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "staged"
+          },
+          "source_kind": {
+            "type": "string",
+            "title": "Source Kind"
+          },
+          "source_method": {
+            "type": "string",
+            "title": "Source Method"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Label"
+          },
+          "target_namespace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Namespace"
+          },
+          "detected_count": {
+            "type": "integer",
+            "title": "Detected Count",
+            "default": 0
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/StagedTypeCandidate"
+            },
+            "type": "array",
+            "title": "Candidates",
+            "default": []
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_kind",
+          "source_method"
+        ],
+        "title": "PrimitiveImportStageResult",
+        "description": "The staged result of an import plus the id of its provenance record (#3460)."
       },
       "PrimitiveSchema": {
         "properties": {
@@ -20146,6 +20410,30 @@
         ],
         "title": "SpecImportVersionTarget",
         "description": "Target catalog revision for an import job."
+      },
+      "StagedTypeCandidate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "pointer": {
+            "type": "string",
+            "title": "Pointer"
+          },
+          "ref_count": {
+            "type": "integer",
+            "title": "Ref Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "pointer"
+        ],
+        "title": "StagedTypeCandidate",
+        "description": "One candidate type detected in a staged import (#3460)."
       },
       "SunsetTimelineEntryOut": {
         "properties": {

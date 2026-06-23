@@ -480,7 +480,7 @@ flowchart LR
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |---|---|---|---|:---:|:---:|---|---|
-| 4.1 #3460 | Import pipeline core + ingestion | Orchestrator + file/paste/URL/git source intake | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
+| 4.1 #3460 ✅ | ~~Import pipeline core + ingestion~~ | **DONE** — `POST /v1/primitives/{tenant_slug}/import/stage` orchestrator: ingests paste/file/url/git, parses JSON/YAML, stages candidate types per kind (json-schema/type-def-bundle/openapi), records a `staged` `odb.primitive_imports` row; legacy paste `/import` retained | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
 | 4.2 #3461 | JSON Schema 2020-12 parser | Parse single doc + `$defs` into discrete types | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | L | objectified-rest |
 | 4.3 #3462 | Type-definition bundle importer | Expand `.zip`/`.json` bundle into many interlinked types | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | L | objectified-rest |
 | 4.4 #3463 | `$ref` rewrite + namespace/scope mapping | Rewrite refs relative to import source; map to namespace/scope | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
