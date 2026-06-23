@@ -18,6 +18,7 @@ import {
   GitFork,
   Library,
   FolderTree,
+  Settings,
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
@@ -32,6 +33,7 @@ import PrimitivesNamespaceCollections from './PrimitivesNamespaceCollections';
 import PrimitivesRecentActivity from './PrimitivesRecentActivity';
 import PrimitivesResolverView from './PrimitivesResolverView';
 import PrimitivesNamespacesView from './PrimitivesNamespacesView';
+import PrimitivesSettingsView from './PrimitivesSettingsView';
 import {
   countUnresolvedByNamespace,
   type NamespaceScopeFilter,
@@ -94,7 +96,9 @@ export default function PrimitivesManagementClient() {
   const [namespaceScopeFilter, setNamespaceScopeFilter] = useState<NamespaceScopeFilter>('all');
   const [selectedNamespace, setSelectedNamespace] = useState<string | null>(null);
 
-  const [activeView, setActiveView] = useState<'registry' | 'namespaces' | 'resolver'>('registry');
+  const [activeView, setActiveView] = useState<
+    'registry' | 'namespaces' | 'resolver' | 'settings'
+  >('registry');
 
   const [showEditorDialog, setShowEditorDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -395,10 +399,26 @@ export default function PrimitivesManagementClient() {
                 <GitFork className="w-4 h-4" />
                 Resolver
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeView === 'settings'}
+                onClick={() => setActiveView('settings')}
+                className={`flex items-center gap-2 px-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeView === 'settings'
+                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-indigo-500'
+                }`}
+              >
+                <Settings className="w-4 h-4" />
+                Settings
+              </button>
             </nav>
           </div>
 
-          {activeView === 'resolver' ? (
+          {activeView === 'settings' ? (
+            <PrimitivesSettingsView onMessage={showMessage} />
+          ) : activeView === 'resolver' ? (
             <PrimitivesResolverView onMessage={showMessage} />
           ) : activeView === 'namespaces' ? (
             <PrimitivesNamespacesView

@@ -589,7 +589,7 @@ The in-app surface under **Control Panel → Governance**, matching the `governa
 | 5.4 #3469 ✅ | Import UI (wizard) | **DONE** — 3-step wizard (`PrimitiveImportDialog`): source-kind cards (JSON Schema / type-def bundle / OpenAPI) + file/URL/paste tabs + options (target namespace, `$ref` rewrite, dedupe); review step wired to `POST /import/review` showing New/Identical/Conflict/Invalid classification with per-conflict keep/overwrite/rename resolution; commit via `POST /import` with `resolutions`; result step with per-bucket outcome. New `/api/primitives/import/review` proxy; pure model in `primitiveImportModel.ts` | `type-registry`,`ui`,`import`,`mvp`,`roadmap-type-registry` | Y | Y | L | objectified-ui |
 | 5.5 #3470 ✅ | Reference Resolver UI | **DONE** — Resolver tab under Primitives (`/ade/dashboard/primitives`): read-only resolution-base control, namespace filter, Re-resolve action wired to `POST /api/types/resolve` → REST `POST /v1/types/{slug}/resolve` (3.4/#3459), summary chips (resolved/unresolved/circular), reference graph (cross-scope tenant→core highlighted), and the per-edge resolution table with status filter. First load and Re-resolve hit the same endpoint so statuses persist/update; `circular` already wired for #3458. New `/api/types/resolve` proxy + `proxyRestPost`; pure model in `primitivesResolverModel.ts` | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
 | 5.6 #3471 ✅ | Namespaces & Scopes UI | **DONE** — Namespaces & Scopes tab under Primitives (`/ade/dashboard/primitives`): scope-model explainer cards (system `std/*` vs tenant), namespaces table (scope, base URI, version root, types, visibility, default) with create/edit for tenant rows (system-core read-only), scope precedence/resolution-order card, and a governed promote-to-core card (gated on platform admin, 7.3). Create/edit wired to new `POST /api/types/namespaces` + `PUT /api/types/namespaces/[id]` proxies → REST `/v1/types/{slug}/namespaces` (#3451); new `proxyRestPut`; pure model in `namespaceModel.ts` | `type-registry`,`ui`,`registry`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
-| 5.7 #3472 | Type Registry Settings UI | DB status, dialect, resolution & validation policy | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | S | objectified-ui |
+| 5.7 #3472 ✅ | Type Registry Settings UI | **DONE** — Settings tab under Primitives (`/ade/dashboard/primitives`): live registry storage status (from `GET /api/primitives/health` → REST `/v1/primitives/health`, #3450 — shared `objectified-db`, no separate DB), JSON Schema dialect (default draft + strict/annotation/coerce toggles), `$ref` resolution policy (base URL, ref style, remote allowlist, max depth 1–64, circular policy), import defaults (scope, target namespace, rewrite, accepted formats, dedupe), and validation/publishing governance (validate-on-save, block-publish-on-errors, core publish role — read by #3479). Settings persist server-side: new `odb.type_registry_settings` table (per-tenant, defaults when unsaved), REST `GET`/`PUT /v1/types/{slug}/settings` (tenant-admin write, enum/range validated), `/api/types/settings` proxy, pure model in `primitivesSettingsModel.ts` (minimal-diff PUT) | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | S | objectified-ui, objectified-rest, objectified-db |
 | 5.8 #3473 | Governance area overview page | Governance landing positioning Type Registry + tools | `type-registry`,`ui`,`governance`,`roadmap-type-registry` | Y | N | S | objectified-ui |
 
 ### Issue 5.1 — Governance nav entry + route group
@@ -793,7 +793,7 @@ Governance controls around the registry: entitlements, publish gates, promotion,
 
 ## 13. MVP vs V2 Summary
 
-**MVP issues (open):** 1.1–1.4, 2.1–2.5, 3.1, 3.2, 3.4, 4.1–4.5, 5.2–5.7, 6.1–6.3, 7.1, 7.2, 7.4.
+**MVP issues (open):** 1.1–1.4, 2.1–2.5, 3.1, 3.2, 3.4, 4.1–4.5, 6.1–6.3, 7.1, 7.2, 7.4.
 
 **Closed duplicates (shipped):** 2.6 (#3455 UI proxy), 5.1 (#3466 nav entry).
 
@@ -874,7 +874,7 @@ epic.
 | #3440 E2 | #3450 (2.1) · #3451 (2.2) · #3452 (2.3) · #3453 (2.4) · #3454 (2.5) · ~~#3455 (2.6)~~ ✅ closed |
 | #3441 E3 | #3456 (3.1) · #3457 (3.2) · #3458 (3.3) · #3459 (3.4) |
 | #3442 E4 | #3460 (4.1) · #3461 (4.2) · #3462 (4.3) · #3463 (4.4) · #3464 (4.5) · #3465 (4.6) |
-| #3443 E5 | ~~#3466 (5.1)~~ ✅ closed · ~~#3467 (5.2)~~ ✅ · ~~#3468 (5.3)~~ ✅ · ~~#3469 (5.4)~~ ✅ · ~~#3470 (5.5)~~ ✅ · ~~#3471 (5.6)~~ ✅ · #3472 (5.7) · #3473 (5.8) |
+| #3443 E5 | ~~#3466 (5.1)~~ ✅ closed · ~~#3467 (5.2)~~ ✅ · ~~#3468 (5.3)~~ ✅ · ~~#3469 (5.4)~~ ✅ · ~~#3470 (5.5)~~ ✅ · ~~#3471 (5.6)~~ ✅ · ~~#3472 (5.7)~~ ✅ · #3473 (5.8) |
 | #3444 E6 | #3474 (6.1) · #3475 (6.2) · #3476 (6.3) · #3477 (6.4) |
 | #3445 E7 | #3478 (7.1) · #3479 (7.2) · #3480 (7.3) · #3481 (7.4) · #3482 (7.5) |
 

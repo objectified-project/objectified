@@ -504,6 +504,93 @@ class TypeNamespaceUpdateRequest(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# ==================== Type-registry settings (#3472) ====================
+
+
+# Allowed enum values, shared by the request/response models and asserted against the
+# DB CHECK constraints in 20260623-120000.sql.
+DefaultDraft = Literal["2020-12", "2019-09", "draft-07"]
+RefStyle = Literal["relative", "absolute", "anchor"]
+CircularRefPolicy = Literal["error", "warn"]
+ImportScope = Literal["tenant", "system"]
+CorePublishRole = Literal["platform_admin", "tenant_admin", "maintainer"]
+
+
+class TypeRegistrySettingsSchema(BaseModel):
+    """Per-tenant type-registry behavior settings (#3472).
+
+    Configures the default JSON Schema dialect, the ``$ref`` resolution policy, import
+    defaults, and the validation/publishing governance toggles read by the validation gate
+    (#3479). A tenant that has never saved settings receives the column defaults below.
+    """
+    # JSON Schema dialect
+    default_draft: DefaultDraft = "2020-12"
+    strict_validation: bool = True
+    allow_annotation_keywords: bool = True
+    coerce_imported_drafts: bool = True
+
+    # Reference resolution
+    resolution_base_url: str = "https://api.objectified.dev/types/"
+    ref_style: RefStyle = "relative"
+    allow_remote_refs: bool = False
+    remote_host_allowlist: List[str] = ["json-schema.org", "spec.openapis.org"]
+    max_resolution_depth: int = 12
+    circular_ref_policy: CircularRefPolicy = "error"
+
+    # Import defaults
+    default_import_scope: ImportScope = "tenant"
+    default_target_namespace: Optional[str] = None
+    rewrite_refs_on_import: bool = True
+    accepted_formats: List[str] = ["json-schema-2020-12", "type-def-bundle", "openapi-3.1"]
+    dedupe_identical_types: bool = True
+
+    # Validation & publishing governance
+    validate_on_save: bool = True
+    block_publish_on_errors: bool = True
+    core_publish_role: CorePublishRole = "platform_admin"
+
+    # Provenance — null until the tenant first saves settings (defaults are unsaved).
+    is_default: bool = True  # True when no row exists yet (these are the unsaved defaults)
+    updated_by: Optional[str] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TypeRegistrySettingsUpdateRequest(BaseModel):
+    """Request model for saving a tenant's type-registry settings (#3472).
+
+    Every field is optional so the UI may send a partial update; omitted fields keep their
+    current persisted value (or the default when no row exists yet). Enum and range checks
+    here mirror the ``odb.type_registry_settings`` CHECK constraints so an invalid value is
+    rejected with a clean 422 before it ever reaches the database.
+    """
+    default_draft: Optional[DefaultDraft] = None
+    strict_validation: Optional[bool] = None
+    allow_annotation_keywords: Optional[bool] = None
+    coerce_imported_drafts: Optional[bool] = None
+
+    resolution_base_url: Optional[str] = None
+    ref_style: Optional[RefStyle] = None
+    allow_remote_refs: Optional[bool] = None
+    remote_host_allowlist: Optional[List[str]] = None
+    max_resolution_depth: Optional[int] = Field(default=None, ge=1, le=64)
+    circular_ref_policy: Optional[CircularRefPolicy] = None
+
+    default_import_scope: Optional[ImportScope] = None
+    default_target_namespace: Optional[str] = None
+    rewrite_refs_on_import: Optional[bool] = None
+    accepted_formats: Optional[List[str]] = None
+    dedupe_identical_types: Optional[bool] = None
+
+    validate_on_save: Optional[bool] = None
+    block_publish_on_errors: Optional[bool] = None
+    core_publish_role: Optional[CorePublishRole] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ==================== Specification import job (CLI / REST contract) ====================
 #
 # Today the dashboard runs imports via Next.js server actions (see objectified-ui/lib/db/import-helper.ts).

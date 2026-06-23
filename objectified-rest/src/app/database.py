@@ -1910,6 +1910,106 @@ class Database:
                 (tenant_id,),
             )
 
+    # ==================== Type-registry settings (#3472) ====================
+
+    # The mutable settings columns, in one place so the read projection and the upsert write
+    # list stay in lock-step (a column added to one but not the other would silently drop).
+    TYPE_REGISTRY_SETTINGS_COLUMNS = (
+        "default_draft",
+        "strict_validation",
+        "allow_annotation_keywords",
+        "coerce_imported_drafts",
+        "resolution_base_url",
+        "ref_style",
+        "allow_remote_refs",
+        "remote_host_allowlist",
+        "max_resolution_depth",
+        "circular_ref_policy",
+        "default_import_scope",
+        "default_target_namespace",
+        "rewrite_refs_on_import",
+        "accepted_formats",
+        "dedupe_identical_types",
+        "validate_on_save",
+        "block_publish_on_errors",
+        "core_publish_role",
+    )
+
+    def get_type_registry_settings(self, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """Get a tenant's persisted type-registry settings (#3472).
+
+        Returns the saved row when one exists. A tenant that has never saved settings has no
+        row; this returns ``None`` and the route layer serves the model defaults (the GET is a
+        pure read and never materializes a row).
+
+        Args:
+            tenant_id: The caller's tenant id.
+
+        Returns:
+            The settings row, or None when the tenant has not saved settings yet.
+        """
+        columns = ", ".join(self.TYPE_REGISTRY_SETTINGS_COLUMNS)
+        query = f"""
+            SELECT {columns}, updated_by, created_at, updated_at
+            FROM odb.type_registry_settings
+            WHERE tenant_id = %s::uuid
+        """
+        results = self.execute_query(query, (tenant_id,))
+        return results[0] if results else None
+
+    def upsert_type_registry_settings(
+        self, tenant_id: str, updates: Dict[str, Any], updated_by: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Insert or update a tenant's type-registry settings (#3472).
+
+        The first save for a tenant inserts a row; subsequent saves update only the supplied
+        fields and leave the rest untouched (``COALESCE`` keeps the stored value when a column
+        is omitted, falling back to the table default on the initial insert). Runs as a single
+        upsert keyed on ``tenant_id``.
+
+        Args:
+            tenant_id: The owning tenant id.
+            updates: Subset of {@link TYPE_REGISTRY_SETTINGS_COLUMNS} to persist; omitted
+                columns keep their current value (or the table default on first save).
+            updated_by: The authenticated user id making the change (None for API-key auth).
+
+        Returns:
+            The full persisted settings row after the write.
+        """
+        columns = list(self.TYPE_REGISTRY_SETTINGS_COLUMNS)
+        # Only the supplied columns get an explicit value; omitted ones fall to their table default
+        # on first insert. On conflict we update *only* the supplied columns — an omitted column is
+        # left exactly as stored. (We cannot COALESCE over EXCLUDED here: for a column absent from
+        # the INSERT list, EXCLUDED.<col> is that column's DEFAULT, not NULL, so a partial update
+        # would otherwise reset every untouched column back to its default.)
+        supplied = [col for col in columns if col in updates]
+        insert_cols = ["tenant_id", "updated_by", *supplied]
+        insert_vals: List[Any] = [tenant_id, updated_by, *(updates[col] for col in supplied)]
+
+        set_clauses = [f"{col} = EXCLUDED.{col}" for col in supplied]
+        set_clauses.append("updated_by = EXCLUDED.updated_by")
+        set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+
+        placeholders = ", ".join(["%s"] * len(insert_vals))
+        select_cols = ", ".join(columns)
+        query = f"""
+            INSERT INTO odb.type_registry_settings ({", ".join(insert_cols)})
+            VALUES ({placeholders})
+            ON CONFLICT (tenant_id) DO UPDATE SET {", ".join(set_clauses)}
+            RETURNING {select_cols}, updated_by, created_at, updated_at
+        """
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, tuple(insert_vals))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
     # ==================== Project CRUD Operations ====================
     # NOTE: queries below select `change_report_template_version_id`, which requires
     # migration 20260414-150000.sql. Ensure that migration is applied before deploying.
