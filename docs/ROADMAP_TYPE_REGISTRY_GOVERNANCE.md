@@ -696,7 +696,7 @@ flowchart LR
 |---|---|---|---|:---:|:---:|---|---|
 | 6.1 #3474 ✅ | Type picker component | **DONE** — `PrimitiveSelector` evolved into the full type picker (`Select Type`): Standard / Core / Tenant / Custom tabs that classify `odb.primitives` by `is_system` / `tenant_id` / `source` (`classifyPrimitive`), per-tab counts, scope chips + per-row scope badges, search across name/namespace/`$ref`/tags, and a per-row resolved `$ref` preview. Selecting a registry type emits a stable `$ref` (`buildTypeRef`, e.g. `std/v0/types/date`) onto `PropertyFormData.$ref` and fires `onTypeBound`; legacy namespace-less primitives still bind by inline schema (no `$ref`). A bound-type chip on the trigger shows/clears the current binding. Persisting the binding is #3475 | `type-registry`,`ui`,`schema-designer`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
 | 6.2 #3475 ✅ | Property→type `$ref` binding storage | **DONE** — the Designer persists a bound property's type reference to dedicated `odb.class_properties` columns (`primitive_id` FK to `odb.primitives` + the stored `primitive_ref` `$ref`, #3448 model), sent top-level on class-property create/update and rehydrated into the bound-type chip on reload. Binding a primitive increments its `usage_count` (create always; update only on a changed binding, so re-saves don't inflate it). Clearing the chip writes NULL/NULL — distinct from the legacy inline-primitive merge (the migration path for namespace-less primitives) | `type-registry`,`ui`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-ui, objectified-rest |
-| 6.3 #3476 | Resolved-type display in Designer/Paths | Show resolved schema + validate against it | `type-registry`,`ui`,`schema-designer`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
+| 6.3 #3476 ✅ | Resolved-type display in Designer/Paths | **DONE** — a bound property's persisted binding (`$ref` + resolved `primitive_id`, #3475) resolves to the primitive's *effective* JSON Schema for display in the Designer's class-property editor: `ResolvedTypePreview` fetches the primitive by its FK (`/api/primitives/{id}`, or accepts a pre-resolved schema for reuse in Paths), `summarizeEffectiveSchema` renders the resolved type/format/constraint pills, and a live example-value field coerces free text to the schema's JSON type and validates it with AJV (2020-12) via `validateExampleAgainstSchema`. Pure resolver/summary/coercion helpers live in `resolvedTypeModel.ts` | `type-registry`,`ui`,`schema-designer`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
 | 6.4 #3477 | "Used by properties" dependents/impact | Reverse index: which properties use a type | `type-registry`,`rest`,`roadmap-type-registry` | Y | N | M | objectified-rest, objectified-ui |
 
 ### Issue 6.1 — Type picker component
@@ -731,7 +731,18 @@ flowchart LR
 - **Parallelism/Dependencies.** Depends on 1.3, 3.1, 6.1; blocks 6.3.
 - **Technical Stack.** Next.js, FastAPI, PostgreSQL.
 
-### Issue 6.3 — Resolved-type display in Designer/Paths
+### Issue 6.3 — Resolved-type display in Designer/Paths ✅ DONE (#3476)
+- **Delivered.** A bound property's persisted binding (`$ref` + resolved `primitive_id`, #3475)
+  resolves to its primitive's *effective* JSON Schema for display in the Designer's class-property
+  editor. New `ResolvedTypePreview` component fetches the primitive by its stored FK
+  (`/api/primitives/{id}`) — or takes a pre-resolved schema so the Paths editor can reuse it —
+  and renders the resolved type, format and constraint pills via `summarizeEffectiveSchema`. A
+  live "try an example value" field coerces free text to the schema's JSON type
+  (`coerceExampleValue`) and validates it against the resolved schema with AJV 2020-12
+  (`validateExampleAgainstSchema`, reusing `lib/database/validateSchema`). The pure
+  resolver/summary/coercion/validation helpers live in `resolvedTypeModel.ts`. Tests:
+  `objectified-ui` `tests/resolvedTypeModel.test.ts` (resolve/summarize/coerce/validate) and
+  `tests/ResolvedTypePreview.test.tsx` (fetch-by-FK render + valid/invalid example validation).
 - **Problem.** The Designer must render the resolved type and validate values against it.
 - **Solution/Scope.** Resolve a property's `$ref` to its effective schema and display it (type,
   format, constraints); use it for client-side validation/preview. Source: property-binding +
