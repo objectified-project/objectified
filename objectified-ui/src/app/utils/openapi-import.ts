@@ -11,6 +11,7 @@ import { convertSwaggerToOpenAPI, isSwagger2 } from './swagger-converter';
 import { convertJsonSchemaToOpenAPI, isJsonSchema } from './jsonschema-converter';
 import { convertGraphQLToOpenAPI, isGraphQL, isGraphQLIntrospection, convertGraphQLIntrospectionToOpenAPI } from './graphql-converter';
 import { convertOpenAPI30ToOpenAPI31, isOpenAPI30 } from './openapi30-converter';
+import { convertOpenAPI32ToOpenAPI31, isOpenAPI32 } from './openapi32-converter';
 import { convertRAMLToOpenAPI, isRAML } from './raml-converter';
 import { convertProtobufToOpenAPI, isProtobuf } from './protobuf-converter';
 import { convertAvroToOpenAPI, isAvroSchemaObject } from './avro-converter';
@@ -483,6 +484,39 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
         : [`Successfully converted from OpenAPI ${originalVersion} to OpenAPI 3.1.x`];
 
       // Continue with the converted spec
+      return parseOpenAPISpecInternal(spec, globalWarnings);
+    }
+
+    // Check for OpenAPI 3.2.0 and normalize to 3.1.x if needed (OA2, #3499).
+    // Runs after the OA1 routing decision (3.2.x is accepted) so 3.2-only constructs
+    // are transformed/stashed rather than silently dropped by the 3.1 importer.
+    if (isOpenAPI32(spec)) {
+      const originalVersion = spec.openapi || '3.2.0';
+      const conversionResult = convertOpenAPI32ToOpenAPI31(spec);
+
+      if (!conversionResult.success) {
+        return {
+          success: false,
+          classes: [],
+          warnings: conversionResult.warnings,
+          error: `OpenAPI 3.2 conversion failed: ${conversionResult.error}`
+        };
+      }
+
+      // Use the normalized spec.
+      spec = conversionResult.document;
+
+      // Surface conversion notes plus any carried-forward 3.2-only constructs.
+      const constructNotes = conversionResult.unsupportedConstructs.map(
+        (c) => `${c.label}: ${c.description} (${c.count} occurrence${c.count === 1 ? '' : 's'})`
+      );
+      const globalWarnings = [
+        `Normalized OpenAPI ${originalVersion} to OpenAPI 3.1.x for import`,
+        ...conversionResult.warnings,
+        ...constructNotes
+      ];
+
+      // Continue with the normalized spec.
       return parseOpenAPISpecInternal(spec, globalWarnings);
     }
 
