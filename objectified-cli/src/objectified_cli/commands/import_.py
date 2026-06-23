@@ -41,6 +41,7 @@ from objectified_cli.import_.detect import (
 from objectified_cli.import_.source import (
     format_document_import_progress,
     load_import_document,
+    source_basename,
 )
 from objectified_cli.import_.json_schema import (
     JsonSchemaTarget,
@@ -893,14 +894,15 @@ def import_auto(
         typer.echo(str(exc), err=True)
         raise typer.Exit(EXIT_USAGE) from exc
 
-    command = resolve_auto_import_command(document)
+    filename = source_basename(path)
+    command = resolve_auto_import_command(document, filename=filename)
     if command is None:
         typer.echo(unrecognized_auto_import_message(document), err=True)
         raise typer.Exit(EXIT_USAGE)
 
     if not no_progress:
         typer.echo(
-            f"Detected {describe_document_format(document)}; "
+            f"Detected {describe_document_format(document, filename=filename)}; "
             f"running import {command}.",
             err=True,
         )

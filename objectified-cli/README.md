@@ -216,7 +216,17 @@ Detect the document format from top-level headers (``openapi``, ``swagger``, ``a
 objectified import auto ./spec.json
 objectified import auto https://example.com/openapi.json
 objectified import auto ./schema.json --dry-run
+
+# Filename hint: a *.arazzo.{yaml,yml,json} document routes to the Arazzo
+# importer even when its `arazzo:` version line is missing or it would
+# otherwise sniff as generic YAML.
+objectified import auto ./checkout.arazzo.yaml
 ```
+
+Content markers always win; the ``*.arazzo.{yaml,yml,json}`` extension hint is a
+last resort applied only when no header matches (mirrors the REST repository
+scanner). Stdin (``-``) has no filename, so pipe Arazzo documents that omit the
+``arazzo:`` line through ``import arazzo`` explicitly.
 
 ### Import OpenAPI
 
