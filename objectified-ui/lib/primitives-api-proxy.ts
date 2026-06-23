@@ -61,13 +61,20 @@ export async function proxyRestGet(
   return { data, error: null, status: response.status };
 }
 
-export async function proxyRestPost(
+/**
+ * Issue a body-carrying request (POST/PUT) to the REST API and normalize the result.
+ *
+ * Shared by {@link proxyRestPost} and {@link proxyRestPut} so the two write verbs handle
+ * non-JSON responses and FastAPI ``detail`` error payloads identically.
+ */
+async function proxyRestWrite(
+  method: 'POST' | 'PUT',
   user: SessionUser,
   path: string,
   body?: unknown
 ): Promise<{ data: unknown; error: string | null; status: number }> {
   const response = await fetch(`${REST_API_BASE_URL}${path}`, {
-    method: 'POST',
+    method,
     headers: createRestAuthHeaders(user),
     cache: 'no-store',
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -86,4 +93,20 @@ export async function proxyRestPost(
   }
 
   return { data, error: null, status: response.status };
+}
+
+export async function proxyRestPost(
+  user: SessionUser,
+  path: string,
+  body?: unknown
+): Promise<{ data: unknown; error: string | null; status: number }> {
+  return proxyRestWrite('POST', user, path, body);
+}
+
+export async function proxyRestPut(
+  user: SessionUser,
+  path: string,
+  body?: unknown
+): Promise<{ data: unknown; error: string | null; status: number }> {
+  return proxyRestWrite('PUT', user, path, body);
 }

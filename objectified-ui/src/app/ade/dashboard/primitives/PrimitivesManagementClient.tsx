@@ -17,6 +17,7 @@ import {
   RefreshCw,
   GitFork,
   Library,
+  FolderTree,
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
@@ -30,6 +31,7 @@ import PrimitivesRegistryKpiStrip from './PrimitivesRegistryKpiStrip';
 import PrimitivesNamespaceCollections from './PrimitivesNamespaceCollections';
 import PrimitivesRecentActivity from './PrimitivesRecentActivity';
 import PrimitivesResolverView from './PrimitivesResolverView';
+import PrimitivesNamespacesView from './PrimitivesNamespacesView';
 import {
   countUnresolvedByNamespace,
   type NamespaceScopeFilter,
@@ -92,7 +94,7 @@ export default function PrimitivesManagementClient() {
   const [namespaceScopeFilter, setNamespaceScopeFilter] = useState<NamespaceScopeFilter>('all');
   const [selectedNamespace, setSelectedNamespace] = useState<string | null>(null);
 
-  const [activeView, setActiveView] = useState<'registry' | 'resolver'>('registry');
+  const [activeView, setActiveView] = useState<'registry' | 'namespaces' | 'resolver'>('registry');
 
   const [showEditorDialog, setShowEditorDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -368,6 +370,20 @@ export default function PrimitivesManagementClient() {
               <button
                 type="button"
                 role="tab"
+                aria-selected={activeView === 'namespaces'}
+                onClick={() => setActiveView('namespaces')}
+                className={`flex items-center gap-2 px-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeView === 'namespaces'
+                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-indigo-500'
+                }`}
+              >
+                <FolderTree className="w-4 h-4" />
+                Namespaces &amp; Scopes
+              </button>
+              <button
+                type="button"
+                role="tab"
                 aria-selected={activeView === 'resolver'}
                 onClick={() => setActiveView('resolver')}
                 className={`flex items-center gap-2 px-1 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -384,6 +400,14 @@ export default function PrimitivesManagementClient() {
 
           {activeView === 'resolver' ? (
             <PrimitivesResolverView onMessage={showMessage} />
+          ) : activeView === 'namespaces' ? (
+            <PrimitivesNamespacesView
+              namespaces={namespaces}
+              unresolvedByNamespace={unresolvedByNamespace}
+              loading={registryLoading}
+              onRefresh={refreshAll}
+              onMessage={showMessage}
+            />
           ) : (
           <>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
