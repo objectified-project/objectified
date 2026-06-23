@@ -396,6 +396,8 @@ const Versions = () => {
   const [publishVisibility, setPublishVisibility] = useState<'private' | 'public'>('private');
   const [publishShortMessage, setPublishShortMessage] = useState('');
   const [publishChangelog, setPublishChangelog] = useState('');
+  /** Force publish: bypass publish prechecks (missing descriptions, OpenAPI build, compatibility). */
+  const [publishForce, setPublishForce] = useState(false);
   /** Publication change report baseline (CR): mirrors REST publish-preview / publish bodies. */
   const [publishChangeReportBaselineMode, setPublishChangeReportBaselineMode] = useState<
     'auto' | 'initial' | 'manual'
@@ -1282,6 +1284,7 @@ const Versions = () => {
     setPublishChangelog(ver.changelog?.trim() ?? '');
     setPublishChangeReportBaselineMode('auto');
     setPublishManualBaselineRevisionId('');
+    setPublishForce(false);
     setPublishPreview(null);
     setPublishPreviewError(null);
     setShowPublishDialog(true);
@@ -1407,6 +1410,7 @@ const Versions = () => {
           visibility: publishVisibility,
           shortMessage: publishShortMessage.trim(),
           changelog: publishChangelog.trim() || null,
+          ...(publishForce ? { skipPublishChecks: true } : {}),
           ...(changeReportUiEnabled
             ? {
                 changeReportBaselineMode: publishChangeReportBaselineMode,
@@ -4052,6 +4056,24 @@ const Versions = () => {
                 placeholder="Release notes; use - breaking: lines for migration docs"
                 className="font-mono text-sm"
               />
+            </div>
+            <div className="space-y-1">
+              <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={publishForce}
+                  onChange={(e) => setPublishForce(e.target.checked)}
+                  className="mt-0.5 rounded border-gray-300 dark:border-gray-600"
+                />
+                <span>Force publish (ignore validation errors)</span>
+              </label>
+              {publishForce && (
+                <Alert variant="warning" className="text-sm">
+                  Publish prechecks will be bypassed — missing class descriptions, OpenAPI build,
+                  and backward-compatibility gates are not enforced. Use only when you intend to
+                  publish despite these errors.
+                </Alert>
+              )}
             </div>
             {changeReportUiEnabled && (
               <div className="space-y-3 rounded-lg border border-indigo-200/80 bg-indigo-50/50 p-4 dark:border-indigo-800/60 dark:bg-indigo-950/20">

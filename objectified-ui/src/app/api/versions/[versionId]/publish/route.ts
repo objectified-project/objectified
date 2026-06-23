@@ -117,6 +117,7 @@ export async function POST(
       changelog,
       changeReportBaselineMode,
       changeReportBaselineRevisionId,
+      skipPublishChecks,
     } = body as {
       projectId?: string;
       visibility?: string;
@@ -124,6 +125,7 @@ export async function POST(
       changelog?: string | null;
       changeReportBaselineMode?: 'auto' | 'initial' | 'manual';
       changeReportBaselineRevisionId?: string | null;
+      skipPublishChecks?: boolean;
     };
 
     if (!projectId) {
@@ -147,6 +149,7 @@ export async function POST(
     if (changeReportBaselineRevisionId !== undefined) {
       payload.changeReportBaselineRevisionId = changeReportBaselineRevisionId;
     }
+    if (skipPublishChecks) payload.skipPublishChecks = true;
 
     const response = await fetch(`${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}/${versionId}/publish`, {
       method: 'POST',
