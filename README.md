@@ -39,12 +39,22 @@ This is a list of the LLMs used, and their purposes.
 | Cursor Auto | Most trivial development tasks |
 | gpt-5.5 | Planning, Roadmaps, Ticket Implementation |
 
+## Development Tools Used
+
+Engineering tools all vary, but the primary ones used are:
+
+- Cursor
+- Copilot CLI
+- Claude CLI
+
 ## Contributing
 
 Fork the project, and off you go.  Please feel free to contribute to the project in the form of pull requests,
 bug reports, fixes, and so on.  We encourage users to contribute!
 
 ## Donations
+
+Donations to help with the Anthropic Claude, Cursor, and GitHub Copilot token budget are always appreciated.
 
 ## License
 
