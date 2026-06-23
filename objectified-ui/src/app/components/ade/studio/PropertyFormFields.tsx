@@ -317,6 +317,14 @@ export interface PropertyFormData {
 
   // Schema Metadata (JSON Schema 2020-12)
   $comment?: string; // Internal comments for schema authors
+
+  // Type Registry binding (#3474 type picker / #3475 persisted binding)
+  /**
+   * Stable registry `$ref` to an `odb.primitives` type selected via the type
+   * picker (e.g. `std/v0/types/date`). Empty/undefined when the property is not
+   * bound to a registry type. Persistence of this binding is handled by #3475.
+   */
+  $ref?: string;
 }
 
 interface SortableEnumItemProps {
@@ -654,7 +662,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
   // State for dependent schemas form
   const [newDepPropName, setNewDepPropName] = React.useState('');
 
-  // When "Apply from Primitive" dialog is open, dim the parent form
+  // When the "Bind to a Type" picker dialog is open, dim the parent form
   const [primitiveDialogOpen, setPrimitiveDialogOpen] = React.useState(false);
 
   // DnD sensors for enum reordering
@@ -1300,10 +1308,10 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b', mb: 0.25 }}>
-              Apply from Primitive
+              Bind to a Type
             </Typography>
             <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
-              Quickly apply format, pattern, and constraints from a predefined primitive type
+              Bind this property to a Standard, Core, Tenant, or Custom registry type — applies its constraints and records a stable $ref
             </Typography>
           </Box>
           <PrimitiveSelector

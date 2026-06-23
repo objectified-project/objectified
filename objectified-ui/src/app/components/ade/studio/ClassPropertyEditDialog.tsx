@@ -168,10 +168,10 @@ const BasicsSection: React.FC<BasicsSectionProps> = ({
             </span>
             <div className="min-w-0">
               <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Apply from Primitive
+                Bind to a Type
               </h4>
               <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                Quickly apply format, pattern, and constraints from a predefined primitive type.
+                Bind this property to a Standard, Core, Tenant, or Custom registry type. The type&apos;s constraints are applied and a stable <code>$ref</code> is recorded.
               </p>
             </div>
           </div>
