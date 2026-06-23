@@ -8,6 +8,7 @@ import { convertSwaggerToOpenAPI, isSwagger2 } from './swagger-converter';
 import { convertJsonSchemaToOpenAPI, isJsonSchema } from './jsonschema-converter';
 import { convertGraphQLToOpenAPI, isGraphQL, isGraphQLIntrospection, convertGraphQLIntrospectionToOpenAPI } from './graphql-converter';
 import { convertOpenAPI30ToOpenAPI31, isOpenAPI30 } from './openapi30-converter';
+import { convertOpenAPI32ToOpenAPI31, isOpenAPI32, OpenAPI32UnsupportedConstruct } from './openapi32-converter';
 import { convertAsyncAPIToOpenAPI, isAsyncAPI } from './asyncapi-converter';
 import { convertRAMLToOpenAPI, isRAML } from './raml-converter';
 import { convertProtobufToOpenAPI, isProtobuf } from './protobuf-converter';
@@ -1465,6 +1466,20 @@ function identifyDeprecatedConstructs(doc: any): UnsupportedFeature[] {
 }
 
 /**
+ * Map a carried-forward OpenAPI 3.2 construct (OA2, #3499) to the analyzer's
+ * unsupported-feature shape for the pre-import compatibility check.
+ */
+function toUnsupportedFeature(construct: OpenAPI32UnsupportedConstruct): UnsupportedFeature {
+  return {
+    id: `openapi32-${construct.id}`,
+    label: construct.label,
+    description: construct.description,
+    count: construct.count,
+    severity: construct.severity
+  };
+}
+
+/**
  * Identify features in the specification that are not or only partially supported by the import.
  * Used for pre-import compatibility check (#573).
  */
@@ -1683,6 +1698,9 @@ export async function analyzeSpecification(fileContent: string, fileName: string
 
   let doc = parseResult.data;
   let conversionWarnings: AnalysisIssue[] = [];
+  // 3.2-only constructs carried forward by the OA2 normalization layer (#3499),
+  // surfaced as unsupported features for the pre-import compatibility check.
+  let openapi32Constructs: UnsupportedFeature[] = [];
 
   // Convert Swagger 2.x to OpenAPI 3.1.x if needed
   if (isSwagger2(doc)) {
@@ -1779,6 +1797,25 @@ export async function analyzeSpecification(fileContent: string, fileName: string
         severity: 'low' as const
       }))
     ];
+  }
+
+  // Normalize OpenAPI 3.2.0 for the pre-import compatibility check (OA2, #3499).
+  // The doc is left as-is (so the version display and OA1 version note are preserved);
+  // the converter is run only to collect the 3.2-only constructs it would carry forward,
+  // which are surfaced below as unsupported features.
+  if (isOpenAPI32(doc)) {
+    const conversionResult = convertOpenAPI32ToOpenAPI31(doc);
+    if (conversionResult.success) {
+      openapi32Constructs = conversionResult.unsupportedConstructs.map(toUnsupportedFeature);
+      conversionWarnings = [
+        ...conversionWarnings,
+        ...conversionResult.warnings.map(warning => ({
+          type: 'warning' as const,
+          message: warning,
+          severity: 'low' as const
+        }))
+      ];
+    }
   }
 
   // Convert Apache Avro (.avsc) to OpenAPI 3.1–like document for import (#239) — before JSON Schema so Avro records are not mistaken for JSON Schema
@@ -2211,7 +2248,8 @@ export async function analyzeSpecification(fileContent: string, fileName: string
   const allWarnings = [...conversionWarnings, ...warnings];
 
   // Identify unsupported features for import compatibility (#573)
-  const unsupportedFeatures = identifyUnsupportedFeatures(doc);
+  // Append any 3.2-only constructs carried forward by the OA2 normalization layer (#3499).
+  const unsupportedFeatures = [...identifyUnsupportedFeatures(doc), ...openapi32Constructs];
 
   return {
     isValid: validation.valid,
