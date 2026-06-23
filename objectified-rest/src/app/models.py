@@ -1,6 +1,7 @@
 from datetime import datetime
-from pydantic import BaseModel, Field, AliasChoices, ConfigDict, model_validator
-from typing import Callable, Optional, Dict, Any, List, Union, Literal
+from typing import Any, Callable, Dict, List, Literal, Optional, Union
+
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from .repository_refresh_status import RefreshStatus, compute_refresh_status
 
@@ -220,6 +221,72 @@ class PrimitiveImportRecord(BaseModel):
     error_count: int = 0
     imported_by: Optional[str] = None
     created_at: Optional[Union[datetime, str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== Import pipeline staging (#3460) ====================
+
+
+class GitSourceLocator(BaseModel):
+    """Locator for the ``git`` import method — a single file in a Git repository (#3460).
+
+    MVP supports public ``github.com`` repositories; the file is fetched via the
+    GitHub contents API.
+    """
+    repo_url: str  # A github.com repository URL.
+    path: str  # Path to the file within the repository.
+    ref: Optional[str] = None  # Branch / tag / SHA; defaults to 'main' when omitted.
+
+    class Config:
+        from_attributes = True
+
+
+class PrimitiveImportStageRequest(BaseModel):
+    """Request to stage an import through the pipeline (#3460).
+
+    The pipeline accepts a source ``kind`` (json-schema / type-def-bundle / openapi)
+    by one of four ``method``s (paste / file / url / git), fetches and parses it, and
+    returns a *staged* result — candidate types ready for parsing (#3461/#3462),
+    ref-rewrite (#3463), and review (#3464). Nothing is committed to the registry.
+
+    Locator fields are method-specific: ``content`` carries paste/file text, ``url``
+    the http(s) source, and ``git`` the repository locator.
+    """
+    source_kind: str = 'json-schema'  # 'json-schema' | 'type-def-bundle' | 'openapi'
+    source_method: str = 'paste'  # 'paste' | 'file' | 'url' | 'git'
+    source_label: Optional[str] = None  # Human label / filename for provenance.
+    target_namespace: Optional[str] = None  # Registry namespace the import targets.
+    content: Optional[str] = None  # Raw document text (paste/file); JSON or YAML.
+    url: Optional[str] = None  # Source URL (url method).
+    git: Optional[GitSourceLocator] = None  # Git locator (git method).
+
+    class Config:
+        from_attributes = True
+
+
+class StagedTypeCandidate(BaseModel):
+    """One candidate type detected in a staged import (#3460)."""
+    name: str  # The candidate's name (schema key or derived single-doc name).
+    pointer: str  # JSON Pointer to the fragment within the source (e.g. #/$defs/Money).
+    ref_count: int = 0  # Number of $ref values in the fragment (rewrite signal).
+
+    class Config:
+        from_attributes = True
+
+
+class PrimitiveImportStageResult(BaseModel):
+    """The staged result of an import plus the id of its provenance record (#3460)."""
+    import_id: Optional[str] = None  # The recorded odb.primitive_imports row id.
+    status: str = 'staged'  # Lifecycle status of the import (always 'staged' here).
+    source_kind: str
+    source_method: str
+    source_label: Optional[str] = None
+    target_namespace: Optional[str] = None
+    detected_count: int = 0  # Number of candidate types detected.
+    candidates: List[StagedTypeCandidate] = []
+    warnings: List[str] = []  # Non-fatal notes (e.g. an empty container).
 
     class Config:
         from_attributes = True

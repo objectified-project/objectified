@@ -5,43 +5,48 @@ Provides CRUD endpoints for managing primitive type definitions.
 All endpoints are tenant-scoped and require authentication via JWT token or API key.
 """
 
-from fastapi import APIRouter, HTTPException, Header, Query, Depends
-from typing import Optional, List, Dict, Any
-import json
+from typing import Any, Dict, List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from .auth import get_authenticated_user_id, validate_authentication
 from .database import db
+from .import_ingestion import IngestionError, ingest_source
+from .import_pipeline import VALID_SOURCE_KINDS, build_staged_import
 from .models import (
-    PrimitiveSchema,
     PrimitiveCreateRequest,
-    PrimitiveUpdateRequest,
-    PrimitiveImportRequest,
     PrimitiveImportRecord,
+    PrimitiveImportRequest,
+    PrimitiveImportStageRequest,
+    PrimitiveImportStageResult,
+    PrimitiveSchema,
+    PrimitiveUpdateRequest,
     RegistryHealthResponse,
     UnresolvedRefPrimitive,
     UnresolvedRefsResponse,
 )
-from .auth import validate_authentication, get_authenticated_user_id
-from .schema_validation import (
-    SchemaValidationError,
-    validate_schema_document,
-    derive_base_uri,
-    derive_draft,
-    derive_schema_id,
-    stamp_identity,
-    REGISTRY_BASE_URL,
-)
+from .primitives_resolver import build_ref_edges
 from .primitives_scope import (
     ScopeViolationError,
     enforce_ref_scope,
     is_core_namespace,
     tenant_segment_of,
 )
-from .primitives_resolver import build_ref_edges
+from .schema_validation import (
+    REGISTRY_BASE_URL,
+    SchemaValidationError,
+    derive_base_uri,
+    derive_draft,
+    derive_schema_id,
+    stamp_identity,
+    validate_schema_document,
+)
 
 router = APIRouter(prefix="/v1/primitives", tags=["primitives"])
 
-# Allowed import source shapes — must match the odb.primitive_imports CHECK constraint.
-VALID_IMPORT_SOURCE_KINDS = {"json-schema", "type-def-bundle", "openapi"}
+# Allowed import source shapes — must match the odb.primitive_imports CHECK
+# constraint. Sourced from the pipeline so the staging and legacy paths agree.
+VALID_IMPORT_SOURCE_KINDS = VALID_SOURCE_KINDS
 
 
 def _schema_validation_http_error(errors: List[Dict[str, str]]) -> HTTPException:
@@ -672,7 +677,7 @@ async def update_primitive(
         if "unique constraint" in str(e).lower():
             raise HTTPException(
                 status_code=409,
-                detail=f"A primitive with that name already exists in the category"
+                detail="A primitive with that name already exists in the category"
             )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -891,3 +896,110 @@ async def import_primitives(
         "import_id": import_id,
         **report,
     }
+
+
+@router.post("/{tenant_slug}/import/stage", response_model=PrimitiveImportStageResult)
+async def stage_import(
+    tenant_slug: str,
+    request: PrimitiveImportStageRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> PrimitiveImportStageResult:
+    """Stage an import through the unified pipeline (#3460).
+
+    The single orchestration path for all source kinds and intake methods: it
+    fetches the source (paste / file / url / git), parses it (JSON or YAML),
+    detects the candidate types it carries (json-schema / type-def-bundle /
+    openapi), records a provenance row on ``odb.primitive_imports`` marked
+    ``staged``, and returns the staged candidates.
+
+    Nothing is committed to the registry here — parsing into discrete types
+    (#3461/#3462), ``$ref`` rewrite (#3463), and conflict/dedupe review (#3464)
+    operate on the staged result in the subsequent pipeline stages. The legacy
+    ``POST /{tenant_slug}/import`` (paste, commit) remains supported alongside it.
+
+    Args:
+        tenant_slug: The tenant slug.
+        request: The staging request (source kind/method + a method locator).
+        auth_data: Authentication data (injected by dependency).
+
+    Returns:
+        The staged result: detected candidates plus the recorded ``import_id``.
+
+    Raises:
+        HTTPException: 400 for an invalid source kind/method or missing locator,
+            422 for an unparseable source, 502 for a fetch failure.
+    """
+    if request.source_kind not in VALID_IMPORT_SOURCE_KINDS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Invalid source_kind '{request.source_kind}'. "
+                f"Expected one of: {', '.join(sorted(VALID_IMPORT_SOURCE_KINDS))}"
+            )
+        )
+
+    # Ingest (fetch + parse) the source document for the declared method. A bad
+    # locator or empty/invalid document is a 400/422; a remote fetch failure is a
+    # 502 (the source, not the request, is at fault).
+    git_locator = request.git.model_dump() if request.git is not None else None
+    try:
+        ingested = ingest_source(
+            request.source_method,
+            content=request.content,
+            url=request.url,
+            git=git_locator,
+            source_label=request.source_label,
+        )
+    except IngestionError as e:
+        # A network/remote failure is a 502; a client-side locator/parse problem is a 400.
+        is_remote = request.source_method in ("url", "git") and (
+            "fetch" in e.message.lower() or "http" in e.message.lower()
+        )
+        raise HTTPException(status_code=502 if is_remote else 400, detail=e.message)
+
+    # Detect candidate types and assemble the staged result (pure; no commit).
+    try:
+        staged = build_staged_import(
+            ingested.document,
+            source_kind=request.source_kind,
+            source_method=request.source_method,
+            source_label=ingested.resolved_label,
+            target_namespace=request.target_namespace,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Record an auditable provenance row for the staged import (#3448 reuse). The
+    # report carries the staged candidates and warnings; counts stay zero because
+    # nothing was committed. Best-effort: a record failure must not lose the
+    # staged result, but it is surfaced as a warning so the audit gap is visible.
+    created_by = get_authenticated_user_id(auth_data)
+    import_id = None
+    try:
+        import_record = db.create_primitive_import(
+            tenant_id=auth_data['tenant_id'],
+            report=staged.report(),
+            source_kind=staged.source_kind,
+            source_label=staged.source_label,
+            target_namespace=staged.target_namespace,
+            options={"source_method": staged.source_method, "staged": True},
+            imported_count=0,
+            skipped_count=0,
+            error_count=0,
+            imported_by=created_by,
+        )
+        import_id = str(import_record['id'])
+    except Exception as e:
+        staged.warnings.append(f"Failed to record import provenance: {e}")
+
+    return PrimitiveImportStageResult(
+        import_id=import_id,
+        status=staged.status,
+        source_kind=staged.source_kind,
+        source_method=staged.source_method,
+        source_label=staged.source_label,
+        target_namespace=staged.target_namespace,
+        detected_count=staged.detected_count,
+        candidates=[c.as_dict() for c in staged.candidates],
+        warnings=staged.warnings,
+    )

@@ -5,6 +5,24 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.16] - 2026-06-22
+
+### Added
+- **Import pipeline core + ingestion (#3460)** — new `POST /v1/primitives/{tenant_slug}/import/stage`,
+  the single orchestration path for all import sources. It ingests a document by one of four
+  methods — `paste` / `file` (inline text), `url` (http/https fetch), or `git` (a file from a public
+  github.com repo, reusing the repository-scan fetcher) — parses it as JSON **or** YAML, and detects
+  the candidate types it carries, dispatched on source kind: `$defs`/`definitions` for `json-schema`
+  (a bare document is one candidate), the `types`/`$defs` container for `type-def-bundle`, and
+  `components.schemas` for `openapi`. The result is *staged*, not committed — each candidate carries
+  its JSON Pointer and `$ref` count for the downstream parse (#3461/#3462), `$ref` rewrite (#3463),
+  and conflict review (#3464) stages. Every staged import records an auditable `staged`
+  `odb.primitive_imports` row (reusing #3448; no new table). The legacy paste-and-commit
+  `POST /v1/primitives/{tenant_slug}/import` is unchanged. New `app/import_ingestion.py` (per-method
+  fetch + JSON/YAML parse), `app/import_pipeline.py` (pure detection + staging), and
+  `PrimitiveImportStageRequest` / `PrimitiveImportStageResult` / `StagedTypeCandidate` /
+  `GitSourceLocator` models.
+
 ## [1.0.13] - 2026-06-22
 
 ### Added
