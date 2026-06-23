@@ -183,7 +183,13 @@ class ImportResolution(BaseModel):
     type the review classified as a **Conflict** (an existing type with the same registry
     identity but a different schema); New and Identical types ignore any resolution.
     """
-    action: str = 'keep'  # 'keep' (leave existing) | 'overwrite' | 'rename'
+    # One of 'keep' (leave existing) | 'overwrite' | 'rename'. Kept a plain ``str`` rather than an
+    # ``Enum`` deliberately: ``_normalize_resolutions`` validates it against
+    # ``primitives_review.VALID_ACTIONS`` and rejects an unknown action with a domain-specific
+    # **400** ("Invalid resolution action ..."). A Pydantic ``Enum`` field would instead reject it
+    # with a generic **422** before that handler runs, so a typo like 'Overwrite' is *not* silently
+    # accepted today — it is surfaced as a clear 400.
+    action: str = 'keep'
     new_name: Optional[str] = None  # Required when action == 'rename'.
 
     class Config:

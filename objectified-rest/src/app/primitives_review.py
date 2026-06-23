@@ -60,6 +60,11 @@ def schemas_equivalent(a: Any, b: Any) -> bool:
     derived ``$id`` whenever they share a registry identity, so a plain deep comparison
     distinguishes a true duplicate (Identical) from a divergent redefinition (Conflict).
 
+    Python ``==`` on ``dict``/``list`` is recursive and *key-order independent* — two dicts
+    are equal when they hold the same key/value pairs regardless of insertion order — so this
+    is robust to the non-deterministic key ordering JSON/YAML deserialization can produce and
+    needs no canonical (``sort_keys``) serialization to compare correctly.
+
     Args:
         a: One schema document (e.g. the existing row's ``schema``).
         b: The other schema document (e.g. the stamped candidate).
@@ -180,8 +185,12 @@ def decide(
             )
         return CommitDecision(action="rename", outcome=OUTCOME_RENAMED, new_name=new_name)
 
-    # ACTION_KEEP (and any unrecognized action defaulting to keep): leave the existing
-    # type in place, but report the conflict rather than dropping it silently.
+    # ACTION_KEEP is the explicit default. The HTTP layer rejects any non-``VALID_ACTIONS``
+    # value with a 400 (see ``_normalize_resolutions``) before reaching here, so an unrecognized
+    # action is unreachable from a request; this pure function nonetheless degrades to the safe
+    # default (keep) rather than raising, so a direct caller that forgets to validate still gets
+    # a defined, non-destructive outcome. Either way: leave the existing type in place, but
+    # report the conflict rather than dropping it silently.
     return CommitDecision(
         action="skip",
         outcome=OUTCOME_SKIPPED,

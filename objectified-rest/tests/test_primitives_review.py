@@ -120,3 +120,12 @@ def test_unknown_action_defaults_to_keep():
     d = decide(STATUS_CONFLICT, action="bogus")
     assert d.action == "skip"
     assert d.outcome == OUTCOME_SKIPPED
+
+
+def test_empty_string_action_defaults_to_keep():
+    # An empty action string is just another unrecognized value: it degrades to the safe
+    # default (keep → surfaced as skipped), never overwrite/rename. The HTTP layer rejects it
+    # upstream with a 400; this documents the pure function's defensive fallback explicitly.
+    d = decide(STATUS_CONFLICT, action="")
+    assert d.action == "skip"
+    assert d.outcome == OUTCOME_SKIPPED

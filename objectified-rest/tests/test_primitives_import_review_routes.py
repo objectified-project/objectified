@@ -270,14 +270,18 @@ def test_commit_dedupes_identical_definitions():
 
 
 def test_commit_invalid_resolution_action_is_400():
+    # Resolution validation (_normalize_resolutions) runs before any registry lookup, so no
+    # get_primitive_by_schema_id stub is needed — the 400 is raised before the commit loop. The
+    # db is patched only to guarantee the route can't reach a real database if that order ever
+    # changed; the lookup is asserted untouched below.
     with patch("app.primitives_routes.db") as mdb:
-        mdb.get_primitive_by_schema_id.return_value = None
         r = _import(
             {"$defs": {"Money": {"type": "object"}}},
             resolutions={"Money": {"action": "explode"}},
         )
     assert r.status_code == 400
     assert "Invalid resolution action" in r.json()["detail"]
+    mdb.get_primitive_by_schema_id.assert_not_called()
 
 
 def test_commit_rename_without_new_name_is_400():

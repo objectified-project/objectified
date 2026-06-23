@@ -752,9 +752,19 @@ class _PreparedDefinition:
     New / Identical / Conflict. The same prepared state drives the dry-run review endpoint and
     the commit path, so a committed outcome can never disagree with the review that preceded it.
 
+    The ``status`` field carries two related-but-distinct ideas under one ``STATUS_*`` value:
+    a *registry* classification (``STATUS_NEW`` / ``STATUS_IDENTICAL`` / ``STATUS_CONFLICT``)
+    for a committable definition, or ``STATUS_INVALID`` when the definition can't be committed
+    at all. Use ``valid`` to disambiguate the latter: ``status == STATUS_INVALID`` covers both a
+    malformed draft 2020-12 schema (``valid is False``, with ``validation_errors``) *and* a
+    well-formed schema that violates scope (``valid is True``, with a ``scope_violation`` error).
+    A caller that only cares about the New/Identical/Conflict classification should first gate on
+    ``status == STATUS_INVALID`` (as the commit and review paths do) before reading the rest.
+
     Attributes:
         name: The definition's name (its registry-identity leaf).
-        status: The classification — a ``primitives_review.STATUS_*`` value.
+        status: The classification — a ``primitives_review.STATUS_*`` value (``STATUS_INVALID``
+            when the definition cannot be committed; see the note above on ``valid``).
         valid: Whether the fragment is a valid draft 2020-12 schema (scope violations are
             valid schemas, so this stays ``True`` for them).
         validation_errors: Field-level draft 2020-12 errors when ``valid`` is ``False``.
@@ -1046,6 +1056,12 @@ def _commit_imported_definitions(
             elif decision.action == "rename":
                 # Re-prepare under the new name so it gets its own registry identity, then
                 # create it — unless that name is itself already taken (a fresh conflict).
+                # A rename only re-derives *this* definition's $id; sibling definitions in the
+                # same bundle keep their own identities. A sibling's ``$ref`` therefore resolves
+                # against the name it was authored to point at, not this new name — renaming one
+                # type does not silently re-point its siblings' edges. An edge that pointed at
+                # this type's original name lands in that sibling's ``unresolved_refs`` (the
+                # review surfaces it), exactly as it would for any other unresolved registry ref.
                 renamed_prep = _prepare_imported_definition(
                     decision.new_name,
                     def_schema,
