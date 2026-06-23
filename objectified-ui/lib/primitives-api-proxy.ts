@@ -60,3 +60,30 @@ export async function proxyRestGet(
 
   return { data, error: null, status: response.status };
 }
+
+export async function proxyRestPost(
+  user: SessionUser,
+  path: string,
+  body?: unknown
+): Promise<{ data: unknown; error: string | null; status: number }> {
+  const response = await fetch(`${REST_API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: createRestAuthHeaders(user),
+    cache: 'no-store',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  const contentType = response.headers.get('content-type');
+  if (!contentType?.includes('application/json')) {
+    const text = await response.text();
+    return { data: null, error: text || 'Request failed', status: response.status || 500 };
+  }
+
+  const data = await response.json();
+  if (!response.ok) {
+    const detail = typeof data?.detail === 'string' ? data.detail : 'Request failed';
+    return { data: null, error: detail, status: response.status };
+  }
+
+  return { data, error: null, status: response.status };
+}
