@@ -86,44 +86,44 @@ Five phases. Ship gates at the end of Phase 4 (`RC1`) and Phase 5 (`GA-ready`). 
 
 ---
 
-### Phase 0 — Prove the Spine & Stop the Bleeding  *(week 1)*
+### Phase 0 — Prove the Spine & Stop the Bleeding  *(week 1)*  · **Epic #3603**
 *Lock down what's already built before adding anything. Nothing here is optional.*
 
-**0.1 — End-to-end spine smoke test** · **M** · *blocks everything*
+**0.1 — End-to-end spine smoke test** (#3608) · **M** · *blocks everything*
 Author one golden path exercised in CI and by hand: `import an OpenAPI doc → edit a class & a path in the
 UI → lint → cut a version → publish → view in browse → export OpenAPI + download via CLI → query via MCP`.
 This is both a regression net and the definition of "the product works."
 *Exit:* a scripted run (and a manual checklist) that goes green start-to-finish on a clean `docker compose up`.
 
-**0.2 — Real quality-scoring / linting service** · **L** · *blocks RC; gap #1*
+**0.2 — Real quality-scoring / linting service** (#3609) · **L** · *blocks RC; gap #1*
 Promote the A–F score from localStorage to a backend endpoint: a rule set over the OpenAPI/JSON-Schema
 output (naming, descriptions, missing examples, unbounded arrays, breaking-change flags via the existing
 `compatibility_engine`), returning a score + itemized findings. Wire the UI badges and a per-version report
 to it. ‖ parallel with 0.3.
 *Exit:* `GET .../lint` (or equivalent) returns deterministic findings + score; UI reflects server truth; CLI `lint` command added.
 
-**0.3 — Auth & secret hardening pass** · **M** · *blocks RC* · ‖ parallel
+**0.3 — Auth & secret hardening pass** (#3610) · **M** · *blocks RC* · ‖ parallel
 Token lifetimes/refresh, API-key scope audit, CORS, secret handling in compose/env (`docker-compose.env.example`
 reviewed), brute-force/lockout on login. No new authz model yet — that's 1.1.
 *Exit:* documented auth model; no plaintext secrets in repo/images; pen-test-style checklist passed.
 
 ---
 
-### Phase 1 — Access & Trust  *(weeks 2–4)*
+### Phase 1 — Access & Trust  *(weeks 2–4)*  · **Epic #3604**
 *The things that make multi-tenant exposure safe. Highest-priority gap fills.*
 
-**1.1 — Granular RBAC + platform-admin plane** · **L** · *blocks RC; gap #2*
+**1.1 — Granular RBAC + platform-admin plane** (#3611) · **L** · *blocks RC; gap #2*
 Implement the `access/` mockup: roles (`Owner/Admin/Editor/Viewer` + custom), a `role_permissions` model,
 and a **central permission guard** replacing ad-hoc `_assert_tenant_admin` checks on every route. Separate
 platform-admin from tenant-admin. Member lifecycle (invite/suspend/offboard) UI.
 *Depends on:* 0.3. *Exit:* every mutating route is permission-checked; matrix editable in UI; audit log of grants.
 
-**1.2 — Security review of the branch/surface** · **M** · *blocks RC* · ‖ parallel with 1.1 tail
+**1.2 — Security review of the branch/surface** (#3612) · **M** · *blocks RC* · ‖ parallel with 1.1 tail
 Run `/security-review`; address authz bypass, injection, SSRF (import-from-URL, repo refresh), file-upload,
 and multi-tenant data-isolation findings. Add per-tenant rate limiting on public + auth endpoints.
 *Exit:* no High/Critical findings open; rate limits enforced; isolation tests pass.
 
-**1.3 — Backup & DR baseline** · **M** · *blocks RC; gap #3*
+**1.3 — Backup & DR baseline** (#3613) · **M** · *blocks RC; gap #3*
 Implement the `backup/` mockup at MVP depth: scheduled logical backups (tenant + project scope), encrypted
 off-site copy, a **documented and tested** restore runbook, and at least a manual PITR using the existing
 snapshot+event model. Full DR-drill automation can trail into Phase 5.
@@ -131,15 +131,15 @@ snapshot+event model. Full DR-drill automation can trail into Phase 5.
 
 ---
 
-### Phase 2 — Developer Value & First-Run  *(weeks 4–6, overlaps Phase 1)*
+### Phase 2 — Developer Value & First-Run  *(weeks 4–6, overlaps Phase 1)*  · **Epic #3605**
 *Make the first five minutes great and close the consume loop.*
 
-**2.1 — Onboarding & sample content** · **M** · *blocks RC; gap #5*
+**2.1 — Onboarding & sample content** (#3614) · **M** · *blocks RC; gap #5*
 Fill `README.md` Getting Started (compose quick-start + first-project walkthrough). Add a seeded **sample
 project** and 2–3 **starter templates/blueprints** so a new tenant isn't empty. Guided first-run in the UI.
 *Exit:* a brand-new user reaches a published, browsable spec in < 10 minutes without docs spelunking.
 
-**2.2 — Mock Server** · **L** · *high value; gap #4* · ‖ parallel with 2.1
+**2.2 — Mock Server** (#3615) · **L** · *high value; gap #4* · ‖ parallel with 2.1
 Implement the `mock-server/` mockup: one-click hosted mock from a published version, schema-valid responses
 (examples + faker), per-operation scenarios, optional stateful mode. Generated from existing
 `/v1/swagger/...` output. Free-tier mocks auto-expire.
@@ -148,37 +148,37 @@ Implement the `mock-server/` mockup: one-click hosted mock from a published vers
 
 ---
 
-### Phase 3 — Release Engineering & Operability  *(weeks 5–7, overlaps Phase 2)*
+### Phase 3 — Release Engineering & Operability  *(weeks 5–7, overlaps Phase 2)*  · **Epic #3606**
 *What turns "works" into "operable in production."*
 
-**3.1 — Test coverage across the spine** · **L** · *blocks RC*
+**3.1 — Test coverage across the spine** (#3616) · **L** · *blocks RC*
 Integration tests on the REST routers touched by the golden path; component tests on the UI editors;
 contract tests between UI ↔ REST. CI gates merges on them.
 *Exit:* spine endpoints + editors covered; CI red on regression of the golden path.
 
-**3.2 — Observability & error handling** · **M** · *blocks RC* · ‖ parallel
+**3.2 — Observability & error handling** (#3617) · **M** · *blocks RC* · ‖ parallel
 Structured logs (MCP already uses structlog — extend to REST), health/readiness endpoints, error tracking,
 and a minimal ops dashboard (request rate, error rate, latency, backup status). Graceful API error envelopes.
 *Exit:* a failing request is diagnosable from logs/metrics alone; health checks wired into compose/deploy.
 
-**3.3 — Production deployment story** · **M** · *blocks RC* · ‖ parallel
+**3.3 — Production deployment story** (#3618) · **M** · *blocks RC* · ‖ parallel
 Promote `docker-compose` to a documented production deploy (TLS, managed Postgres or pinned volume, secrets,
 backups from 1.3 wired in, migration step gated). Reproducible from a clean host.
 *Exit:* documented deploy runbook produces a working stack on a fresh environment; rollback documented.
 
-**3.4 — Documentation set** · **M** · ‖ parallel
+**3.4 — Documentation set** (#3619) · **M** · ‖ parallel
 User guide for the spine, API reference (the REST app already serves Swagger UI — publish it), MCP setup,
 CLI reference. Keep it lean; depth can grow post-RC.
 *Exit:* each spine capability has a "how do I…" page; MCP/CLI quick-starts exist.
 
 ---
 
-### Phase 4 — RC1 Stabilization & Gate  *(week 8)*
+### Phase 4 — RC1 Stabilization & Gate  *(week 8)*  · **Epic #3607**
 *Dogfood, burn down, sign off.*
 
-**4.1 — Private beta / dogfood** · **M** — invite a small cohort; triage on real usage.
-**4.2 — Bug burn-down** · **M** — fix Critical/High; defer the rest with explicit notes.
-**4.3 — Performance & accessibility pass** · **S–M** — load-check the spine endpoints; a11y audit of editors/browse.
+**4.1 — Private beta / dogfood** (#3620) · **M** — invite a small cohort; triage on real usage.
+**4.2 — Bug burn-down** (#3621) · **M** — fix Critical/High; defer the rest with explicit notes.
+**4.3 — Performance & accessibility pass** (#3622) · **S–M** — load-check the spine endpoints; a11y audit of editors/browse.
 **4.4 — RC1 release gate** — all boxes in §5 checked → **tag `v1.0.0-rc.1`, announce publicly.**
 
 ---
@@ -241,6 +241,35 @@ The three RC-relevant gaps now have draft mockups (static HTML, matching the exi
 - `docs/planning/mockups/backup/` — Backup catalog, Restore & PITR, DR drills *(supports 1.3)*
 
 All three are registered in `docs/planning/mockups/index.html`.
+
+---
+
+## 9. GitHub Issue Tracker
+
+Created in `objectified-project/objectified` (pack label `roadmap-first-rc`, all tagged `mvp`):
+
+| Issue | Title | Phase |
+|---|---|---|
+| #3603 | Epic: RC1 Phase 0 — Prove the Spine & Stop the Bleeding | 0 |
+| #3608 | RC1-0.1 — End-to-end spine smoke test (golden path) | 0 |
+| #3609 | RC1-0.2 — Real quality-scoring / linting service | 0 |
+| #3610 | RC1-0.3 — Auth & secret hardening pass | 0 |
+| #3604 | Epic: RC1 Phase 1 — Access & Trust | 1 |
+| #3611 | RC1-1.1 — Granular RBAC + platform-admin plane | 1 |
+| #3612 | RC1-1.2 — Security review + per-tenant rate limiting | 1 |
+| #3613 | RC1-1.3 — Backup & disaster-recovery baseline | 1 |
+| #3605 | Epic: RC1 Phase 2 — Developer Value & First-Run | 2 |
+| #3614 | RC1-2.1 — Onboarding, sample project & starter templates | 2 |
+| #3615 | RC1-2.2 — Mock Server | 2 |
+| #3606 | Epic: RC1 Phase 3 — Release Engineering & Operability | 3 |
+| #3616 | RC1-3.1 — Test coverage across the spine | 3 |
+| #3617 | RC1-3.2 — Observability & error handling | 3 |
+| #3618 | RC1-3.3 — Production deployment story | 3 |
+| #3619 | RC1-3.4 — Documentation set (spine + API/MCP/CLI) | 3 |
+| #3607 | Epic: RC1 Phase 4 — Stabilization & Release Gate | 4 |
+| #3620 | RC1-4.1 — Private beta / dogfood | 4 |
+| #3621 | RC1-4.2 — Bug burn-down | 4 |
+| #3622 | RC1-4.3 — Performance & accessibility pass | 4 |
 
 ---
 
