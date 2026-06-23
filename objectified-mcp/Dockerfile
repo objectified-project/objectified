@@ -8,9 +8,13 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 WORKDIR /build
 
+# READMEs are copied alongside each pyproject because both packages declare
+# `readme = "README.md"`; hatchling reads it while building the (non-editable) wheels.
 COPY objectified-rest/pyproject.toml /build/objectified-rest/pyproject.toml
+COPY objectified-rest/README.md /build/objectified-rest/README.md
 COPY objectified-rest/src /build/objectified-rest/src
 COPY objectified-mcp/pyproject.toml /build/objectified-mcp/pyproject.toml
+COPY objectified-mcp/README.md /build/objectified-mcp/README.md
 COPY objectified-mcp/uv.lock /build/objectified-mcp/uv.lock
 COPY objectified-mcp/src /build/objectified-mcp/src
 
