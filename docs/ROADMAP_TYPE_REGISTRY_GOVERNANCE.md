@@ -585,7 +585,7 @@ The in-app surface under **Control Panel → Governance**, matching the `governa
 |---|---|---|---|:---:|:---:|---|---|
 | 5.1 #3466 | ~~Governance nav entry + route group~~ | **CLOSED — duplicate** (`/ade/dashboard/primitives` in nav) | `type-registry`,`ui`,`governance`,`mvp`,`roadmap-type-registry` | N | Y | S | objectified-ui |
 | 5.2 #3467 ✅ | Enhance Primitives overview (registry KPIs) | **DONE** — KPI strip from stats API, namespace collections, recent import activity, row click → type detail | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
-| 5.3 #3468 | Type detail page | Schema, resolved refs, dependents, metadata | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
+| 5.3 #3468 ✅ | Type detail page | **DONE** — read-only detail at `/ade/dashboard/primitives/[id]`: JSON Schema, reference-resolution table (#3456), generated example instance, dependents (graceful empty-state until #3477 reverse index), metadata (scope/namespace/version-root/owner/mutability), base chain, used-in mini-stats, Export-schema download + gated Deprecate (lifecycle #3482) | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
 | 5.4 #3469 | Import UI (wizard) | Source/options/review wired to Epic 4 | `type-registry`,`ui`,`import`,`mvp`,`roadmap-type-registry` | Y | Y | L | objectified-ui |
 | 5.5 #3470 | Reference Resolver UI | Graph + table, base, unresolved/circular | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
 | 5.6 #3471 | Namespaces & Scopes UI | Manage namespaces, scope, base URI, version root | `type-registry`,`ui`,`registry`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
@@ -862,7 +862,7 @@ epic.
 | #3440 E2 | #3450 (2.1) · #3451 (2.2) · #3452 (2.3) · #3453 (2.4) · #3454 (2.5) · ~~#3455 (2.6)~~ ✅ closed |
 | #3441 E3 | #3456 (3.1) · #3457 (3.2) · #3458 (3.3) · #3459 (3.4) |
 | #3442 E4 | #3460 (4.1) · #3461 (4.2) · #3462 (4.3) · #3463 (4.4) · #3464 (4.5) · #3465 (4.6) |
-| #3443 E5 | ~~#3466 (5.1)~~ ✅ closed · ~~#3467 (5.2)~~ ✅ · #3468 (5.3) · #3469 (5.4) · #3470 (5.5) · #3471 (5.6) · #3472 (5.7) · #3473 (5.8) |
+| #3443 E5 | ~~#3466 (5.1)~~ ✅ closed · ~~#3467 (5.2)~~ ✅ · ~~#3468 (5.3)~~ ✅ · #3469 (5.4) · #3470 (5.5) · #3471 (5.6) · #3472 (5.7) · #3473 (5.8) |
 | #3444 E6 | #3474 (6.1) · #3475 (6.2) · #3476 (6.3) · #3477 (6.4) |
 | #3445 E7 | #3478 (7.1) · #3479 (7.2) · #3480 (7.3) · #3481 (7.4) · #3482 (7.5) |
 
