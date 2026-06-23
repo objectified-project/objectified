@@ -165,6 +165,7 @@ def test_import_rejects_scope_violating_definition_but_imports_valid():
     with patch("app.primitives_routes.db") as mdb:
         mdb.create_primitive.side_effect = _create
         mdb.create_primitive_import.return_value = {"id": "imp1"}
+        mdb.get_primitive_by_schema_id.return_value = None  # clean registry — all New (#3464)
         r = client.post(
             "/v1/primitives/acme/import",
             json={

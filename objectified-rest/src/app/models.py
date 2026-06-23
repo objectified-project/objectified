@@ -176,6 +176,20 @@ class PrimitiveUpdateRequest(BaseModel):
         from_attributes = True
 
 
+class ImportResolution(BaseModel):
+    """How to resolve one conflicting type during import (#3464).
+
+    Keyed by definition name in :attr:`PrimitiveImportRequest.resolutions`. Applies only to a
+    type the review classified as a **Conflict** (an existing type with the same registry
+    identity but a different schema); New and Identical types ignore any resolution.
+    """
+    action: str = 'keep'  # 'keep' (leave existing) | 'overwrite' | 'rename'
+    new_name: Optional[str] = None  # Required when action == 'rename'.
+
+    class Config:
+        from_attributes = True
+
+
 class PrimitiveImportRequest(BaseModel):
     """Request model for importing primitives from JSON Schema."""
     schema: Dict[str, Any]  # Full JSON Schema document
@@ -188,6 +202,11 @@ class PrimitiveImportRequest(BaseModel):
     # Map recognized string formats (email, uuid, uri, date, date-time, time) to the seeded
     # std/v0/types core types by injecting a relative $ref during rewrite (#3463). Default on.
     map_core_formats: bool = True
+    # Import review controls (#3464). When dedupe is on (default), a definition identical to an
+    # existing type is silently skipped; resolutions carries per-type conflict choices
+    # (keep / overwrite / rename), keyed by definition name.
+    dedupe: bool = True
+    resolutions: Optional[Dict[str, ImportResolution]] = None
 
     class Config:
         from_attributes = True

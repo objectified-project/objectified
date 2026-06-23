@@ -1007,6 +1007,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/primitives/{tenant_slug}/import/review:
+    post:
+      tags:
+      - primitives
+      summary: Review Import Primitives
+      description: "Dry-run review of an import: conflicts, dedupe, and a validation\
+        \ report (#3464).\n\nResolves the source exactly as ``POST /import`` would,\
+        \ but **writes nothing** — it\nclassifies each definition against the registry\
+        \ (New / Identical / Conflict), attaches its\ndraft 2020-12 validation report\
+        \ and unresolved-ref mapping, and lists the resolution\nchoices each conflict\
+        \ offers. This is the report the import wizard (#3469) renders so the\nuser\
+        \ can pick keep / overwrite / rename before committing; the same classification\
+        \ drives\nthe commit, so the committed result matches the review.\n\nArgs:\n\
+        \    tenant_slug: The tenant slug.\n    request: The import request (source\
+        \ document + options); ``resolutions`` is ignored.\n    auth_data: Authentication\
+        \ data (injected by dependency).\n\nReturns:\n    A ``{\"status\": \"review\"\
+        , \"summary\", \"types\", ...}`` report."
+      operationId: review_import_primitives_v1_primitives__tenant_slug__import_review_post
+      parameters:
+      - name: tenant_slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Slug
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrimitiveImportRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Review Import Primitives V1 Primitives  Tenant Slug  Import
+                  Review Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/primitives/{tenant_slug}/import:
     post:
       tags:
@@ -10564,6 +10627,29 @@ components:
           title: Detail
       type: object
       title: HTTPValidationError
+    ImportResolution:
+      properties:
+        action:
+          type: string
+          title: Action
+          default: keep
+        new_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: New Name
+      type: object
+      title: ImportResolution
+      description: 'How to resolve one conflicting type during import (#3464).
+
+
+        Keyed by definition name in :attr:`PrimitiveImportRequest.resolutions`. Applies
+        only to a
+
+        type the review classified as a **Conflict** (an existing type with the same
+        registry
+
+        identity but a different schema); New and Identical types ignore any resolution.'
     LinkOperationRequest:
       properties:
         metadata:
@@ -10956,6 +11042,17 @@ components:
           type: boolean
           title: Map Core Formats
           default: true
+        dedupe:
+          type: boolean
+          title: Dedupe
+          default: true
+        resolutions:
+          anyOf:
+          - additionalProperties:
+              $ref: '#/components/schemas/ImportResolution'
+            type: object
+          - type: 'null'
+          title: Resolutions
       type: object
       required:
       - schema

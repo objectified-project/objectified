@@ -484,7 +484,7 @@ flowchart LR
 | 4.2 #3461 ✅ | ~~JSON Schema 2020-12 parser~~ | **DONE** — `primitives_parser.parse_json_schema_document`: each `$defs`/`definitions` entry → a discrete type (single-root doc → one type), captures intra-doc `#/$defs` refs as `internal` `refs` edges for rewrite (#3463), per-type draft 2020-12 validation report; wired through the `/import/stage` pipeline and the legacy `/import` commit path | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | L | objectified-rest |
 | 4.3 #3462 ✅ | ~~Type-definition bundle importer~~ | **DONE** — `primitives_bundle.parse_type_def_bundle` expands a `.json`/`.yaml` bundle's `types` (or `$defs`/`definitions`) container into discrete types, capturing inter-type `#/types`/`#/$defs` refs as `internal` `refs` edges for rewrite (#3463) with per-type draft 2020-12 validation; `expand_zip_bundle` merges a `.zip` of per-type files into a bundle document. Wired through `/import/stage` (deep candidates) and the `/import` commit path (`source_kind='type-def-bundle'` → N types commit N `odb.primitives` rows with refs intact); malformed bundle → clear 400 | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | L | objectified-rest |
 | 4.4 #3463 ✅ | ~~`$ref` rewrite + namespace/scope mapping~~ | **DONE** — `primitives_rewrite.rewrite_import_schema` rewrites each imported definition's intra-source pointers (`#/$defs/Money`, `#/definitions/Money`, `#/types/Money`) to relative registry refs at the sibling's committed `$id` (`./money`, preserving any deeper pointer as `./money#/...`), and maps recognized string formats (email, uuid, uri, date, date-time, time) to the seeded `std/v0/types` core types by injecting a relative `$ref` (author refs never overridden). Both rewrites yield ordinary registry-relative refs, so the existing resolver (#3456) persists them as `refs` edges — imported refs are stored relative and resolve via Epic 3; no `internal` edges remain on committed rows. Applied on commit (`POST /import`) for the JSON Schema and bundle paths; `map_core_formats` flag (default on) toggles format mapping; import report gains a per-type `rewrites` map | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
-| 4.5 #3464 | Import review: conflicts, dedupe, report | Conflict resolution, dedupe identical, validation report | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-rest |
+| 4.5 #3464 ✅ | ~~Import review: conflicts, dedupe, report~~ | **DONE** — `primitives_review.py` classifies each imported definition New/Identical/Conflict against the registry (by derived `$id`), and `decide()` turns a per-type resolution (keep/overwrite/rename) into a commit action. New `POST /import/review` dry-run returns the classification + draft 2020-12 validation report + `$ref` rewrites + unresolved-ref mapping + allowed resolutions (writes nothing); the same classification drives `POST /import` so the committed outcome matches the review. `/import` gains `dedupe` (default on → Identical skipped) and `resolutions` request fields; conflicts resolved `overwrite` update the existing row, `rename` creates a slugified copy, default `keep` surfaces the conflict instead of dropping it silently. Report gains `overwritten`/`renamed`/`identical` buckets + per-type `reviews` | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-rest |
 | 4.6 #3465 | OpenAPI 3.1 components importer | Extract `components/schemas` as types | `type-registry`,`import`,`rest`,`roadmap-type-registry` | Y | N | M | objectified-rest |
 
 ### Issue 4.1 — Import pipeline core + ingestion
@@ -540,7 +540,24 @@ flowchart LR
 - **Parallelism/Dependencies.** Depends on 4.2/4.3; uses 3.1.
 - **Technical Stack.** FastAPI.
 
-### Issue 4.5 — Import review: conflicts, dedupe, report
+### Issue 4.5 — Import review: conflicts, dedupe, report ✅ DONE (#3464)
+- **Delivered.** `objectified-rest/src/app/primitives_review.py` holds the pure review logic:
+  `classify_status()` labels each imported definition **New** (no visible type holds its derived
+  `$id`), **Identical** (an existing type has the same `$id` and a deep-equal schema), or
+  **Conflict** (same `$id`, different schema), and `decide()` turns a per-type resolution
+  (`keep` / `overwrite` / `rename`, with `dedupe` controlling whether Identical is auto-skipped)
+  into a concrete commit action. A new `POST /v1/primitives/{tenant_slug}/import/review` dry-run
+  resolves the source exactly as the commit would but **writes nothing**, returning per-type
+  classification, the draft 2020-12 validation report, the `$ref` rewrites (#3463), the
+  unresolved-ref mapping, and the allowed resolutions for each conflict. The same
+  `_prepare_imported_definition` pipeline drives the commit, so the committed outcome can't disagree
+  with the review. `POST /import` gains `dedupe` (default on) and `resolutions` request fields:
+  `overwrite` updates the existing row in place, `rename` creates a slugified copy (erroring if the
+  target name is taken), and the default `keep` **surfaces** the conflict (`skipped`) rather than
+  dropping it silently. The import report gains `overwritten` / `renamed` / `identical` buckets and
+  their totals plus a per-type `reviews` list, and provenance counts reflect rows written vs. passed
+  over. Unit tests in `tests/test_primitives_review.py`, route tests in
+  `tests/test_primitives_import_review_routes.py`.
 - **Problem.** Imports collide with existing types and may duplicate.
 - **Solution/Scope.** Detect New/Conflict/Identical per type; offer keep/overwrite/rename; dedupe
   identical; produce a validation report (draft 2020-12: valid/errors/warnings) and unresolved-ref
