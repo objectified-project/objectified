@@ -25,8 +25,24 @@ database, now defunct.)  Official work on this project started in 2021.
 ## Getting Started
 
 
+## LLMs Used
+
+LLMs are used in conjunction with development.  They do not replace development, they simply augment the
+engineering tasks.
+
+This is a list of the LLMs used, and their purposes.
+
+| Model | Purpose |
+|-------|---------|
+| qwen3.6 | Pull request code reviews |
+| opus4.8 | UI/UX component improvements, issue completeness |
+| Cursor Auto | Most trivial development tasks |
+| gpt-5.5 | Planning, Roadmaps, Ticket Implementation |
+
 ## Contributing
 
+Fork the project, and off you go.  Please feel free to contribute to the project in the form of pull requests,
+bug reports, fixes, and so on.  We encourage users to contribute!
 
 ## Donations
 
