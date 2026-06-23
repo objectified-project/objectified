@@ -185,6 +185,9 @@ class PrimitiveImportRequest(BaseModel):
     source_kind: str = 'json-schema'  # 'json-schema' | 'type-def-bundle' | 'openapi'
     source_label: Optional[str] = None  # Human label / filename / URL of the source
     target_namespace: Optional[str] = None  # Registry namespace imported into, if any
+    # Map recognized string formats (email, uuid, uri, date, date-time, time) to the seeded
+    # std/v0/types core types by injecting a relative $ref during rewrite (#3463). Default on.
+    map_core_formats: bool = True
 
     class Config:
         from_attributes = True
