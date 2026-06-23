@@ -44,6 +44,9 @@ We continue to improve the platform based on your feedback with improvements and
 - **`objectified-cli`**: TOML config with XDG / Windows paths, `default_profile`, `objectified config path|get|set|list`, auto-created `config.toml` (`0600` on Unix), strict profile validation, env-based API keys only, and tenant slug from config/env (#3188).
 - **`objectified-cli`**: shared output layer (`lib/output.ts`) with `this.output` on `BaseCommand` — tables (`cli-table3`), stable sorted JSON/YAML, ora spinners, stderr warnings/errors, and TTY / `--json` / `--quiet` / `--no-color` / `LANG=C` behavior; Vitest snapshots cover render modes (#3189).
 
+## Governance
+- **Primitives overview** (`objectified-ui`): Governance → Primitives now shows registry KPIs (core/tenant/imported/bound/unresolved), namespace collections with scope filters, a recent-import activity feed, and row click-through to a type detail page — backed by `GET /v1/types/{tenant}/stats` (#3454) and new `/api/primitives/*` proxies (#3467).
+
 ## Import
 - **Primitives import review** (`objectified-rest`): `POST /v1/primitives/{tenant}/import/review` dry-runs an import and classifies each definition as **New**, **Identical**, or **Conflict** against the registry, with a draft 2020-12 validation report, `$ref` rewrites, and resolution choices; `POST …/import` honors `dedupe` (default on) and per-type `resolutions` (`keep` / `overwrite` / `rename`) so conflicts are surfaced instead of skipped silently (#3464).
 - Import supports Swagger 2.0 format

@@ -424,6 +424,28 @@ class ResolveResponse(BaseModel):
         from_attributes = True
 
 
+# ==================== Registry coverage/stats (#3454) ====================
+
+
+class RegistryCoverageStatsResponse(BaseModel):
+    """Aggregate registry coverage KPIs for the Primitives overview (#3454).
+
+    Counts are scoped to the caller's tenant: system-core types are seeded per tenant
+    (``is_system = true`` rows owned by the tenant), tenant types are private rows
+    (``is_system = false``). ``unresolved_ref_count`` mirrors ``GET …/unresolved`` (#3457).
+    """
+    core_type_count: int = 0
+    tenant_type_count: int = 0
+    imported_count: int = 0
+    properties_bound_count: int = 0
+    bound_class_count: int = 0
+    unresolved_ref_count: int = 0
+    namespace_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
 # ==================== Type-registry namespaces (#3451) ====================
 
 

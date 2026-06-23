@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   Database,
@@ -9,7 +10,6 @@ import {
   Trash2,
   Search,
   FileCode,
-  Tag,
   AlertCircle,
   CheckCircle,
   Upload,
@@ -24,10 +24,19 @@ import { LoadingState } from '@/app/components/ui/LoadingState';
 import { useDialog } from '@/app/components/providers/DialogProvider';
 import PrimitiveEditorDialog from './PrimitiveEditorDialog';
 import PrimitiveImportDialog from './PrimitiveImportDialog';
+import PrimitivesRegistryKpiStrip from './PrimitivesRegistryKpiStrip';
+import PrimitivesNamespaceCollections from './PrimitivesNamespaceCollections';
+import PrimitivesRecentActivity from './PrimitivesRecentActivity';
+import {
+  countUnresolvedByNamespace,
+  type NamespaceScopeFilter,
+  type PrimitiveImportActivity,
+  type RegistryCoverageStats,
+  type TypeNamespaceCollection,
+} from './primitivesRegistryTypes';
 import {
   dashboardContentStackClass,
   dashboardMainClass,
-  dashboardPanelClass,
   dashboardPanelPaddedClass,
   dashboardTableWrapClass,
   dashboardTableTheadClass,
@@ -50,25 +59,36 @@ interface Primitive {
   is_public: boolean;
   usage_count: number;
   enabled: boolean;
+  source?: string;
+  namespace?: string | null;
+  schema_id?: string | null;
+  draft?: string;
   created_at: string;
   updated_at: string;
 }
 
 export default function PrimitivesManagementClient() {
+  const router = useRouter();
   const { data: session } = useSession();
   const { confirm } = useDialog();
 
   const [primitives, setPrimitives] = useState<Primitive[]>([]);
   const [filteredPrimitives, setFilteredPrimitives] = useState<Primitive[]>([]);
   const [loading, setLoading] = useState(true);
+  const [registryLoading, setRegistryLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Filters
+  const [stats, setStats] = useState<RegistryCoverageStats | null>(null);
+  const [namespaces, setNamespaces] = useState<TypeNamespaceCollection[]>([]);
+  const [imports, setImports] = useState<PrimitiveImportActivity[]>([]);
+  const [unresolvedByNamespace, setUnresolvedByNamespace] = useState<Record<string, number>>({});
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showSystemPrimitives, setShowSystemPrimitives] = useState(true);
+  const [namespaceScopeFilter, setNamespaceScopeFilter] = useState<NamespaceScopeFilter>('all');
+  const [selectedNamespace, setSelectedNamespace] = useState<string | null>(null);
 
-  // Dialogs
   const [showEditorDialog, setShowEditorDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [editingPrimitive, setEditingPrimitive] = useState<Primitive | null>(null);
@@ -77,6 +97,51 @@ export default function PrimitivesManagementClient() {
 
   const sortByName = (items: Primitive[]) =>
     [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+  const showMessage = useCallback((type: 'success' | 'error', text: string) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 5000);
+  }, []);
+
+  const loadRegistryOverview = useCallback(async () => {
+    setRegistryLoading(true);
+    try {
+      const [statsRes, namespacesRes, importsRes, unresolvedRes] = await Promise.all([
+        fetch('/api/primitives/stats'),
+        fetch('/api/types/namespaces'),
+        fetch('/api/primitives/imports?limit=8'),
+        fetch('/api/primitives/unresolved'),
+      ]);
+
+      const [statsData, namespacesData, importsData, unresolvedData] = await Promise.all([
+        statsRes.json(),
+        namespacesRes.json(),
+        importsRes.json(),
+        unresolvedRes.json(),
+      ]);
+
+      if (statsData.success) {
+        setStats(statsData.stats as RegistryCoverageStats);
+      }
+      if (namespacesData.success) {
+        setNamespaces(namespacesData.namespaces as TypeNamespaceCollection[]);
+      }
+      if (importsData.success) {
+        setImports(importsData.imports as PrimitiveImportActivity[]);
+      }
+      if (unresolvedData.success && unresolvedData.unresolved?.primitives) {
+        setUnresolvedByNamespace(
+          countUnresolvedByNamespace(unresolvedData.unresolved.primitives)
+        );
+      } else {
+        setUnresolvedByNamespace({});
+      }
+    } catch (error) {
+      console.error('Error loading registry overview:', error);
+    } finally {
+      setRegistryLoading(false);
+    }
+  }, []);
 
   const loadPrimitives = useCallback(async () => {
     if (!currentTenantId) {
@@ -88,7 +153,6 @@ export default function PrimitivesManagementClient() {
     try {
       const response = await fetch('/api/primitives');
 
-      // Check if response is ok before parsing
       if (!response.ok) {
         const text = await response.text();
         console.error('API error:', response.status, text);
@@ -110,48 +174,50 @@ export default function PrimitivesManagementClient() {
     } finally {
       setLoading(false);
     }
-  }, [currentTenantId]);
+  }, [currentTenantId, showMessage]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadPrimitives(), loadRegistryOverview()]);
+  }, [loadPrimitives, loadRegistryOverview]);
 
   const filterPrimitives = useCallback(() => {
     let filtered = [...primitives];
 
-    // Filter by system/tenant
     if (!showSystemPrimitives) {
-      filtered = filtered.filter(p => !p.is_system);
+      filtered = filtered.filter((p) => !p.is_system);
     }
 
-    // Filter by category
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(p => p.category === selectedCategory);
+      filtered = filtered.filter((p) => p.category === selectedCategory);
     }
 
-    // Filter by search query
+    if (selectedNamespace) {
+      filtered = filtered.filter((p) => (p.namespace ?? '') === selectedNamespace);
+    }
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(p =>
-        p.name.toLowerCase().includes(query) ||
-        p.description?.toLowerCase().includes(query) ||
-        p.tags.some(tag => tag.toLowerCase().includes(query))
+      filtered = filtered.filter(
+        (p) =>
+          p.name.toLowerCase().includes(query) ||
+          p.description?.toLowerCase().includes(query) ||
+          p.tags.some((tag) => tag.toLowerCase().includes(query)) ||
+          p.namespace?.toLowerCase().includes(query)
       );
     }
 
     setFilteredPrimitives(sortByName(filtered));
-  }, [primitives, searchQuery, selectedCategory, showSystemPrimitives]);
+  }, [primitives, searchQuery, selectedCategory, showSystemPrimitives, selectedNamespace]);
 
   useEffect(() => {
     if (currentTenantId) {
-      loadPrimitives();
+      void refreshAll();
     }
-  }, [currentTenantId, loadPrimitives]);
+  }, [currentTenantId, refreshAll]);
 
   useEffect(() => {
     filterPrimitives();
   }, [filterPrimitives]);
-
-  const showMessage = (type: 'success' | 'error', text: string) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage(null), 5000);
-  };
 
   const handleCreatePrimitive = () => {
     setEditingPrimitive(null);
@@ -167,7 +233,8 @@ export default function PrimitivesManagementClient() {
     setShowEditorDialog(true);
   };
 
-  const handleDeletePrimitive = async (primitive: Primitive) => {
+  const handleDeletePrimitive = async (primitive: Primitive, event: React.MouseEvent) => {
+    event.stopPropagation();
     if (primitive.is_system) {
       showMessage('error', 'System primitives cannot be deleted');
       return;
@@ -192,7 +259,7 @@ export default function PrimitivesManagementClient() {
 
       if (data.success) {
         showMessage('success', 'Primitive deleted successfully');
-        await loadPrimitives();
+        await refreshAll();
       } else {
         showMessage('error', data.error || 'Failed to delete primitive');
       }
@@ -203,22 +270,24 @@ export default function PrimitivesManagementClient() {
   };
 
   const handleSavePrimitive = async () => {
-    await loadPrimitives();
+    await refreshAll();
     setShowEditorDialog(false);
   };
 
   const handleImportComplete = async () => {
-    await loadPrimitives();
+    await refreshAll();
     setShowImportDialog(false);
   };
 
-  const categories = Array.from(new Set(primitives.map(p => p.category))).sort();
-  const stats = {
-    total: primitives.length,
-    system: primitives.filter(p => p.is_system).length,
-    tenant: primitives.filter(p => !p.is_system).length,
-    categories: categories.length,
+  const handleRowClick = (primitive: Primitive) => {
+    router.push(`/ade/dashboard/primitives/${primitive.id}`);
   };
+
+  const handleNamespaceSelect = (namespace: string) => {
+    setSelectedNamespace((current) => (current === namespace ? null : namespace));
+  };
+
+  const categories = Array.from(new Set(primitives.map((p) => p.category))).sort();
 
   if (!currentTenantId) {
     return (
@@ -233,7 +302,6 @@ export default function PrimitivesManagementClient() {
 
   return (
     <>
-      {/* Header */}
       <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
@@ -243,14 +311,12 @@ export default function PrimitivesManagementClient() {
                 Primitives
               </h2>
               <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-                Manage your tenant&apos;s reusable JSON Schema primitive definitions
+                JSON Schema 2020-12 type registry · core system &amp; tenant scopes · relative{' '}
+                <span className="font-mono">$ref</span> resolution
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Button
-                onClick={() => setShowImportDialog(true)}
-                variant="secondary"
-              >
+              <Button onClick={() => setShowImportDialog(true)} variant="secondary">
                 <Upload className="w-4 h-4 mr-2" />
                 Import from Schema
               </Button>
@@ -263,10 +329,8 @@ export default function PrimitivesManagementClient() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className={dashboardMainClass} aria-busy={loading}>
+      <main className={dashboardMainClass} aria-busy={loading || registryLoading}>
         <div className={dashboardContentStackClass}>
-          {/* Message Banner */}
           {message && (
             <Alert variant={message.type === 'success' ? 'default' : 'error'}>
               {message.type === 'success' ? (
@@ -278,56 +342,20 @@ export default function PrimitivesManagementClient() {
             </Alert>
           )}
 
-          {loading ? (
-            <div className={dashboardTableWrapClass}>
-              <LoadingState minHeightClassName="min-h-[220px]" message="Loading primitives…" />
-            </div>
-          ) : (
-            <>
-          {/* Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className={`${dashboardPanelClass} p-4`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Primitives</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stats.total}</p>
-                </div>
-                <Database className="w-8 h-8 text-indigo-600 dark:text-indigo-400 opacity-50" />
-              </div>
-            </div>
+          <PrimitivesRegistryKpiStrip stats={stats} loading={registryLoading} />
 
-            <div className={`${dashboardPanelClass} p-4`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">System</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stats.system}</p>
-                </div>
-                <Shield className="w-8 h-8 text-blue-600 dark:text-blue-400 opacity-50" />
-              </div>
-            </div>
-
-            <div className={`${dashboardPanelClass} p-4`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Tenant</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stats.tenant}</p>
-                </div>
-                <FileCode className="w-8 h-8 text-green-600 dark:text-green-400 opacity-50" />
-              </div>
-            </div>
-
-            <div className={`${dashboardPanelClass} p-4`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Categories</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stats.categories}</p>
-                </div>
-                <Tag className="w-8 h-8 text-purple-600 dark:text-purple-400 opacity-50" />
-              </div>
-            </div>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <PrimitivesNamespaceCollections
+              namespaces={namespaces}
+              unresolvedByNamespace={unresolvedByNamespace}
+              scopeFilter={namespaceScopeFilter}
+              onScopeFilterChange={setNamespaceScopeFilter}
+              onNamespaceSelect={handleNamespaceSelect}
+              loading={registryLoading}
+            />
+            <PrimitivesRecentActivity imports={imports} loading={registryLoading} />
           </div>
 
-          {/* Filters */}
           <div className={dashboardPanelPaddedClass}>
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
@@ -343,15 +371,27 @@ export default function PrimitivesManagementClient() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                {selectedNamespace ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedNamespace(null)}
+                    className="text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+                  >
+                    Namespace: {selectedNamespace} ×
+                  </button>
+                ) : null}
+
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="all">All Categories</option>
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
                   ))}
                 </select>
 
@@ -365,21 +405,17 @@ export default function PrimitivesManagementClient() {
                   <span className="text-sm text-gray-700 dark:text-gray-300">Show System</span>
                 </label>
 
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={loadPrimitives}
-                  disabled={loading}
-                >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <Button variant="secondary" size="sm" onClick={refreshAll} disabled={loading || registryLoading}>
+                  <RefreshCw className={`w-4 h-4 ${loading || registryLoading ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Primitives Table */}
           <div className={dashboardTableWrapClass}>
-            {filteredPrimitives.length === 0 ? (
+            {loading ? (
+              <LoadingState minHeightClassName="min-h-[220px]" message="Loading primitives…" />
+            ) : filteredPrimitives.length === 0 ? (
               <div className="p-6">
                 <EmptyState
                   icon={<Database className="h-8 w-8" />}
@@ -395,34 +431,21 @@ export default function PrimitivesManagementClient() {
                 <table className="w-full">
                   <thead className={dashboardTableTheadClass}>
                     <tr>
-                      <th className={dashboardThClass}>
-                        Name
-                      </th>
-                      <th className={dashboardThClass}>
-                        Category
-                      </th>
-                      <th className={dashboardThClass}>
-                        Description
-                      </th>
-                      <th className={dashboardThClass}>
-                        Tags
-                      </th>
-                      <th className={dashboardThClass}>
-                        Usage
-                      </th>
-                      <th className={dashboardThClass}>
-                        Type
-                      </th>
-                      <th className={dashboardThRightClass}>
-                        Actions
-                      </th>
+                      <th className={dashboardThClass}>Name</th>
+                      <th className={dashboardThClass}>Namespace</th>
+                      <th className={dashboardThClass}>Category</th>
+                      <th className={dashboardThClass}>Description</th>
+                      <th className={dashboardThClass}>Usage</th>
+                      <th className={dashboardThClass}>Type</th>
+                      <th className={dashboardThRightClass}>Actions</th>
                     </tr>
                   </thead>
                   <tbody className={dashboardTbodyClass}>
                     {filteredPrimitives.map((primitive) => (
                       <tr
                         key={primitive.id}
-                        className={dashboardTrHoverClass}
+                        className={`${dashboardTrHoverClass} cursor-pointer`}
+                        onClick={() => handleRowClick(primitive)}
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
@@ -433,28 +456,21 @@ export default function PrimitivesManagementClient() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                            {primitive.namespace ?? '—'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
                             {primitive.category}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm text-gray-600 dark:text-gray-400 max-w-xs line-clamp-3" title={primitive.description || undefined}>
+                          <div
+                            className="text-sm text-gray-600 dark:text-gray-400 max-w-xs line-clamp-3"
+                            title={primitive.description || undefined}
+                          >
                             {primitive.description || '—'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-1">
-                            {primitive.tags.slice(0, 3).map((tag, idx) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                            {primitive.tags.length > 3 && (
-                              <span className="text-xs text-gray-500">+{primitive.tags.length - 3}</span>
-                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
@@ -475,7 +491,10 @@ export default function PrimitivesManagementClient() {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end gap-2">
                             <button
-                              onClick={() => handleEditPrimitive(primitive)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditPrimitive(primitive);
+                              }}
                               disabled={primitive.is_system}
                               className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
                               title={primitive.is_system ? 'System primitives cannot be edited' : 'Edit primitive'}
@@ -483,7 +502,7 @@ export default function PrimitivesManagementClient() {
                               <Edit className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleDeletePrimitive(primitive)}
+                              onClick={(e) => handleDeletePrimitive(primitive, e)}
                               disabled={primitive.is_system}
                               className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
                               title={primitive.is_system ? 'System primitives cannot be deleted' : 'Delete primitive'}
@@ -499,12 +518,9 @@ export default function PrimitivesManagementClient() {
               </div>
             )}
           </div>
-            </>
-          )}
         </div>
       </main>
 
-      {/* Dialogs */}
       {showEditorDialog && (
         <PrimitiveEditorDialog
           primitive={editingPrimitive}

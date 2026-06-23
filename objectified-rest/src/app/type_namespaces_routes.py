@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from .auth import get_authenticated_user_id, validate_authentication
 from .database import db
 from .models import (
+    RegistryCoverageStatsResponse,
     ResolvedPrimitiveRefs,
     ResolvedRefEdge,
     ResolveResponse,
@@ -100,6 +101,27 @@ def _to_schema(row: Dict[str, Any]) -> TypeNamespaceSchema:
         created_at=row.get("created_at"),
         updated_at=row.get("updated_at"),
     )
+
+
+@router.get("/{tenant_slug}/stats", response_model=RegistryCoverageStatsResponse)
+async def get_registry_coverage_stats(
+    tenant_slug: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> RegistryCoverageStatsResponse:
+    """Return aggregate registry coverage KPIs for the Primitives overview (#3454).
+
+    Counts core vs tenant types, imported schemas, property bindings, unresolved ``$ref``
+    edges, and distinct namespaces. Feeds the Governance → Primitives KPI strip (#3467).
+
+    Args:
+        tenant_slug: The tenant slug.
+        auth_data: Authentication data (injected by dependency).
+
+    Returns:
+        ``RegistryCoverageStatsResponse`` with the tenant's registry coverage counts.
+    """
+    stats = db.get_registry_coverage_stats(auth_data["tenant_id"])
+    return RegistryCoverageStatsResponse(**stats)
 
 
 @router.get("/{tenant_slug}/namespaces")
