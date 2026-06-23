@@ -284,6 +284,51 @@ describe('PrimitiveSelector type picker', () => {
     await waitFor(() => expect(onChangeSpy).toHaveBeenCalledWith('$ref', ''));
   });
 
+  it('persists the resolved primitive id alongside the $ref when binding (#3475)', async () => {
+    const onChangeSpy = jest.fn();
+    render(<Harness onChangeSpy={onChangeSpy} />);
+    await openPicker();
+
+    const dateRow = await screen.findByRole('button', { name: /std\/v0\/types\/date/i });
+    fireEvent.click(dateRow);
+    fireEvent.click(screen.getByRole('button', { name: /apply type/i }));
+
+    // Both the $ref string and the FK target (the primitive's id) are recorded
+    // so the binding can round-trip through class_properties.primitive_ref/_id.
+    await waitFor(() =>
+      expect(onChangeSpy).toHaveBeenCalledWith('$ref', 'std/v0/types/date'),
+    );
+    expect(onChangeSpy).toHaveBeenCalledWith('primitive_id', 'core-date');
+  });
+
+  it('clears the primitive id for a legacy namespace-less primitive (#3475)', async () => {
+    const onChangeSpy = jest.fn();
+    render(<Harness onChangeSpy={onChangeSpy} />);
+    await openPicker();
+
+    const emailRow = await screen.findByRole('button', { name: /Email Address/i });
+    fireEvent.click(emailRow);
+    fireEvent.click(screen.getByRole('button', { name: /apply type/i }));
+
+    // No stable $ref → no FK binding either; falls back to inline-schema merge.
+    await waitFor(() => expect(onChangeSpy).toHaveBeenCalledWith('$ref', ''));
+    expect(onChangeSpy).toHaveBeenCalledWith('primitive_id', '');
+  });
+
+  it('drops both the $ref and the primitive id when the binding is cleared (#3475)', async () => {
+    const onChangeSpy = jest.fn();
+    render(
+      <Harness
+        onChangeSpy={onChangeSpy}
+        initial={{ $ref: 'std/v0/types/date', primitive_id: 'core-date' }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /clear type binding/i }));
+    await waitFor(() => expect(onChangeSpy).toHaveBeenCalledWith('$ref', ''));
+    expect(onChangeSpy).toHaveBeenCalledWith('primitive_id', '');
+  });
+
   it('searches across namespaces within the active tab', async () => {
     render(<Harness />);
     await openPicker();

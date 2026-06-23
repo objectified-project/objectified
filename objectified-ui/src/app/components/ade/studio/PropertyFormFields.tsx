@@ -322,9 +322,15 @@ export interface PropertyFormData {
   /**
    * Stable registry `$ref` to an `odb.primitives` type selected via the type
    * picker (e.g. `std/v0/types/date`). Empty/undefined when the property is not
-   * bound to a registry type. Persistence of this binding is handled by #3475.
+   * bound to a registry type. Persisted to `class_properties.primitive_ref` (#3475).
    */
   $ref?: string;
+  /**
+   * Resolved target of the `$ref` binding: the `id` of the `odb.primitives` row
+   * the property is bound to. Set alongside `$ref` by the type picker and
+   * persisted to `class_properties.primitive_id` (#3475). Empty when unbound.
+   */
+  primitive_id?: string;
 }
 
 interface SortableEnumItemProps {

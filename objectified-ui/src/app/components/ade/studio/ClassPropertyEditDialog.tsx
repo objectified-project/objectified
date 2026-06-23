@@ -842,6 +842,11 @@ export default function ClassPropertyEditDialog({
     // Populate form data
     setFormData({
       description: editingClassProperty.description || '',
+      // Rehydrate the persisted type-registry binding (#3475) so the bound-type
+      // chip and resolved target survive a reload. These live in dedicated
+      // class_properties columns, not in the property's JSON Schema `data`.
+      $ref: editingClassProperty.primitive_ref || '',
+      primitive_id: editingClassProperty.primitive_id || '',
       required: !!propData.required,
       nullable: isNullable,
       deprecated: !!propData.deprecated,
@@ -1582,6 +1587,11 @@ export default function ClassPropertyEditDialog({
           name: editPropName.trim(),
           description: formData.description || null,
           data: updatedData,
+          // Persist the type-registry binding (#3475) as dedicated columns: the
+          // resolved primitive id (FK) and the stored registry $ref. Sent as
+          // null when unbound/cleared so the binding can be removed.
+          primitive_id: formData.primitive_id || null,
+          primitive_ref: formData.$ref || null,
         }),
       });
 

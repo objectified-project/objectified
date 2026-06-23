@@ -44,7 +44,7 @@ Before implementing net-new registry mechanics, account for what is **already li
 | REST | `/v1/primitives/{tenant_slug}` CRUD + `/import` from `$defs` | No namespaces, resolver, stats, or server-side draft 2020-12 gate |
 | UI proxy | `/api/primitives/*` | ✅ **Done** — closed as duplicate (#3455) |
 | Management UI | `/ade/dashboard/primitives` — stats, table, CRUD, import dialog | ✅ Nav done (#3466 closed); overview/import are **partial** — extend, don't rebuild |
-| Designer | `PrimitiveSelector` — full type picker with Standard/Core/Tenant/Custom tabs + scope chips; emits a stable `$ref` (#3474 ✅) | Persisted `$ref` binding still pending (#3475) |
+| Designer | `PrimitiveSelector` — full type picker with Standard/Core/Tenant/Custom tabs + scope chips; emits a stable `$ref` (#3474 ✅); the binding is persisted to `class_properties.primitive_id`/`primitive_ref` and rehydrates on reload (#3475 ✅) | — |
 | Validation | AJV in `PrimitiveEditorDialog` (client) | ✅ **Done** — REST persist strictly validated against draft 2020-12 with field-level errors (#3452) |
 | Scope | `is_system` immutability, tenant rows | ✅ **Done** — reads resolve `is_system ∪ tenant` (cross-tenant isolation; all tenants see `std/*`); core→tenant and tenant→other-tenant `$ref` rejected on save/import (#3453) |
 
@@ -695,7 +695,7 @@ flowchart LR
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |---|---|---|---|:---:|:---:|---|---|
 | 6.1 #3474 ✅ | Type picker component | **DONE** — `PrimitiveSelector` evolved into the full type picker (`Select Type`): Standard / Core / Tenant / Custom tabs that classify `odb.primitives` by `is_system` / `tenant_id` / `source` (`classifyPrimitive`), per-tab counts, scope chips + per-row scope badges, search across name/namespace/`$ref`/tags, and a per-row resolved `$ref` preview. Selecting a registry type emits a stable `$ref` (`buildTypeRef`, e.g. `std/v0/types/date`) onto `PropertyFormData.$ref` and fires `onTypeBound`; legacy namespace-less primitives still bind by inline schema (no `$ref`). A bound-type chip on the trigger shows/clears the current binding. Persisting the binding is #3475 | `type-registry`,`ui`,`schema-designer`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
-| 6.2 #3475 | Property→type `$ref` binding storage | Persist & read property bindings (1.3) | `type-registry`,`ui`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-ui, objectified-rest |
+| 6.2 #3475 ✅ | Property→type `$ref` binding storage | **DONE** — the Designer persists a bound property's type reference to dedicated `odb.class_properties` columns (`primitive_id` FK to `odb.primitives` + the stored `primitive_ref` `$ref`, #3448 model), sent top-level on class-property create/update and rehydrated into the bound-type chip on reload. Binding a primitive increments its `usage_count` (create always; update only on a changed binding, so re-saves don't inflate it). Clearing the chip writes NULL/NULL — distinct from the legacy inline-primitive merge (the migration path for namespace-less primitives) | `type-registry`,`ui`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-ui, objectified-rest |
 | 6.3 #3476 | Resolved-type display in Designer/Paths | Show resolved schema + validate against it | `type-registry`,`ui`,`schema-designer`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-ui |
 | 6.4 #3477 | "Used by properties" dependents/impact | Reverse index: which properties use a type | `type-registry`,`rest`,`roadmap-type-registry` | Y | N | M | objectified-rest, objectified-ui |
 
@@ -710,7 +710,19 @@ flowchart LR
 - **Parallelism/Dependencies.** Depends on 2.6; parallel with 6.3.
 - **Technical Stack.** Next.js, Tailwind, Radix.
 
-### Issue 6.2 — Property→type `$ref` binding storage
+### Issue 6.2 — Property→type `$ref` binding storage ✅ DONE (#3475)
+- **Delivered.** The type picker (#3474) emits both the stable `$ref` and the resolved
+  primitive id onto the property form; the class-property editor sends them top-level
+  (`primitive_id`, `primitive_ref`) on save and reads them back into the bound-type chip on
+  reload. The REST class-property create/update/read path already carried these dedicated
+  `odb.class_properties` columns (the #3448 model — a real FK to `odb.primitives` plus the stored
+  `$ref`); this ticket wires the Designer write/read ends and the `PropertySchema` contract, and
+  increments the bound primitive's `usage_count` (on create, and on update only when the binding
+  target changes — repeated saves of an unchanged binding don't inflate it). Clearing the chip
+  persists NULL/NULL, keeping a registry binding distinct from the legacy inline-primitive merge
+  (the migration path for namespace-less primitives). Tests: `objectified-rest`
+  `tests/test_class_property_binding.py` (route passthrough/clear/read + model contract) and the
+  `objectified-ui` `PrimitiveSelector` binding-persistence cases.
 - **Problem.** A bound property must persist its type reference.
 - **Solution/Scope.** Write/read the property↔type binding (1.3), storing the `$ref` + resolved
   target on the `objectified-db` `class_property` (or the binding link). Source:

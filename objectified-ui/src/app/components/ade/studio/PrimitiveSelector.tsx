@@ -350,10 +350,13 @@ export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
       onChange('description', schema.description as string);
     }
 
-    // Persist the stable registry `$ref` binding (or clear it for legacy
-    // primitives that have no namespace and thus no stable ref).
+    // Persist the stable registry `$ref` binding plus the resolved target
+    // (the primitive's id) so the binding survives reload (#3475). Legacy
+    // primitives have no namespace and thus no stable ref — clear both so they
+    // fall back to inline-schema merge (the migration path for existing props).
     const ref = buildTypeRef(primitive);
     onChange('$ref', ref || '');
+    onChange('primitive_id', ref ? primitive.id : '');
     if (ref && onTypeBound) {
       onTypeBound({ ref, primitive });
     }
@@ -373,9 +376,11 @@ export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
     onOpenChange?.(false);
   };
 
-  // Clear the current registry binding without opening the picker.
+  // Clear the current registry binding without opening the picker. Drops both
+  // the stored `$ref` and the resolved primitive id (#3475).
   const clearBinding = () => {
     onChange('$ref', '');
+    onChange('primitive_id', '');
   };
 
   // Render schema preview
