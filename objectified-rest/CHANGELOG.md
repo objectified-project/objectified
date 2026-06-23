@@ -5,6 +5,26 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.23] - 2026-06-23
+
+### Added
+- **Primitives type-registry entitlement & feature gating (#3478)** — the advanced Type Registry
+  surface can now be gated behind a per-tenant `primitives-registry` entitlement. A reusable
+  `require_primitives_registry` dependency (`app/feature_gating.py`) guards every `/v1/types/*`
+  route (resolver, namespaces, settings, stats) plus the `/v1/primitives/*` import pipeline
+  (`/import`, `/import/review`, `/import/stage`, `/imports`, `/imports/{id}`) and the `/unresolved`
+  resolver. Baseline primitives CRUD (list/get/create/update/delete) and `/health` are never gated.
+- **`Database.tenant_has_feature_flag(tenant_id, user_id, flag_name)`** — resolves a named feature
+  flag for a tenant/user with precedence per-user override → per-tenant override → license default,
+  honoring the flag's global master switch (`odb.feature_flags.enabled`).
+
+### Changed
+- **`OBJECTIFIED_PRIMITIVES_REGISTRY_GATING` operator switch (default off)** — when off, the gate is
+  a pass-through and behavior is unchanged (every authenticated tenant reaches the advanced routes);
+  when on, non-entitled tenants receive `403`. The `primitives-registry` flag is seeded by
+  objectified-db migration `20260623-130000.sql` (bundled into the Paid and Sponsor plans, not Free)
+  and is managed through the existing admin Feature-Flag panel.
+
 ## [1.0.20] - 2026-06-22
 
 ### Added
