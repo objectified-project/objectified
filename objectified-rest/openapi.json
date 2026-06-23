@@ -1242,6 +1242,81 @@
         }
       }
     },
+    "/v1/primitives/{tenant_slug}/unresolved": {
+      "get": {
+        "tags": [
+          "primitives"
+        ],
+        "summary": "List Unresolved Refs",
+        "description": "Report the tenant's unresolved relative-``$ref`` edges and counts (#3457).\n\nA primitive's relative ``$ref`` values are resolved to registry edges on save/import\nand flagged ``resolved`` / ``unresolved`` (#3456). This endpoint aggregates the\nunresolved ones: the two top-level counts feed the registry coverage/stats KPIs\n(#3454), and ``primitives`` is the per-primitive breakdown \u2014 each with only its\nunresolved edges \u2014 the resolver UI lists (#3470).\n\nRegistered before ``GET /{tenant_slug}/{primitive_id}`` so the literal ``unresolved``\npath is matched here rather than being captured as a primitive id.\n\nArgs:\n    tenant_slug: The tenant slug.\n    auth_data: Authentication data (injected by dependency).\n\nReturns:\n    ``UnresolvedRefsResponse`` with the total unresolved-edge count, the number of\n    affected primitives, and the per-primitive unresolved-edge breakdown.",
+        "operationId": "list_unresolved_refs_v1_primitives__tenant_slug__unresolved_get",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnresolvedRefsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/primitives/{tenant_slug}/{primitive_id}": {
       "get": {
         "tags": [
@@ -17066,6 +17141,15 @@
             ],
             "title": "Base Uri"
           },
+          "refs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Refs",
+            "default": []
+          },
           "created_at": {
             "anyOf": [
               {
@@ -20875,6 +20959,97 @@
         "type": "object",
         "title": "TypeNamespaceUpdateRequest",
         "description": "Request model for updating a namespace. The namespace path is immutable (it links the\nnamespace to its primitives); only base URI, version root, description, visibility, and the\ndefault flag may change."
+      },
+      "UnresolvedRefPrimitive": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "schema_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Id"
+          },
+          "namespace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Namespace"
+          },
+          "base_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Uri"
+          },
+          "unresolved_count": {
+            "type": "integer",
+            "title": "Unresolved Count",
+            "default": 0
+          },
+          "unresolved_refs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Unresolved Refs",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "UnresolvedRefPrimitive",
+        "description": "A primitive that carries one or more unresolved relative-``$ref`` edges (#3457).\n\nSurfaced to the registry overview (#3454) and resolver UI (#3470) so a dangling\nreference can be located and re-resolved. ``unresolved_refs`` is the subset of the\nprimitive's ``refs`` edges whose ``status`` is ``unresolved``."
+      },
+      "UnresolvedRefsResponse": {
+        "properties": {
+          "unresolved_ref_count": {
+            "type": "integer",
+            "title": "Unresolved Ref Count",
+            "default": 0
+          },
+          "affected_primitive_count": {
+            "type": "integer",
+            "title": "Affected Primitive Count",
+            "default": 0
+          },
+          "primitives": {
+            "items": {
+              "$ref": "#/components/schemas/UnresolvedRefPrimitive"
+            },
+            "type": "array",
+            "title": "Primitives",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "UnresolvedRefsResponse",
+        "description": "Tenant-wide unresolved-``$ref`` summary for the type registry (#3457).\n\n``unresolved_ref_count`` (every unresolved edge) and ``affected_primitive_count``\n(distinct primitives carrying at least one) are the KPIs consumed by the registry\ncoverage/stats endpoint (#3454); ``primitives`` is the per-primitive breakdown the\nresolver UI lists (#3470)."
       },
       "ValidationError": {
         "properties": {
