@@ -16,6 +16,7 @@ import { Badge } from '../../ui/Badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/Select';
 import { PropertyFormFields, PropertyFormData } from './PropertyFormFields';
 import { PrimitiveSelector } from './PrimitiveSelector';
+import { ResolvedTypePreview } from './ResolvedTypePreview';
 import ExtractToClassDialog from './ExtractToClassDialog';
 import {
   GitBranch,
@@ -182,6 +183,15 @@ const BasicsSection: React.FC<BasicsSectionProps> = ({
             size="small"
           />
         </div>
+        {/* Resolve the bound registry type to its effective schema and let the
+            author validate an example value against it (#3476). */}
+        {formData.$ref && (
+          <ResolvedTypePreview
+            className="mt-4"
+            propertyRef={formData.$ref}
+            primitiveId={formData.primitive_id}
+          />
+        )}
       </div>
     )}
   </FormSection>
