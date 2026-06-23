@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 #
-# Runs the sem-apply scripty
+# Apply pending Flyway migrations using the objectified-db CLI.
+# Connection is resolved from OBJECTIFIED_DB_URL / DATABASE_URL / POSTGRES_* (see README).
 
-sem-apply --url $DATABASE_URL
-
+exec node dist/cli.js migrate "$@"
