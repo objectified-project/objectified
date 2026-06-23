@@ -1457,6 +1457,73 @@ class Database:
             "affected_primitive_count": int(row.get("affected_primitive_count") or 0),
         }
 
+    def get_registry_coverage_stats(self, tenant_id: str) -> Dict[str, int]:
+        """Aggregate registry coverage KPIs for the Primitives overview (#3454).
+
+        Type counts use the tenant's own ``odb.primitives`` rows (system-core types are
+        seeded per tenant). Property bindings count ``class_properties`` rows in the
+        tenant's projects that carry a ``primitive_id`` or ``primitive_ref``.
+
+        Args:
+            tenant_id: The caller's tenant id.
+
+        Returns:
+            Counts for core/tenant/imported types, bindings, unresolved refs, and namespaces.
+        """
+        query = """
+            WITH type_counts AS (
+                SELECT
+                    COUNT(*) FILTER (WHERE is_system) AS core_type_count,
+                    COUNT(*) FILTER (WHERE NOT is_system) AS tenant_type_count,
+                    COUNT(*) FILTER (WHERE source = 'imported') AS imported_count,
+                    COUNT(DISTINCT namespace) FILTER (WHERE namespace IS NOT NULL)
+                        AS namespace_count
+                FROM odb.primitives
+                WHERE tenant_id = %s
+            ),
+            binding_counts AS (
+                SELECT
+                    COUNT(*) AS properties_bound_count,
+                    COUNT(DISTINCT cp.class_id) AS bound_class_count
+                FROM odb.class_properties cp
+                JOIN odb.classes c ON cp.class_id = c.id
+                JOIN odb.versions v ON c.version_id = v.id
+                JOIN odb.projects p ON v.project_id = p.id
+                WHERE p.tenant_id = %s
+                  AND (cp.primitive_id IS NOT NULL OR cp.primitive_ref IS NOT NULL)
+            ),
+            unresolved AS (
+                SELECT
+                    COUNT(*) FILTER (WHERE edge->>'status' = 'unresolved')
+                        AS unresolved_ref_count
+                FROM odb.primitives p
+                LEFT JOIN LATERAL jsonb_array_elements(p.refs) AS edge ON true
+                WHERE p.tenant_id = %s
+            )
+            SELECT
+                tc.core_type_count,
+                tc.tenant_type_count,
+                tc.imported_count,
+                tc.namespace_count,
+                bc.properties_bound_count,
+                bc.bound_class_count,
+                u.unresolved_ref_count
+            FROM type_counts tc
+            CROSS JOIN binding_counts bc
+            CROSS JOIN unresolved u
+        """
+        results = self.execute_query(query, (tenant_id, tenant_id, tenant_id))
+        row = results[0] if results else {}
+        return {
+            "core_type_count": int(row.get("core_type_count") or 0),
+            "tenant_type_count": int(row.get("tenant_type_count") or 0),
+            "imported_count": int(row.get("imported_count") or 0),
+            "namespace_count": int(row.get("namespace_count") or 0),
+            "properties_bound_count": int(row.get("properties_bound_count") or 0),
+            "bound_class_count": int(row.get("bound_class_count") or 0),
+            "unresolved_ref_count": int(row.get("unresolved_ref_count") or 0),
+        }
+
     def get_primitives_with_unresolved_refs(self, tenant_id: str) -> List[Dict[str, Any]]:
         """List the tenant's primitives that have at least one unresolved ``$ref`` edge (#3457).
 
