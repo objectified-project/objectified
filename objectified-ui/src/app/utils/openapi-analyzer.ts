@@ -248,6 +248,42 @@ interface FormatDetectionResult {
 }
 
 /**
+ * Highest OpenAPI 3.x minor version this importer recognizes and routes natively (OA1, #3498).
+ *
+ * 3.0 → converted to 3.1; 3.1 / 3.2 → imported natively. Newer 3.x minors are still accepted
+ * (routed to the importer at OpenAPI 3.1 fidelity) but flagged with a non-blocking warning so
+ * they degrade gracefully as the OpenAPI spec evolves instead of being hard-rejected.
+ */
+export const MAX_KNOWN_OPENAPI_MINOR = 2;
+
+/**
+ * Classification of an OpenAPI `openapi` version string.
+ */
+export interface OpenAPIVersionClassification {
+  /** The 3.x minor version number, or null when the version is not in the 3.x line. */
+  minor: number | null;
+  /** Whether the version is part of the OpenAPI 3.x line (e.g. 3.0, 3.1, 3.2, 3.9). */
+  isThreeX: boolean;
+  /** Whether the 3.x minor is within the recognized range (<= MAX_KNOWN_OPENAPI_MINOR). */
+  isKnownMinor: boolean;
+}
+
+/**
+ * Classify an OpenAPI `openapi` version string into its 3.x minor and support tier (OA1, #3498).
+ *
+ * @param version - the raw `openapi` field value (e.g. "3.2.0").
+ * @returns the parsed minor number plus 3.x / known-minor flags. Non-3.x and malformed
+ *   versions yield `{ minor: null, isThreeX: false, isKnownMinor: false }`.
+ */
+export function classifyOpenAPIVersion(version: string): OpenAPIVersionClassification {
+  const match = typeof version === 'string' ? /^3\.(\d+)/.exec(version.trim()) : null;
+  const minor = match ? parseInt(match[1], 10) : null;
+  const isThreeX = minor !== null;
+  const isKnownMinor = minor !== null && minor <= MAX_KNOWN_OPENAPI_MINOR;
+  return { minor, isThreeX, isKnownMinor };
+}
+
+/**
  * Detect specification format and version
  */
 function detectFormat(doc: any): FormatDetectionResult {
@@ -294,13 +330,18 @@ function detectFormat(doc: any): FormatDetectionResult {
   // OpenAPI 3.x
   if (doc.openapi) {
     const version = doc.openapi;
-    // OpenAPI 3.0.x and 3.1.x are supported (3.0.x is converted to 3.1.x)
-    const isSupported = version.startsWith('3.0') || version.startsWith('3.1');
+    const { minor, isThreeX, isKnownMinor } = classifyOpenAPIVersion(version);
+    // Any 3.x document is accepted (OA1, #3498). 3.0.x is converted to 3.1.x; 3.1.x / 3.2.x
+    // import natively. Unknown future 3.x minors are accepted at OpenAPI 3.1 fidelity rather
+    // than hard-rejected, so the importer degrades gracefully as the spec evolves.
+    const isSupported = isThreeX;
     let displayName = `OpenAPI ${version}`;
 
-    if (version.startsWith('3.0')) {
+    if (minor === 0) {
       displayName = `OpenAPI ${version} (will be converted to OpenAPI 3.1.x)`;
-    } else if (!isSupported) {
+    } else if (isThreeX && !isKnownMinor) {
+      displayName = `OpenAPI ${version} (unrecognized 3.x minor — imported at OpenAPI 3.1 fidelity)`;
+    } else if (!isThreeX) {
       displayName = `OpenAPI ${version} (unsupported version)`;
     }
 
@@ -1215,19 +1256,38 @@ function findWarnings(doc: any): AnalysisIssue[] {
   const warnings: AnalysisIssue[] = [];
   const schemas = doc.components?.schemas || doc.definitions || {};
 
-  // Check for unsupported OpenAPI versions
-  if (doc.openapi && !doc.openapi.startsWith('3.1')) {
-    if (doc.openapi.startsWith('3.0')) {
+  // Check OpenAPI version handling (OA1, #3498). 3.1.x is native and produces no warning.
+  if (doc.openapi) {
+    const { minor, isThreeX, isKnownMinor } = classifyOpenAPIVersion(doc.openapi);
+    if (minor === 0) {
+      // 3.0.x: converted to 3.1.x for import.
       warnings.push({
         type: 'warning',
         message: `OpenAPI ${doc.openapi} was automatically converted to OpenAPI 3.1.x format for import.`,
         path: 'openapi',
         severity: 'low'
       });
-    } else {
+    } else if (isThreeX && minor !== null && minor > 1 && isKnownMinor) {
+      // 3.2.x (recognized post-3.1 minor): accepted and normalized for import — informational only.
       warnings.push({
         type: 'warning',
-        message: `OpenAPI ${doc.openapi} is not supported. Please upgrade to OpenAPI 3.0.x or 3.1.x.`,
+        message: `OpenAPI ${doc.openapi} was normalized to OpenAPI 3.1 fidelity for import. Newer 3.2 keywords are accepted but not yet transformed.`,
+        path: 'openapi',
+        severity: 'low'
+      });
+    } else if (isThreeX && !isKnownMinor) {
+      // Unknown future 3.x minor (e.g. 3.9.0): non-blocking warning, not a hard error.
+      warnings.push({
+        type: 'warning',
+        message: `OpenAPI ${doc.openapi} is newer than the recognized 3.${MAX_KNOWN_OPENAPI_MINOR}.x range; it was accepted and imported at OpenAPI 3.1 fidelity. Some newer features may not be fully represented.`,
+        path: 'openapi',
+        severity: 'medium'
+      });
+    } else if (!isThreeX) {
+      // Non-3.x (e.g. 4.0.0): unsupported.
+      warnings.push({
+        type: 'warning',
+        message: `OpenAPI ${doc.openapi} is not supported. Please use OpenAPI 3.0.x, 3.1.x, or 3.2.x.`,
         path: 'openapi',
         severity: 'high'
       });
