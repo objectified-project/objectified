@@ -5,6 +5,20 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.26] - 2026-06-23
+
+### Added
+- **Registry coverage/stats endpoint (#3454)** — `GET /v1/types/{tenant_slug}/stats` returns the
+  tenant's registry coverage KPIs as a single server-side aggregate: core type count, tenant type
+  count, imported count, properties bound, bound class count, unresolved `$ref` count, and
+  namespace count. Backed by `Database.get_registry_coverage_stats(tenant_id)`, which aggregates
+  over the extended `odb.primitives` table (type/namespace/import counts and unresolved `refs`
+  edges) and the tenant's `odb.class_properties` bindings on the existing `objectified-db`
+  connection — replacing the client-side stat computation in the Primitives overview dashboard
+  (#3467). Gated by the `require_primitives_registry` entitlement and tenant-scoped to the
+  authenticated caller. (The endpoint, model, and DB aggregate first shipped alongside #3467; this
+  release documents and formally closes #3454.)
+
 ## [1.0.23] - 2026-06-23
 
 ### Added

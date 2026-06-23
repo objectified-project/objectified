@@ -328,7 +328,7 @@ enforcement, plus the `objectified-ui` proxy + typed client.
 | 2.2 #3451 ✅ | Namespace CRUD API | **DONE** — `GET/POST/PUT /v1/types/{tenant_slug}/namespaces` over `odb.type_namespaces`; tenant-admin writes, system-core read-only, type counts joined from `odb.primitives` | `type-registry`,`registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
 | 2.3 #3452 ✅ | Type definition CRUD + draft 2020-12 validation | **DONE** — strict JSON Schema draft 2020-12 meta-validation on primitive create/update/import (`app/schema_validation.py`), field-level 422 errors, stable derived `$id` (`schema_id`) + stamped `draft` persisted to `odb.primitives` | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
 | 2.4 #3453 ✅ | Scope & visibility enforcement | **DONE** — read scope `is_system ∪ tenant` on `odb.primitives` reads (cross-tenant isolation, all tenants see `std/*`); centralized `$ref`-direction rules (`app/primitives_scope.py`) reject core→tenant and tenant→other-tenant refs on create/update/import with structured 422 violations | `type-registry`,`governance`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-rest |
-| 2.5 #3454 | Registry coverage/stats endpoint | Counts by scope, imported, unresolved (for dashboard KPIs) | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | S | objectified-rest |
+| 2.5 #3454 ✅ | Registry coverage/stats endpoint | **DONE** — `GET /v1/types/{tenant_slug}/stats` returns a single server-side aggregate (core/tenant/imported type counts, properties bound, bound classes, unresolved `$ref` count, namespace count) via `Database.get_registry_coverage_stats` over `odb.primitives` + `odb.class_properties`; entitlement-gated and tenant-scoped, replacing the dashboard's client-side stat computation (feeds #3467 KPIs) | `type-registry`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | S | objectified-rest |
 | 2.6 #3455 | ~~UI proxy routes + typed client~~ | **CLOSED — duplicate** (`/api/primitives/*` shipped) | `type-registry`,`ui`,`mvp`,`roadmap-type-registry` | N | Y | S | objectified-ui |
 
 ### Issue 2.1 — Registry service skeleton + auth/scoping
@@ -383,7 +383,7 @@ enforcement, plus the `objectified-ui` proxy + typed client.
 - **Parallelism/Dependencies.** Depends on 2.2/2.3; reinforced by 3.1.
 - **Technical Stack.** FastAPI authorization layer.
 
-### Issue 2.5 — Registry coverage/stats endpoint
+### Issue 2.5 — Registry coverage/stats endpoint ✅ DONE
 - **Problem.** The overview KPIs need aggregate counts.
 - **Solution/Scope.** `GET /v1/types/{tenant_slug}/stats` → core type count, tenant type count,
   imported count, properties bound, unresolved `$ref` count. Source:
@@ -391,6 +391,16 @@ enforcement, plus the `objectified-ui` proxy + typed client.
 - **Acceptance Criteria.** Numbers match fixtures and the resolver/binding state.
 - **Parallelism/Dependencies.** Depends on 2.3, 3.2, 6.2; parallel otherwise.
 - **Technical Stack.** FastAPI, SQL aggregation.
+- **Status (#3454).** Shipped in `objectified-rest`. `GET /v1/types/{tenant_slug}/stats`
+  (`app/type_namespaces_routes.py`) returns `RegistryCoverageStatsResponse`
+  (`core_type_count`, `tenant_type_count`, `imported_count`, `properties_bound_count`,
+  `bound_class_count`, `unresolved_ref_count`, `namespace_count`) from a single
+  `Database.get_registry_coverage_stats` SQL aggregate over `odb.primitives` (type/namespace/
+  import counts + unresolved `refs` edges) and `odb.class_properties` (bindings), tenant-scoped
+  and entitlement-gated (`require_primitives_registry`). Consumed by the Primitives overview
+  dashboard (#3467), replacing client-side stat computation. Covered by
+  `tests/test_primitives_registry_stats.py` (API: 200 + auth) and
+  `tests/test_primitives_registry_stats_db.py` (DB row-mapping + empty-result fallback).
 
 ### Issue 2.6 — UI proxy routes + typed client
 - **Problem.** Browser calls must proxy through Next.js with JWT injection.
