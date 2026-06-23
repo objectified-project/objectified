@@ -18,8 +18,9 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from .auth import get_authenticated_user_id, validate_authentication
+from .auth import get_authenticated_user_id
 from .database import db
+from .feature_gating import require_primitives_registry
 from .models import (
     RegistryCoverageStatsResponse,
     ResolvedPrimitiveRefs,
@@ -108,7 +109,7 @@ def _to_schema(row: Dict[str, Any]) -> TypeNamespaceSchema:
 @router.get("/{tenant_slug}/stats", response_model=RegistryCoverageStatsResponse)
 async def get_registry_coverage_stats(
     tenant_slug: str,
-    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    auth_data: Dict[str, Any] = Depends(require_primitives_registry),
 ) -> RegistryCoverageStatsResponse:
     """Return aggregate registry coverage KPIs for the Primitives overview (#3454).
 
@@ -129,7 +130,7 @@ async def get_registry_coverage_stats(
 @router.get("/{tenant_slug}/namespaces")
 async def list_namespaces(
     tenant_slug: str,
-    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    auth_data: Dict[str, Any] = Depends(require_primitives_registry),
 ) -> List[TypeNamespaceSchema]:
     """List namespaces visible to the tenant: system-core (``std/*``) plus the tenant's own.
 
@@ -148,7 +149,7 @@ async def list_namespaces(
 async def create_namespace(
     tenant_slug: str,
     request: TypeNamespaceCreateRequest,
-    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    auth_data: Dict[str, Any] = Depends(require_primitives_registry),
 ) -> TypeNamespaceSchema:
     """Create a namespace.
 
@@ -224,7 +225,7 @@ async def update_namespace(
     tenant_slug: str,
     namespace_id: str,
     request: TypeNamespaceUpdateRequest,
-    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    auth_data: Dict[str, Any] = Depends(require_primitives_registry),
 ) -> TypeNamespaceSchema:
     """Update a tenant namespace's base URI, version root, description, visibility, or default flag.
 
@@ -306,7 +307,7 @@ def _settings_to_schema(row: Dict[str, Any]) -> TypeRegistrySettingsSchema:
 @router.get("/{tenant_slug}/settings", response_model=TypeRegistrySettingsSchema)
 async def get_registry_settings(
     tenant_slug: str,
-    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    auth_data: Dict[str, Any] = Depends(require_primitives_registry),
 ) -> TypeRegistrySettingsSchema:
     """Return the tenant's type-registry settings (#3472).
 
@@ -332,7 +333,7 @@ async def get_registry_settings(
 async def update_registry_settings(
     tenant_slug: str,
     request: TypeRegistrySettingsUpdateRequest,
-    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    auth_data: Dict[str, Any] = Depends(require_primitives_registry),
 ) -> TypeRegistrySettingsSchema:
     """Save the tenant's type-registry settings (#3472).
 
@@ -373,7 +374,7 @@ async def update_registry_settings(
 @router.post("/{tenant_slug}/resolve", response_model=ResolveResponse)
 async def resolve_refs(
     tenant_slug: str,
-    auth_data: Dict[str, Any] = Depends(validate_authentication),
+    auth_data: Dict[str, Any] = Depends(require_primitives_registry),
 ) -> ResolveResponse:
     """Re-resolve the tenant's ``$ref`` edges and return the dependency listing (#3459).
 

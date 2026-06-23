@@ -3399,6 +3399,74 @@ class Database:
         """
         return bool(self.execute_query(q, (tenant_id, user_id)))
 
+    def tenant_has_feature_flag(
+        self,
+        tenant_id: Optional[str],
+        user_id: Optional[str],
+        flag_name: str,
+    ) -> bool:
+        """Resolve whether a tenant/user is entitled to a named feature flag (#3478).
+
+        Effective entitlement layers, highest precedence first:
+
+        1. Per-user override (``odb.user_feature_flags.enabled``) — an admin explicitly
+           granting or revoking the flag for this user.
+        2. Per-tenant override (``odb.tenant_feature_flags.enabled``) — all members of the
+           tenant inherit this unless a user override exists.
+        3. License default (``odb.license_feature_flags`` via ``user_entitlements.license_id``)
+           — the flag is bundled into the user's assigned plan.
+
+        The flag's global master switch (``odb.feature_flags.enabled``) is honored: a missing
+        or globally-disabled flag is never entitled, regardless of overrides. ``user_id`` may be
+        ``None`` (e.g. a legacy API key without an attributed user), in which case only the
+        tenant-level override is consulted.
+
+        Args:
+            tenant_id: The acting tenant's id (``None`` skips the tenant-override lookup).
+            user_id: The acting user's id (``None`` skips user-override and license lookups).
+            flag_name: The feature flag slug, e.g. ``"primitives-registry"``.
+
+        Returns:
+            True when the flag is globally enabled and the resolved entitlement grants it.
+        """
+        row = self.execute_query(
+            """
+            WITH ff AS (
+                SELECT id, enabled FROM odb.feature_flags WHERE name = %s
+            )
+            SELECT
+                ff.enabled                          AS flag_enabled,
+                uff.enabled                         AS user_override,
+                tff.enabled                         AS tenant_override,
+                (lff.feature_flag_id IS NOT NULL)   AS license_grant
+            FROM ff
+            LEFT JOIN odb.user_feature_flags uff
+                   ON uff.feature_flag_id = ff.id AND uff.user_id = %s::uuid
+            LEFT JOIN odb.tenant_feature_flags tff
+                   ON tff.feature_flag_id = ff.id AND tff.tenant_id = %s::uuid
+            LEFT JOIN odb.user_entitlements ue
+                   ON ue.user_id = %s::uuid
+            LEFT JOIN odb.license_feature_flags lff
+                   ON lff.feature_flag_id = ff.id AND lff.license_id = ue.license_id
+            LIMIT 1
+            """,
+            (flag_name, user_id, tenant_id, user_id),
+        )
+        if not row:
+            # Flag is not defined in the registry — treat as not entitled.
+            return False
+
+        record = row[0]
+        if not record["flag_enabled"]:
+            # Globally disabled master switch — off for everyone.
+            return False
+
+        if record["user_override"] is not None:
+            return bool(record["user_override"])
+        if record["tenant_override"] is not None:
+            return bool(record["tenant_override"])
+        return bool(record["license_grant"])
+
     def get_active_tenant_auth_row(self, tenant_slug: str) -> Optional[Dict[str, Any]]:
         """Resolve a non-deleted tenant slug to id/slug/name for auth checks."""
         query = """

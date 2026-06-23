@@ -59,6 +59,20 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Primitives type-registry entitlement gating (#3478). When False (default), the
+    # advanced Type Registry surface (resolver, namespaces, settings, stats, import) is
+    # open to every authenticated tenant — current behavior, unchanged. When True, those
+    # routes require the calling tenant/user to hold the ``primitives-registry`` feature
+    # flag (per-user override > per-tenant override > license default); non-entitled
+    # callers get 403. Baseline primitives CRUD and /health are never gated.
+    primitives_registry_gating_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_PRIMITIVES_REGISTRY_GATING",
+            "primitives_registry_gating_enabled",
+        ),
+    )
+
     # Global auto-refresh kill switch (RAR-3.3, #3524). When False, the refresh
     # sweep halts entirely (no repository is auto-refreshed) regardless of per-repo
     # auto_refresh_enabled. Intended for incident response. Manual "Refresh Now"

@@ -767,18 +767,30 @@ Governance controls around the registry: entitlements, publish gates, promotion,
 
 | Issue | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |---|---|---|---|:---:|:---:|---|---|
-| 7.1 #3478 | Entitlement & feature gating | Gate Type Registry behind tenant entitlement | `type-registry`,`governance`,`rest`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | S | objectified-rest, objectified-ui |
+| 7.1 #3478 ✅ | Entitlement & feature gating | **DONE** — optional `primitives-registry` entitlement gates the advanced Type Registry surface (resolver, namespaces, settings, stats, import) in `objectified-rest`; baseline primitives CRUD + `/health` stay always-on | `type-registry`,`governance`,`rest`,`ui`,`mvp`,`roadmap-type-registry` | Y | Y | S | objectified-rest, objectified-ui |
 | 7.2 #3479 | Type publishing & validation gate | Validate on save; block publish on errors | `type-registry`,`governance`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-rest |
 | 7.3 #3480 | Promote tenant type → core (CAB) | Governed promotion of a vetted tenant type to `std/*` | `type-registry`,`governance`,`rest`,`ui`,`roadmap-type-registry` | Y | N | M | objectified-rest, objectified-ui |
 | 7.4 #3481 | Registry audit log | Record create/update/import/publish/bind events | `type-registry`,`governance`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | S | objectified-rest |
 | 7.5 #3482 | Version roots & deprecation lifecycle | Manage `v0`/`v1` roots; deprecate/sunset types | `type-registry`,`versions`,`governance`,`roadmap-type-registry` | Y | N | M | objectified-rest, objectified-ui |
 
-### Issue 7.1 — Entitlement & feature gating
+### Issue 7.1 — Entitlement & feature gating ✅ DONE (#3478)
 - **Solution/Scope.** Add a `type-registry` entitlement; gate nav, routes, and API. Source:
   `governance/README.md`.
 - **Acceptance Criteria.** Non-entitled tenants cannot see/reach the feature; entitled can.
 - **Parallelism/Dependencies.** Parallel; soft-blocks 5.1 visibility.
 - **Technical Stack.** FastAPI entitlements, Next.js checks.
+- **DONE.** The `primitives-registry` feature flag (seeded by objectified-db migration
+  `20260623-130000.sql`; bundled into the Paid and Sponsor plans, not Free) is the entitlement,
+  managed through the existing admin Feature-Flag panel (per-user / per-tenant overrides on top of
+  the license default). Enforcement is authoritative in `objectified-rest`: a reusable
+  `require_primitives_registry` dependency (`app/feature_gating.py`) gates the **advanced** surface —
+  every `/v1/types/*` route (resolver, namespaces, settings, stats) plus the `/v1/primitives/*`
+  import pipeline and `/unresolved` resolver — while baseline primitives CRUD and `/health` remain
+  always-on. The gate is itself behind an operator switch
+  (`OBJECTIFIED_PRIMITIVES_REGISTRY_GATING`, default **off**): when off, behavior is unchanged and
+  every authenticated tenant reaches the advanced routes; when on, non-entitled tenants get `403`.
+  Entitlement resolves with precedence per-user override → per-tenant override → license default
+  (`Database.tenant_has_feature_flag`), honoring the flag's global master switch.
 
 ### Issue 7.2 — Type publishing & validation gate
 - **Solution/Scope.** Validate on save (2020-12); block publish on validation errors per Settings
