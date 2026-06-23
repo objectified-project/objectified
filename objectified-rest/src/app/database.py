@@ -542,6 +542,15 @@ class Database:
                      parent_id, primitive_id, primitive_ref)
                 )
                 result = cursor.fetchone()
+                # Binding a property to a registry type counts as a use of that
+                # primitive (#3475 — increment usage via the existing usage_count
+                # pattern). Done in the same transaction so the count and the
+                # binding commit atomically.
+                if primitive_id:
+                    cursor.execute(
+                        "UPDATE odb.primitives SET usage_count = usage_count + 1 WHERE id = %s",
+                        (primitive_id,)
+                    )
                 conn.commit()
                 # Parse JSON data if it's a string
                 if result and isinstance(result.get('data'), str):
@@ -564,9 +573,11 @@ class Database:
         """Update a class property, ensuring it belongs to the class and tenant."""
         import json
         
-        # First verify the class property belongs to a class that belongs to the tenant
+        # First verify the class property belongs to a class that belongs to the tenant.
+        # Also fetch the current primitive binding so we can tell whether this update
+        # newly binds the property to a primitive (for the usage_count increment, #3475).
         verify_query = """
-            SELECT cp.id, cp.class_id
+            SELECT cp.id, cp.class_id, cp.primitive_id
             FROM odb.class_properties cp
             JOIN odb.classes c ON cp.class_id = c.id
             JOIN odb.versions v ON c.version_id = v.id
@@ -578,6 +589,7 @@ class Database:
         verify_result = self.execute_query(verify_query, (class_property_id, class_id, tenant_id))
         if not verify_result:
             return None
+        old_primitive_id = verify_result[0].get('primitive_id')
         
         # Build dynamic update query
         update_fields = []
@@ -622,6 +634,17 @@ class Database:
             with conn.cursor() as cursor:
                 cursor.execute(query, tuple(params))
                 result = cursor.fetchone()
+                # If this update binds the property to a *different* primitive than
+                # before, count it as a new use of that primitive (#3475). Comparing
+                # against the prior value keeps repeated saves of an unchanged binding
+                # from inflating usage_count. Same transaction as the update.
+                if 'primitive_id' in updates:
+                    new_primitive_id = updates['primitive_id']
+                    if new_primitive_id and str(new_primitive_id) != str(old_primitive_id):
+                        cursor.execute(
+                            "UPDATE odb.primitives SET usage_count = usage_count + 1 WHERE id = %s",
+                            (new_primitive_id,)
+                        )
                 conn.commit()
                 if result and isinstance(result.get('data'), str):
                     result['data'] = json.loads(result['data'])

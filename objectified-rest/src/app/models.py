@@ -84,6 +84,11 @@ class PropertySchema(BaseModel):
     property_source_id: Optional[str] = None
     property_source_name: Optional[str] = None
     parent_id: Optional[str] = None  # New: nested properties support
+    # Property→type registry binding (#3448 model, persisted by #3475). A real FK
+    # to the resolved odb.primitives row plus the stored registry $ref string.
+    # Both NULL for inline/library-only properties that are not bound to a type.
+    primitive_id: Optional[str] = None
+    primitive_ref: Optional[str] = None
 
     class Config:
         from_attributes = True
