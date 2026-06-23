@@ -2,8 +2,8 @@
  * Apply SQL migrations from scripts/ using Flyway-compatible conventions.
  *
  * - Scripts are named `V<version>__<description>.sql` (Flyway versioned migrations). The
- *   version is a digit string (we use the 14-digit `YYYYMMDDHHMMSS` timestamp), parts may be
- *   separated by `.` or `_`; the description follows the `__` separator.
+ *   version is a zero-padded sequential number (`V001`, `V002`, …); parts may be separated by
+ *   `.` or `_`; the description follows the `__` separator.
  * - Applied state is tracked in a Flyway-shaped history table (`flyway_schema_history`) living
  *   in the configured history schema (default `public`, which survives the app `odb` schema
  *   being dropped by the first migration / `clean`).

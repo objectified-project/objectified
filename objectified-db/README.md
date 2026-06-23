@@ -15,8 +15,9 @@ Database migrations **and** the `objectified-db` admin CLI for the Objectified p
 
 Migrations follow Flyway conventions (a self-contained TypeScript engine — no Java required):
 
-- **Naming** — `V<version>__<description>.sql`. The version is the 14-digit `YYYYMMDDHHMMSS`
-  timestamp (e.g. `V20251026012616__multitenant_init.sql`); scripts apply in version order.
+- **Naming** — `V<version>__<description>.sql`. The version is a zero-padded sequential number
+  (`V001`, `V002`, … e.g. `V001__multitenant_init.sql`); scripts apply in version order. When
+  adding a migration, use the next number after the highest existing one.
 - **Tracking** — applied scripts are recorded in `flyway_schema_history` (in the `public`
   schema by default, so it survives the app `odb` schema being dropped) with a CRC32 `checksum`
   of each script's contents.
@@ -191,7 +192,7 @@ table in place**. Primitives are tenant-scoped (each row's `tenant_id`) **and** 
 (`is_system` / `is_public`), so a tenant's own types and the shared `std/*` types compose across
 the tenant's projects with ordinary same-database foreign keys.
 
-Migration `V20260622230000__consolidate_the_type_registry_into_objec.sql` adds these registry
+Migration `V111__consolidate_the_type_registry_into_objec.sql` adds these registry
 columns to `odb.primitives` (no new tables, no separate schema):
 
 | Column | Role |

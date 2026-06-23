@@ -16,7 +16,7 @@ import { describe, expect, it, beforeAll } from "vitest";
 import { listMigrationFiles } from "../src/migrate.js";
 
 const SCRIPTS_DIR = new URL("../scripts", import.meta.url).pathname;
-const MIGRATION = "V20260622240000__seed_core_system_primitives_types_std_v0.sql";
+const MIGRATION = "V113__seed_core_system_primitives_types_std_v0.sql";
 
 let sql = "";
 let lower = "";
@@ -51,7 +51,7 @@ describe("std/v0 core system types seed migration", () => {
     const files = await listMigrationFiles(SCRIPTS_DIR);
     expect(files).toContain(MIGRATION);
     expect(files.indexOf(MIGRATION)).toBeGreaterThan(
-      files.indexOf("V20260622235000__import_provenance_property_primitive_bin.sql"),
+      files.indexOf("V112__import_provenance_property_primitive_bin.sql"),
     );
   });
 

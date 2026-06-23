@@ -9,22 +9,22 @@ import {
 
 describe("isMigrationFilename", () => {
   it("accepts Flyway versioned scripts", () => {
-    expect(isMigrationFilename("V20251026012616__multitenant_init.sql")).toBe(true);
-    expect(isMigrationFilename("V20260511162000__rename_thing.sql")).toBe(true);
+    expect(isMigrationFilename("V001__multitenant_init.sql")).toBe(true);
+    expect(isMigrationFilename("V117__rename_thing.sql")).toBe(true);
   });
 
   it("rejects non-migration / SEM-style files", () => {
     expect(isMigrationFilename("test_foo.sql")).toBe(false);
     expect(isMigrationFilename("20251026-012616.sql")).toBe(false); // old SEM name
-    expect(isMigrationFilename("V20251026012616.sql")).toBe(false); // missing __description
+    expect(isMigrationFilename("V001.sql")).toBe(false); // missing __description
     expect(isMigrationFilename("R__repeatable.sql")).toBe(false); // repeatable unsupported
   });
 });
 
 describe("parseMigrationName", () => {
   it("splits the version and description", () => {
-    expect(parseMigrationName("V20251026012616__multitenant_init.sql")).toEqual({
-      version: "20251026012616",
+    expect(parseMigrationName("V001__multitenant_init.sql")).toEqual({
+      version: "001",
       description: "multitenant init",
     });
   });
