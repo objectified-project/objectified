@@ -21,10 +21,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from .auth import get_authenticated_user_id, validate_authentication
 from .database import db
 from .models import (
+    ResolvedPrimitiveRefs,
+    ResolvedRefEdge,
+    ResolveResponse,
     TypeNamespaceCreateRequest,
     TypeNamespaceSchema,
     TypeNamespaceUpdateRequest,
 )
+from .type_resolver import STATUS_RESOLVED, STATUS_UNRESOLVED, reresolve_edges
 
 router = APIRouter(prefix="/v1/types", tags=["type-registry"])
 
@@ -242,3 +246,96 @@ async def update_namespace(
         raise HTTPException(status_code=404, detail=f"Namespace not found: {namespace_id}")
 
     return _to_schema(row)
+
+
+@router.post("/{tenant_slug}/resolve", response_model=ResolveResponse)
+async def resolve_refs(
+    tenant_slug: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> ResolveResponse:
+    """Re-resolve the tenant's ``$ref`` edges and return the dependency listing (#3459).
+
+    The resolver API for the UI and Designer (#3470). It walks every primitive visible to
+    the tenant (system-core ∪ own), re-evaluates each stored dependency edge's
+    resolved/unresolved status against the *current* registry — so a target created since
+    the edge was last computed now resolves, and a deleted one now dangles — and persists
+    the refreshed edges for any of the tenant's own primitives whose status changed
+    ("re-resolve updates statuses"). Each resolved edge is enriched with its dependency
+    target's id and name so the response is the dependency graph the resolver UI lists.
+
+    Only primitives that carry at least one ``$ref`` edge appear in ``primitives``; the
+    flat system-core seed (no refs) is omitted. System-core rows are read-only, so a status
+    change on one is reflected in the response but never written back.
+
+    Args:
+        tenant_slug: The tenant slug (caller scope comes from the authenticated token).
+        auth_data: Authentication data (injected by dependency).
+
+    Returns:
+        ``ResolveResponse`` with tenant-wide edge counts, the number of primitives whose
+        stored statuses were updated by this pass, and the per-primitive dependency listing.
+    """
+    tenant_id = auth_data["tenant_id"]
+    primitives = db.get_primitives_for_tenant(tenant_id)
+
+    # Each distinct target $id is resolved once and reused across every edge that points at
+    # it (a target is commonly shared by many dependents); the cache also dedupes the
+    # repeated misses for a still-missing target.
+    target_cache: Dict[str, Optional[Dict[str, Any]]] = {}
+
+    def _target_lookup(schema_id: str) -> Optional[Dict[str, Any]]:
+        if schema_id not in target_cache:
+            target_cache[schema_id] = db.get_primitive_by_schema_id(schema_id, tenant_id)
+        return target_cache[schema_id]
+
+    listing: List[ResolvedPrimitiveRefs] = []
+    ref_count = 0
+    resolved_ref_count = 0
+    unresolved_ref_count = 0
+    affected_primitive_count = 0
+    reresolved_primitive_count = 0
+
+    for prim in primitives:
+        stored_edges = prim.get("refs") or []
+        if not stored_edges:
+            continue  # No dependency edges — nothing to resolve or list.
+
+        persisted, dependencies, changed = reresolve_edges(stored_edges, _target_lookup)
+
+        # Persist the refreshed statuses for the tenant's own writable rows. System-core
+        # rows are read-only (and flat, so they never change); skip writing those.
+        if changed and not prim.get("is_system"):
+            db.update_primitive(str(prim["id"]), tenant_id, {"refs": persisted})
+            reresolved_primitive_count += 1
+
+        resolved = sum(1 for e in persisted if e["status"] == STATUS_RESOLVED)
+        unresolved = sum(1 for e in persisted if e["status"] == STATUS_UNRESOLVED)
+        ref_count += len(persisted)
+        resolved_ref_count += resolved
+        unresolved_ref_count += unresolved
+        if unresolved:
+            affected_primitive_count += 1
+
+        listing.append(
+            ResolvedPrimitiveRefs(
+                id=str(prim["id"]),
+                name=prim["name"],
+                schema_id=prim.get("schema_id"),
+                namespace=prim.get("namespace"),
+                base_uri=prim.get("base_uri"),
+                ref_count=len(persisted),
+                resolved_count=resolved,
+                unresolved_count=unresolved,
+                refs=[ResolvedRefEdge(**edge) for edge in dependencies],
+            )
+        )
+
+    return ResolveResponse(
+        total_primitives=len(listing),
+        ref_count=ref_count,
+        resolved_ref_count=resolved_ref_count,
+        unresolved_ref_count=unresolved_ref_count,
+        affected_primitive_count=affected_primitive_count,
+        reresolved_primitive_count=reresolved_primitive_count,
+        primitives=listing,
+    )

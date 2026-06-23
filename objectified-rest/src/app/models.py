@@ -260,6 +260,70 @@ class UnresolvedRefsResponse(BaseModel):
         from_attributes = True
 
 
+# ==================== Type-registry resolver API (#3459) ====================
+
+
+class ResolvedRefEdge(BaseModel):
+    """One re-resolved ``$ref`` dependency edge of a primitive (#3459).
+
+    The persisted edge fields (``relative_ref`` / ``resolved_target`` / ``status``)
+    plus the resolved dependency target's identity. ``target_id`` / ``target_name``
+    are populated only for a ``resolved`` edge (the primitive currently carrying the
+    target ``$id`` within the caller's read scope); they are ``None`` for an
+    ``unresolved`` edge whose target does not yet exist.
+    """
+    relative_ref: Optional[str] = None
+    resolved_target: Optional[str] = None
+    status: str  # 'resolved' | 'unresolved'
+    target_id: Optional[str] = None
+    target_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ResolvedPrimitiveRefs(BaseModel):
+    """A primitive and its re-resolved dependency edges (#3459).
+
+    One row of the resolver UI table (#3470): the source primitive's identity, its
+    per-edge resolved/unresolved counts, and its dependency edges.
+    """
+    id: str
+    name: str
+    schema_id: Optional[str] = None
+    namespace: Optional[str] = None
+    base_uri: Optional[str] = None
+    ref_count: int = 0
+    resolved_count: int = 0
+    unresolved_count: int = 0
+    refs: List[ResolvedRefEdge] = []
+
+    class Config:
+        from_attributes = True
+
+
+class ResolveResponse(BaseModel):
+    """Result of a tenant-wide ``$ref`` re-resolution pass (#3459).
+
+    ``POST /v1/types/{tenant_slug}/resolve`` recomputes the resolved/unresolved status
+    of every dependency edge across the tenant's primitives against the current registry
+    state, persists any edge whose status changed, and returns the per-primitive
+    dependency listing the resolver UI consumes (#3470). The top-level counts mirror the
+    coverage KPIs of ``GET …/unresolved`` (#3457/#3454); ``reresolved_primitive_count``
+    is how many primitives had at least one edge status flip during this pass.
+    """
+    total_primitives: int = 0  # primitives carrying at least one $ref edge
+    ref_count: int = 0  # total dependency edges across those primitives
+    resolved_ref_count: int = 0
+    unresolved_ref_count: int = 0
+    affected_primitive_count: int = 0  # primitives with at least one unresolved edge
+    reresolved_primitive_count: int = 0  # primitives whose stored statuses were updated
+    primitives: List[ResolvedPrimitiveRefs] = []
+
+    class Config:
+        from_attributes = True
+
+
 # ==================== Type-registry namespaces (#3451) ====================
 
 
