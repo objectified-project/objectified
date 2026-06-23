@@ -215,8 +215,12 @@ def test_import_rejects_invalid_definition_but_imports_valid():
     assert mdb.create_primitive.call_count == 1
 
 
-def test_import_captures_internal_defs_refs_in_refs_jsonb():
-    """#3461: a committed primitive's refs JSONB carries its intra-doc #/$defs edges."""
+def test_import_rewrites_internal_defs_refs_to_relative_registry_edges():
+    """#3463: a committed primitive's intra-doc #/$defs edges are rewritten relative + resolved.
+
+    The #/$defs/Currency sibling pointer becomes ./currency and is resolved against the import's
+    base URI like any registry ref (#3456) — no leftover 'internal' fragment pointer remains.
+    """
     captured = {}
 
     def _create(**kwargs):
@@ -244,8 +248,12 @@ def test_import_captures_internal_defs_refs_in_refs_jsonb():
         )
     assert r.status_code == 200
     money_refs = captured["Money"]["refs"]
-    assert {"relative_ref": "#/$defs/Currency", "resolved_target": "Currency",
-            "status": "internal"} in money_refs
+    assert {
+        "relative_ref": "./currency",
+        "resolved_target": "https://api.objectified.dev/types/tenant/acme/currency",
+        "status": "unresolved",
+    } in money_refs
+    assert all(e["status"] != "internal" for e in money_refs)
     # A def with no internal refs commits an empty edge list.
     assert captured["Currency"]["refs"] == []
 

@@ -10952,6 +10952,10 @@ components:
           - type: string
           - type: 'null'
           title: Target Namespace
+        map_core_formats:
+          type: boolean
+          title: Map Core Formats
+          default: true
       type: object
       required:
       - schema

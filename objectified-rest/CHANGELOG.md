@@ -5,6 +5,32 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.19] - 2026-06-22
+
+### Added
+- **`$ref` rewrite + namespace/scope mapping (#3463)** — imported definitions now have their refs
+  rewritten for their committed place in the registry instead of carrying document-local pointers.
+  New `app/primitives_rewrite.py` provides `rewrite_import_schema()`, which (1) rewrites every
+  intra-source pointer (`#/$defs/Money`, `#/definitions/Money`, `#/types/Money`) to a relative
+  registry ref at the sibling's committed `$id` (`./money`, matching the `$id` leaf-slug; a deeper
+  pointer like `#/$defs/Money/properties/c` is preserved as `./money#/properties/c`), and (2) maps a
+  recognized string `format` (`email`, `uuid`, `uri`, `date`, `date-time`, `time`) to its seeded
+  `std/v0/types` core type by injecting a relative `$ref` (mirroring the seed's
+  `{"$ref": "../primitives/string", "format": "email"}` shape; an author's explicit `$ref` is never
+  overridden). Because both rewrites produce ordinary registry-relative `$ref` values, the existing
+  resolver (#3456) turns them into persisted `refs` edges with no separate internal-edge bookkeeping
+  — so imported refs are stored relative and resolve via Epic 3, and core-format mapping resolves to
+  the core type. `POST /v1/primitives/{tenant_slug}/import` applies this on commit for both the JSON
+  Schema and type-def-bundle paths; a new `map_core_formats` request flag (default `true`) toggles
+  the format mapping, and the import report gains a per-type `rewrites` map for the review table.
+
+### Changed
+- **Import commit no longer persists `internal` ref edges (#3463).** The `$defs`/`types` sibling
+  pointers that #3461/#3462 captured as `{status: "internal"}` edges are now rewritten to relative
+  registry refs and resolved like any other edge, so a committed primitive's `refs` carries only
+  `resolved`/`unresolved` edges. (The staging path's per-candidate `internal_refs` metadata is
+  unchanged.)
+
 ## [1.0.18] - 2026-06-22
 
 ### Added

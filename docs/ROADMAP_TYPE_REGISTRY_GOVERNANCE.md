@@ -483,7 +483,7 @@ flowchart LR
 | 4.1 #3460 ✅ | ~~Import pipeline core + ingestion~~ | **DONE** — `POST /v1/primitives/{tenant_slug}/import/stage` orchestrator: ingests paste/file/url/git, parses JSON/YAML, stages candidate types per kind (json-schema/type-def-bundle/openapi), records a `staged` `odb.primitive_imports` row; legacy paste `/import` retained | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | M | objectified-rest |
 | 4.2 #3461 ✅ | ~~JSON Schema 2020-12 parser~~ | **DONE** — `primitives_parser.parse_json_schema_document`: each `$defs`/`definitions` entry → a discrete type (single-root doc → one type), captures intra-doc `#/$defs` refs as `internal` `refs` edges for rewrite (#3463), per-type draft 2020-12 validation report; wired through the `/import/stage` pipeline and the legacy `/import` commit path | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | L | objectified-rest |
 | 4.3 #3462 ✅ | ~~Type-definition bundle importer~~ | **DONE** — `primitives_bundle.parse_type_def_bundle` expands a `.json`/`.yaml` bundle's `types` (or `$defs`/`definitions`) container into discrete types, capturing inter-type `#/types`/`#/$defs` refs as `internal` `refs` edges for rewrite (#3463) with per-type draft 2020-12 validation; `expand_zip_bundle` merges a `.zip` of per-type files into a bundle document. Wired through `/import/stage` (deep candidates) and the `/import` commit path (`source_kind='type-def-bundle'` → N types commit N `odb.primitives` rows with refs intact); malformed bundle → clear 400 | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | L | objectified-rest |
-| 4.4 #3463 | `$ref` rewrite + namespace/scope mapping | Rewrite refs relative to import source; map to namespace/scope | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
+| 4.4 #3463 ✅ | ~~`$ref` rewrite + namespace/scope mapping~~ | **DONE** — `primitives_rewrite.rewrite_import_schema` rewrites each imported definition's intra-source pointers (`#/$defs/Money`, `#/definitions/Money`, `#/types/Money`) to relative registry refs at the sibling's committed `$id` (`./money`, preserving any deeper pointer as `./money#/...`), and maps recognized string formats (email, uuid, uri, date, date-time, time) to the seeded `std/v0/types` core types by injecting a relative `$ref` (author refs never overridden). Both rewrites yield ordinary registry-relative refs, so the existing resolver (#3456) persists them as `refs` edges — imported refs are stored relative and resolve via Epic 3; no `internal` edges remain on committed rows. Applied on commit (`POST /import`) for the JSON Schema and bundle paths; `map_core_formats` flag (default on) toggles format mapping; import report gains a per-type `rewrites` map | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | N | Y | L | objectified-rest |
 | 4.5 #3464 | Import review: conflicts, dedupe, report | Conflict resolution, dedupe identical, validation report | `type-registry`,`import`,`rest`,`mvp`,`roadmap-type-registry` | Y | Y | M | objectified-rest |
 | 4.6 #3465 | OpenAPI 3.1 components importer | Extract `components/schemas` as types | `type-registry`,`import`,`rest`,`roadmap-type-registry` | Y | N | M | objectified-rest |
 
@@ -515,7 +515,21 @@ flowchart LR
 - **Parallelism/Dependencies.** Depends on 4.1; parallel with 4.2.
 - **Technical Stack.** FastAPI, zip/json.
 
-### Issue 4.4 — `$ref` rewrite + namespace/scope mapping
+### Issue 4.4 — `$ref` rewrite + namespace/scope mapping ✅ DONE (#3463)
+- **Delivered.** `objectified-rest/src/app/primitives_rewrite.py` (`rewrite_import_schema`) rewrites
+  each imported definition's intra-source pointers — `#/$defs/Money` / `#/definitions/Money` /
+  `#/types/Money` → `./money` (the sibling's committed `$id` leaf-slug, deeper pointers preserved as
+  `./money#/properties/c`) — and maps recognized string formats (email, uuid, uri, date, date-time,
+  time) to the seeded `std/v0/types` core types by injecting a relative `$ref` (mirroring the seed's
+  `{"$ref": "../primitives/string", "format": "email"}` shape; an author's explicit `$ref` is never
+  overridden). Both rewrites produce ordinary registry-relative refs, so the existing resolver
+  (#3456) persists them as `refs` edges — committed rows carry only `resolved`/`unresolved` edges, no
+  `internal` ones. Applied on commit (`POST /v1/primitives/{tenant_slug}/import`) for the JSON Schema
+  and type-def-bundle paths via the shared `_commit_imported_definitions`; the `map_core_formats`
+  request flag (default on) toggles format mapping, and the import report gains a per-type `rewrites`
+  map for the review table. Unit tests in `tests/test_primitives_rewrite.py` (round-trip each
+  rewritten ref through the resolver's URL semantics) and route tests in
+  `tests/test_primitives_import_rewrite_routes.py`.
 - **Problem.** External refs (`#/$defs/Money`, absolute URLs) must become **relative** refs
   rooted at the import source, mapped into a target namespace + scope.
 - **Solution/Scope.** Rewrite engine: `#/$defs/Money → ./money`, external known refs → core

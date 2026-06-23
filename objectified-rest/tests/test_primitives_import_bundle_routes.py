@@ -68,13 +68,16 @@ def test_bundle_of_n_types_imports_n_rows_with_refs_intact():
     # Two rows created — one per bundle type.
     assert len(created) == 2
     by_name = {c["name"]: c for c in created}
-    # Order's inter-type ref is persisted as an 'internal' edge for the rewrite stage (#3463).
+    # Order's inter-type ref is rewritten to a relative registry ref (#3463) and resolved like
+    # any other registry edge (unresolved here, since the target is not yet committed) — no
+    # leftover 'internal' fragment pointer remains in the stored refs.
     order_refs = by_name["Order"]["refs"]
     assert {
-        "relative_ref": "#/types/Line",
-        "resolved_target": "Line",
-        "status": "internal",
+        "relative_ref": "./line",
+        "resolved_target": "https://api.objectified.dev/types/std/v0/types/line",
+        "status": "unresolved",
     } in order_refs
+    assert all(e["status"] != "internal" for e in order_refs)
     # Line's registry-relative ref is resolved (unresolved here) — kept distinct from internal.
     line_refs = by_name["Line"]["refs"]
     assert any(e["relative_ref"] == "../primitives/number" for e in line_refs)
