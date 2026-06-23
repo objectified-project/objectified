@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 _OPENAPI_KEYS = frozenset({"openapi", "swagger"})
 _ARAZZO_KEY = "arazzo"
+_ARAZZO_FILENAME_SUFFIXES = (".arazzo.yaml", ".arazzo.yml", ".arazzo.json")
 _DRAFT_2020_12_SCHEMA_URIS = frozenset(
     {
         "https://json-schema.org/draft/2020-12/schema",
@@ -101,6 +102,19 @@ def looks_like_arazzo(document: dict[str, Any]) -> bool:
         return False
     raw = document.get(_ARAZZO_KEY)
     return isinstance(raw, str) and bool(raw.strip())
+
+
+def looks_like_arazzo_filename(filename: str | None) -> bool:
+    """Return True when *filename* uses an Arazzo naming hint.
+
+    Mirrors the REST repository scanner's filename heuristic: a basename ending
+    in ``.arazzo.yaml``, ``.arazzo.yml``, or ``.arazzo.json`` signals an Arazzo
+    workflow document. Comparison is case-insensitive. ``None`` (stdin) and
+    names without the ``.arazzo.`` infix return ``False``.
+    """
+    if not filename:
+        return False
+    return filename.strip().lower().endswith(_ARAZZO_FILENAME_SUFFIXES)
 
 
 def is_draft_2020_12_schema_uri(schema_uri: str) -> bool:
@@ -238,11 +252,25 @@ def _has_openapi_version(document: dict[str, Any]) -> bool:
     return isinstance(raw, str) and bool(raw.strip())
 
 
-def resolve_auto_import_command(document: dict[str, Any]) -> ImportCommand | None:
+def resolve_auto_import_command(
+    document: dict[str, Any],
+    *,
+    filename: str | None = None,
+) -> ImportCommand | None:
     """Return the import subcommand for *document* based on top-level format headers.
 
     Detection uses the document's declarative version fields (``openapi``,
     ``swagger``, ``arazzo``, ``$schema``) and JSON Schema vocabulary markers.
+    Content markers always win. When *filename* uses an Arazzo naming hint
+    (``*.arazzo.{yaml,yml,json}``) and **no** content marker matched, the
+    document is routed to ``arazzo`` as a last resort — rescuing Arazzo files
+    whose ``arazzo:`` version line is missing or that would otherwise sniff as
+    generic YAML.
+
+    Args:
+        document: Parsed top-level mapping from an import file.
+        filename: Optional source basename used only for the Arazzo extension
+            hint; ``None`` (stdin) disables the hint.
     """
     if _has_swagger_version(document):
         return "swagger"
@@ -254,11 +282,23 @@ def resolve_auto_import_command(document: dict[str, Any]) -> ImportCommand | Non
         return "json-schema-type"
     if looks_like_json_schema(document):
         return "json-schema"
+    if looks_like_arazzo_filename(filename):
+        return "arazzo"
     return None
 
 
-def describe_document_format(document: dict[str, Any]) -> str:
-    """Return a short human-readable label for detected document headers."""
+def describe_document_format(
+    document: dict[str, Any],
+    *,
+    filename: str | None = None,
+) -> str:
+    """Return a short human-readable label for detected document headers.
+
+    *filename* enables the Arazzo extension hint label (``Arazzo (by
+    filename)``) for documents that lack a content marker but use the
+    ``*.arazzo.{yaml,yml,json}`` naming convention, matching the routing in
+    :func:`resolve_auto_import_command`.
+    """
     if _has_swagger_version(document):
         return f"Swagger {document['swagger'].strip()}"
     if _has_openapi_version(document):
@@ -273,6 +313,8 @@ def describe_document_format(document: dict[str, Any]) -> str:
         return "JSON Schema type library ($defs)"
     if looks_like_json_schema(document):
         return "JSON Schema"
+    if looks_like_arazzo_filename(filename):
+        return "Arazzo (by filename)"
     return "unknown"
 
 

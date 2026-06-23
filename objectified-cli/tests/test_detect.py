@@ -11,6 +11,7 @@ from objectified_cli.import_.detect import (
     is_draft_2020_12_schema_uri,
     is_recognized_json_schema_draft_uri,
     looks_like_arazzo,
+    looks_like_arazzo_filename,
     looks_like_json_schema,
     looks_like_json_schema_type,
     looks_like_openapi,
@@ -51,6 +52,14 @@ _JSON_SCHEMA_NO_META = {
 
 _ARAZZO_SPEC = {
     "arazzo": "1.0.0",
+    "info": {"title": "Checkout", "version": "1.0.0"},
+    "sourceDescriptions": [
+        {"name": "api", "url": "https://example.test/openapi.json", "type": "openapi"},
+    ],
+    "workflows": [{"workflowId": "flow", "steps": []}],
+}
+
+_ARAZZO_NO_VERSION = {
     "info": {"title": "Checkout", "version": "1.0.0"},
     "sourceDescriptions": [
         {"name": "api", "url": "https://example.test/openapi.json", "type": "openapi"},
@@ -128,6 +137,26 @@ def test_looks_like_arazzo_false_for_openapi() -> None:
     assert looks_like_arazzo(_OPENAPI_SPEC) is False
 
 
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("checkout.arazzo.yaml", True),
+        ("checkout.arazzo.yml", True),
+        ("checkout.arazzo.json", True),
+        ("CHECKOUT.ARAZZO.YAML", True),
+        ("  checkout.arazzo.yaml  ", True),
+        ("checkout.yaml", False),
+        ("arazzo.yaml", False),
+        ("checkout-arazzo.yaml", False),
+        ("checkout.arazzo.txt", False),
+        ("", False),
+        (None, False),
+    ],
+)
+def test_looks_like_arazzo_filename(filename: str | None, expected: bool) -> None:
+    assert looks_like_arazzo_filename(filename) is expected
+
+
 def test_detect_document_kind_arazzo() -> None:
     assert detect_document_kind(_ARAZZO_SPEC) is DocumentKind.arazzo
 
@@ -177,10 +206,76 @@ def test_resolve_auto_import_command(document: dict, expected: str | None) -> No
     assert resolve_auto_import_command(document) == expected
 
 
+def test_resolve_auto_import_command_arazzo_filename_hint_when_inconclusive() -> None:
+    """A marker-less Arazzo file routes to ``arazzo`` via its filename hint."""
+    assert resolve_auto_import_command(_ARAZZO_NO_VERSION) is None
+    assert (
+        resolve_auto_import_command(
+            _ARAZZO_NO_VERSION,
+            filename="checkout.arazzo.yaml",
+        )
+        == "arazzo"
+    )
+
+
+def test_resolve_auto_import_command_content_marker_wins_over_filename() -> None:
+    """An ``arazzo:`` content marker is authoritative regardless of filename."""
+    assert (
+        resolve_auto_import_command(_ARAZZO_SPEC, filename="weird.yaml") == "arazzo"
+    )
+
+
+def test_resolve_auto_import_command_openapi_content_beats_arazzo_filename() -> None:
+    """An OpenAPI document named ``*.arazzo.yaml`` still resolves to OpenAPI."""
+    assert (
+        resolve_auto_import_command(
+            _OPENAPI_SPEC,
+            filename="api.arazzo.yaml",
+        )
+        == "openapi"
+    )
+
+
+def test_resolve_auto_import_command_json_schema_content_beats_arazzo_filename() -> None:
+    """A JSON Schema document named ``*.arazzo.yaml`` still resolves to JSON Schema."""
+    assert (
+        resolve_auto_import_command(
+            _JSON_SCHEMA_WITH_META,
+            filename="thing.arazzo.json",
+        )
+        == "json-schema"
+    )
+
+
+def test_resolve_auto_import_command_unknown_without_filename_hint() -> None:
+    """Unknown content with a non-Arazzo filename stays unresolved."""
+    assert (
+        resolve_auto_import_command(_ARAZZO_NO_VERSION, filename="checkout.yaml")
+        is None
+    )
+
+
 def test_describe_document_format() -> None:
     assert describe_document_format(_SWAGGER_SPEC) == "Swagger 2.0"
     assert describe_document_format(_OPENAPI_SPEC) == "OpenAPI 3.1.0"
     assert describe_document_format(_ARAZZO_SPEC) == "Arazzo 1.0.0"
+
+
+def test_describe_document_format_arazzo_filename_hint() -> None:
+    assert (
+        describe_document_format(
+            _ARAZZO_NO_VERSION,
+            filename="checkout.arazzo.yaml",
+        )
+        == "Arazzo (by filename)"
+    )
+    # Content markers keep their precise label even with an Arazzo filename.
+    assert (
+        describe_document_format(_OPENAPI_SPEC, filename="api.arazzo.yaml")
+        == "OpenAPI 3.1.0"
+    )
+    # No filename hint and unknown content stays "unknown".
+    assert describe_document_format(_ARAZZO_NO_VERSION) == "unknown"
 
 
 def test_unrecognized_auto_import_message_lists_headers() -> None:
