@@ -1411,6 +1411,129 @@ class Database:
         except Exception:
             pass  # Don't fail if we can't increment usage
 
+    # ============== Unresolved-$ref detection, flags & counts (#3457) ==============
+    #
+    # A primitive's relative ``$ref`` edges live in the ``refs`` JSONB column, each
+    # ``{relative_ref, resolved_target, status}`` with status resolved|unresolved (#3456).
+    # The aggregates below summarize the unresolved edges for the registry overview KPIs
+    # (#3454) and the resolver UI (#3470); ``mark_refs_resolved_to_target`` clears the
+    # unresolved flag on dependents once the referenced target is created (re-resolve).
+    #
+    # Scope note: system-core primitives are seeded *per tenant* (one ``odb.primitives``
+    # row per tenant, with ``is_system = true``), so the tenant's own ``tenant_id`` rows
+    # already include a copy of every visible system type. The aggregates therefore scope
+    # to ``tenant_id = <caller>`` alone — adding ``OR is_system = true`` would re-count
+    # every *other* tenant's system copies. Unresolved edges only ever occur on a tenant's
+    # authored/imported types anyway (the std/v0 seed resolves fully).
+
+    def count_unresolved_refs(self, tenant_id: str) -> Dict[str, int]:
+        """Count the tenant's unresolved ``$ref`` edges and the primitives carrying them (#3457).
+
+        Aggregates over the ``refs`` JSONB column of the tenant's primitives, feeding the
+        registry overview KPIs (#3454) and the resolver UI (#3470).
+
+        Args:
+            tenant_id: The caller's tenant id (scopes the aggregate — see section note).
+
+        Returns:
+            ``{"unresolved_ref_count": int, "affected_primitive_count": int}`` —
+            the total number of unresolved edges and the number of distinct primitives
+            that have at least one. Both are ``0`` when nothing is unresolved.
+        """
+        query = """
+            SELECT
+                COUNT(*) FILTER (WHERE edge->>'status' = 'unresolved')
+                    AS unresolved_ref_count,
+                COUNT(DISTINCT p.id) FILTER (WHERE edge->>'status' = 'unresolved')
+                    AS affected_primitive_count
+            FROM odb.primitives p
+            LEFT JOIN LATERAL jsonb_array_elements(p.refs) AS edge ON true
+            WHERE p.tenant_id = %s
+        """
+        results = self.execute_query(query, (tenant_id,))
+        row = results[0] if results else {}
+        return {
+            "unresolved_ref_count": int(row.get("unresolved_ref_count") or 0),
+            "affected_primitive_count": int(row.get("affected_primitive_count") or 0),
+        }
+
+    def get_primitives_with_unresolved_refs(self, tenant_id: str) -> List[Dict[str, Any]]:
+        """List the tenant's primitives that have at least one unresolved ``$ref`` edge (#3457).
+
+        Backs the resolver UI's dangling-reference table (#3470): each returned row
+        carries the primitive's identity plus its full ``refs`` edge list (the route
+        narrows it to the unresolved edges).
+
+        Args:
+            tenant_id: The caller's tenant id (scopes the listing — see section note).
+
+        Returns:
+            The matching primitive rows (id, name, schema_id, namespace, base_uri, refs),
+            ordered by namespace then name. Empty when nothing is unresolved.
+        """
+        query = """
+            SELECT id, tenant_id, name, schema_id, namespace, base_uri, refs
+            FROM odb.primitives
+            WHERE tenant_id = %s
+              AND EXISTS (
+                  SELECT 1 FROM jsonb_array_elements(refs) AS e
+                  WHERE e->>'status' = 'unresolved'
+              )
+            ORDER BY namespace NULLS FIRST, name
+        """
+        return self.execute_query(query, (tenant_id,))
+
+    def mark_refs_resolved_to_target(self, tenant_id: str, target_schema_id: str) -> int:
+        """Clear the unresolved flag on edges that point at a now-existing target (#3457).
+
+        When a primitive is created/imported (or repinned), any of the tenant's other
+        primitives that carried an *unresolved* edge whose ``resolved_target`` equals the
+        new primitive's ``$id`` are re-resolved: just that edge flips to ``resolved`` in
+        place, preserving edge order and leaving every other edge untouched. This is the
+        "fixing target clears on re-resolve" half of the acceptance criteria — it runs
+        without requiring the dependent primitive to be re-saved by hand.
+
+        Only the tenant's own rows are rewritten (system-core rows are seeded/immutable),
+        and only edges that are both unresolved *and* aimed at ``target_schema_id`` change.
+
+        Args:
+            tenant_id: The tenant whose primitives may reference the new target.
+            target_schema_id: The absolute ``$id`` of the just-created/updated primitive.
+
+        Returns:
+            The number of dependent primitives whose ``refs`` were updated (0 when none
+            referenced the target as unresolved).
+        """
+        query = """
+            UPDATE odb.primitives p
+            SET refs = (
+                SELECT jsonb_agg(
+                    CASE
+                        WHEN e->>'resolved_target' = %s AND e->>'status' = 'unresolved'
+                        THEN jsonb_set(e, '{status}', '"resolved"'::jsonb)
+                        ELSE e
+                    END
+                    ORDER BY ord
+                )
+                FROM jsonb_array_elements(p.refs) WITH ORDINALITY AS t(e, ord)
+            )
+            WHERE p.tenant_id = %s
+              AND EXISTS (
+                  SELECT 1 FROM jsonb_array_elements(p.refs) AS e2
+                  WHERE e2->>'resolved_target' = %s AND e2->>'status' = 'unresolved'
+              )
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (target_schema_id, tenant_id, target_schema_id))
+                affected = cursor.rowcount
+                conn.commit()
+                return affected
+        except Exception as e:
+            conn.rollback()
+            raise e
+
     # ==================== Primitive Import Provenance (#3448) ====================
 
     def create_primitive_import(

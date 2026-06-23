@@ -225,6 +225,41 @@ class PrimitiveImportRecord(BaseModel):
         from_attributes = True
 
 
+class UnresolvedRefPrimitive(BaseModel):
+    """A primitive that carries one or more unresolved relative-``$ref`` edges (#3457).
+
+    Surfaced to the registry overview (#3454) and resolver UI (#3470) so a dangling
+    reference can be located and re-resolved. ``unresolved_refs`` is the subset of the
+    primitive's ``refs`` edges whose ``status`` is ``unresolved``.
+    """
+    id: str
+    name: str
+    schema_id: Optional[str] = None
+    namespace: Optional[str] = None
+    base_uri: Optional[str] = None
+    unresolved_count: int = 0
+    unresolved_refs: List[Dict[str, Any]] = []
+
+    class Config:
+        from_attributes = True
+
+
+class UnresolvedRefsResponse(BaseModel):
+    """Tenant-wide unresolved-``$ref`` summary for the type registry (#3457).
+
+    ``unresolved_ref_count`` (every unresolved edge) and ``affected_primitive_count``
+    (distinct primitives carrying at least one) are the KPIs consumed by the registry
+    coverage/stats endpoint (#3454); ``primitives`` is the per-primitive breakdown the
+    resolver UI lists (#3470).
+    """
+    unresolved_ref_count: int = 0
+    affected_primitive_count: int = 0
+    primitives: List[UnresolvedRefPrimitive] = []
+
+    class Config:
+        from_attributes = True
+
+
 # ==================== Type-registry namespaces (#3451) ====================
 
 

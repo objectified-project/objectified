@@ -16,7 +16,9 @@ from .models import (
     PrimitiveUpdateRequest,
     PrimitiveImportRequest,
     PrimitiveImportRecord,
-    RegistryHealthResponse
+    RegistryHealthResponse,
+    UnresolvedRefPrimitive,
+    UnresolvedRefsResponse,
 )
 from .auth import validate_authentication, get_authenticated_user_id
 from .schema_validation import (
@@ -102,6 +104,30 @@ def resolve_primitive_refs(
         return db.get_primitive_by_schema_id(absolute_uri, tenant_id) is not None
 
     return build_ref_edges(schema, base_uri=base_uri, target_exists=_target_exists)
+
+
+def reconcile_dependents_for_target(schema_id: Optional[str], *, tenant_id: str) -> None:
+    """Re-resolve the tenant's dangling edges that point at a now-existing target (#3457).
+
+    The "fixing target clears on re-resolve" half of the acceptance criteria. When a
+    primitive is created/imported (or repinned to a new ``$id``), any of the tenant's
+    other primitives that held an *unresolved* edge aimed at that ``$id`` are cleared to
+    ``resolved`` in place — no manual re-save of the dependent is required. Resolution is
+    best-effort: a failure here must not fail the create/update that triggered it (the
+    primitive is already persisted), so it is swallowed rather than surfaced.
+
+    Args:
+        schema_id: The ``$id`` of the just-persisted primitive (no-op when ``None``).
+        tenant_id: The tenant whose dependents may reference the target.
+    """
+    if not schema_id:
+        return
+    try:
+        db.mark_refs_resolved_to_target(tenant_id, schema_id)
+    except Exception:
+        # Reconciliation is a convenience pass over already-correct data; the dependent's
+        # edge will also re-resolve the next time it is saved or re-resolved explicitly.
+        pass
 
 
 def resolve_primitive_identity(
@@ -365,6 +391,59 @@ async def get_primitive_import(
     return PrimitiveImportRecord(**record)
 
 
+@router.get("/{tenant_slug}/unresolved", response_model=UnresolvedRefsResponse)
+async def list_unresolved_refs(
+    tenant_slug: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> UnresolvedRefsResponse:
+    """Report the tenant's unresolved relative-``$ref`` edges and counts (#3457).
+
+    A primitive's relative ``$ref`` values are resolved to registry edges on save/import
+    and flagged ``resolved`` / ``unresolved`` (#3456). This endpoint aggregates the
+    unresolved ones: the two top-level counts feed the registry coverage/stats KPIs
+    (#3454), and ``primitives`` is the per-primitive breakdown — each with only its
+    unresolved edges — the resolver UI lists (#3470).
+
+    Registered before ``GET /{tenant_slug}/{primitive_id}`` so the literal ``unresolved``
+    path is matched here rather than being captured as a primitive id.
+
+    Args:
+        tenant_slug: The tenant slug.
+        auth_data: Authentication data (injected by dependency).
+
+    Returns:
+        ``UnresolvedRefsResponse`` with the total unresolved-edge count, the number of
+        affected primitives, and the per-primitive unresolved-edge breakdown.
+    """
+    tenant_id = auth_data['tenant_id']
+    counts = db.count_unresolved_refs(tenant_id)
+    rows = db.get_primitives_with_unresolved_refs(tenant_id)
+
+    primitives: List[UnresolvedRefPrimitive] = []
+    for row in rows:
+        unresolved = [
+            edge for edge in (row.get('refs') or [])
+            if edge.get('status') == 'unresolved'
+        ]
+        primitives.append(
+            UnresolvedRefPrimitive(
+                id=str(row['id']),
+                name=row['name'],
+                schema_id=row.get('schema_id'),
+                namespace=row.get('namespace'),
+                base_uri=row.get('base_uri'),
+                unresolved_count=len(unresolved),
+                unresolved_refs=unresolved,
+            )
+        )
+
+    return UnresolvedRefsResponse(
+        unresolved_ref_count=counts['unresolved_ref_count'],
+        affected_primitive_count=counts['affected_primitive_count'],
+        primitives=primitives,
+    )
+
+
 @router.get("/{tenant_slug}/{primitive_id}")
 async def get_primitive(
     tenant_slug: str,
@@ -453,6 +532,12 @@ async def create_primitive(
             namespace=request.namespace,
             base_uri=identity['base_uri'],
             refs=refs,
+        )
+
+        # This new type may be the target of other primitives' dangling refs — clear
+        # their unresolved flag now that it exists (#3457).
+        reconcile_dependents_for_target(
+            identity['schema_id'], tenant_id=auth_data['tenant_id']
         )
 
         return PrimitiveSchema(**primitive)
@@ -570,6 +655,13 @@ async def update_primitive(
             raise HTTPException(
                 status_code=404,
                 detail=f"Primitive not found: {primitive_id}"
+            )
+
+        # If the schema/placement changed, the (possibly new) $id may now satisfy other
+        # primitives' dangling refs — clear their unresolved flag (#3457).
+        if identity_touched:
+            reconcile_dependents_for_target(
+                updates.get('schema_id'), tenant_id=auth_data['tenant_id']
             )
 
         return PrimitiveSchema(**primitive)
@@ -749,6 +841,11 @@ async def import_primitives(
                 refs=refs,
             )
             imported.append(primitive['name'])
+            # Each imported type may be the target of an earlier definition's ref (within
+            # this same batch or a prior import) — clear those unresolved flags (#3457).
+            reconcile_dependents_for_target(
+                identity['schema_id'], tenant_id=auth_data['tenant_id']
+            )
         except Exception as e:
             if "unique constraint" in str(e).lower():
                 skipped.append(def_name)

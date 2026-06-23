@@ -5,6 +5,22 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.12] - 2026-06-22
+
+### Added
+- **Unresolved-reference detection, flags & counts (#3457)** — a primitive's relative `$ref`
+  edges are resolved and flagged `resolved`/`unresolved` on save/import (#3456); this adds the
+  detection surface and the re-resolve-clears behavior on top of it. New
+  `GET /v1/primitives/{tenant_slug}/unresolved` returns the tenant's total unresolved-edge count,
+  the number of affected primitives, and a per-primitive breakdown (each with only its unresolved
+  edges) — feeding the registry coverage/stats KPIs (#3454) and the resolver UI (#3470). New
+  `UnresolvedRefsResponse`/`UnresolvedRefPrimitive` models and DB aggregates
+  `count_unresolved_refs` / `get_primitives_with_unresolved_refs` (scoped to the caller's tenant,
+  aggregating over the `odb.primitives.refs` JSONB column). Creating, importing, or repinning a
+  primitive now runs a best-effort reconcile (`mark_refs_resolved_to_target`) that clears the
+  unresolved flag on the tenant's other primitives whose dangling edge pointed at the new type's
+  `$id`, so "fixing the target clears on re-resolve" without re-saving each dependent by hand.
+
 ## [1.0.11] - 2026-06-22
 
 ### Added
