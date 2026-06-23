@@ -150,6 +150,29 @@ def reconcile_dependents_for_target(schema_id: Optional[str], *, tenant_id: str)
         pass
 
 
+def load_publish_gate(tenant_id: str) -> tuple[bool, bool]:
+    """Load a tenant's publish/save validation-gate flags (#3479).
+
+    Reads the persisted type-registry settings (#3472) and returns the two toggles the
+    create/update paths consult before persisting a primitive. A tenant that has never
+    saved settings has no row; the registry defaults (gate fully on) apply, matching the
+    strict behavior shipped before this gate existed.
+
+    Args:
+        tenant_id: The caller's tenant id.
+
+    Returns:
+        A ``(validate_on_save, block_publish_on_errors)`` tuple.
+    """
+    row = db.get_type_registry_settings(tenant_id)
+    if not row:
+        return True, True
+    return (
+        bool(row.get("validate_on_save", True)),
+        bool(row.get("block_publish_on_errors", True)),
+    )
+
+
 def resolve_primitive_identity(
     schema: Dict[str, Any],
     *,
@@ -158,11 +181,18 @@ def resolve_primitive_identity(
     base_uri: Optional[str],
     tenant_slug: str,
     is_system: bool = False,
+    validate: bool = True,
+    block_on_errors: bool = True,
 ) -> Dict[str, Any]:
     """Validate a schema and derive its persisted JSON Schema 2020-12 identity (#3452).
 
     Shared by the create, update, and import paths so all three reject invalid schemas
     identically and compute a stable ``$id`` the same way.
+
+    The ``validate`` / ``block_on_errors`` flags implement the per-tenant publish/save gate
+    (#3479): they govern only the draft 2020-12 *meta-schema* check. Structural reachability
+    (the schema must be a JSON object to carry a derived ``$id``) and cross-tenant ``$ref``
+    scope enforcement (#3453, a security boundary) are always applied regardless of the gate.
 
     Args:
         schema: The candidate JSON Schema document.
@@ -173,26 +203,34 @@ def resolve_primitive_identity(
         is_system: Whether the primitive is system-core. Core types are held to the
             stricter reference-direction rule (they may not ``$ref`` a tenant
             namespace). A namespace under ``std/`` is also treated as core (#3453).
+        validate: When True (the ``validate_on_save`` setting), run the draft 2020-12
+            meta-schema check. When False the check is skipped entirely.
+        block_on_errors: When True (the ``block_publish_on_errors`` setting), meta-schema
+            errors abort with :class:`SchemaValidationError`. When False the (invalid)
+            schema is persisted anyway; the gate is advisory only.
 
     Returns:
         A dict with ``schema`` (identity-stamped copy), ``schema_id``, ``draft``,
         and ``base_uri``.
 
     Raises:
-        SchemaValidationError: If ``schema`` is not a valid draft 2020-12 document,
-            or is a boolean schema (valid per spec, but a primitive needs an object
-            schema to carry a derived ``$id``).
+        SchemaValidationError: If ``schema`` is not a JSON object (always), or — when
+            ``validate`` and ``block_on_errors`` are both set — if it is not a valid
+            draft 2020-12 document.
         ScopeViolationError: If a ``$ref`` crosses a forbidden scope boundary
             (core→tenant, or tenant→other-tenant) (#3453).
     """
     if not isinstance(schema, dict):
+        # A non-object (e.g. boolean) schema can never carry a derived ``$id`` and cannot be
+        # stored as a primitive row, so this is fatal even when the gate is relaxed.
         raise SchemaValidationError(
             [{"path": "(root)", "message": "Schema must be a JSON object", "keyword": "type"}]
         )
 
-    errors = validate_schema_document(schema)
-    if errors:
-        raise SchemaValidationError(errors)
+    if validate and block_on_errors:
+        errors = validate_schema_document(schema)
+        if errors:
+            raise SchemaValidationError(errors)
 
     resolved_base = derive_base_uri(namespace, base_uri, tenant_slug)
     schema_id = derive_schema_id(schema, name=name, base_uri=resolved_base)
@@ -515,7 +553,9 @@ async def create_primitive(
     Returns:
         The created primitive
     """
-    # Strict server-side draft 2020-12 validation + stable $id derivation (#3452).
+    # Server-side draft 2020-12 validation + stable $id derivation (#3452), gated by the
+    # tenant's publish/save settings (#3479): block invalid schemas only when the gate is on.
+    validate_on_save, block_on_errors = load_publish_gate(auth_data['tenant_id'])
     try:
         identity = resolve_primitive_identity(
             request.schema,
@@ -523,6 +563,8 @@ async def create_primitive(
             namespace=request.namespace,
             base_uri=request.base_uri,
             tenant_slug=tenant_slug,
+            validate=validate_on_save,
+            block_on_errors=block_on_errors,
         )
     except SchemaValidationError as e:
         raise _schema_validation_http_error(e.errors)
@@ -642,6 +684,8 @@ async def update_primitive(
         effective_base_uri = (
             request.base_uri if request.base_uri is not None else existing.get('base_uri')
         )
+        # Honor the tenant's publish/save gate (#3479) on re-validation just like create.
+        validate_on_save, block_on_errors = load_publish_gate(auth_data['tenant_id'])
         try:
             identity = resolve_primitive_identity(
                 schema_doc,
@@ -649,6 +693,8 @@ async def update_primitive(
                 namespace=effective_namespace,
                 base_uri=effective_base_uri,
                 tenant_slug=tenant_slug,
+                validate=validate_on_save,
+                block_on_errors=block_on_errors,
             )
         except SchemaValidationError as e:
             raise _schema_validation_http_error(e.errors)
