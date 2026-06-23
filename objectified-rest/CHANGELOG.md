@@ -5,6 +5,33 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.20] - 2026-06-22
+
+### Added
+- **Import review: conflicts, dedupe, validation report (#3464)** — the Primitives import path no
+  longer skips duplicates silently. New `app/primitives_review.py` provides the pure review logic:
+  each imported definition is classified against the registry as **New** (nothing shares its `$id`),
+  **Identical** (an existing type has the same `$id` and an identical schema), or **Conflict** (same
+  `$id`, different schema), and a caller's per-type resolution choice (**keep** / **overwrite** /
+  **rename**) is turned into a concrete commit decision by `decide()`.
+- **`POST /v1/primitives/{tenant_slug}/import/review`** — a dry-run that writes nothing and returns
+  the classification, a draft 2020-12 validation report, the `$ref` rewrites, the unresolved-ref
+  mapping, and the resolution choices each conflict offers. This is the report the import wizard
+  (#3469) renders before commit; the same classification drives the commit, so the committed result
+  matches the review.
+
+### Changed
+- **`POST /v1/primitives/{tenant_slug}/import`** now honors review choices. New request fields:
+  `dedupe` (default `true` — an Identical definition is skipped as a duplicate) and `resolutions`
+  (a `name -> {action, new_name}` map). On commit, a conflict resolved `overwrite` updates the
+  existing row in place, `rename` creates a copy under a new (slugified) name, and the default
+  `keep` leaves the existing type but **surfaces** the conflict instead of dropping it. The import
+  report gains `overwritten` / `renamed` / `identical` buckets (and their totals) plus a per-type
+  `reviews` list, so the report can be shown to match the outcome; provenance counts reflect rows
+  written (created + overwritten + renamed) vs. passed over (deduped + kept).
+- Regenerated `openapi.{json,yaml}` for the new endpoint, request fields, and `ImportResolution`
+  model; bumped to 1.0.20 (npm) / 1.0.90 (py).
+
 ## [1.0.19] - 2026-06-22
 
 ### Added

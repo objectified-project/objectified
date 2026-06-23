@@ -5,6 +5,7 @@ Provides CRUD endpoints for managing primitive type definitions.
 All endpoints are tenant-scoped and require authentication via JWT token or API key.
 """
 
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -30,6 +31,14 @@ from .primitives_bundle import (
     parse_type_def_bundle,
 )
 from .primitives_resolver import build_ref_edges
+from .primitives_review import (
+    ACTION_RENAME,
+    STATUS_INVALID,
+    VALID_ACTIONS,
+    allowed_resolutions,
+    classify_status,
+    decide,
+)
 from .primitives_rewrite import rewrite_import_schema
 from .primitives_scope import (
     ScopeViolationError,
@@ -733,6 +742,190 @@ async def delete_primitive(
     return {"message": "Primitive deleted successfully"}
 
 
+@dataclass
+class _PreparedDefinition:
+    """A single imported definition resolved far enough to be reviewed or committed (#3464).
+
+    Produced by :func:`_prepare_imported_definition`, which applies the ``$ref`` rewrite
+    (#3463), validates + derives identity (#3452/#3453), resolves the ``refs`` edges (#3456),
+    and looks the derived ``$id`` up against the registry so the definition can be classified
+    New / Identical / Conflict. The same prepared state drives the dry-run review endpoint and
+    the commit path, so a committed outcome can never disagree with the review that preceded it.
+
+    The ``status`` field carries two related-but-distinct ideas under one ``STATUS_*`` value:
+    a *registry* classification (``STATUS_NEW`` / ``STATUS_IDENTICAL`` / ``STATUS_CONFLICT``)
+    for a committable definition, or ``STATUS_INVALID`` when the definition can't be committed
+    at all. Use ``valid`` to disambiguate the latter: ``status == STATUS_INVALID`` covers both a
+    malformed draft 2020-12 schema (``valid is False``, with ``validation_errors``) *and* a
+    well-formed schema that violates scope (``valid is True``, with a ``scope_violation`` error).
+    A caller that only cares about the New/Identical/Conflict classification should first gate on
+    ``status == STATUS_INVALID`` (as the commit and review paths do) before reading the rest.
+
+    Attributes:
+        name: The definition's name (its registry-identity leaf).
+        status: The classification — a ``primitives_review.STATUS_*`` value (``STATUS_INVALID``
+            when the definition cannot be committed; see the note above on ``valid``).
+        valid: Whether the fragment is a valid draft 2020-12 schema (scope violations are
+            valid schemas, so this stays ``True`` for them).
+        validation_errors: Field-level draft 2020-12 errors when ``valid`` is ``False``.
+        error: A ``{"error", "details"}`` record when the definition cannot be committed
+            (invalid schema or scope violation), else ``None``.
+        schema_id: The derived ``$id`` (``None`` when the definition is invalid).
+        identity: The full identity dict (stamped ``schema``/``schema_id``/``draft``/``base_uri``)
+            when valid, else ``None``.
+        rewritten: The rewritten schema (carries description/tags/category), or the original.
+        refs: The resolved relative-``$ref`` edges to persist, or ``None`` when invalid.
+        rewrites: The applied ``{"from", "to", "kind"}`` ref rewrites for the report.
+        existing: The existing primitive row sharing this ``$id`` (Identical/Conflict), else ``None``.
+    """
+
+    name: str
+    status: str
+    valid: bool = True
+    validation_errors: List[Dict[str, Any]] = field(default_factory=list)
+    error: Optional[Dict[str, Any]] = None
+    schema_id: Optional[str] = None
+    identity: Optional[Dict[str, Any]] = None
+    rewritten: Optional[Dict[str, Any]] = None
+    refs: Optional[List[Dict[str, str]]] = None
+    rewrites: List[Dict[str, str]] = field(default_factory=list)
+    existing: Optional[Dict[str, Any]] = None
+
+
+def _prepare_imported_definition(
+    def_name: str,
+    def_schema: Any,
+    *,
+    tenant_id: str,
+    tenant_slug: str,
+    target_namespace: Optional[str],
+    map_core_formats: bool,
+) -> _PreparedDefinition:
+    """Rewrite, validate, resolve, and classify one imported definition (#3464).
+
+    Runs the same registry pipeline a commit would — ``$ref`` rewrite (#3463), draft
+    2020-12 validation + ``$id`` derivation + scope enforcement (#3452/#3453), and ``refs``
+    resolution (#3456) — then looks the derived ``$id`` up in the caller's read scope to
+    classify the definition New / Identical / Conflict (:func:`classify_status`). It never
+    writes; the returned :class:`_PreparedDefinition` is consumed by both the review endpoint
+    and the commit path. An invalid or scope-violating definition is returned with
+    ``status == STATUS_INVALID`` and a populated ``error`` rather than raising, so one bad
+    definition never blocks the rest of a bundle.
+
+    Args:
+        def_name: The definition's name (drives its derived ``$id`` leaf).
+        def_schema: The raw definition fragment from the source document.
+        tenant_id: The caller's tenant id (scopes ref resolution and the existing-row lookup).
+        tenant_slug: The tenant slug (used for the default base URI).
+        target_namespace: Optional registry namespace the definition is imported into.
+        map_core_formats: Whether to map recognized formats to core types (#3463).
+
+    Returns:
+        The :class:`_PreparedDefinition` for this definition.
+    """
+    # Rewrite the definition's refs for its committed place in the registry before
+    # validating/persisting (#3463). The base URI a definition's refs resolve against is the
+    # same one resolve_primitive_identity derives, so the rewrite and the $id agree.
+    if isinstance(def_schema, dict):
+        base_uri = derive_base_uri(target_namespace, None, tenant_slug)
+        rewritten_schema, applied = rewrite_import_schema(
+            def_schema, base_uri=base_uri, map_core_formats=map_core_formats
+        )
+    else:
+        # A non-object definition cannot be rewritten; let validation reject it below.
+        rewritten_schema, applied = def_schema, []
+
+    try:
+        identity = resolve_primitive_identity(
+            rewritten_schema,
+            name=def_name,
+            namespace=target_namespace,
+            base_uri=None,
+            tenant_slug=tenant_slug,
+        )
+    except SchemaValidationError as e:
+        # Not a valid draft 2020-12 schema — the validation report records the field errors.
+        return _PreparedDefinition(
+            name=def_name,
+            status=STATUS_INVALID,
+            valid=False,
+            validation_errors=e.errors,
+            error={"error": "invalid_schema", "details": e.errors},
+            rewritten=rewritten_schema if isinstance(rewritten_schema, dict) else None,
+        )
+    except ScopeViolationError as e:
+        # A valid schema that crosses a forbidden scope boundary — valid stays True.
+        return _PreparedDefinition(
+            name=def_name,
+            status=STATUS_INVALID,
+            valid=True,
+            error={"error": "scope_violation", "details": e.violations},
+            rewritten=rewritten_schema if isinstance(rewritten_schema, dict) else None,
+        )
+
+    # The rewrite turned every intra-source/core ref into an ordinary registry-relative ref,
+    # so the standard resolver (#3456) produces the full edge set — no internal-edge appending.
+    refs = resolve_primitive_refs(
+        identity['schema'], base_uri=identity['base_uri'], tenant_id=tenant_id
+    )
+
+    # Classify against the registry: does a visible type already hold this $id, and if so is
+    # its schema identical (a dedupe) or divergent (a conflict the caller must resolve)?
+    existing = db.get_primitive_by_schema_id(identity['schema_id'], tenant_id)
+    status = classify_status(existing, identity['schema'])
+
+    return _PreparedDefinition(
+        name=def_name,
+        status=status,
+        valid=True,
+        schema_id=identity['schema_id'],
+        identity=identity,
+        rewritten=rewritten_schema,
+        refs=refs,
+        rewrites=applied,
+        existing=existing,
+    )
+
+
+def _create_primitive_from_prepared(
+    prep: _PreparedDefinition,
+    *,
+    name: str,
+    tenant_id: str,
+    target_namespace: Optional[str],
+    created_by: Optional[str],
+) -> None:
+    """Persist a prepared definition as a new ``odb.primitives`` row and reconcile dependents.
+
+    Shared by the New-import and rename paths so both create rows identically. After the row
+    lands, any of the tenant's dangling edges that pointed at this ``$id`` are reconciled (#3457).
+
+    Args:
+        prep: The prepared definition (must be valid, i.e. carry an ``identity``).
+        name: The name to create under (the original name, or a rename target).
+        tenant_id: The owning tenant id.
+        target_namespace: The registry namespace the row is placed in.
+        created_by: The authenticated user id (None for API-key auth).
+    """
+    identity = prep.identity
+    db.create_primitive(
+        tenant_id=tenant_id,
+        name=name,
+        category=determine_category_from_schema(prep.rewritten),
+        schema=identity['schema'],
+        description=prep.rewritten.get('description'),
+        tags=prep.rewritten.get('tags', []),
+        created_by=created_by,
+        source='imported',
+        schema_id=identity['schema_id'],
+        draft=identity['draft'],
+        namespace=target_namespace,
+        base_uri=identity['base_uri'],
+        refs=prep.refs,
+    )
+    reconcile_dependents_for_target(identity['schema_id'], tenant_id=tenant_id)
+
+
 def _commit_imported_definitions(
     definitions: Dict[str, Any],
     *,
@@ -741,22 +934,25 @@ def _commit_imported_definitions(
     target_namespace: Optional[str],
     created_by: Optional[str],
     map_core_formats: bool = True,
+    dedupe: bool = True,
+    resolutions: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """Commit a ``name -> schema`` map of imported definitions as primitive rows.
+    """Commit a ``name -> schema`` map of imported definitions, honoring review choices (#3464).
 
-    Shared by the JSON Schema ``$defs`` import and the type-definition bundle import
-    (#3462) so both create rows identically. Each definition is first **rewritten** for its
-    place in the registry (#3463): its intra-source pointers (``#/$defs/Money`` /
-    ``#/definitions/Money`` / ``#/types/Money``) become relative registry refs at the sibling's
-    committed ``$id`` (``./money``), and — when ``map_core_formats`` — a recognized string
-    ``format`` (email, uuid, uri, date, date-time, time) is mapped to its seeded ``std/v0/types``
-    core type. The rewritten schema then goes through the same draft 2020-12 validator, ``$id``
-    derivation, and scope enforcement as create/update (#3452, #3453), and its now registry-relative
-    ``$ref`` values are resolved against the registry into persisted ``refs`` edges by the existing
-    resolver (#3456) — so rewritten refs resolve via Epic 3 with no separate edge bookkeeping. Any
-    dependents' dangling refs are reconciled (#3457). An invalid or scope-violating definition is
-    recorded under ``errors`` and skipped without blocking the others, so a bundle of N valid types
-    commits N rows.
+    Shared by the JSON Schema ``$defs`` import and the type-definition bundle import (#3462).
+    Each definition is prepared (rewrite #3463, validate/derive identity #3452/#3453, resolve
+    refs #3456) and classified against the registry, then committed according to its
+    classification and the caller's per-type resolution:
+
+    - **New** → a row is created (``imported``).
+    - **Identical** → deduped and skipped when ``dedupe`` is on (``identical``); otherwise it
+      is treated like a conflict so an explicit resolution still applies.
+    - **Conflict** → the caller's resolution decides: ``overwrite`` replaces the existing row
+      (``overwritten``), ``rename`` creates a copy under a new name (``renamed``), and the
+      default ``keep`` leaves the existing type in place but **surfaces** the conflict
+      (``skipped``) instead of dropping it silently.
+    - **Invalid** / scope-violating definitions are recorded under ``errors`` without blocking
+      the rest.
 
     Args:
         definitions: The ``name -> schema fragment`` map to import.
@@ -765,79 +961,378 @@ def _commit_imported_definitions(
         target_namespace: Optional registry namespace each definition is imported into.
         created_by: The authenticated user id (None for API-key auth).
         map_core_formats: Whether to map recognized formats to core types (#3463).
+        dedupe: Whether Identical definitions are auto-skipped (default) or surfaced.
+        resolutions: Optional ``name -> {"action", "new_name"}`` conflict resolutions.
 
     Returns:
-        A ``{"imported", "skipped", "errors", "rewrites"}`` outcome, where each error is
-        ``{"name", "error"[, "details"]}`` and ``rewrites`` maps each imported definition's name
-        to its list of applied ``{"from", "to", "kind"}`` ref rewrites (for the import report).
+        A ``{"imported", "overwritten", "renamed", "identical", "skipped", "errors",
+        "rewrites", "reviews"}`` outcome. ``reviews`` carries each definition's classification
+        and validation report so the report can be shown to match the committed outcome.
     """
+    resolutions = resolutions or {}
     imported: List[str] = []
+    overwritten: List[str] = []
+    renamed: List[Dict[str, str]] = []
+    identical: List[str] = []
     skipped: List[str] = []
     errors: List[Dict[str, Any]] = []
     rewrites: Dict[str, List[Dict[str, str]]] = {}
+    reviews: List[Dict[str, Any]] = []
 
     for def_name, def_schema in definitions.items():
-        # Rewrite the definition's refs for its committed place in the registry before
-        # validating/persisting (#3463). The base URI a definition's refs resolve against is the
-        # same one resolve_primitive_identity derives, so the rewrite and the $id agree.
-        if isinstance(def_schema, dict):
-            base_uri = derive_base_uri(target_namespace, None, tenant_slug)
-            rewritten_schema, applied = rewrite_import_schema(
-                def_schema, base_uri=base_uri, map_core_formats=map_core_formats
-            )
-        else:
-            # A non-object definition cannot be rewritten; let validation reject it below.
-            rewritten_schema, applied = def_schema, []
+        prep = _prepare_imported_definition(
+            def_name,
+            def_schema,
+            tenant_id=tenant_id,
+            tenant_slug=tenant_slug,
+            target_namespace=target_namespace,
+            map_core_formats=map_core_formats,
+        )
 
-        try:
-            identity = resolve_primitive_identity(
-                rewritten_schema,
-                name=def_name,
-                namespace=target_namespace,
-                base_uri=None,
-                tenant_slug=tenant_slug,
-            )
-        except SchemaValidationError as e:
-            errors.append({"name": def_name, "error": "invalid_schema", "details": e.errors})
-            continue
-        except ScopeViolationError as e:
-            errors.append({"name": def_name, "error": "scope_violation", "details": e.violations})
+        # Record the per-type classification + validation report (mirrors the review endpoint).
+        reviews.append({
+            "name": def_name,
+            "status": prep.status,
+            "valid": prep.valid,
+            "validation_errors": prep.validation_errors,
+            "existing_id": str(prep.existing["id"]) if prep.existing else None,
+        })
+
+        if prep.status == STATUS_INVALID:
+            errors.append({"name": def_name, **prep.error})
             continue
 
-        # The rewrite turned every intra-source/core ref into an ordinary registry-relative ref,
-        # so the standard resolver (#3456) produces the full edge set — no internal-edge appending.
-        refs = resolve_primitive_refs(
-            identity['schema'], base_uri=identity['base_uri'], tenant_id=tenant_id
+        resolution = resolutions.get(def_name) or {}
+        decision = decide(
+            prep.status,
+            action=resolution.get("action", "keep"),
+            new_name=resolution.get("new_name"),
+            dedupe=dedupe,
         )
 
         try:
-            schema_type = determine_category_from_schema(rewritten_schema)
-            db.create_primitive(
-                tenant_id=tenant_id,
-                name=def_name,
-                category=schema_type,
-                schema=identity['schema'],
-                description=rewritten_schema.get('description'),
-                tags=rewritten_schema.get('tags', []),
-                created_by=created_by,
-                source='imported',
-                schema_id=identity['schema_id'],
-                draft=identity['draft'],
-                namespace=target_namespace,
-                base_uri=identity['base_uri'],
-                refs=refs,
-            )
-            imported.append(def_name)
-            if applied:
-                rewrites[def_name] = applied
-            reconcile_dependents_for_target(identity['schema_id'], tenant_id=tenant_id)
+            if decision.action == "create":
+                _create_primitive_from_prepared(
+                    prep,
+                    name=def_name,
+                    tenant_id=tenant_id,
+                    target_namespace=target_namespace,
+                    created_by=created_by,
+                )
+                imported.append(def_name)
+                if prep.rewrites:
+                    rewrites[def_name] = prep.rewrites
+
+            elif decision.action == "update":
+                # A conflict against a shared system-core type can't be overwritten by a tenant
+                # import — the row isn't tenant-owned, so the update would silently match nothing.
+                # Reject it explicitly rather than report a phantom overwrite.
+                if prep.existing.get("is_system"):
+                    errors.append({
+                        "name": def_name,
+                        "error": "cannot_overwrite_system",
+                        "details": "A system-core type cannot be overwritten by an import",
+                    })
+                else:
+                    # Overwrite the existing row's schema/refs in place; identity is unchanged
+                    # (same name + namespace → same $id), so the edge graph stays consistent.
+                    db.update_primitive(
+                        str(prep.existing["id"]),
+                        tenant_id,
+                        {
+                            "schema": prep.identity['schema'],
+                            "category": determine_category_from_schema(prep.rewritten),
+                            "description": prep.rewritten.get('description'),
+                            "tags": prep.rewritten.get('tags', []),
+                            "draft": prep.identity['draft'],
+                            "refs": prep.refs,
+                        },
+                    )
+                    reconcile_dependents_for_target(prep.schema_id, tenant_id=tenant_id)
+                    overwritten.append(def_name)
+                    if prep.rewrites:
+                        rewrites[def_name] = prep.rewrites
+
+            elif decision.action == "rename":
+                # Re-prepare under the new name so it gets its own registry identity, then
+                # create it — unless that name is itself already taken (a fresh conflict).
+                # A rename only re-derives *this* definition's $id; sibling definitions in the
+                # same bundle keep their own identities. A sibling's ``$ref`` therefore resolves
+                # against the name it was authored to point at, not this new name — renaming one
+                # type does not silently re-point its siblings' edges. An edge that pointed at
+                # this type's original name lands in that sibling's ``unresolved_refs`` (the
+                # review surfaces it), exactly as it would for any other unresolved registry ref.
+                renamed_prep = _prepare_imported_definition(
+                    decision.new_name,
+                    def_schema,
+                    tenant_id=tenant_id,
+                    tenant_slug=tenant_slug,
+                    target_namespace=target_namespace,
+                    map_core_formats=map_core_formats,
+                )
+                if renamed_prep.status == STATUS_INVALID:
+                    errors.append({"name": def_name, **renamed_prep.error})
+                elif renamed_prep.existing is not None:
+                    errors.append({
+                        "name": def_name,
+                        "error": "rename_conflict",
+                        "details": f"A type named '{decision.new_name}' already exists",
+                    })
+                else:
+                    _create_primitive_from_prepared(
+                        renamed_prep,
+                        name=decision.new_name,
+                        tenant_id=tenant_id,
+                        target_namespace=target_namespace,
+                        created_by=created_by,
+                    )
+                    renamed.append({"from": def_name, "to": decision.new_name})
+                    if renamed_prep.rewrites:
+                        rewrites[decision.new_name] = renamed_prep.rewrites
+
+            elif decision.action == "skip":
+                if decision.outcome == "identical":
+                    identical.append(def_name)
+                else:
+                    skipped.append(def_name)
+
+            else:  # decision.action == "error"
+                errors.append({"name": def_name, "error": decision.reason})
+
         except Exception as e:
+            # A unique-constraint hit means another writer won the race for this identity;
+            # surface it as a skip rather than a hard failure, mirroring prior behavior.
             if "unique constraint" in str(e).lower():
                 skipped.append(def_name)
             else:
                 errors.append({"name": def_name, "error": str(e)})
 
-    return {"imported": imported, "skipped": skipped, "errors": errors, "rewrites": rewrites}
+    return {
+        "imported": imported,
+        "overwritten": overwritten,
+        "renamed": renamed,
+        "identical": identical,
+        "skipped": skipped,
+        "errors": errors,
+        "rewrites": rewrites,
+        "reviews": reviews,
+    }
+
+
+def _review_imported_definitions(
+    definitions: Dict[str, Any],
+    *,
+    tenant_id: str,
+    tenant_slug: str,
+    target_namespace: Optional[str],
+    map_core_formats: bool,
+    dedupe: bool,
+) -> Dict[str, Any]:
+    """Build a dry-run review of a ``name -> schema`` map without writing anything (#3464).
+
+    Classifies each definition New / Identical / Conflict, attaches its draft 2020-12
+    validation report and unresolved-ref mapping, and lists the resolution choices a
+    Conflict offers — the report the import UI (#3469) renders before the user commits.
+
+    Args:
+        definitions: The ``name -> schema fragment`` map to review.
+        tenant_id: The caller's tenant id (scopes the existing-row lookup).
+        tenant_slug: The tenant slug (used for the default base URI).
+        target_namespace: Optional registry namespace the import targets.
+        map_core_formats: Whether recognized formats would be mapped to core types (#3463).
+        dedupe: Whether Identical definitions would be auto-skipped — reflected in the summary.
+
+    Returns:
+        A ``{"status", "summary", "types"}`` review report (plus echoed source context added
+        by the caller). Each ``types`` entry carries name, status, validation report,
+        rewrites, ref counts, the existing row's id, and the allowed resolutions.
+    """
+    types: List[Dict[str, Any]] = []
+    summary = {"new": 0, "identical": 0, "conflict": 0, "invalid": 0}
+
+    for def_name, def_schema in definitions.items():
+        prep = _prepare_imported_definition(
+            def_name,
+            def_schema,
+            tenant_id=tenant_id,
+            tenant_slug=tenant_slug,
+            target_namespace=target_namespace,
+            map_core_formats=map_core_formats,
+        )
+        summary[prep.status] = summary.get(prep.status, 0) + 1
+
+        unresolved = [e for e in (prep.refs or []) if e.get("status") == "unresolved"]
+        types.append({
+            "name": def_name,
+            "status": prep.status,
+            "valid": prep.valid,
+            "validation_errors": prep.validation_errors,
+            "error": prep.error,
+            "schema_id": prep.schema_id,
+            "existing_id": str(prep.existing["id"]) if prep.existing else None,
+            "rewrites": prep.rewrites,
+            "ref_count": len(prep.refs or []),
+            "unresolved_refs": unresolved,
+            "allowed_resolutions": allowed_resolutions(prep.status),
+        })
+
+    return {
+        "status": "review",
+        "dedupe": dedupe,
+        "summary": {**summary, "total": len(types)},
+        "types": types,
+    }
+
+
+def _resolve_import_definitions(
+    request: PrimitiveImportRequest,
+) -> tuple[Dict[str, Any], List[str]]:
+    """Resolve an import request's source document into a ``name -> schema`` map.
+
+    Shared by the commit (``/import``) and review (``/import/review``) endpoints so both
+    interpret the source identically. A type-def bundle is expanded by the bundle importer
+    (#3462) — a malformed bundle is a clear 400 — while JSON Schema / OpenAPI documents
+    extract their ``$defs`` / ``definitions``. The ``selected_definitions`` filter is applied
+    here when ``import_all`` is false.
+
+    Args:
+        request: The import request carrying the source document and selection options.
+
+    Returns:
+        ``(definitions, warnings)`` — the resolved definitions and any non-fatal warnings
+        (e.g. from bundle expansion).
+
+    Raises:
+        HTTPException: 400 for an invalid source kind, a malformed bundle, a document with no
+            definitions, or a selection that matches nothing.
+    """
+    if request.source_kind not in VALID_IMPORT_SOURCE_KINDS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Invalid source_kind '{request.source_kind}'. "
+                f"Expected one of: {', '.join(sorted(VALID_IMPORT_SOURCE_KINDS))}"
+            )
+        )
+
+    warnings: List[str] = []
+    if request.source_kind == 'type-def-bundle':
+        try:
+            parsed_types, warnings = parse_type_def_bundle(
+                request.schema, source_label=request.source_label
+            )
+        except BundleError as e:
+            raise HTTPException(status_code=400, detail=e.message)
+        definitions: Dict[str, Any] = {p.name: p.schema for p in parsed_types}
+    else:
+        definitions = {}
+        # Check for $defs (JSON Schema 2020-12)
+        if '$defs' in request.schema:
+            definitions.update(request.schema['$defs'])
+        # Check for definitions (older JSON Schema versions)
+        if 'definitions' in request.schema:
+            definitions.update(request.schema['definitions'])
+
+        if not definitions:
+            raise HTTPException(
+                status_code=400,
+                detail="No definitions found in JSON Schema. Schema must contain $defs or definitions."
+            )
+
+    # Filter definitions if specific ones are requested.
+    if not request.import_all and request.selected_definitions:
+        definitions = {
+            k: v for k, v in definitions.items()
+            if k in request.selected_definitions
+        }
+
+    if not definitions:
+        raise HTTPException(
+            status_code=400,
+            detail="No matching definitions found to import"
+        )
+
+    return definitions, warnings
+
+
+def _normalize_resolutions(
+    request: PrimitiveImportRequest,
+) -> Optional[Dict[str, Dict[str, Any]]]:
+    """Validate and flatten a request's per-type conflict resolutions (#3464).
+
+    Args:
+        request: The import request whose ``resolutions`` map is being applied.
+
+    Returns:
+        A ``name -> {"action", "new_name"}`` map of plain dicts, or ``None`` when the
+        request carries no resolutions.
+
+    Raises:
+        HTTPException: 400 if a resolution names an unknown action, or a ``rename`` omits
+            its ``new_name``.
+    """
+    if not request.resolutions:
+        return None
+    normalized: Dict[str, Dict[str, Any]] = {}
+    for name, resolution in request.resolutions.items():
+        if resolution.action not in VALID_ACTIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Invalid resolution action '{resolution.action}' for '{name}'. "
+                    f"Expected one of: {', '.join(sorted(VALID_ACTIONS))}"
+                )
+            )
+        if resolution.action == ACTION_RENAME and not resolution.new_name:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Resolution for '{name}' is 'rename' but no new_name was provided",
+            )
+        normalized[name] = {"action": resolution.action, "new_name": resolution.new_name}
+    return normalized
+
+
+@router.post("/{tenant_slug}/import/review")
+async def review_import_primitives(
+    tenant_slug: str,
+    request: PrimitiveImportRequest,
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> Dict[str, Any]:
+    """Dry-run review of an import: conflicts, dedupe, and a validation report (#3464).
+
+    Resolves the source exactly as ``POST /import`` would, but **writes nothing** — it
+    classifies each definition against the registry (New / Identical / Conflict), attaches its
+    draft 2020-12 validation report and unresolved-ref mapping, and lists the resolution
+    choices each conflict offers. This is the report the import wizard (#3469) renders so the
+    user can pick keep / overwrite / rename before committing; the same classification drives
+    the commit, so the committed result matches the review.
+
+    Args:
+        tenant_slug: The tenant slug.
+        request: The import request (source document + options); ``resolutions`` is ignored.
+        auth_data: Authentication data (injected by dependency).
+
+    Returns:
+        A ``{"status": "review", "summary", "types", ...}`` report.
+    """
+    definitions, warnings = _resolve_import_definitions(request)
+
+    review = _review_imported_definitions(
+        definitions,
+        tenant_id=auth_data['tenant_id'],
+        tenant_slug=tenant_slug,
+        target_namespace=request.target_namespace,
+        map_core_formats=request.map_core_formats,
+        dedupe=request.dedupe,
+    )
+
+    return {
+        "source_kind": request.source_kind,
+        "source_label": request.source_label,
+        "target_namespace": request.target_namespace,
+        "warnings": warnings,
+        **review,
+    }
 
 
 @router.post("/{tenant_slug}/import")
@@ -869,63 +1364,18 @@ async def import_primitives(
     Returns:
         Summary of imported primitives plus the id of the recorded provenance row.
     """
-    # Validate the declared source shape against the persisted CHECK constraint.
-    if request.source_kind not in VALID_IMPORT_SOURCE_KINDS:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Invalid source_kind '{request.source_kind}'. "
-                f"Expected one of: {', '.join(sorted(VALID_IMPORT_SOURCE_KINDS))}"
-            )
-        )
-
-    # Resolve the source into a {name: schema} map of definitions. A type-def bundle is
-    # expanded by the bundle importer (#3462), and a malformed bundle is a clear 400. JSON
-    # Schema / OpenAPI documents extract their $defs / definitions. Each definition's intra-source
-    # and core-format refs are rewritten during commit (#3463), so no source-specific edge
-    # builder is needed here — the rewrite handles #/$defs, #/definitions, and #/types alike.
-    warnings: List[str] = []
-    if request.source_kind == 'type-def-bundle':
-        try:
-            parsed_types, warnings = parse_type_def_bundle(
-                request.schema, source_label=request.source_label
-            )
-        except BundleError as e:
-            raise HTTPException(status_code=400, detail=e.message)
-        definitions = {p.name: p.schema for p in parsed_types}
-    else:
-        definitions = {}
-        # Check for $defs (JSON Schema 2020-12)
-        if '$defs' in request.schema:
-            definitions.update(request.schema['$defs'])
-        # Check for definitions (older JSON Schema versions)
-        if 'definitions' in request.schema:
-            definitions.update(request.schema['definitions'])
-
-        if not definitions:
-            raise HTTPException(
-                status_code=400,
-                detail="No definitions found in JSON Schema. Schema must contain $defs or definitions."
-            )
-
-    # Filter definitions if specific ones are requested
-    if not request.import_all and request.selected_definitions:
-        definitions = {
-            k: v for k, v in definitions.items()
-            if k in request.selected_definitions
-        }
-
-    if not definitions:
-        raise HTTPException(
-            status_code=400,
-            detail="No matching definitions found to import"
-        )
+    # Resolve the source into a {name: schema} map of definitions (shared with /import/review).
+    # A malformed bundle / empty document is a clear 400. Each definition's intra-source and
+    # core-format refs are rewritten during commit (#3463).
+    definitions, warnings = _resolve_import_definitions(request)
+    resolutions = _normalize_resolutions(request)
 
     # Get user_id from auth data (will be None for API key auth)
     created_by = get_authenticated_user_id(auth_data)
 
-    # Commit each definition as a primitive (shared by JSON Schema and bundle imports). Each
-    # definition's refs are rewritten relative + mapped to core types during commit (#3463).
+    # Commit each definition as a primitive (shared by JSON Schema and bundle imports), honoring
+    # the caller's conflict/dedupe resolutions (#3464). Each definition's refs are rewritten
+    # relative + mapped to core types during commit (#3463).
     outcome = _commit_imported_definitions(
         definitions,
         tenant_id=auth_data['tenant_id'],
@@ -933,21 +1383,36 @@ async def import_primitives(
         target_namespace=request.target_namespace,
         created_by=created_by,
         map_core_formats=request.map_core_formats,
+        dedupe=request.dedupe,
+        resolutions=resolutions,
     )
     imported = outcome["imported"]
+    overwritten = outcome["overwritten"]
+    renamed = outcome["renamed"]
+    identical = outcome["identical"]
     skipped = outcome["skipped"]
     errors = outcome["errors"]
     rewrites = outcome["rewrites"]
+    reviews = outcome["reviews"]
 
     # Build the auditable report and persist a provenance record (#3448). The rewrites map
-    # records the $ref rewrites applied per type (#3463) for the import-review table.
+    # records the $ref rewrites applied per type (#3463) for the import-review table, and the
+    # reviews list records each type's New/Identical/Conflict classification so the report can
+    # be shown to match the committed outcome (#3464).
     report = {
         "imported": imported,
+        "overwritten": overwritten,
+        "renamed": renamed,
+        "identical": identical,
         "skipped": skipped,
         "errors": errors,
         "warnings": warnings,
         "rewrites": rewrites,
+        "reviews": reviews,
         "total_imported": len(imported),
+        "total_overwritten": len(overwritten),
+        "total_renamed": len(renamed),
+        "total_identical": len(identical),
         "total_skipped": len(skipped),
         "total_errors": len(errors),
     }
@@ -955,7 +1420,14 @@ async def import_primitives(
         "import_all": request.import_all,
         "selected_definitions": request.selected_definitions,
         "map_core_formats": request.map_core_formats,
+        "dedupe": request.dedupe,
+        "resolutions": resolutions,
     }
+
+    # Rows written = newly created + overwritten + renamed; rows passed over = deduped
+    # identical + kept conflicts. This keeps the provenance counts matching the outcome.
+    written_count = len(imported) + len(overwritten) + len(renamed)
+    passed_over_count = len(identical) + len(skipped)
 
     import_id = None
     try:
@@ -966,8 +1438,8 @@ async def import_primitives(
             source_label=request.source_label,
             target_namespace=request.target_namespace,
             options=options,
-            imported_count=len(imported),
-            skipped_count=len(skipped),
+            imported_count=written_count,
+            skipped_count=passed_over_count,
             error_count=len(errors),
             imported_by=created_by,
         )
