@@ -1174,7 +1174,7 @@ class Database:
             SELECT DISTINCT ON (category, name)
                    id, tenant_id, name, description, category, schema, tags,
                    created_by, is_system, is_public, usage_count, source,
-                   schema_id, draft, namespace, base_uri,
+                   schema_id, draft, namespace, base_uri, refs,
                    created_at, updated_at
             FROM odb.primitives
             WHERE (tenant_id = %s OR is_system = true)
@@ -1209,12 +1209,43 @@ class Database:
         query = """
             SELECT id, tenant_id, name, description, category, schema, tags,
                    created_by, is_system, is_public, usage_count, source,
-                   schema_id, draft, namespace, base_uri,
+                   schema_id, draft, namespace, base_uri, refs,
                    created_at, updated_at
             FROM odb.primitives
             WHERE id = %s AND (tenant_id = %s OR is_system = true)
         """
         results = self.execute_query(query, (primitive_id, tenant_id))
+        return results[0] if results else None
+
+    def get_primitive_by_schema_id(
+        self, schema_id: str, tenant_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Resolve a primitive by its JSON Schema ``$id`` within the tenant's read scope (#3456).
+
+        Backs relative ``$ref`` resolution: a resolved absolute registry URI is matched
+        against ``odb.primitives.schema_id``. Scope is the same as the other reads —
+        system-core ∪ the caller's own — so a tenant resolves only to shared system-core
+        or its own types, never to another tenant's private type (honoring #3453). When
+        system-core types are seeded per tenant, the caller's own copy is preferred.
+
+        Args:
+            schema_id: The absolute ``$id`` to resolve (the ref's resolved target URI).
+            tenant_id: The caller's tenant id (scopes visibility).
+
+        Returns:
+            The matching primitive row, or None when no visible type has that ``$id``.
+        """
+        query = """
+            SELECT id, tenant_id, name, description, category, schema, tags,
+                   created_by, is_system, is_public, usage_count, source,
+                   schema_id, draft, namespace, base_uri, refs,
+                   created_at, updated_at
+            FROM odb.primitives
+            WHERE schema_id = %s AND (tenant_id = %s OR is_system = true)
+            ORDER BY (tenant_id = %s) DESC
+            LIMIT 1
+        """
+        results = self.execute_query(query, (schema_id, tenant_id, tenant_id))
         return results[0] if results else None
 
     def create_primitive(
@@ -1230,7 +1261,8 @@ class Database:
         schema_id: Optional[str] = None,
         draft: str = '2020-12',
         namespace: Optional[str] = None,
-        base_uri: Optional[str] = None
+        base_uri: Optional[str] = None,
+        refs: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """Create a new primitive.
 
@@ -1241,20 +1273,23 @@ class Database:
             draft: The JSON Schema dialect/draft, default '2020-12' (#3452).
             namespace: Optional registry namespace path locating the primitive (#3452).
             base_uri: Optional namespace base URI the ``$id`` was computed against (#3452).
+            refs: Resolved relative-``$ref`` edges for the schema, each
+                ``{relative_ref, resolved_target, status}`` (#3456). Defaults to ``[]``.
         """
         query = """
             INSERT INTO odb.primitives
             (tenant_id, name, description, category, schema, tags, created_by, source,
-             schema_id, draft, namespace, base_uri)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             schema_id, draft, namespace, base_uri, refs)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, tenant_id, name, description, category, schema, tags,
                       created_by, is_system, is_public, usage_count, source,
-                      schema_id, draft, namespace, base_uri,
+                      schema_id, draft, namespace, base_uri, refs,
                       created_at, updated_at
         """
 
         import json
         schema_json = json.dumps(schema)
+        refs_json = json.dumps(refs or [])
 
         conn = self.connect()
         try:
@@ -1262,7 +1297,7 @@ class Database:
                 cursor.execute(
                     query,
                     (tenant_id, name, description, category, schema_json, tags or [],
-                     created_by, source, schema_id, draft, namespace, base_uri)
+                     created_by, source, schema_id, draft, namespace, base_uri, refs_json)
                 )
                 result = cursor.fetchone()
                 conn.commit()
@@ -1316,6 +1351,12 @@ class Database:
         if 'base_uri' in updates and updates['base_uri'] is not None:
             update_fields.append("base_uri = %s")
             params.append(updates['base_uri'])
+        # Resolved relative-$ref edges, re-derived by the route whenever the schema or
+        # registry placement changes (#3456). May be an empty list (no edges), so the
+        # presence of the key — not its truthiness — drives the write.
+        if 'refs' in updates and updates['refs'] is not None:
+            update_fields.append("refs = %s")
+            params.append(json.dumps(updates['refs']))
 
         if not update_fields:
             # Nothing to update, return current primitive
@@ -1328,7 +1369,7 @@ class Database:
             WHERE id = %s AND tenant_id = %s
             RETURNING id, tenant_id, name, description, category, schema, tags,
                       created_by, is_system, is_public, usage_count, source,
-                      schema_id, draft, namespace, base_uri,
+                      schema_id, draft, namespace, base_uri, refs,
                       created_at, updated_at
         """
 

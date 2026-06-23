@@ -131,6 +131,9 @@ class PrimitiveSchema(BaseModel):
     draft: str = '2020-12'
     namespace: Optional[str] = None
     base_uri: Optional[str] = None
+    # Resolved relative-`$ref` edges for this primitive's schema (#3456). Each edge is
+    # {relative_ref, resolved_target, status} with status resolved|unresolved|circular.
+    refs: List[Dict[str, Any]] = []
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
     enabled: bool = True

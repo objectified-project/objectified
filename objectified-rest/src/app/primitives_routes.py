@@ -34,6 +34,7 @@ from .primitives_scope import (
     is_core_namespace,
     tenant_segment_of,
 )
+from .primitives_resolver import build_ref_edges
 
 router = APIRouter(prefix="/v1/primitives", tags=["primitives"])
 
@@ -77,6 +78,30 @@ def _scope_violation_http_error(error: ScopeViolationError) -> HTTPException:
             "violations": error.violations,
         },
     )
+
+
+def resolve_primitive_refs(
+    schema: Dict[str, Any], *, base_uri: str, tenant_id: str
+) -> List[Dict[str, str]]:
+    """Resolve a primitive's relative ``$ref`` edges against the registry (#3456).
+
+    Walks the schema's ``$ref`` values, resolves each against ``base_uri``, and marks
+    each edge ``resolved`` / ``unresolved`` by looking the target ``$id`` up in the
+    tenant's read scope (system-core ∪ tenant), so resolution honors scope (#3453).
+
+    Args:
+        schema: The identity-stamped JSON Schema document of the source primitive.
+        base_uri: The source primitive's base URI (relative refs resolve against it).
+        tenant_id: The caller's tenant id, scoping target lookups.
+
+    Returns:
+        The ``{relative_ref, resolved_target, status}`` edge list to persist on
+        ``odb.primitives.refs``.
+    """
+    def _target_exists(absolute_uri: str) -> bool:
+        return db.get_primitive_by_schema_id(absolute_uri, tenant_id) is not None
+
+    return build_ref_edges(schema, base_uri=base_uri, target_exists=_target_exists)
 
 
 def resolve_primitive_identity(
@@ -405,6 +430,11 @@ async def create_primitive(
     except ScopeViolationError as e:
         raise _scope_violation_http_error(e)
 
+    # Resolve relative $ref edges against the registry and persist them (#3456).
+    refs = resolve_primitive_refs(
+        identity['schema'], base_uri=identity['base_uri'], tenant_id=auth_data['tenant_id']
+    )
+
     try:
         # Get user_id from auth data (will be None for API key auth)
         created_by = get_authenticated_user_id(auth_data)
@@ -422,6 +452,7 @@ async def create_primitive(
             draft=identity['draft'],
             namespace=request.namespace,
             base_uri=identity['base_uri'],
+            refs=refs,
         )
 
         return PrimitiveSchema(**primitive)
@@ -522,6 +553,10 @@ async def update_primitive(
         updates['schema_id'] = identity['schema_id']
         updates['draft'] = identity['draft']
         updates['base_uri'] = identity['base_uri']
+        # Re-resolve relative $ref edges whenever the schema or its base changes (#3456).
+        updates['refs'] = resolve_primitive_refs(
+            identity['schema'], base_uri=identity['base_uri'], tenant_id=auth_data['tenant_id']
+        )
 
     try:
         # Update primitive
@@ -687,6 +722,11 @@ async def import_primitives(
             errors.append({"name": def_name, "error": "scope_violation", "details": e.violations})
             continue
 
+        # Resolve relative $ref edges for the imported definition (#3456).
+        refs = resolve_primitive_refs(
+            identity['schema'], base_uri=identity['base_uri'], tenant_id=auth_data['tenant_id']
+        )
+
         try:
             # Determine category from schema
             schema_type = determine_category_from_schema(def_schema)
@@ -706,6 +746,7 @@ async def import_primitives(
                 draft=identity['draft'],
                 namespace=request.target_namespace,
                 base_uri=identity['base_uri'],
+                refs=refs,
             )
             imported.append(primitive['name'])
         except Exception as e:
