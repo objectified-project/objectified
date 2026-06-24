@@ -8,6 +8,9 @@ import {
   Import,
   LayoutGrid,
   Sparkles,
+  ShieldCheck,
+  Layers,
+  Globe,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -71,6 +74,27 @@ const HOME_FEATURES: HomeFeature[] = [
       "Describe your API in plain English and let AI generate a complete OpenAPI specification. Quality scoring grades your spec from A to F.",
     tone: "sky",
   },
+  {
+    icon: <ShieldCheck className="h-5 w-5" />,
+    title: "Roles & Access Control",
+    description:
+      "Granular RBAC with built-in Owner, Admin, Editor, and Viewer roles, a tunable permission matrix, member lifecycle controls, and a tamper-evident access audit log.",
+    tone: "rose",
+  },
+  {
+    icon: <Layers className="h-5 w-5" />,
+    title: "Multi-Tenant Workspaces",
+    description:
+      "Organize projects by team and organization with isolated workspaces, per-tenant roles, and a separate platform-admin plane for operators.",
+    tone: "green",
+  },
+  {
+    icon: <Globe className="h-5 w-5" />,
+    title: "Public API Browser",
+    description:
+      "Publish specifications to a public portal with Monaco-powered viewers, version comparison, and embeddable snippets — or browse community designs.",
+    tone: "cyan",
+  },
 ];
 
 const HOW_STEPS: { title: string; description: string; dotClass: string }[] = [
@@ -108,6 +132,8 @@ const MARQUEE_ITEMS = [
   "Code Generation",
   "Version Control",
   "AI-Powered Design",
+  "Granular RBAC",
+  "Access Audit Log",
   "Mermaid · PlantUML",
   "PNG · SVG · PDF",
 ];
@@ -133,7 +159,7 @@ export default function Home() {
             <Reveal>
               <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-blue-50/70 px-4 py-2 text-sm font-medium text-blue-700 backdrop-blur animate-pulse-ring dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
                 <Star className="h-4 w-4" />
-                <span className="text-shimmer">Now in Public Beta</span>
+                <span className="text-shimmer">Now in Release Candidate &middot; RC1</span>
               </div>
             </Reveal>
 

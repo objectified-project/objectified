@@ -82,26 +82,34 @@ export function Navbar() {
               scrolled ? 'h-14' : 'h-16',
             )}
           >
-            <Link href="/" className="group flex items-center gap-3">
-              <div className="relative flex h-10 w-auto items-center transition-transform duration-300 group-hover:scale-[1.03]">
-                <Image
-                  src="/Objectified-02.png"
-                  alt="Objectified Logo"
-                  width={120}
-                  height={40}
-                  className="h-10 w-auto object-contain dark:hidden"
-                  priority
-                />
-                <Image
-                  src="/Objectified-05.png"
-                  alt="Objectified Logo"
-                  width={120}
-                  height={40}
-                  className="hidden h-10 w-auto object-contain dark:block"
-                  priority
-                />
-              </div>
-            </Link>
+            <div className="flex items-center gap-2.5">
+              <Link href="/" className="group flex items-center gap-3">
+                <div className="relative flex h-10 w-auto items-center transition-transform duration-300 group-hover:scale-[1.03]">
+                  <Image
+                    src="/Objectified-02.png"
+                    alt="Objectified Logo"
+                    width={120}
+                    height={40}
+                    className="h-10 w-auto object-contain dark:hidden"
+                    priority
+                  />
+                  <Image
+                    src="/Objectified-05.png"
+                    alt="Objectified Logo"
+                    width={120}
+                    height={40}
+                    className="hidden h-10 w-auto object-contain dark:block"
+                    priority
+                  />
+                </div>
+              </Link>
+              <span
+                title="Release Candidate"
+                className="inline-flex items-center rounded-full border border-amber-300/60 bg-amber-50/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700 backdrop-blur dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-300"
+              >
+                RC
+              </span>
+            </div>
 
             <div className="flex items-center gap-1 sm:gap-2">
               <div className="hidden items-center gap-1 sm:flex">

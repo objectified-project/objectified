@@ -6,7 +6,6 @@ import {
   Layers,
   Zap,
   GitBranch,
-  Lock,
   FileCode,
   Eye,
   Shield,
@@ -21,6 +20,10 @@ import {
   Network,
   Paintbrush,
   MousePointerClick,
+  ShieldCheck,
+  Users,
+  ScrollText,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Aurora } from "../components/ui/Aurora";
@@ -139,7 +142,10 @@ const FEATURE_GRID: FeatureDef[] = [
   { icon: <Network className="h-5 w-5" />, title: 'Relationship Visualization', description: 'Animated edges with smart routing, cardinality labels, and constraint badges for clear data flow.', tone: 'cyan' },
   { icon: <FileCode className="h-5 w-5" />, title: 'Rich Export Options', description: 'Export canvas to PNG, SVG, PDF, Mermaid, PlantUML, GraphML, DOT, or raw JSON with an export wizard.', tone: 'violet' },
   { icon: <Search className="h-5 w-5" />, title: 'Canvas Search', description: 'Find any class or property instantly with Cmd+F search, regex support, and result highlighting.', tone: 'amber' },
-  { icon: <Lock className="h-5 w-5" />, title: 'Enterprise Security', description: 'Role-based access control, SSO integration, audit logs, and compliance features for enterprise teams.', tone: 'rose' },
+  { icon: <ShieldCheck className="h-5 w-5" />, title: 'Granular RBAC', description: 'Built-in Owner, Admin, Editor, and Viewer roles per workspace, with a resource-by-action permission matrix you can tune to your team.', tone: 'rose' },
+  { icon: <Users className="h-5 w-5" />, title: 'Member Lifecycle', description: 'Invite, suspend, and offboard members with status-aware access — suspended members are denied tenant access immediately.', tone: 'teal' },
+  { icon: <ScrollText className="h-5 w-5" />, title: 'Tamper-Evident Audit Log', description: 'Every privileged action is recorded to an append-only, hash-chained access ledger, exportable to JSON or CSV for compliance.', tone: 'amber' },
+  { icon: <KeyRound className="h-5 w-5" />, title: 'Platform Admin Plane', description: 'A platform-administration plane kept separate from tenant administration, with SSO and SCIM provisioning on the roadmap.', tone: 'violet' },
   { icon: <Shield className="h-5 w-5" />, title: 'API Security Schemes', description: 'Configure OAuth2, API Key, Bearer token, and OpenID Connect security directly on operations.', tone: 'red' },
   { icon: <Sparkles className="h-5 w-5" />, title: 'AI-Powered Import', description: 'Describe your API in plain English and let AI generate a complete OpenAPI specification for you.', tone: 'sky' },
   { icon: <SlidersHorizontal className="h-5 w-5" />, title: 'Quality Scoring', description: 'Automated A–F quality grades measuring completeness, consistency, best practices, and security coverage.', tone: 'teal' },
@@ -159,7 +165,7 @@ export default function FeaturesPage() {
           <Reveal>
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-blue-50/80 px-4 py-2 text-sm font-medium text-blue-700 backdrop-blur dark:border-blue-900/60 dark:bg-blue-950/50 dark:text-blue-300">
               <Sparkles className="h-4 w-4" />
-              Continuously Improving
+              Now in Release Candidate &middot; RC1
             </div>
           </Reveal>
           <Reveal delay={0.06}>
@@ -448,5 +454,7 @@ const comparisonRows = [
   { feature: 'Group Containers for Schemas', objectified: '✅', swagger: '❌', stoplight: '❌', postman: '❌' },
   { feature: 'Smart Edge Routing (4 styles)', objectified: '✅', swagger: '❌', stoplight: 'Basic', postman: '❌' },
   { feature: 'Multi-Tenant / Team Workspaces', objectified: '✅', swagger: '❌', stoplight: '✅', postman: '✅' },
+  { feature: 'Granular RBAC (Owner / Editor / Viewer)', objectified: '✅', swagger: '❌', stoplight: 'Partial', postman: 'Partial' },
+  { feature: 'Tamper-Evident Access Audit Log', objectified: '✅', swagger: '❌', stoplight: '❌', postman: '❌' },
   { feature: 'Free Personal Tier', objectified: '✅', swagger: '✅', stoplight: '✅', postman: '✅' },
 ];

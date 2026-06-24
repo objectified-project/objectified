@@ -195,7 +195,7 @@ const ROLES: RoleCard[] = [
     title: "Enterprise CTOs",
     description:
       "Technical leaders who need governance, compliance, and visibility across all API and database assets.",
-    bullets: ["Central governance", "Audit trails", "Cost reduction"],
+    bullets: ["Granular role-based access", "Tamper-evident audit trails", "Member lifecycle controls"],
     tone: "rose",
   },
 ];
