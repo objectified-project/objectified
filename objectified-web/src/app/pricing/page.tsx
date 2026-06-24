@@ -54,7 +54,7 @@ function PricingCard({
       )}
     >
       {recommended && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white shadow-lg">
+        <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white shadow-lg">
           Recommended
         </div>
       )}
@@ -233,13 +233,13 @@ export default function PricingPage() {
               <PricingCard
                 name="Enterprise Unlimited"
                 price="Contact sales"
-                period=""
+                period="No limits"
                 featuresHeading="Includes:"
                 features={[
-                  "Unlimited tenants",
-                  "Unlimited projects",
+                  "Unlimited tenants, projects, and users",
                   "AI assistance",
                   "Public & private publishing",
+                  "Your tenant's own custom URL",
                   "Dedicated support & SLA",
                   "SSO & advanced security",
                   "Priority New Feature Access",
