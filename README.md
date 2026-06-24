@@ -45,6 +45,50 @@ scripts/golden_path/run.sh
 See [docs/GOLDEN_PATH.md](docs/GOLDEN_PATH.md) for the step-by-step automated harness and the manual
 UI checklist.
 
+### Your first project in ~10 minutes
+
+A fresh tenant is never empty: a curated, **published** sample project ("Pet Store") is provisioned
+automatically on tenant creation (and by the dev seed), so you have a browsable spec to learn from
+on day one.
+
+1. **Seed the dev stack** (loads the `acme-corp` tenant + the published `petstore-sample` project):
+
+   ```bash
+   docker compose run --rm seed
+   ```
+
+2. **Sign in** to the UI (dev login: `ada@example.com` / `objectified-dev`) and open **Control
+   Panel → Dashboard**. The **Get started** checklist tracks your progress and links each step.
+
+3. **Designer** (`/ade/studio`): create a project, then **Add a class → Browse templates** to drop
+   one of the 50 built-in starter class templates onto the canvas.
+
+4. **Versions** (`/ade/dashboard/versions`): **cut a version**, then **Publish** it (public).
+
+5. **View in Browse**: open your published version to see its OpenAPI spec render — or open the
+   seeded **petstore-sample** project first to see the finished shape end to end.
+
+Every newly created tenant (self-signup, admin panel, or `objectified-db tenants create
+--sample-creator <user>`) gets the same sample via the shared `odb.provision_sample_project()`
+routine. See [`objectified-db/README.md`](objectified-db/README.md) and
+[`docs/runbooks/BACKUP_AND_DR.md`](docs/runbooks/BACKUP_AND_DR.md) for operational details.
+
+### Production deployment
+
+The same compose stack runs in production behind TLS via the
+[`docker-compose.prod.yml`](docker-compose.prod.yml) overlay (Let's Encrypt TLS, fail-closed
+secrets, a gated migration step, and the encrypted backups wired in). The full, reproducible
+fresh-host procedure — including rollback — is in
+[`docs/runbooks/PRODUCTION_DEPLOY.md`](docs/runbooks/PRODUCTION_DEPLOY.md); copy
+[`docker-compose.prod.env.example`](docker-compose.prod.env.example) to `.env` to configure it.
+
+## Documentation
+
+The [**User Guide**](docs/guide/README.md) covers the spine end to end — a "how do I…" page per
+capability (import, edit classes & paths, lint, cut a version, publish, browse, export), plus the
+**API reference** (the REST app's interactive Swagger UI at `/docs`) and **CLI** and **MCP**
+quick-starts.
+
 ## LLMs Used
 
 LLMs are used in conjunction with development.  They do not replace development, they simply augment the

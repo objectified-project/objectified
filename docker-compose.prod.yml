@@ -1,0 +1,157 @@
+# Production overlay for the Objectified spine. Apply ON TOP of the base docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml <command>
+#
+# See docs/runbooks/PRODUCTION_DEPLOY.md for the full, reproducible fresh-host runbook. This file
+# only encodes the production *posture*; the runbook sequences the deploy (TLS, gated migration,
+# backups, rollback).
+#
+# What this overlay changes versus the local/dev base compose:
+#   • TLS:        adds a Caddy reverse proxy (automatic Let's Encrypt) in front of rest + mcp, and
+#                 stops publishing the app/database ports on the host (Caddy reaches them over the
+#                 internal network). Only 80/443 are exposed.
+#   • Secrets:    removes every insecure dev default — Postgres password, the shared JWT secret, the
+#                 MCP internal secret and the CORS allow-list must be provided or the stack refuses
+#                 to start (compose `${VAR:?…}` required-variable syntax + REST's fail-closed prod
+#                 JWT check). OBJECTIFIED_ENV=production turns on REST's fail-closed checks.
+#   • Migrations: the migrate step is GATED — moved behind the `migrate` profile so `up` never
+#                 auto-applies schema changes. The operator previews (`migrate status` / `--dry-run`),
+#                 backs up, then applies it as a deliberate step (see the runbook).
+#   • Seeding:    the dev seed is moved behind the `dev-only` profile so it can never load sample
+#                 data into a production database.
+#   • Backups:    a profile-gated `backup` service (RC1-1.3 tooling) writes encrypted backups to a
+#                 shared volume that REST reads (OBJECTIFIED_BACKUP_DIR) so the ops dashboard
+#                 (RC1-3.2) can report backup freshness.
+#   • Resilience: long-running services get `restart: unless-stopped`.
+#
+# REQUIRES Docker Compose v2.24+ (for the `!override` / `!reset` merge tags used below).
+
+services:
+  postgres:
+    # Pin a specific minor for reproducible production builds (the base uses the floating
+    # `16-bookworm`). For a managed database (RDS/Cloud SQL/…), see the runbook: point the app
+    # services at the managed host and drop this service.
+    image: postgres:16.6-bookworm
+    environment:
+      # No dev fallback in production — the deploy fails fast if the password is unset.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your .env (openssl rand -base64 24)}
+    # Do not publish Postgres on the host. Operators reach it with `docker compose exec postgres psql`.
+    ports: !override []
+    restart: unless-stopped
+
+  # ── Gated migration step ──────────────────────────────────────────────────────────────────────
+  # Behind the `migrate` profile so it never runs on a plain `up`. The app services no longer
+  # depend on it (see the !override depends_on below), so schema changes are applied only when an
+  # operator runs them explicitly, after previewing and backing up:
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile migrate \
+  #     run --rm migrate migrate status        # preview pending scripts (also: migrate --dry-run)
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile migrate \
+  #     run --rm migrate                        # apply (CMD defaults to `migrate`)
+  migrate:
+    profiles: ["migrate"]
+    restart: "no"
+
+  # The dev seed must never touch a production database. Park it behind a profile so `up` skips it.
+  seed:
+    profiles: ["dev-only"]
+
+  rest:
+    environment:
+      # Turn on REST's fail-closed production checks (insecure JWT default is refused, etc.).
+      OBJECTIFIED_ENV: production
+      # Shared session/JWT secret (HS256). Must match whatever issues the NextAuth session.
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in your .env (openssl rand -base64 32)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your .env}
+      # Browser origins allowed to call the API. Lock this to your real UI origin(s).
+      OBJECTIFIED_CORS_ALLOWED_ORIGINS: ${OBJECTIFIED_CORS_ALLOWED_ORIGINS:?set OBJECTIFIED_CORS_ALLOWED_ORIGINS to your UI origin(s), e.g. https://app.example.com}
+      # Surface backup freshness on the ops dashboard (RC1-3.2 reads RC1-1.3 manifests).
+      OBJECTIFIED_BACKUP_DIR: /var/backups/objectified
+    # Schema is applied by the gated migrate step before bring-up, so REST only needs the DB up.
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+    # Reached only through Caddy on the internal network; not published on the host.
+    ports: !override []
+    volumes:
+      - objectified_backups:/var/backups/objectified:ro
+    restart: unless-stopped
+
+  mcp:
+    environment:
+      # No dev fallback — a weak MCP internal secret in production is a real exposure.
+      OBJECTIFIED_MCP_INTERNAL_SECRET: ${OBJECTIFIED_MCP_INTERNAL_SECRET:?set OBJECTIFIED_MCP_INTERNAL_SECRET in your .env (min 16 chars; openssl rand -base64 24)}
+      OBJECTIFIED_MCP_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your .env}@postgres:5432/${POSTGRES_DB:-objectified}
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+    ports: !override []
+    restart: unless-stopped
+
+  # ── TLS terminator / reverse proxy ────────────────────────────────────────────────────────────
+  # Automatic Let's Encrypt certificates. The only host-exposed ports in production.
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      DEPLOY_API_DOMAIN: ${DEPLOY_API_DOMAIN:?set DEPLOY_API_DOMAIN to the REST API hostname, e.g. api.example.com}
+      DEPLOY_MCP_DOMAIN: ${DEPLOY_MCP_DOMAIN:?set DEPLOY_MCP_DOMAIN to the MCP hostname, e.g. mcp.example.com}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL for Let's Encrypt expiry notices}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # issued certificates + ACME account (persist across restarts)
+      - caddy_config:/config
+    depends_on:
+      rest:
+        condition: service_healthy
+      mcp:
+        condition: service_healthy
+    networks:
+      - objectified-mcp
+
+  # ── Scheduled backups (RC1-1.3 tooling) ───────────────────────────────────────────────────────
+  # Profile-gated; invoked on a schedule from the host (cron/systemd timer), e.g.:
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile ops \
+  #     run --rm backup tenant <slug>          # or: full | project <tenant> <project>
+  # Encryption is mandatory in the wrapper: it refuses to run without OBJECTIFIED_BACKUP_KEY.
+  backup:
+    build:
+      context: ./objectified-db
+      dockerfile: Dockerfile
+    profiles: ["ops"]
+    entrypoint: ["/app/scripts/backup/scheduled-backup.sh"]
+    command: ["full"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your .env}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-objectified}
+      OBJECTIFIED_BACKUP_DIR: /var/backups/objectified
+      OBJECTIFIED_BACKUP_OFFSITE_DIR: /mnt/offsite/objectified
+      # The encryption key is the recovery dependency — store it in a secret manager, not next to
+      # the backups. The wrapper exits non-zero if it is unset (never writes plaintext).
+      OBJECTIFIED_BACKUP_KEY: ${OBJECTIFIED_BACKUP_KEY:-}
+      OBJECTIFIED_BACKUP_KEEP_DAYS: ${OBJECTIFIED_BACKUP_KEEP_DAYS:-30}
+      OBJECTIFIED_BACKUP_KEEP_LAST: ${OBJECTIFIED_BACKUP_KEEP_LAST:-7}
+    volumes:
+      - objectified_backups:/var/backups/objectified
+      - objectified_backups_offsite:/mnt/offsite/objectified
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - objectified-mcp
+
+volumes:
+  objectified_postgres_data:
+  caddy_data:
+  caddy_config:
+  objectified_backups:
+  # In a real deployment, replace this named volume with a bind mount to genuine off-host storage
+  # (NFS/object-store gateway) so a host loss does not take the off-site copy with it.
+  objectified_backups_offsite:

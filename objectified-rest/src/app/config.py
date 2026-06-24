@@ -168,6 +168,38 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Mock Server (#3615, RC1-2.2). Free-tier mocks auto-expire after a default TTL (capped at a
+    # maximum) and are rate limited per instance on the data plane. Set
+    # OBJECTIFIED_MOCK_SERVER_ENABLED=false to disable provisioning + serving entirely.
+    mock_server_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MOCK_SERVER_ENABLED",
+            "mock_server_enabled",
+        ),
+    )
+    mock_default_ttl_hours: int = Field(
+        default=24,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MOCK_DEFAULT_TTL_HOURS",
+            "mock_default_ttl_hours",
+        ),
+    )
+    mock_max_ttl_hours: int = Field(
+        default=168,  # 7 days
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MOCK_MAX_TTL_HOURS",
+            "mock_max_ttl_hours",
+        ),
+    )
+    mock_rate_limit_per_minute: int = Field(
+        default=60,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MOCK_RATE_LIMIT_PER_MINUTE",
+            "mock_rate_limit_per_minute",
+        ),
+    )
+
     # Global auto-refresh kill switch (RAR-3.3, #3524). When False, the refresh
     # sweep halts entirely (no repository is auto-refreshed) regardless of per-repo
     # auto_refresh_enabled. Intended for incident response. Manual "Refresh Now"
@@ -179,6 +211,48 @@ class Settings(BaseSettings):
             "refresh_enabled",
         ),
     )
+
+    # Observability & error handling (RC1-3.2, #3617). Structured JSON logs, request-id
+    # propagation, in-process request metrics, and an ops dashboard that surfaces backup status.
+    #
+    # log_level     standard logging level name (DEBUG/INFO/WARNING/ERROR/CRITICAL).
+    # log_json      emit one JSON object per log line (production default). Set false for
+    #               human-friendly console output in local development.
+    # request_id_header  inbound/outbound header carrying the per-request correlation id. When a
+    #               client (or upstream proxy) supplies it we reuse the value; otherwise we mint one.
+    log_level: str = Field(
+        default="INFO",
+        validation_alias=AliasChoices("OBJECTIFIED_LOG_LEVEL", "LOG_LEVEL", "log_level"),
+    )
+    log_json: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("OBJECTIFIED_LOG_JSON", "LOG_JSON", "log_json"),
+    )
+    request_id_header: str = Field(
+        default="X-Request-ID",
+        validation_alias=AliasChoices("OBJECTIFIED_REQUEST_ID_HEADER", "request_id_header"),
+    )
+
+    # Backup status surfacing (RC1-3.2 reads RC1-1.3 manifests, #3617/#3613). The ops dashboard
+    # scans this directory for ``*.manifest.json`` sidecars to report the latest backup per scope.
+    # When unset, backup status is reported as "unconfigured" rather than failing.
+    backup_dir: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("OBJECTIFIED_BACKUP_DIR", "backup_dir"),
+    )
+    # A backup older than this many hours is flagged "stale" on the ops dashboard (RPO guard).
+    backup_stale_after_hours: int = Field(
+        default=24,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_BACKUP_STALE_AFTER_HOURS",
+            "backup_stale_after_hours",
+        ),
+    )
+
+    @property
+    def effective_log_level(self) -> int:
+        """Resolve the configured ``log_level`` name to a stdlib logging integer (INFO fallback)."""
+        return getattr(logging, str(self.log_level).strip().upper(), logging.INFO)
 
     @property
     def effective_database_url(self) -> str:

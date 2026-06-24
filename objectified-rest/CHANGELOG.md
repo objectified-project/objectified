@@ -5,6 +5,52 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-24
+
+### Added
+- **Observability & error handling (#3617, RC1-3.2)** — production-grade diagnosability for the REST
+  service. Structured JSON logging via `structlog` (`app/logging_config.py`, mirroring the MCP setup)
+  emits one JSON object per line with `timestamp`, `level`, `logger`, `event` and a per-request
+  `request_id` that is bound for the whole request lifetime — so every log line a handler emits is
+  correlated to its request. A new `ObservabilityMiddleware` (`app/observability.py`, installed as the
+  outermost layer) assigns/propagates the id via the `X-Request-ID` header (reusing an upstream value
+  when present), records an in-process metrics registry (total requests, requests/sec, error rate,
+  in-flight gauge, latency p50/p95/p99), and logs one access line per request.
+- **Consistent error envelope** — exception handlers wrap every `4xx`/`5xx` (including
+  `RequestValidationError` and the rate limiter's `429`) in a uniform shape that *preserves* FastAPI's
+  `detail` for backward compatibility while adding an `error` object (`status`/`message`/`type`/
+  `request_id`) and a top-level `request_id`. An unhandled-exception handler logs the full stack trace
+  correlated to the request id (error tracking) and returns a safe generic 500 that never leaks
+  internal details.
+- **Health / readiness probes** — `GET /livez` (liveness, no DB), `GET /readyz` (readiness; `503` when
+  the database is unreachable), and the backward-compatible `GET /health`. Wired into `docker-compose`
+  (the `rest` healthcheck now uses `/readyz`; the `mcp` service gained a `/health` healthcheck).
+- **Minimal ops dashboard** (platform-admin only) — `GET /v1/ops/metrics`, `/v1/ops/backups`,
+  `/v1/ops/status`, and a dependency-free HTML `/v1/ops/dashboard`. Backup status is read from the
+  RC1-1.3 backup manifests (`app/backup_status.py`): latest backup per scope, age, and a `stale` flag
+  against the configured RPO window.
+- New settings: `OBJECTIFIED_LOG_LEVEL`, `OBJECTIFIED_LOG_JSON`, `OBJECTIFIED_REQUEST_ID_HEADER`,
+  `OBJECTIFIED_BACKUP_DIR`, `OBJECTIFIED_BACKUP_STALE_AFTER_HOURS`.
+
+## [1.3.0] - 2026-06-23
+
+### Added
+- **Mock Server (#3615, RC1-2.2)** — provision a hosted mock from any published version and consume
+  the designed API before a backend exists. New management plane `POST/GET /v1/mocks/{tenant_slug}`
+  (provision, list), `GET/DELETE /v1/mocks/{tenant_slug}/{id}` (inspect, destroy), and
+  `PUT .../active-scenario` (switch scenario), all tenant-scoped + authenticated. The OpenAPI
+  document generated for the version (same output as `/v1/swagger/...`) is frozen into the instance,
+  so the mock is stable for its lifetime. New public data plane `ANY /v1/mock/{id}/...` replays
+  schema-valid responses synthesised deterministically from the response schemas
+  (`app/mock_data_generator.py`, validated with `jsonschema`) and applies the selected scenario
+  (`app/mock_engine.py`). Per-operation scenarios override status / latency / body and are selectable
+  per instance or per request via the `X-Mock-Scenario` header; four built-ins ship (happy-path,
+  server-error, not-found, slow). Free-tier guardrails: instances auto-expire (`410 Gone` past
+  `expires_at`) and are rate limited per instance (`429` with `Retry-After`). Backed by migration
+  V123 (`odb.mock_instances`). Configurable via `OBJECTIFIED_MOCK_SERVER_ENABLED` (default on),
+  `OBJECTIFIED_MOCK_DEFAULT_TTL_HOURS` (default 24), `OBJECTIFIED_MOCK_MAX_TTL_HOURS` (default 168),
+  and `OBJECTIFIED_MOCK_RATE_LIMIT_PER_MINUTE` (default 60).
+
 ## [1.2.0] - 2026-06-23
 
 ### Added

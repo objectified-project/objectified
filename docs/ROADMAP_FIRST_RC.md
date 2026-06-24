@@ -155,16 +155,30 @@ wrapper (`scripts/backup/scheduled-backup.sh`); RPO/RTO targets, restore runbook
 ### Phase 2 — Developer Value & First-Run  *(weeks 4–6, overlaps Phase 1)*  · **Epic #3605**
 *Make the first five minutes great and close the consume loop.*
 
-**2.1 — Onboarding & sample content** (#3614) · **M** · *blocks RC; gap #5*
+**2.1 — Onboarding & sample content** (#3614) · **M** · *blocks RC; gap #5* · ✅ **Done**
 Fill `README.md` Getting Started (compose quick-start + first-project walkthrough). Add a seeded **sample
 project** and 2–3 **starter templates/blueprints** so a new tenant isn't empty. Guided first-run in the UI.
 *Exit:* a brand-new user reaches a published, browsable spec in < 10 minutes without docs spelunking.
+*Shipped:* shared idempotent `odb.provision_sample_project()` (objectified-db V122) auto-seeds a curated,
+published+public "Pet Store" sample on **every** tenant-creation path — OAuth self-signup, admin tenant
+create, the `objectified-db tenants provision-sample` / `tenants create --sample-creator` CLI, and the dev
+seed; the sample renders end-to-end in Browse (verified live via `GET /v1/schema/.../petstore-sample/1.0.0`).
+Starter templates reuse the existing 50 system `class_templates` (surfaced via the Designer template
+browser). A dismissible **Get started** checklist on the dashboard derives completion from real stats
+(localStorage-persisted). README "Your first project in ~10 minutes" walkthrough added. Tests: objectified-db
+vitest (migration shape), objectified-rest pytest (sample render contract), objectified-ui jest (checklist
+logic + component).
 
-**2.2 — Mock Server** (#3615) · **L** · *high value; gap #4* · ‖ parallel with 2.1
+**2.2 — Mock Server** (#3615) · **L** · *high value; gap #4* · ‖ parallel with 2.1 · ✅ **Done**
 Implement the `mock-server/` mockup: one-click hosted mock from a published version, schema-valid responses
 (examples + faker), per-operation scenarios, optional stateful mode. Generated from existing
 `/v1/swagger/...` output. Free-tier mocks auto-expire.
 *Exit:* provision a mock, hit it, get schema-valid responses; expiry + rate limit enforced.
+*Shipped:* objectified-rest mock plane — management `/v1/mocks/{tenant}` (provision/list/get/active-scenario/destroy)
++ public data plane `/v1/mock/{id}/...`. Frozen OpenAPI spec per instance; deterministic schema-valid response
+synthesis (`mock_data_generator`) validated with jsonschema; selectable per-operation scenarios (status/latency/body,
+4 built-ins + `X-Mock-Scenario` header); free-tier auto-expiry (410) + per-instance rate limit (429). Migration V123
+`odb.mock_instances`. Tests: pytest (generator, engine, routes, migration).
 *Note:* if velocity is tight, 2.2 may slip to Phase 5 — it is the most deferrable RC item. 2.1 may not slip.
 
 ---
@@ -172,25 +186,52 @@ Implement the `mock-server/` mockup: one-click hosted mock from a published vers
 ### Phase 3 — Release Engineering & Operability  *(weeks 5–7, overlaps Phase 2)*  · **Epic #3606**
 *What turns "works" into "operable in production."*
 
-**3.1 — Test coverage across the spine** (#3616) · **L** · *blocks RC*
+**3.1 — Test coverage across the spine** (#3616) · **L** · *blocks RC* · ✅ **Done**
 Integration tests on the REST routers touched by the golden path; component tests on the UI editors;
 contract tests between UI ↔ REST. CI gates merges on them.
 *Exit:* spine endpoints + editors covered; CI red on regression of the golden path.
+*Delivered:* the objectified-rest pytest suite was repaired (collection errors fixed, suite made
+deterministic and DB-free) and is now gated in CI with coverage (`objectified-rest-test.yml`);
+objectified-ui CI now reports coverage; a shared UI↔REST golden-path contract
+(`scripts/golden_path/contract.json`) is verified from both sides; and the class-designer editor
+toolbar gained component tests. See `docs/TESTING.md`.
 
-**3.2 — Observability & error handling** (#3617) · **M** · *blocks RC* · ‖ parallel
+**3.2 — Observability & error handling** (#3617) · **M** · *blocks RC* · ✅ **Done**
 Structured logs (MCP already uses structlog — extend to REST), health/readiness endpoints, error tracking,
 and a minimal ops dashboard (request rate, error rate, latency, backup status). Graceful API error envelopes.
 *Exit:* a failing request is diagnosable from logs/metrics alone; health checks wired into compose/deploy.
+*Delivered:* objectified-rest now emits structured JSON logs via structlog (`app/logging_config.py`)
+with a per-request `request_id` bound for the request's lifetime; an `ObservabilityMiddleware`
+(`app/observability.py`) propagates the id (`X-Request-ID`), records an in-process metrics registry
+(request rate, error rate, latency p50/p95/p99), and logs one access line per request. A consistent
+error envelope (additive over FastAPI's `detail`, with `error`/`request_id`) wraps every 4xx/5xx via
+exception handlers, and an unhandled-exception handler logs the stack trace correlated to the request
+id (error tracking) while returning a safe 500. Liveness (`/livez`), readiness (`/readyz`, DB-checked)
+and the backward-compatible `/health` are wired into `docker-compose` (rest → `/readyz`, mcp → `/health`).
+A platform-admin ops dashboard (`/v1/ops/metrics|backups|status|dashboard`) surfaces those metrics plus
+backup status read from the RC1-1.3 manifests (`app/backup_status.py`). 39 unit/integration tests.
 
-**3.3 — Production deployment story** (#3618) · **M** · *blocks RC* · ‖ parallel
+**3.3 — Production deployment story** (#3618) · **M** · *blocks RC* · ‖ parallel · ✅ **Done**
 Promote `docker-compose` to a documented production deploy (TLS, managed Postgres or pinned volume, secrets,
 backups from 1.3 wired in, migration step gated). Reproducible from a clean host.
 *Exit:* documented deploy runbook produces a working stack on a fresh environment; rollback documented.
+*Delivered:* a [`docker-compose.prod.yml`](../docker-compose.prod.yml) overlay (Caddy TLS terminator with
+automatic Let's Encrypt, host-exposed ports reduced to 80/443, fail-closed secrets via compose
+required-variable syntax + `OBJECTIFIED_ENV=production`, the dev seed parked behind a `dev-only` profile,
+RC1-1.3 encrypted backups wired into an `ops`-profile service whose volume REST reads for the RC1-3.2 ops
+dashboard, and `restart: unless-stopped`); a **gated** migration step (the `migrate` profile + app services no
+longer depend on it, so schema is previewed/backed-up/applied deliberately);
+[`docker-compose.prod.env.example`](../docker-compose.prod.env.example) and [`deploy/Caddyfile`](../deploy/Caddyfile);
+and a fresh-host runbook with rollback and a managed-Postgres variant in
+[`docs/runbooks/PRODUCTION_DEPLOY.md`](runbooks/PRODUCTION_DEPLOY.md). `objectified-db`'s runtime image now
+bundles `postgresql-client` so its `backup`/`restore` (pg_dump/pg_restore) commands work in-container.
 
-**3.4 — Documentation set** (#3619) · **M** · ‖ parallel
+**3.4 — Documentation set** (#3619) · **M** · ‖ parallel · ✅ **done**
 User guide for the spine, API reference (the REST app already serves Swagger UI — publish it), MCP setup,
 CLI reference. Keep it lean; depth can grow post-RC.
 *Exit:* each spine capability has a "how do I…" page; MCP/CLI quick-starts exist.
+*Shipped:* [`docs/guide/`](guide/README.md) — a how-to page per spine capability, an API-reference page
+(Swagger UI at `/docs`), and CLI + MCP quick-starts.
 
 ---
 
@@ -223,8 +264,8 @@ Public RC1 ships only when **all** of these are true:
 - [ ] New user reaches a published, browsable spec in < 10 min via onboarding + sample (2.1).
 - [ ] Spine has integration/component test coverage gating merges (3.1).
 - [ ] Logs/metrics/health checks make a failure diagnosable; backup status visible (3.2).
-- [ ] Production deploy reproducible from a clean host with a rollback path (3.3).
-- [ ] Spine user guide + API/MCP/CLI references published (3.4).
+- [x] Production deploy reproducible from a clean host with a rollback path (3.3).
+- [x] Spine user guide + API/MCP/CLI references published (3.4).
 - [ ] Beta bug burn-down complete; no Critical/High open (4.2).
 
 ---
@@ -274,13 +315,7 @@ Created in `objectified-project/objectified` (pack label `roadmap-first-rc`, all
 | #3603 | Epic: RC1 Phase 0 — Prove the Spine & Stop the Bleeding | 0 |
 | #3604 | Epic: RC1 Phase 1 — Access & Trust | 1 |
 | #3605 | Epic: RC1 Phase 2 — Developer Value & First-Run | 2 |
-| #3614 | RC1-2.1 — Onboarding, sample project & starter templates | 2 |
-| #3615 | RC1-2.2 — Mock Server | 2 |
 | #3606 | Epic: RC1 Phase 3 — Release Engineering & Operability | 3 |
-| #3616 | RC1-3.1 — Test coverage across the spine | 3 |
-| #3617 | RC1-3.2 — Observability & error handling | 3 |
-| #3618 | RC1-3.3 — Production deployment story | 3 |
-| #3619 | RC1-3.4 — Documentation set (spine + API/MCP/CLI) | 3 |
 | #3607 | Epic: RC1 Phase 4 — Stabilization & Release Gate | 4 |
 | #3620 | RC1-4.1 — Private beta / dogfood | 4 |
 | #3621 | RC1-4.2 — Bug burn-down | 4 |

@@ -1,7 +1,10 @@
-from fastapi import FastAPI, HTTPException, Response, Header, Query
+from fastapi import FastAPI, HTTPException, Request, Response, Header, Query
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.encoders import jsonable_encoder
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from typing import Dict, Any, Optional
 import asyncio
 import json
@@ -10,6 +13,9 @@ import yaml
 
 from .config import settings
 from .database import db, Database
+from .logging_config import configure_logging, get_logger
+from .observability import ObservabilityMiddleware, build_error_envelope
+from .ops_routes import health_router, ops_router
 from .rate_limit import RateLimitMiddleware
 from .openapi_generator import generate_openapi_spec, generate_class_openapi_spec
 from .arazzo_generator import generate_arazzo_spec, generate_class_arazzo_spec
@@ -42,12 +48,17 @@ from .tenants_session_routes import router as tenants_session_router
 from .browse_public_routes import router as browse_public_router
 from .spec_import_routes import router as spec_import_router
 from .access_routes import router as access_router, platform_router as access_platform_router
+from .mock_routes import router as mock_router, data_router as mock_data_router
+
+# Configure structured JSON logging before anything else logs, so every line (including library
+# loggers) is emitted in the consistent observability shape (RC1-3.2, #3617).
+configure_logging(log_level=settings.effective_log_level, json_output=settings.log_json)
 
 # Create FastAPI app
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.62"
+    version="1.0.64"
 )
 
 
@@ -100,6 +111,78 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Observability middleware is added last so it is the OUTERMOST layer (#3617): it assigns the
+# request id and binds the structured-log context before any other middleware or handler runs, and
+# observes the final status/latency of every response — including those produced by CORS and the
+# rate limiter — for the metrics surface and access log.
+app.add_middleware(ObservabilityMiddleware)
+
+_error_log = get_logger("app.errors")
+
+
+def _request_id_of(request: Request) -> Optional[str]:
+    """Pull the correlation id the observability middleware stashed on the request (if any)."""
+    return getattr(request.state, "request_id", None)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    """Wrap HTTP errors (404/403/401/4xx raised via HTTPException) in the consistent envelope.
+
+    ``detail`` is preserved verbatim so existing clients/tests keep working; an ``error`` object and
+    top-level ``request_id`` are added for uniform, diagnosable error reporting.
+    """
+    message = exc.detail if isinstance(exc.detail, str) else "Request failed"
+    envelope = build_error_envelope(
+        status_code=exc.status_code,
+        message=message,
+        detail=exc.detail,
+        error_type="http_error",
+        request_id=_request_id_of(request),
+    )
+    return JSONResponse(status_code=exc.status_code, content=envelope, headers=getattr(exc, "headers", None))
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Return 422 validation errors in the consistent envelope, preserving FastAPI's ``detail`` list."""
+    envelope = build_error_envelope(
+        status_code=422,
+        message="Request validation failed",
+        detail=jsonable_encoder(exc.errors()),
+        error_type="validation_error",
+        request_id=_request_id_of(request),
+    )
+    return JSONResponse(status_code=422, content=envelope)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Last-resort handler: log the full exception with its request id and return a safe 500 envelope.
+
+    This is the "error tracking" half of observability — an unexpected failure is logged with a
+    stack trace correlated to the ``request_id`` (so it is diagnosable from logs), while the client
+    receives a generic message that never leaks internal details.
+    """
+    request_id = _request_id_of(request)
+    _error_log.bind(request_id=request_id).exception(
+        "unhandled_exception", path=request.url.path, method=request.method
+    )
+    envelope = build_error_envelope(
+        status_code=500,
+        message="Internal server error",
+        detail="Internal server error",
+        error_type="internal_error",
+        request_id=request_id,
+    )
+    # An unhandled exception propagates past the observability middleware, so its header injection is
+    # skipped — set the correlation header here so the 500 response still carries it (the middleware
+    # already set it on every non-500 response).
+    headers = {settings.request_id_header: request_id} if request_id else None
+    return JSONResponse(status_code=500, content=envelope, headers=headers)
+
 # Include routers (browse_public_router first for unauthenticated /v1/browse/* routes;
 # data_router next so /v1/data/* is matched before any generic patterns)
 app.include_router(browse_public_router)
@@ -130,6 +213,12 @@ app.include_router(spec_import_router)
 app.include_router(tenant_repositories_router)
 app.include_router(access_router)
 app.include_router(access_platform_router)
+# Mock Server (#3615): tenant-scoped management plane, then the public data plane catch-all.
+app.include_router(mock_router)
+app.include_router(mock_data_router)
+# Observability & ops (#3617): liveness/readiness probes + platform-admin ops dashboard.
+app.include_router(health_router)
+app.include_router(ops_router)
 
 
 _webhook_delivery_task: asyncio.Task | None = None
@@ -947,15 +1036,4 @@ async def get_class_jsonschema_spec(
 
     # Default to JSON
     return JSONResponse(content=jsonschema_spec)
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    try:
-        # Try to connect to database
-        db.connect()
-        return {"status": "healthy", "database": "connected"}
-    except Exception as e:
-        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
 
