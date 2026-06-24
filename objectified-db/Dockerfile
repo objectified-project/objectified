@@ -13,6 +13,14 @@ RUN npm install && npm run build
 
 FROM node:20-bookworm-slim
 
+# postgresql-client supplies pg_dump / pg_restore, which the `backup` command group shells out to
+# for full-cluster (`backup create --full`) and full-restore operations. Without it those commands
+# fail at runtime, so the production deploy (docs/runbooks/PRODUCTION_DEPLOY.md) — which runs
+# scheduled backups from this very image — would have no working full-backup path.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
     NODE_ENV=production

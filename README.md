@@ -73,6 +73,15 @@ Every newly created tenant (self-signup, admin panel, or `objectified-db tenants
 routine. See [`objectified-db/README.md`](objectified-db/README.md) and
 [`docs/runbooks/BACKUP_AND_DR.md`](docs/runbooks/BACKUP_AND_DR.md) for operational details.
 
+### Production deployment
+
+The same compose stack runs in production behind TLS via the
+[`docker-compose.prod.yml`](docker-compose.prod.yml) overlay (Let's Encrypt TLS, fail-closed
+secrets, a gated migration step, and the encrypted backups wired in). The full, reproducible
+fresh-host procedure — including rollback — is in
+[`docs/runbooks/PRODUCTION_DEPLOY.md`](docs/runbooks/PRODUCTION_DEPLOY.md); copy
+[`docker-compose.prod.env.example`](docker-compose.prod.env.example) to `.env` to configure it.
+
 ## LLMs Used
 
 LLMs are used in conjunction with development.  They do not replace development, they simply augment the
