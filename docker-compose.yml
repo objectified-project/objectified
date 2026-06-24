@@ -15,7 +15,10 @@
 
 services:
   postgres:
-    image: postgres:16-bookworm
+    # pgvector/pgvector ships Postgres 16 with the `vector` extension preinstalled, which the
+    # schema requires (V001 `CREATE EXTENSION vector`; embedding columns/HNSW indexes in V062/V102).
+    # Plain `postgres:16-bookworm` lacks it and fails the first migration.
+    image: pgvector/pgvector:pg16-bookworm
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-objectified_local_dev}
@@ -78,8 +81,10 @@ services:
   # publish / browse / export through this service (the same endpoints the UI calls).
   rest:
     build:
-      context: ./objectified-rest
-      dockerfile: Dockerfile
+      # Repo root context so the Dockerfile can pull in the objectified-ui workspace (the
+      # spec-import worker runs as a tsx script from objectified-ui).
+      context: .
+      dockerfile: objectified-rest/Dockerfile
     ports:
       - "${OBJECTIFIED_REST_HTTP_PORT:-8000}:8000"
     environment:

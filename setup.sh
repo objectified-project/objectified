@@ -231,6 +231,11 @@ prompt REST_PORT "REST API port" "8000"
 prompt REST_RELOAD "Enable auto-reload (True/False)" "$DEFAULT_REST_RELOAD"
 DEFAULT_REST_BASE_URL="http://localhost:${REST_PORT}/v1"
 prompt NEXT_PUBLIC_REST_API_BASE_URL "REST API base URL (client-facing)" "$DEFAULT_REST_BASE_URL"
+# The UI calls the REST API under the "/v1" prefix, so ensure the base URL ends with it.
+NEXT_PUBLIC_REST_API_BASE_URL="${NEXT_PUBLIC_REST_API_BASE_URL%/}"
+if [[ "$NEXT_PUBLIC_REST_API_BASE_URL" != */v1 ]]; then
+  NEXT_PUBLIC_REST_API_BASE_URL="${NEXT_PUBLIC_REST_API_BASE_URL}/v1"
+fi
 DEFAULT_OBJECTIFIED_BASE_URL="http://localhost:${REST_PORT}"
 prompt OBJECTIFIED_BASE_URL "CLI REST base URL (no /v1 suffix)" "$DEFAULT_OBJECTIFIED_BASE_URL"
 

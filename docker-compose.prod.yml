@@ -28,10 +28,12 @@
 
 services:
   postgres:
-    # Pin a specific minor for reproducible production builds (the base uses the floating
-    # `16-bookworm`). For a managed database (RDS/Cloud SQL/…), see the runbook: point the app
-    # services at the managed host and drop this service.
-    image: postgres:16.6-bookworm
+    # Pin a specific pgvector release for reproducible production builds (the base uses the floating
+    # `pg16-bookworm`). The `vector` extension is required by the schema (V001 `CREATE EXTENSION
+    # vector`; embedding columns/HNSW indexes in V062/V102), so a plain `postgres:16` image fails the
+    # first migration. For a managed database (RDS/Cloud SQL/…), see the runbook: point the app
+    # services at the managed host (with pgvector enabled) and drop this service.
+    image: pgvector/pgvector:0.8.3-pg16-bookworm
     environment:
       # No dev fallback in production — the deploy fails fast if the password is unset.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your .env (openssl rand -base64 24)}
