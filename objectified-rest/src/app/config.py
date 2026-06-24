@@ -212,6 +212,48 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Observability & error handling (RC1-3.2, #3617). Structured JSON logs, request-id
+    # propagation, in-process request metrics, and an ops dashboard that surfaces backup status.
+    #
+    # log_level     standard logging level name (DEBUG/INFO/WARNING/ERROR/CRITICAL).
+    # log_json      emit one JSON object per log line (production default). Set false for
+    #               human-friendly console output in local development.
+    # request_id_header  inbound/outbound header carrying the per-request correlation id. When a
+    #               client (or upstream proxy) supplies it we reuse the value; otherwise we mint one.
+    log_level: str = Field(
+        default="INFO",
+        validation_alias=AliasChoices("OBJECTIFIED_LOG_LEVEL", "LOG_LEVEL", "log_level"),
+    )
+    log_json: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("OBJECTIFIED_LOG_JSON", "LOG_JSON", "log_json"),
+    )
+    request_id_header: str = Field(
+        default="X-Request-ID",
+        validation_alias=AliasChoices("OBJECTIFIED_REQUEST_ID_HEADER", "request_id_header"),
+    )
+
+    # Backup status surfacing (RC1-3.2 reads RC1-1.3 manifests, #3617/#3613). The ops dashboard
+    # scans this directory for ``*.manifest.json`` sidecars to report the latest backup per scope.
+    # When unset, backup status is reported as "unconfigured" rather than failing.
+    backup_dir: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("OBJECTIFIED_BACKUP_DIR", "backup_dir"),
+    )
+    # A backup older than this many hours is flagged "stale" on the ops dashboard (RPO guard).
+    backup_stale_after_hours: int = Field(
+        default=24,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_BACKUP_STALE_AFTER_HOURS",
+            "backup_stale_after_hours",
+        ),
+    )
+
+    @property
+    def effective_log_level(self) -> int:
+        """Resolve the configured ``log_level`` name to a stdlib logging integer (INFO fallback)."""
+        return getattr(logging, str(self.log_level).strip().upper(), logging.INFO)
+
     @property
     def effective_database_url(self) -> str:
         """Get the database URL, preferring DATABASE_URL over building from components."""

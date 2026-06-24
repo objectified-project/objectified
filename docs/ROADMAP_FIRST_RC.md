@@ -196,10 +196,20 @@ objectified-ui CI now reports coverage; a shared UI↔REST golden-path contract
 (`scripts/golden_path/contract.json`) is verified from both sides; and the class-designer editor
 toolbar gained component tests. See `docs/TESTING.md`.
 
-**3.2 — Observability & error handling** (#3617) · **M** · *blocks RC* · ‖ parallel
+**3.2 — Observability & error handling** (#3617) · **M** · *blocks RC* · ✅ **Done**
 Structured logs (MCP already uses structlog — extend to REST), health/readiness endpoints, error tracking,
 and a minimal ops dashboard (request rate, error rate, latency, backup status). Graceful API error envelopes.
 *Exit:* a failing request is diagnosable from logs/metrics alone; health checks wired into compose/deploy.
+*Delivered:* objectified-rest now emits structured JSON logs via structlog (`app/logging_config.py`)
+with a per-request `request_id` bound for the request's lifetime; an `ObservabilityMiddleware`
+(`app/observability.py`) propagates the id (`X-Request-ID`), records an in-process metrics registry
+(request rate, error rate, latency p50/p95/p99), and logs one access line per request. A consistent
+error envelope (additive over FastAPI's `detail`, with `error`/`request_id`) wraps every 4xx/5xx via
+exception handlers, and an unhandled-exception handler logs the stack trace correlated to the request
+id (error tracking) while returning a safe 500. Liveness (`/livez`), readiness (`/readyz`, DB-checked)
+and the backward-compatible `/health` are wired into `docker-compose` (rest → `/readyz`, mcp → `/health`).
+A platform-admin ops dashboard (`/v1/ops/metrics|backups|status|dashboard`) surfaces those metrics plus
+backup status read from the RC1-1.3 manifests (`app/backup_status.py`). 39 unit/integration tests.
 
 **3.3 — Production deployment story** (#3618) · **M** · *blocks RC* · ‖ parallel
 Promote `docker-compose` to a documented production deploy (TLS, managed Postgres or pinned volume, secrets,
@@ -294,7 +304,6 @@ Created in `objectified-project/objectified` (pack label `roadmap-first-rc`, all
 | #3604 | Epic: RC1 Phase 1 — Access & Trust | 1 |
 | #3605 | Epic: RC1 Phase 2 — Developer Value & First-Run | 2 |
 | #3606 | Epic: RC1 Phase 3 — Release Engineering & Operability | 3 |
-| #3617 | RC1-3.2 — Observability & error handling | 3 |
 | #3618 | RC1-3.3 — Production deployment story | 3 |
 | #3619 | RC1-3.4 — Documentation set (spine + API/MCP/CLI) | 3 |
 | #3607 | Epic: RC1 Phase 4 — Stabilization & Release Gate | 4 |

@@ -5,6 +5,33 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-24
+
+### Added
+- **Observability & error handling (#3617, RC1-3.2)** — production-grade diagnosability for the REST
+  service. Structured JSON logging via `structlog` (`app/logging_config.py`, mirroring the MCP setup)
+  emits one JSON object per line with `timestamp`, `level`, `logger`, `event` and a per-request
+  `request_id` that is bound for the whole request lifetime — so every log line a handler emits is
+  correlated to its request. A new `ObservabilityMiddleware` (`app/observability.py`, installed as the
+  outermost layer) assigns/propagates the id via the `X-Request-ID` header (reusing an upstream value
+  when present), records an in-process metrics registry (total requests, requests/sec, error rate,
+  in-flight gauge, latency p50/p95/p99), and logs one access line per request.
+- **Consistent error envelope** — exception handlers wrap every `4xx`/`5xx` (including
+  `RequestValidationError` and the rate limiter's `429`) in a uniform shape that *preserves* FastAPI's
+  `detail` for backward compatibility while adding an `error` object (`status`/`message`/`type`/
+  `request_id`) and a top-level `request_id`. An unhandled-exception handler logs the full stack trace
+  correlated to the request id (error tracking) and returns a safe generic 500 that never leaks
+  internal details.
+- **Health / readiness probes** — `GET /livez` (liveness, no DB), `GET /readyz` (readiness; `503` when
+  the database is unreachable), and the backward-compatible `GET /health`. Wired into `docker-compose`
+  (the `rest` healthcheck now uses `/readyz`; the `mcp` service gained a `/health` healthcheck).
+- **Minimal ops dashboard** (platform-admin only) — `GET /v1/ops/metrics`, `/v1/ops/backups`,
+  `/v1/ops/status`, and a dependency-free HTML `/v1/ops/dashboard`. Backup status is read from the
+  RC1-1.3 backup manifests (`app/backup_status.py`): latest backup per scope, age, and a `stale` flag
+  against the configured RPO window.
+- New settings: `OBJECTIFIED_LOG_LEVEL`, `OBJECTIFIED_LOG_JSON`, `OBJECTIFIED_REQUEST_ID_HEADER`,
+  `OBJECTIFIED_BACKUP_DIR`, `OBJECTIFIED_BACKUP_STALE_AFTER_HOURS`.
+
 ## [1.3.0] - 2026-06-23
 
 ### Added

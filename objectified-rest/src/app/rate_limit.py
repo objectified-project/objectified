@@ -35,9 +35,11 @@ from starlette.responses import JSONResponse, Response
 
 from .config import settings
 
-# Paths never rate limited: liveness/health, the root banner, and the
+# Paths never rate limited: liveness/readiness/health probes, the root banner, and the
 # interactive API docs / schema.
-_EXEMPT_PATHS = frozenset({"/", "/health", "/docs", "/redoc", "/openapi.json"})
+_EXEMPT_PATHS = frozenset(
+    {"/", "/health", "/livez", "/readyz", "/docs", "/redoc", "/openapi.json"}
+)
 
 # Top-level ``/v1`` areas whose second path segment is NOT a tenant slug, so we
 # do not mis-key their requests onto a bogus "tenant" bucket. Everything else
@@ -181,9 +183,21 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         if not allowed:
             headers["Retry-After"] = str(retry_after)
+            # Use the consistent error envelope (#3617) so a throttled caller gets the same shape as
+            # every other REST error, including the request id for correlation. ``detail`` is kept
+            # for backward compatibility.
+            from .observability import build_error_envelope  # local import avoids a cycle
+
+            detail_message = "Rate limit exceeded. Slow down and retry later."
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Rate limit exceeded. Slow down and retry later."},
+                content=build_error_envelope(
+                    status_code=429,
+                    message=detail_message,
+                    detail=detail_message,
+                    error_type="rate_limited",
+                    request_id=getattr(request.state, "request_id", None),
+                ),
                 headers=headers,
             )
 
