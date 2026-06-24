@@ -226,10 +226,12 @@ and a fresh-host runbook with rollback and a managed-Postgres variant in
 [`docs/runbooks/PRODUCTION_DEPLOY.md`](runbooks/PRODUCTION_DEPLOY.md). `objectified-db`'s runtime image now
 bundles `postgresql-client` so its `backup`/`restore` (pg_dump/pg_restore) commands work in-container.
 
-**3.4 — Documentation set** (#3619) · **M** · ‖ parallel
+**3.4 — Documentation set** (#3619) · **M** · ‖ parallel · ✅ **done**
 User guide for the spine, API reference (the REST app already serves Swagger UI — publish it), MCP setup,
 CLI reference. Keep it lean; depth can grow post-RC.
 *Exit:* each spine capability has a "how do I…" page; MCP/CLI quick-starts exist.
+*Shipped:* [`docs/guide/`](guide/README.md) — a how-to page per spine capability, an API-reference page
+(Swagger UI at `/docs`), and CLI + MCP quick-starts.
 
 ---
 
@@ -263,7 +265,7 @@ Public RC1 ships only when **all** of these are true:
 - [ ] Spine has integration/component test coverage gating merges (3.1).
 - [ ] Logs/metrics/health checks make a failure diagnosable; backup status visible (3.2).
 - [x] Production deploy reproducible from a clean host with a rollback path (3.3).
-- [ ] Spine user guide + API/MCP/CLI references published (3.4).
+- [x] Spine user guide + API/MCP/CLI references published (3.4).
 - [ ] Beta bug burn-down complete; no Critical/High open (4.2).
 
 ---
@@ -314,7 +316,6 @@ Created in `objectified-project/objectified` (pack label `roadmap-first-rc`, all
 | #3604 | Epic: RC1 Phase 1 — Access & Trust | 1 |
 | #3605 | Epic: RC1 Phase 2 — Developer Value & First-Run | 2 |
 | #3606 | Epic: RC1 Phase 3 — Release Engineering & Operability | 3 |
-| #3619 | RC1-3.4 — Documentation set (spine + API/MCP/CLI) | 3 |
 | #3607 | Epic: RC1 Phase 4 — Stabilization & Release Gate | 4 |
 | #3620 | RC1-4.1 — Private beta / dogfood | 4 |
 | #3621 | RC1-4.2 — Bug burn-down | 4 |
