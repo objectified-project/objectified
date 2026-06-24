@@ -69,6 +69,10 @@ USER appuser
 ENV PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
     NODE_ENV=production \
+    # The worker runs with cwd "/", so tsx can't auto-discover objectified-ui/tsconfig.json;
+    # point it there explicitly so the workspace path aliases (@/* -> ./src/*, @lib/* -> ./lib/*)
+    # used by the import lib chain resolve.
+    TSX_TSCONFIG_PATH=/objectified-ui/tsconfig.json \
     # Pin the spec-import worker invocation (resolver's #1 choice) so it does not depend on
     # yarn/npm being on PATH or on workspace .bin symlink hoisting. cwd for this override is the
     # repo root ("/"): node resolves the bare `tsx` loader from /node_modules, and tsx resolves
