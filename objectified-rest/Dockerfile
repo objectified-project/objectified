@@ -39,9 +39,14 @@ WORKDIR /app
 # user up front so the workspace copies below can be chowned in a single layer.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libpq5 \
-      nodejs \
+      libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 1000 appuser
+
+# Node.js runtime for the tsx spec-import worker. Copy the binary from the Node build stage
+# (a real /usr/local/bin/node) rather than relying on Debian's nodejs package, whose layout
+# (e.g. /usr/bin/nodejs vs /usr/bin/node) broke the worker's `#!/usr/bin/env node` shebang.
+COPY --from=uideps /usr/local/bin/node /usr/local/bin/node
 
 # Python dependencies (requirements.txt + extras from pyproject.toml)
 COPY objectified-rest/requirements.txt .
@@ -65,9 +70,10 @@ ENV PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
     NODE_ENV=production \
     # Pin the spec-import worker invocation (resolver's #1 choice) so it does not depend on
-    # yarn/npm being on PATH. cwd for this override is the repo root ("/"); tsx resolves the
-    # script's relative imports against /objectified-ui and its tsconfig paths.
-    SPEC_IMPORT_WORKER_ARGV='["/objectified-ui/node_modules/.bin/tsx","objectified-ui/scripts/rest-spec-import-worker.ts"]'
+    # yarn/npm being on PATH or on workspace .bin symlink hoisting. cwd for this override is the
+    # repo root ("/"): node resolves the bare `tsx` loader from /node_modules, and tsx resolves
+    # the worker's relative imports against /objectified-ui and its tsconfig paths.
+    SPEC_IMPORT_WORKER_ARGV='["node","--import","tsx","objectified-ui/scripts/rest-spec-import-worker.ts"]'
 
 EXPOSE 8000
 
