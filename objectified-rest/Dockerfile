@@ -14,7 +14,6 @@ RUN corepack enable
 # Root workspace metadata + every workspace manifest: yarn needs the whole graph to resolve,
 # even though we only install (focus) the objectified-ui workspace below.
 COPY package.json yarn.lock .yarnrc.yml ./
-COPY .yarn/ ./.yarn/
 COPY objectified-cli/package.json ./objectified-cli/package.json
 COPY objectified-db/package.json ./objectified-db/package.json
 COPY objectified-mcp/package.json ./objectified-mcp/package.json
