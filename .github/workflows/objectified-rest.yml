@@ -40,7 +40,10 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: ./objectified-rest
+          # Repo-root context: the Dockerfile bundles the objectified-ui workspace (tsx
+          # spec-import worker) alongside the Python app.
+          context: .
+          file: objectified-rest/Dockerfile
           push: true
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
