@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import {
+  checkLoginRateLimit,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from '@lib/auth/login-rate-limit';
+
+/** Resolve a best-effort client IP for rate-limiting the super-admin password form. */
+function clientRateLimitKey(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  const ip = forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
+  return `admin:${ip}`;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +26,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Brute-force protection: throttle repeated failures from the same client IP.
+    const rateLimitKey = clientRateLimitKey(request);
+    const limit = checkLoginRateLimit(rateLimitKey);
+    if (limit.blocked) {
+      const retryAfter = Math.ceil(limit.retryAfterMs / 1000);
+      return NextResponse.json(
+        { error: 'Too many failed attempts. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+      );
+    }
+
     if (password === adminPassword) {
+      recordLoginSuccess(rateLimitKey);
+
       // Create a cookie to store admin authentication
       const cookieStore = await cookies();
 
@@ -31,6 +56,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ success: true });
     } else {
+      recordLoginFailure(rateLimitKey);
       return NextResponse.json(
         { error: 'Invalid password' },
         { status: 401 }

@@ -8,6 +8,7 @@ import json
 import logging
 import yaml
 
+from .config import settings
 from .database import db, Database
 from .openapi_generator import generate_openapi_spec, generate_class_openapi_spec
 from .arazzo_generator import generate_arazzo_spec, generate_class_arazzo_spec
@@ -81,13 +82,13 @@ def custom_openapi() -> Dict[str, Any]:
 
 app.openapi = custom_openapi
 
+# CORS allow-list is configuration-driven (OBJECTIFIED_CORS_ALLOWED_ORIGINS /
+# OBJECTIFIED_CORS_ALLOWED_ORIGIN_REGEX) so production can lock origins down without a code
+# change; defaults preserve local dev ports + *.objectified.dev. See app/config.py.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Next.js default port
-        "http://localhost:3001",  # Next.js when 3000 is taken
-    ],
-    allow_origin_regex=r"https://.*\.objectified\.dev",  # Allow all *.objectified.dev subdomains
+    allow_origins=settings.cors_allowed_origins_list,
+    allow_origin_regex=settings.effective_cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -133,6 +134,8 @@ async def startup_event():
     """Connect to database on startup."""
     db.connect()
     _startup_log = logging.getLogger("uvicorn.error")
+    # Fail fast in production if the JWT secret is missing (refuses the insecure default).
+    settings.effective_jwt_secret
     try:
         db.ensure_system_change_report_template()
     except Exception as e:

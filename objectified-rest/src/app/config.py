@@ -1,7 +1,23 @@
+import logging
 from typing import Optional
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+# Insecure development-only JWT secret. Used (with a warning) when no secret is configured
+# outside production; production fails closed instead — see Settings.effective_jwt_secret.
+INSECURE_JWT_SECRET_FALLBACK = "your-secret-key-here"
+
+# Default CORS allow-list applied when OBJECTIFIED_CORS_ALLOWED_ORIGINS is unset.
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",  # Next.js default port
+    "http://localhost:3001",  # Next.js when 3000 is taken
+]
+
+# Default CORS origin regex applied when OBJECTIFIED_CORS_ALLOWED_ORIGIN_REGEX is unset.
+DEFAULT_CORS_ORIGIN_REGEX = r"https://.*\.objectified\.dev"
 
 
 class Settings(BaseSettings):
@@ -19,11 +35,42 @@ class Settings(BaseSettings):
     port: int = 8000
     reload: bool = True
 
+    # Deployment environment. "production"/"prod" enables fail-closed checks (e.g. the JWT
+    # secret must be configured — no insecure built-in fallback). Defaults to development.
+    app_env: str = Field(
+        default="development",
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_ENV",
+            "APP_ENV",
+            "ENVIRONMENT",
+            "app_env",
+        ),
+    )
+
     # JWT settings (should match NextAuth secret)
     # Can be set via JWT_SECRET or NEXTAUTH_SECRET env var
     jwt_secret: Optional[str] = None
     nextauth_secret: Optional[str] = None
     jwt_algorithm: str = "HS256"
+
+    # CORS allow-list. Comma-separated exact origins via OBJECTIFIED_CORS_ALLOWED_ORIGINS
+    # (defaults to the local Next.js dev ports). A regex for trusted subdomains is supplied
+    # via OBJECTIFIED_CORS_ALLOWED_ORIGIN_REGEX (defaults to *.objectified.dev); set it to an
+    # empty string to disable subdomain matching entirely.
+    cors_allowed_origins: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_CORS_ALLOWED_ORIGINS",
+            "cors_allowed_origins",
+        ),
+    )
+    cors_allowed_origin_regex: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_CORS_ALLOWED_ORIGIN_REGEX",
+            "cors_allowed_origin_regex",
+        ),
+    )
 
     # Embedding (Ollama) for data_snapshot vectorization
     ollama_base_url: str = "http://localhost:11434"
@@ -93,9 +140,56 @@ class Settings(BaseSettings):
         return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
     @property
+    def is_production(self) -> bool:
+        """True when running in a production-like environment (fail-closed checks on)."""
+        return self.app_env.strip().lower() in {"production", "prod"}
+
+    @property
     def effective_jwt_secret(self) -> str:
-        """Get the JWT secret, preferring NEXTAUTH_SECRET over JWT_SECRET."""
-        return self.nextauth_secret or self.jwt_secret or "your-secret-key-here"
+        """
+        Get the JWT secret, preferring NEXTAUTH_SECRET over JWT_SECRET.
+
+        Fail-closed in production: if neither secret is configured we refuse to fall back
+        to the insecure built-in default (which would let anyone forge JWTs). In
+        development the well-known default is returned with a warning so local setups
+        keep working.
+
+        Raises:
+            RuntimeError: in production when no JWT secret is configured.
+        """
+        secret = self.nextauth_secret or self.jwt_secret
+        if secret:
+            return secret
+        if self.is_production:
+            raise RuntimeError(
+                "JWT secret is not configured. Set NEXTAUTH_SECRET (or JWT_SECRET) before "
+                "starting objectified-rest in production; refusing to use the insecure default."
+            )
+        logger.warning(
+            "Using the insecure built-in JWT secret. Set NEXTAUTH_SECRET (or JWT_SECRET) "
+            "for any non-local deployment."
+        )
+        return INSECURE_JWT_SECRET_FALLBACK
+
+    @property
+    def cors_allowed_origins_list(self) -> list[str]:
+        """Exact CORS origins: configured comma-separated list, or the local dev defaults."""
+        if self.cors_allowed_origins:
+            return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
+        return list(DEFAULT_CORS_ORIGINS)
+
+    @property
+    def effective_cors_origin_regex(self) -> Optional[str]:
+        """
+        CORS origin regex: the configured value, or the *.objectified.dev default.
+
+        An explicitly-empty string disables subdomain matching (returns None so the regex
+        is not applied at all).
+        """
+        if self.cors_allowed_origin_regex is None:
+            return DEFAULT_CORS_ORIGIN_REGEX
+        stripped = self.cors_allowed_origin_regex.strip()
+        return stripped or None
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -1,5 +1,11 @@
 import * as helper from '../db/helper';
 import { upsertOauthSignupPending, consumeAuthOneTimeCode } from '../db/oauth-signup';
+import {
+  checkLoginRateLimit,
+  recordLoginFailure,
+  recordLoginSuccess,
+  credentialsRateLimitKey,
+} from './login-rate-limit';
 
 const bcrypt = require('bcrypt');
 
@@ -157,25 +163,33 @@ export const credentialsAuthorize = async (credentials: ICredentials) => {
     return null;
   }
 
+  // Brute-force protection: refuse the attempt (without touching the DB or hashing)
+  // once this account has accumulated too many recent failures. See login-rate-limit.ts.
+  const rateLimitKey = credentialsRateLimitKey(email);
+  if (rateLimitKey && checkLoginRateLimit(rateLimitKey).blocked) {
+    console.warn(`[credentialsAuthorize] Login temporarily locked for ${email} (too many failed attempts)`);
+    return null;
+  }
+
   const results = await helper.getUserByEmail(email);
 
   if (results.rowCount > 0) {
     const userResult = results.rows[0];
     const hashPassword = userResult.password;
 
-    if (userResult.password) {
-      if (bcrypt.compareSync(password, hashPassword)) {
-        delete userResult.password;
-
-        return userResult;
+    if (userResult.password && bcrypt.compareSync(password, hashPassword)) {
+      delete userResult.password;
+      if (rateLimitKey) {
+        recordLoginSuccess(rateLimitKey);
       }
-
-      return null;
-    } else {
-      return null;
+      return userResult;
     }
   }
 
+  // No user, no stored password, or a bad password — all count as a failed attempt.
+  if (rateLimitKey) {
+    recordLoginFailure(rateLimitKey);
+  }
   return null;
 };
 

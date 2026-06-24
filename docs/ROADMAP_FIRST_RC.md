@@ -110,10 +110,15 @@ to it. ‖ parallel with 0.3.
 `--min-grade` CI gate); UI server-backed per-version quality badge + lint report dialog
 (`VersionLintBadge`, `/api/projects/[projectId]/versions/[versionId]/lint` proxy).
 
-**0.3 — Auth & secret hardening pass** (#3610) · **M** · *blocks RC* · ‖ parallel
+**0.3 — Auth & secret hardening pass** (#3610) · **M** · *blocks RC* · ‖ parallel · ✅ **Done**
 Token lifetimes/refresh, API-key scope audit, CORS, secret handling in compose/env (`docker-compose.env.example`
 reviewed), brute-force/lockout on login. No new authz model yet — that's 1.1.
 *Exit:* documented auth model; no plaintext secrets in repo/images; pen-test-style checklist passed.
+*Delivered:* [`docs/security/AUTH_MODEL.md`](security/AUTH_MODEL.md) (tokens/keys/scopes/expiry, CORS, secrets)
+and [`docs/security/RC1_HARDENING_CHECKLIST.md`](security/RC1_HARDENING_CHECKLIST.md); in-memory login
+brute-force limiter (`objectified-ui/lib/auth/login-rate-limit.ts`) wired into credential + super-admin login;
+configuration-driven REST CORS allow-list and a fail-closed production JWT secret (`objectified-rest/src/app/config.py`,
+`main.py`); secret audit (only placeholder `.env` templates tracked, real `.env` git-ignored).
 
 ---
 
@@ -259,7 +264,6 @@ Created in `objectified-project/objectified` (pack label `roadmap-first-rc`, all
 | Issue | Title | Phase |
 |---|---|---|
 | #3603 | Epic: RC1 Phase 0 — Prove the Spine & Stop the Bleeding | 0 |
-| #3610 | RC1-0.3 — Auth & secret hardening pass | 0 |
 | #3604 | Epic: RC1 Phase 1 — Access & Trust | 1 |
 | #3611 | RC1-1.1 — Granular RBAC + platform-admin plane | 1 |
 | #3612 | RC1-1.2 — Security review + per-tenant rate limiting | 1 |
