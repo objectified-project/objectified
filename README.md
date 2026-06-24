@@ -82,6 +82,13 @@ fresh-host procedure — including rollback — is in
 [`docs/runbooks/PRODUCTION_DEPLOY.md`](docs/runbooks/PRODUCTION_DEPLOY.md); copy
 [`docker-compose.prod.env.example`](docker-compose.prod.env.example) to `.env` to configure it.
 
+## Documentation
+
+The [**User Guide**](docs/guide/README.md) covers the spine end to end — a "how do I…" page per
+capability (import, edit classes & paths, lint, cut a version, publish, browse, export), plus the
+**API reference** (the REST app's interactive Swagger UI at `/docs`) and **CLI** and **MCP**
+quick-starts.
+
 ## LLMs Used
 
 LLMs are used in conjunction with development.  They do not replace development, they simply augment the

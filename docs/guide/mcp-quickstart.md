@@ -1,0 +1,99 @@
+# MCP setup quick-start
+
+The Objectified **MCP server** exposes your **published OpenAPI specs** to MCP hosts (Claude Desktop,
+IDEs, automation). It is **read-only**: it lists, searches, and returns published documents and
+fragments. Anonymous callers see **public** specs; a valid **MCP API key** additionally unlocks
+**in-scope private** specs for its tenant.
+
+Full reference: [`objectified-mcp/README.md`](../../objectified-mcp/README.md) and
+[`objectified-mcp/docs/CONFIGURATION.md`](../../objectified-mcp/docs/CONFIGURATION.md).
+
+---
+
+## 1. Get an MCP API key (optional, for private specs)
+
+Create an MCP-type key in the UI under **Dashboard → API keys** (`/ade/dashboard/api-keys`). Keys are
+stored hashed and can be scoped to specific tenants/projects. You can skip this if you only need
+public specs.
+
+## 2. Connect a host
+
+The server speaks two transports. For connecting to an already-running Objectified, **streamable
+HTTP** is the simplest.
+
+### Streamable HTTP (recommended)
+
+The server's MCP endpoint is `http://<host>:8765/mcp` (default port **8765**). Point your host at
+that URL and pass the key as a bearer token:
+
+```
+URL:     http://localhost:8765/mcp
+Header:  Authorization: Bearer <your-mcp-api-key>
+```
+
+Liveness check (no auth, no DB): `GET http://localhost:8765/health`.
+
+### stdio (local / self-hosted)
+
+For hosts that launch the server as a subprocess. The server connects **directly to Postgres**, so
+it needs the database URL and an internal secret:
+
+```jsonc
+// Claude Desktop — claude_desktop_config.json
+{
+  "mcpServers": {
+    "objectified": {
+      "command": "uv",
+      "args": ["run", "objectified-mcp", "serve", "--transport", "stdio"],
+      "env": {
+        "OBJECTIFIED_MCP_DATABASE_URL": "postgresql://user:pass@localhost:5432/objectified",
+        "OBJECTIFIED_MCP_INTERNAL_SECRET": "<16+ character secret>"
+      }
+    }
+  }
+}
+```
+
+With stdio, the API key (if any) is passed per call in the JSON-RPC `_meta` (e.g. `api_key`), not as
+an HTTP header.
+
+## 3. Run the server yourself (for HTTP transport)
+
+```bash
+cd objectified-mcp
+uv sync
+uv run objectified-mcp serve --transport http --host 0.0.0.0 --port 8765
+```
+
+Required env (see `objectified-mcp/.env.example`): `OBJECTIFIED_MCP_DATABASE_URL`,
+`OBJECTIFIED_MCP_INTERNAL_SECRET` (≥16 chars). Host/port default to `127.0.0.1:8765` and can be set
+with `OBJECTIFIED_MCP_HTTP_HOST` / `OBJECTIFIED_MCP_HTTP_PORT`. The local `docker compose up` already
+brings the MCP server up on `:8765`.
+
+## Tools available to the host
+
+| Tool | What it returns |
+|---|---|
+| `ping` | Service name, version, DB reachability, timestamp |
+| `spec.list` | Published specs (public; + in-scope private with a key) |
+| `project.list` | Distinct projects visible to the caller |
+| `spec.list_my_specs` | Specs for the authenticated key only |
+| `spec.describe` | Metadata for one spec revision |
+| `spec.get_openapi` | Full OpenAPI 3.1 JSON for a revision |
+| `spec.export_yaml` | The same document as YAML |
+| `spec.list_operations` / `spec.describe_operation` | Operation index / one operation's fragments |
+| `spec.list_components` / `spec.describe_component` | Component index / one component definition |
+| `spec.search` | Full-text search over public specs |
+| `spec.search_semantic` | Semantic search (needs `OBJECTIFIED_MCP_OPENAI_API_KEY`) |
+| `spec.list_tags` | Distinct public tags with counts |
+
+## Verify
+
+Call `ping` from your host — it returns the service version and confirms Postgres reachability. Then
+`spec.list` should return the published specs (including the seeded `petstore-sample` if you loaded
+the dev seed). This is the same query the [Golden Path](../GOLDEN_PATH.md) runs as its final step.
+
+## Related
+
+- [publish-a-version.md](publish-a-version.md) — only published specs are visible over MCP
+- [browse-published-specs.md](browse-published-specs.md) — the same catalog, in the UI
