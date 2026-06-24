@@ -951,7 +951,7 @@ wheels = [
 
 [[package]]
 name = "objectified-mcp"
-version = "0.1.28"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "bcrypt" },
@@ -998,7 +998,7 @@ dev = [
 
 [[package]]
 name = "objectified-rest"
-version = "1.0.63"
+version = "1.6.0"
 source = { editable = "../objectified-rest" }
 dependencies = [
     { name = "bcrypt" },
@@ -1007,6 +1007,7 @@ dependencies = [
     { name = "email-validator" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "jsonschema" },
     { name = "numpy" },
     { name = "pgvector" },
     { name = "psycopg2-binary" },
@@ -1016,6 +1017,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "pyyaml" },
+    { name = "structlog" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1028,6 +1030,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
+    { name = "jsonschema", specifier = ">=4.21.0" },
     { name = "numpy", specifier = ">=2.4.2" },
     { name = "pgvector", specifier = ">=0.4.2" },
     { name = "psycopg2-binary", specifier = ">=2.9.9" },
@@ -1036,10 +1039,12 @@ requires-dist = [
     { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "requests", marker = "extra == 'dev'", specifier = ">=2.31.0" },
+    { name = "structlog", specifier = ">=24.4.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.31.0" },
 ]
 provides-extras = ["dev"]
@@ -1049,6 +1054,7 @@ dev = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.23.0" },
+    { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "requests", specifier = ">=2.31.0" },
 ]
 

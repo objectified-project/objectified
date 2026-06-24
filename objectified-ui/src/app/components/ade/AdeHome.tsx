@@ -28,7 +28,7 @@ import WhatsNewDialog from './WhatsNewDialog';
 
 const APP_BUILD_LABEL = process.env.NEXT_PUBLIC_APP_BUILD_LABEL?.trim();
 const APP_VERSION_BADGE =
-  APP_BUILD_LABEL && APP_BUILD_LABEL.length > 0 ? APP_BUILD_LABEL : `v${packageJson.version}`;
+  APP_BUILD_LABEL && APP_BUILD_LABEL.length > 0 ? APP_BUILD_LABEL : `v${packageJson.version} RC`;
 
 type AppCardConfig = {
   id: string;
