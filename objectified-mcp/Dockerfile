@@ -19,6 +19,13 @@ COPY objectified-mcp/uv.lock /build/objectified-mcp/uv.lock
 COPY objectified-mcp/src /build/objectified-mcp/src
 
 WORKDIR /build/objectified-mcp
+
+# Build the virtualenv at the SAME absolute path it will occupy in the runtime stage
+# (/app/.venv). uv bakes that path into the generated console-script shebangs
+# (e.g. .venv/bin/objectified-mcp -> #!/app/.venv/bin/python); building under the default
+# /build/objectified-mcp/.venv and copying it to /app/.venv leaves a dangling shebang, so
+# `objectified-mcp` fails at runtime with "exec ... no such file or directory".
+ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --compile-bytecode --no-editable
 
@@ -30,7 +37,7 @@ RUN useradd --create-home --uid 1000 --shell /usr/sbin/nologin mcp \
 
 WORKDIR /app
 
-COPY --from=builder --chown=mcp:mcp /build/objectified-mcp/.venv /app/.venv
+COPY --from=builder --chown=mcp:mcp /app/.venv /app/.venv
 
 USER mcp
 
