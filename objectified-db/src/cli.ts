@@ -413,7 +413,21 @@ apiKeysCmd
 // ───────────────────────────── backup ────────────────────────────
 const backupCmd = program
   .command("backup")
-  .description("Create, list, restore, prune, and drill database backups (logical + PITR)");
+  .description("Dump, create, list, restore, prune, and drill database backups (logical + PITR)");
+
+backupCmd
+  .command("dump")
+  .description("Dump the database to a dated .sql file; store only a diff vs. the prior day's backup when one exists")
+  .option("--out <dir>", "Backup directory (env: OBJECTIFIED_BACKUP_DIR; default ./backups)")
+  .option("--full", "Force a full dump even when a prior-day backup exists", false)
+  .action(async (opts, cmd: Command) => {
+    const g = cmd.optsWithGlobals() as GlobalOpts;
+    await backup.runBackupDump(
+      connectionOf(g),
+      { outDir: opts.out, full: Boolean(opts.full) },
+      modeOf(g),
+    );
+  });
 
 backupCmd
   .command("create")

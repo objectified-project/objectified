@@ -154,6 +154,8 @@ Each backup writes the (encrypted) artifact plus a plaintext `*.manifest.json` s
 scope, size, SHA-256 integrity, encryption status, recovery-point marker, and row counts.
 
 ```
+backup dump   [--out <dir>] [--full]        Dump the DB to a dated .sql file; when a prior-day
+                                            backup exists, write only the diff vs. that day
 backup create [--tenant <slug|id>] [--project <slug|id>] [--full]
               [--out <dir>] [--offsite <dir>] [--encrypt-key-file <path>]
               [--require-encryption]        Create a backup (logical or pg_dump)
@@ -200,6 +202,40 @@ objectified-db backup drill --rto-target-minutes 30 --rpo-target-minutes 60
 Scheduling uses [`scripts/backup/scheduled-backup.sh`](./scripts/backup/scheduled-backup.sh)
 (`full` | `tenant <slug>` | `project <tenant> <proj>`), which always encrypts and then prunes per
 the retention policy — see the runbook for cron examples.
+
+### Daily plain-SQL dumps with diffs (`backup dump`)
+
+`backup dump` is a simpler, self-contained path for routine daily dumps: it runs
+`pg_dump --format=plain` and writes a dated file under `OBJECTIFIED_BACKUP_DIR` (or `--out`).
+
+- The first run (or any `--full` run) writes a **full** dump: `backup-YYYY-MM-DD.sql`.
+- When a backup for an earlier day already exists, the run instead writes only the **unified
+  diff** from that prior day's state to the fresh dump: `backup-YYYY-MM-DD.sql.patch`. This is the
+  standard incremental scheme — a full dump of a real database is large; a day's changes are tiny.
+
+```bash
+export OBJECTIFIED_BACKUP_DIR=/var/backups/objectified
+
+# Day 1 → full dump (backup-2026-06-22.sql)
+objectified-db backup dump
+# Day 2 → only the diff vs. day 1 (backup-2026-06-23.sql.patch)
+objectified-db backup dump
+# Force a fresh full dump regardless of prior days:
+objectified-db backup dump --full
+```
+
+**Restore** a given day by starting from the most recent full dump and applying each later
+`.patch` in date order with the standard `patch` tool:
+
+```bash
+cp backup-2026-06-22.sql restored.sql           # latest full ≤ target day
+patch restored.sql backup-2026-06-23.sql.patch  # apply each later day's diff, in order
+psql -d objectified_restore -f restored.sql      # load into a fresh database
+```
+
+> Requires `pg_dump` and GNU `diff`/`patch` on `PATH`. Note that PostgreSQL 17+ emits a random
+> `\restrict`/`\unrestrict` token in every plain dump, so an "unchanged" day still produces a small
+> (≈1 KB) diff; this is expected and harmless.
 
 ### Docker
 

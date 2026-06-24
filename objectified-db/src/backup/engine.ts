@@ -309,11 +309,18 @@ export async function loadDataset(
 
 // ──────────────────────────── pg_dump (full) ──────────────────────────
 
+/** Options controlling the `pg_dump` archive format. */
+export type PgDumpFormat = "custom" | "plain";
+
 /** Build the `pg_dump` argument vector and environment from connection options. */
-export function pgDumpInvocation(opts: ConnectionOptions): { args: string[]; env: NodeJS.ProcessEnv } {
+export function pgDumpInvocation(
+  opts: ConnectionOptions,
+  format: PgDumpFormat = "custom",
+): { args: string[]; env: NodeJS.ProcessEnv } {
   const cfg = buildPgConfig(opts);
-  // Custom format (-Fc) is compressed and restorable with pg_restore.
-  const args = ["--format=custom", "--no-owner", "--no-privileges"];
+  // Custom format (-Fc) is compressed and restorable with pg_restore; plain is a portable .sql
+  // script that diffs cleanly line-by-line (used by `backup dump`).
+  const args = [`--format=${format}`, "--no-owner", "--no-privileges"];
   const env: NodeJS.ProcessEnv = { ...process.env };
   if (cfg.connectionString) {
     args.push(`--dbname=${cfg.connectionString}`);
@@ -328,8 +335,11 @@ export function pgDumpInvocation(opts: ConnectionOptions): { args: string[]; env
 }
 
 /** Run `pg_dump` and return the archive bytes. Surfaces a friendly error if pg_dump is absent. */
-export async function runPgDump(opts: ConnectionOptions): Promise<Buffer> {
-  const { args, env } = pgDumpInvocation(opts);
+export async function runPgDump(
+  opts: ConnectionOptions,
+  format: PgDumpFormat = "custom",
+): Promise<Buffer> {
+  const { args, env } = pgDumpInvocation(opts, format);
   try {
     const { stdout } = await execFileAsync("pg_dump", args, {
       env,
