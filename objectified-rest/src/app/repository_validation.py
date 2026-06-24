@@ -12,6 +12,8 @@ from urllib.parse import quote, urlparse
 
 import httpx
 
+from .ssrf_guard import SSRFError, build_guarded_client, validate_url
+
 _logger = logging.getLogger(__name__)
 
 UA = "Objectified-RepositoryRegistration/1.0"
@@ -95,7 +97,12 @@ def parse_gitlab_project_path(url: str) -> tuple[str, str] | None:
     path = path.strip("/")
     if path.count("/") < 1:
         return None
-    origin = f"{u.scheme}://{u.host}"
+    # Reconstruct the origin from the parsed host (urlparse exposes ``hostname``,
+    # not ``host``), preserving an explicit port for self-hosted GitLab.
+    netloc = u.hostname or ""
+    if u.port:
+        netloc = f"{netloc}:{u.port}"
+    origin = f"{u.scheme}://{netloc}"
     return origin, quote(path, safe="")
 
 
@@ -195,7 +202,15 @@ def validate_public_clone_url(clone_url: str) -> dict:
     gl = parse_gitlab_project_path(url)
     if gl:
         api_origin, enc_path = gl
-        with httpx.Client(timeout=_HTTP_TIMEOUT, headers={"User-Agent": UA}) as client:
+        # The GitLab API origin is derived from the tenant-supplied host (any host
+        # containing "gitlab"), so vet it against the SSRF guard and use the
+        # guarded client before reaching out — unlike GitHub/Bitbucket above,
+        # which target hardcoded api.* hosts (#3612).
+        try:
+            validate_url(api_origin)
+        except SSRFError as exc:
+            raise ValueError(str(exc)) from exc
+        with build_guarded_client(timeout=_HTTP_TIMEOUT, headers={"User-Agent": UA}) as client:
             api_url = f"{api_origin}/api/v4/projects/{enc_path}"
             r = client.get(api_url)
         if r.status_code == 200:
@@ -218,9 +233,18 @@ def validate_public_clone_url(clone_url: str) -> dict:
             raise ValueError("GitLab returned 404 — project may not exist or may be private.")
         raise ValueError(f"GitLab API error: HTTP {r.status_code}")
 
-    with httpx.Client(timeout=_HTTP_TIMEOUT, headers={"User-Agent": UA}) as client:
+    # Generic (non-provider) URL: this hits an arbitrary tenant-supplied host, so
+    # vet it against the SSRF guard before connecting and re-validate redirects
+    # via the guarded client (#3612).
+    try:
+        validate_url(url)
+    except SSRFError as exc:
+        raise ValueError(str(exc)) from exc
+    with build_guarded_client(timeout=_HTTP_TIMEOUT, headers={"User-Agent": UA}) as client:
         try:
             _try_head_or_get(client, url)
+        except SSRFError as exc:
+            raise ValueError(str(exc)) from exc
         except httpx.RequestError as exc:
             _logger.debug("generic clone URL check failed: %s", exc)
             raise ValueError("could not reach this URL (network error or timeout).") from exc

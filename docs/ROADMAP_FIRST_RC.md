@@ -131,10 +131,13 @@ and a **central permission guard** replacing ad-hoc `_assert_tenant_admin` check
 platform-admin from tenant-admin. Member lifecycle (invite/suspend/offboard) UI.
 *Depends on:* 0.3. *Exit:* every mutating route is permission-checked; matrix editable in UI; audit log of grants.
 
-**1.2 — Security review of the branch/surface** (#3612) · **M** · *blocks RC* · ‖ parallel with 1.1 tail
+**1.2 — Security review of the branch/surface** (#3612) · **M** · *blocks RC* · ‖ parallel with 1.1 tail · ✅ **Done**
 Run `/security-review`; address authz bypass, injection, SSRF (import-from-URL, repo refresh), file-upload,
 and multi-tenant data-isolation findings. Add per-tenant rate limiting on public + auth endpoints.
 *Exit:* no High/Critical findings open; rate limits enforced; isolation tests pass.
+*Shipped:* SSRF guard (`app/ssrf_guard.py`) on import-from-URL + public-repo registration (generic + GitLab
+branches), per-tenant rate-limit middleware (`app/rate_limit.py`), and a fixed GitLab-branch host-controlled
+SSRF surfaced by the review. Tenant-isolation auth tests pass.
 
 **1.3 — Backup & DR baseline** (#3613) · **M** · *blocks RC; gap #3*
 Implement the `backup/` mockup at MVP depth: scheduled logical backups (tenant + project scope), encrypted
@@ -265,7 +268,6 @@ Created in `objectified-project/objectified` (pack label `roadmap-first-rc`, all
 |---|---|---|
 | #3603 | Epic: RC1 Phase 0 — Prove the Spine & Stop the Bleeding | 0 |
 | #3604 | Epic: RC1 Phase 1 — Access & Trust | 1 |
-| #3612 | RC1-1.2 — Security review + per-tenant rate limiting | 1 |
 | #3613 | RC1-1.3 — Backup & disaster-recovery baseline | 1 |
 | #3605 | Epic: RC1 Phase 2 — Developer Value & First-Run | 2 |
 | #3614 | RC1-2.1 — Onboarding, sample project & starter templates | 2 |

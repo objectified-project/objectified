@@ -10,6 +10,7 @@ import yaml
 
 from .config import settings
 from .database import db, Database
+from .rate_limit import RateLimitMiddleware
 from .openapi_generator import generate_openapi_spec, generate_class_openapi_spec
 from .arazzo_generator import generate_arazzo_spec, generate_class_arazzo_spec
 from .jsonschema_generator import generate_jsonschema_spec, generate_class_jsonschema_spec
@@ -46,7 +47,7 @@ from .access_routes import router as access_router, platform_router as access_pl
 app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
-    version="1.0.61"
+    version="1.0.62"
 )
 
 
@@ -82,6 +83,10 @@ def custom_openapi() -> Dict[str, Any]:
 
 
 app.openapi = custom_openapi
+
+# Per-tenant rate limiting (#3612). Added before CORS so CORS ends up the
+# outermost middleware and its headers are applied to 429 responses too.
+app.add_middleware(RateLimitMiddleware)
 
 # CORS allow-list is configuration-driven (OBJECTIFIED_CORS_ALLOWED_ORIGINS /
 # OBJECTIFIED_CORS_ALLOWED_ORIGIN_REGEX) so production can lock origins down without a code
