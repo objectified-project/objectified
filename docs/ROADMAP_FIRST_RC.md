@@ -211,10 +211,20 @@ and the backward-compatible `/health` are wired into `docker-compose` (rest → 
 A platform-admin ops dashboard (`/v1/ops/metrics|backups|status|dashboard`) surfaces those metrics plus
 backup status read from the RC1-1.3 manifests (`app/backup_status.py`). 39 unit/integration tests.
 
-**3.3 — Production deployment story** (#3618) · **M** · *blocks RC* · ‖ parallel
+**3.3 — Production deployment story** (#3618) · **M** · *blocks RC* · ‖ parallel · ✅ **Done**
 Promote `docker-compose` to a documented production deploy (TLS, managed Postgres or pinned volume, secrets,
 backups from 1.3 wired in, migration step gated). Reproducible from a clean host.
 *Exit:* documented deploy runbook produces a working stack on a fresh environment; rollback documented.
+*Delivered:* a [`docker-compose.prod.yml`](../docker-compose.prod.yml) overlay (Caddy TLS terminator with
+automatic Let's Encrypt, host-exposed ports reduced to 80/443, fail-closed secrets via compose
+required-variable syntax + `OBJECTIFIED_ENV=production`, the dev seed parked behind a `dev-only` profile,
+RC1-1.3 encrypted backups wired into an `ops`-profile service whose volume REST reads for the RC1-3.2 ops
+dashboard, and `restart: unless-stopped`); a **gated** migration step (the `migrate` profile + app services no
+longer depend on it, so schema is previewed/backed-up/applied deliberately);
+[`docker-compose.prod.env.example`](../docker-compose.prod.env.example) and [`deploy/Caddyfile`](../deploy/Caddyfile);
+and a fresh-host runbook with rollback and a managed-Postgres variant in
+[`docs/runbooks/PRODUCTION_DEPLOY.md`](runbooks/PRODUCTION_DEPLOY.md). `objectified-db`'s runtime image now
+bundles `postgresql-client` so its `backup`/`restore` (pg_dump/pg_restore) commands work in-container.
 
 **3.4 — Documentation set** (#3619) · **M** · ‖ parallel
 User guide for the spine, API reference (the REST app already serves Swagger UI — publish it), MCP setup,
@@ -252,7 +262,7 @@ Public RC1 ships only when **all** of these are true:
 - [ ] New user reaches a published, browsable spec in < 10 min via onboarding + sample (2.1).
 - [ ] Spine has integration/component test coverage gating merges (3.1).
 - [ ] Logs/metrics/health checks make a failure diagnosable; backup status visible (3.2).
-- [ ] Production deploy reproducible from a clean host with a rollback path (3.3).
+- [x] Production deploy reproducible from a clean host with a rollback path (3.3).
 - [ ] Spine user guide + API/MCP/CLI references published (3.4).
 - [ ] Beta bug burn-down complete; no Critical/High open (4.2).
 
@@ -304,7 +314,6 @@ Created in `objectified-project/objectified` (pack label `roadmap-first-rc`, all
 | #3604 | Epic: RC1 Phase 1 — Access & Trust | 1 |
 | #3605 | Epic: RC1 Phase 2 — Developer Value & First-Run | 2 |
 | #3606 | Epic: RC1 Phase 3 — Release Engineering & Operability | 3 |
-| #3618 | RC1-3.3 — Production deployment story | 3 |
 | #3619 | RC1-3.4 — Documentation set (spine + API/MCP/CLI) | 3 |
 | #3607 | Epic: RC1 Phase 4 — Stabilization & Release Gate | 4 |
 | #3620 | RC1-4.1 — Private beta / dogfood | 4 |
