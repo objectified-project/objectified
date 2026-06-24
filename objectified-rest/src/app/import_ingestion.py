@@ -21,6 +21,7 @@ import yaml
 
 from .repository_file_scan import fetch_github_repository_file_text
 from .repository_validation import parse_github_owner_repo_from_url
+from .ssrf_guard import SSRFError, build_guarded_client, validate_url
 
 # Source intake methods the pipeline understands.
 VALID_SOURCE_METHODS = {"paste", "file", "url", "git"}
@@ -121,9 +122,16 @@ def _fetch_url_text(url: str, *, max_bytes: int) -> str:
     if scheme not in ("http", "https"):
         raise IngestionError("URL ingestion supports only http/https URLs")
 
+    # SSRF guard: reject internal/metadata targets before connecting (#3612).
+    # ``build_guarded_client`` re-validates every redirect hop as well.
+    try:
+        validate_url(url.strip())
+    except SSRFError as exc:
+        raise IngestionError(str(exc))
+
     headers = {"User-Agent": _UA, "Accept": "application/json, application/yaml, text/plain, */*"}
     try:
-        with httpx.Client(timeout=_HTTP_TIMEOUT, follow_redirects=True) as client:
+        with build_guarded_client(timeout=_HTTP_TIMEOUT, follow_redirects=True) as client:
             with client.stream("GET", url, headers=headers) as resp:
                 if resp.status_code >= 400:
                     raise IngestionError(
@@ -140,6 +148,9 @@ def _fetch_url_text(url: str, *, max_bytes: int) -> str:
                         raise IngestionError(
                             f"Source document exceeds the {max_bytes}-byte ingestion limit"
                         )
+    except SSRFError as exc:
+        # A redirect hop pointed at a non-public address (caught by the guard hook).
+        raise IngestionError(str(exc))
     except httpx.HTTPError as exc:
         raise IngestionError(f"Failed to fetch URL: {exc}")
 

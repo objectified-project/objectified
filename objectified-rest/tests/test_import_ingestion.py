@@ -102,6 +102,16 @@ def test_fetch_url_rejects_non_http_scheme():
         import_ingestion._fetch_url_text("ftp://example.com/x", max_bytes=1000)
 
 
+def test_fetch_url_rejects_internal_address_ssrf():
+    # SSRF guard (#3612): a URL resolving to the cloud metadata IP must be
+    # rejected before any connection is attempted.
+    from app import ssrf_guard
+
+    with patch.object(ssrf_guard, "_resolve_host_ips", lambda host: ["169.254.169.254"]):
+        with pytest.raises(IngestionError, match="non-public"):
+            import_ingestion._fetch_url_text("http://metadata.internal/", max_bytes=1000)
+
+
 # ===========================================================================
 # ingest_source — git
 # ===========================================================================

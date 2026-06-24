@@ -120,6 +120,54 @@ class Settings(BaseSettings):
         ),
     )
 
+    # SSRF guard (#3612). When False (default), user-supplied URLs fetched by the
+    # import-from-URL and public repository-registration paths are resolved and
+    # rejected if they point at non-public addresses (loopback, RFC1918,
+    # link-local incl. the 169.254.169.254 metadata IP, etc.). Set to True only
+    # for local development where importing from localhost is intentional; the
+    # http/https-only and no-credentials-in-URL checks always apply.
+    ssrf_allow_private: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_SSRF_ALLOW_PRIVATE",
+            "ssrf_allow_private",
+        ),
+    )
+
+    # Per-tenant rate limiting (#3612). The limiter buckets requests per API key
+    # / tenant slug / client IP and enforces a fixed window. Authenticated
+    # traffic (API key or Authorization header) uses the higher limit; public
+    # traffic uses the lower one. Set ``OBJECTIFIED_RATE_LIMIT_ENABLED=false`` to
+    # disable entirely. Limits are per replica (in-process counter).
+    rate_limit_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_RATE_LIMIT_ENABLED",
+            "rate_limit_enabled",
+        ),
+    )
+    rate_limit_authenticated_per_minute: int = Field(
+        default=600,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_RATE_LIMIT_AUTHENTICATED_PER_MINUTE",
+            "rate_limit_authenticated_per_minute",
+        ),
+    )
+    rate_limit_public_per_minute: int = Field(
+        default=120,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_RATE_LIMIT_PUBLIC_PER_MINUTE",
+            "rate_limit_public_per_minute",
+        ),
+    )
+    rate_limit_window_seconds: int = Field(
+        default=60,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_RATE_LIMIT_WINDOW_SECONDS",
+            "rate_limit_window_seconds",
+        ),
+    )
+
     # Global auto-refresh kill switch (RAR-3.3, #3524). When False, the refresh
     # sweep halts entirely (no repository is auto-refreshed) regardless of per-repo
     # auto_refresh_enabled. Intended for incident response. Manual "Refresh Now"

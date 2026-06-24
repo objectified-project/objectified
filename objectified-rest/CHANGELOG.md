@@ -5,6 +5,34 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-06-23
+
+### Added
+- **SSRF guard for user-supplied URL fetches (#3612)** — a new `app/ssrf_guard.py` vets every URL
+  the import-from-URL and public repository-registration paths fetch: http/https only, no embedded
+  credentials, and DNS resolution with rejection of any non-public address (loopback, RFC1918,
+  link-local incl. the `169.254.169.254` metadata IP, multicast, reserved, unspecified — IPv4 and
+  IPv6 including IPv4-mapped). Installed as an httpx request event hook so each redirect hop is
+  re-validated, closing redirect-based bypasses. Applied to `import_ingestion._fetch_url_text`, the
+  generic-URL branch of `repository_validation.validate_public_clone_url`, and the GitLab branch
+  (whose API origin is derived from the tenant-supplied host). Set
+  `OBJECTIFIED_SSRF_ALLOW_PRIVATE=true` to disable IP filtering for local development.
+- **Per-tenant rate limiting (#3612)** — a new `app/rate_limit.py` middleware buckets requests by
+  API key (hashed) → tenant slug (from the path) → client IP, enforcing a configurable fixed window.
+  Authenticated traffic uses the higher limit, public traffic the lower; over-limit requests get
+  `429` with `Retry-After`, and every response carries `X-RateLimit-{Limit,Remaining,Reset}`.
+  Configurable via `OBJECTIFIED_RATE_LIMIT_ENABLED` (default on),
+  `OBJECTIFIED_RATE_LIMIT_AUTHENTICATED_PER_MINUTE` (default 600),
+  `OBJECTIFIED_RATE_LIMIT_PUBLIC_PER_MINUTE` (default 120), and
+  `OBJECTIFIED_RATE_LIMIT_WINDOW_SECONDS` (default 60). `/health` and the docs are exempt. Limits
+  are per replica (in-process counter); a shared store is the path to multi-replica enforcement.
+
+### Fixed
+- **GitLab clone-URL SSRF + crash (#3612)** — `parse_gitlab_project_path` built its API origin from
+  `urlparse(...).host` (nonexistent attribute; raised `AttributeError`) and the GitLab branch
+  fetched the tenant-controlled host with an unguarded client. Now reconstructs the origin from
+  `hostname`/`port` and routes the fetch through the SSRF guard.
+
 ## [1.0.26] - 2026-06-23
 
 ### Added
