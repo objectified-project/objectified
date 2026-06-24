@@ -27,6 +27,7 @@ import {
   describeRetention,
   type RetentionPolicy,
 } from "../backup/retention.js";
+import { createDumpBackup, realDumpDeps } from "../backup/dump.js";
 
 /** Build a filesystem-safe, sortable backup id from scope + timestamp. */
 function makeBackupId(
@@ -266,5 +267,38 @@ export async function runBackupDrill(
   if (result.summary.result === "fail") {
     process.exitCode = 1;
     note("Drill FAILED: restored state did not verify.");
+  }
+}
+
+export type DumpOptions = {
+  outDir?: string;
+  full?: boolean;
+};
+
+/**
+ * `backup dump` — write a dated plain-SQL dump, or, when a prior-day backup exists, only the
+ * unified diff from that prior state to the new dump.
+ */
+export async function runBackupDump(
+  conn: ConnectionOptions,
+  opts: DumpOptions,
+  mode: OutputMode,
+): Promise<void> {
+  const dir = opts.outDir ?? defaultBackupDir();
+  const result = await createDumpBackup(dir, realDumpDeps(conn), {
+    now: new Date(),
+    force: Boolean(opts.full),
+  });
+
+  if (mode.json) {
+    printRecord(mode, { dir, ...result });
+    return;
+  }
+  if (result.kind === "full") {
+    note(`Full backup written: ${result.path} (${result.bytes} bytes).`);
+  } else {
+    note(`Incremental backup written: ${result.path} (${result.bytes} bytes).`);
+    note(`  diff from prior day ${result.priorDate} → ${result.date}.`);
+    note(`  restore: apply patches in date order onto the latest full (see README).`);
   }
 }
