@@ -2055,13 +2055,52 @@ class Database:
             SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
                    p.enabled, p.metadata, p.change_report_template_version_id, p.created_at, p.updated_at,
                    p.deleted_at,
-                   u.name as creator_name, u.email as creator_email
+                   u.name as creator_name, u.email as creator_email,
+                   qs.quality_score, qs.quality_grade
             FROM odb.projects p
             LEFT JOIN odb.users u ON p.creator_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT v.quality_score, v.quality_grade
+                FROM odb.versions v
+                WHERE v.project_id = p.id AND v.deleted_at IS NULL
+                ORDER BY v.created_at DESC NULLS LAST, v.id DESC
+                LIMIT 1
+            ) qs ON TRUE
             WHERE p.tenant_id = %s {deleted_filter}
             {order_clause}
         """
         return self.execute_query(query, (tenant_id,))
+
+    def set_version_quality_score(
+        self,
+        version_record_id: str,
+        tenant_id: str,
+        score: int,
+        grade: str,
+        report_fingerprint: Optional[str] = None,
+    ) -> bool:
+        """Persist the captured quality/lint score onto a revision (#3609 follow-up).
+
+        Scoped to ``tenant_id`` via the owning project so a caller cannot write a score onto another
+        tenant's revision. Returns True when a row was updated.
+        """
+        query = """
+            UPDATE odb.versions v
+            SET quality_score = %s,
+                quality_grade = %s,
+                quality_report_fingerprint = %s,
+                updated_at = CURRENT_TIMESTAMP
+            FROM odb.projects p
+            WHERE v.id = %s
+              AND v.project_id = p.id
+              AND p.tenant_id = %s
+              AND v.deleted_at IS NULL
+            RETURNING v.id
+        """
+        rows = self.execute_query(
+            query, (score, grade, report_fingerprint, version_record_id, tenant_id)
+        )
+        return bool(rows)
 
     def get_project_by_id(
         self, project_id: str, tenant_id: str, *, include_deleted: bool = False

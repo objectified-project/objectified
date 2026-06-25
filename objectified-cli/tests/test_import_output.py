@@ -119,6 +119,29 @@ def test_emit_import_result_human_shows_ids_and_counts() -> None:
     assert "Errors:" not in output
 
 
+def test_emit_import_result_human_shows_flat_spec_import_result() -> None:
+    """The async spec-import result has flat keys (no nested project/version objects).
+
+    Regression: the project slug and version id must still render instead of blank ``()``.
+    """
+    flat = {
+        "project_id": "51600bcd-a740-450b-a339-9ee8a493f10b",
+        "project_slug": "networkmanagementclient",
+        "version_id": "2018-12-01",
+        "version_record_id": "54aa1111-2222-4333-8444-555566667777",
+    }
+    output = _capture_human_output(emit_import_result, flat, json_mode=False)
+
+    assert "Import completed." in output
+    # Project line shows the slug and the project id.
+    assert "Project: (networkmanagementclient) — 51600bcd-a740-450b-a339-9ee8a493f10b" in output
+    # Version line shows the version id and the version record id.
+    assert "Version: 2018-12-01 — 54aa1111-2222-4333-8444-555566667777" in output
+    # Never the empty-slug placeholder.
+    assert "(  )" not in output
+    assert " () " not in output
+
+
 def test_emit_import_result_human_shows_provenance_filename() -> None:
     """Human mode includes the imported source filename when provenance is present."""
     payload = {

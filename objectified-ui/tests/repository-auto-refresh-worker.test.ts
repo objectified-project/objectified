@@ -17,6 +17,8 @@ import { describe, test, expect } from '@jest/globals';
 import {
   AUTO_REFRESH_SOURCE_KIND,
   buildImportJobInput,
+  mapSourceKind,
+  parseSpecDocument,
   resolveImport,
   type StoredImportSpec,
   type WorkerImportPayload,
@@ -172,5 +174,105 @@ describe('Repository auto-refresh spec-faithful re-import (RAR-4.1, #3527)', () 
     const built = buildImportJobInput(autoRefreshPayload());
     expect(built.existingProjectId).toBe('proj-1');
     expect(built.version.versionId).toBe('1.0.1');
+  });
+});
+
+describe('Swagger 2.0 import via the worker (CLI "import auto" → source_kind "swagger-2")', () => {
+  /** The payload the CLI sends for a Swagger 2.0 document detected by `import auto`. */
+  function swagger2Payload(sourceKind = 'swagger-2'): WorkerImportPayload {
+    return {
+      tenant_id: 'tenant-1',
+      user_id: 'user-1',
+      rest_job_id: 'job-swagger2',
+      metadata: {
+        source_kind: sourceKind,
+        project: { name: 'Petstore', slug: 'petstore', description: null },
+        version: { version_id: '1.0.0', description: null },
+      },
+      document_base64: SWAGGER_DOC_B64,
+      filename: 'petstore.json',
+      content_type: 'application/json',
+    };
+  }
+
+  test('mapSourceKind routes the CLI swagger-2 discriminator (and variants) to openapi', () => {
+    for (const kind of ['swagger-2', 'swagger2', 'Swagger-2.0', 'SWAGGER2.0']) {
+      expect(mapSourceKind(kind)).toBe('openapi');
+    }
+  });
+
+  test('mapSourceKind still rejects genuinely unsupported kinds', () => {
+    expect(() => mapSourceKind('raml')).toThrow(/unsupported source_kind/i);
+  });
+
+  test('a Swagger 2.0 document is up-converted to OpenAPI 3.1 before importing', () => {
+    const built = buildImportJobInput(swagger2Payload());
+    expect(built.sourceKind).toBe('openapi');
+    const doc = built.document as {
+      openapi?: string;
+      swagger?: string;
+      definitions?: unknown;
+      components?: { schemas?: Record<string, unknown> };
+    };
+    // Converted to OpenAPI 3.x: schemas now live under components.schemas (where the importer
+    // reads them), not Swagger's definitions.
+    expect(doc.openapi).toMatch(/^3\./);
+    expect(doc.swagger).toBeUndefined();
+    expect(doc.definitions).toBeUndefined();
+    expect(doc.components?.schemas).toHaveProperty('Pet');
+  });
+
+  test('the explicit `swagger` format override also up-converts a Swagger 2.0 body', () => {
+    const built = buildImportJobInput(swagger2Payload('swagger'));
+    const doc = built.document as { components?: { schemas?: Record<string, unknown> } };
+    expect(doc.components?.schemas).toHaveProperty('Pet');
+  });
+
+  test('a YAML body mislabeled as application/json is still parsed as YAML', () => {
+    // The CLI uploads a re-serialized `.yaml` body but defaulted the part to application/json;
+    // parseSpecDocument must not force JSON.parse onto a YAML body.
+    const yaml = 'swagger: "2.0"\ninfo:\n  title: 1Forge\n  version: 0.0.1\n';
+    const parsed = parseSpecDocument(yaml, 'application/json') as { swagger?: string };
+    expect(parsed.swagger).toBe('2.0');
+  });
+
+  test('parseSpecDocument honors explicit and sniffed JSON/YAML correctly', () => {
+    expect((parseSpecDocument('{"openapi":"3.1.0"}', 'application/json') as any).openapi).toBe('3.1.0');
+    expect((parseSpecDocument('{"openapi":"3.1.0"}', null) as any).openapi).toBe('3.1.0');
+    expect((parseSpecDocument('openapi: "3.1.0"\n', null) as any).openapi).toBe('3.1.0');
+    // A JSON body explicitly labeled YAML still parses (YAML is a JSON superset).
+    expect((parseSpecDocument('{"openapi":"3.1.0"}', 'application/yaml') as any).openapi).toBe('3.1.0');
+  });
+
+  test('a Swagger 2.0 YAML file uploaded as application/json imports its schemas end to end', () => {
+    const yaml = [
+      'swagger: "2.0"',
+      'info:',
+      '  title: 1Forge',
+      '  version: 0.0.1',
+      'definitions:',
+      '  Quote:',
+      '    type: object',
+      '    properties:',
+      '      symbol:',
+      '        type: string',
+      '',
+    ].join('\n');
+    const built = buildImportJobInput({
+      tenant_id: 'tenant-1',
+      user_id: 'user-1',
+      rest_job_id: 'job-1forge',
+      metadata: {
+        source_kind: 'swagger-2',
+        project: { name: '1Forge', slug: '1forge', description: null },
+        version: { version_id: '0.0.1', description: null },
+      },
+      document_base64: Buffer.from(yaml, 'utf8').toString('base64'),
+      filename: 'swagger.yaml',
+      content_type: 'application/json',
+    });
+    const doc = built.document as { openapi?: string; components?: { schemas?: Record<string, unknown> } };
+    expect(doc.openapi).toMatch(/^3\./);
+    expect(doc.components?.schemas).toHaveProperty('Quote');
   });
 });

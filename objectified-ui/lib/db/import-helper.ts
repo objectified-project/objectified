@@ -15,6 +15,7 @@ import {
   addPropertyToClassTx,
   getClassesWithPropertiesAndTagsTx,
   getLatestVersionUuidForProjectTx,
+  getProjectIdBySlugTx,
   getVersionUuidForCatalogVersionLineTx,
   listProjectLibraryPropertiesTx,
 } from './import-transaction';
@@ -123,7 +124,10 @@ export interface ImportJobInput {
 }
 
 function isDuplicateCatalogVersionLineError(message: string | undefined): boolean {
-  return Boolean(message && message.includes('A version with this ID already exists in this project'));
+  // Matches the duplicate-version errors from createVersionTx, which now embed the version id and
+  // project slug (e.g. `A version with ID "37" already exists in project "adyen-checkout-api"`) as
+  // well as the legacy phrasing.
+  return Boolean(message && /^A version with .+ already exists/i.test(message));
 }
 
 /** Merge OpenAPI/Swagger `document.info` into project description + projects.metadata (all import entry points). */
@@ -828,7 +832,13 @@ export async function startImport(input: ImportJobInput) {
         if (job.canceled) throw new Error('Import canceled');
         setProgress(job, 'creating-project', 1, 0, input.project.name);
         let projectId: string;
-        const existingInc = input.existingProjectId?.trim();
+        // Reuse an existing project when one is explicitly targeted, or when a project with the same
+        // slug already exists in the tenant (a new version of an existing API). Only a duplicate
+        // project *and* version is rejected — caught at version creation below.
+        const existingInc =
+          input.existingProjectId?.trim() ||
+          (await getProjectIdBySlugTx(client!, input.tenantId, input.project.slug)) ||
+          null;
         if (existingInc) {
           projectId = existingInc;
           emit(job, 'info', 'EXISTING_PROJECT', `Using existing project: ${input.project.name}`, { projectId });
@@ -871,7 +881,7 @@ export async function startImport(input: ImportJobInput) {
                 parentVersionUuidInc
                   ? 'Imported from specification (follow-on revision in same project)'
                   : 'Imported from specification',
-                parentVersionUuidInc ? { parentVersionUuid: parentVersionUuidInc } : undefined
+                { parentVersionUuid: parentVersionUuidInc ?? undefined, projectSlug: input.project.slug }
               ),
             { maxAttempts: 3, initialDelayMs: 500, label: 'createVersion' }
           )
@@ -998,7 +1008,13 @@ export async function startImport(input: ImportJobInput) {
 
       setProgress(job, 'creating-project', 1, 0, input.project.name);
       let projectId: string;
-      const existingTx = input.existingProjectId?.trim();
+      // Reuse an existing project when one is explicitly targeted, or when a project with the same
+      // slug already exists in the tenant (a new version of an existing API). Only a duplicate
+      // project *and* version is rejected — caught at version creation below.
+      const existingTx =
+        input.existingProjectId?.trim() ||
+        (await getProjectIdBySlugTx(client!, input.tenantId, input.project.slug)) ||
+        null;
       if (existingTx) {
         projectId = existingTx;
         emit(job, 'info', 'EXISTING_PROJECT', `Using existing project: ${input.project.name}`, { projectId });
@@ -1043,7 +1059,7 @@ export async function startImport(input: ImportJobInput) {
               parentVersionUuidTx
                 ? 'Imported from specification (follow-on revision in same project)'
                 : 'Imported from specification',
-              parentVersionUuidTx ? { parentVersionUuid: parentVersionUuidTx } : undefined
+              { parentVersionUuid: parentVersionUuidTx ?? undefined, projectSlug: input.project.slug }
             ),
           { maxAttempts: 3, initialDelayMs: 500, label: 'createVersion' }
         )

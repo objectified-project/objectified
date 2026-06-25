@@ -111,6 +111,28 @@ async function runFromPayload(payload: Payload): Promise<void> {
   }
 }
 
+/**
+ * Flush any buffered stdout (the final status line can be large) and exit.
+ *
+ * The worker is a one-shot process: once its final result is on stdout it must exit immediately. The
+ * import opens a database connection pool whose idle connections keep Node alive (pg's default
+ * `idleTimeoutMillis` is ~10s), and on a normal completion `main()` resolves without ever calling
+ * `process.exit`. The REST layer only applies the terminal job status when the worker's stdout reaches
+ * EOF (process exit), so lingering for the pool timeout delayed the CLI's result by ~10s even though
+ * the import itself finished in well under a second. Exiting here removes that delay. We wait for the
+ * stdout buffer to drain first so `process.exit()` cannot truncate a large pending status line.
+ */
+function flushStdoutAndExit(code: number): void {
+  const done = (): void => process.exit(code);
+  if (process.stdout.writableLength === 0) {
+    done();
+    return;
+  }
+  process.stdout.once('drain', done);
+  // Safety net: never hang if 'drain' does not fire.
+  setTimeout(done, 1000).unref();
+}
+
 async function main(): Promise<void> {
   const raw = await readStdin();
   let payload: Payload;
@@ -122,8 +144,10 @@ async function main(): Promise<void> {
   await runFromPayload(payload);
 }
 
-main().catch((err: unknown) => {
-  const message = err instanceof Error ? err.message : String(err);
-  writeWorkerStdoutLine({ ok: false, error: message });
-  process.exit(1);
-});
+main()
+  .then(() => flushStdoutAndExit(0))
+  .catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    writeWorkerStdoutLine({ ok: false, error: message });
+    flushStdoutAndExit(1);
+  });

@@ -194,6 +194,18 @@ def emit_import_result(
         if isinstance(version.get("slug"), str):
             version_slug = version["slug"]
 
+    # The async spec-import result carries flat keys (project_slug, version_id, version_record_id)
+    # rather than nested project/version objects, so fall back to them — otherwise the project slug
+    # and version id render blank.
+    if not project_slug and isinstance(payload.get("project_slug"), str):
+        project_slug = payload["project_slug"]
+    if not version_label and isinstance(payload.get("version_id"), str):
+        version_label = payload["version_id"]
+
+    project_id = payload.get("project_id", "")
+    # Prefer the version's unique record id; fall back to the (possibly semantic) version id.
+    version_ref = payload.get("version_record_id") or payload.get("version_id", "")
+
     if dry_run:
         typer.echo("Dry run completed (no changes written).")
     else:
@@ -205,12 +217,14 @@ def emit_import_result(
         if isinstance(filename, str) and filename.strip():
             typer.echo(f"  Source file: {filename.strip()}")
 
-    typer.echo(
-        f"  Project: {project_name} ({project_slug}) — {payload.get('project_id', '')}",
+    project_label = f"{project_name} ({project_slug})".strip() if project_slug else project_name
+    version_full = (
+        f"{version_label} ({version_slug})".strip()
+        if version_slug and version_slug != version_label
+        else version_label
     )
-    typer.echo(
-        f"  Version: {version_label} ({version_slug}) — {payload.get('version_id', '')}",
-    )
+    typer.echo(f"  Project: {project_label} — {project_id}")
+    typer.echo(f"  Version: {version_full} — {version_ref}")
 
     counts_heading = "Planned entities" if dry_run else "Created entities"
     _emit_created_counts_table(payload.get("created"), heading=counts_heading)

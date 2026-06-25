@@ -23,6 +23,7 @@ const mockCreateClassTx = jest.fn();
 const mockAddPropertyToClassTx = jest.fn();
 const mockGetClassesWithPropertiesAndTagsTx = jest.fn();
 const mockGetLatestVersionUuidForProjectTx = jest.fn(() => Promise.resolve(null));
+const mockGetProjectIdBySlugTx = jest.fn<() => Promise<string | null>>(() => Promise.resolve(null));
 const mockListProjectLibraryPropertiesTx = jest.fn(() => Promise.resolve([]));
 
 // When set, createClassTx will return failure for this class name (simulate one class failing)
@@ -46,6 +47,7 @@ jest.mock('../lib/db/import-transaction', () => ({
   addPropertyToClassTx: (...args: any[]) => mockAddPropertyToClassTx(...args),
   getClassesWithPropertiesAndTagsTx: (...args: any[]) => mockGetClassesWithPropertiesAndTagsTx(...args),
   getLatestVersionUuidForProjectTx: (...args: any[]) => mockGetLatestVersionUuidForProjectTx(...args),
+  getProjectIdBySlugTx: (...args: any[]) => mockGetProjectIdBySlugTx(...args),
   listProjectLibraryPropertiesTx: (...args: any[]) => mockListProjectLibraryPropertiesTx(...args),
 }));
 
@@ -127,6 +129,8 @@ describe('Import Incremental Mode (#730)', () => {
     mockAddPropertyToClassTx.mockReset();
     mockGetClassesWithPropertiesAndTagsTx.mockReset();
     mockGetLatestVersionUuidForProjectTx.mockReset();
+    mockGetProjectIdBySlugTx.mockReset();
+    mockGetProjectIdBySlugTx.mockResolvedValue(null);
     mockListProjectLibraryPropertiesTx.mockReset();
 
     mockGetTransactionClient.mockResolvedValue(mockClient);
@@ -372,6 +376,34 @@ describe('Import Incremental Mode (#730)', () => {
     const versionCalls = mockCreateVersionTx.mock.calls;
     expect(versionCalls.length).toBeGreaterThanOrEqual(1);
     const lastCall = versionCalls[versionCalls.length - 1];
-    expect(lastCall[6]).toEqual({ parentVersionUuid: 'previous-version-uuid' });
+    expect(lastCall[6]).toEqual({
+      parentVersionUuid: 'previous-version-uuid',
+      projectSlug: 'incremental-project',
+    });
+  });
+
+  test('reuses an existing project with the same slug instead of creating a duplicate (new version of an existing API)', async () => {
+    // No existingProjectId is supplied, but a project with this slug already exists in the tenant —
+    // a new API version of an existing project. It must be reused, not rejected.
+    mockGetProjectIdBySlugTx.mockResolvedValue('existing-project-by-slug');
+    mockGetLatestVersionUuidForProjectTx.mockResolvedValue('prev-version-uuid');
+
+    const { startImport, getImportStatus } = await import('../lib/db/import-helper');
+    const { jobId } = await startImport(incrementalInput);
+
+    await waitForJobEnd(getImportStatus, jobId);
+
+    // Looked up by tenant + project slug, and the project was NOT re-created.
+    expect(mockGetProjectIdBySlugTx).toHaveBeenCalledWith(
+      expect.anything(),
+      'tenant-1',
+      'incremental-project'
+    );
+    expect(mockCreateProjectTx).not.toHaveBeenCalled();
+
+    // The new version is created against the reused project.
+    const versionCalls = mockCreateVersionTx.mock.calls;
+    expect(versionCalls.length).toBeGreaterThanOrEqual(1);
+    expect(versionCalls[versionCalls.length - 1][1]).toBe('existing-project-by-slug');
   });
 });

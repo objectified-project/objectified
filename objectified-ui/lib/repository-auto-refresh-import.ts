@@ -19,6 +19,7 @@
 
 import { parse as parseYaml } from 'yaml';
 
+import { convertSwaggerToOpenAPI, isSwagger2 } from '../src/app/utils/swagger-converter';
 import type { ImportJobInput } from './db/import-helper';
 
 /**
@@ -84,17 +85,30 @@ export interface WorkerImportPayload {
  * @param kind the importer kind (`openapi-3`, `arazzo`, …) or resolved format (`swagger`, …).
  * @returns the resolved `openapi` or `arazzo` discriminator.
  * @throws when the kind is not a REST-supported spec import kind.
+ *
+ * Swagger 2.0 (`swagger-2`, the CLI's discriminator from {@link infer_source_kind}) routes to the
+ * `openapi` importer; the Swagger 2.0 document is up-converted to OpenAPI 3.1 in
+ * {@link buildImportJobInput} before the importer sees it.
  */
 export function mapSourceKind(kind: string): ResolvedImportSourceKind {
   const k = kind.trim().toLowerCase();
-  if (k === 'openapi-3' || k === 'openapi3' || k === 'swagger' || k === 'openapi') {
+  if (
+    k === 'openapi-3' ||
+    k === 'openapi3' ||
+    k === 'openapi' ||
+    k === 'swagger' ||
+    k === 'swagger-2' ||
+    k === 'swagger2' ||
+    k === 'swagger-2.0' ||
+    k === 'swagger2.0'
+  ) {
     return 'openapi';
   }
   if (k === 'arazzo') {
     return 'arazzo';
   }
   throw new Error(
-    `Unsupported source_kind "${kind}" for REST import (supported: openapi-3, arazzo).`,
+    `Unsupported source_kind "${kind}" for REST import (supported: openapi-3, swagger-2, arazzo).`,
   );
 }
 
@@ -154,14 +168,21 @@ export function optionsFromRecord(o: Record<string, unknown>): ImportJobInput['o
 export function parseSpecDocument(text: string, contentType?: string | null): unknown {
   const ct = (contentType ?? '').trim().toLowerCase();
   const t = text.trim();
-  if (ct.includes('json')) {
-    return JSON.parse(text) as unknown;
-  }
+  const looksLikeJson = t.startsWith('{') || t.startsWith('[');
+
+  // An explicit YAML hint always wins — and a YAML parser also accepts JSON, so it is safe even if
+  // the body is actually JSON.
   if (ct.includes('yaml') || ct.includes('yml')) {
     return parseYaml(text) as unknown;
   }
+  // Honor a JSON hint only when the body actually looks like JSON. Callers can mislabel the content
+  // type (e.g. the CLI uploads a re-serialized YAML body of a `.yaml` file as `application/json`),
+  // so a non-JSON-looking body falls back to YAML rather than being force-fed to `JSON.parse`.
+  if (ct.includes('json')) {
+    return (looksLikeJson ? JSON.parse(text) : parseYaml(text)) as unknown;
+  }
   // No usable content-type hint: sniff JSON vs YAML from the first token.
-  if (t.startsWith('{') || t.startsWith('[')) {
+  if (looksLikeJson) {
     return JSON.parse(text) as unknown;
   }
   return parseYaml(text) as unknown;
@@ -242,6 +263,20 @@ export function buildImportJobInput(payload: WorkerImportPayload): ImportJobInpu
     document = parseSpecDocument(text, resolved.contentType ?? payload.content_type ?? null);
   } catch (e: unknown) {
     throw new Error(`Could not parse specification document: ${(e as Error)?.message ?? e}`);
+  }
+
+  // Swagger 2.0 (OpenAPI 2.0) is imported through the OpenAPI 3 importer, which reads schemas from
+  // `components.schemas`. A Swagger 2.0 document keeps them under `definitions`, so it must first be
+  // up-converted to OpenAPI 3.1 — exactly what the UI's browser import does via
+  // `convertSwaggerToOpenAPI`. Mirroring it here lets the REST/CLI worker import Swagger 2.0 (the
+  // CLI's `import auto` resolves such documents to `source_kind: "swagger-2"`) instead of producing
+  // an empty import.
+  if (resolved.sourceKind === 'openapi' && isSwagger2(document)) {
+    const conversion = convertSwaggerToOpenAPI(document);
+    if (!conversion.success) {
+      throw new Error(`Swagger 2.0 to OpenAPI 3 conversion failed: ${conversion.error ?? 'unknown error'}`);
+    }
+    document = conversion.document;
   }
 
   const existing = meta.existing_project_id?.trim();

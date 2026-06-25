@@ -19,6 +19,7 @@ from objectified_cli.config import CliSettings
 from objectified_cli.exit_codes import EXIT_ERROR
 from objectified_cli.import_.jobs import (
     DEFAULT_POLL_INTERVAL,
+    _failure_detail,
     format_import_progress,
     wait_for_import_job,
 )
@@ -115,6 +116,96 @@ def test_wait_for_import_job_failed_exits_error(httpx_mock: object) -> None:
             sleep=lambda _seconds: None,
         )
     assert exc_info.value.exit_code == EXIT_ERROR
+
+
+def test_failure_detail_prefers_summary_then_falls_back_to_events() -> None:
+    """summary.message wins; otherwise error-level events are surfaced with their code."""
+    assert (
+        _failure_detail({"summary": {"message": "parse error"}, "events": []})
+        == "parse error"
+    )
+    # The REST engine records worker/import failures in events with no summary.
+    assert (
+        _failure_detail(
+            {
+                "events": [
+                    {"level": "info", "message": "started"},
+                    {"level": "error", "code": "WORKER_FAILED", "message": "boom"},
+                ]
+            }
+        )
+        == "[WORKER_FAILED] boom"
+    )
+    # An error event without a code is surfaced verbatim.
+    assert (
+        _failure_detail({"events": [{"level": "error", "message": "no code here"}]})
+        == "no code here"
+    )
+    # Nothing usable -> None (caller prints a bare "Import failed.").
+    assert _failure_detail({"state": "failed"}) is None
+    assert _failure_detail({"events": [{"level": "info", "message": "fyi"}]}) is None
+
+
+def test_wait_for_import_job_failed_surfaces_event_error(
+    httpx_mock: object, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A failure carried only in events (no summary) still reaches the user on stderr."""
+    httpx_mock.add_response(
+        url="http://localhost:8000/v1/tenants/acme-corp/imports/job-3",
+        json={
+            "state": "failed",
+            "events": [
+                {
+                    "level": "error",
+                    "code": "WORKER_FAILED",
+                    "message": "No importer registered for openapi",
+                }
+            ],
+        },
+    )
+    client = RestClient(CliSettings(), timeout=30.0)
+    with pytest.raises(typer.Exit) as exc_info:
+        wait_for_import_job(
+            client,
+            "acme-corp",
+            "job-3",
+            no_progress=True,
+            sleep=lambda _seconds: None,
+        )
+    assert exc_info.value.exit_code == EXIT_ERROR
+    err = capsys.readouterr().err
+    assert "WORKER_FAILED" in err
+    assert "No importer registered for openapi" in err
+
+
+def test_wait_for_import_job_failure_message_not_glued_to_progress_spinner(
+    httpx_mock: object, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """With progress enabled, the failure message is emitted after the spinner clears, on its own line.
+
+    Regression for the message rendering on top of the spinner line (e.g.
+    "Import running… (0s)Import failed: …").
+    """
+    httpx_mock.add_response(
+        url="http://localhost:8000/v1/tenants/acme-corp/imports/job-4",
+        json={"state": "failed", "summary": {"message": "A project with this slug already exists"}},
+    )
+    client = RestClient(CliSettings(), timeout=30.0)
+    with pytest.raises(typer.Exit):
+        wait_for_import_job(
+            client,
+            "acme-corp",
+            "job-4",
+            no_progress=False,
+            sleep=lambda _seconds: None,
+        )
+    err = capsys.readouterr().err
+    # The message is present and starts a line — never appended after spinner/progress text.
+    assert any(
+        line.strip() == "Import failed: A project with this slug already exists"
+        for line in err.splitlines()
+    ), err
+    assert "running…Import failed" not in err.replace(" ", "")
 
 
 def test_wait_for_import_job_timeout_exits_error() -> None:

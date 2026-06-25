@@ -34,6 +34,41 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 
+
+def _capture_version_quality_score(
+    tenant_slug: str, tenant_id: str, version_record_id: str
+) -> None:
+    """Best-effort: compute and persist the lint/quality score for a freshly imported revision.
+
+    Captured after a completed import so the projects list can surface a score for *every* import
+    source (not only browser-local snapshots, #3609 follow-up). Strictly best-effort: the revision is
+    already committed, so any failure here just leaves the score for an on-demand lint to fill and
+    never affects the import outcome. Imported lazily to avoid a heavy import-time dependency cycle.
+    """
+    try:
+        from .compatibility_engine import openapi_for_revision
+        from .database import db
+        from .schema_lint import lint_openapi_spec
+
+        version = db.get_version_by_id(version_record_id, tenant_id)
+        if not version:
+            return
+        spec = openapi_for_revision(version, tenant_slug, tenant_id)
+        result = lint_openapi_spec(spec)
+        db.set_version_quality_score(
+            version_record_id,
+            tenant_id,
+            result.score,
+            result.grade,
+            result.report_fingerprint,
+        )
+    except Exception:  # noqa: BLE001 - capture is strictly best-effort
+        logger.warning(
+            "Failed to capture quality score for revision %s",
+            version_record_id,
+            exc_info=True,
+        )
+
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 # Path segments relative to the ``objectified-ui`` package (yarn workspace cwd).
 _WORKER_SCRIPT_UI_REL = Path("scripts") / "rest-spec-import-worker.ts"
@@ -446,6 +481,18 @@ async def _drive_job(job_id: str, payload: Dict[str, Any]) -> None:
         rec.state = status.state
         rec.status = status
         rec.commit_response = _maybe_build_commit_response(job_id, status)
+        tenant_slug = rec.tenant_slug
+
+    # Capture the quality/lint score onto the newly imported revision so the projects list can show
+    # it (#3609 follow-up). Done outside the lock, off the event loop (DB-bound), and best-effort.
+    result = status.result
+    version_record_id = getattr(result, "version_record_id", None) if result else None
+    if status.state == "completed" and version_record_id:
+        tenant_id = str(payload.get("tenant_id") or "")
+        if tenant_id:
+            await asyncio.to_thread(
+                _capture_version_quality_score, tenant_slug, tenant_id, version_record_id
+            )
 
 
 def _get_record(tenant_slug: str, job_id: str) -> _JobRecord:

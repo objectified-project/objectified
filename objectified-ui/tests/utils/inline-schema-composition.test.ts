@@ -1,9 +1,50 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   buildSchemaFromInlineProperties,
+  buildStoredInlineSchema,
   validateInlineSchemaCompositions,
 } from '../../lib/utils/inline-schema-utils';
 import { buildResponseForOpenAPI, type ResponseInfo } from '../../lib/utils/openapi-paths-generator';
+
+describe('buildStoredInlineSchema (import persistence)', () => {
+  it('preserves array items and example instead of collapsing to type only', () => {
+    const stored = buildStoredInlineSchema({
+      type: 'array',
+      items: { type: 'string' },
+      example: ['EURUSD', 'GBPJPY', 'AUDUSD'],
+    });
+    expect(stored).toEqual({
+      type: 'array',
+      items: { type: 'string' },
+      example: ['EURUSD', 'GBPJPY', 'AUDUSD'],
+    });
+  });
+
+  it('preserves scalar constraints (format, enum, example)', () => {
+    const stored = buildStoredInlineSchema({
+      type: 'string',
+      format: 'date-time',
+      enum: ['a', 'b'],
+      example: 'a',
+    });
+    expect(stored).toEqual({ type: 'string', format: 'date-time', enum: ['a', 'b'], example: 'a' });
+  });
+
+  it('stores an object with properties in the editor property-array node shape', () => {
+    const stored = buildStoredInlineSchema({
+      type: 'object',
+      properties: { id: { type: 'string' }, count: { type: 'integer' } },
+    }) as { type: string; properties: Array<{ name: string; data: unknown; parent_id: null }> };
+    expect(stored.type).toBe('object');
+    expect(stored.properties.map((p) => p.name)).toEqual(['id', 'count']);
+    expect(stored.properties[0]).toMatchObject({ name: 'id', data: { type: 'string' }, parent_id: null });
+  });
+
+  it('preserves composition keywords (allOf) verbatim', () => {
+    const stored = buildStoredInlineSchema({ allOf: [{ $ref: '#/components/schemas/A' }] });
+    expect(stored).toEqual({ allOf: [{ $ref: '#/components/schemas/A' }] });
+  });
+});
 
 describe('inline schema composition', () => {
   it('validateInlineSchemaCompositions flags multiple combinators', () => {

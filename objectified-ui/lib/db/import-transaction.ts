@@ -84,7 +84,9 @@ export async function createProjectTx(
     );
     return successResponse({ project: result.rows[0] });
   } catch (error: any) {
-    if (error.code === '23505') return errorResponse('A project with this slug already exists in this tenant');
+    if (error.code === '23505') {
+      return errorResponse(`A project with slug "${slug.trim().toLowerCase()}" already exists in this tenant`);
+    }
     if (error.code === '23503') {
       // Foreign key constraint violation
       if (error.constraint === 'projects_tenant_id_fkey') {
@@ -169,7 +171,7 @@ export async function createVersionTx(
   versionId: string,
   description: string,
   changeLog: string,
-  opts?: { parentVersionUuid?: string | null }
+  opts?: { parentVersionUuid?: string | null; projectSlug?: string | null }
 ): Promise<string> {
   try {
     if (!versionId?.trim()) return errorResponse('Version ID is required');
@@ -198,9 +200,40 @@ export async function createVersionTx(
         );
     return successResponse({ version: result.rows[0] });
   } catch (error: any) {
-    if (error.code === '23505') return errorResponse('A version with this ID already exists in this project');
+    if (error.code === '23505') {
+      const version = versionId.trim();
+      const projectSlug = opts?.projectSlug?.trim();
+      return errorResponse(
+        projectSlug
+          ? `A version with ID "${version}" already exists in project "${projectSlug}"`
+          : `A version with ID "${version}" already exists in this project`
+      );
+    }
     return errorResponse(error.message);
   }
+}
+
+/**
+ * Resolve an existing project's id by tenant + slug (case-insensitive, matching createProjectTx's
+ * lowercasing). Used so importing a *new version of an existing API* (same project slug, different
+ * version) reuses the project instead of failing on the unique-slug constraint — only a duplicate
+ * project **and** version is a hard error.
+ */
+export async function getProjectIdBySlugTx(
+  client: PoolClient,
+  tenantId: string,
+  slug: string
+): Promise<string | null> {
+  const normalized = slug?.trim().toLowerCase();
+  if (!normalized) return null;
+  const result = await client.query(
+    `SELECT id FROM odb.projects
+     WHERE tenant_id = $1 AND slug = $2 AND deleted_at IS NULL
+     LIMIT 1`,
+    [tenantId, normalized]
+  );
+  const row = result.rows[0];
+  return row?.id ? (row.id as string) : null;
 }
 
 /** Latest non-deleted revision (versions.id) for a project — used as parent for incremental catalog imports. */

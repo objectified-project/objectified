@@ -308,6 +308,29 @@ describe('OpenAPI Paths Generator', () => {
         items: { type: 'string' },
       });
     });
+
+    it('preserves array items and example on an inline-schema response (#symbols regression)', () => {
+      // The 1Forge /symbols 200 response: `type: array` with `items` + `example`. These must survive
+      // export, not collapse to a bare `type: array`.
+      const response: ResponseInfo = {
+        id: 'resp-symbols',
+        status_code: '200',
+        description: 'A list of symbols',
+        inline_schema: {
+          type: 'array',
+          items: { type: 'string' },
+          example: ['EURUSD', 'GBPJPY', 'AUDUSD'],
+        },
+      };
+
+      const result = buildResponseForOpenAPI(response);
+      const content = result.content as Record<string, { schema: Record<string, unknown> }>;
+      expect(content['application/json'].schema).toEqual({
+        type: 'array',
+        items: { type: 'string' },
+        example: ['EURUSD', 'GBPJPY', 'AUDUSD'],
+      });
+    });
   });
 
   describe('buildOperationForOpenAPI', () => {

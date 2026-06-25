@@ -144,6 +144,9 @@ interface Project {
   creator_name: string;
   creator_email: string;
   metadata?: ProjectMetadata;
+  /** Server-captured quality score of the project's latest revision (#3609), camelCase from REST. */
+  qualityScore?: number | null;
+  qualityGrade?: string | null;
 }
 
 function ProjectsSortTh({
@@ -418,7 +421,14 @@ const Projects = () => {
     for (const p of projects) {
       const qh = projectQualityHistoryMap[p.id] ?? [];
       const last = qh.length > 0 ? qh[qh.length - 1] : null;
-      out[p.id] = last != null ? last.overall : null;
+      // Prefer the browser-local trend's latest score; fall back to the server-captured score so
+      // imports made outside this browser (e.g. the CLI) still sort/score/average correctly (#3609).
+      out[p.id] =
+        last != null
+          ? last.overall
+          : typeof p.qualityScore === 'number'
+            ? p.qualityScore
+            : null;
     }
     return out;
   }, [projects, projectQualityHistoryMap]);
@@ -1206,10 +1216,28 @@ const Projects = () => {
                         const qh = projectQualityHistoryMap[project.id] ?? [];
                         const latest = qh.length > 0 ? qh[qh.length - 1] : null;
                         const tier = latest ? getNumericScoreTier(latest.overall) : null;
+                        const serverScore =
+                          typeof project.qualityScore === 'number' ? project.qualityScore : null;
                         if (!latest) {
+                          if (serverScore === null) {
+                            return (
+                              <span className="text-xs text-gray-400 dark:text-gray-600" title="No quality score captured yet">
+                                —
+                              </span>
+                            );
+                          }
+                          // Server-captured score (e.g. a CLI/server import) with no browser-local
+                          // trend history — show a static badge instead of a sparkline.
+                          const serverTier = getNumericScoreTier(serverScore);
                           return (
-                            <span className="text-xs text-gray-400 dark:text-gray-600" title="No import scores recorded yet in this browser">
-                              —
+                            <span
+                              className={`inline-flex items-center gap-1 text-sm font-semibold tabular-nums leading-none ${serverTier?.textClass ?? ''}`}
+                              title="Quality score captured at import"
+                            >
+                              {serverScore}
+                              {project.qualityGrade ? (
+                                <span className="text-xs font-medium opacity-70">({project.qualityGrade})</span>
+                              ) : null}
                             </span>
                           );
                         }

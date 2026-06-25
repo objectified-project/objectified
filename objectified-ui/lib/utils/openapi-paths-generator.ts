@@ -248,11 +248,14 @@ function resolveInlineSchemaForExport(inline: InlineSchema): Record<string, unkn
     if (inline.maximum !== undefined) schema.maximum = inline.maximum;
     if (inline.enum) schema.enum = inline.enum;
     if (inline.default !== undefined) schema.default = inline.default;
+    if (inline.example !== undefined) schema.example = inline.example;
+    if (inline.examples !== undefined) schema.examples = inline.examples;
     if (inline.type === 'array' && inline.items) {
       if (inline.items.$ref) {
         schema.items = { $ref: inline.items.$ref };
-      } else if (inline.items.type) {
-        schema.items = { type: inline.items.type };
+      } else {
+        // Preserve the full item schema (type plus any constraints), not just its type.
+        schema.items = { ...inline.items };
       }
     }
     return schema;

@@ -6,6 +6,12 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## Bug Fixes
 
+- CLI: Corrected Swagger 2.0 support in auto import mode
+- Import: Corrected import for Swagger responses in paths to capture the schema properly for array items
+- Import: Import speed improved
+- Import: Special cases with unicode characters are now properly handled
+- Import: Better duplication checks - now compares project and version IDs before rejecting
+
 ---
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!

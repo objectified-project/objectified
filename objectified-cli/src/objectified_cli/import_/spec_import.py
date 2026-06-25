@@ -75,13 +75,19 @@ def build_spec_import_json_body(
 
 
 def document_bytes_from_spec(spec: dict[str, Any], *, filename: str | None = None) -> bytes:
-    """Serialize a parsed JSON spec to bytes for upload."""
-    name = (filename or "import.json").lower()
-    if name.endswith((".yaml", ".yml")):
-        from yaml12 import format_yaml
+    """Serialize a parsed spec to **JSON** bytes for upload (never YAML).
 
-        return format_yaml(spec).encode("utf-8")
-    return json.dumps(spec, indent=2).encode("utf-8")
+    The import worker parses the uploaded document with a strict JS YAML reader. Re-serializing a
+    parsed spec back to YAML can emit constructs that reader rejects — e.g. a description line that
+    begins ``- **field**:`` round-trips into an ambiguous block sequence / alias ("A block sequence
+    may not be used as an implicit map key") — even when the *original* document parsed cleanly. JSON
+    is unambiguous, is itself valid YAML, and round-trips through both the JS ``JSON.parse`` and YAML
+    readers. ``default=str`` coerces any non-JSON scalars a YAML loader may have produced (e.g. bare
+    dates) so serialization never fails. ``filename`` is accepted for caller convenience but no longer
+    affects the format.
+    """
+    _ = filename
+    return json.dumps(spec, indent=2, default=str).encode("utf-8")
 
 
 def post_spec_import_json(
@@ -101,6 +107,8 @@ def post_spec_import_multipart(
     filename: str,
     content_type: str = "application/json",
 ) -> Any:
+    # The document is always uploaded as JSON (see document_bytes_from_spec), so the part's content
+    # type is application/json unless a caller explicitly overrides it.
     return client.post(
         api_paths.tenant_imports_upload(tenant_slug),
         data={"metadata": json.dumps(metadata)},

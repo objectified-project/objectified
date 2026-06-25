@@ -27,6 +27,7 @@ jest.mock('../lib/db/import-transaction', () => ({
   addPropertyToClassTx: jest.fn(),
   getClassesWithPropertiesAndTagsTx: jest.fn(),
   getLatestVersionUuidForProjectTx: jest.fn(() => Promise.resolve(null)),
+  getProjectIdBySlugTx: jest.fn(() => Promise.resolve(null)),
   listProjectLibraryPropertiesTx: jest.fn(() => Promise.resolve([])),
 }));
 

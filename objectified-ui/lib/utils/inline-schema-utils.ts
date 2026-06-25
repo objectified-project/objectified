@@ -49,10 +49,40 @@ export interface InlineSchema {
   enum?: (string | number | boolean | null)[];
   // Default value
   default?: unknown;
+  // Illustrative example(s) — preserved for array/scalar inline schemas (#import round-trip)
+  example?: unknown;
+  examples?: unknown;
 }
 
 export interface PropertyTreeNode extends InlineSchemaProperty {
   children: PropertyTreeNode[];
+}
+
+/**
+ * Build the `inline_schema` stored for an inline (non-`$ref`) request/response content schema during
+ * import.
+ *
+ * An `object` schema with a property map is stored in the editor's property-array node shape
+ * (`{ type: 'object', properties: [{ id, name, data, parent_id }] }`). Every other schema — arrays,
+ * scalars, compositions, object-without-properties — is preserved verbatim so constraints such as
+ * `items`, `example`, `format`, `enum`, and composition keywords survive. These were previously
+ * collapsed to `{ type, properties: [] }`, which dropped everything but the type (e.g. a `type: array`
+ * response with `items` + `example` was imported as a bare `type: array`).
+ */
+export function buildStoredInlineSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  const props = (schema as { properties?: unknown }).properties;
+  if (schema.type === 'object' && props && typeof props === 'object' && !Array.isArray(props)) {
+    return {
+      type: 'object',
+      properties: Object.entries(props as Record<string, unknown>).map(([name, propSchema]) => ({
+        id: `prop-${name}`,
+        name,
+        data: propSchema || { type: 'string' },
+        parent_id: null,
+      })),
+    };
+  }
+  return { ...schema };
 }
 
 // =============================================================================

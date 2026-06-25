@@ -1223,6 +1223,10 @@ class ProjectSchema(BaseModel):
         None,
         serialization_alias="changeReportTemplateVersionId",
     )
+    # Captured quality score of the project's latest revision (#3609 follow-up). Populated from the
+    # score persisted onto a revision at import; NULL until a revision has been scored.
+    quality_score: Optional[int] = Field(None, serialization_alias="qualityScore")
+    quality_grade: Optional[str] = Field(None, serialization_alias="qualityGrade")
     creator_name: Optional[str] = None
     creator_email: Optional[str] = None
     created_at: Optional[Union[datetime, str]] = None

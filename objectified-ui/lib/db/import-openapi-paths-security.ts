@@ -8,6 +8,7 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const connectionPool = require('./db');
 import type { ParsedPath, ParsedOperation, ParsedSecurityScheme } from '../../src/app/utils/openapi-import';
+import { buildStoredInlineSchema } from '../utils/inline-schema-utils';
 
 function getRefSchemaName(ref: string | undefined): string | null {
   if (!ref || typeof ref !== 'string') return null;
@@ -179,14 +180,7 @@ export async function importOpenAPIPathsAndSecurity(
             const refName = content.$ref ? getRefSchemaName(content.$ref) : null;
             const classId = refName ? classNameToId.get(refName) ?? null : null;
             const inlineSchema = !content.$ref && content.schema
-              ? (content.schema.type === 'object' && content.schema.properties
-                  ? { type: 'object', properties: Object.entries(content.schema.properties).map(([name, schema]: [string, any]) => ({
-                      id: `prop-${name}`,
-                      name,
-                      data: schema || { type: 'string' },
-                      parent_id: null,
-                    })) }
-                  : { type: (content.schema as any).type || 'object', properties: [] })
+              ? buildStoredInlineSchema(content.schema as Record<string, unknown>)
               : null;
             if (classId || inlineSchema) {
               await client.query(
@@ -225,15 +219,7 @@ export async function importOpenAPIPathsAndSecurity(
               const refName = firstMediaObj?.$ref ? getRefSchemaName(firstMediaObj.$ref) : null;
               classId = refName ? classNameToId.get(refName) ?? null : null;
               if (!firstMediaObj?.$ref && firstMediaObj?.schema) {
-                const s = firstMediaObj.schema as any;
-                inlineSchema = s.type === 'object' && s.properties
-                  ? { type: 'object', properties: Object.entries(s.properties).map(([name, schema]: [string, any]) => ({
-                      id: `prop-${name}`,
-                      name,
-                      data: schema || { type: 'string' },
-                      parent_id: null,
-                    })) }
-                  : { type: s?.type || 'object', properties: [] };
+                inlineSchema = buildStoredInlineSchema(firstMediaObj.schema as Record<string, unknown>);
               } else {
                 inlineSchema = { type: 'object', properties: [] };
               }
@@ -267,14 +253,7 @@ export async function importOpenAPIPathsAndSecurity(
               const refName = mediaObj?.$ref ? getRefSchemaName(mediaObj.$ref) : null;
               const ctClassId = refName ? classNameToId.get(refName) ?? null : null;
               const ctInlineSchema = !mediaObj?.$ref && mediaObj?.schema
-                ? ((mediaObj.schema as any).type === 'object' && (mediaObj.schema as any).properties
-                    ? { type: 'object', properties: Object.entries((mediaObj.schema as any).properties).map(([name, schema]: [string, any]) => ({
-                        id: `prop-${name}`,
-                        name,
-                        data: schema || { type: 'string' },
-                        parent_id: null,
-                      })) }
-                    : { type: (mediaObj.schema as any)?.type || 'object', properties: [] })
+                ? buildStoredInlineSchema(mediaObj.schema as Record<string, unknown>)
                 : { type: 'object', properties: [] };
               const existingContent = await client.query(
                 'SELECT id FROM odb.shared_path_response_content WHERE shared_path_response_id = $1 AND media_type = $2',

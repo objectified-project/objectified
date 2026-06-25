@@ -295,6 +295,7 @@ def _run_openapi_import(
             file_bytes,
             metadata,
             filename=upload_name,
+            content_type="application/json",
         )
         response = post_spec_import_json(client, tenant_slug, body)
     json_mode = json_mode_from_context(ctx)
