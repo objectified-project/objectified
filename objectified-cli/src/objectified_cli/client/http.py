@@ -146,6 +146,40 @@ class RestClient:
         exit_on_api_error(response)
         return response
 
+    def post_raw(
+        self,
+        path: str,
+        *,
+        json: object = None,
+        headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        """Issue POST ``path`` and return the response without exiting on HTTP errors.
+
+        Like :meth:`post`, but the caller inspects the status (e.g. to retry on a
+        recoverable gate). Transport errors still exit the CLI.
+
+        Parameters
+        ----------
+        path:
+            URL path starting with ``/``.
+        json:
+            Optional JSON-serialisable payload; sets ``Content-Type: application/json``.
+        headers:
+            Additional request headers merged with default auth headers.
+
+        Returns
+        -------
+        httpx.Response
+            The HTTP response; transport errors still exit the CLI.
+        """
+        url = f"{self._base_url}{path}"
+        merged_headers = {**self._headers, **(headers or {})}
+        try:
+            with httpx.Client(timeout=self._timeout, verify=self._verify) as client:
+                return client.post(url, json=json, headers=merged_headers)
+        except httpx.RequestError as exc:
+            exit_on_connection_error(exc)
+
     def put(self, path: str, *, json: object = None) -> httpx.Response:
         """Issue PUT ``path`` relative to ``base_url`` and exit on HTTP error.
 

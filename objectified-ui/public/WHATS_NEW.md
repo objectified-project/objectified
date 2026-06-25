@@ -7,11 +7,13 @@ We continue to improve the platform based on your feedback with improvements and
 ## Bug Fixes
 
 - CLI: Corrected Swagger 2.0 support in auto import mode
+- CLI: Adds --force option to import so that warnings do not prevent publication
 - Import: Corrected import for Swagger responses in paths to capture the schema properly for array items
-- Import: Import speed improved
+- Import: Import speed greatly improved
 - Import: Special cases with unicode characters are now properly handled
 - Import: Better duplication checks - now compares project and version IDs before rejecting
 - Import: Fixes publish flag when importing via CLI
+- Import: Publish uses short note via description, title, or slug and version if not provided
 
 ---
 

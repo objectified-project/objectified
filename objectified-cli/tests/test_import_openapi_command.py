@@ -25,7 +25,10 @@ _VALID_SPEC = {
 
 _IMPORT_RESULT = {
     "project_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    "version_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    # Mirrors REST SpecImportCommitResponse: ``version_id`` is the semver label,
+    # ``version_record_id`` is the version record UUID that publish must address.
+    "version_id": "1.0.0",
+    "version_record_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     "project": {
         "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         "tenant_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
@@ -449,13 +452,14 @@ def test_import_openapi_help_lists_flags() -> None:
     assert "--project-id" in help_text
     assert "--publish" in help_text
     assert "--visibility" in help_text
+    assert "--force" in help_text
     assert "--wait" in help_text
     assert "--poll-interval" in help_text
 
 
 _PUBLISH_URL = (
     "http://localhost:8000/v1/versions/acme-corp/"
-    f"{_IMPORT_RESULT['project_id']}/{_IMPORT_RESULT['version_id']}/publish"
+    f"{_IMPORT_RESULT['project_id']}/{_IMPORT_RESULT['version_record_id']}/publish"
 )
 
 
@@ -465,7 +469,7 @@ def _mock_publish(httpx_mock: object, *, visibility: str) -> None:
         url=_PUBLISH_URL,
         method="POST",
         json={
-            "id": _IMPORT_RESULT["version_id"],
+            "id": _IMPORT_RESULT["version_record_id"],
             "project_id": _IMPORT_RESULT["project_id"],
             "version": "1.0.0",
             "publish_visibility": visibility,
@@ -497,7 +501,12 @@ def test_import_openapi_publish_private_maps_to_protected(
     publish_request = requests[-1]
     assert publish_request.method == "POST"
     assert str(publish_request.url) == _PUBLISH_URL
-    assert json.loads(publish_request.content) == {"visibility": "protected"}
+    # Commit policy requires a revision note; absent one, it is derived from the
+    # spec info (title here, since _VALID_SPEC has no description).
+    assert json.loads(publish_request.content) == {
+        "visibility": "protected",
+        "shortMessage": "Pet Store",
+    }
     assert "Published imported version as private." in result.stderr
 
 
@@ -523,8 +532,134 @@ def test_import_openapi_publish_public_accepted(
     publish_request = requests[-1]
     assert publish_request.method == "POST"
     assert str(publish_request.url) == _PUBLISH_URL
-    assert json.loads(publish_request.content) == {"visibility": "public"}
+    assert json.loads(publish_request.content) == {
+        "visibility": "public",
+        "shortMessage": "Pet Store",
+    }
     assert "Published imported version as public." in result.stderr
+
+
+def test_import_openapi_publish_note_prefers_description(
+    httpx_mock: object,
+    tmp_path: Path,
+) -> None:
+    """The publish revision note prefers the spec description's first non-blank line."""
+    spec_path = tmp_path / "petstore.json"
+    spec = {
+        "openapi": "3.1.0",
+        "info": {
+            "title": "Pet Store",
+            "version": "1.0.0",
+            "description": "\n  First line of the description.\nSecond line.\n",
+        },
+        "paths": {},
+    }
+    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+    _mock_import_completed(httpx_mock)
+    _mock_publish(httpx_mock, visibility="public")
+
+    result = runner.invoke(
+        app,
+        ["import", "openapi", "--publish", "public", str(spec_path)],
+    )
+
+    assert result.exit_code == 0
+    publish_request = httpx_mock.get_requests()[-1]
+    assert json.loads(publish_request.content) == {
+        "visibility": "public",
+        "shortMessage": "First line of the description.",
+    }
+
+
+def _mock_publish_gate(httpx_mock: object, *, status_code: int = 422) -> None:
+    """Register a publish-gate failure (e.g. classes missing required descriptions)."""
+    httpx_mock.add_response(  # type: ignore[attr-defined]
+        url=_PUBLISH_URL,
+        method="POST",
+        status_code=status_code,
+        json={"detail": "7 class(es) are missing required descriptions (first: 'X')."},
+    )
+
+
+def test_import_openapi_publish_gate_blocks_without_force(
+    httpx_mock: object,
+    tmp_path: Path,
+) -> None:
+    """Without --force, a publish gate (422) surfaces and the command exits non-zero."""
+    spec_path = tmp_path / "petstore.json"
+    _write_spec(spec_path)
+    _mock_import_completed(httpx_mock)
+    _mock_publish_gate(httpx_mock)
+
+    result = runner.invoke(
+        app,
+        ["import", "openapi", "--publish", "public", str(spec_path)],
+    )
+
+    assert result.exit_code != 0
+    assert "missing required descriptions" in result.stderr
+    # Only the single (un-forced) publish attempt was made.
+    publish_posts = [
+        r for r in httpx_mock.get_requests() if r.method == "POST" and str(r.url) == _PUBLISH_URL
+    ]
+    assert len(publish_posts) == 1
+    assert "skipPublishChecks" not in json.loads(publish_posts[0].content)
+
+
+def test_import_openapi_force_bypasses_publish_gate_with_warnings(
+    httpx_mock: object,
+    tmp_path: Path,
+) -> None:
+    """--force retries past a publish gate and reports success with warnings."""
+    spec_path = tmp_path / "petstore.json"
+    _write_spec(spec_path)
+    _mock_import_completed(httpx_mock)
+    _mock_publish_gate(httpx_mock)  # first attempt blocked
+    _mock_publish(httpx_mock, visibility="public")  # forced retry succeeds
+
+    result = runner.invoke(
+        app,
+        ["import", "openapi", "--publish", "public", "--force", str(spec_path)],
+    )
+
+    assert result.exit_code == 0
+    publish_posts = [
+        r for r in httpx_mock.get_requests() if r.method == "POST" and str(r.url) == _PUBLISH_URL
+    ]
+    assert len(publish_posts) == 2
+    # The forced retry bypasses the gates.
+    retry_body = json.loads(publish_posts[1].content)
+    assert retry_body["skipPublishChecks"] is True
+    assert retry_body["allowBreaking"] is True
+    # The bypassed warnings are reported, not silently swallowed.
+    assert "Publish warnings (bypassed with --force):" in result.stderr
+    assert "7 class(es) are missing required descriptions" in result.stderr
+    assert "Published import as public with warnings." in result.stderr
+
+
+def test_import_openapi_force_without_warnings_uses_normal_message(
+    httpx_mock: object,
+    tmp_path: Path,
+) -> None:
+    """--force does not alter the message when publish succeeds with no gate hit."""
+    spec_path = tmp_path / "petstore.json"
+    _write_spec(spec_path)
+    _mock_import_completed(httpx_mock)
+    _mock_publish(httpx_mock, visibility="public")
+
+    result = runner.invoke(
+        app,
+        ["import", "openapi", "--publish", "public", "--force", str(spec_path)],
+    )
+
+    assert result.exit_code == 0
+    publish_posts = [
+        r for r in httpx_mock.get_requests() if r.method == "POST" and str(r.url) == _PUBLISH_URL
+    ]
+    assert len(publish_posts) == 1
+    assert "skipPublishChecks" not in json.loads(publish_posts[0].content)
+    assert "Published imported version as public." in result.stderr
+    assert "with warnings" not in result.stderr
 
 
 def test_import_openapi_override_flags_in_request_body(

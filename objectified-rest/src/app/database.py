@@ -10,7 +10,7 @@ from psycopg2.extensions import register_adapter, AsIs, adapt
 from typing import Optional, List, Dict, Any, Tuple, Set
 from .config import settings, WEBHOOK_MAX_DELIVERY_ATTEMPTS
 from .jsonschema_generator import generate_class_jsonschema_spec
-from .revision_deprecation import coerce_metadata, effective_sunset_string, successor_revision_id_from_metadata
+from .revision_deprecation import coerce_metadata, effective_sunset_string, successor_revision_id_from_metadata, is_uuid_string
 from .revision_lifecycle import prepare_version_metadata_update, sql_effective_lifecycle_expr
 from .push_webhook_crypto import encrypt_signing_secret
 
@@ -2386,6 +2386,11 @@ class Database:
 
     def get_version_by_id(self, version_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
         """Get a specific version by ID, ensuring it belongs to the tenant."""
+        # A non-UUID identifier (e.g. a version string like '0.0.1' sent to a route that
+        # expects the version record UUID) can never match v.id and would otherwise raise
+        # psycopg2 InvalidTextRepresentation -> a 500. Treat it as "not found" instead.
+        if not version_id or not is_uuid_string(str(version_id)):
+            return None
         query = """
             SELECT v.id, v.project_id, v.creator_id, v.version_id, v.description,
                    v.change_log, v.visibility, v.published, v.published_at, v.published_immutable,

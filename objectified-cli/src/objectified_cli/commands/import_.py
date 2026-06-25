@@ -15,6 +15,7 @@ from objectified_cli.cli_context import (
     settings_from_context,
 )
 from objectified_cli.client import api_paths
+from objectified_cli.client.errors import exit_on_api_error
 from objectified_cli.client.http import RestClient
 from objectified_cli.client.tenant_scope import require_tenant_slug
 from objectified_cli.import_.spec_import import (
@@ -140,6 +141,88 @@ def _import_result_id(
     return None
 
 
+# Commit policy default (objectified-rest version_notes.py: max_short_message_chars).
+_MAX_REVISION_NOTE_CHARS = 2000
+
+
+def _first_nonempty_line(text: str) -> str:
+    """Return the first non-blank line of *text*, stripped (empty string if none)."""
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
+def _payload_str(payload: dict[str, Any], top_key: str, nested_key: str, nested_field: str) -> str:
+    """Read a string field from the import result (top-level or nested)."""
+    value = payload.get(top_key)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    nested = payload.get(nested_key)
+    if isinstance(nested, dict):
+        nested_value = nested.get(nested_field)
+        if isinstance(nested_value, str) and nested_value.strip():
+            return nested_value.strip()
+    return ""
+
+
+def _derive_revision_note(spec: dict[str, Any]) -> str | None:
+    """Best-effort revision note from a spec's ``info`` block: description, then title.
+
+    The slug + version fallback is applied by the caller from the persisted import
+    result, so this returns None when info carries neither a description nor a title.
+    """
+    info = spec.get("info") if isinstance(spec, dict) else None
+    if not isinstance(info, dict):
+        return None
+    description = info.get("description")
+    if isinstance(description, str):
+        note = _first_nonempty_line(description)
+        if note:
+            return note[:_MAX_REVISION_NOTE_CHARS]
+    title = info.get("title")
+    if isinstance(title, str) and title.strip():
+        return title.strip()[:_MAX_REVISION_NOTE_CHARS]
+    return None
+
+
+# Publish gates that ``--force`` (skipPublishChecks) is allowed to bypass:
+# 422 documentation/build gaps (e.g. missing class descriptions) and 409 breaking changes.
+_PUBLISH_GATE_STATUSES = frozenset({409, 422})
+
+_FORCE_FLAG_HELP = (
+    "With --publish, bypass publish gates (e.g. classes missing required "
+    "descriptions, breaking changes) so the version still publishes."
+)
+
+
+def _gate_warning_text(response: Any) -> str:
+    """Extract the human-readable gate message from a blocked publish response."""
+    try:
+        payload = response.json()
+    except ValueError:
+        return response.text.strip()
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict) and isinstance(error.get("message"), str) and error["message"].strip():
+            return error["message"].strip()
+        for key in ("detail", "message"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            if isinstance(value, dict) and isinstance(value.get("message"), str) and value["message"].strip():
+                return value["message"].strip()
+    return response.text.strip()
+
+
+def _report_publish_warnings(response: Any) -> None:
+    """Print the publish gate warning(s) that ``--force`` is bypassing, to stderr."""
+    warning = _gate_warning_text(response)
+    typer.echo("Publish warnings (bypassed with --force):", err=True)
+    typer.echo(f"  - {warning}" if warning else "  - (no detail provided)", err=True)
+
+
 def _publish_imported_version(
     client: RestClient,
     tenant_slug: str,
@@ -147,29 +230,75 @@ def _publish_imported_version(
     payload: dict[str, Any],
     visibility: str,
     no_progress: bool,
+    short_message: str | None = None,
+    force: bool = False,
 ) -> None:
     """Publish the version created by a completed import via the publish endpoint.
 
     The ``/v1`` spec-import surface carries no visibility field, so ``--publish``
     is realized as a follow-up ``POST .../{version_record_id}/publish`` once the
     import has produced a concrete project and version record.
+
+    Commit policy may require a revision note (shortMessage). The import never
+    collects one interactively, so when none is supplied we derive it from the
+    spec description/title (``short_message``), falling back to the persisted
+    ``slug + version`` — otherwise publish fails with POLICY_VIOLATION.
+
+    Publish also enforces documentation/compatibility gates (e.g. classes missing
+    required descriptions -> 422). When ``force`` is set, a blocked publish is
+    retried with the gates bypassed and the success message notes the warnings.
     """
     project_id = _import_result_id(payload, top_key="project_id", nested_key="project")
-    version_id = _import_result_id(payload, top_key="version_id", nested_key="version")
-    if project_id is None or version_id is None:
+    # Publish addresses the version by its record UUID (versions.id). The import result's
+    # top-level ``version_id`` is the semver label (e.g. '0.0.1'); the UUID lives in
+    # ``version_record_id`` (and in nested ``version.id``). Using the label here produced
+    # ``.../0.0.1/publish`` and a 500 from the REST layer.
+    version_record_id = _import_result_id(
+        payload, top_key="version_record_id", nested_key="version"
+    )
+    if project_id is None or version_record_id is None:
         typer.echo(
             "Imported successfully but could not publish: the import result is "
             "missing the project or version id.",
             err=True,
         )
         raise typer.Exit(EXIT_ERROR)
-    client.post(
-        api_paths.version_publish(tenant_slug, project_id, version_id),
-        json={"visibility": visibility},
-    )
+
+    note = (short_message or "").strip()
+    if not note:
+        slug = _payload_str(payload, "project_slug", "project", "slug")
+        semver = _payload_str(payload, "version_id", "version", "version")
+        note = " ".join(part for part in (slug, semver) if part)
+    body: dict[str, Any] = {"visibility": visibility}
+    if note:
+        body["shortMessage"] = note[:_MAX_REVISION_NOTE_CHARS]
+
+    path = api_paths.version_publish(tenant_slug, project_id, version_record_id)
+    forced_past_warnings = False
+    if not force:
+        # No --force: publish normally; any HTTP error (including a publish gate) exits.
+        client.post(path, json=body)
+    else:
+        # --force: attempt normally, then bypass publish gates only if one blocks us, so
+        # the "with warnings" note is shown only when a warning was actually overridden.
+        response = client.post_raw(path, json=body)
+        if response.is_success:
+            pass
+        elif response.status_code in _PUBLISH_GATE_STATUSES:
+            # Report what we are overriding before bypassing the gate, so the warnings
+            # behind "…with warnings." are visible rather than silently swallowed.
+            _report_publish_warnings(response)
+            client.post(path, json={**body, "skipPublishChecks": True, "allowBreaking": True})
+            forced_past_warnings = True
+        else:
+            exit_on_api_error(response)
+
     if not no_progress:
         label = "public" if visibility == "public" else "private"
-        typer.echo(f"Published imported version as {label}.", err=True)
+        if forced_past_warnings:
+            typer.echo(f"Published import as {label} with warnings.", err=True)
+        else:
+            typer.echo(f"Published imported version as {label}.", err=True)
 
 
 def _format_openapi_import_target(
@@ -237,6 +366,7 @@ def _run_openapi_import(
     version_slug: str | None,
     publish: str | None,
     visibility: str | None,
+    force: bool,
     wait: bool,
     poll_interval: float,
     progress_label: str,
@@ -388,6 +518,8 @@ def _run_openapi_import(
                     payload=resolution.payload,
                     visibility=publish_visibility,
                     no_progress=no_progress,
+                    short_message=_derive_revision_note(spec),
+                    force=force,
                 )
         return
 
@@ -466,6 +598,11 @@ def import_openapi(
         min=0.1,
         help="Seconds between ``GET /imports/{job_id}`` polls when waiting.",
     ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help=_FORCE_FLAG_HELP,
+    ),
 ) -> None:
     """Import an OpenAPI document from a file, URL, or stdin."""
     _run_openapi_import(
@@ -480,6 +617,7 @@ def import_openapi(
         version_slug=version_slug,
         publish=publish,
         visibility=visibility,
+        force=force,
         wait=wait,
         poll_interval=poll_interval,
         progress_label="OpenAPI",
@@ -553,6 +691,11 @@ def import_swagger(
         min=0.1,
         help="Seconds between ``GET /imports/{job_id}`` polls when waiting.",
     ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help=_FORCE_FLAG_HELP,
+    ),
 ) -> None:
     """Import a Swagger 2.0 document from a file, URL, or stdin."""
     _run_openapi_import(
@@ -567,6 +710,7 @@ def import_swagger(
         version_slug=version_slug,
         publish=publish,
         visibility=visibility,
+        force=force,
         wait=wait,
         poll_interval=poll_interval,
         progress_label="Swagger",
@@ -951,6 +1095,11 @@ def import_auto(
         min=0.1,
         help="Seconds between ``GET /imports/{job_id}`` polls when waiting.",
     ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help=f"{_FORCE_FLAG_HELP} (OpenAPI/Arazzo).",
+    ),
 ) -> None:
     """Detect document format from headers and run the matching import."""
     import_timeout = import_timeout_from_context(ctx)
@@ -995,6 +1144,7 @@ def import_auto(
             version_slug=version_slug,
             publish=publish,
             visibility=visibility,
+            force=force,
             wait=wait,
             poll_interval=poll_interval,
             progress_label="Swagger" if command == "swagger" else "OpenAPI",
