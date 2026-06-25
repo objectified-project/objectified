@@ -13,7 +13,7 @@ env:
 jobs:
   build-and-push:
     name: Build and push objectified-web image
-    runs-on: self-runner
+    runs-on: self-hosted
     env:
       DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}

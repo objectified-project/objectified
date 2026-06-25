@@ -10,7 +10,7 @@ on:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     env:
       OBJECTIFIED_API_KEY: ${{ secrets.OBJECTIFIED_API_KEY }}
     steps:

@@ -24,7 +24,7 @@ on:
 jobs:
   test:
     name: Lint, type-check and test objectified-mcp
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     env:
       OBJECTIFIED_MCP_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/objectified_ci
 
@@ -84,7 +84,7 @@ jobs:
     name: Build and push objectified-mcp image
     needs: test
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     env:
       DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}

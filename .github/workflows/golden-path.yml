@@ -34,7 +34,7 @@ on:
 jobs:
   golden-path:
     name: End-to-end golden path
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

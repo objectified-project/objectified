@@ -15,7 +15,7 @@ on:
 jobs:
   test:
     name: Run Objectified UI Test and Build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     services:
       postgres:
