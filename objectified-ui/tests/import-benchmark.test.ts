@@ -21,8 +21,12 @@ jest.mock('../lib/db/import-transaction', () => ({
   createProjectTx: jest.fn(() => Promise.resolve(ok({ project: { id: 'p1' } }))),
   createVersionTx: jest.fn(() => Promise.resolve(ok({ version: { id: 'v1' } }))),
   createPropertyTx: jest.fn(() => Promise.resolve(ok({ property: { id: 'prop1' } }))),
+  createPropertiesBatchTx: jest.fn((_client: unknown, rows: unknown[]) =>
+    Promise.resolve(ok({ inserted: Array.isArray(rows) ? rows.length : 0, failed: [] }))),
   createClassTx: jest.fn(() => Promise.resolve(ok({ class: { id: 'c1' } }))),
   addPropertyToClassTx: jest.fn(() => Promise.resolve(ok({ classProperty: { id: 'cp1' } }))),
+  addPropertiesToClassBatchTx: jest.fn((_client: unknown, rows: unknown[]) =>
+    Promise.resolve(ok({ inserted: Array.isArray(rows) ? rows.length : 0 }))),
   getClassesWithPropertiesAndTagsTx: jest.fn(() => Promise.resolve('[]')),
   getLatestVersionUuidForProjectTx: jest.fn(() => Promise.resolve(null)),
   getProjectIdBySlugTx: jest.fn(() => Promise.resolve(null)),
@@ -115,14 +119,16 @@ describe('Import benchmarking', () => {
     expect(status.state).toBe('completed');
     const names = (status.summary?.benchmark?.spans ?? []).map((s: any) => s.name);
     expect(names).toContain('parse:normalize');
-    expect(names).toContain('db:createProperty');
+    // Library properties are created in a single batched insert (not one round-trip each).
+    expect(names).toContain('db:createPropertiesBatch');
     expect(names).toContain('db:createClass');
-    expect(names).toContain('db:addPropertyToClass');
+    // Properties are written in a single batched insert per class (not one round-trip each).
+    expect(names).toContain('db:addPropertiesToClassBatch');
     expect(names).toContain('phase:writeClasses');
 
-    // The property created twice (id, email are distinct shapes) -> count reflects round-trips.
-    const createProp = status.summary.benchmark.spans.find((s: any) => s.name === 'db:createProperty');
-    expect(createProp.count).toBeGreaterThanOrEqual(1);
+    // Both distinct shapes (id, email) are created in one batched insert -> a single round-trip.
+    const createProp = status.summary.benchmark.spans.find((s: any) => s.name === 'db:createPropertiesBatch');
+    expect(createProp.count).toBe(1);
 
     // Per-phase timing is emitted live (as PHASE_TIMING events) so it can be followed
     // while the import runs, not only in the final BENCHMARK summary.

@@ -321,6 +321,96 @@ export async function createPropertyTx(
 }
 
 /**
+ * Row to insert into odb.properties. id is supplied by the caller so a whole batch of
+ * library shapes can be written in one statement and the ids fed straight into the
+ * class-property links without a second round-trip.
+ */
+export interface PropertyInsert {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  data: any;
+}
+
+const PROPERTIES_COLS = 5;
+const PROPERTIES_INSERT_HEAD =
+  'INSERT INTO odb.properties (id, project_id, name, description, data) VALUES ';
+
+function propertyValues(r: PropertyInsert): any[] {
+  return [r.id, r.projectId, r.name.trim(), r.description, JSON.stringify(r.data)];
+}
+
+/**
+ * Bulk-create project library properties in one (chunked) multi-row INSERT.
+ *
+ * #perf: replaces the per-shape N+1 round-trips in buildPropertyIdMapForImport. Same
+ * shape as addPropertiesToClassBatchTx — savepoint-protected with a per-row fallback so
+ * a single name collision is reported (and skipped) without aborting the whole batch.
+ * Returns { inserted, failed: [{ name, error }] }.
+ */
+export async function createPropertiesBatchTx(
+  client: PoolClient,
+  rows: PropertyInsert[]
+): Promise<string> {
+  if (rows.length === 0) return successResponse({ inserted: 0, failed: [] });
+
+  const CHUNK = 1000; // 1000 * 5 = 5000 params, far below the 65535 limit
+  const SP = 'imp_props_lib_batch';
+
+  try {
+    await client.query(`SAVEPOINT ${SP}`);
+  } catch (error: any) {
+    return errorResponse(error.message);
+  }
+
+  try {
+    let inserted = 0;
+    for (let start = 0; start < rows.length; start += CHUNK) {
+      const chunk = rows.slice(start, start + CHUNK);
+      const params: any[] = [];
+      const valueGroups = chunk.map((r, i) => {
+        const b = i * PROPERTIES_COLS;
+        params.push(...propertyValues(r));
+        return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5})`;
+      });
+      const result = await client.query(PROPERTIES_INSERT_HEAD + valueGroups.join(', '), params);
+      inserted += result.rowCount ?? chunk.length;
+    }
+    await client.query(`RELEASE SAVEPOINT ${SP}`);
+    return successResponse({ inserted, failed: [] });
+  } catch (_batchError: any) {
+    try {
+      await client.query(`ROLLBACK TO SAVEPOINT ${SP}`);
+      const failed: Array<{ name: string; error: string }> = [];
+      let inserted = 0;
+      const ROW_SP = 'imp_prop_lib_row';
+      for (const r of rows) {
+        await client.query(`SAVEPOINT ${ROW_SP}`);
+        try {
+          await client.query(`${PROPERTIES_INSERT_HEAD}($1, $2, $3, $4, $5)`, propertyValues(r));
+          await client.query(`RELEASE SAVEPOINT ${ROW_SP}`);
+          inserted++;
+        } catch (rowError: any) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${ROW_SP}`);
+          failed.push({
+            name: r.name,
+            error:
+              rowError?.code === '23505'
+                ? 'A property with this name already exists in this project'
+                : rowError?.message || 'insert failed',
+          });
+        }
+      }
+      await client.query(`RELEASE SAVEPOINT ${SP}`);
+      return successResponse({ inserted, failed });
+    } catch (recoverError: any) {
+      return errorResponse(recoverError.message);
+    }
+  }
+}
+
+/**
  * Create a class within a transaction
  */
 export async function createClassTx(
@@ -393,6 +483,116 @@ export async function addPropertyToClassTx(
       return errorResponse('A property with this name already exists in this class');
     }
     return errorResponse(error.message);
+  }
+}
+
+/**
+ * Row to insert into odb.class_properties. The id is supplied by the caller so the
+ * full property tree (including parent links) can be flattened and inserted in a
+ * single multi-row statement instead of one round-trip per property.
+ */
+export interface ClassPropertyInsert {
+  id: string;
+  classId: string;
+  propertyId: string | null;
+  name: string;
+  description: string | null;
+  data: any;
+  parentId: string | null;
+}
+
+const CLASS_PROPERTIES_COLS = 7;
+const CLASS_PROPERTIES_INSERT_HEAD =
+  'INSERT INTO odb.class_properties (id, class_id, property_id, name, description, data, parent_id) VALUES ';
+
+function classPropertyValues(r: ClassPropertyInsert): any[] {
+  return [r.id, r.classId, r.propertyId, r.name.trim(), r.description, JSON.stringify(r.data), r.parentId];
+}
+
+/**
+ * Bulk-insert class properties in one (chunked) multi-row INSERT.
+ *
+ * #perf: replaces the per-property N+1 round-trips in writeClassWithProperties. The
+ * caller pre-assigns each row's UUID (the id column defaults to uuid_generate_v4()
+ * but accepts a supplied value), so parent/child links are resolved client-side and
+ * the whole tree goes to the DB in a single statement. Rows are chunked to stay well
+ * under the Postgres 65535 bound-parameter limit (7 cols/row → ~9362 rows max).
+ *
+ * The batch runs inside a SAVEPOINT so a failure (e.g. a duplicate name) can be
+ * recovered without poisoning the surrounding transaction. On failure it rolls back
+ * and retries row-by-row (each in its own savepoint), so one bad property is skipped
+ * while the rest still import — preserving the graceful-degradation contract (#733).
+ * Returns { inserted, failed: [{ name, error }] }; `failed` is only populated when
+ * the per-row fallback ran.
+ */
+export async function addPropertiesToClassBatchTx(
+  client: PoolClient,
+  rows: ClassPropertyInsert[]
+): Promise<string> {
+  if (rows.length === 0) return successResponse({ inserted: 0, failed: [] });
+
+  const CHUNK = 1000; // 1000 * 7 = 7000 params, far below the 65535 limit
+  const SP = 'imp_props_batch';
+
+  try {
+    await client.query(`SAVEPOINT ${SP}`);
+  } catch (error: any) {
+    // Not inside a transaction (shouldn't happen on the import paths) — surface it.
+    return errorResponse(error.message);
+  }
+
+  // Fast path: chunked multi-row inserts.
+  try {
+    let inserted = 0;
+    for (let start = 0; start < rows.length; start += CHUNK) {
+      const chunk = rows.slice(start, start + CHUNK);
+      const params: any[] = [];
+      const valueGroups = chunk.map((r, i) => {
+        const b = i * CLASS_PROPERTIES_COLS;
+        params.push(...classPropertyValues(r));
+        return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}, $${b + 7})`;
+      });
+      const result = await client.query(
+        CLASS_PROPERTIES_INSERT_HEAD + valueGroups.join(', '),
+        params
+      );
+      inserted += result.rowCount ?? chunk.length;
+    }
+    await client.query(`RELEASE SAVEPOINT ${SP}`);
+    return successResponse({ inserted, failed: [] });
+  } catch (_batchError: any) {
+    // Recover the transaction and retry row-by-row so a single bad row doesn't drop the
+    // whole class (graceful degradation). This path only runs on the rare failure case.
+    try {
+      await client.query(`ROLLBACK TO SAVEPOINT ${SP}`);
+      const failed: Array<{ name: string; error: string }> = [];
+      let inserted = 0;
+      const ROW_SP = 'imp_prop_row';
+      for (const r of rows) {
+        await client.query(`SAVEPOINT ${ROW_SP}`);
+        try {
+          await client.query(
+            `${CLASS_PROPERTIES_INSERT_HEAD}($1, $2, $3, $4, $5, $6, $7)`,
+            classPropertyValues(r)
+          );
+          await client.query(`RELEASE SAVEPOINT ${ROW_SP}`);
+          inserted++;
+        } catch (rowError: any) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${ROW_SP}`);
+          failed.push({
+            name: r.name,
+            error:
+              rowError?.code === '23505'
+                ? 'A property with this name already exists in this class'
+                : rowError?.message || 'insert failed',
+          });
+        }
+      }
+      await client.query(`RELEASE SAVEPOINT ${SP}`);
+      return successResponse({ inserted, failed });
+    } catch (recoverError: any) {
+      return errorResponse(recoverError.message);
+    }
   }
 }
 

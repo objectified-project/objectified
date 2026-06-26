@@ -20,6 +20,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Import: Updates import service to include benchmarking output
 - Import: Fixes linting problem in rare cases during import
 - Import: Corrects base ref and $ref external dereferencing
+- Import: Updating class creation step to increase speed using transactions and commits in groups
 
 ---
 

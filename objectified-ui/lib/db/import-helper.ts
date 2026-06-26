@@ -10,9 +10,11 @@ import {
   createProjectTx,
   mergeProjectImportOpenApiFieldsTx,
   createVersionTx,
-  createPropertyTx,
+  createPropertiesBatchTx,
+  PropertyInsert,
   createClassTx,
-  addPropertyToClassTx,
+  addPropertiesToClassBatchTx,
+  ClassPropertyInsert,
   getClassesWithPropertiesAndTagsTx,
   getLatestVersionUuidForProjectTx,
   getProjectIdBySlugTx,
@@ -20,6 +22,7 @@ import {
   listProjectLibraryPropertiesTx,
 } from './import-transaction';
 import { ImportSourceKind, getImporter, NormalizedClass, NormalizedProperty } from '../importers';
+import { randomUUID } from 'crypto';
 import { withRetry } from '../retry';
 import { permanentDeleteProject } from './helper';
 import { extractPaths, extractSecuritySchemes } from '../../src/app/utils/openapi-import';
@@ -459,6 +462,11 @@ async function buildPropertyIdMapForImport(
       (reuseLibraryFromProject ? ` (${sigToLibraryId.size} existing shape(s) indexed)` : '')
   );
 
+  // #perf: resolve reuses inline, then create every brand-new shape in a single batched
+  // INSERT instead of one round-trip per shape. UUIDs are assigned here so the new ids
+  // populate propertyIdMap directly (no RETURNING round-trip needed). A per-shape unique
+  // name is derived up front so the batch can't self-collide.
+  const toCreate: Array<{ sig: string; row: PropertyInsert }> = [];
   for (const [sig, payload] of propertyMap.entries()) {
     if (job.canceled) throw new Error('Import canceled');
 
@@ -468,7 +476,7 @@ async function buildPropertyIdMapForImport(
       continue;
     }
 
-    let baseName = Array.from(payload.names)[0];
+    const baseName = Array.from(payload.names)[0];
     let propName = baseName;
     let suffix = 1;
     while (usedNames.has(propName)) {
@@ -477,23 +485,39 @@ async function buildPropertyIdMapForImport(
     }
     usedNames.add(propName);
 
-    emit(job, 'info', 'DEBUG_PROPERTY', `Creating property: ${propName} (used as: ${Array.from(payload.names).join(', ')})`, {
-      description: payload.description,
-      dataType: payload.data?.type,
+    const id = randomUUID();
+    toCreate.push({
+      sig,
+      row: { id, projectId, name: propName, description: payload.description || null, data: payload.data },
     });
+    // Optimistically register the id; failures (rare) are unwound after the batch.
+    propertyIdMap.set(sig, id);
+    sigToLibraryId.set(sig, id);
+    if (job.summary) job.summary.propertiesCreated++;
+  }
 
-    const resProp = JSON.parse(
-      await benchTime(job.bench, 'db:createProperty', () =>
-        createPropertyTx(client, projectId, propName, payload.description || null, payload.data)
+  if (toCreate.length > 0) {
+    const batchRes = JSON.parse(
+      await benchTime(job.bench, 'db:createPropertiesBatch', () =>
+        createPropertiesBatchTx(client, toCreate.map((t) => t.row))
       )
     );
-    if (!resProp.success) {
-      emit(job, 'warn', 'PROPERTY_CREATE_WARN', `Could not create property "${propName}": ${resProp.error}`);
-      continue;
+    if (!batchRes.success) {
+      throw new Error(batchRes.error || 'Failed to create project library properties');
     }
-    propertyIdMap.set(sig, resProp.property.id as string);
-    sigToLibraryId.set(sig, resProp.property.id as string);
-    if (job.summary) job.summary.propertiesCreated++;
+    // Unwind any rows the per-row fallback couldn't insert so class linking won't point at
+    // a non-existent library id.
+    const failedNames = new Set<string>((batchRes.failed || []).map((f: { name: string }) => f.name));
+    if (failedNames.size > 0) {
+      for (const { sig, row } of toCreate) {
+        if (!failedNames.has(row.name)) continue;
+        const err = (batchRes.failed as Array<{ name: string; error: string }>).find((f) => f.name === row.name);
+        emit(job, 'warn', 'PROPERTY_CREATE_WARN', `Could not create property "${row.name}": ${err?.error || 'insert failed'}`);
+        propertyIdMap.delete(sig);
+        sigToLibraryId.delete(sig);
+        if (job.summary) job.summary.propertiesCreated--;
+      }
+    }
   }
 
   emit(job, 'info', 'PROPERTIES_READY', `Resolved ${propertyIdMap.size} property library id(s) for class linking`);
@@ -729,7 +753,12 @@ async function writeClassWithProperties(
   if (!resClass.success) throw new Error(resClass.error || 'Failed to create class');
   const classId = resClass.class.id as string;
 
-  const linkRec = async (classId: string, props: any[], parentId: string | null = null) => {
+  // #perf: flatten the whole property tree into one insert batch instead of issuing
+  // a DB round-trip per property. Each row's UUID is assigned here so parent/child
+  // links resolve client-side; the entire class then writes in a single statement.
+  const rows: ClassPropertyInsert[] = [];
+
+  const collect = (props: any[], parentId: string | null) => {
     for (const p of props || []) {
       if (job.canceled) return;
       let propertyId: string | null = null;
@@ -747,38 +776,41 @@ async function writeClassWithProperties(
             dataType: p.data.type,
             signature: sig.substring(0, 200)
           });
-          // Still process children if any
+          // A skipped parent drops its subtree (children can't reference a missing parent)
           if (p.children && p.children.length) {
             emit(job, 'warn', 'SKIP_CHILDREN', `Also skipping ${p.children.length} child properties of "${p.name}"`);
           }
           continue;
         }
       }
-      emit(job, 'info', 'DEBUG_CLASS_PROPERTY', `Adding property to class: ${p.name}`, {
-        description: p.description,
-        propertyId,
-        parentId
-      });
-      const addRes = JSON.parse(
-        await benchTime(job.bench, 'db:addPropertyToClass', () =>
-          addPropertyToClassTx(client, classId, propertyId, p.name, p.description || null, p.data, parentId)
-        )
-      );
-      if (!addRes.success) {
-        // Graceful degradation: log and continue with remaining properties
-        emit(job, 'warn', 'PROPERTY_LINK_FAILED', `Could not add property "${p.name}" to class "${cls.name}": ${addRes.error}`, {
-          className: cls.name,
-          propertyName: p.name
-        });
-        if (job.summary) job.summary.warnings++;
-        continue;
-      }
-      const newId = addRes.classProperty.id as string;
-      if (p.children && p.children.length) await linkRec(classId, p.children, newId);
+      const id = randomUUID();
+      rows.push({ id, classId, propertyId, name: p.name, description: p.description || null, data: p.data, parentId });
+      if (p.children && p.children.length) collect(p.children, id);
     }
   };
 
-  await linkRec(classId, cls.properties || [], null);
+  collect(cls.properties || [], null);
+
+  if (job.canceled || rows.length === 0) return;
+
+  const addRes = JSON.parse(
+    await benchTime(job.bench, 'db:addPropertiesToClassBatch', () =>
+      addPropertiesToClassBatchTx(client, rows)
+    )
+  );
+  if (!addRes.success) {
+    // Catastrophic batch failure (couldn't even recover the transaction) — surface it so
+    // the caller rolls back and marks the class failed.
+    throw new Error(addRes.error || `Failed to add properties to class "${cls.name}"`);
+  }
+  // Graceful degradation (#733): any individual rows the per-row fallback couldn't insert
+  // are reported (and warned on) without failing the whole class.
+  for (const f of (addRes.failed || []) as Array<{ name: string; error: string }>) {
+    emit(job, 'warn', 'PROPERTY_LINK_FAILED', `Could not add property "${f.name}" to class "${cls.name}": ${f.error}`, {
+      className: cls.name,
+      propertyName: f.name,
+    });
+  }
 }
 
 export async function startImport(input: ImportJobInput) {

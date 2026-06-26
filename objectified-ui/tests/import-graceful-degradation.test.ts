@@ -11,6 +11,9 @@ import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globa
 // Track addPropertyToClassTx call count for "fail on Nth call" behavior
 let addPropertyToClassTxCallCount = 0;
 let addPropertyToClassTxFailOnCall: number | null = null;
+// When set, the batched property insert reports this property name as a per-row failure
+// (graceful degradation): the rest of the class still imports.
+let batchFailForPropertyName: string | null = null;
 
 // Control getClassesWithPropertiesAndTagsTx response for verification tests
 let getClassesWithPropertiesAndTagsTxReturnsMismatch = false;
@@ -33,6 +36,11 @@ jest.mock('../lib/db/import-transaction', () => ({
     const id = 'prop-' + JSON.stringify(data).length;
     return Promise.resolve(JSON.stringify({ success: true, property: { id } }));
   }),
+  createPropertiesBatchTx: jest.fn((_client: any, rows: any[]) =>
+    Promise.resolve(
+      JSON.stringify({ success: true, inserted: Array.isArray(rows) ? rows.length : 0, failed: [] })
+    )
+  ),
   createClassTx: jest.fn(() =>
     Promise.resolve(JSON.stringify({ success: true, class: { id: 'class-1' } }))
   ),
@@ -45,6 +53,15 @@ jest.mock('../lib/db/import-transaction', () => ({
     }
     return Promise.resolve(
       JSON.stringify({ success: true, classProperty: { id: 'cp-' + addPropertyToClassTxCallCount } })
+    );
+  }),
+  addPropertiesToClassBatchTx: jest.fn(async (_client: any, rows: any[]) => {
+    const list = Array.isArray(rows) ? rows : [];
+    const failed = batchFailForPropertyName
+      ? list.filter((r) => r.name === batchFailForPropertyName).map((r) => ({ name: r.name, error: 'Constraint violation (simulated)' }))
+      : [];
+    return Promise.resolve(
+      JSON.stringify({ success: true, inserted: list.length - failed.length, failed })
     );
   }),
   getClassesWithPropertiesAndTagsTx: jest.fn(async () => {
@@ -123,6 +140,7 @@ describe('Import Graceful Degradation (#733)', () => {
   beforeEach(() => {
     addPropertyToClassTxCallCount = 0;
     addPropertyToClassTxFailOnCall = null;
+    batchFailForPropertyName = null;
     getClassesWithPropertiesAndTagsTxReturnsMismatch = false;
     mockClient.query.mockReset();
     mockClient.release.mockReset();
@@ -133,7 +151,7 @@ describe('Import Graceful Degradation (#733)', () => {
   });
 
   test('when addPropertyToClassTx fails for one property: emits PROPERTY_LINK_FAILED warn and reaches pending-approval', async () => {
-    addPropertyToClassTxFailOnCall = 2; // Fail on second property link
+    batchFailForPropertyName = 'count'; // The batched insert reports one property as failed
 
     const { startImport, getImportStatus } = await import('../lib/db/import-helper');
     const { jobId } = await startImport(validInput);

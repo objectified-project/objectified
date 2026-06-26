@@ -29,11 +29,17 @@ jest.mock('../lib/db/import-transaction', () => ({
   createPropertyTx: jest.fn((_client: any, _projectId: string, _name: string, _desc: any, data: any) =>
     Promise.resolve(JSON.stringify({ success: true, property: { id: 'prop-' + JSON.stringify(data).length } }))
   ),
+  createPropertiesBatchTx: jest.fn((_c: any, rows: any[]) =>
+    Promise.resolve(JSON.stringify({ success: true, inserted: Array.isArray(rows) ? rows.length : 0, failed: [] }))
+  ),
   createClassTx: jest.fn(() =>
     Promise.resolve(JSON.stringify({ success: true, class: { id: 'class-1' } }))
   ),
   addPropertyToClassTx: jest.fn(() =>
     Promise.resolve(JSON.stringify({ success: true, classProperty: { id: 'cp-1' } }))
+  ),
+  addPropertiesToClassBatchTx: jest.fn((_c: any, rows: any[]) =>
+    Promise.resolve(JSON.stringify({ success: true, inserted: Array.isArray(rows) ? rows.length : 0, failed: [] }))
   ),
   getClassesWithPropertiesAndTagsTx: jest.fn(() =>
     Promise.resolve(

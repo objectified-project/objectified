@@ -19,8 +19,10 @@ const mockReleaseClient = jest.fn();
 const mockCreateProjectTx = jest.fn();
 const mockCreateVersionTx = jest.fn();
 const mockCreatePropertyTx = jest.fn();
+const mockCreatePropertiesBatchTx = jest.fn();
 const mockCreateClassTx = jest.fn();
 const mockAddPropertyToClassTx = jest.fn();
+const mockAddPropertiesToClassBatchTx = jest.fn();
 const mockGetClassesWithPropertiesAndTagsTx = jest.fn();
 const mockGetLatestVersionUuidForProjectTx = jest.fn(() => Promise.resolve(null));
 const mockGetProjectIdBySlugTx = jest.fn<() => Promise<string | null>>(() => Promise.resolve(null));
@@ -40,11 +42,13 @@ jest.mock('../lib/db/import-transaction', () => ({
   createProjectTx: (...args: any[]) => mockCreateProjectTx(...args),
   createVersionTx: (...args: any[]) => mockCreateVersionTx(...args),
   createPropertyTx: (...args: any[]) => mockCreatePropertyTx(...args),
+  createPropertiesBatchTx: (...args: any[]) => mockCreatePropertiesBatchTx(...args),
   createClassTx: async (...args: any[]) => {
     const result = await mockCreateClassTx(...args);
     return result;
   },
   addPropertyToClassTx: (...args: any[]) => mockAddPropertyToClassTx(...args),
+  addPropertiesToClassBatchTx: (...args: any[]) => mockAddPropertiesToClassBatchTx(...args),
   getClassesWithPropertiesAndTagsTx: (...args: any[]) => mockGetClassesWithPropertiesAndTagsTx(...args),
   getLatestVersionUuidForProjectTx: (...args: any[]) => mockGetLatestVersionUuidForProjectTx(...args),
   getProjectIdBySlugTx: (...args: any[]) => mockGetProjectIdBySlugTx(...args),
@@ -125,8 +129,10 @@ describe('Import Incremental Mode (#730)', () => {
     mockCreateProjectTx.mockReset();
     mockCreateVersionTx.mockReset();
     mockCreatePropertyTx.mockReset();
+    mockCreatePropertiesBatchTx.mockReset();
     mockCreateClassTx.mockReset();
     mockAddPropertyToClassTx.mockReset();
+    mockAddPropertiesToClassBatchTx.mockReset();
     mockGetClassesWithPropertiesAndTagsTx.mockReset();
     mockGetLatestVersionUuidForProjectTx.mockReset();
     mockGetProjectIdBySlugTx.mockReset();
@@ -150,6 +156,11 @@ describe('Import Incremental Mode (#730)', () => {
           JSON.stringify({ success: true, property: { id: `prop-${name}-${JSON.stringify(data).length}` } })
         )
     );
+    mockCreatePropertiesBatchTx.mockImplementation((_c: any, rows: any[]) =>
+      Promise.resolve(
+        JSON.stringify({ success: true, inserted: Array.isArray(rows) ? rows.length : 0, failed: [] })
+      )
+    );
     mockCreateClassTx.mockImplementation((_c: any, _vid: string, name: string) => {
       if (createClassTxFailForClassName !== null && name === createClassTxFailForClassName) {
         return Promise.resolve(JSON.stringify({ success: false, error: 'Duplicate class (simulated)' }));
@@ -158,6 +169,9 @@ describe('Import Incremental Mode (#730)', () => {
     });
     mockAddPropertyToClassTx.mockResolvedValue(
       JSON.stringify({ success: true, classProperty: { id: 'cp-1' } })
+    );
+    mockAddPropertiesToClassBatchTx.mockImplementation((_c: any, rows: any[]) =>
+      Promise.resolve(JSON.stringify({ success: true, inserted: Array.isArray(rows) ? rows.length : 0, failed: [] }))
     );
     mockGetClassesWithPropertiesAndTagsTx.mockResolvedValue(
       JSON.stringify([
