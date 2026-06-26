@@ -17,6 +17,8 @@ We continue to improve the platform based on your feedback with improvements and
 - UI: Fixes Published Versions viewing of OpenAPI and Arazzo URLs
 - UI: Fixes Published Versions list so versions starting with a "v" don't duplicate and show "vv"
 - DB: Optimizations made to increase speed for import processing
+- Import: Updates import service to include benchmarking output
+- Import: Fixes linting problem in rare cases during import
 
 ---
 
