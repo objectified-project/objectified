@@ -1,4 +1,15 @@
 /**
+ * Render a version id with a single leading "v" prefix, avoiding a duplicate when
+ * the stored value already starts with "v" (e.g. "v1" -> "v1", "1.0.0" -> "v1.0.0").
+ * The UI prepends "v" for display, so a stored "v1" would otherwise show as "vv1".
+ */
+export function formatVersionWithPrefix(versionId: string | null | undefined): string {
+  const trimmed = (versionId ?? '').trim();
+  if (!trimmed) return '';
+  return `v${trimmed.replace(/^v/i, '')}`;
+}
+
+/**
  * REST list/detail payloads use `shortMessage` for the revision note; legacy/UI code often used `description`.
  */
 export function getVersionRevisionNote(version: {

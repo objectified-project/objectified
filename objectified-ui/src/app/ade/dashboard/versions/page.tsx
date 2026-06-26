@@ -105,6 +105,7 @@ import { localDatetimeLocalToUtcIso, utcIsoToDatetimeLocalValue } from '../../..
 import { usePushConflictBanner } from '@/app/providers/PushConflictBannerProvider';
 import ServerAheadPushBanner from '@/app/components/ade/ServerAheadPushBanner';
 import { parseStaleHeadFromVersionsPostJson } from '@/app/utils/push-conflict';
+import { formatVersionWithPrefix } from '@/app/utils/version-display';
 import { suggestBranchNameFromRevision } from '../../../../../lib/version-branch-utils';
 import { projectHeadRevisionId } from '../../../utils/project-head-revision';
 import {
@@ -4507,7 +4508,7 @@ const Versions = () => {
                         <div className="flex items-center gap-2"><div className="w-4 h-4 bg-green-200 dark:bg-green-900 border border-green-400"></div><span>Added</span></div>
                         <div className="flex items-center gap-2"><div className="w-4 h-4 bg-gray-100 dark:bg-gray-800 border border-gray-300"></div><span>Unchanged</span></div>
                       </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">v{versions.find(v => v.id === compareVersion1Id)?.version_id} → v{versions.find(v => v.id === compareVersion2Id)?.version_id}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{formatVersionWithPrefix(versions.find(v => v.id === compareVersion1Id)?.version_id)} → {formatVersionWithPrefix(versions.find(v => v.id === compareVersion2Id)?.version_id)}</div>
                     </div>
                     <div className="border border-gray-300 dark:border-gray-600 rounded font-mono text-xs h-[calc(90vh-280px)]">
                       {diffViewMode === 'overlay' ? (
@@ -5511,7 +5512,7 @@ const Versions = () => {
               with <span className="font-mono">parent</span> pointing at the prior head. History is not rewritten.
               {rollbackTargetVersion ? (
                 <span className="block mt-2 text-gray-700 dark:text-gray-300">
-                  Restore snapshot from <span className="font-mono">v{rollbackTargetVersion.version_id}</span>
+                  Restore snapshot from <span className="font-mono">{formatVersionWithPrefix(rollbackTargetVersion.version_id)}</span>
                 </span>
               ) : null}
             </DialogDescription>

@@ -40,6 +40,7 @@ import {
   getStoredPreviewApiKey,
   setStoredPreviewApiKey,
 } from '@/app/utils/preview-api-key-storage';
+import { formatVersionWithPrefix } from '@/app/utils/version-display';
 
 interface PublishedVersion {
   id: string;
@@ -369,7 +370,7 @@ const PublishedVersions = ({ restApiBaseUrl }: { restApiBaseUrl: string }) => {
                         <div className="flex flex-col">
                           <div className="text-sm font-semibold text-gray-900 dark:text-white">{version.project_name}</div>
                           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-0.5">
-                            <span className="font-mono font-medium text-indigo-600 dark:text-indigo-400">v{version.version_id}</span>
+                            <span className="font-mono font-medium text-indigo-600 dark:text-indigo-400">{formatVersionWithPrefix(version.version_id)}</span>
                             <div className="p-0.5 bg-blue-100 dark:bg-blue-900/30 rounded"><Lock className="h-3 w-3 text-blue-600 dark:text-blue-400" /></div>
                           </div>
                           {version.description && <div className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 max-w-xs truncate">{version.description}</div>}
