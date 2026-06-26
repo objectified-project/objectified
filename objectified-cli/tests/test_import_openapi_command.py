@@ -160,10 +160,106 @@ def test_import_openapi_sync_success(httpx_mock: object, tmp_path: Path) -> None
     result = runner.invoke(app, ["import", "openapi", str(spec_path)])
 
     assert result.exit_code == 0
-    assert "Import completed: elapsed=(" in result.stdout
+    assert "Import completed: " in result.stdout
     assert "Pet Store" in result.stdout
     assert "pet-store" in result.stdout
     assert "Uploading OpenAPI document petstore.json" in result.stderr
+
+
+def test_import_openapi_elapsed_includes_async_resolution(
+    httpx_mock: object,
+    tmp_path: Path,
+) -> None:
+    """Elapsed time must span the async job resolution, not just the upload POST.
+
+    Regression: for async imports the POST returns a quick 202 and the real work
+    happens while the CLI polls the job to completion. Measuring before resolution
+    reported ``0s`` regardless of how long the import actually took.
+    """
+    from objectified_cli.import_.upload import ImportResolution
+
+    spec_path = tmp_path / "petstore.json"
+    _write_spec(spec_path)
+    _mock_import_completed(httpx_mock)
+
+    # A fake monotonic clock the command module reads; resolution advances it by 16s.
+    clock = {"now": 100.0}
+    real_resolve = __import__(
+        "objectified_cli.commands.import_", fromlist=["resolve_import_result"]
+    ).resolve_import_result
+
+    def _resolve_then_advance(*args: object, **kwargs: object) -> ImportResolution:
+        resolution = real_resolve(*args, **kwargs)
+        clock["now"] += 16.0
+        return resolution
+
+    with patch(
+        "objectified_cli.commands.import_.time.monotonic",
+        side_effect=lambda: clock["now"],
+    ), patch(
+        "objectified_cli.commands.import_.resolve_import_result",
+        side_effect=_resolve_then_advance,
+    ):
+        result = runner.invoke(app, ["import", "openapi", str(spec_path)])
+
+    assert result.exit_code == 0
+    # Before the fix this would read "Import completed: 0s".
+    assert "Import completed: 16s" in result.stdout
+
+
+def _capture_resolution_timeout(
+    httpx_mock: object,
+    spec_path: Path,
+    argv: list[str],
+) -> float:
+    """Invoke an import and return the ``timeout`` passed to resolve_import_result."""
+    from objectified_cli.import_.upload import ImportResolution
+
+    _write_spec(spec_path)
+    # Only the POST accept is hit; resolve_import_result (which would poll the GET) is
+    # patched out so we can capture the timeout it would have been called with.
+    _mock_accept(httpx_mock)
+
+    captured: dict[str, float] = {}
+
+    def _capture(*args: object, **kwargs: object) -> ImportResolution:
+        captured["timeout"] = kwargs["timeout"]  # type: ignore[assignment]
+        return ImportResolution(kind="completed", payload=_IMPORT_RESULT)
+
+    with patch(
+        "objectified_cli.commands.import_.resolve_import_result",
+        side_effect=_capture,
+    ):
+        result = runner.invoke(app, argv)
+
+    assert result.exit_code == 0, result.stdout
+    return captured["timeout"]
+
+
+def test_import_openapi_import_timeout_option_overrides_poll_timeout(
+    httpx_mock: object,
+    tmp_path: Path,
+) -> None:
+    """``--import-timeout`` raises the wait/poll timeout above the 120s default."""
+    timeout = _capture_resolution_timeout(
+        httpx_mock,
+        tmp_path / "petstore.json",
+        ["import", "openapi", str(tmp_path / "petstore.json"), "--import-timeout", "600"],
+    )
+    assert timeout == 600.0
+
+
+def test_import_openapi_defaults_to_120s_poll_timeout(
+    httpx_mock: object,
+    tmp_path: Path,
+) -> None:
+    """Without the option the import wait keeps the 120s default."""
+    timeout = _capture_resolution_timeout(
+        httpx_mock,
+        tmp_path / "petstore.json",
+        ["import", "openapi", str(tmp_path / "petstore.json")],
+    )
+    assert timeout == 120.0
 
 
 def test_import_openapi_lists_local_schema_coercion_warnings(
@@ -210,7 +306,7 @@ def test_import_openapi_from_url(httpx_mock: object) -> None:
     result = runner.invoke(app, ["import", "openapi", spec_url])
 
     assert result.exit_code == 0
-    assert "Import completed: elapsed=(" in result.stdout
+    assert "Import completed: " in result.stdout
     assert "Fetching OpenAPI document petstore.json" in result.stderr
 
 
@@ -264,7 +360,7 @@ def test_import_openapi_async_polls_until_completed(
     result = runner.invoke(app, ["import", "openapi", str(spec_path)])
 
     assert result.exit_code == 0
-    assert "Import completed: elapsed=(" in result.stdout
+    assert "Import completed: " in result.stdout
     stderr = strip_ansi(result.stderr)
     assert "Import running" in stderr or "Uploading" in stderr
 
@@ -318,7 +414,7 @@ def test_import_openapi_errors_in_result_exit_error(
     result = runner.invoke(app, ["import", "openapi", str(spec_path)])
 
     assert result.exit_code == EXIT_ERROR
-    assert "Import completed: elapsed=(" in result.stdout
+    assert "Import completed: " in result.stdout
     assert "Errors: 1" in result.stdout
 
 

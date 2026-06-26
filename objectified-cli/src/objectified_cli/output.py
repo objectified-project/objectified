@@ -152,12 +152,27 @@ def _emit_created_counts_table(created: object, *, heading: str) -> None:
     console.print(table, justify="left")
 
 
+def _format_elapsed(seconds: float) -> str:
+    """Render a duration as a compact human-readable string (e.g. ``16s``, ``1m 16s``, ``1h 2m 3s``)."""
+    total = max(0, int(seconds))
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    parts: list[str] = []
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    # Always show seconds so a sub-minute (or zero) duration still reads as e.g. "0s".
+    if secs or not parts:
+        parts.append(f"{secs}s")
+    return " ".join(parts)
+
+
 def _format_import_completed_line(*, elapsed_seconds: float | None = None) -> str:
     """Build the human-mode import success headline."""
     if elapsed_seconds is None:
         return "Import completed."
-    elapsed = max(0, int(elapsed_seconds))
-    return f"Import completed: elapsed=({elapsed})s"
+    return f"Import completed: {_format_elapsed(elapsed_seconds)}"
 
 
 def emit_import_job_accepted(payload: dict[str, Any], *, json_mode: bool) -> None:

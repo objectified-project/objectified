@@ -8,19 +8,21 @@ We continue to improve the platform based on your feedback with improvements and
 
 - CLI: Corrected Swagger 2.0 support in auto import mode
 - CLI: Adds --force option to import so that warnings do not prevent publication
+- CLI: Import shows correct elapsed time for an import job
+- CLI: Adds "--import-timeout (seconds)" option to import to override 120 second timeout
+- DB: Optimizations made to increase speed for import processing
 - Import: Corrected import for Swagger responses in paths to capture the schema properly for array items
 - Import: Import speed greatly improved
 - Import: Special cases with unicode characters are now properly handled
 - Import: Better duplication checks - now compares project and version IDs before rejecting
 - Import: Fixes publish flag when importing via CLI
 - Import: Publish uses short note via description, title, or slug and version if not provided
-- UI: Fixes Published Versions viewing of OpenAPI and Arazzo URLs
-- UI: Fixes Published Versions list so versions starting with a "v" don't duplicate and show "vv"
-- DB: Optimizations made to increase speed for import processing
 - Import: Updates import service to include benchmarking output
 - Import: Fixes linting problem in rare cases during import
 - Import: Corrects base ref and $ref external dereferencing
 - Import: Updating class creation step to increase speed using transactions and commits in groups
+- UI: Fixes Published Versions viewing of OpenAPI and Arazzo URLs
+- UI: Fixes Published Versions list so versions starting with a "v" don't duplicate and show "vv"
 
 ---
 

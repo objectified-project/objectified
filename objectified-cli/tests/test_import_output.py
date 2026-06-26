@@ -10,12 +10,32 @@ import pytest
 from rich.console import Console
 
 from objectified_cli.output import (
+    _format_elapsed,
     emit_import_job_accepted,
     emit_import_result,
     emit_json,
     emit_json_schema_type_import_result,
     merge_import_warnings,
 )
+
+
+@pytest.mark.parametrize(
+    ("seconds", "expected"),
+    [
+        (0, "0s"),
+        (0.4, "0s"),
+        (16, "16s"),
+        (59.9, "59s"),
+        (60, "1m"),
+        (76, "1m 16s"),
+        (3600, "1h"),
+        (3661, "1h 1m 1s"),
+        (-5, "0s"),
+    ],
+)
+def test_format_elapsed_is_human_readable(seconds: float, expected: str) -> None:
+    """Durations render compactly with units, never as ``elapsed=(N)s``."""
+    assert _format_elapsed(seconds) == expected
 
 _SAMPLE_RESULT = {
     "project_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -128,7 +148,7 @@ def test_emit_import_result_human_shows_elapsed_seconds() -> None:
         elapsed_seconds=12.7,
     )
 
-    assert "Import completed: elapsed=(12)s" in output
+    assert "Import completed: 12s" in output
 
 
 def test_emit_import_result_human_shows_flat_spec_import_result() -> None:

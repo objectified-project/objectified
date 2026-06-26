@@ -142,7 +142,8 @@ def main(
         "--timeout",
         min=0.1,
         help=(
-            "HTTP timeout in seconds (default 30; import wait uses 120 unless set)."
+            "HTTP timeout in seconds (default 30; import wait uses 120 unless set). "
+            "For imports, prefer the per-command --import-timeout."
         ),
     ),
     no_progress: bool = typer.Option(

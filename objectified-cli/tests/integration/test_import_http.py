@@ -40,7 +40,7 @@ def test_import_openapi_sync_200_completes(
     result = runner.invoke(app, ["--no-progress", "import", "openapi", str(spec_path)])
 
     assert result.exit_code == 0
-    assert "Import completed: elapsed=(" in result.stdout
+    assert "Import completed: " in result.stdout
     assert "Integration Pet Store" in result.stdout
     assert len(httpx_mock.get_requests()) == 2
 
@@ -78,7 +78,7 @@ def test_import_openapi_async_202_polls_running_to_completed(
     )
 
     assert result.exit_code == 0
-    assert "Import completed: elapsed=(" in result.stdout
+    assert "Import completed: " in result.stdout
     assert len(httpx_mock.get_requests()) == 3
     methods = [request.method for request in httpx_mock.get_requests()]
     assert methods == ["POST", "GET", "GET"]
@@ -155,7 +155,7 @@ def test_import_openapi_async_failed_job_exits_error(
     )
 
     assert result.exit_code == EXIT_ERROR
-    assert "Import completed: elapsed=(" not in result.stdout
+    assert "Import completed: " not in result.stdout
     assert "OpenAPI parse error" in strip_ansi(result.stderr)
 
 

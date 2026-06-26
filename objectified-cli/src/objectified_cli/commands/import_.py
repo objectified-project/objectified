@@ -10,6 +10,7 @@ from uuid import UUID
 import typer
 
 from objectified_cli.cli_context import (
+    DEFAULT_IMPORT_TIMEOUT,
     import_timeout_from_context,
     insecure_from_context,
     no_progress_from_context,
@@ -197,6 +198,13 @@ _FORCE_FLAG_HELP = (
     "descriptions, breaking changes) so the version still publishes."
 )
 
+_IMPORT_TIMEOUT_HELP = (
+    "Max seconds to wait for an async import job to finish, and the per-request "
+    f"HTTP timeout used while waiting (default {int(DEFAULT_IMPORT_TIMEOUT)}). "
+    "Increase for large specs that take longer than the default to import. "
+    "Overrides the global --timeout for this import."
+)
+
 
 def _gate_warning_text(response: Any) -> str:
     """Extract the human-readable gate message from a blocked publish response."""
@@ -354,6 +362,16 @@ def import_group(ctx: typer.Context) -> None:
     group_callback_without_subcommand(ctx)
 
 
+def _resolve_import_timeout(
+    ctx: typer.Context,
+    override: float | None,
+) -> float:
+    """Prefer an explicit ``--import-timeout`` over the context (``--timeout``/default)."""
+    if override is not None and override > 0:
+        return float(override)
+    return import_timeout_from_context(ctx)
+
+
 def _run_openapi_import(
     ctx: typer.Context,
     *,
@@ -372,6 +390,7 @@ def _run_openapi_import(
     poll_interval: float,
     progress_label: str,
     attempted: str = "openapi",
+    import_timeout_override: float | None = None,
 ) -> None:
     settings = settings_from_context(ctx)
     require_api_key(settings)
@@ -379,7 +398,7 @@ def _run_openapi_import(
     # Resolve before uploading so invalid --publish/--visibility input fails fast.
     publish_visibility = _coerce_publish_visibility(publish=publish, visibility=visibility)
 
-    import_timeout = import_timeout_from_context(ctx)
+    import_timeout = _resolve_import_timeout(ctx, import_timeout_override)
     no_progress = no_progress_from_context(ctx)
 
     try:
@@ -485,7 +504,6 @@ def _run_openapi_import(
             content_type="application/json",
         )
         response = post_spec_import_json(client, tenant_slug, body)
-    import_elapsed_seconds = time.monotonic() - import_started_at
     json_mode = json_mode_from_context(ctx)
     resolution = resolve_import_result(
         response,
@@ -496,6 +514,9 @@ def _run_openapi_import(
         timeout=import_timeout,
         no_progress=no_progress,
     )
+    # Measure after resolution: for async imports the POST returns a quick 202 and the
+    # real work happens while resolve_import_result polls the job to completion.
+    import_elapsed_seconds = time.monotonic() - import_started_at
 
     if resolution.kind == "completed":
         result_payload = merge_import_warnings(
@@ -608,6 +629,12 @@ def import_openapi(
         "--force",
         help=_FORCE_FLAG_HELP,
     ),
+    import_timeout: float | None = typer.Option(
+        None,
+        "--import-timeout",
+        min=1.0,
+        help=_IMPORT_TIMEOUT_HELP,
+    ),
 ) -> None:
     """Import an OpenAPI document from a file, URL, or stdin."""
     _run_openapi_import(
@@ -627,6 +654,7 @@ def import_openapi(
         poll_interval=poll_interval,
         progress_label="OpenAPI",
         attempted="openapi",
+        import_timeout_override=import_timeout,
     )
 
 
@@ -701,6 +729,12 @@ def import_swagger(
         "--force",
         help=_FORCE_FLAG_HELP,
     ),
+    import_timeout: float | None = typer.Option(
+        None,
+        "--import-timeout",
+        min=1.0,
+        help=_IMPORT_TIMEOUT_HELP,
+    ),
 ) -> None:
     """Import a Swagger 2.0 document from a file, URL, or stdin."""
     _run_openapi_import(
@@ -720,6 +754,7 @@ def import_swagger(
         poll_interval=poll_interval,
         progress_label="Swagger",
         attempted="swagger",
+        import_timeout_override=import_timeout,
     )
 
 
@@ -1105,9 +1140,16 @@ def import_auto(
         "--force",
         help=f"{_FORCE_FLAG_HELP} (OpenAPI/Arazzo).",
     ),
+    import_timeout: float | None = typer.Option(
+        None,
+        "--import-timeout",
+        min=1.0,
+        help=_IMPORT_TIMEOUT_HELP,
+    ),
 ) -> None:
     """Detect document format from headers and run the matching import."""
-    import_timeout = import_timeout_from_context(ctx)
+    import_timeout_override = import_timeout
+    import_timeout = _resolve_import_timeout(ctx, import_timeout_override)
     no_progress = no_progress_from_context(ctx)
 
     try:
@@ -1154,6 +1196,7 @@ def import_auto(
             poll_interval=poll_interval,
             progress_label="Swagger" if command == "swagger" else "OpenAPI",
             attempted=command,
+            import_timeout_override=import_timeout_override,
         )
         return
 
