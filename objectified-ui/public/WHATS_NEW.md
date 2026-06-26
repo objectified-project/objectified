@@ -14,7 +14,8 @@ We continue to improve the platform based on your feedback with improvements and
 - Import: Better duplication checks - now compares project and version IDs before rejecting
 - Import: Fixes publish flag when importing via CLI
 - Import: Publish uses short note via description, title, or slug and version if not provided
-- UI: Fixes published versions viewing of OpenAPI and Arazzo URLs
+- UI: Fixes Published Versions viewing of OpenAPI and Arazzo URLs
+- UI: Fixes Published Versions list so versions starting with a "v" don't duplicate and show "vv"
 
 ---
 
