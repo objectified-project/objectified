@@ -15,6 +15,7 @@ dependencies = [
     "py-yaml12>=0.1.0",
     "jsonschema>=4.0",
     "openapi-spec-validator>=0.8.5",
+    "openapi-schema-validator>=0.6",
 ]
 
 [project.scripts]

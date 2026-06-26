@@ -26,7 +26,7 @@ jobs:
     name: Lint, type-check and test objectified-mcp
     runs-on: self-hosted
     env:
-      OBJECTIFIED_MCP_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/objectified_ci
+      OBJECTIFIED_MCP_DATABASE_URL: postgresql://postgres:postgres@localhost:55432/objectified_ci
 
     services:
       postgres:
@@ -36,7 +36,10 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: objectified_ci
         ports:
-          - 5432:5432
+          # Publish on a non-standard host port: the self-hosted runner already has
+          # a PostgreSQL on 5432, so binding host 5432 fails ("port is already
+          # allocated"). The job connects via localhost:55432 (see DATABASE_URL above).
+          - 55432:5432
         options: >-
           --health-cmd "pg_isready -U postgres -d objectified_ci"
           --health-interval 10s

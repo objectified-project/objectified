@@ -19,6 +19,11 @@ import dataclasses
 from pathlib import Path
 from typing import Any
 
+from openapi_schema_validator import (
+    OAS30Validator,
+    OAS31Validator,
+    OAS32Validator,
+)
 from openapi_spec_validator import validate as validate_openapi_spec
 from openapi_spec_validator.validation.exceptions import (
     OpenAPIValidationError,
@@ -202,6 +207,76 @@ def _prepare_openapi_for_validation(
     )
 
 
+# Keys whose presence marks a node as a Schema Object (so its sibling
+# ``default`` / ``example`` is a value to validate against that schema).
+_SCHEMA_MARKER_KEYS = (
+    "type",
+    "enum",
+    "properties",
+    "items",
+    "allOf",
+    "anyOf",
+    "oneOf",
+    "not",
+    "format",
+    "additionalProperties",
+    "required",
+    "patternProperties",
+)
+
+
+def _schema_value_validator_cls(version_info: OpenApiVersionInfo) -> Any:
+    """Pick the OAS value-validator class matching the document version."""
+    version = getattr(version_info, "version", None)
+    minor = getattr(version, "minor", None)
+    if getattr(version, "major", None) == 3 and minor == 1:
+        return OAS31Validator
+    if getattr(version, "major", None) == 3 and minor == 2:
+        return OAS32Validator
+    # OpenAPI 3.0.x and Swagger 2.0 both validate values with the 3.0 dialect
+    # (matching openapi-spec-validator's own keyword registry).
+    return OAS30Validator
+
+
+def _looks_like_schema(node: dict[str, Any]) -> bool:
+    return any(key in node for key in _SCHEMA_MARKER_KEYS)
+
+
+def _drop_nonconforming_schema_values(
+    node: Any,
+    validator_cls: Any,
+    removed: list[str],
+    pointer: str = "",
+) -> None:
+    """Recursively remove schema ``default`` / ``example`` values that fail their
+    own schema, recording an RFC 6901 pointer for each removal.
+
+    Third-party specs (e.g. those in the openapi-directory) frequently carry
+    documentation-placeholder defaults/examples like ``"<all available types>"``
+    that do not satisfy the schema's ``enum`` / ``type``. These advisory values
+    should not abort an import. Nodes whose validation needs ``$ref`` resolution
+    are left untouched (validation raises and is treated as "cannot judge").
+    """
+    if isinstance(node, dict):
+        if _looks_like_schema(node) and "$ref" not in node:
+            base = {k: v for k, v in node.items() if k not in ("default", "example")}
+            for keyword in ("default", "example"):
+                if keyword not in node:
+                    continue
+                try:
+                    errors = list(validator_cls(base).iter_errors(node[keyword]))
+                except Exception:  # noqa: BLE001 — unresolved $ref etc.: cannot judge, keep it
+                    errors = []
+                if errors:
+                    del node[keyword]
+                    removed.append(f"{pointer}/{keyword}")
+        for key, value in list(node.items()):
+            _drop_nonconforming_schema_values(value, validator_cls, removed, f"{pointer}/{key}")
+    elif isinstance(node, list):
+        for index, item in enumerate(node):
+            _drop_nonconforming_schema_values(item, validator_cls, removed, f"{pointer}/{index}")
+
+
 def validate_openapi_structure(
     spec: dict[str, Any],
     *,
@@ -238,7 +313,34 @@ def validate_openapi_structure(
     try:
         validate_openapi_spec(spec)
     except OpenAPIValidationError as exc:
-        raise OpenApiStructureError(str(exc).strip()) from exc
+        # A non-conformant advisory `default` / `example` value (common in
+        # third-party specs) should not abort the import. Drop only the offending
+        # values, then re-validate; if the document is now valid, continue with a
+        # warning. Any remaining failure is structural and is re-raised.
+        removed: list[str] = []
+        _drop_nonconforming_schema_values(
+            spec, _schema_value_validator_cls(version_info), removed
+        )
+        if not removed:
+            raise OpenApiStructureError(str(exc).strip()) from exc
+        try:
+            validate_openapi_spec(spec)
+        except OpenAPIValidationError as exc2:
+            raise OpenApiStructureError(str(exc2).strip()) from exc2
+        if preparation_warnings is not None:
+            preview = ", ".join(removed[:5])
+            if len(removed) > 5:
+                preview += ", …"
+            preparation_warnings.append(
+                SchemaTypeCoercionWarning(
+                    code="schema.value.nonconforming_dropped",
+                    message=(
+                        f"Dropped {len(removed)} schema default/example value(s) that "
+                        f"did not satisfy their schema: {preview}"
+                    ),
+                    path=removed[0],
+                )
+            )
     except PointerToNowhere as exc:
         pointer = exc.ref if isinstance(getattr(exc, "ref", None), str) else None
         message = f"Unresolved $ref {pointer}: component or pointer target is missing."

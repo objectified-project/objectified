@@ -921,3 +921,93 @@ def test_load_and_validate_stdin() -> None:
         _spec, version_info = load_and_validate_openapi_file("-")
 
     assert version_info.family == "3.0.x"
+
+
+def test_validate_drops_nonconforming_enum_default_and_warns() -> None:
+    """A default that violates its schema's enum is dropped (not fatal), with a warning.
+
+    Regression: third-party specs (e.g. adyen.com PayoutService) carry placeholder
+    defaults like ['<all available types>'] that fail items.enum; the import must
+    succeed by dropping only the offending value.
+    """
+    spec = {
+        "openapi": "3.0.3",
+        "info": {"title": "Demo", "version": "1.0.0"},
+        "paths": {},
+        "components": {
+            "schemas": {
+                "DeviceRenderOptions": {
+                    "type": "object",
+                    "properties": {
+                        "sdkUiType": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "multiSelect",
+                                    "otherHtml",
+                                    "outOfBand",
+                                    "singleSelect",
+                                    "text",
+                                ],
+                            },
+                            "default": ["<all available types>"],
+                        },
+                    },
+                }
+            }
+        },
+    }
+    warnings: list = []
+
+    validate_openapi_structure(spec, preparation_warnings=warnings)
+
+    sdk = spec["components"]["schemas"]["DeviceRenderOptions"]["properties"]["sdkUiType"]
+    assert "default" not in sdk
+    codes = [w.code for w in warnings]
+    assert "schema.value.nonconforming_dropped" in codes
+
+
+def test_validate_keeps_conforming_default_untouched() -> None:
+    """A default that satisfies its schema's enum is preserved, with no drop warning."""
+    spec = {
+        "openapi": "3.0.3",
+        "info": {"title": "Demo", "version": "1.0.0"},
+        "paths": {},
+        "components": {
+            "schemas": {
+                "Mode": {
+                    "type": "string",
+                    "enum": ["text", "html"],
+                    "default": "text",
+                }
+            }
+        },
+    }
+    warnings: list = []
+
+    validate_openapi_structure(spec, preparation_warnings=warnings)
+
+    assert spec["components"]["schemas"]["Mode"]["default"] == "text"
+    assert not any(w.code == "schema.value.nonconforming_dropped" for w in warnings)
+
+
+def test_validate_still_raises_on_structural_error_after_value_drop() -> None:
+    """Dropping advisory values does not mask genuine structural errors."""
+    spec = {
+        "openapi": "3.0.3",
+        "info": {"title": "Demo"},  # missing required 'version' -> structural
+        "paths": {},
+        "components": {
+            "schemas": {
+                "X": {
+                    "type": "string",
+                    "enum": ["a"],
+                    "default": "not-in-enum",
+                }
+            }
+        },
+    }
+
+    with pytest.raises(OpenApiStructureError):
+        validate_openapi_structure(spec)
