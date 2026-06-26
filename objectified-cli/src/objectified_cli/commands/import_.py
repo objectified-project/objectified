@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import time
 from typing import Any
 from uuid import UUID
 
@@ -464,6 +465,7 @@ def _run_openapi_import(
             err=True,
         )
 
+    import_started_at = time.monotonic()
     if use_multipart:
         file_bytes = document_bytes_from_spec(spec, filename=upload_name)
         response = post_spec_import_multipart(
@@ -482,6 +484,7 @@ def _run_openapi_import(
             content_type="application/json",
         )
         response = post_spec_import_json(client, tenant_slug, body)
+    import_elapsed_seconds = time.monotonic() - import_started_at
     json_mode = json_mode_from_context(ctx)
     resolution = resolve_import_result(
         response,
@@ -502,6 +505,7 @@ def _run_openapi_import(
             result_payload,
             json_mode=json_mode,
             dry_run=dry_run,
+            elapsed_seconds=import_elapsed_seconds,
         )
         if import_result_has_errors(resolution.payload):
             raise typer.Exit(EXIT_ERROR)

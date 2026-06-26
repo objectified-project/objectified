@@ -32,8 +32,10 @@ jobs:
         ports:
           # Publish on a non-standard host port: the self-hosted runner already has
           # a PostgreSQL on 5432, so binding host 5432 fails ("port is already
-          # allocated"). Steps reach the service via localhost:55432 (see POSTGRES_PORT).
-          - 55432:5432
+          # allocated"). Use 55433 here (objectified-mcp uses 55432) so parallel
+          # self-hosted jobs do not collide. Steps reach the service via
+          # localhost:55433 (see POSTGRES_PORT).
+          - 55433:5432
 
     steps:
       - name: Checkout code
@@ -60,7 +62,7 @@ jobs:
         env:
           TEST_POSTGRES_DB: objectified_test
           POSTGRES_HOST: localhost
-          POSTGRES_PORT: 55432
+          POSTGRES_PORT: 55433
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           NODE_ENV: test
@@ -102,7 +104,7 @@ jobs:
         env:
           TEST_POSTGRES_DB: objectified_test
           POSTGRES_HOST: localhost
-          POSTGRES_PORT: 55432
+          POSTGRES_PORT: 55433
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           NODE_ENV: test

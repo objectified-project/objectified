@@ -152,6 +152,14 @@ def _emit_created_counts_table(created: object, *, heading: str) -> None:
     console.print(table, justify="left")
 
 
+def _format_import_completed_line(*, elapsed_seconds: float | None = None) -> str:
+    """Build the human-mode import success headline."""
+    if elapsed_seconds is None:
+        return "Import completed."
+    elapsed = max(0, int(elapsed_seconds))
+    return f"Import completed: elapsed=({elapsed})s"
+
+
 def emit_import_job_accepted(payload: dict[str, Any], *, json_mode: bool) -> None:
     """Print an async import accept body (``202``) when not waiting for completion."""
     if json_mode:
@@ -171,6 +179,7 @@ def emit_import_result(
     *,
     json_mode: bool,
     dry_run: bool = False,
+    elapsed_seconds: float | None = None,
 ) -> None:
     """Print an ``ImportResult`` to stdout (human summary or raw JSON)."""
     if json_mode:
@@ -209,7 +218,7 @@ def emit_import_result(
     if dry_run:
         typer.echo("Dry run completed (no changes written).")
     else:
-        typer.echo("Import completed.")
+        typer.echo(_format_import_completed_line(elapsed_seconds=elapsed_seconds))
 
     provenance = payload.get("provenance")
     if isinstance(provenance, dict):
@@ -257,6 +266,7 @@ def emit_json_schema_type_import_result(
     *,
     json_mode: bool,
     dry_run: bool = False,
+    elapsed_seconds: float | None = None,
 ) -> None:
     """Print an ``ImportJsonSchemaTypeResult`` to stdout (human table or raw JSON)."""
     if json_mode:
@@ -266,7 +276,7 @@ def emit_json_schema_type_import_result(
     if dry_run:
         typer.echo("Dry run completed (no changes written).")
     else:
-        typer.echo("Import completed.")
+        typer.echo(_format_import_completed_line(elapsed_seconds=elapsed_seconds))
 
     entries = payload.get("entries")
     if isinstance(entries, list) and entries:

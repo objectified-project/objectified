@@ -228,6 +228,7 @@ source = { editable = "." }
 dependencies = [
     { name = "httpx" },
     { name = "jsonschema" },
+    { name = "openapi-schema-validator" },
     { name = "openapi-spec-validator" },
     { name = "py-yaml12" },
     { name = "pydantic-settings" },
@@ -245,6 +246,7 @@ dev = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.0" },
+    { name = "openapi-schema-validator", specifier = ">=0.6" },
     { name = "openapi-spec-validator", specifier = ">=0.8.5" },
     { name = "py-yaml12", specifier = ">=0.1.0" },
     { name = "pydantic-settings", specifier = ">=2.0" },

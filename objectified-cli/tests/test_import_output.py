@@ -119,6 +119,18 @@ def test_emit_import_result_human_shows_ids_and_counts() -> None:
     assert "Errors:" not in output
 
 
+def test_emit_import_result_human_shows_elapsed_seconds() -> None:
+    """Human mode includes elapsed seconds on the completion line when provided."""
+    output = _capture_human_output(
+        emit_import_result,
+        _SAMPLE_RESULT,
+        json_mode=False,
+        elapsed_seconds=12.7,
+    )
+
+    assert "Import completed: elapsed=(12)s" in output
+
+
 def test_emit_import_result_human_shows_flat_spec_import_result() -> None:
     """The async spec-import result has flat keys (no nested project/version objects).
 

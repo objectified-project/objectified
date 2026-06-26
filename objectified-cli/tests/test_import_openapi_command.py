@@ -160,7 +160,7 @@ def test_import_openapi_sync_success(httpx_mock: object, tmp_path: Path) -> None
     result = runner.invoke(app, ["import", "openapi", str(spec_path)])
 
     assert result.exit_code == 0
-    assert "Import completed." in result.stdout
+    assert "Import completed: elapsed=(" in result.stdout
     assert "Pet Store" in result.stdout
     assert "pet-store" in result.stdout
     assert "Uploading OpenAPI document petstore.json" in result.stderr
@@ -210,7 +210,7 @@ def test_import_openapi_from_url(httpx_mock: object) -> None:
     result = runner.invoke(app, ["import", "openapi", spec_url])
 
     assert result.exit_code == 0
-    assert "Import completed." in result.stdout
+    assert "Import completed: elapsed=(" in result.stdout
     assert "Fetching OpenAPI document petstore.json" in result.stderr
 
 
@@ -264,7 +264,7 @@ def test_import_openapi_async_polls_until_completed(
     result = runner.invoke(app, ["import", "openapi", str(spec_path)])
 
     assert result.exit_code == 0
-    assert "Import completed." in result.stdout
+    assert "Import completed: elapsed=(" in result.stdout
     stderr = strip_ansi(result.stderr)
     assert "Import running" in stderr or "Uploading" in stderr
 
@@ -318,7 +318,7 @@ def test_import_openapi_errors_in_result_exit_error(
     result = runner.invoke(app, ["import", "openapi", str(spec_path)])
 
     assert result.exit_code == EXIT_ERROR
-    assert "Import completed." in result.stdout
+    assert "Import completed: elapsed=(" in result.stdout
     assert "Errors: 1" in result.stdout
 
 
