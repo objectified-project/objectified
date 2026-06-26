@@ -13,6 +13,15 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: monorepoRoot,
   },
+  // Bound build-time parallelism. The static-generation worker pool defaults to
+  // (CPU count - 1) workers — 19 on a 20-core box — and each worker loads the app,
+  // so peak memory spikes hard. On the shared self-hosted CI runner that starves
+  // the agent and it "loses communication" mid-build. Cap the pool and let Next
+  // shrink it further when free memory is low.
+  experimental: {
+    cpus: 4,
+    memoryBasedWorkersCount: true,
+  },
 };
 
 export default nextConfig;

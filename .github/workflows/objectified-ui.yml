@@ -103,3 +103,8 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           NODE_ENV: test
+          # Cap heap so the build cannot balloon and swap-thrash the shared
+          # self-hosted runner into losing communication (worker count is also
+          # bounded in next.config.ts via experimental.cpus / memoryBasedWorkersCount).
+          NODE_OPTIONS: --max-old-space-size=4096
+          NEXT_TELEMETRY_DISABLED: "1"
