@@ -862,6 +862,101 @@ def test_validate_openapi_structure_accepts_contract_p_invalid_enum_default() ->
     assert any(warning.code == "schema_enum_default_removed" for warning in warnings)
 
 
+def test_validate_openapi_structure_resolves_sibling_file_refs(tmp_path: Path) -> None:
+    """Relative file $ref values resolve from the spec path during validation."""
+    from objectified_cli.import_.openapi import load_openapi_file
+
+    sibling = tmp_path / "routeFilter.json"
+    sibling.write_text(
+        json.dumps(
+            {
+                "definitions": {
+                    "RouteFilter": {
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}},
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    spec_path = tmp_path / "swagger.yaml"
+    spec_path.write_text(
+        textwrap.dedent(
+            """\
+            swagger: "2.0"
+            info:
+              title: External Ref Test
+              version: "1.0.0"
+            paths: {}
+            definitions:
+              ExpressRouteCrossConnection:
+                type: object
+                properties:
+                  routeFilter:
+                    $ref: './routeFilter.json#/definitions/RouteFilter'
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    spec = load_openapi_file(str(spec_path))
+    validate_openapi_structure(spec, source=str(spec_path))
+
+
+def test_validate_openapi_structure_warns_on_missing_external_file_ref() -> None:
+    """Missing external file refs become warnings during import prep, not crashes."""
+    from objectified_cli.import_.openapi import load_openapi_file
+
+    path = Path(
+        "/home/kenji/Development/openapi-directory/APIs/azure.com/"
+        "network-expressRouteCrossConnection/2018-02-01/swagger.yaml"
+    )
+    if not path.is_file():
+        pytest.skip("Azure expressRouteCrossConnection fixture not available locally")
+
+    spec = load_openapi_file(str(path))
+    warnings: list = []
+    version_info = validate_openapi_structure(
+        spec,
+        source=str(path),
+        preparation_warnings=warnings,
+    )
+
+    assert version_info.keyword == "swagger"
+    assert any(warning.code == "external_ref_not_followed" for warning in warnings)
+
+
+def test_validate_openapi_structure_missing_external_ref_raises_without_warnings(
+    tmp_path: Path,
+) -> None:
+    """Direct validation without preparation_warnings still fails on missing external refs."""
+    spec_path = tmp_path / "swagger.yaml"
+    spec_path.write_text(
+        textwrap.dedent(
+            """\
+            swagger: "2.0"
+            info:
+              title: External Ref Test
+              version: "1.0.0"
+            paths:
+              /items:
+                get:
+                  responses:
+                    "200":
+                      schema:
+                        $ref: './routeFilter.json#/definitions/RouteFilter'
+            """
+        ),
+        encoding="utf-8",
+    )
+    from objectified_cli.import_.openapi import load_openapi_file
+
+    spec = load_openapi_file(str(spec_path))
+    with pytest.raises(OpenApiStructureError, match=r"routeFilter\.json"):
+        validate_openapi_structure(spec, source=str(spec_path))
+
+
 # ---------------------------------------------------------------------------
 # load_and_validate_openapi_file
 # ---------------------------------------------------------------------------

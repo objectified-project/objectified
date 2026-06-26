@@ -29,7 +29,7 @@ from openapi_spec_validator.validation.exceptions import (
     OpenAPIValidationError,
     ValidatorDetectError,
 )
-from referencing.exceptions import PointerToNowhere
+from referencing.exceptions import PointerToNowhere, Unresolvable
 from openapi_spec_validator.versions.consts import (
     OPENAPIV2,
     OPENAPIV30,
@@ -54,11 +54,14 @@ from objectified_cli.import_.schema_type_coercion import (
     restore_oas30_numeric_exclusive_bounds_for_spec_validation,
 )
 from objectified_cli.import_.source import (
+    is_local_file_source,
     is_remote_source,
     parse_mapping_document,
     read_document_text,
     suffix_from_source,
 )
+
+_CODE_EXTERNAL_REF_NOT_FOLLOWED = "external_ref_not_followed"
 
 # Supported OpenAPI / Swagger families for detection reporting.
 _SUPPORTED_SPEC_VERSIONS: tuple[SpecVersion, ...] = (
@@ -85,6 +88,67 @@ class OpenApiVersionInfo:
     keyword: str
     version: str
     family: str
+
+
+def validation_base_uri(source: str | None) -> str:
+    """Return the document base URI for resolving relative ``$ref`` values."""
+    if not source or source == "-":
+        return ""
+    if is_remote_source(source):
+        return source
+    if is_local_file_source(source):
+        return Path(source).resolve().as_uri()
+    return ""
+
+
+def _is_external_file_ref(ref: str) -> bool:
+    """Return whether *ref* points outside the current document (file or URL)."""
+    if not ref or ref.startswith("#"):
+        return False
+    if ref.startswith(("http://", "https://")):
+        return True
+    path_part = ref.split("#", 1)[0]
+    if not path_part:
+        return False
+    if path_part.startswith(("./", "../")):
+        return True
+    lower = path_part.lower()
+    return lower.endswith((".json", ".yaml", ".yml"))
+
+
+def _unresolved_ref_message(ref: str) -> str:
+    return (
+        f"Unresolved $ref {ref!r}: reference target could not be loaded. "
+        "For file imports, ensure sibling files exist next to the spec."
+    )
+
+
+def _handle_unresolvable_ref(
+    exc: Unresolvable,
+    *,
+    version_info: OpenApiVersionInfo,
+    preparation_warnings: list[SchemaTypeCoercionWarning] | None,
+) -> OpenApiVersionInfo:
+    ref = getattr(exc, "ref", None)
+    ref_str = ref if isinstance(ref, str) else str(ref) if ref is not None else ""
+    message = (
+        _unresolved_ref_message(ref_str)
+        if ref_str
+        else "Unresolved $ref: reference target could not be loaded."
+    )
+    if ref_str and _is_external_file_ref(ref_str) and preparation_warnings is not None:
+        preparation_warnings.append(
+            SchemaTypeCoercionWarning(
+                code=_CODE_EXTERNAL_REF_NOT_FOLLOWED,
+                message=(
+                    f"External $ref {ref_str!r} was not resolved during validation; "
+                    "import will not follow this reference."
+                ),
+                path=ref_str,
+            )
+        )
+        return version_info
+    raise OpenApiStructureError(message) from exc
 
 
 class OpenApiStructureError(ValueError):
@@ -280,6 +344,7 @@ def _drop_nonconforming_schema_values(
 def validate_openapi_structure(
     spec: dict[str, Any],
     *,
+    source: str | None = None,
     preparation_warnings: list[SchemaTypeCoercionWarning] | None = None,
 ) -> OpenApiVersionInfo:
     """Validate *spec* against the OpenAPI JSON Schema for its detected version.
@@ -291,8 +356,11 @@ def validate_openapi_structure(
     Args:
         spec: Parsed top-level OpenAPI document mapping. Coerced defaults are
             written back into this mapping in place.
+        source: Import path, URL, or ``"-"`` for stdin. When set, relative
+            file ``$ref`` values are resolved from the document location.
         preparation_warnings: When provided, schema coercion warnings are
-            appended for the caller to surface.
+            appended for the caller to surface. Unresolvable external file
+            ``$ref`` values become warnings instead of hard failures.
 
     Returns:
         Version metadata for the validated document.
@@ -310,8 +378,9 @@ def validate_openapi_structure(
 
     version_info = detect_openapi_version(spec)
     restore_oas30_numeric_exclusive_bounds_for_spec_validation(spec)
+    base_uri = validation_base_uri(source)
     try:
-        validate_openapi_spec(spec)
+        validate_openapi_spec(spec, base_uri=base_uri)
     except OpenAPIValidationError as exc:
         # A non-conformant advisory `default` / `example` value (common in
         # third-party specs) should not abort the import. Drop only the offending
@@ -324,9 +393,15 @@ def validate_openapi_structure(
         if not removed:
             raise OpenApiStructureError(str(exc).strip()) from exc
         try:
-            validate_openapi_spec(spec)
+            validate_openapi_spec(spec, base_uri=base_uri)
         except OpenAPIValidationError as exc2:
             raise OpenApiStructureError(str(exc2).strip()) from exc2
+        except Unresolvable as exc2:
+            return _handle_unresolvable_ref(
+                exc2,
+                version_info=version_info,
+                preparation_warnings=preparation_warnings,
+            )
         if preparation_warnings is not None:
             preview = ", ".join(removed[:5])
             if len(removed) > 5:
@@ -341,6 +416,12 @@ def validate_openapi_structure(
                     path=removed[0],
                 )
             )
+    except Unresolvable as exc:
+        return _handle_unresolvable_ref(
+            exc,
+            version_info=version_info,
+            preparation_warnings=preparation_warnings,
+        )
     except PointerToNowhere as exc:
         pointer = exc.ref if isinstance(getattr(exc, "ref", None), str) else None
         message = f"Unresolved $ref {pointer}: component or pointer target is missing."
@@ -369,5 +450,5 @@ def load_and_validate_openapi_file(path: str) -> tuple[dict[str, Any], OpenApiVe
         OpenApiStructureError: If structural validation fails.
     """
     spec = load_openapi_file(path)
-    version_info = validate_openapi_structure(spec)
+    version_info = validate_openapi_structure(spec, source=path)
     return spec, version_info

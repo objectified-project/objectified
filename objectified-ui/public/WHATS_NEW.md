@@ -19,6 +19,7 @@ We continue to improve the platform based on your feedback with improvements and
 - DB: Optimizations made to increase speed for import processing
 - Import: Updates import service to include benchmarking output
 - Import: Fixes linting problem in rare cases during import
+- Import: Corrects base ref and $ref external dereferencing
 
 ---
 

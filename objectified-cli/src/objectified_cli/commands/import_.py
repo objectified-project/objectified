@@ -407,6 +407,7 @@ def _run_openapi_import(
         preparation_warnings: list[SchemaTypeCoercionWarning] = []
         validate_openapi_structure(
             spec,
+            source=path,
             preparation_warnings=preparation_warnings,
         )
     except OpenApiStructureError as exc:
