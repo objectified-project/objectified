@@ -65,6 +65,22 @@ _SNAKE_CASE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _SCALAR_TYPES = frozenset({"string", "number", "integer", "boolean"})
 
 
+def _schema_type_set(schema: Mapping[str, Any]) -> frozenset:
+    """Normalize a schema's ``type`` to a set of type-name strings.
+
+    OpenAPI 3.1 / JSON Schema 2020-12 allow ``type`` to be a list (a union such as
+    ``["string", "null"]``); OpenAPI 3.0 uses a single string. Returns an empty set
+    when ``type`` is absent or not a string/list, so membership tests stay list-safe
+    (a raw list value is unhashable and crashes ``x in _SCALAR_TYPES``).
+    """
+    raw = schema.get("type")
+    if isinstance(raw, str):
+        return frozenset((raw,))
+    if isinstance(raw, list):
+        return frozenset(item for item in raw if isinstance(item, str))
+    return frozenset()
+
+
 def _is_pascal_case(name: str) -> bool:
     return bool(_PASCAL_CASE.match(name))
 
@@ -178,7 +194,12 @@ def _walk_property(
         )
 
     ref_only = _is_ref_only(schema)
-    schema_type = schema.get("type")
+    # `type` may be a string (OpenAPI 3.0) or a list (3.1 / JSON Schema union, e.g.
+    # ["string", "null"]); normalize to a set so checks are list-safe.
+    schema_types = _schema_type_set(schema)
+    non_null_types = schema_types - {"null"}
+    is_array = "array" in schema_types
+    type_label = "/".join(sorted(schema_types)) if schema_types else str(schema.get("type"))
 
     if not ref_only:
         # Documentation: every property should describe itself.
@@ -190,18 +211,19 @@ def _walk_property(
                     f"Property '{name}' is missing a description.",
                 )
             )
-        # Documentation: leaf scalar properties should carry an example.
-        if schema_type in _SCALAR_TYPES and not _has_example(schema):
+        # Documentation: leaf scalar properties should carry an example. A nullable
+        # scalar (e.g. ["string","null"]) still counts; a union with a non-scalar does not.
+        if non_null_types and non_null_types <= _SCALAR_TYPES and not _has_example(schema):
             findings.append(
                 _make_finding(
                     path,
                     "documentation.property-missing-example",
-                    f"Property '{name}' ({schema_type}) is missing an example.",
+                    f"Property '{name}' ({type_label}) is missing an example.",
                 )
             )
 
     # Structure: arrays must bound their size.
-    if schema_type == "array" and "maxItems" not in schema:
+    if is_array and "maxItems" not in schema:
         findings.append(
             _make_finding(
                 path,
@@ -222,7 +244,7 @@ def _walk_property(
             )
 
     # Recurse into array item schemas.
-    if schema_type == "array":
+    if is_array:
         items = schema.get("items")
         if isinstance(items, dict):
             item_props = items.get("properties")

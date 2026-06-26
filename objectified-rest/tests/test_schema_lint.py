@@ -163,3 +163,68 @@ def test_compatibility_findings_fold_into_score():
     with_compat = lint_openapi_spec(CLEAN_SPEC, extra_findings=breaking)
     assert with_compat.score < base.score
     assert with_compat.severity_counts["error"] == 1
+
+
+# Regression: OpenAPI 3.1 / JSON Schema allow `type` to be a list (a union such as
+# ["string", "null"]). A raw list is unhashable and previously crashed the scalar-type
+# membership check (`schema_type in _SCALAR_TYPES`) with a TypeError, which aborted the
+# import-time quality capture. The linter must handle list `type` values.
+
+_UNION_TYPE_SPEC = {
+    "openapi": "3.1.0",
+    "info": {"title": "Union", "version": "1.0.0", "description": "Union type API."},
+    "paths": {},
+    "components": {
+        "schemas": {
+            "Thing": {
+                "type": "object",
+                "description": "A thing.",
+                "properties": {
+                    # nullable scalar, no example -> should still be flagged, not crash
+                    "label": {"type": ["string", "null"], "description": "A label."},
+                    # nullable array, no maxItems -> should be treated as array
+                    "items": {
+                        "type": ["array", "null"],
+                        "description": "Items.",
+                        "items": {"type": "string"},
+                    },
+                },
+            }
+        }
+    },
+}
+
+
+def test_list_type_does_not_crash_linter():
+    result = lint_openapi_spec(_UNION_TYPE_SPEC)  # must not raise TypeError
+    rules = {f.rule for f in result.findings}
+    # nullable scalar without example is still flagged as a scalar leaf
+    assert "documentation.property-missing-example" in rules
+    # nullable array without maxItems is still treated as an (unbounded) array
+    assert "structure.unbounded-array" in rules
+
+
+def test_union_with_non_scalar_not_flagged_for_example():
+    spec = {
+        "openapi": "3.1.0",
+        "info": {"title": "U", "version": "1.0.0", "description": "d"},
+        "paths": {},
+        "components": {
+            "schemas": {
+                "Thing": {
+                    "type": "object",
+                    "description": "A thing.",
+                    "properties": {
+                        # union including a non-scalar -> not a scalar leaf, no example finding
+                        "blob": {"type": ["object", "null"], "description": "Blob."},
+                    },
+                }
+            }
+        },
+    }
+    result = lint_openapi_spec(spec)
+    example_findings = [
+        f for f in result.findings
+        if f.rule == "documentation.property-missing-example" and f.path.endswith("blob")
+    ]
+    assert example_findings == []

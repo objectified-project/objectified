@@ -14,7 +14,7 @@ import os
 import shutil
 import uuid
 import base64
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
 
@@ -23,6 +23,7 @@ from fastapi import HTTPException
 from .config import settings
 from .models import (
     SpecImportCommitResponse,
+    SpecImportEvent,
     SpecImportJobAccepted,
     SpecImportJobListItem,
     SpecImportJobListResponse,
@@ -33,6 +34,58 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Import milestone / benchmark-phase event codes surfaced at INFO so the phase timings are
+# easy to follow in the REST logs as the import runs. Other (e.g. per-row DEBUG_*) events are
+# logged at DEBUG. Warnings/errors are always logged regardless of code.
+_IMPORT_PHASE_EVENT_CODES = frozenset(
+    {
+        "PHASE_TIMING",
+        "BENCHMARK",
+        "INCREMENTAL_MODE",
+        "INIT",
+        "PROJECT_CREATED",
+        "EXISTING_PROJECT",
+        "VERSION_CREATED",
+        "CREATING_PROPERTIES",
+        "PROPERTIES_READY",
+        "IMPORTING_PATHS",
+        "PATHS_IMPORTED",
+        "PENDING_APPROVAL",
+        "IMPORT_SKIPPED_NOOP",
+        "DUPLICATE_VERSION_SKIPPED",
+    }
+)
+
+
+def _take_new_import_events(rec: "_JobRecord", status: SpecImportJobStatus) -> List[SpecImportEvent]:
+    """Return import events not yet seen for this job (marking them seen). Cheap; call under lock."""
+    fresh: List[SpecImportEvent] = []
+    for ev in status.events or []:
+        if ev.id in rec.logged_event_ids:
+            continue
+        rec.logged_event_ids.add(ev.id)
+        fresh.append(ev)
+    return fresh
+
+
+def _log_import_events(events: List[SpecImportEvent], job_id: str) -> None:
+    """Log streamed import events so benchmark phases are visible as the import runs.
+
+    Phase/milestone and benchmark events go to INFO; warnings/errors to their level; the
+    high-cardinality per-row DEBUG_* events go to DEBUG to keep the running log readable.
+    """
+    for ev in events:
+        code = ev.code or ""
+        line = f"spec import job={job_id} [{code}] {ev.message}"
+        if ev.level == "error":
+            logger.error(line)
+        elif ev.level == "warn":
+            logger.warning(line)
+        elif code in _IMPORT_PHASE_EVENT_CODES:
+            logger.info(line)
+        else:
+            logger.debug(line)
 
 
 def _capture_version_quality_score(
@@ -212,6 +265,8 @@ class _JobRecord:
     cancel_requested: bool = False
     commit_response: Optional[SpecImportCommitResponse] = None
     rollback_response: Optional[SpecImportRollbackResponse] = None
+    # IDs of import events already written to the REST log (dedupe across streamed snapshots).
+    logged_event_ids: set = field(default_factory=set)
 
 
 _jobs: Dict[str, _JobRecord] = {}
@@ -293,6 +348,9 @@ async def _apply_streaming_spec_import_status(job_id: str, status_raw: Dict[str,
             return
         rec.state = status.state
         rec.status = status
+        fresh_events = _take_new_import_events(rec, status)
+    # Log outside the lock (logging handlers can block); surfaces benchmark phases live.
+    _log_import_events(fresh_events, job_id)
 
 
 async def _run_subprocess_worker(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -482,6 +540,10 @@ async def _drive_job(job_id: str, payload: Dict[str, Any]) -> None:
         rec.status = status
         rec.commit_response = _maybe_build_commit_response(job_id, status)
         tenant_slug = rec.tenant_slug
+        # Final snapshot carries any events not seen in streamed partials (notably the
+        # end-of-run BENCHMARK summary); log them so the timing breakdown lands in the logs.
+        fresh_events = _take_new_import_events(rec, status)
+    _log_import_events(fresh_events, job_id)
 
     # Capture the quality/lint score onto the newly imported revision so the projects list can show
     # it (#3609 follow-up). Done outside the lock, off the event loop (DB-bound), and best-effort.

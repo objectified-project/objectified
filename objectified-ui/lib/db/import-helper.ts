@@ -169,6 +169,8 @@ interface JobState {
   // Transaction state
   transactionClient?: PoolClient;
   transactionPending?: boolean;
+  // Per-phase / per-DB-op timing accumulator (see finalizeBenchmark).
+  bench?: Bench;
   summary?: {
     classesCreated: number;
     propertiesCreated: number;
@@ -184,6 +186,11 @@ interface JobState {
     incrementalMode?: boolean;
     /** True when import exited early because the catalog version line already existed (`skipDuplicateVersions`). */
     skippedDuplicateVersion?: boolean;
+    /** Per-phase / per-DB-op timing breakdown for diagnosing slow imports (see finalizeBenchmark). */
+    benchmark?: {
+      totalMs: number;
+      spans: Array<{ name: string; ms: number; count: number; avgMs: number; pct: number }>;
+    };
     classes: Array<{ name: string; status: 'success' | 'warning' | 'failed' }>;
     verification?: {
       passed: boolean;
@@ -261,6 +268,96 @@ function emit(job: JobState, level: ImportLogLevel, code: string, message: strin
 function setProgress(job: JobState, phase: ProgressEvent['phase'], total: number, completed: number, currentItem?: string) {
   job.progress = { phase, total, completed, currentItem };
   job.percent = total > 0 ? Math.floor((completed / total) * 100) : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Import benchmarking (#perf): accumulate wall-clock time + call counts per named
+// span so a slow import can be attributed to a phase (parse vs DB writes) and to
+// the specific DB op (e.g. addPropertyToClass) driving the cost. Spans are summed
+// across the whole job; `db:*` spans count round-trips and surface N+1 patterns.
+// ---------------------------------------------------------------------------
+
+interface BenchMark {
+  ms: number;
+  count: number;
+}
+
+type Bench = Record<string, BenchMark>;
+
+/** Add an elapsed measurement to a named span (creating it on first use). */
+function benchAdd(bench: Bench | undefined, name: string, ms: number): void {
+  if (!bench) return;
+  const m = bench[name] || (bench[name] = { ms: 0, count: 0 });
+  m.ms += ms;
+  m.count += 1;
+}
+
+/** Time an async operation into a named span and return its result. */
+async function benchTime<T>(bench: Bench | undefined, name: string, fn: () => Promise<T>): Promise<T> {
+  const t = Date.now();
+  try {
+    return await fn();
+  } finally {
+    benchAdd(bench, name, Date.now() - t);
+  }
+}
+
+/** Record a completed phase: accumulate its time AND emit a streaming PHASE_TIMING event so
+ * the phase timing is visible (e.g. in objectified-rest logs) while the import is still running,
+ * not only in the final BENCHMARK summary. */
+function recordPhase(job: JobState, name: string, ms: number): void {
+  benchAdd(job.bench, name, ms);
+  emit(job, 'info', 'PHASE_TIMING', `Phase ${name} completed in ${ms}ms`, { phase: name, ms });
+}
+
+/** Time an async phase, accumulate it, and emit a streaming PHASE_TIMING event when it finishes. */
+async function benchPhase<T>(job: JobState, name: string, fn: () => Promise<T>): Promise<T> {
+  const t = Date.now();
+  try {
+    return await fn();
+  } finally {
+    recordPhase(job, name, Date.now() - t);
+  }
+}
+
+/** Build the benchmark report (spans sorted slowest-first, with % of total job time). */
+function buildBenchmarkReport(bench: Bench, totalMs: number): {
+  totalMs: number;
+  spans: Array<{ name: string; ms: number; count: number; avgMs: number; pct: number }>;
+} {
+  const spans = Object.entries(bench)
+    .map(([name, m]) => ({
+      name,
+      ms: m.ms,
+      count: m.count,
+      avgMs: m.count > 0 ? Math.round((m.ms / m.count) * 100) / 100 : 0,
+      pct: totalMs > 0 ? Math.round((m.ms / totalMs) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.ms - a.ms);
+  return { totalMs, spans };
+}
+
+/** Attach the benchmark to the job summary and emit it as a single log event. Runs on every
+ * terminal path (success, skip, failure) so timings are always available for diagnosis. */
+function finalizeBenchmark(job: JobState, startTime: number): void {
+  if (!job.bench) return;
+  const totalMs = Date.now() - startTime;
+  const report = buildBenchmarkReport(job.bench, totalMs);
+  if (job.summary) job.summary.benchmark = report;
+  const top = report.spans
+    .slice(0, 12)
+    .map((s) => `${s.name}=${s.ms}ms (${s.count}x, avg ${s.avgMs}ms, ${s.pct}%)`)
+    .join(', ');
+  emit(
+    job,
+    'info',
+    'BENCHMARK',
+    `Import timing — total ${totalMs}ms. Slowest spans: ${top || '(none recorded)'}`,
+    { totalMs, spans: report.spans },
+  );
+  // Also log to stderr so it lands in the REST worker / server logs. NOTE: stdout is
+  // reserved for the worker's NDJSON status protocol — only ever use console.error here.
+  console.error(`[import-benchmark] total=${totalMs}ms ${top}`);
 }
 
 /** REST/CLI imports into an existing project skip createProjectTx — persist enriched OpenAPI info here. */
@@ -341,7 +438,9 @@ async function buildPropertyIdMapForImport(
   const sigToLibraryId = new Map<string, string>();
 
   if (reuseLibraryFromProject) {
-    const rows = await listProjectLibraryPropertiesTx(client, projectId);
+    const rows = await benchTime(job.bench, 'db:listLibraryProperties', () =>
+      listProjectLibraryPropertiesTx(client, projectId)
+    );
     for (const row of rows) {
       usedNames.add(row.name);
       const sig = stableStringify(row.data);
@@ -384,7 +483,9 @@ async function buildPropertyIdMapForImport(
     });
 
     const resProp = JSON.parse(
-      await createPropertyTx(client, projectId, propName, payload.description || null, payload.data)
+      await benchTime(job.bench, 'db:createProperty', () =>
+        createPropertyTx(client, projectId, propName, payload.description || null, payload.data)
+      )
     );
     if (!resProp.success) {
       emit(job, 'warn', 'PROPERTY_CREATE_WARN', `Could not create property "${propName}": ${resProp.error}`);
@@ -622,7 +723,9 @@ async function writeClassWithProperties(
   job: JobState,
   propertyIdMap: Map<string, string>
 ) {
-  const resClass = JSON.parse(await createClassTx(client, versionId, cls.name, cls.description || null, cls.schema || { type: 'object' }));
+  const resClass = JSON.parse(await benchTime(job.bench, 'db:createClass', () =>
+    createClassTx(client, versionId, cls.name, cls.description || null, cls.schema || { type: 'object' })
+  ));
   if (!resClass.success) throw new Error(resClass.error || 'Failed to create class');
   const classId = resClass.class.id as string;
 
@@ -657,7 +760,9 @@ async function writeClassWithProperties(
         parentId
       });
       const addRes = JSON.parse(
-        await addPropertyToClassTx(client, classId, propertyId, p.name, p.description || null, p.data, parentId)
+        await benchTime(job.bench, 'db:addPropertyToClass', () =>
+          addPropertyToClassTx(client, classId, propertyId, p.name, p.description || null, p.data, parentId)
+        )
       );
       if (!addRes.success) {
         // Graceful degradation: log and continue with remaining properties
@@ -696,6 +801,7 @@ export async function startImport(input: ImportJobInput) {
     events: [],
     percent: 0,
     transactionPending: false,
+    bench: {},
     summary: {
       classesCreated: 0,
       propertiesCreated: 0,
@@ -722,6 +828,7 @@ export async function startImport(input: ImportJobInput) {
 
       const importer = getImporter(input.sourceKind);
       if (!importer) throw new Error(`No importer registered for ${input.sourceKind}`);
+      const _normalizeStart = Date.now();
       const norm = importer.normalize({
         document: input.document,
         options: {
@@ -739,6 +846,7 @@ export async function startImport(input: ImportJobInput) {
           generateExamples: input.options.generateExamples,
         },
       });
+      recordPhase(job, 'parse:normalize', Date.now() - _normalizeStart);
       if (norm.warnings.length) emit(job, 'warn', 'NORMALIZE_WARN', norm.warnings.join('\n'));
 
       // Log normalized class info for debugging
@@ -924,23 +1032,26 @@ export async function startImport(input: ImportJobInput) {
           parentVersionUuid: parentVersionUuidInc ?? undefined,
         });
 
-        const propertyIdMapInc = await buildPropertyIdMapForImport(
-          client!,
-          projectId,
-          norm,
-          job,
-          reuseLibraryInc
+        const propertyIdMapInc = await benchPhase(job, 'phase:buildPropertyLibrary', () =>
+          buildPropertyIdMapForImport(
+            client!,
+            projectId,
+            norm,
+            job,
+            reuseLibraryInc
+          )
         );
 
         setProgress(job, 'creating-classes', 2 + norm.classes.length, 2);
         let classCountInc = 0;
+        const _writeClassesStart = Date.now();
         for (const cls of norm.classes) {
           if (job.canceled) throw new Error('Import canceled');
           setProgress(job, 'creating-classes', 2 + norm.classes.length, 2 + classCountInc, cls.name);
           try {
-            await beginTransaction(client!);
+            await benchTime(job.bench, 'db:beginTransaction', () => beginTransaction(client!));
             await writeClassWithProperties(client!, projectId, versionId, cls, job, propertyIdMapInc);
-            await commitTransaction(client!);
+            await benchTime(job.bench, 'db:commitTransaction', () => commitTransaction(client!));
             emit(job, 'info', 'CLASS_CREATED', `Imported class: ${cls.name}`);
             if (job.summary) {
               job.summary.classesCreated++;
@@ -958,10 +1069,13 @@ export async function startImport(input: ImportJobInput) {
           }
           classCountInc++;
         }
+        recordPhase(job, 'phase:writeClasses', Date.now() - _writeClassesStart);
 
         if (job.canceled) throw new Error('Import canceled');
         setProgress(job, 'verifying', 3 + norm.classes.length, 2 + norm.classes.length, 'Verifying import...');
-        const verificationResultInc = await verifyImport(client!, versionId, norm.classes, job);
+        const verificationResultInc = await benchPhase(job, 'phase:verify', () =>
+          verifyImport(client!, versionId, norm.classes, job)
+        );
         if (job.summary) job.summary.verification = verificationResultInc;
         if (!verificationResultInc.passed && job.summary) job.summary.warnings++;
 
@@ -970,7 +1084,9 @@ export async function startImport(input: ImportJobInput) {
           const securitySchemes = extractSecuritySchemes(input.document);
           if (paths.length > 0 || securitySchemes.length > 0) {
             emit(job, 'info', 'IMPORTING_PATHS', `Importing ${paths.length} path(s) and ${securitySchemes.length} security scheme(s)...`);
-            const pathResult = await importOpenAPIPathsAndSecurity(versionId, paths, securitySchemes);
+            const pathResult = await benchPhase(job, 'phase:importPaths', () =>
+              importOpenAPIPathsAndSecurity(versionId, paths, securitySchemes)
+            );
             if (pathResult.success) {
               if (job.summary) job.summary.pathsImported = paths.length;
               emit(job, 'info', 'PATHS_IMPORTED', 'Paths and security schemes imported.');
@@ -1190,6 +1306,14 @@ export async function startImport(input: ImportJobInput) {
       } else {
         job.state = 'failed';
         emit(job, 'error', 'FAILED', err?.message || 'Import failed');
+      }
+    } finally {
+      // Always surface the timing breakdown (success, early-skip, or failure) so slow
+      // imports can be diagnosed without re-running. Best-effort: never mask the outcome.
+      try {
+        finalizeBenchmark(job, startTime);
+      } catch {
+        /* benchmarking must never affect the import result */
       }
     }
   })();
