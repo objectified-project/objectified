@@ -529,7 +529,7 @@ flowchart LR
 - **Dependencies / Parallelism.** After 4.1. Blocks 4.3/4.5.
 - **Technical Stack.** Python.
 
-### MCAT-4.3 — Version creation on change  ·  **#3670**
+### MCAT-4.3 — Version creation on change  ·  **#3670**  ·  ✅ Done (objectified-rest 1.8.4)
 - **Problem.** Only changes should create versions (avoid version spam).
 - **Solution / Scope.** In the discovery pipeline: if `fingerprint == current` → update `last_discovered_at` only; else insert a new `mcp_endpoint_versions` (`version_seq+1`, `discovered_at`), persist capability items + change rows, and set `mcp_endpoints.current_version_id`. Transactional.
 - **Acceptance Criteria.** Re-discovering an unchanged server creates no version; a changed server creates exactly one new version with diffs; `current_version_id` advances.

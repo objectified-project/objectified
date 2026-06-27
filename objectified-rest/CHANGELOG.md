@@ -5,6 +5,28 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.4] - 2026-06-26
+
+### Changed
+- **Version creation on change — canonical diff wiring (#3670, V2-MCP-18.3 / MCAT-4.3)** — the
+  discovery persistence step (`app.mcp_discovery_engine`) now computes the `previous → new`
+  change set with the canonical surface diff engine (`diff_surfaces`, #3669) instead of the
+  legacy inline raw-entry diff. On re-discovery, an unchanged `surface_fingerprint` still
+  creates **no** new version (only `last_discovered_at` is stamped, so a stable server never
+  spams the history); a changed fingerprint inserts exactly one new version
+  (`version_seq+1`) with its capability items and the diff persisted as `mcp_version_changes`
+  rows, and advances `mcp_endpoints.current_version_id` — all in one transaction. Because the
+  diff now runs over each surface's *semantic projection* (the same fields that feed the
+  fingerprint), it is in lock-step with change detection — volatile/vendor fields never
+  produce phantom change rows — and it records **server-metadata** changes (server
+  version/title/name, protocol version, instructions, capabilities) that the prior
+  capability-only raw diff missed, with per-field before/after detail. The first version
+  emits one `added` row per capability and suppresses synthetic "changed from null"
+  server-metadata rows. The previous snapshot is reconstructed from its stored rows via
+  `DiscoverySurface.from_rows`, so version-creation and the on-demand compare API (MCAT-4.5)
+  share a single diff implementation. `compute_version_changes` is replaced by
+  `compute_version_change_rows`.
+
 ## [1.8.3] - 2026-06-26
 
 ### Added
