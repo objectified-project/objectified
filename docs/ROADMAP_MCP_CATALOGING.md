@@ -308,14 +308,13 @@ erDiagram
 
 | ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |----|-------|---------|--------|----------|-----|-----------|------------------|
-| 1.1 | MCP catalog data model & migrations | `mcp_endpoints` table (tenant-scoped, friendly name, url, transport, visibility, cadence) | mcp-catalog,database,mvp | N (root) | Y | M | objectified-db |
 | 1.2 | Capability-item normalized store | `mcp_capability_items` (tool/resource/template/prompt rows + JSONB schemas) | mcp-catalog,database,mvp | N | Y | M | objectified-db |
 | 1.3 | Version + change-record tables | `mcp_endpoint_versions`, `mcp_version_changes` (immutable snapshots + diffs) | mcp-catalog,database,version-control,mvp | N | Y | M | objectified-db |
 | 1.4 | Credential vault table (encrypted) | `mcp_endpoint_credentials` (auth_type enum, encrypted payload, OAuth fields) | mcp-catalog,database,security,mvp | Y | Y | M | objectified-db |
 | 1.5 | Scores, discovery-jobs, test-log tables | `mcp_version_scores`, `mcp_discovery_jobs`, `mcp_test_invocations` | mcp-catalog,database,mvp | Y | Y | M | objectified-db |
 | 1.6 | Public read views + visibility/publish | `mcp_v_public_endpoints` view + publish columns/indexes | mcp-catalog,database,browser | Y | N | S | objectified-db |
 
-### MCAT-1.1 — MCP catalog data model & migrations  ·  **#3651**
+### MCAT-1.1 — MCP catalog data model & migrations  ·  **#3651**  ·  ✅ Done (V126)
 - **Problem.** There is no table representing an external MCP endpoint a tenant wants to catalog.
 - **Solution / Scope.** Create `odb.mcp_endpoints` (migration **V126**). Columns: `id UUID PK`, `tenant_id`, `creator_id`, `name` (friendly UI label), `slug`, `endpoint_url TEXT`, `transport VARCHAR` (`streamable_http`|`sse`|`stdio`), `description`, `category`, `visibility visibility_type DEFAULT 'private'` (reuse enum from V006), `published BOOLEAN DEFAULT false`, `enabled BOOLEAN DEFAULT true`, `discovery_cadence_seconds INT NULL`, `last_discovered_at`, `last_discovery_status VARCHAR`, `current_version_id UUID NULL` (FK added after 1.3), `metadata JSONB`, soft-delete + audit columns. `UNIQUE(tenant_id, slug)`. Indexes on `(tenant_id)`, `(tenant_id, slug)`, `(published, visibility)`, `(enabled, last_discovered_at)`. Transport values per [MCP transports spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports).
 - **Acceptance Criteria.** Migration applies cleanly on a fresh DB and over V125; rollback notes documented; `flyway`/CI migration check passes; column comments present (matches house style).
