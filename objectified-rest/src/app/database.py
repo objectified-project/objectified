@@ -2,7 +2,7 @@ import psycopg2
 import json
 import logging
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 import bcrypt
 import numpy as np
 from psycopg2.extras import Json, RealDictCursor
@@ -32,6 +32,25 @@ def _deep_equal(a: Any, b: Any) -> bool:
             return False
         return all(_deep_equal(x, y) for x, y in zip(a, b))
     return False
+
+
+def format_mcp_version_tag(discovered_at: datetime) -> str:
+    """Build the human-readable UTC date/time tag for an MCP version snapshot (#3671).
+
+    Produces a compact, minute-precision ISO-8601-style label such as ``2026-06-26T14:03Z``
+    from the moment a discovery ran. The value is normalized to UTC so the tag is stable and
+    comparable regardless of the server clock's timezone, matching the SQL backfill format in
+    migration V131 (``YYYY-MM-DD"T"HH24:MI"Z"`` over ``discovered_at AT TIME ZONE 'UTC'``).
+
+    Args:
+        discovered_at: When the discovery that produced the snapshot ran. A naive datetime is
+            assumed to already be UTC; an aware one is converted to UTC.
+
+    Returns:
+        The base date/time tag (without any collision suffix).
+    """
+    dt = discovered_at if discovered_at.tzinfo is not None else discovered_at.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
 
 
 class StaleHeadPushError(Exception):
@@ -9360,9 +9379,9 @@ class Database:
     ) -> Optional[Dict[str, Any]]:
         """Return the highest-``version_seq`` snapshot for an endpoint, or None if never discovered."""
         q = """
-            SELECT id, endpoint_id, version_seq, protocol_version, server_name,
-                   server_title, server_version, instructions, capabilities,
-                   surface_fingerprint, discovered_at, created_at
+            SELECT id, endpoint_id, version_seq, version_tag, protocol_version,
+                   server_name, server_title, server_version, instructions,
+                   capabilities, surface_fingerprint, discovered_at, created_at
             FROM odb.mcp_endpoint_versions
             WHERE endpoint_id = %s::uuid
             ORDER BY version_seq DESC
@@ -9382,6 +9401,40 @@ class Database:
         """
         return self.execute_query(q, (version_id,))
 
+    def _next_mcp_version_tag(self, cursor: Any, endpoint_id: str, base_tag: str) -> str:
+        """Resolve a per-endpoint-unique date/time tag, disambiguating same-minute collisions.
+
+        The base tag is minute-precision (e.g. ``2026-06-26T14:03Z``), so two material surface
+        changes to one endpoint inside a single minute would map to the same label. Mirroring how
+        ``version_seq`` is allocated, the second and subsequent collisions get a ``-2``, ``-3``, …
+        suffix. Lookups run inside the caller's open transaction; two concurrent persists could
+        still both pick the same tag, in which case the ``(endpoint_id, version_tag)`` unique
+        constraint (V131) is the backstop that fails the loser loudly.
+
+        Args:
+            cursor: An open cursor on the in-progress transaction.
+            endpoint_id: Owning endpoint the tag must be unique within.
+            base_tag: The minute-precision base label from :func:`format_mcp_version_tag`.
+
+        Returns:
+            The first free tag — ``base_tag`` itself, or ``base_tag`` with a ``-N`` suffix.
+        """
+        candidate = base_tag
+        suffix = 1
+        while True:
+            cursor.execute(
+                """
+                SELECT 1 FROM odb.mcp_endpoint_versions
+                WHERE endpoint_id = %s::uuid AND version_tag = %s
+                LIMIT 1
+                """,
+                (endpoint_id, candidate),
+            )
+            if cursor.fetchone() is None:
+                return candidate
+            suffix += 1
+            candidate = f"{base_tag}-{suffix}"
+
     def record_mcp_discovery_version(
         self,
         endpoint_id: str,
@@ -9393,10 +9446,11 @@ class Database:
     ) -> Dict[str, Any]:
         """Persist a new version snapshot atomically and point the endpoint at it.
 
-        In one transaction this: assigns the next ``version_seq`` for the endpoint,
-        inserts the immutable ``mcp_endpoint_versions`` row, its ``mcp_capability_items``
-        children, and any ``mcp_version_changes`` diff rows, then updates the endpoint's
-        ``current_version_id`` / ``last_discovered_at`` / ``last_discovery_status``.
+        In one transaction this: assigns the next ``version_seq`` for the endpoint, stamps a
+        unique human-readable date/time ``version_tag``, inserts the immutable
+        ``mcp_endpoint_versions`` row, its ``mcp_capability_items`` children, and any
+        ``mcp_version_changes`` diff rows, then updates the endpoint's ``current_version_id`` /
+        ``last_discovered_at`` / ``last_discovery_status``.
 
         Args:
             endpoint_id: Owning endpoint.
@@ -9405,10 +9459,11 @@ class Database:
                 (``version_id`` is overwritten here with the freshly assigned id).
             change_rows: Diff rows (``change_type`` / ``item_type`` / ``item_name`` /
                 ``detail``) relative to the previous version; empty for a first run.
-            discovered_at: When the discovery that produced this snapshot ran.
+            discovered_at: When the discovery that produced this snapshot ran; also the source
+                of the ``version_tag`` date/time label.
 
         Returns:
-            ``{"version_id": str, "version_seq": int}`` for the new snapshot.
+            ``{"version_id": str, "version_seq": int, "version_tag": str}`` for the new snapshot.
         """
         conn = self.connect()
         prev_autocommit = self._begin_tx(conn)
@@ -9427,20 +9482,28 @@ class Database:
                 )
                 next_seq = int(cursor.fetchone()["next_seq"])
 
+                # Human-readable, per-endpoint-unique date/time tag for this snapshot (#3671).
+                # The base label is minute-precision UTC; collisions within a minute are
+                # disambiguated with a -N suffix, backstopped by the unique constraint (V131).
+                version_tag = self._next_mcp_version_tag(
+                    cursor, endpoint_id, format_mcp_version_tag(discovered_at)
+                )
+
                 cursor.execute(
                     """
                     INSERT INTO odb.mcp_endpoint_versions (
-                        endpoint_id, version_seq, protocol_version, server_name,
+                        endpoint_id, version_seq, version_tag, protocol_version, server_name,
                         server_title, server_version, instructions, capabilities,
                         surface_fingerprint, discovered_at
                     ) VALUES (
-                        %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                     )
                     RETURNING id
                     """,
                     (
                         endpoint_id,
                         next_seq,
+                        version_tag,
                         version_row.get("protocol_version"),
                         version_row.get("server_name"),
                         version_row.get("server_title"),
@@ -9518,7 +9581,11 @@ class Database:
                     (version_id, discovered_at, endpoint_id),
                 )
             conn.commit()
-            return {"version_id": version_id, "version_seq": next_seq}
+            return {
+                "version_id": version_id,
+                "version_seq": next_seq,
+                "version_tag": version_tag,
+            }
         except Exception as e:
             conn.rollback()
             raise e

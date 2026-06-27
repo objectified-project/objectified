@@ -536,7 +536,7 @@ flowchart LR
 - **Dependencies / Parallelism.** After 4.2, 1.3. Used by 3.2 and Epic-5.
 - **Technical Stack.** FastAPI, SQL transaction.
 
-### MCAT-4.4 — Date/time version tagging  ·  **#3671**
+### MCAT-4.4 — Date/time version tagging  ·  **#3671**  ·  ✅ Done (objectified-db 0.13.0, objectified-rest 1.8.5)
 - **Problem.** Version history must be navigable by tagged date/time (explicit user requirement).
 - **Solution / Scope.** Auto-create a human-readable tag per version (e.g. `2026-06-26T14:03Z`) — either a column on the version or reuse a `version_tags`-style table for MCP. Expose in history listings.
 - **Acceptance Criteria.** Every version is addressable by its date/time tag; tags are unique per endpoint and immutable.

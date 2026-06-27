@@ -14,6 +14,11 @@ fingerprint differs, exactly one new version is inserted (``version_seq+1``) wit
 capability items and the ``previous → new`` diff persisted as ``mcp_version_changes`` rows,
 and ``mcp_endpoints.current_version_id`` is advanced to it — all in one transaction.
 
+Date/time tagging (V2-MCP-18.4 / MCAT-4.4, #3671): each new version is stamped with a
+human-readable, per-endpoint-unique ``version_tag`` (e.g. ``2026-06-26T14:03Z``) derived from
+its discovery time, so version history is navigable by date/time. The tag is carried in the
+job ``result`` payload (``version_tag``) on both the changed and unchanged paths.
+
 This mirrors the submit→poll shape of :mod:`spec_import_engine`: the route returns a job
 reference immediately and the caller polls the job for the terminal state. Unlike the spec
 importer, discovery runs entirely in-process (the MCP client is async Python), so there is no
@@ -208,6 +213,7 @@ def _persist_outcome(
         result = {
             "version_id": version_id,
             "version_seq": version_seq,
+            "version_tag": previous.get("version_tag"),
             "changed": False,
             "fingerprint": fingerprint,
         }
@@ -227,6 +233,7 @@ def _persist_outcome(
     result = {
         "version_id": persisted["version_id"],
         "version_seq": persisted["version_seq"],
+        "version_tag": persisted.get("version_tag"),
         "changed": True,
         "change_count": len(change_rows),
         "fingerprint": fingerprint,
