@@ -650,12 +650,13 @@ flowchart TB
 | 6.4 | OAuth 2.1 auth-code+PKCE + refresh | full token acquisition + refresh + DCR | mcp-catalog,auth,security,v2 | N | N | L | objectified-rest |
 | 6.5 | Credential REST + redaction | set/clear creds, never echo secrets | mcp-catalog,rest,security,mvp | Y | Y | S | objectified-rest |
 
-### MCAT-6.1 — Auth-type model + none/bearer/header  ·  **#3677**
+### MCAT-6.1 — Auth-type model + none/bearer/header  ·  **#3677**  ·  ✅ Done (objectified-rest 1.12.0)
 - **Problem.** Many servers need a bearer token or custom header; this is the MVP auth path.
 - **Solution / Scope.** Apply `none`/`bearer`/`header` credentials to the Epic-2 client (`Authorization: Bearer …` or arbitrary headers); never put tokens in URLs (per spec). `env` type supported for future stdio.
 - **Acceptance Criteria.** Discovery/test succeed against a bearer-protected stub; tokens only ever sent in headers.
 - **Dependencies / Parallelism.** After 1.4, 2.1. Blocks 3.2 protected path.
 - **Technical Stack.** Python.
+- **Implementation.** New `app/mcp_auth.py` holds the pure auth-type model: `build_auth_headers(auth_type, payload)` maps a **decrypted** credential onto request headers — `none`→`{}`, `bearer`→`Authorization: Bearer <token>`, `header`→one arbitrary `<name>: <value>`, `oauth2`→presents an already-obtained `access_token` as a bearer (full flow is 6.3/6.4), `env`→no HTTP headers (its `vars` bundle is surfaced via `env_vars_for_payload` for a future stdio transport). The model returns headers only — never a URL — and validates header names against the RFC 9110 token grammar while rejecting CR/LF/control characters in values, so a stored secret can't inject headers or split a request; secrets are never logged. `app/mcp_credentials.py` routes the stored row through the model behind a single `decrypt_credential_payload` seam: `none` is the anonymous fast path, and every sealed type degrades to an unauthenticated run until the MCAT-6.2 (#3678) decrypting key is wired into that one function. An end-to-end test drives the full `initialize`→`*/list` discovery against a bearer-protected loopback stub, asserting success and that the token appears only in headers, never in any request path.
 
 ### MCAT-6.2 — Encryption-at-rest for credentials  ·  **#3678**
 - **Problem.** Secrets must never be stored in plaintext.
