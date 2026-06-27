@@ -212,6 +212,45 @@ class Settings(BaseSettings):
         ),
     )
 
+    # MCP catalog periodic re-discovery sweep (V2-MCP-19.1 / MCAT-5.1, #3673). A background
+    # async loop re-handshakes enabled endpoints whose discovery cadence has elapsed, mirroring
+    # the repository auto-refresh sweep above.
+    #
+    # mcp_discovery_enabled              Global kill switch. When False the sweep halts entirely
+    #                                    (no endpoint is auto-discovered) regardless of per-endpoint
+    #                                    `enabled`. Intended for incident response. Manual discovery
+    #                                    (POST .../discover) is unaffected.
+    # mcp_discovery_default_cadence_seconds  Cadence applied to an endpoint that has no explicit
+    #                                    `discovery_cadence_seconds` override. Defaults to ~hourly,
+    #                                    the registry-recommended aggregator cadence
+    #                                    (https://modelcontextprotocol.io/registry/about).
+    # mcp_discovery_min_interval_seconds The sweep's tick floor: how often the loop wakes to look
+    #                                    for due endpoints. The per-endpoint cadence (not this floor)
+    #                                    decides which endpoints are actually due each tick, so a
+    #                                    small floor never re-discovers an endpoint faster than its
+    #                                    own cadence allows.
+    mcp_discovery_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MCP_DISCOVERY_ENABLED",
+            "mcp_discovery_enabled",
+        ),
+    )
+    mcp_discovery_default_cadence_seconds: int = Field(
+        default=3600,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MCP_DISCOVERY_DEFAULT_CADENCE",
+            "mcp_discovery_default_cadence_seconds",
+        ),
+    )
+    mcp_discovery_min_interval_seconds: int = Field(
+        default=60,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MCP_DISCOVERY_MIN_INTERVAL",
+            "mcp_discovery_min_interval_seconds",
+        ),
+    )
+
     # Observability & error handling (RC1-3.2, #3617). Structured JSON logs, request-id
     # propagation, in-process request metrics, and an ops dashboard that surfaces backup status.
     #

@@ -593,12 +593,13 @@ that re-discovers enabled endpoints, diffs, and versions changes automatically.
 | 5.3 | Failure handling, backoff & status | retries, exponential backoff, disable on chronic failure | mcp-catalog,polling,monitoring,mvp | Y | Y | M | objectified-rest |
 | 5.4 | Sweep observability & metrics | per-run counters, last-status, surfaced via API | mcp-catalog,monitoring,analytics | Y | N | S | objectified-rest |
 
-### MCAT-5.1 — Sweep scheduler & cadence config  ·  **#3673**
+### MCAT-5.1 — Sweep scheduler & cadence config  ·  **#3673**  ·  ✅ Done (objectified-rest 1.9.0, V132)
 - **Problem.** Endpoints must be re-queried "on a periodic basis."
 - **Solution / Scope.** A background async loop (mirror `repository_refresh_sweep.py`) selecting endpoints where `enabled AND (last_discovered_at + cadence) <= now()`. Global default cadence + per-endpoint override (`discovery_cadence_seconds`). Registry-recommended aggregator cadence is ~hourly ([registry/about](https://modelcontextprotocol.io/registry/about)).
 - **Acceptance Criteria.** Due endpoints selected fairly; disabled/deleted skipped; cadence override respected; loop is idempotent and singleton-safe.
 - **Dependencies / Parallelism.** After 3.2/4.3. Blocks 5.2.
 - **Technical Stack.** Python asyncio.
+- **Implementation.** Due-selection DAO `Database.list_due_mcp_endpoints` (enabled + live filter, `COALESCE(discovery_cadence_seconds, default)` cadence, oldest-first ordering). Sweep `app/mcp_discovery_sweep.py` (`process_mcp_discovery_sweep`) dispatches each due endpoint through the shared `trigger_discovery` pipeline tagged `trigger='sweep'`; the existing per-endpoint enqueue dedup (advisory lock + active-state check) provides idempotency/singleton-safety. Background loop `_mcp_discovery_sweep` wired in `app/main.py`. Config: `OBJECTIFIED_MCP_DISCOVERY_ENABLED` (kill switch), `OBJECTIFIED_MCP_DISCOVERY_DEFAULT_CADENCE` (~hourly), `OBJECTIFIED_MCP_DISCOVERY_MIN_INTERVAL` (tick floor). Migration **V132** corrects the `discovery_cadence_seconds` column comment: null now means "use the global default cadence" (the `enabled` column is the on/off switch). Per-endpoint poll→diff→version concurrency bounding + timeouts are MCAT-5.2.
 
 ### MCAT-5.2 — Per-endpoint poll/diff/version step  ·  **#3674**
 - **Problem.** The sweep must reuse the same discovery→diff→version pipeline as manual runs.

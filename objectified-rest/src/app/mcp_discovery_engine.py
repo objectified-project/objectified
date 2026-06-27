@@ -336,13 +336,22 @@ async def _drive_discovery_job(job_id: str, endpoint: Dict[str, Any]) -> None:
 
 
 async def trigger_discovery(
-    tenant_id: str, endpoint: Dict[str, Any]
+    tenant_id: str, endpoint: Dict[str, Any], *, trigger: str = "manual"
 ) -> Tuple[Dict[str, Any], bool]:
-    """Enqueue a manual discovery job for an endpoint and start it unless de-duplicated.
+    """Enqueue a discovery job for an endpoint and start it unless de-duplicated.
+
+    Shared by the manual ``POST .../discover`` route (``trigger='manual'``) and the
+    periodic re-discovery sweep (``trigger='sweep'``, MCAT-5.1). The de-duplication in
+    :meth:`Database.enqueue_mcp_discovery_job` is what makes the sweep idempotent and
+    singleton-safe: if a job is already queued/running for the endpoint — e.g. a previous
+    sweep tick's run has not finished, or a manual run is in flight — the existing job is
+    returned and no second run starts.
 
     Args:
         tenant_id: Owning tenant (stamped on the job for scoped reads).
         endpoint: The already tenant-validated ``mcp_endpoints`` row to discover.
+        trigger: How the run was initiated — ``manual`` (default) or ``sweep``. Recorded
+            on the job row so its provenance is auditable.
 
     Returns:
         ``(job_row, deduplicated)`` — when ``deduplicated`` is ``True`` an already-active
@@ -351,7 +360,7 @@ async def trigger_discovery(
     """
     endpoint_id = str(endpoint["id"])
     enqueued = await asyncio.to_thread(
-        db.enqueue_mcp_discovery_job, endpoint_id, tenant_id, "manual"
+        db.enqueue_mcp_discovery_job, endpoint_id, tenant_id, trigger
     )
     job = enqueued["job"]
     deduplicated = bool(enqueued["deduplicated"])
