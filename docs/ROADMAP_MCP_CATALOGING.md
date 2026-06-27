@@ -470,7 +470,7 @@ Tenant-facing CRUD + the async discovery job lifecycle (mirrors `spec_import` en
 - **Dependencies / Parallelism.** After 2.x, 4.x, 6.1. Core MVP path.
 - **Technical Stack.** FastAPI async, job engine.
 
-### MCAT-3.3 — Endpoint Pydantic models & validation  ·  **#3665**
+### MCAT-3.3 — Endpoint Pydantic models & validation  ·  **#3665**  ·  ✅ Done (objectified-rest 1.7.1)
 - **Problem.** Inputs (URL, transport, cadence) need strict validation.
 - **Solution / Scope.** Pydantic v2 models in `models.py`: `McpEndpointCreate/Update/Out`, transport enum, URL must be https (or localhost in dev), cadence bounds. Redacts credentials in `Out`.
 - **Acceptance Criteria.** Invalid URL/transport rejected with 422; models reused by 3.1/3.2.
