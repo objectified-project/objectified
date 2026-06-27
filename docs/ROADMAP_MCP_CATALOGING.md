@@ -328,11 +328,11 @@ mcp_endpoints
    current_version_id?, last_discovered_at, last_discovery_status, metadata
 ```
 
-### MCAT-1.2 — Capability-item normalized store  ·  **#3652**
+### MCAT-1.2 — Capability-item normalized store  ·  **#3652**  ·  ✅ Done (V127)
 - **Problem.** Discovered tools/resources/prompts must be queryable (search, diff, render) — not just blobs.
 - **Solution / Scope.** Create `odb.mcp_capability_items` (V127): `id`, `version_id FK`, `item_type VARCHAR` (`tool`|`resource`|`resource_template`|`prompt`), `name`, `title`, `description TEXT`, `input_schema JSONB`, `output_schema JSONB`, `annotations JSONB`, `uri/uri_template` (resources), `raw JSONB` (verbatim entry for fidelity), `ordinal INT`. Indexes on `(version_id, item_type)`, `(name)`, and a `to_tsvector` GIN index on `coalesce(name||' '||description)` for search (MCAT-9.2). Field set per [tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools)/[resources](https://modelcontextprotocol.io/specification/2025-06-18/server/resources)/[prompts](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts).
 - **Acceptance Criteria.** Stores all four item types; nullable fields tolerate 2025-03-26 servers (no `title`/`outputSchema`); FTS index present.
-- **Dependencies / Parallelism.** After 1.3 (needs `version_id`). Parallel with 1.4/1.5.
+- **Dependencies / Parallelism.** Needs `version_id` from 1.3. V127 lands before 1.3's table (V128), so — as with V126's `current_version_id` — `version_id` is a plain `NOT NULL UUID` here and the FK to `mcp_endpoint_versions(id)` is added in **V128** (FK ordering). Parallel with 1.4/1.5.
 - **Technical Stack.** PostgreSQL JSONB + GIN/tsvector.
 
 ### MCAT-1.3 — Version + change-record tables  ·  **#3653**
