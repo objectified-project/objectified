@@ -9110,6 +9110,390 @@ class Database:
             conn.rollback()
             raise e
 
+    # -----------------------------------------------------------------------
+    # MCP Catalog — discovery jobs & version persistence (MCAT-3.2, #3664)
+    # -----------------------------------------------------------------------
+
+    # Columns returned for every discovery-job read/write. Kept as one constant so
+    # enqueue/get/list/transition all project the same shape.
+    _MCP_DISCOVERY_JOB_COLUMNS = (
+        "id, endpoint_id, tenant_id, state, trigger, started_at, finished_at, "
+        "error, result, created_at"
+    )
+
+    # A discovery job is "active" (and therefore a de-duplication target) while it is
+    # still queued or running; completed/failed jobs never coalesce a new request.
+    _MCP_DISCOVERY_ACTIVE_STATES = ("queued", "running")
+
+    def enqueue_mcp_discovery_job(
+        self,
+        endpoint_id: str,
+        tenant_id: str,
+        trigger: str = "manual",
+    ) -> Dict[str, Any]:
+        """Create a queued discovery job for an endpoint, de-duplicating concurrent runs.
+
+        A transaction-scoped Postgres advisory lock keyed on the endpoint serializes
+        concurrent callers so the "is one already active?" check and the insert see a
+        consistent snapshot: if a queued/running job already exists for the endpoint the
+        existing row is returned instead of inserting a second one. The lock is released
+        automatically when the transaction commits.
+
+        Args:
+            endpoint_id: The endpoint to discover (assumed already tenant-validated).
+            tenant_id: Owning tenant, stamped on the job for scoped reads.
+            trigger: How the run was initiated — one of ``manual`` / ``sweep`` /
+                ``registry`` (this REST path always passes ``manual``).
+
+        Returns:
+            ``{"job": <row>, "deduplicated": bool}`` — ``deduplicated`` is ``True`` when an
+            already-active job was returned rather than a new one being created.
+        """
+        select_active = f"""
+            SELECT {self._MCP_DISCOVERY_JOB_COLUMNS}
+            FROM odb.mcp_discovery_jobs
+            WHERE endpoint_id = %s::uuid AND state = ANY(%s)
+            ORDER BY created_at ASC
+            LIMIT 1
+        """
+        insert_job = f"""
+            INSERT INTO odb.mcp_discovery_jobs (endpoint_id, tenant_id, trigger)
+            VALUES (%s::uuid, %s::uuid, %s)
+            RETURNING {self._MCP_DISCOVERY_JOB_COLUMNS}
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                # Serialize per endpoint so the dedupe check below cannot race a
+                # concurrent insert. hashtext() maps the id to the int the advisory
+                # lock expects; the lock is held until commit.
+                cursor.execute(
+                    "SELECT pg_advisory_xact_lock(hashtext(%s))", (str(endpoint_id),)
+                )
+                cursor.execute(
+                    select_active,
+                    (endpoint_id, list(self._MCP_DISCOVERY_ACTIVE_STATES)),
+                )
+                existing = cursor.fetchone()
+                if existing is not None:
+                    conn.commit()
+                    return {"job": dict(existing), "deduplicated": True}
+                cursor.execute(insert_job, (endpoint_id, tenant_id, trigger))
+                row = cursor.fetchone()
+                conn.commit()
+                return {"job": dict(row), "deduplicated": False}
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def get_mcp_discovery_job(
+        self, tenant_id: str, job_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch one discovery job scoped to ``tenant_id`` (a cross-tenant id reads as None)."""
+        q = f"""
+            SELECT {self._MCP_DISCOVERY_JOB_COLUMNS}
+            FROM odb.mcp_discovery_jobs
+            WHERE id = %s::uuid AND tenant_id = %s::uuid
+            LIMIT 1
+        """
+        rows = self.execute_query(q, (job_id, tenant_id))
+        return dict(rows[0]) if rows else None
+
+    def list_mcp_discovery_jobs(
+        self, tenant_id: str, endpoint_id: str
+    ) -> List[Dict[str, Any]]:
+        """List discovery jobs for one endpoint (newest first), scoped to the tenant."""
+        q = f"""
+            SELECT {self._MCP_DISCOVERY_JOB_COLUMNS}
+            FROM odb.mcp_discovery_jobs
+            WHERE endpoint_id = %s::uuid AND tenant_id = %s::uuid
+            ORDER BY created_at DESC
+        """
+        return self.execute_query(q, (endpoint_id, tenant_id))
+
+    def mark_mcp_discovery_job_running(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Transition a queued job to ``running`` and stamp ``started_at``.
+
+        Idempotent in spirit: the WHERE clause only advances a job that is still
+        ``queued`` so a double-start is a no-op (returns ``None``).
+        """
+        q = f"""
+            UPDATE odb.mcp_discovery_jobs
+            SET state = 'running', started_at = CURRENT_TIMESTAMP
+            WHERE id = %s::uuid AND state = 'queued'
+            RETURNING {self._MCP_DISCOVERY_JOB_COLUMNS}
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, (job_id,))
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row) if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def finish_mcp_discovery_job(
+        self,
+        job_id: str,
+        state: str,
+        *,
+        result: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Move a job to a terminal state (``completed`` / ``failed``).
+
+        Stamps ``finished_at`` and writes the JSONB ``result`` payload (which carries the
+        ``version_id`` reference on success) and/or the ``error`` text on failure.
+        """
+        q = f"""
+            UPDATE odb.mcp_discovery_jobs
+            SET state = %s,
+                finished_at = CURRENT_TIMESTAMP,
+                result = COALESCE(%s, result),
+                error = %s
+            WHERE id = %s::uuid
+            RETURNING {self._MCP_DISCOVERY_JOB_COLUMNS}
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    q,
+                    (
+                        state,
+                        Json(result) if result is not None else None,
+                        error,
+                        job_id,
+                    ),
+                )
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row) if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def get_latest_mcp_endpoint_version(
+        self, endpoint_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Return the highest-``version_seq`` snapshot for an endpoint, or None if never discovered."""
+        q = """
+            SELECT id, endpoint_id, version_seq, protocol_version, server_name,
+                   server_title, server_version, instructions, capabilities,
+                   surface_fingerprint, discovered_at, created_at
+            FROM odb.mcp_endpoint_versions
+            WHERE endpoint_id = %s::uuid
+            ORDER BY version_seq DESC
+            LIMIT 1
+        """
+        rows = self.execute_query(q, (endpoint_id,))
+        return dict(rows[0]) if rows else None
+
+    def get_mcp_capability_items(self, version_id: str) -> List[Dict[str, Any]]:
+        """Fetch the normalized capability rows of a version snapshot (discovery order)."""
+        q = """
+            SELECT version_id, item_type, name, title, description, input_schema,
+                   output_schema, annotations, uri, uri_template, raw, ordinal
+            FROM odb.mcp_capability_items
+            WHERE version_id = %s::uuid
+            ORDER BY item_type ASC, ordinal ASC
+        """
+        return self.execute_query(q, (version_id,))
+
+    def record_mcp_discovery_version(
+        self,
+        endpoint_id: str,
+        *,
+        version_row: Dict[str, Any],
+        capability_rows: List[Dict[str, Any]],
+        change_rows: List[Dict[str, Any]],
+        discovered_at: Any,
+    ) -> Dict[str, Any]:
+        """Persist a new version snapshot atomically and point the endpoint at it.
+
+        In one transaction this: assigns the next ``version_seq`` for the endpoint,
+        inserts the immutable ``mcp_endpoint_versions`` row, its ``mcp_capability_items``
+        children, and any ``mcp_version_changes`` diff rows, then updates the endpoint's
+        ``current_version_id`` / ``last_discovered_at`` / ``last_discovery_status``.
+
+        Args:
+            endpoint_id: Owning endpoint.
+            version_row: Surface columns from :meth:`DiscoverySurface.to_version_row`.
+            capability_rows: Rows from :meth:`DiscoverySurface.to_capability_rows`
+                (``version_id`` is overwritten here with the freshly assigned id).
+            change_rows: Diff rows (``change_type`` / ``item_type`` / ``item_name`` /
+                ``detail``) relative to the previous version; empty for a first run.
+            discovered_at: When the discovery that produced this snapshot ran.
+
+        Returns:
+            ``{"version_id": str, "version_seq": int}`` for the new snapshot.
+        """
+        conn = self.connect()
+        prev_autocommit = self._begin_tx(conn)
+        try:
+            with conn.cursor() as cursor:
+                # Next monotonic per-endpoint sequence (1 on first run). Computed under
+                # the transaction so two concurrent persists cannot collide; the
+                # (endpoint_id, version_seq) unique constraint is the final backstop.
+                cursor.execute(
+                    """
+                    SELECT COALESCE(MAX(version_seq), 0) + 1 AS next_seq
+                    FROM odb.mcp_endpoint_versions
+                    WHERE endpoint_id = %s::uuid
+                    """,
+                    (endpoint_id,),
+                )
+                next_seq = int(cursor.fetchone()["next_seq"])
+
+                cursor.execute(
+                    """
+                    INSERT INTO odb.mcp_endpoint_versions (
+                        endpoint_id, version_seq, protocol_version, server_name,
+                        server_title, server_version, instructions, capabilities,
+                        surface_fingerprint, discovered_at
+                    ) VALUES (
+                        %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    )
+                    RETURNING id
+                    """,
+                    (
+                        endpoint_id,
+                        next_seq,
+                        version_row.get("protocol_version"),
+                        version_row.get("server_name"),
+                        version_row.get("server_title"),
+                        version_row.get("server_version"),
+                        version_row.get("instructions"),
+                        Json(version_row.get("capabilities"))
+                        if version_row.get("capabilities") is not None
+                        else None,
+                        version_row.get("surface_fingerprint"),
+                        discovered_at,
+                    ),
+                )
+                version_id = str(cursor.fetchone()["id"])
+
+                for item in capability_rows:
+                    cursor.execute(
+                        """
+                        INSERT INTO odb.mcp_capability_items (
+                            version_id, item_type, name, title, description,
+                            input_schema, output_schema, annotations, uri,
+                            uri_template, raw, ordinal
+                        ) VALUES (
+                            %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        )
+                        """,
+                        (
+                            version_id,
+                            item.get("item_type"),
+                            item.get("name"),
+                            item.get("title"),
+                            item.get("description"),
+                            Json(item["input_schema"])
+                            if item.get("input_schema") is not None
+                            else None,
+                            Json(item["output_schema"])
+                            if item.get("output_schema") is not None
+                            else None,
+                            Json(item["annotations"])
+                            if item.get("annotations") is not None
+                            else None,
+                            item.get("uri"),
+                            item.get("uri_template"),
+                            Json(item.get("raw") if item.get("raw") is not None else {}),
+                            item.get("ordinal"),
+                        ),
+                    )
+
+                for change in change_rows:
+                    cursor.execute(
+                        """
+                        INSERT INTO odb.mcp_version_changes (
+                            version_id, change_type, item_type, item_name, detail
+                        ) VALUES (
+                            %s::uuid, %s, %s, %s, %s
+                        )
+                        """,
+                        (
+                            version_id,
+                            change.get("change_type"),
+                            change.get("item_type"),
+                            change.get("item_name"),
+                            Json(change.get("detail") if change.get("detail") is not None else {}),
+                        ),
+                    )
+
+                cursor.execute(
+                    """
+                    UPDATE odb.mcp_endpoints
+                    SET current_version_id = %s::uuid,
+                        last_discovered_at = %s,
+                        last_discovery_status = 'changed',
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s::uuid
+                    """,
+                    (version_id, discovered_at, endpoint_id),
+                )
+            conn.commit()
+            return {"version_id": version_id, "version_seq": next_seq}
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.autocommit = prev_autocommit
+
+    def touch_mcp_endpoint_discovery(
+        self,
+        endpoint_id: str,
+        *,
+        status: str,
+        discovered_at: Any,
+    ) -> None:
+        """Stamp the endpoint's discovery outcome without creating a new version.
+
+        Used when a run finishes but produced no new snapshot — either the surface was
+        unchanged (``status='unchanged'``) or the run failed (``status='failed'``). The
+        ``current_version_id`` is left untouched so it keeps pointing at the last good
+        snapshot.
+        """
+        q = """
+            UPDATE odb.mcp_endpoints
+            SET last_discovered_at = %s,
+                last_discovery_status = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s::uuid
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, (discovered_at, status, endpoint_id))
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def get_mcp_endpoint_credentials(
+        self, endpoint_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch the stored credential row for an endpoint, or None when none is configured.
+
+        Returns the credential metadata (``auth_type``, ``key_version``, ``oauth_metadata``,
+        timestamps) and the ciphertext ``encrypted_payload``. Plaintext secrets are never
+        stored; the caller is responsible for decryption when a decrypting key is wired in.
+        """
+        q = """
+            SELECT id, endpoint_id, auth_type, encrypted_payload, key_version,
+                   oauth_metadata, last_refreshed_at, created_at, updated_at
+            FROM odb.mcp_endpoint_credentials
+            WHERE endpoint_id = %s::uuid
+            LIMIT 1
+        """
+        rows = self.execute_query(q, (endpoint_id,))
+        return dict(rows[0]) if rows else None
+
     def upsert_repository_import_spec(
         self,
         tenant_id: str,
