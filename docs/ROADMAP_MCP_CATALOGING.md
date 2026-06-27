@@ -406,7 +406,7 @@ sequenceDiagram
 - **Dependencies / Parallelism.** After 2.1. Blocks 2.3.
 - **Technical Stack.** Python.
 
-### MCAT-2.3 — Discovery list methods + pagination  ·  **#3659**
+### MCAT-2.3 — Discovery list methods + pagination  ·  **#3659**  ·  ✅ Done (objectified-rest 1.6.3)
 - **Problem.** Must enumerate the full capability surface, not just the first page.
 - **Solution / Scope.** Implement `tools/list`, `resources/list`, `resources/templates/list` (result key `resourceTemplates`), `prompts/list`, each looping on opaque `cursor`/`nextCursor` until exhausted, **only** for capabilities the server declared. Spec: [pagination](https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination).
 - **Acceptance Criteria.** Pages through multi-page lists; skips undeclared capabilities; returns complete item sets; cursor-loop guarded against non-terminating servers.

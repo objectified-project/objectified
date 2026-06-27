@@ -8,8 +8,19 @@ lifecycle handshake (``initialize`` + version negotiation) sits on top of it.
 Modules:
     transport_http: JSON-RPC 2.0 over the MCP "Streamable HTTP" transport.
     handshake: The ``initialize`` opening handshake and protocol-version negotiation.
+    discovery: Paginated ``*/list`` discovery of the declared capability surface.
 """
 
+from .discovery import (
+    DEFAULT_PAGE_LIMIT,
+    LIST_METHODS,
+    DiscoveryListings,
+    ListMethod,
+    McpDiscoveryError,
+    McpPaginationError,
+    discover_listings,
+    paginate,
+)
 from .handshake import (
     DEFAULT_CLIENT_CAPABILITIES,
     DEFAULT_CLIENT_INFO,
@@ -34,18 +45,26 @@ from .transport_http import (
 __all__ = [
     "DEFAULT_CLIENT_CAPABILITIES",
     "DEFAULT_CLIENT_INFO",
+    "DEFAULT_PAGE_LIMIT",
     "DEFAULT_PROTOCOL_VERSION",
     "INVALID_PARAMS_CODE",
+    "LIST_METHODS",
     "SUPPORTED_PROTOCOL_VERSIONS",
+    "DiscoveryListings",
     "InitializeResult",
     "JsonRpcError",
     "JsonRpcResponse",
+    "ListMethod",
+    "McpDiscoveryError",
     "McpHttpStatusError",
+    "McpPaginationError",
     "McpProtocolError",
     "McpSessionExpiredError",
     "McpTransportError",
     "McpVersionNegotiationError",
     "ServerInfo",
     "StreamableHttpTransport",
+    "discover_listings",
     "initialize_session",
+    "paginate",
 ]
