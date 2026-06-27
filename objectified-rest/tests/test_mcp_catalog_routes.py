@@ -16,9 +16,13 @@ from app.auth import validate_authentication
 from app.database import Database
 from app.main import app
 from app.models import (
+    MCP_DISCOVERY_CADENCE_MAX_SECONDS,
+    MCP_DISCOVERY_CADENCE_MIN_SECONDS,
     McpEndpointCreate,
     McpEndpointUpdate,
     mcp_endpoint_out_from_row,
+    redact_url_credentials,
+    validate_mcp_endpoint_url,
 )
 
 client = TestClient(app)
@@ -307,10 +311,10 @@ def test_patch_endpoint_empty_body_is_noop():
 
 
 def test_model_create_camelcase_and_snake_case():
-    m1 = McpEndpointCreate(name="A", endpointUrl="https://x", discoveryCadenceSeconds=10)
-    m2 = McpEndpointCreate(name="A", endpoint_url="https://x", discovery_cadence_seconds=10)
+    m1 = McpEndpointCreate(name="A", endpointUrl="https://x", discoveryCadenceSeconds=600)
+    m2 = McpEndpointCreate(name="A", endpoint_url="https://x", discovery_cadence_seconds=600)
     assert m1.endpoint_url == m2.endpoint_url == "https://x"
-    assert m1.discovery_cadence_seconds == 10
+    assert m1.discovery_cadence_seconds == 600
 
 
 def test_model_update_has_any_field():
@@ -324,6 +328,153 @@ def test_mcp_endpoint_out_from_row_normalizes_types():
     assert out.last_discovered_at.startswith("2026-06-26")
     assert out.current_version_id is None
     assert out.published is False
+
+
+# ===========================================================================
+# Endpoint Pydantic models & validation (V2-MCP-17.3 / MCAT-3.3, #3665)
+# ===========================================================================
+
+
+def test_create_endpoint_plaintext_http_remote_422():
+    """Plaintext http to a non-loopback host is rejected at the API boundary."""
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={"name": "X", "endpoint_url": "http://mcp.acme.example/sse"},
+        )
+    assert r.status_code == 422
+    mdb.insert_mcp_endpoint.assert_not_called()
+
+
+def test_create_endpoint_non_http_scheme_for_http_transport_422():
+    """An HTTP-family transport requires an http(s) URL — ftp:// is rejected."""
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={"name": "X", "endpoint_url": "ftp://mcp.acme.example", "transport": "sse"},
+        )
+    assert r.status_code == 422
+    mdb.insert_mcp_endpoint.assert_not_called()
+
+
+def test_create_endpoint_localhost_http_allowed_in_dev():
+    """http is tolerated for loopback hosts when not in production (the default test env)."""
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.insert_mcp_endpoint.return_value = _ENDPOINT_ROW
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={"name": "Local", "endpoint_url": "http://localhost:8080/mcp"},
+        )
+    assert r.status_code == 201
+    assert mdb.insert_mcp_endpoint.call_args.kwargs["endpoint_url"] == "http://localhost:8080/mcp"
+
+
+def test_create_endpoint_stdio_command_target_allowed():
+    """``stdio`` endpoints carry a command target, not a URL, so scheme rules don't apply."""
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.insert_mcp_endpoint.return_value = _ENDPOINT_ROW
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={
+                "name": "Local stdio",
+                "endpoint_url": "npx -y @modelcontextprotocol/server-everything",
+                "transport": "stdio",
+            },
+        )
+    assert r.status_code == 201
+
+
+def test_create_endpoint_cadence_below_min_422():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={
+                "name": "X",
+                "endpoint_url": "https://x",
+                "discoveryCadenceSeconds": MCP_DISCOVERY_CADENCE_MIN_SECONDS - 1,
+            },
+        )
+    assert r.status_code == 422
+    mdb.insert_mcp_endpoint.assert_not_called()
+
+
+def test_create_endpoint_cadence_above_max_422():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={
+                "name": "X",
+                "endpoint_url": "https://x",
+                "discoveryCadenceSeconds": MCP_DISCOVERY_CADENCE_MAX_SECONDS + 1,
+            },
+        )
+    assert r.status_code == 422
+    mdb.insert_mcp_endpoint.assert_not_called()
+
+
+def test_patch_endpoint_plaintext_http_remote_422():
+    """A URL-only PATCH cannot smuggle in plaintext http to a remote host."""
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.patch(
+            "/v1/mcp/acme/endpoints/11111111-1111-1111-1111-111111111111",
+            json={"endpoint_url": "http://evil.example/mcp"},
+        )
+    assert r.status_code == 422
+    mdb.update_mcp_endpoint.assert_not_called()
+
+
+def test_validate_mcp_endpoint_url_production_rejects_localhost_http():
+    """In production even loopback http is rejected — only https is acceptable."""
+    fake_settings = type("S", (), {"is_production": True})()
+    with patch("app.models.settings", fake_settings):
+        with pytest.raises(ValueError):
+            validate_mcp_endpoint_url("http://localhost:8080/mcp", "streamable_http")
+        # https stays valid in production
+        validate_mcp_endpoint_url("https://mcp.acme.example/sse", "streamable_http")
+
+
+def test_validate_mcp_endpoint_url_blank_rejected():
+    with pytest.raises(ValueError):
+        validate_mcp_endpoint_url("   ", "streamable_http")
+
+
+def test_redact_url_credentials_masks_userinfo():
+    assert (
+        redact_url_credentials("https://user:secret@mcp.acme.example/sse")
+        == "https://***@mcp.acme.example/sse"
+    )
+    # token-as-username (no password) is masked too
+    assert (
+        redact_url_credentials("https://tok123@mcp.acme.example/sse")
+        == "https://***@mcp.acme.example/sse"
+    )
+
+
+def test_redact_url_credentials_preserves_port_and_query():
+    assert (
+        redact_url_credentials("https://u:p@host.example:8443/mcp?x=1")
+        == "https://***@host.example:8443/mcp?x=1"
+    )
+
+
+def test_redact_url_credentials_passes_through_clean_urls():
+    assert (
+        redact_url_credentials("https://mcp.acme.example/sse")
+        == "https://mcp.acme.example/sse"
+    )
+    # stdio command target (no authority) is untouched, even with an @ in the path
+    assert (
+        redact_url_credentials("npx -y @modelcontextprotocol/server-everything")
+        == "npx -y @modelcontextprotocol/server-everything"
+    )
+    assert redact_url_credentials(None) is None
+
+
+def test_out_from_row_redacts_endpoint_url_credentials():
+    row = {**_ENDPOINT_ROW, "endpoint_url": "https://user:secret@mcp.acme.example/sse"}
+    out = mcp_endpoint_out_from_row(row)
+    assert out.endpoint_url == "https://***@mcp.acme.example/sse"
+    assert "secret" not in out.endpoint_url
 
 
 # ===========================================================================

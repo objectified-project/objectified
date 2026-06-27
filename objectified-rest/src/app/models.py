@@ -1,8 +1,11 @@
+import ipaddress
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Literal, Optional, Union
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
+from .config import settings
 from .repository_refresh_status import RefreshStatus, compute_refresh_status
 
 
@@ -3434,8 +3437,109 @@ class MockInstanceResponse(BaseModel):
 # ``mcp_endpoints_transport_check`` constraint in V126 (and the MCP transports spec).
 MCP_ENDPOINT_TRANSPORTS = ("streamable_http", "sse", "stdio")
 
+# Transports whose ``endpoint_url`` is a network URL (and so must be http/https). ``stdio``
+# is excluded: its ``endpoint_url`` is a local command target, not a URL, so the URL scheme
+# rules below do not apply to it.
+MCP_ENDPOINT_URL_TRANSPORTS = frozenset({"streamable_http", "sse"})
+
 # Catalog visibility reuses the ``visibility_type`` enum (V006).
 MCP_ENDPOINT_VISIBILITIES = ("private", "public")
+
+# Cadence bounds for periodic re-discovery (seconds). The floor keeps the scheduler from
+# hammering an external server faster than once a minute; the ceiling (30 days) keeps a
+# cadence meaningful as "automatic" rather than effectively never. The DB only enforces
+# ``> 0`` (V126); these tighten that at the API boundary.
+MCP_DISCOVERY_CADENCE_MIN_SECONDS = 60
+MCP_DISCOVERY_CADENCE_MAX_SECONDS = 30 * 24 * 60 * 60  # 2_592_000 (30 days)
+
+# Hosts for which plaintext ``http`` is tolerated in development (loopback only).
+_MCP_LOOPBACK_HOSTNAMES = frozenset({"localhost"})
+
+# Upper bound on a stored endpoint URL; TEXT in the DB, but a multi-kilobyte URL is
+# pathological and worth rejecting early.
+_MCP_ENDPOINT_URL_MAX_LENGTH = 2048
+
+
+def _is_loopback_host(hostname: Optional[str]) -> bool:
+    """True when ``hostname`` is the local loopback (``localhost`` or a loopback IP)."""
+    if not hostname:
+        return False
+    host = hostname.strip().lower()
+    if host in _MCP_LOOPBACK_HOSTNAMES:
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def validate_mcp_endpoint_url(url: str, transport: Optional[str] = None) -> None:
+    """Validate a catalog endpoint URL, raising ``ValueError`` when it is unacceptable.
+
+    Two rules are enforced:
+
+    * **Scheme by transport** — for an HTTP-family transport (``streamable_http`` / ``sse``)
+      the value must be an ``http``/``https`` URL with a host. ``stdio`` (or an unknown
+      ``transport`` on a partial update) targets a local command, so this check is skipped.
+    * **No plaintext to remote hosts** — whenever the value *is* an ``http`` URL, it is
+      rejected unless the host is loopback (``localhost``/``127.0.0.1``/``::1``) *and* the
+      service is not running in production. ``https`` is always accepted. This guard runs
+      regardless of ``transport`` so a URL-only PATCH cannot smuggle in plaintext.
+
+    Args:
+        url: The endpoint URL (or command target) to validate.
+        transport: The endpoint's transport, when known. ``None`` on a partial update that
+            does not change the transport — only the transport-independent plaintext guard
+            then applies.
+
+    Raises:
+        ValueError: When the URL is blank, malformed for its transport, or uses plaintext
+            ``http`` to a non-loopback host.
+    """
+    candidate = (url or "").strip()
+    if not candidate:
+        raise ValueError("endpoint_url must not be blank")
+
+    parts = urlsplit(candidate)
+    scheme = parts.scheme.lower()
+
+    if transport in MCP_ENDPOINT_URL_TRANSPORTS:
+        if scheme not in ("http", "https"):
+            raise ValueError(
+                f"endpoint_url must be an http(s) URL for the {transport} transport"
+            )
+        if not parts.hostname:
+            raise ValueError("endpoint_url must include a host")
+
+    if scheme == "http":
+        if not parts.hostname:
+            raise ValueError("endpoint_url must include a host")
+        if settings.is_production or not _is_loopback_host(parts.hostname):
+            raise ValueError(
+                "endpoint_url must use https (plaintext http is allowed only for "
+                "localhost in development)"
+            )
+
+
+def redact_url_credentials(url: Optional[str]) -> Optional[str]:
+    """Mask any ``user:password@`` userinfo embedded in a URL's authority.
+
+    Some MCP servers carry a token in the URL (``https://tok@host/...``). The catalog stores
+    the URL verbatim for discovery to use, but the wire model must never echo the secret back
+    to a client, so the userinfo is replaced with ``***`` while host, port, path, and query
+    are preserved exactly. URLs without an authority/userinfo (e.g. ``stdio`` command targets)
+    are returned unchanged.
+    """
+    if not url:
+        return url
+    parts = urlsplit(url)
+    if "@" not in parts.netloc:
+        return url
+    host_port = parts.netloc.rsplit("@", 1)[1]
+    redacted_netloc = f"***@{host_port}"
+    return urlunsplit(
+        (parts.scheme, redacted_netloc, parts.path, parts.query, parts.fragment)
+    )
 
 
 class McpEndpointCreate(BaseModel):
@@ -3454,6 +3558,7 @@ class McpEndpointCreate(BaseModel):
     endpoint_url: str = Field(
         ...,
         min_length=1,
+        max_length=_MCP_ENDPOINT_URL_MAX_LENGTH,
         validation_alias=AliasChoices("endpointUrl", "endpoint_url"),
     )
     transport: str = "streamable_http"
@@ -3463,7 +3568,8 @@ class McpEndpointCreate(BaseModel):
     visibility: str = "private"
     discovery_cadence_seconds: Optional[int] = Field(
         default=None,
-        gt=0,
+        ge=MCP_DISCOVERY_CADENCE_MIN_SECONDS,
+        le=MCP_DISCOVERY_CADENCE_MAX_SECONDS,
         validation_alias=AliasChoices("discoveryCadenceSeconds", "discovery_cadence_seconds"),
     )
 
@@ -3479,8 +3585,7 @@ class McpEndpointCreate(BaseModel):
             )
         if not self.name.strip():
             raise ValueError("name must not be blank")
-        if not self.endpoint_url.strip():
-            raise ValueError("endpoint_url must not be blank")
+        validate_mcp_endpoint_url(self.endpoint_url, self.transport)
         return self
 
 
@@ -3498,6 +3603,7 @@ class McpEndpointUpdate(BaseModel):
     endpoint_url: Optional[str] = Field(
         default=None,
         min_length=1,
+        max_length=_MCP_ENDPOINT_URL_MAX_LENGTH,
         validation_alias=AliasChoices("endpointUrl", "endpoint_url"),
     )
     transport: Optional[str] = None
@@ -3508,7 +3614,8 @@ class McpEndpointUpdate(BaseModel):
     enabled: Optional[bool] = None
     discovery_cadence_seconds: Optional[int] = Field(
         default=None,
-        gt=0,
+        ge=MCP_DISCOVERY_CADENCE_MIN_SECONDS,
+        le=MCP_DISCOVERY_CADENCE_MAX_SECONDS,
         validation_alias=AliasChoices("discoveryCadenceSeconds", "discovery_cadence_seconds"),
     )
 
@@ -3524,8 +3631,10 @@ class McpEndpointUpdate(BaseModel):
             )
         if self.name is not None and not self.name.strip():
             raise ValueError("name must not be blank")
-        if self.endpoint_url is not None and not self.endpoint_url.strip():
-            raise ValueError("endpoint_url must not be blank")
+        if self.endpoint_url is not None:
+            # ``transport`` may be None here (URL-only PATCH); the helper then enforces only
+            # the transport-independent plaintext-http guard.
+            validate_mcp_endpoint_url(self.endpoint_url, self.transport)
         return self
 
     def has_any_field(self) -> bool:
@@ -3547,7 +3656,12 @@ class McpEndpointUpdate(BaseModel):
 
 
 class McpEndpointOut(BaseModel):
-    """Wire representation of one catalog endpoint (snake_case keys for UI/CLI)."""
+    """Wire representation of one catalog endpoint (snake_case keys for UI/CLI).
+
+    ``endpoint_url`` is credential-redacted: any ``user:password@`` userinfo embedded in the
+    stored URL is masked to ``***`` before it leaves the service (see
+    :func:`mcp_endpoint_out_from_row`).
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -3588,7 +3702,9 @@ def mcp_endpoint_out_from_row(row: Dict[str, Any]) -> McpEndpointOut:
     """Project an ``odb.mcp_endpoints`` row onto the wire model.
 
     Timestamps and UUIDs are normalized to strings so the response serializes
-    cleanly regardless of the driver's native column types.
+    cleanly regardless of the driver's native column types, and any credentials
+    embedded in ``endpoint_url`` are redacted (:func:`redact_url_credentials`) so a
+    stored secret never reaches a client.
     """
 
     def _ts(value: Any) -> Optional[str]:
@@ -3607,7 +3723,7 @@ def mcp_endpoint_out_from_row(row: Dict[str, Any]) -> McpEndpointOut:
         tenant_id=str(row["tenant_id"]),
         name=str(row["name"]),
         slug=str(row["slug"]),
-        endpoint_url=str(row["endpoint_url"]),
+        endpoint_url=redact_url_credentials(str(row["endpoint_url"])),
         transport=str(row["transport"]),
         description=_s(row.get("description")),
         category=_s(row.get("category")),
