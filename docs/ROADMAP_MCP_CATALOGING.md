@@ -349,7 +349,7 @@ mcp_endpoints
 - **Dependencies / Parallelism.** After 1.1. Parallel with 1.2/1.3/1.5.
 - **Technical Stack.** PostgreSQL `BYTEA`.
 
-### MCAT-1.5 — Scores, discovery-jobs, test-log tables  ·  **#3655**
+### MCAT-1.5 — Scores, discovery-jobs, test-log tables  ·  **#3655**  ·  ✅ Done (V130)
 - **Problem.** Need persistence for scores, async discovery jobs, and test invocations.
 - **Solution / Scope.** (V130) `mcp_version_scores`: `version_id FK`, `score SMALLINT`, `grade TEXT`, `report JSONB`, `report_fingerprint TEXT`, `scored_at` (mirrors `versions.quality_*` from V124). `mcp_discovery_jobs`: `id`, `endpoint_id`, `tenant_id`, `state` (`queued|running|completed|failed`), `trigger` (`manual|sweep|registry`), `started_at`, `finished_at`, `error TEXT`, `result JSONB`. `mcp_test_invocations`: `id`, `endpoint_id`, `version_id`, `item_type`, `item_name`, `arguments JSONB`, `response JSONB`, `is_error BOOLEAN`, `latency_ms INT`, `invoked_by`, `created_at`.
 - **Acceptance Criteria.** All three tables created with appropriate indexes (`(endpoint_id, created_at)`, `(state)`); FK cascades on endpoint delete.
