@@ -11,7 +11,7 @@ Three layers, all DB-free:
   fake cursor/connection, mirroring the doubles used by ``test_mcp_catalog_routes``.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 
 from app import mcp_credentials, mcp_discovery_engine
 from app.auth import validate_authentication
-from app.database import Database
+from app.database import Database, format_mcp_version_tag
 from app.main import app
 from app.mcp_client import (
     DiscoveryListings,
@@ -216,7 +216,12 @@ def _version_row(surface: DiscoverySurface, *, version_id: str = "ver-prev", ver
     server-metadata change.
     """
     version_row = surface.to_version_row()
-    return {"id": version_id, "version_seq": version_seq, **version_row}
+    return {
+        "id": version_id,
+        "version_seq": version_seq,
+        "version_tag": f"2026-06-26T12:0{version_seq}Z",
+        **version_row,
+    }
 
 
 def _db_with_previous(surface: DiscoverySurface, *, version_id: str = "ver-prev") -> MagicMock:
@@ -303,7 +308,11 @@ def test_persist_first_run_creates_version_one():
     surface = _surface([_tool("alpha")])
     mdb = MagicMock()
     mdb.get_latest_mcp_endpoint_version.return_value = None
-    mdb.record_mcp_discovery_version.return_value = {"version_id": "ver-1", "version_seq": 1}
+    mdb.record_mcp_discovery_version.return_value = {
+        "version_id": "ver-1",
+        "version_seq": 1,
+        "version_tag": "2026-06-26T12:00Z",
+    }
     with patch.object(mcp_discovery_engine, "db", mdb):
         result = mcp_discovery_engine._persist_outcome(
             _JOB_UUID, _ENDPOINT_ROW, surface, _NOW
@@ -311,6 +320,8 @@ def test_persist_first_run_creates_version_one():
     assert result["changed"] is True
     assert result["version_id"] == "ver-1"
     assert result["version_seq"] == 1
+    # The date/time tag from the persisted snapshot is surfaced on the job result (#3671).
+    assert result["version_tag"] == "2026-06-26T12:00Z"
     # First run: every item is an "added" change.
     kwargs = mdb.record_mcp_discovery_version.call_args.kwargs
     assert kwargs["change_rows"][0]["change_type"] == "added"
@@ -325,6 +336,7 @@ def test_persist_unchanged_makes_no_new_version():
     mdb.get_latest_mcp_endpoint_version.return_value = {
         "id": "ver-7",
         "version_seq": 7,
+        "version_tag": "2026-06-26T11:07Z",
         "surface_fingerprint": fp,
     }
     with patch.object(mcp_discovery_engine, "db", mdb):
@@ -333,6 +345,8 @@ def test_persist_unchanged_makes_no_new_version():
         )
     assert result["changed"] is False
     assert result["version_id"] == "ver-7"
+    # Unchanged: the existing snapshot's tag is echoed (no new version, no new tag).
+    assert result["version_tag"] == "2026-06-26T11:07Z"
     mdb.record_mcp_discovery_version.assert_not_called()
     mdb.touch_mcp_endpoint_discovery.assert_called_once()
     assert mdb.touch_mcp_endpoint_discovery.call_args.kwargs["status"] == "unchanged"
@@ -577,7 +591,8 @@ def test_enqueue_job_dedups_to_active(monkeypatch):
 
 def test_record_version_assigns_next_seq_and_updates_endpoint(monkeypatch):
     surface = _surface([_tool("alpha")])
-    cur = _FakeCursor(fetchone_results=[{"next_seq": 1}, {"id": "ver-1"}])
+    # fetchone queue: next_seq → version_tag collision check (no collision) → INSERT RETURNING id.
+    cur = _FakeCursor(fetchone_results=[{"next_seq": 1}, None, {"id": "ver-1"}])
     conn = _FakeConn(cur)
     db = Database()
     monkeypatch.setattr(db, "connect", lambda: conn)
@@ -592,12 +607,50 @@ def test_record_version_assigns_next_seq_and_updates_endpoint(monkeypatch):
         discovered_at=_NOW,
     )
 
-    assert out == {"version_id": "ver-1", "version_seq": 1}
+    # The snapshot is tagged with the minute-precision UTC discovery time (#3671).
+    assert out == {"version_id": "ver-1", "version_seq": 1, "version_tag": "2026-06-26T12:00Z"}
     sqls = " ".join(sql for sql, _ in cur.executed)
     assert "INSERT INTO odb.mcp_endpoint_versions" in sqls
     assert "INSERT INTO odb.mcp_capability_items" in sqls
     assert "INSERT INTO odb.mcp_version_changes" in sqls
     assert "UPDATE odb.mcp_endpoints" in sqls
+    # The tag is one of the columns/params carried on the version INSERT.
+    insert_sql, insert_params = next(
+        (sql, params)
+        for sql, params in cur.executed
+        if "INSERT INTO odb.mcp_endpoint_versions" in sql
+    )
+    assert "version_tag" in insert_sql
+    assert "2026-06-26T12:00Z" in insert_params
+
+
+def test_record_version_disambiguates_same_minute_tag_collision(monkeypatch):
+    """A second snapshot in the same minute gets a ``-N`` suffix on its date/time tag."""
+    surface = _surface([_tool("alpha")])
+    # The first collision probe finds an existing row (truthy), the second probe is clear (None).
+    cur = _FakeCursor(
+        fetchone_results=[{"next_seq": 2}, {"exists": 1}, None, {"id": "ver-2"}]
+    )
+    conn = _FakeConn(cur)
+    db = Database()
+    monkeypatch.setattr(db, "connect", lambda: conn)
+
+    out = db.record_mcp_discovery_version(
+        _EP_UUID,
+        version_row=surface.to_version_row(),
+        capability_rows=surface.to_capability_rows(None),
+        change_rows=[],
+        discovered_at=_NOW,
+    )
+
+    assert out["version_tag"] == "2026-06-26T12:00Z-2"
+    # Two collision probes were issued against mcp_endpoint_versions before the INSERT.
+    probes = [
+        params
+        for sql, params in cur.executed
+        if "SELECT 1 FROM odb.mcp_endpoint_versions" in sql
+    ]
+    assert [p[1] for p in probes] == ["2026-06-26T12:00Z", "2026-06-26T12:00Z-2"]
     assert conn.committed is True
 
 
@@ -613,3 +666,31 @@ def test_finish_job_writes_terminal_state(monkeypatch):
     assert "finished_at = CURRENT_TIMESTAMP" in sql
     assert params[0] == "completed"
     assert conn.committed is True
+
+
+# ===========================================================================
+# DB LAYER — date/time version tag formatting (MCAT-4.4, #3671)
+# ===========================================================================
+
+
+def test_format_version_tag_minute_precision_utc():
+    """An aware UTC datetime renders as a compact minute-precision ISO label."""
+    assert format_mcp_version_tag(_NOW) == "2026-06-26T12:00Z"
+    assert (
+        format_mcp_version_tag(datetime(2026, 6, 26, 14, 3, 47, tzinfo=timezone.utc))
+        == "2026-06-26T14:03Z"
+    )
+
+
+def test_format_version_tag_converts_to_utc():
+    """A non-UTC aware datetime is normalized to UTC before formatting."""
+    eastern = timezone(timedelta(hours=-4))
+    # 10:03 at UTC-4 is 14:03 UTC.
+    local = datetime(2026, 6, 26, 10, 3, 0, tzinfo=eastern)
+    assert format_mcp_version_tag(local) == "2026-06-26T14:03Z"
+
+
+def test_format_version_tag_assumes_utc_for_naive():
+    """A naive datetime is treated as already-UTC (matches the SQL backfill assumption)."""
+    naive = datetime(2026, 6, 26, 14, 3, 0)
+    assert format_mcp_version_tag(naive) == "2026-06-26T14:03Z"
