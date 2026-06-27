@@ -411,13 +411,21 @@ async def test_drive_job_classifies_client_failure(monkeypatch):
     _install_runner(monkeypatch, exc=RuntimeError("boom"))
     mdb = MagicMock()
     mdb.mark_mcp_discovery_job_running.return_value = {**_JOB_ROW, "state": "running"}
+    mdb.record_mcp_discovery_failure.return_value = {
+        "consecutive_failures": 1,
+        "backoff_seconds": 60.0,
+        "quarantined": False,
+        "newly_quarantined": False,
+    }
     monkeypatch.setattr(mcp_discovery_engine, "db", mdb)
 
     await mcp_discovery_engine._drive_discovery_job(_JOB_UUID, _ENDPOINT_ROW)
 
     mdb.record_mcp_discovery_version.assert_not_called()
-    mdb.touch_mcp_endpoint_discovery.assert_called_once()
-    assert mdb.touch_mcp_endpoint_discovery.call_args.kwargs["status"] == "failed"
+    # Failures now accumulate backoff/quarantine state via record_mcp_discovery_failure, and
+    # last_discovery_status carries the specific error code (here the unknown-exception bucket).
+    mdb.record_mcp_discovery_failure.assert_called_once()
+    assert mdb.record_mcp_discovery_failure.call_args.kwargs["status"] == "unknown"
     finish = mdb.finish_mcp_discovery_job.call_args
     assert finish.args[1] == "failed"
     assert "error" in finish.kwargs["result"]

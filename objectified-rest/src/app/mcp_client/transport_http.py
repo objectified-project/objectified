@@ -145,6 +145,54 @@ class McpSessionExpiredError(McpHttpStatusError):
         )
 
 
+class McpRateLimitedError(McpHttpStatusError):
+    """The server returned ``429 Too Many Requests``, asking the client to slow down.
+
+    Surfaced as a dedicated error — separate from a generic :class:`McpHttpStatusError`
+    — so the discovery taxonomy can record a stable "rate limited" outcome and the
+    periodic sweep's backoff can *respect* the server's pacing: when the response carries
+    a ``Retry-After`` header expressed as a delay in seconds, it is parsed into
+    :attr:`retry_after` so the backoff never retries sooner than the server permits
+    (MCAT-5.3). An ``HTTP-date`` form of ``Retry-After`` is not converted (left ``None``),
+    so the client falls back to its own exponential backoff in that case.
+
+    Attributes:
+        retry_after: The ``Retry-After`` delay in seconds when the header was present and
+            given as a non-negative integer, else ``None``.
+    """
+
+    def __init__(self, body: str = "", retry_after: Optional[int] = None) -> None:
+        self.retry_after = retry_after
+        hint = f" (Retry-After: {retry_after}s)" if retry_after is not None else ""
+        super().__init__(
+            429, body, message=f"MCP server rate limited the request (HTTP 429){hint}"
+        )
+
+
+def parse_retry_after_seconds(value: Optional[str]) -> Optional[int]:
+    """Parse a ``Retry-After`` header value expressed as a delay in seconds.
+
+    Only the ``delta-seconds`` form (RFC 9110 §10.2.3) is recognized; the alternative
+    ``HTTP-date`` form returns ``None`` (the caller falls back to its own backoff). A
+    negative or non-integer value also returns ``None`` so a malformed header can never
+    shorten — or invert — the backoff delay.
+
+    Args:
+        value: The raw ``Retry-After`` header value, or ``None`` when absent.
+
+    Returns:
+        The non-negative integer delay in seconds, or ``None`` when the header is
+        absent, an HTTP-date, or otherwise unparseable.
+    """
+    if value is None:
+        return None
+    text = value.strip()
+    if not text.isdigit():
+        return None
+    seconds = int(text)
+    return seconds if seconds >= 0 else None
+
+
 class McpAuthRequiredError(McpHttpStatusError):
     """The server returned ``401 Unauthorized``, requesting authentication.
 
@@ -492,6 +540,10 @@ class StreamableHttpTransport:
         body = await self._safe_body(response)
         if status == 401:
             raise McpAuthRequiredError(body, response.headers.get("WWW-Authenticate"))
+        if status == 429:
+            raise McpRateLimitedError(
+                body, parse_retry_after_seconds(response.headers.get("Retry-After"))
+            )
         if status == 404 and self._session_id is not None:
             expired = self._session_id
             self._session_id = None

@@ -42,6 +42,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 from .database import db
 from .mcp_client import (
     DiscoveryError,
+    DiscoveryErrorCode,
     DiscoverySurface,
     ServerInfo,
     StreamableHttpTransport,
@@ -270,12 +271,48 @@ def _persist_outcome(
     return result
 
 
+def _retry_after_from_error(error: DiscoveryError) -> Optional[float]:
+    """Extract a server ``Retry-After`` (seconds) from a rate-limited discovery error.
+
+    Only :attr:`DiscoveryErrorCode.RATE_LIMITED` failures carry one (parsed from the 429
+    response in the transport); every other failure returns ``None`` so the backoff falls
+    back to its own exponential schedule.
+    """
+    if error.code is not DiscoveryErrorCode.RATE_LIMITED:
+        return None
+    value = error.detail.get("retry_after")
+    if isinstance(value, (int, float)) and value > 0:
+        return float(value)
+    return None
+
+
 def _persist_failure(
-    job_id: str, endpoint_id: str, error: DiscoveryError, discovered_at: datetime
+    job_id: str,
+    endpoint: Dict[str, Any],
+    error: DiscoveryError,
+    discovered_at: datetime,
 ) -> None:
-    """Record a failed run on both the job and the endpoint (synchronous)."""
-    db.touch_mcp_endpoint_discovery(
-        endpoint_id, status="failed", discovered_at=discovered_at
+    """Record a failed run on the job and accumulate the endpoint's failure state (synchronous).
+
+    The endpoint side goes through :meth:`Database.record_mcp_discovery_failure` (MCAT-5.3): the
+    consecutive-failure counter is incremented, an exponential backoff anchor is written (honouring
+    a 429 ``Retry-After``), and the endpoint is quarantined once it crosses the configured
+    threshold. ``last_discovery_status`` is stamped with the *specific* error code (e.g.
+    ``connect_error``, ``rate_limited``) so the failure mode is visible via the status API, not just
+    a generic "failed". A quarantine transition emits a one-shot event.
+    """
+    from .config import settings
+
+    endpoint_id = str(endpoint["id"])
+    outcome = db.record_mcp_discovery_failure(
+        endpoint_id,
+        discovered_at=discovered_at,
+        status=error.code.value,
+        backoff_base_seconds=float(settings.mcp_discovery_backoff_base_seconds),
+        backoff_max_seconds=float(settings.mcp_discovery_backoff_max_seconds),
+        quarantine_threshold=int(settings.mcp_discovery_quarantine_threshold),
+        quarantine_reason=f"{error.code.value}: {error.message}"[:500],
+        retry_after_seconds=_retry_after_from_error(error),
     )
     db.finish_mcp_discovery_job(
         job_id,
@@ -283,6 +320,47 @@ def _persist_failure(
         result={"error": error.as_dict()},
         error=f"{error.code}: {error.message}"[:2000],
     )
+    _log_failure_outcome(endpoint, error, outcome)
+
+
+def _log_failure_outcome(
+    endpoint: Dict[str, Any],
+    error: DiscoveryError,
+    outcome: Optional[Dict[str, Any]],
+) -> None:
+    """Emit the failure/quarantine event for one failed discovery run.
+
+    A quarantine *transition* (``newly_quarantined``) is logged at WARNING as the auto-disable
+    event the ticket calls for; an ongoing failure is logged at INFO with its backoff so the
+    sweep's pacing is observable. Both carry the endpoint id/tenant and the specific error code so
+    the structured-log observability layer (RC1-3.2) surfaces them. Best-effort: a logging issue
+    never propagates back into the discovery run.
+    """
+    if outcome is None:
+        return
+    endpoint_id = str(endpoint.get("id"))
+    tenant_id = str(endpoint.get("tenant_id"))
+    failures = outcome.get("consecutive_failures")
+    backoff = outcome.get("backoff_seconds")
+    if outcome.get("newly_quarantined"):
+        logger.warning(
+            "mcp endpoint quarantined: endpoint=%s tenant=%s consecutive_failures=%s "
+            "reason=%s (auto-disabled from the re-discovery sweep until it recovers)",
+            endpoint_id,
+            tenant_id,
+            failures,
+            error.code.value,
+        )
+    else:
+        logger.info(
+            "mcp endpoint discovery failed: endpoint=%s tenant=%s consecutive_failures=%s "
+            "error=%s next_retry_in=%.0fs",
+            endpoint_id,
+            tenant_id,
+            failures,
+            error.code.value,
+            float(backoff) if backoff is not None else 0.0,
+        )
 
 
 async def _drive_discovery_job(job_id: str, endpoint: Dict[str, Any]) -> None:
@@ -308,7 +386,7 @@ async def _drive_discovery_job(job_id: str, endpoint: Dict[str, Any]) -> None:
         )
         try:
             await asyncio.to_thread(
-                _persist_failure, job_id, endpoint_id, error, _utcnow()
+                _persist_failure, job_id, endpoint, error, _utcnow()
             )
         except Exception:  # noqa: BLE001 - last-resort guard so the task never crashes
             logger.exception("failed to record discovery failure job=%s", job_id)
@@ -329,7 +407,7 @@ async def _drive_discovery_job(job_id: str, endpoint: Dict[str, Any]) -> None:
         logger.exception("discovery persistence failed job=%s", job_id)
         try:
             await asyncio.to_thread(
-                _persist_failure, job_id, endpoint_id, error, _utcnow()
+                _persist_failure, job_id, endpoint, error, _utcnow()
             )
         except Exception:  # noqa: BLE001
             logger.exception("failed to record discovery persistence failure job=%s", job_id)
@@ -414,7 +492,7 @@ async def run_discovery_job(
         )
         try:
             await asyncio.to_thread(
-                _persist_failure, job_id, endpoint_id, error, _utcnow()
+                _persist_failure, job_id, endpoint, error, _utcnow()
             )
         except Exception:  # noqa: BLE001 - last-resort guard so the sweep task never crashes
             logger.exception(

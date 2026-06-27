@@ -8947,7 +8947,8 @@ class Database:
     _MCP_ENDPOINT_COLUMNS = (
         "id, tenant_id, name, slug, endpoint_url, transport, description, category, "
         "visibility, published, enabled, discovery_cadence_seconds, last_discovered_at, "
-        "last_discovery_status, current_version_id, created_at, updated_at"
+        "last_discovery_status, consecutive_failures, next_discovery_after, quarantined_at, "
+        "quarantine_reason, current_version_id, created_at, updated_at"
     )
 
     def list_mcp_endpoints(self, tenant_id: str) -> List[Dict[str, Any]]:
@@ -8997,6 +8998,14 @@ class Database:
         re-check them. Ordering is oldest-first (NULLs — never discovered — first)
         so attention is spread fairly and a brand-new endpoint is picked up promptly.
 
+        Failure handling (MCAT-5.3, #3675) adds two more carve-outs so a flaky/dead
+        endpoint cannot wedge the sweep or spam failures: a **quarantined** endpoint
+        (``quarantined_at IS NOT NULL`` — it tripped the consecutive-failure threshold)
+        is excluded entirely until it recovers or an operator clears it, and an endpoint
+        still inside its **backoff window** (``next_discovery_after`` in the future) is
+        skipped even when its cadence has otherwise elapsed. Both are reset on the next
+        successful contact, so a recovered endpoint rejoins the sweep automatically.
+
         Note: unlike the V126 column comment's original "null means no automatic
         discovery", a null ``discovery_cadence_seconds`` now means "use the global
         default cadence". The real on/off switch is the ``enabled`` column, so an
@@ -9019,6 +9028,8 @@ class Database:
             FROM odb.mcp_endpoints
             WHERE deleted_at IS NULL
               AND enabled = TRUE
+              AND quarantined_at IS NULL
+              AND (next_discovery_after IS NULL OR next_discovery_after <= now())
               AND (
                 last_discovered_at IS NULL
                 OR last_discovered_at <= now() - make_interval(
@@ -9729,12 +9740,18 @@ class Database:
                         ),
                     )
 
+                # A successful discovery clears any failure backoff/quarantine state (MCAT-5.3):
+                # the endpoint is healthy again, so it rejoins the sweep at its normal cadence.
                 cursor.execute(
                     """
                     UPDATE odb.mcp_endpoints
                     SET current_version_id = %s::uuid,
                         last_discovered_at = %s,
                         last_discovery_status = 'changed',
+                        consecutive_failures = 0,
+                        next_discovery_after = NULL,
+                        quarantined_at = NULL,
+                        quarantine_reason = NULL,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = %s::uuid
                     """,
@@ -9759,17 +9776,26 @@ class Database:
         status: str,
         discovered_at: Any,
     ) -> None:
-        """Stamp the endpoint's discovery outcome without creating a new version.
+        """Stamp a successful no-change discovery without creating a new version.
 
-        Used when a run finishes but produced no new snapshot — either the surface was
-        unchanged (``status='unchanged'``) or the run failed (``status='failed'``). The
-        ``current_version_id`` is left untouched so it keeps pointing at the last good
-        snapshot.
+        Used when a run reaches the server and finds an unchanged surface
+        (``status='unchanged'``): the ``current_version_id`` is left untouched so it keeps
+        pointing at the last good snapshot, but the contact still succeeded, so — like a
+        new-version success — any failure backoff/quarantine state is cleared (MCAT-5.3) and
+        the endpoint rejoins the sweep at its normal cadence.
+
+        Failures take a different path (:meth:`record_mcp_discovery_failure`) because they
+        *accumulate* state (increment the counter, set the backoff anchor, maybe quarantine)
+        rather than reset it.
         """
         q = """
             UPDATE odb.mcp_endpoints
             SET last_discovered_at = %s,
                 last_discovery_status = %s,
+                consecutive_failures = 0,
+                next_discovery_after = NULL,
+                quarantined_at = NULL,
+                quarantine_reason = NULL,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s::uuid
         """
@@ -9781,6 +9807,130 @@ class Database:
         except Exception as e:
             conn.rollback()
             raise e
+
+    def record_mcp_discovery_failure(
+        self,
+        endpoint_id: str,
+        *,
+        discovered_at: Any,
+        status: str = "failed",
+        backoff_base_seconds: float,
+        backoff_max_seconds: float,
+        quarantine_threshold: int,
+        quarantine_reason: str,
+        retry_after_seconds: Optional[float] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Record a failed discovery: increment the failure counter, back off, maybe quarantine.
+
+        The failure counterpart of :meth:`touch_mcp_endpoint_discovery` (MCAT-5.3, #3675).
+        In one transaction this:
+
+        1. increments ``consecutive_failures`` and stamps ``last_discovered_at`` /
+           ``last_discovery_status`` so the endpoint is not immediately due again (its cadence
+           anchor advances) and the latest outcome is visible via the status API;
+        2. computes an exponential backoff from the *new* failure count
+           (:func:`app.mcp_discovery_backoff.compute_backoff_seconds`, honouring a 429
+           ``Retry-After`` floor) and writes ``next_discovery_after`` so the sweep defers the
+           endpoint for that delay; and
+        3. when the new count reaches ``quarantine_threshold`` (and ``> 0``), sets
+           ``quarantined_at`` / ``quarantine_reason`` so the endpoint is auto-excluded from the
+           sweep until it recovers — an already-quarantined endpoint keeps its original
+           ``quarantined_at`` (the quarantine does not "renew").
+
+        Args:
+            endpoint_id: The endpoint whose run failed.
+            discovered_at: When the failed attempt ran (the backoff is measured from here).
+            status: ``last_discovery_status`` to stamp (default ``failed``; callers may pass a
+                more specific error code).
+            backoff_base_seconds: Base unit for the exponential backoff.
+            backoff_max_seconds: Ceiling for the exponential backoff (a ``Retry-After`` floor
+                may exceed it).
+            quarantine_threshold: Consecutive-failure count that trips quarantine; ``<= 0``
+                disables quarantine (the endpoint backs off but is never auto-disabled).
+            quarantine_reason: Diagnostic text stored when the endpoint is quarantined.
+            retry_after_seconds: Optional server-supplied minimum delay from a 429 response.
+
+        Returns:
+            ``{"consecutive_failures": int, "backoff_seconds": float, "quarantined": bool,
+            "newly_quarantined": bool}`` describing the post-update state, or ``None`` when the
+            endpoint row no longer exists. ``newly_quarantined`` is ``True`` only on the
+            transition into quarantine, so the caller can emit the quarantine event exactly once.
+        """
+        from .mcp_discovery_backoff import compute_backoff_seconds
+
+        conn = self.connect()
+        prev_autocommit = self._begin_tx(conn)
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE odb.mcp_endpoints
+                    SET consecutive_failures = consecutive_failures + 1,
+                        last_discovered_at = %s,
+                        last_discovery_status = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s::uuid
+                    RETURNING consecutive_failures,
+                              (quarantined_at IS NOT NULL) AS was_quarantined
+                    """,
+                    (discovered_at, status, endpoint_id),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    conn.commit()
+                    return None
+
+                failures = int(row["consecutive_failures"])
+                already_quarantined = bool(row["was_quarantined"])
+                backoff_seconds = compute_backoff_seconds(
+                    failures,
+                    base_seconds=backoff_base_seconds,
+                    max_seconds=backoff_max_seconds,
+                    retry_after_seconds=retry_after_seconds,
+                )
+                should_quarantine = (
+                    quarantine_threshold > 0 and failures >= quarantine_threshold
+                )
+                newly_quarantined = should_quarantine and not already_quarantined
+
+                # Set the backoff anchor always; set quarantine fields only when tripping it,
+                # preserving the original quarantined_at if already quarantined (no renewal).
+                cursor.execute(
+                    """
+                    UPDATE odb.mcp_endpoints
+                    SET next_discovery_after = %s + make_interval(secs => %s),
+                        quarantined_at = CASE
+                            WHEN %s THEN COALESCE(quarantined_at, %s)
+                            ELSE quarantined_at
+                        END,
+                        quarantine_reason = CASE
+                            WHEN %s AND quarantined_at IS NULL THEN %s
+                            ELSE quarantine_reason
+                        END
+                    WHERE id = %s::uuid
+                    """,
+                    (
+                        discovered_at,
+                        backoff_seconds,
+                        should_quarantine,
+                        discovered_at,
+                        should_quarantine,
+                        quarantine_reason,
+                        endpoint_id,
+                    ),
+                )
+                conn.commit()
+                return {
+                    "consecutive_failures": failures,
+                    "backoff_seconds": backoff_seconds,
+                    "quarantined": should_quarantine or already_quarantined,
+                    "newly_quarantined": newly_quarantined,
+                }
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.autocommit = prev_autocommit
 
     def get_mcp_endpoint_credentials(
         self, endpoint_id: str
