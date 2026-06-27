@@ -9,6 +9,7 @@ Modules:
     transport_http: JSON-RPC 2.0 over the MCP "Streamable HTTP" transport.
     handshake: The ``initialize`` opening handshake and protocol-version negotiation.
     discovery: Paginated ``*/list`` discovery of the declared capability surface.
+    normalize: Canonical, version-tolerant ``DiscoverySurface`` + DB row mapping.
 """
 
 from .discovery import (
@@ -31,6 +32,15 @@ from .handshake import (
     ServerInfo,
     initialize_session,
 )
+from .normalize import (
+    ITEM_TYPE_PROMPT,
+    ITEM_TYPE_RESOURCE,
+    ITEM_TYPE_RESOURCE_TEMPLATE,
+    ITEM_TYPE_TOOL,
+    ITEM_TYPES,
+    CapabilityItem,
+    DiscoverySurface,
+)
 from .transport_http import (
     DEFAULT_PROTOCOL_VERSION,
     JsonRpcError,
@@ -48,9 +58,16 @@ __all__ = [
     "DEFAULT_PAGE_LIMIT",
     "DEFAULT_PROTOCOL_VERSION",
     "INVALID_PARAMS_CODE",
+    "ITEM_TYPES",
+    "ITEM_TYPE_PROMPT",
+    "ITEM_TYPE_RESOURCE",
+    "ITEM_TYPE_RESOURCE_TEMPLATE",
+    "ITEM_TYPE_TOOL",
     "LIST_METHODS",
     "SUPPORTED_PROTOCOL_VERSIONS",
+    "CapabilityItem",
     "DiscoveryListings",
+    "DiscoverySurface",
     "InitializeResult",
     "JsonRpcError",
     "JsonRpcResponse",
