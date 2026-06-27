@@ -322,3 +322,12 @@ def lint_mcp_surface(
 def finding_dicts(findings: Iterable[LintFinding]) -> List[Dict[str, str]]:
     """Convenience: render an iterable of findings to a list of JSON-ready dicts."""
     return [finding.as_dict() for finding in findings]
+
+
+# --- Rule pack auto-registration ------------------------------------------------------------
+# Concrete rule packs live in their own modules and register themselves on import (via
+# :func:`lint_rule` / :func:`register_rule_metadata`) without altering the engine logic above.
+# Importing them here — after every public symbol is defined, so the import is non-circular —
+# guarantees that any caller of :func:`lint_mcp_surface` gets the full rule set with no extra
+# wiring. New packs (e.g. V2-MCP-21.3) append one import line below.
+from . import mcp_lint_hygiene as _mcp_lint_hygiene  # noqa: E402,F401  (side-effecting: registers rules)

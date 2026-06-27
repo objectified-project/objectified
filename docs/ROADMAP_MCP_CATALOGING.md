@@ -710,9 +710,9 @@ An MCP-specific linter, modeled on the existing deterministic `schema_lint.py`
 - **Dependencies / Parallelism.** After 2.4. Blocks 7.2/7.3/7.4.
 - **Technical Stack.** Python.
 
-### MCAT-7.2 — Tool/resource/prompt hygiene rules  ·  **#3683**
+### MCAT-7.2 — Tool/resource/prompt hygiene rules  ·  **#3683**  ·  ✅ Done (objectified-rest 1.16.0)
 - **Problem.** Need concrete quality signals from the surface.
-- **Solution / Scope.** Rules: tool missing/empty `description`; `inputSchema` not a valid `type:object` JSON Schema; missing `title`; tools without `outputSchema` (info); resources missing `mimeType`/invalid `uri`; prompts whose args lack `description`/`required`. Per [tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools)/[resources](https://modelcontextprotocol.io/specification/2025-06-18/server/resources)/[prompts](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts) (separate normative MUST fails from best-practice soft signals).
+- **Solution / Scope.** New `mcp_lint_hygiene.py` rule pack auto-registered by the engine. Rules: tool missing/empty `description` (warning); `inputSchema` absent / non-object / not `type:object` / structurally invalid (error); missing `title` on any kind (info); tools without `outputSchema` (info); resources missing `mimeType` (warning) / invalid `uri` (error); resource templates with malformed `uriTemplate` (error) / missing `mimeType` (warning); prompt args lacking `description` (warning) / `required` (info). Two new rule groups: `schema` (MUST/error) and `quality` (SHOULD/advisory). Per [tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools)/[resources](https://modelcontextprotocol.io/specification/2025-06-18/server/resources)/[prompts](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts) (separate normative MUST fails from best-practice soft signals).
 - **Acceptance Criteria.** Each rule fires on a crafted bad surface and stays silent on a clean one; MUST vs SHOULD severities distinguished.
 - **Dependencies / Parallelism.** After 7.1. Parallel with 7.3.
 - **Technical Stack.** Python, `jsonschema`.
