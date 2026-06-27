@@ -386,14 +386,13 @@ sequenceDiagram
 
 | ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |----|-------|---------|--------|----------|-----|-----------|------------------|
-| 2.1 | MCP transport client (Streamable HTTP) | HTTP POST/GET client, `Mcp-Session-Id`, `MCP-Protocol-Version`, SSE parse | mcp-catalog,multi-protocol,python,mvp | N | Y | L | objectified-rest |
 | 2.2 | Initialize handshake + version negotiation | `initialize` + `notifications/initialized`, negotiate 2025-06-18/03-26 | mcp-catalog,multi-protocol,python,mvp | N | Y | M | objectified-rest |
 | 2.3 | Discovery list methods + pagination | tools/resources/templates/prompts list with cursor paging | mcp-catalog,python,mvp | N | Y | M | objectified-rest |
 | 2.4 | Capability-surface normalization | Canonical, version-tolerant in-memory surface model | mcp-catalog,python,mvp | Y | Y | M | objectified-rest |
 | 2.5 | Legacy HTTP+SSE fallback transport | 2024-11-05 two-endpoint SSE for back-compat | mcp-catalog,multi-protocol,python,v2 | Y | N | M | objectified-rest |
 | 2.6 | Discovery error taxonomy & resilience | Timeouts, JSON-RPC errors, version mismatch, partial results | mcp-catalog,python,mvp | Y | Y | M | objectified-rest |
 
-### MCAT-2.1 — MCP transport client (Streamable HTTP)  ·  **#3657**
+### MCAT-2.1 — MCP transport client (Streamable HTTP)  ·  **#3657**  ·  ✅ Done (objectified-rest 1.6.1)
 - **Problem.** No client exists to speak MCP over the network.
 - **Solution / Scope.** Implement `mcp_client/transport_http.py`: JSON-RPC 2.0 over **Streamable HTTP** to a single `…/mcp` endpoint. POST with `Accept: application/json, text/event-stream`; handle 200 JSON vs `text/event-stream` SSE responses and `202` accepts; capture/echo **`Mcp-Session-Id`**; send **`MCP-Protocol-Version`** on post-init requests; `DELETE` to end session; honor `Origin`/HTTPS. Uses `httpx` (already a dep). Spec: [transports 2025-06-18](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports).
 - **Acceptance Criteria.** Can complete a request/response and an SSE-streamed response against a local reference MCP server; session header round-trips; 400/404/405 handled per spec; unit tests with mocked httpx + an integration test against a stub server.

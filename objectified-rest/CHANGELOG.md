@@ -5,6 +5,24 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-06-26
+
+### Added
+- **MCP transport client over Streamable HTTP (#3657, V2-MCP-16.1)** — the network foundation of the
+  MCP discovery client (`app/mcp_client/transport_http.py`). `StreamableHttpTransport` speaks JSON-RPC
+  2.0 to a single `…/mcp` endpoint per the MCP `2025-06-18` spec: every message is `POST`ed with
+  `Accept: application/json, text/event-stream`, and both response shapes are handled transparently —
+  a single `application/json` object or a `text/event-stream` SSE stream drained until the matching
+  response id arrives (server-initiated messages on the stream are dispatched to an optional handler).
+  Notifications are sent without an id and accept `202`. The server's `Mcp-Session-Id` is captured at
+  `initialize` and echoed on every later request, `MCP-Protocol-Version` is pinned on all
+  post-initialization requests, and the session is torn down with `DELETE` (a `405` refusal is
+  tolerated). `400`/`405` surface as `McpHttpStatusError`; a `404` while a session is active surfaces
+  as `McpSessionExpiredError` and clears the local session. Transport security: plaintext `http://` is
+  allowed only to loopback hosts (local reference servers) unless `allow_insecure_http=True`, and an
+  `Origin` header is always sent. Covered by mocked-httpx unit tests plus an integration test against a
+  real loopback stub MCP server.
+
 ## [1.4.0] - 2026-06-24
 
 ### Added
