@@ -399,7 +399,7 @@ sequenceDiagram
 - **Dependencies / Parallelism.** Foundation of the epic — blocks 2.2/2.3.
 - **Technical Stack.** Python, `httpx`, SSE parsing.
 
-### MCAT-2.2 — Initialize handshake + version negotiation  ·  **#3658**
+### MCAT-2.2 — Initialize handshake + version negotiation  ·  **#3658**  ·  ✅ Done (objectified-rest 1.6.2)
 - **Problem.** Discovery is gated by the `initialize` handshake and capability negotiation.
 - **Solution / Scope.** Send `initialize` with our `protocolVersion`, `capabilities`, `clientInfo`; parse `serverInfo`, `capabilities`, `instructions`; send `notifications/initialized`; implement version negotiation (echo, fallback, disconnect on unsupported) handling `-32602`. Record negotiated version for downstream field-set branching. Spec: [lifecycle](https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle).
 - **Acceptance Criteria.** Negotiates against both 2025-06-18 and 2025-03-26 servers; persists `protocol_version`, `server_name/title/version`, `instructions`, `capabilities`; refuses unsupported versions gracefully.
