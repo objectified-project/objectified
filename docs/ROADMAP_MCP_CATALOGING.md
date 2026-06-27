@@ -601,12 +601,13 @@ that re-discovers enabled endpoints, diffs, and versions changes automatically.
 - **Technical Stack.** Python asyncio.
 - **Implementation.** Due-selection DAO `Database.list_due_mcp_endpoints` (enabled + live filter, `COALESCE(discovery_cadence_seconds, default)` cadence, oldest-first ordering). Sweep `app/mcp_discovery_sweep.py` (`process_mcp_discovery_sweep`) dispatches each due endpoint through the shared `trigger_discovery` pipeline tagged `trigger='sweep'`; the existing per-endpoint enqueue dedup (advisory lock + active-state check) provides idempotency/singleton-safety. Background loop `_mcp_discovery_sweep` wired in `app/main.py`. Config: `OBJECTIFIED_MCP_DISCOVERY_ENABLED` (kill switch), `OBJECTIFIED_MCP_DISCOVERY_DEFAULT_CADENCE` (~hourly), `OBJECTIFIED_MCP_DISCOVERY_MIN_INTERVAL` (tick floor). Migration **V132** corrects the `discovery_cadence_seconds` column comment: null now means "use the global default cadence" (the `enabled` column is the on/off switch). Per-endpoint poll→diff→version concurrency bounding + timeouts are MCAT-5.2.
 
-### MCAT-5.2 — Per-endpoint poll/diff/version step  ·  **#3674**
+### MCAT-5.2 — Per-endpoint poll/diff/version step  ·  **#3674**  ·  ✅ Done (objectified-rest 1.10.0)
 - **Problem.** The sweep must reuse the same discovery→diff→version pipeline as manual runs.
 - **Solution / Scope.** For each due endpoint, create a `mcp_discovery_jobs` row (`trigger='sweep'`) and execute the shared pipeline; concurrency cap; per-endpoint timeout.
 - **Acceptance Criteria.** Sweep produces new versions on change, none on no-change; jobs labeled `sweep`; bounded concurrency.
 - **Dependencies / Parallelism.** After 5.1. Blocks 5.3.
 - **Technical Stack.** Python.
+- **Implementation.** The discovery engine's enqueue and run halves are split: `enqueue_discovery_job` creates (or coalesces onto) a `trigger='sweep'` job *without* starting it, and `run_discovery_job` drives one job to terminal state bounded by a per-endpoint wall-clock timeout (an overrun is recorded as a `budget_exceeded` failure so a slow endpoint can't hold a slot). `trigger_discovery` (manual route) is unchanged — it enqueues then schedules the run in the background. The sweep `process_mcp_discovery_sweep` now enqueues every due endpoint up front (dedup-aware) and drives the freshly-created jobs through the shared discovery→diff→version pipeline under an `asyncio.Semaphore` concurrency cap, awaiting them so the cap is real and the next tick can't pile on. Version-on-change / no-version-on-no-change comes for free from reusing the MCAT-3.2/4.x engine. New config: `OBJECTIFIED_MCP_DISCOVERY_MAX_CONCURRENCY` (default 4), `OBJECTIFIED_MCP_DISCOVERY_ENDPOINT_TIMEOUT` (default 150s, above the client's ~120s network budget).
 
 ### MCAT-5.3 — Failure handling, backoff & status  ·  **#3675**
 - **Problem.** Flaky/dead endpoints must not wedge the sweep or spam failures.

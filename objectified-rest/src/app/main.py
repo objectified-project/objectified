@@ -339,7 +339,7 @@ async def startup_event():
                 log.exception("repository refresh sweep")
 
     async def _mcp_discovery_sweep() -> None:
-        """Periodically re-discover MCP catalog endpoints on their cadence (MCAT-5.1, #3673).
+        """Periodically re-discover MCP catalog endpoints on their cadence (MCAT-5.1/5.2).
 
         Ticks on the configured floor (``OBJECTIFIED_MCP_DISCOVERY_MIN_INTERVAL``, default 60s)
         and lets the per-endpoint cadence + due-selection in ``list_due_mcp_endpoints`` decide
@@ -347,7 +347,9 @@ async def startup_event():
         never re-discovers an endpoint more often than its own cadence allows. Unlike the other
         sweeps the discovery pipeline is natively async (the MCP client is asyncio), so the tick
         runs on the event loop and ``process_mcp_discovery_sweep`` pushes only its blocking DB
-        query to a worker thread.
+        writes to worker threads. Each tick runs the due endpoints under a concurrency cap and a
+        per-endpoint timeout (MCAT-5.2) and awaits them, so a tick can outlast the floor; the
+        next tick simply starts after it drains (enqueue dedup prevents any double-run).
         """
         from .config import settings
 

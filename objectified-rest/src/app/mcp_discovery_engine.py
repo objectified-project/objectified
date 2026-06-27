@@ -51,7 +51,7 @@ from .mcp_client import (
     initialize_session,
 )
 from .mcp_client.diff import ITEM_TYPE_SERVER, SurfaceDiff
-from .mcp_client.resilience import TimeBudget
+from .mcp_client.resilience import BudgetExceededError, TimeBudget
 from .mcp_credentials import load_endpoint_auth_headers
 
 logger = logging.getLogger(__name__)
@@ -335,17 +335,104 @@ async def _drive_discovery_job(job_id: str, endpoint: Dict[str, Any]) -> None:
             logger.exception("failed to record discovery persistence failure job=%s", job_id)
 
 
+async def enqueue_discovery_job(
+    tenant_id: str, endpoint: Dict[str, Any], *, trigger: str = "manual"
+) -> Tuple[Dict[str, Any], bool]:
+    """Create (or coalesce onto) a discovery job for an endpoint *without* starting the run.
+
+    The enqueue half of the pipeline, split out so callers that bound or schedule the run
+    themselves — the periodic sweep drives jobs under a concurrency cap + per-endpoint timeout
+    (MCAT-5.2) — can reuse the same de-duplicating job creation the manual path uses.
+
+    De-duplication lives in :meth:`Database.enqueue_mcp_discovery_job`: a per-endpoint advisory
+    lock makes the "is one already active?" check atomic, so if a job is already queued/running
+    for the endpoint (a prior sweep tick's run still in flight, or a concurrent manual run) the
+    existing row is returned and no second job is created.
+
+    Args:
+        tenant_id: Owning tenant (stamped on the job for scoped reads).
+        endpoint: The already tenant-validated ``mcp_endpoints`` row to discover.
+        trigger: How the run was initiated — ``manual`` (default) or ``sweep``. Recorded on
+            the job row so its provenance is auditable.
+
+    Returns:
+        ``(job_row, deduplicated)`` — when ``deduplicated`` is ``True`` an already-active job
+        was returned; otherwise a fresh ``queued`` job was created (and is the caller's to run).
+    """
+    endpoint_id = str(endpoint["id"])
+    enqueued = await asyncio.to_thread(
+        db.enqueue_mcp_discovery_job, endpoint_id, tenant_id, trigger
+    )
+    return enqueued["job"], bool(enqueued["deduplicated"])
+
+
+async def run_discovery_job(
+    job_id: str,
+    endpoint: Dict[str, Any],
+    *,
+    timeout_seconds: Optional[float] = None,
+) -> None:
+    """Drive one enqueued job to a terminal state, bounded by an optional wall-clock timeout.
+
+    Wraps :func:`_drive_discovery_job` (which already maps every internal failure into the
+    stable discovery-error taxonomy and never raises) with a per-endpoint timeout for the
+    sweep (MCAT-5.2). When the whole run — auth load, handshake, pagination, persist — outlasts
+    ``timeout_seconds`` the drive is cancelled and the job/endpoint are recorded as a
+    ``budget_exceeded`` failure, so a poller always observes a terminal state and the endpoint's
+    cadence anchor advances (``last_discovered_at`` is stamped) rather than the endpoint staying
+    perpetually due. The discovery client carries its own ~120s network budget
+    (``_DISCOVERY_BUDGET_SECONDS``); this timeout is the coarser backstop that also covers the
+    non-network phases, so keep it above that network budget.
+
+    Args:
+        job_id: The queued job to run (from :func:`enqueue_discovery_job`).
+        endpoint: The ``mcp_endpoints`` row being discovered.
+        timeout_seconds: Wall-clock ceiling for the whole run; ``None`` or non-positive means
+            unbounded (the network budget still applies inside the client).
+    """
+    if timeout_seconds is None or timeout_seconds <= 0:
+        await _drive_discovery_job(job_id, endpoint)
+        return
+
+    endpoint_id = str(endpoint["id"])
+    try:
+        await asyncio.wait_for(
+            _drive_discovery_job(job_id, endpoint), timeout=timeout_seconds
+        )
+    except (asyncio.TimeoutError, TimeoutError):
+        # The run overran its per-endpoint budget. Cancellation has already unwound the drive;
+        # classify this as a budget timeout and record a terminal failure so the job never hangs
+        # in `running` and the endpoint is not immediately due again.
+        error = classify_exception(
+            BudgetExceededError(elapsed=timeout_seconds, total=timeout_seconds)
+        )
+        logger.warning(
+            "discovery job=%s endpoint=%s timed out after %.1fs (per-endpoint budget)",
+            job_id,
+            endpoint_id,
+            timeout_seconds,
+        )
+        try:
+            await asyncio.to_thread(
+                _persist_failure, job_id, endpoint_id, error, _utcnow()
+            )
+        except Exception:  # noqa: BLE001 - last-resort guard so the sweep task never crashes
+            logger.exception(
+                "failed to record discovery timeout failure job=%s", job_id
+            )
+
+
 async def trigger_discovery(
     tenant_id: str, endpoint: Dict[str, Any], *, trigger: str = "manual"
 ) -> Tuple[Dict[str, Any], bool]:
-    """Enqueue a discovery job for an endpoint and start it unless de-duplicated.
+    """Enqueue a discovery job for an endpoint and start it (in the background) unless de-duplicated.
 
-    Shared by the manual ``POST .../discover`` route (``trigger='manual'``) and the
-    periodic re-discovery sweep (``trigger='sweep'``, MCAT-5.1). The de-duplication in
-    :meth:`Database.enqueue_mcp_discovery_job` is what makes the sweep idempotent and
-    singleton-safe: if a job is already queued/running for the endpoint — e.g. a previous
-    sweep tick's run has not finished, or a manual run is in flight — the existing job is
-    returned and no second run starts.
+    The submit→poll entry point for the manual ``POST .../discover`` route (``trigger='manual'``):
+    it enqueues the job via :func:`enqueue_discovery_job` and, when a fresh job was created,
+    schedules the run as a detached task so the route can return the job reference immediately.
+    The periodic sweep does *not* use this (it needs bounded concurrency + per-endpoint timeouts,
+    MCAT-5.2); it enqueues with :func:`enqueue_discovery_job` and drives with
+    :func:`run_discovery_job` itself.
 
     Args:
         tenant_id: Owning tenant (stamped on the job for scoped reads).
@@ -358,12 +445,7 @@ async def trigger_discovery(
         job was returned and no new run was started; otherwise a fresh job was created and
         its discovery task scheduled.
     """
-    endpoint_id = str(endpoint["id"])
-    enqueued = await asyncio.to_thread(
-        db.enqueue_mcp_discovery_job, endpoint_id, tenant_id, trigger
-    )
-    job = enqueued["job"]
-    deduplicated = bool(enqueued["deduplicated"])
+    job, deduplicated = await enqueue_discovery_job(tenant_id, endpoint, trigger=trigger)
     if not deduplicated:
         asyncio.create_task(_drive_discovery_job(str(job["id"]), endpoint))
     return job, deduplicated

@@ -229,6 +229,17 @@ class Settings(BaseSettings):
     #                                    decides which endpoints are actually due each tick, so a
     #                                    small floor never re-discovers an endpoint faster than its
     #                                    own cadence allows.
+    # mcp_discovery_max_concurrency      Per-tick concurrency cap (MCAT-5.2): the most discovery runs
+    #                                    the sweep drives at once. The remaining due endpoints wait on
+    #                                    a semaphore so a large backlog never floods the event loop,
+    #                                    the network, or the DB with simultaneous handshakes.
+    # mcp_discovery_endpoint_timeout_seconds  Per-endpoint wall-clock ceiling (MCAT-5.2) for one
+    #                                    sweep discovery run end-to-end (handshake + pagination +
+    #                                    persist). A run that exceeds it is cancelled and recorded as a
+    #                                    `budget_exceeded` failure so a single slow/hung endpoint can
+    #                                    never pin a sweep slot indefinitely. Keep it above the
+    #                                    discovery client's own network budget (~120s) so the timeout
+    #                                    is a backstop, not the primary bound.
     mcp_discovery_enabled: bool = Field(
         default=True,
         validation_alias=AliasChoices(
@@ -248,6 +259,20 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices(
             "OBJECTIFIED_MCP_DISCOVERY_MIN_INTERVAL",
             "mcp_discovery_min_interval_seconds",
+        ),
+    )
+    mcp_discovery_max_concurrency: int = Field(
+        default=4,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MCP_DISCOVERY_MAX_CONCURRENCY",
+            "mcp_discovery_max_concurrency",
+        ),
+    )
+    mcp_discovery_endpoint_timeout_seconds: int = Field(
+        default=150,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MCP_DISCOVERY_ENDPOINT_TIMEOUT",
+            "mcp_discovery_endpoint_timeout_seconds",
         ),
     )
 
