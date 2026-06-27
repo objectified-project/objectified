@@ -477,7 +477,7 @@ Tenant-facing CRUD + the async discovery job lifecycle (mirrors `spec_import` en
 - **Dependencies / Parallelism.** Parallel with 3.1 (slight ordering). 
 - **Technical Stack.** Pydantic.
 
-### MCAT-3.4 — Discovery job status/polling API  ·  **#3666**
+### MCAT-3.4 — Discovery job status/polling API  ·  **#3666**  ·  ✅ Done (objectified-rest 1.8.0)
 - **Problem.** UI/CLI must follow a discovery job to completion.
 - **Solution / Scope.** `GET /mcp/endpoints/{id}/jobs` and `…/jobs/{job_id}` returning state, timings, error, result. Same status contract used by CLI poller (Epic-11) and UI.
 - **Acceptance Criteria.** Returns terminal state with `version_id` or structured error; tenant-scoped.
