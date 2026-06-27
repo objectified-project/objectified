@@ -1,7 +1,8 @@
 # Roadmap — MCP Cataloging, Versioning, Scoring & Browse
 
 > **Status:** ✅ **Issues filed on `objectified-project/objectified`** — umbrella **#3637**,
-> epics **#3638–#3650** (V2-MCP-EPIC-15…27), and 64 issues **#3651–#3714**. Each epic/issue
+> epics **#3638–#3650** (V2-MCP-EPIC-15…27), and 69 issues — the original 64 **#3651–#3714**
+> plus 5 UI-design issues **#3938–#3942** added in the 2026-06-27 update. Each epic/issue
 > heading below is annotated with its `#number`; epics track their children as GitHub
 > sub-issues, all under umbrella #3637.
 >
@@ -17,6 +18,15 @@
 > (`MCAT-EPIC-1 → V2-MCP-EPIC-15`, …, `MCAT-EPIC-13 → V2-MCP-EPIC-27`).
 > **GitHub title format:** `objectified: [<V2-MCP epic>.<issue>] <title>`
 > (e.g. `objectified: [15.1] MCP catalog data model & migrations` for MCAT-1.1).
+>
+> **Update (2026-06-27) — UI design coverage.** The REST/versioning backend (EPIC-15…19) is
+> largely shipped, but the **UI work was under-specified** against the resolved design mockup
+> ([`docs/planning/mockups/mcp-catalog/`](planning/mockups/mcp-catalog/)). This revision
+> **enriches the six ADE-UI issues (10.1–10.6) to mockup fidelity** and adds **five proposed
+> issues** that cover the screens/foundation they did not break out: **10.7** design-system
+> foundation & shared primitives, **10.8** grade-led catalog grid, **10.9** Settings tab,
+> **10.10** dark-theme + density polish, and **9.7** public-browse relevance ordering. These were
+> **filed as #3938–#3942** and linked as sub-issues of EPIC-24 (#3647) / EPIC-23 (#3646).
 
 ---
 
@@ -112,7 +122,10 @@ in the issues below:
 5. **Version history can diff any two versions on demand** (base→target selectors or tick two
    in the list), not just consecutive versions. (EPIC-18.2/18.5, EPIC-24.3)
 6. **Test is always available; tools with `destructiveHint` require an explicit confirm.** (EPIC-22)
-7. **Public browse ranks grade-led.** (EPIC-23.6)
+7. **Public browse ranks grade-led** when idle, switching to **relevance→grade while searching**. (EPIC-23.6, EPIC-23.7)
+8. **A shared design-system foundation** (grade glyph, badges, health/recency pills, tab shell, tokens) underpins every MCP screen, CSS-class/token-driven so theming is centralized. (EPIC-24.7)
+9. **The catalog is a grade-led card grid** with a **grid↔dense-list density toggle** and a **"changed since last view"** indicator. (EPIC-24.8)
+10. **A dark-theme variant** covers all MCP screens, honoring objectified-ui's existing theme switch. (EPIC-24.10)
 
 ---
 
@@ -171,14 +184,15 @@ is document-local only.
 | **V2-MCP-EPIC-20** | MCAT-EPIC-6 | Authentication & Secret Vault (outbound) | 6.1–6.5 | ●● MVP+v2 |
 | **V2-MCP-EPIC-21** | MCAT-EPIC-7 | Linting, Grading & Service Scoring | 7.1–7.5 | ●●● core |
 | **V2-MCP-EPIC-22** | MCAT-EPIC-8 | Query & Test Harness | 8.1–8.4 | ●● MVP |
-| **V2-MCP-EPIC-23** | MCAT-EPIC-9 | Browse Catalog, Search & Categorization | 9.1–9.6 | ●● MVP+v2 |
-| **V2-MCP-EPIC-24** | MCAT-EPIC-10 | ADE UI | 10.1–10.6 | ●● MVP+v2 |
+| **V2-MCP-EPIC-23** | MCAT-EPIC-9 | Browse Catalog, Search & Categorization | 9.1–9.7 | ●● MVP+v2 |
+| **V2-MCP-EPIC-24** | MCAT-EPIC-10 | ADE UI | 10.1–10.10 | ●● MVP+v2 |
 | **V2-MCP-EPIC-25** | MCAT-EPIC-11 | CLI | 11.1–11.4 | ●● MVP |
 | **V2-MCP-EPIC-26** | MCAT-EPIC-12 | Official MCP Registry Integration | 12.1–12.4 | ○ v2 |
 | **V2-MCP-EPIC-27** | MCAT-EPIC-13 | Notifications, Webhooks & Observability | 13.1–13.4 | ○ v2 |
 
-**Total: 13 epics (V2-MCP-EPIC-15…27), 64 issues.** Issue `MCAT-E.N` is created as
-`V2-MCP-(E+14).N` — e.g. MCAT-7.4 → `V2-MCP-21.4`, GitHub title
+**Total: 13 epics (V2-MCP-EPIC-15…27), 69 issues** — the original 64 (#3651–#3714) plus the
+5 UI-design issues added in this update (#3938–#3942: 9.7 and 10.7–10.10). Issue `MCAT-E.N` is
+created as `V2-MCP-(E+14).N` — e.g. MCAT-7.4 → `V2-MCP-21.4`, GitHub title
 `objectified: [21.4] Scoring, grading & fingerprint persistence`.
 
 ### Issue index
@@ -200,10 +214,10 @@ is document-local only.
 | 3.1 | Endpoint CRUD REST | 9.4 | Auto-categorization heuristics |
 | 3.2 | Manual discovery trigger + async job | 9.5 | Public publish workflow + guards |
 | 3.3 | Endpoint Pydantic models & validation | 9.6 | objectified-browse public MCP pages |
-| 3.4 | Discovery job status/polling API | 10.1 | ADE nav + endpoint list/registration wizard |
-| 3.5 | Endpoint lifecycle (enable/disable/delete) | 10.2 | Endpoint detail: capabilities & metadata |
-| 4.1 | Canonical surface fingerprint | 10.3 | Version history & compare/diff viewer |
-| 4.2 | Surface diff engine | 10.4 | Lint report panel |
+| 3.4 | Discovery job status/polling API | 10.1 | ADE nav + endpoint list + import source |
+| 3.5 | Endpoint lifecycle (enable/disable/delete) | 10.2 | Endpoint detail: Overview + Capabilities tabs |
+| 4.1 | Canonical surface fingerprint | 10.3 | Versions tab: history & compare/diff viewer |
+| 4.2 | Surface diff engine | 10.4 | Lint & Score tab + Overview grade summary |
 | 4.3 | Version creation on change | 10.5 | Test/query panel (auth-aware) |
 | 4.4 | Date/time version tagging | 10.6 | Credential management UI |
 | 4.5 | Change-report & compare API | 11.1 | CLI: register/list/show |
@@ -218,6 +232,21 @@ is document-local only.
 | 6.5 | Credential REST + redaction | 13.2 | Webhook subscriptions on change |
 | | | 13.3 | Health/uptime monitoring |
 | | | 13.4 | Catalog analytics dashboard |
+
+#### UI design coverage additions (this update — ✅ filed)
+
+These close the gap between the filed issues and the resolved design mockup
+([`docs/planning/mockups/mcp-catalog/`](planning/mockups/mcp-catalog/)). They extend existing
+epics (no new epic) and were filed as GitHub issues **#3938–#3942**, each linked as a sub-issue
+of its epic.
+
+| ID | Issue | Title | Epic | Module |
+|----|-------|-------|------|--------|
+| 9.7 | #3942 | Public browse: relevance→grade search ordering | EPIC-9 / V2-MCP-EPIC-23 | objectified-browse |
+| 10.7 | #3938 | Design-system foundation & shared MCP UI primitives | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
+| 10.8 | #3939 | Catalog grade-led card grid (filter/group/sort + density) | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
+| 10.9 | #3940 | Endpoint detail: Settings tab | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
+| 10.10 | #3941 | Dark-theme variant + density polish | EPIC-10 / V2-MCP-EPIC-24 | objectified-ui |
 
 ---
 
@@ -758,6 +787,7 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 | 9.4 | Auto-categorization heuristics | infer category from tool semantics | mcp-catalog,ai-llm,analytics | Y | N | M | objectified-rest |
 | 9.5 | Public publish workflow + guards | publish endpoint public; gate on score/secret checks | mcp-catalog,governance,security | N | N | M | objectified-rest |
 | 9.6 | objectified-browse public MCP pages | public browse-by-site + search UI | mcp-catalog,browser,community,v2 | N | N | L | objectified-browse |
+| 9.7 | Public browse: relevance→grade search ordering | grade-led when idle, relevance→grade while searching | mcp-catalog,browser,community,v2 | Y | N | S | objectified-browse |
 
 ### MCAT-9.1 — Private browse: endpoints & detail  ·  **#3691**
 - **Problem.** Tenants must browse their cataloged MCPs and inspect what each provides.
@@ -801,60 +831,111 @@ Private browse (MVP) and public browse/search (v2), plus categorization.
 - **Dependencies / Parallelism.** After 9.2/9.5. **v2.** Largest UI item.
 - **Technical Stack.** Next.js (objectified-browse).
 
+### MCAT-9.7 — Public browse: relevance→grade search ordering  ·  **#3942**
+- **Problem.** The mockup resolves public browse to **grade-led** ranking, but flags an open question: while a user is **actively searching**, strict grade-led ordering buries the most relevant hits. The mockup's public search default shows `Sort: Top graded ▾`.
+- **Solution / Scope.** On the objectified-browse public MCP pages (9.6), order results **grade-led when the query is empty** (idle browse) and switch to **relevance→grade** while a search term is present (FTS rank from 9.2 primary, service grade as tiebreaker), with the sort control reflecting the active mode and allowing an explicit override. Public scope only; reuses the 9.2 search ranking and `mcp_v_public_endpoints`.
+- **Acceptance Criteria.** Idle browse is grade-led; an active query ranks by relevance with grade as tiebreaker; the sort control shows/permits the mode; private endpoints never appear.
+- **Dependencies / Parallelism.** After 9.2, 9.6. **v2.** Parallel with the rest of EPIC-9 v2.
+- **Technical Stack.** Next.js (objectified-browse), PostgreSQL FTS.
+
 ---
 
 ## MCAT-EPIC-10 — ADE UI (objectified-ui)  ·  _created as **V2-MCP-EPIC-24**_  ·  **#3647**
 
+> **Mockup fidelity (this update).** The resolved design in
+> [`docs/planning/mockups/mcp-catalog/`](planning/mockups/mcp-catalog/) is the binding visual
+> reference for every issue in this epic. It defines the sidebar placement, a **grade-led
+> catalog grid**, the MCP **import source** flow, and a **7-tab endpoint detail**
+> (Overview · Capabilities · Versions · Lint & Score · Test · Credentials · Settings). The six
+> original issues (10.1–10.6) are **enriched below to that fidelity**, and four new issues
+> (**10.7–10.10**) fill the screens the original set did not break out: the shared design-system
+> foundation, the grade-led catalog grid, the Settings tab, and the dark-theme/density polish.
+> 10.7–10.10 are **proposed (not yet filed)**; 10.1–10.6 are already created (#3697–#3702).
+
 | ID | Title | Summary | Labels | Parallel | MVP | Complexity | Affected Modules |
 |----|-------|---------|--------|----------|-----|-----------|------------------|
-| 10.1 | ADE nav + endpoint list/registration wizard | nav entry, list, "Add MCP endpoint" wizard | mcp-catalog,ui,mvp | N | Y | M | objectified-ui |
-| 10.2 | Endpoint detail: capabilities & metadata | render tools/resources/prompts + server info | mcp-catalog,ui,mvp | N | Y | M | objectified-ui |
-| 10.3 | Version history & compare/diff viewer | timeline of dated versions + compare any two (base→target) | mcp-catalog,ui,version-control | N | Y | M | objectified-ui |
-| 10.4 | Lint report panel | findings + score/grade visualization | mcp-catalog,ui,linting | Y | Y | S | objectified-ui |
-| 10.5 | Test/query panel (auth-aware) | invoke tool form + result viewer | mcp-catalog,ui,testing | Y | N | M | objectified-ui |
-| 10.6 | Credential management UI | set bearer/header/OAuth, masked display | mcp-catalog,ui,auth,security | Y | N | M | objectified-ui |
+| 10.1 | ADE nav + endpoint list + import source | sidebar entry under Specifications, list route shell, MCP import source card in `ImportDialog` | mcp-catalog,ui,mvp | N | Y | M | objectified-ui |
+| 10.2 | Endpoint detail: Overview + Capabilities tabs | identity header + meta strip + instructions + at-a-glance counts (Overview); grouped tools/resources/prompts with schemas/annotations (Capabilities) | mcp-catalog,ui,mvp | N | Y | M | objectified-ui |
+| 10.3 | Versions tab: history & compare/diff viewer | date-tagged timeline + compare bar to diff any two (base→target) | mcp-catalog,ui,version-control | N | Y | M | objectified-ui |
+| 10.4 | Lint & Score tab + Overview grade summary | grade gauge + category bars + MUST/SHOULD findings; compact summary on Overview | mcp-catalog,ui,linting | Y | Y | S | objectified-ui |
+| 10.5 | Test tab (auth-aware) | tool picker + schema-driven arg form + result/latency/isError; destructive confirm | mcp-catalog,ui,testing | Y | N | M | objectified-ui |
+| 10.6 | Credentials tab | set bearer/header/OAuth, masked display, encryption note | mcp-catalog,ui,auth,security | Y | N | M | objectified-ui |
+| 10.7 | Design-system foundation & shared MCP UI primitives | grade glyph, transport/visibility/auth/annotation badges, health & recency pills, tab shell, tokens | mcp-catalog,ui,design-system,mvp | N | Y | M | objectified-ui |
+| 10.8 | Catalog grade-led card grid (filter/group/sort + density) | grade-led cards, badges, counts, health; group-by-host, sort-by-grade, filter; grid↔dense-list density toggle; "changed since last view" | mcp-catalog,ui,browser,mvp | N | Y | M | objectified-ui |
+| 10.9 | Endpoint detail: Settings tab | name/URL/transport/cadence/visibility edit; disable & delete with confirms | mcp-catalog,ui | Y | Y | S | objectified-ui |
+| 10.10 | Dark-theme variant + density polish | dark-theme tokens across all MCP screens; honor app theme; density preference persistence | mcp-catalog,ui,design-system | Y | N | S | objectified-ui |
 
 ### MCAT-10.1 — ADE nav (Specifications › MCP Servers) + endpoint list + import source  ·  **#3697**
 - **Problem.** Tenants need a UI to add/manage MCP servers, consistent with how specs are imported today.
-- **Solution / Scope.** Add a **"MCP Servers" item under the existing "Specifications" group** in `DashboardSideNav` (Lucide `network` icon, like Projects/Repositories/Published). Endpoint list page (status, score, last-discovered, grouped by host). Adding a server is a **new "MCP Server" source card in the existing `ImportDialog`** (alongside File/URL/Clipboard/Git/SwaggerHub/Postman): selecting it reveals endpoint URL + transport + auth inputs, then runs the discovery/import job through the standard stepper. **Reuse, do not fork, `ImportDialog`/`DashboardSideNav`.** Design mockup: [`docs/planning/mockups/mcp-catalog/`](planning/mockups/mcp-catalog/).
-- **Acceptance Criteria.** "MCP Servers" appears under Specifications; Import → MCP Server source → discovery job runs with live status → endpoint appears with v1.
-- **Dependencies / Parallelism.** After 3.x. Blocks 10.2.
+- **Solution / Scope.** Add a **"MCP Servers" item under the existing "Specifications" group** in `DashboardSideNav` (Lucide `network` icon, like Projects/Repositories/Published). Build the **catalog route + page shell** (header, "+ Register MCP endpoint" entry, the search/sort/group toolbar, and the responsive container) — the **card-grid presentation itself is 10.8**, which renders into this shell. Adding a server is a **new "MCP Server" source card in the existing `ImportDialog`** (alongside File/URL/Clipboard/Git/SwaggerHub/Postman): selecting it reveals endpoint URL + transport + auth inputs, then runs the discovery/import job through the standard numbered stepper with live status, committing catalog **v1** via the spec-import job pipeline. **Reuse, do not fork, `ImportDialog`/`DashboardSideNav`.** Design mockup: the *Sidebar* + *Catalog* + *Import dialog (MCP source)* screens in [`docs/planning/mockups/mcp-catalog/`](planning/mockups/mcp-catalog/).
+- **Acceptance Criteria.** "MCP Servers" appears under Specifications and routes to the catalog page shell; Import → MCP Server source → numbered stepper runs the discovery job with live status → endpoint appears with v1; uses the shared primitives from 10.7.
+- **Dependencies / Parallelism.** After 3.x and 10.7. Blocks 10.2, 10.8.
 - **Technical Stack.** Next.js, TanStack Query.
 
-### MCAT-10.2 — Endpoint detail: capabilities & metadata  ·  **#3698**
-- **Problem.** Need to see what an MCP provides.
-- **Solution / Scope.** Detail page rendering serverInfo, instructions, and grouped tools/resources/prompts (schemas, annotations), current score, controls (re-discover, enable/disable, publish).
-- **Acceptance Criteria.** Renders all four item types; schema/annotation rendering; actions wired to REST.
-- **Dependencies / Parallelism.** After 10.1, 4.5. Blocks 10.3.
+### MCAT-10.2 — Endpoint detail: Overview + Capabilities tabs  ·  **#3698**
+- **Problem.** Need to see what an MCP provides, with a scannable summary first and the full surface on demand (the mockup splits this into two tabs).
+- **Solution / Scope.** Build the **endpoint-detail shell** (identity header with name/host/grade glyph/health, the meta strip, and the tab strip from 10.7) and its first two tabs:
+  - **Overview tab** — server `instructions`, a meta strip (transport, visibility, auth type, cadence, last-discovered), and an **at-a-glance counts** block (tools/resources/templates/prompts, current version tag, plus the **compact grade summary** rendered by 10.4). Header controls: re-discover, enable/disable, publish.
+  - **Capabilities tab** — grouped **tools / resources / resource_templates / prompts** with title/description, `inputSchema`/`outputSchema`, annotations (`readOnlyHint`/`destructiveHint`/`idempotentHint`/`openWorldHint` badges from 10.7), resource `uri`/`mimeType`; a "Filter capabilities" box; inline lint hints on offending items. Empty/"no description" states per mockup.
+- **Acceptance Criteria.** Detail shell renders the identity header + 7-tab strip; Overview shows instructions, meta strip, at-a-glance counts, and the compact grade summary; Capabilities renders all four item types with schemas + annotation badges and filters; actions wired to REST.
+- **Dependencies / Parallelism.** After 10.1, 10.7, 4.5. Blocks 10.3, 10.9.
 - **Technical Stack.** Next.js.
 
-### MCAT-10.3 — Version history & compare/diff viewer  ·  **#3699**
+### MCAT-10.3 — Versions tab: history & compare/diff viewer  ·  **#3699**
 - **Problem.** Users must track version history by date/time **and run a diff between any two versions** to see exactly what changed (per mockup).
-- **Solution / Scope.** Version timeline (date tags, seq, score, change counts) plus a **compare bar**: pick a **base** and **target** version (selectors), *or* tick two versions in the timeline, then render the diff from the compare API (4.5). Diff panel updates per pair with a header (`vX → vY`), change counts (`+added · −removed · ~modified · fingerprint changed`), and color-coded rows (added=green, removed=red, modified=blue) showing the item path + before/after. Enforces older→newer (auto-swap) and shows an "identical surface" state when nothing changed. See the mockup's Versions tab.
-- **Acceptance Criteria.** Timeline newest-first with date tags; selecting any two versions (adjacent or not) renders the correct diff; same-version selection is handled; counts match the API.
+- **Solution / Scope.** The detail **Versions tab**: a version timeline (date tags, seq, score, change counts, a `current` marker) plus a **compare bar**: pick a **base** and **target** version (selectors), *or* tick two versions in the timeline, then render the diff from the compare API (4.5). Diff panel header reads `vX → vY` with change counts (`+added · −removed · ~modified · fingerprint changed`) and color-coded rows (added=green, removed=red, modified=blue) showing the item path + before/after. Enforces older→newer (auto-swap) and shows an "identical surface" state when nothing changed. Backed by the four read routes from **4.5** (`…/versions`, `…/versions/{vid}`, `…/versions/{vid}/changes`, `…/versions/compare`). See the mockup's *Versions* tab (`Diff · v4 → v5`).
+- **Acceptance Criteria.** Timeline newest-first with date tags; selecting any two versions (adjacent or not) renders the correct diff; same-version selection shows the identical-surface state; counts match the API.
 - **Dependencies / Parallelism.** After 10.2, 4.5. Parallel with 10.4.
 - **Technical Stack.** Next.js.
 
-### MCAT-10.4 — Lint report panel  ·  **#3700**
-- **Problem.** Show grading/linting results.
-- **Solution / Scope.** A **dedicated "Lint & Score" tab** — findings grouped by severity/rule (MUST vs SHOULD) + score/grade gauge + category bars, from 7.5 — **plus a compact grade summary surfaced on the Overview tab** (grade, score, MUST/SHOULD counts), per the mockup decision.
-- **Acceptance Criteria.** Lint tab renders findings + score/grade and links to offending items; Overview shows the compact grade summary.
-- **Dependencies / Parallelism.** After 7.5, 10.2. Parallel with 10.3.
+### MCAT-10.4 — Lint & Score tab + Overview grade summary  ·  **#3700**
+- **Problem.** Show grading/linting results, and surface the headline grade where users land first.
+- **Solution / Scope.** A **dedicated "Lint & Score" tab** — a **grade gauge** (A–F + 0–100), **category bars**, and findings grouped/split **MUST vs SHOULD** with links to the offending capability item, from 7.5 — **plus the compact grade summary surfaced on the Overview tab** (grade, score, MUST/SHOULD counts) consumed by 10.2, per the mockup decision. Reuses the grade glyph + finding-severity styling from 10.7.
+- **Acceptance Criteria.** Lint tab renders the gauge, category bars, and MUST/SHOULD findings linking to offending items; Overview shows the compact grade summary; both use shared primitives.
+- **Dependencies / Parallelism.** After 7.5, 10.2, 10.7. Parallel with 10.3.
 - **Technical Stack.** Next.js.
 
-### MCAT-10.5 — Test/query panel (auth-aware)  ·  **#3701**
+### MCAT-10.5 — Test tab (auth-aware)  ·  **#3701**
 - **Problem.** Let users invoke a tool from the UI.
-- **Solution / Scope.** Tool picker + argument form generated from `inputSchema`; result/error/latency viewer; destructive-tool confirm. Calls 8.2.
-- **Acceptance Criteria.** Form invokes a tool and renders result; destructive confirm enforced.
+- **Solution / Scope.** The detail **Test tab**: tool picker + argument form generated from `inputSchema`; result/error/latency/`isError` viewer (mockup shows `142 ms · isError: false`); destructive-tool confirm for tools carrying `destructiveHint`. Auth-aware (uses stored credentials via 8.2). Calls 8.2.
+- **Acceptance Criteria.** Form invokes a tool and renders result/latency/isError; destructive confirm enforced; missing-credential state surfaced.
 - **Dependencies / Parallelism.** After 8.2, 10.2. **v2.** Parallel with 10.6.
 - **Technical Stack.** Next.js, JSON-Schema form.
 
-### MCAT-10.6 — Credential management UI  ·  **#3702**
+### MCAT-10.6 — Credentials tab  ·  **#3702**
 - **Problem.** Configure outbound auth safely.
-- **Solution / Scope.** Forms for bearer/header (and OAuth connect flow in v2); masked display; clear-credential. Calls 6.5/6.4.
-- **Acceptance Criteria.** Set/clear creds; secrets shown masked; OAuth connect handshake (v2) completes.
+- **Solution / Scope.** The detail **Credentials tab**: forms for bearer/header (and the OAuth 2.1 connect flow in v2); **masked** secret display (`••••••••`), an encryption-at-rest note, and clear-credential. Never echoes stored secrets. Calls 6.5/6.4.
+- **Acceptance Criteria.** Set/clear creds; secrets shown masked; encryption note present; OAuth connect handshake (v2) completes.
 - **Dependencies / Parallelism.** After 6.5. **v2 for OAuth.** Parallel with 10.5.
 - **Technical Stack.** Next.js.
+
+### MCAT-10.7 — Design-system foundation & shared MCP UI primitives  ·  **#3938**
+- **Problem.** Every MCP screen in the mockup reuses the same visual atoms — the A–F **grade glyph** (the lead signal everywhere, e.g. `B · 82`), **badges** (transport `streamable_http`/`http+sse (legacy)`, visibility `private`/`public`, auth `bearer`/`header`/`OAuth 2.1`, capability annotations `readOnly`/`destructive`/`idempotent`/`openWorld`), **health/recency pills** (`healthy`/`degraded`/`unreachable`, `Last discovered …`), the **finding-severity** styling (MUST vs SHOULD), and the **detail tab strip**. Building these ad-hoc per screen would drift from the mockup and from objectified-ui. They must exist **before** the screens that consume them.
+- **Solution / Scope.** A small, documented component library + tokens under objectified-ui, mirroring the mockup's `:root` (brand indigo `#6366f1`, slate neutrals, Aptos/Segoe type, 8/12px radii) and objectified-ui conventions: `<GradeGlyph>`, `<McpBadge variant=…>`, `<HealthPill>`/`<RecencyPill>`, `<FindingSeverity>`, the `<DetailTabs>` shell, and shared empty/loading/error states. **CSS classes only — no hard-coded colors/spacing in consumers** (tokens drive theming, which 10.10 extends to dark). Includes Storybook/wiki entries and unit/visual tests. Reuse objectified-ui primitives where they already exist; do not fork.
+- **Acceptance Criteria.** All listed primitives exist, are token-driven (no literals in consumers), documented with examples, and render every variant the mockup shows; 10.1/10.2/10.4/10.8 consume them rather than re-implementing.
+- **Dependencies / Parallelism.** After 3.x (so REST shapes are known); foundational — **blocks 10.1, 10.2, 10.4, 10.8** and feeds 10.10. Can start in parallel with late EPIC-3/4 REST work.
+- **Technical Stack.** Next.js, CSS modules/tokens, Storybook.
+
+### MCAT-10.8 — Catalog grade-led card grid (filter / group / sort + density)  ·  **#3939**
+- **Problem.** The catalog landing (Specifications › MCP Servers) is, in the mockup, a **grade-led card grid grouped by site/host** — not a plain table. The original 10.1 only builds the route/shell; the rich grid presentation, grouping, and the open density/"changed since" questions need their own issue.
+- **Solution / Scope.** Render the catalog inside 10.1's shell: **grade-led cards** (grade glyph lead, name/host, transport + visibility + auth **badges**, capability counts, **health** rollup like `11 healthy · 1 failing`, recency), **grouped by site/host** by default with per-group headers; a **Sort** control (default `Grade ▾`) and filters (host, grade, transport, visibility, auth, category); the catalog search box. Adds the resolved-open-question polish: a **grid ↔ dense-list density toggle** and a **"changed since last view"** indicator on cards whose surface versioned since the user last looked. All atoms from 10.7. Backed by private browse (9.1) + search/filter (9.2).
+- **Acceptance Criteria.** Catalog renders grade-led cards grouped by host; sort defaults to grade; filters compose; density toggle switches grid↔dense-list and persists the preference (see 10.10); "changed since last view" appears only on newly-versioned endpoints; empty/loading/error states present.
+- **Dependencies / Parallelism.** After 10.1, 10.7, 9.1/9.2. Parallel with 10.2/10.3.
+- **Technical Stack.** Next.js, TanStack Query.
+
+### MCAT-10.9 — Endpoint detail: Settings tab  ·  **#3940**
+- **Problem.** The mockup's detail view has a **Settings tab** (edit identity/connection, manage lifecycle) that the original 10.x set never broke out, leaving the enable/disable/delete UI (REST shipped in 3.5) and cadence/visibility editing unowned.
+- **Solution / Scope.** The detail **Settings tab**: edit **name, endpoint URL, transport, discovery cadence, visibility**; **disable/enable**; and **delete** with an explicit confirm that names the cascade (versions, jobs, credentials are purged per 3.5). Inline validation mirrors the import-source inputs (URL/transport rules). Wires to the endpoint CRUD/lifecycle REST (3.1/3.5). Uses 10.7 primitives; destructive actions use the shared confirm pattern.
+- **Acceptance Criteria.** Editable fields persist via PATCH; visibility/cadence changes reflected; disable hides the endpoint from sweeps; delete requires a typed/explicit confirm and shows the teardown summary; no hard-coded styles.
+- **Dependencies / Parallelism.** After 10.2 (detail shell), 3.5. Parallel with 10.3/10.4/10.5/10.6.
+- **Technical Stack.** Next.js.
+
+### MCAT-10.10 — Dark-theme variant + density polish  ·  **#3941**
+- **Problem.** objectified-ui ships multiple themes; the mockup is light-only and flags a **dark-theme variant** and a **density** preference as open polish items. Without a token pass the MCP screens would break under the app's dark theme.
+- **Solution / Scope.** Extend the 10.7 tokens with a **dark-theme variant** covering every MCP screen (catalog grid, all detail tabs, import source, diff colors that stay legible on dark), wired to honor the app's existing theme switch (no bespoke toggle unless objectified-ui lacks one). Persist the catalog **density** preference (grid↔dense-list from 10.8) across sessions. Pure token/CSS work — no behavioral change. Verifies contrast/legibility (esp. grade glyph and diff add/remove/modify colors).
+- **Acceptance Criteria.** Switching the app to dark renders all MCP screens correctly (no literal-color leaks); diff/grade colors remain legible; density preference persists; light theme unchanged.
+- **Dependencies / Parallelism.** After 10.7 and the screens it themes (10.1/10.2/10.8 at least). **v2/polish.** Parallel with test/credentials work.
+- **Technical Stack.** Next.js, CSS tokens.
 
 ---
 
