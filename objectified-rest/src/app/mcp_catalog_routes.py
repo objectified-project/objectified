@@ -31,11 +31,14 @@ from .mcp_discovery_engine import trigger_discovery
 from .models import (
     McpDiscoveryJobListResponse,
     McpDiscoveryJobResponse,
+    McpDiscoveryJobStatusListResponse,
+    McpDiscoveryJobStatusResponse,
     McpEndpointCreate,
     McpEndpointListResponse,
     McpEndpointResponse,
     McpEndpointUpdate,
     mcp_discovery_job_out_from_row,
+    mcp_discovery_job_status_from_row,
     mcp_endpoint_out_from_row,
 )
 
@@ -288,3 +291,65 @@ async def get_mcp_discovery_job(
     if not job or str(job.get("endpoint_id")) != str(endpoint_id):
         raise HTTPException(status_code=404, detail="discovery job not found")
     return McpDiscoveryJobResponse(success=True, job=mcp_discovery_job_out_from_row(job))
+
+
+# ===========================================================================
+# Discovery job status/polling API (V2-MCP-17.4 / MCAT-3.4, #3666)
+# ===========================================================================
+#
+# The canonical "follow a discovery job to completion" surface for the CLI poller
+# (Epic-11) and the UI. These mirror the ``…/discover`` reads above but return the
+# ergonomic :class:`McpDiscoveryJobStatus` snapshot — ``state``, timings, the lifted
+# ``version_id`` / ``changed`` (success) or structured ``error_detail`` (failure),
+# and a ``status_path`` to re-poll — rather than the raw job row. Both are scoped to
+# the caller's token tenant, so a cross-tenant id reads as ``404``.
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/endpoints/{endpoint_id}/jobs",
+    response_model=McpDiscoveryJobStatusListResponse,
+)
+async def list_mcp_endpoint_jobs(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpDiscoveryJobStatusListResponse:
+    """List an endpoint's discovery-job status snapshots, newest first.
+
+    404 when the endpoint is not the caller's tenant's (so an unknown id never
+    discloses another tenant's jobs as an empty list).
+    """
+    tenant_id = str(auth_data["tenant_id"])
+    endpoint = db.get_mcp_endpoint(tenant_id, str(endpoint_id))
+    if not endpoint:
+        raise HTTPException(status_code=404, detail="MCP endpoint not found")
+    rows = db.list_mcp_discovery_jobs(tenant_id, str(endpoint_id))
+    return McpDiscoveryJobStatusListResponse(
+        success=True,
+        jobs=[mcp_discovery_job_status_from_row(r, tenant_slug) for r in rows],
+    )
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/endpoints/{endpoint_id}/jobs/{job_id}",
+    response_model=McpDiscoveryJobStatusResponse,
+)
+async def get_mcp_endpoint_job(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    job_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpDiscoveryJobStatusResponse:
+    """Poll one discovery job's status snapshot (state, timings, version_id/error).
+
+    A terminal snapshot carries ``version_id`` (completed) or ``error`` /
+    ``error_detail`` (failed). 404 when the job is not this tenant+endpoint's.
+    """
+    tenant_id = str(auth_data["tenant_id"])
+    job = db.get_mcp_discovery_job(tenant_id, str(job_id))
+    if not job or str(job.get("endpoint_id")) != str(endpoint_id):
+        raise HTTPException(status_code=404, detail="discovery job not found")
+    return McpDiscoveryJobStatusResponse(
+        success=True,
+        job=mcp_discovery_job_status_from_row(job, tenant_slug),
+    )

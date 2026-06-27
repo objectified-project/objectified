@@ -3824,3 +3824,153 @@ def mcp_discovery_job_out_from_row(row: Dict[str, Any]) -> McpDiscoveryJobOut:
         result=result,
         created_at=_ts(row.get("created_at")),
     )
+
+
+# ===========================================================================
+# MCP Catalog — discovery job status/polling API (V2-MCP-17.4 / MCAT-3.4, #3666)
+# ===========================================================================
+#
+# The canonical "follow a discovery job to completion" contract consumed by the
+# CLI poller (Epic-11) and the UI. It is a thin, ergonomic projection of an
+# ``mcp_discovery_jobs`` row that lifts the fields a poller needs out of the
+# free-form ``result`` blob: whether the job has reached a ``terminal`` state, the
+# ``version_id`` the run produced (on success), the structured ``error_detail`` (on
+# failure), the run ``duration_ms``, and a ``status_path`` to re-poll.
+
+# A poller stops once a job reports one of these terminal states; ``queued`` and
+# ``running`` mean "keep polling".
+MCP_DISCOVERY_TERMINAL_STATES = frozenset({"completed", "failed"})
+
+
+def _parse_job_timestamp(value: Any) -> Optional[datetime]:
+    """Coerce a job timestamp (datetime or ISO-8601 string) to a datetime, else None."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+
+
+def _job_duration_ms(started: Any, finished: Any) -> Optional[int]:
+    """Whole-millisecond wall-clock duration between ``started_at`` and ``finished_at``.
+
+    Returns None when either bound is missing/unparseable, or when the interval is
+    negative (clock skew) — so a duration is only ever reported for a job that has
+    actually run to a finish.
+    """
+    start = _parse_job_timestamp(started)
+    finish = _parse_job_timestamp(finished)
+    if start is None or finish is None:
+        return None
+    delta_ms = (finish - start).total_seconds() * 1000.0
+    return int(delta_ms) if delta_ms >= 0 else None
+
+
+class McpDiscoveryJobStatus(BaseModel):
+    """Poll snapshot for one discovery job (MCAT-3.4).
+
+    The status contract shared by the CLI poller and UI. ``state`` is the raw
+    lifecycle state (``queued`` → ``running`` → ``completed`` | ``failed``);
+    ``terminal`` is True once the job has reached a final state so a poller knows to
+    stop. On a successful terminal run ``version_id`` points at the snapshot the run
+    produced (present even when ``changed`` is False — the surface matched the prior
+    version) and ``changed`` says whether a new version was written. On a failed run
+    ``error`` is a short human summary and ``error_detail`` is the structured
+    discovery-error taxonomy entry. ``result`` is the full raw payload for callers
+    that need more than the lifted fields.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    job_id: str
+    endpoint_id: str
+    tenant_id: str
+    state: str
+    trigger: str
+    terminal: bool = False
+    created_at: Optional[str] = None
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    duration_ms: Optional[int] = None
+    # Lifted from ``result`` on a completed run; None until then.
+    version_id: Optional[str] = None
+    changed: Optional[bool] = None
+    # Lifted on a failed run: short summary plus the structured error taxonomy entry.
+    error: Optional[str] = None
+    error_detail: Optional[Dict[str, Any]] = None
+    result: Dict[str, Any] = Field(default_factory=dict)
+    # Relative URL to re-poll this job; populated when a tenant slug is in scope.
+    status_path: Optional[str] = None
+
+
+class McpDiscoveryJobStatusResponse(BaseModel):
+    """Response envelope for a single discovery-job status snapshot."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    job: McpDiscoveryJobStatus
+
+
+class McpDiscoveryJobStatusListResponse(BaseModel):
+    """Response envelope listing an endpoint's discovery-job snapshots (newest first)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    jobs: List[McpDiscoveryJobStatus]
+
+
+def mcp_discovery_job_status_from_row(
+    row: Dict[str, Any], tenant_slug: Optional[str] = None
+) -> McpDiscoveryJobStatus:
+    """Project an ``odb.mcp_discovery_jobs`` row onto the poll-status contract.
+
+    Reuses :func:`mcp_discovery_job_out_from_row` for the string/timestamp
+    normalization, then lifts the poller-facing fields out of the ``result`` blob
+    (``version_id`` / ``changed`` on success, the structured error on failure) and
+    derives ``terminal`` and ``duration_ms``. ``status_path`` — the relative URL a
+    poller re-fetches — is filled in only when ``tenant_slug`` is supplied.
+
+    Args:
+        row: The ``mcp_discovery_jobs`` row as a dict.
+        tenant_slug: The catalog tenant slug from the request path, used to build
+            ``status_path``; omitted in contexts that do not have one.
+
+    Returns:
+        The :class:`McpDiscoveryJobStatus` snapshot for the row.
+    """
+    base = mcp_discovery_job_out_from_row(row)
+    result = base.result if isinstance(base.result, dict) else {}
+
+    version_id = result.get("version_id")
+    changed = result.get("changed")
+    raw_error = result.get("error")
+
+    status_path = None
+    if tenant_slug is not None:
+        status_path = (
+            f"/v1/mcp/{tenant_slug}/endpoints/{base.endpoint_id}/jobs/{base.id}"
+        )
+
+    return McpDiscoveryJobStatus(
+        job_id=base.id,
+        endpoint_id=base.endpoint_id,
+        tenant_id=base.tenant_id,
+        state=base.state,
+        trigger=base.trigger,
+        terminal=base.state in MCP_DISCOVERY_TERMINAL_STATES,
+        created_at=base.created_at,
+        started_at=base.started_at,
+        finished_at=base.finished_at,
+        duration_ms=_job_duration_ms(row.get("started_at"), row.get("finished_at")),
+        version_id=str(version_id) if version_id is not None else None,
+        changed=changed if isinstance(changed, bool) else None,
+        error=base.error,
+        error_detail=raw_error if isinstance(raw_error, dict) else None,
+        result=result,
+        status_path=status_path,
+    )
