@@ -46,6 +46,7 @@ from .transport_http import (
     McpAuthRequiredError,
     McpHttpStatusError,
     McpProtocolError,
+    McpRateLimitedError,
     McpSessionExpiredError,
     McpSsrfError,
     McpTransportError,
@@ -72,6 +73,7 @@ class DiscoveryErrorCode(StrEnum):
 
     # Application-level HTTP / MCP signalling.
     AUTH_REQUIRED = "auth_required"  # 401 + WWW-Authenticate challenge.
+    RATE_LIMITED = "rate_limited"  # 429 Too Many Requests (may carry a Retry-After).
     SESSION_EXPIRED = "session_expired"  # 404 to a request carrying a session id.
     HTTP_STATUS = "http_status"  # any other rejected HTTP status (400/405/5xx…).
 
@@ -144,9 +146,9 @@ def classify_exception(exc: BaseException) -> DiscoveryError:
     """Map any discovery exception to a stable :class:`DiscoveryError`.
 
     Resolves the exception against the taxonomy most-specific-first (so, e.g.,
-    :class:`McpAuthRequiredError` is recognized before its
-    :class:`McpHttpStatusError` base, and :class:`McpPaginationError` before its
-    :class:`McpDiscoveryError` base). Anything unrecognized becomes
+    :class:`McpAuthRequiredError` and :class:`McpRateLimitedError` are recognized
+    before their :class:`McpHttpStatusError` base, and :class:`McpPaginationError`
+    before its :class:`McpDiscoveryError` base). Anything unrecognized becomes
     :attr:`DiscoveryErrorCode.UNKNOWN` rather than raising, so a job runner can
     always persist *something* explanatory.
 
@@ -211,6 +213,12 @@ def classify_exception(exc: BaseException) -> DiscoveryError:
             DiscoveryErrorCode.AUTH_REQUIRED,
             message,
             detail={"status": exc.status_code, "www_authenticate": exc.www_authenticate},
+        )
+    if isinstance(exc, McpRateLimitedError):
+        return DiscoveryError(
+            DiscoveryErrorCode.RATE_LIMITED,
+            message,
+            detail={"status": exc.status_code, "retry_after": exc.retry_after},
         )
     if isinstance(exc, McpSessionExpiredError):
         return DiscoveryError(

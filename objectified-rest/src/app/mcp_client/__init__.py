@@ -73,10 +73,12 @@ from .transport_http import (
     McpAuthRequiredError,
     McpHttpStatusError,
     McpProtocolError,
+    McpRateLimitedError,
     McpSessionExpiredError,
     McpSsrfError,
     McpTransportError,
     StreamableHttpTransport,
+    parse_retry_after_seconds,
 )
 
 __all__ = [
@@ -115,6 +117,7 @@ __all__ = [
     "McpHttpStatusError",
     "McpPaginationError",
     "McpProtocolError",
+    "McpRateLimitedError",
     "McpSessionExpiredError",
     "McpSsrfError",
     "McpTransportError",
@@ -128,5 +131,6 @@ __all__ = [
     "discover_listings",
     "initialize_session",
     "paginate",
+    "parse_retry_after_seconds",
     "private_address_reason",
 ]

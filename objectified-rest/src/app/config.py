@@ -276,6 +276,42 @@ class Settings(BaseSettings):
         ),
     )
 
+    # MCP discovery failure handling, backoff & quarantine (V2-MCP-19.3 / MCAT-5.3, #3675). A
+    # flaky/dead endpoint must not wedge the sweep or spam failures: each failed discovery defers
+    # the endpoint by an exponential backoff, and after enough consecutive failures it is
+    # quarantined (auto-excluded from the sweep) until it recovers.
+    #
+    # mcp_discovery_quarantine_threshold  Consecutive failures after which an endpoint is
+    #                                    quarantined and an event emitted. <= 0 disables quarantine
+    #                                    (endpoints keep backing off but are never auto-disabled).
+    # mcp_discovery_backoff_base_seconds The first-failure backoff delay and the exponential's unit:
+    #                                    the Nth consecutive failure defers by base * 2**(N-1).
+    # mcp_discovery_backoff_max_seconds  Ceiling on the exponential backoff so a long-dead endpoint
+    #                                    is still re-checked periodically (and can recover). A
+    #                                    server-supplied 429 Retry-After is honoured as a floor and
+    #                                    may exceed this ceiling.
+    mcp_discovery_quarantine_threshold: int = Field(
+        default=5,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MCP_DISCOVERY_QUARANTINE_THRESHOLD",
+            "mcp_discovery_quarantine_threshold",
+        ),
+    )
+    mcp_discovery_backoff_base_seconds: int = Field(
+        default=60,
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MCP_DISCOVERY_BACKOFF_BASE",
+            "mcp_discovery_backoff_base_seconds",
+        ),
+    )
+    mcp_discovery_backoff_max_seconds: int = Field(
+        default=21600,  # 6 hours
+        validation_alias=AliasChoices(
+            "OBJECTIFIED_MCP_DISCOVERY_BACKOFF_MAX",
+            "mcp_discovery_backoff_max_seconds",
+        ),
+    )
+
     # Observability & error handling (RC1-3.2, #3617). Structured JSON logs, request-id
     # propagation, in-process request metrics, and an ops dashboard that surfaces backup status.
     #

@@ -3679,6 +3679,12 @@ class McpEndpointOut(BaseModel):
     discovery_cadence_seconds: Optional[int] = None
     last_discovered_at: Optional[str] = None
     last_discovery_status: Optional[str] = None
+    # Failure handling, backoff & quarantine status (V2-MCP-19.3 / MCAT-5.3).
+    consecutive_failures: int = 0
+    next_discovery_after: Optional[str] = None
+    quarantined: bool = False
+    quarantined_at: Optional[str] = None
+    quarantine_reason: Optional[str] = None
     current_version_id: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
@@ -3753,6 +3759,11 @@ def mcp_endpoint_out_from_row(row: Dict[str, Any]) -> McpEndpointOut:
         discovery_cadence_seconds=int(cadence) if isinstance(cadence, int) else None,
         last_discovered_at=_ts(row.get("last_discovered_at")),
         last_discovery_status=_s(row.get("last_discovery_status")),
+        consecutive_failures=int(row.get("consecutive_failures") or 0),
+        next_discovery_after=_ts(row.get("next_discovery_after")),
+        quarantined=row.get("quarantined_at") is not None,
+        quarantined_at=_ts(row.get("quarantined_at")),
+        quarantine_reason=_s(row.get("quarantine_reason")),
         current_version_id=_s(row.get("current_version_id")),
         created_at=_ts(row.get("created_at")),
         updated_at=_ts(row.get("updated_at")),

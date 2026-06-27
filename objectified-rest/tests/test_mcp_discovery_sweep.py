@@ -21,7 +21,8 @@ from unittest.mock import MagicMock
 
 from app import mcp_discovery_engine, mcp_discovery_sweep
 from app.database import Database
-from app.mcp_client.errors import DiscoveryErrorCode
+from app.mcp_client.errors import DiscoveryError, DiscoveryErrorCode, classify_exception
+from app.mcp_client.transport_http import McpRateLimitedError
 
 _NOW = datetime(2026, 6, 27, 12, 0, 0, tzinfo=timezone.utc)
 _EP1 = "11111111-1111-1111-1111-111111111111"
@@ -68,6 +69,10 @@ def test_list_due_endpoints_builds_due_selection_sql(monkeypatch):
     assert "COALESCE(discovery_cadence_seconds, %s)" in q
     # Recency is evaluated in the database (no app clock).
     assert "now() - make_interval" in q
+    # Failure handling (MCAT-5.3): quarantined endpoints and ones still inside their backoff
+    # window are excluded so a flaky/dead endpoint never wedges the sweep.
+    assert "quarantined_at IS NULL" in q
+    assert "next_discovery_after IS NULL OR next_discovery_after <= now()" in q
     # Fair scheduling: oldest first, never-discovered first.
     assert "ORDER BY last_discovered_at ASC NULLS FIRST" in q
     # The global default cadence is the bound parameter.
@@ -103,6 +108,9 @@ def _settings(**overrides):
         "mcp_discovery_min_interval_seconds": 60,
         "mcp_discovery_max_concurrency": 4,
         "mcp_discovery_endpoint_timeout_seconds": 150,
+        "mcp_discovery_quarantine_threshold": 5,
+        "mcp_discovery_backoff_base_seconds": 60,
+        "mcp_discovery_backoff_max_seconds": 21600,
     }
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -388,9 +396,9 @@ async def test_run_discovery_job_records_budget_failure_on_timeout(monkeypatch):
 
     captured = {}
 
-    def _fake_persist_failure(job_id, endpoint_id, error, discovered_at):
+    def _fake_persist_failure(job_id, endpoint, error, discovered_at):
         captured["job_id"] = job_id
-        captured["endpoint_id"] = endpoint_id
+        captured["endpoint"] = endpoint
         captured["error"] = error
 
     monkeypatch.setattr(mcp_discovery_engine, "_drive_discovery_job", _slow_drive)
@@ -402,5 +410,266 @@ async def test_run_discovery_job_records_budget_failure_on_timeout(monkeypatch):
 
     # The overrun is recorded as a terminal budget_exceeded failure on the right job/endpoint.
     assert captured["job_id"] == "job-slow"
-    assert captured["endpoint_id"] == _EP1
+    assert captured["endpoint"]["id"] == _EP1
     assert captured["error"].code == DiscoveryErrorCode.BUDGET_EXCEEDED
+
+
+# ===========================================================================
+# DB LAYER — record_mcp_discovery_failure (backoff + quarantine, fake cursor)
+# ===========================================================================
+
+
+class _FakeCursor:
+    """Cursor double serving a queue of fetchone results and recording statements."""
+
+    def __init__(self, fetchone_results=None):
+        self._fetchone_results = list(fetchone_results or [])
+        self.executed = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, params))
+
+    def fetchone(self):
+        return self._fetchone_results.pop(0) if self._fetchone_results else None
+
+
+class _FakeInfo:
+    transaction_status = 0  # psycopg2 TRANSACTION_STATUS_IDLE
+
+
+class _FakeConn:
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self.committed = False
+        self.rolled_back = False
+        self.autocommit = True
+        self.info = _FakeInfo()
+
+    def cursor(self):
+        return self._cursor
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        self.rolled_back = True
+
+
+def _failure_db(monkeypatch, *, new_count, was_quarantined):
+    """A Database whose record_mcp_discovery_failure runs against a fake connection."""
+    cur = _FakeCursor(
+        fetchone_results=[
+            {"consecutive_failures": new_count, "was_quarantined": was_quarantined}
+        ]
+    )
+    conn = _FakeConn(cur)
+    db = Database()
+    monkeypatch.setattr(db, "connect", lambda: conn)
+    return db, cur, conn
+
+
+def test_record_failure_increments_and_sets_backoff(monkeypatch):
+    db, cur, conn = _failure_db(monkeypatch, new_count=2, was_quarantined=False)
+
+    out = db.record_mcp_discovery_failure(
+        _EP1,
+        discovered_at=_NOW,
+        status="connect_error",
+        backoff_base_seconds=60,
+        backoff_max_seconds=21600,
+        quarantine_threshold=5,
+        quarantine_reason="connect_error: boom",
+    )
+
+    # Second consecutive failure → 2 * base = 120s backoff, not yet quarantined.
+    assert out == {
+        "consecutive_failures": 2,
+        "backoff_seconds": 120.0,
+        "quarantined": False,
+        "newly_quarantined": False,
+    }
+    # The first UPDATE increments the counter and stamps the specific status.
+    inc_sql, inc_params = cur.executed[0]
+    assert "consecutive_failures = consecutive_failures + 1" in inc_sql
+    assert inc_params == (_NOW, "connect_error", _EP1)
+    # The second UPDATE writes the backoff anchor and does NOT trip quarantine.
+    backoff_sql, backoff_params = cur.executed[1]
+    assert "next_discovery_after = %s + make_interval(secs => %s)" in backoff_sql
+    assert backoff_params[0] == _NOW
+    assert backoff_params[1] == 120.0
+    assert backoff_params[2] is False  # should_quarantine
+    assert conn.committed is True
+
+
+def test_record_failure_trips_quarantine_at_threshold(monkeypatch):
+    db, cur, conn = _failure_db(monkeypatch, new_count=5, was_quarantined=False)
+
+    out = db.record_mcp_discovery_failure(
+        _EP1,
+        discovered_at=_NOW,
+        status="connect_error",
+        backoff_base_seconds=60,
+        backoff_max_seconds=21600,
+        quarantine_threshold=5,
+        quarantine_reason="connect_error: dead",
+    )
+
+    assert out["consecutive_failures"] == 5
+    assert out["quarantined"] is True
+    assert out["newly_quarantined"] is True
+    # The quarantine UPDATE carries the should_quarantine flag and the reason text.
+    _backoff_sql, backoff_params = cur.executed[1]
+    assert backoff_params[2] is True  # should_quarantine
+    assert "connect_error: dead" in backoff_params
+
+
+def test_record_failure_already_quarantined_is_not_newly(monkeypatch):
+    db, cur, conn = _failure_db(monkeypatch, new_count=9, was_quarantined=True)
+
+    out = db.record_mcp_discovery_failure(
+        _EP1,
+        discovered_at=_NOW,
+        status="connect_error",
+        backoff_base_seconds=60,
+        backoff_max_seconds=21600,
+        quarantine_threshold=5,
+        quarantine_reason="connect_error: still dead",
+    )
+
+    # Already quarantined: stays quarantined but does not re-emit the transition event.
+    assert out["quarantined"] is True
+    assert out["newly_quarantined"] is False
+
+
+def test_record_failure_threshold_disabled_never_quarantines(monkeypatch):
+    db, cur, conn = _failure_db(monkeypatch, new_count=50, was_quarantined=False)
+
+    out = db.record_mcp_discovery_failure(
+        _EP1,
+        discovered_at=_NOW,
+        status="connect_error",
+        backoff_base_seconds=60,
+        backoff_max_seconds=21600,
+        quarantine_threshold=0,  # disabled
+        quarantine_reason="x",
+    )
+
+    assert out["quarantined"] is False
+    assert out["newly_quarantined"] is False
+    # Backoff is still clamped to the ceiling even with quarantine disabled.
+    assert out["backoff_seconds"] == 21600.0
+
+
+def test_record_failure_returns_none_when_endpoint_gone(monkeypatch):
+    db, cur, conn = _failure_db(monkeypatch, new_count=1, was_quarantined=False)
+    cur._fetchone_results = [None]  # the UPDATE matched no row
+
+    out = db.record_mcp_discovery_failure(
+        _EP1,
+        discovered_at=_NOW,
+        backoff_base_seconds=60,
+        backoff_max_seconds=21600,
+        quarantine_threshold=5,
+        quarantine_reason="x",
+    )
+
+    assert out is None
+    # Only the increment UPDATE ran; the backoff UPDATE was skipped.
+    assert len(cur.executed) == 1
+
+
+# ===========================================================================
+# ENGINE — _persist_failure routes through record_mcp_discovery_failure
+# ===========================================================================
+
+
+def test_persist_failure_routes_to_record_failure(monkeypatch):
+    _patch_settings(monkeypatch)
+    mdb = MagicMock()
+    mdb.record_mcp_discovery_failure.return_value = {
+        "consecutive_failures": 1,
+        "backoff_seconds": 60.0,
+        "quarantined": False,
+        "newly_quarantined": False,
+    }
+    monkeypatch.setattr(mcp_discovery_engine, "db", mdb)
+
+    error = DiscoveryError(DiscoveryErrorCode.CONNECT_ERROR, "refused")
+    mcp_discovery_engine._persist_failure("job-1", _endpoint(_EP1), error, _NOW)
+
+    kwargs = mdb.record_mcp_discovery_failure.call_args.kwargs
+    # last_discovery_status carries the specific error code, and config thresholds are threaded in.
+    assert kwargs["status"] == "connect_error"
+    assert kwargs["backoff_base_seconds"] == 60.0
+    assert kwargs["backoff_max_seconds"] == 21600.0
+    assert kwargs["quarantine_threshold"] == 5
+    assert kwargs["retry_after_seconds"] is None
+    # The job is still finished as failed with the structured error payload.
+    finish = mdb.finish_mcp_discovery_job.call_args
+    assert finish.args[1] == "failed"
+    assert "error" in finish.kwargs["result"]
+
+
+def test_persist_failure_threads_retry_after_for_rate_limit(monkeypatch):
+    _patch_settings(monkeypatch)
+    mdb = MagicMock()
+    mdb.record_mcp_discovery_failure.return_value = {
+        "consecutive_failures": 1,
+        "backoff_seconds": 300.0,
+        "quarantined": False,
+        "newly_quarantined": False,
+    }
+    monkeypatch.setattr(mcp_discovery_engine, "db", mdb)
+
+    error = classify_exception(McpRateLimitedError(retry_after=300))
+    mcp_discovery_engine._persist_failure("job-1", _endpoint(_EP1), error, _NOW)
+
+    kwargs = mdb.record_mcp_discovery_failure.call_args.kwargs
+    assert kwargs["status"] == "rate_limited"
+    # The server's Retry-After is forwarded so the backoff respects the rate limit.
+    assert kwargs["retry_after_seconds"] == 300.0
+
+
+def test_persist_failure_emits_quarantine_event(monkeypatch, caplog):
+    _patch_settings(monkeypatch)
+    mdb = MagicMock()
+    mdb.record_mcp_discovery_failure.return_value = {
+        "consecutive_failures": 5,
+        "backoff_seconds": 960.0,
+        "quarantined": True,
+        "newly_quarantined": True,
+    }
+    monkeypatch.setattr(mcp_discovery_engine, "db", mdb)
+
+    error = DiscoveryError(DiscoveryErrorCode.CONNECT_ERROR, "dead")
+    with caplog.at_level("WARNING"):
+        mcp_discovery_engine._persist_failure("job-1", _endpoint(_EP1), error, _NOW)
+
+    assert any(
+        "mcp endpoint quarantined" in r.message and _EP1 in r.message
+        for r in caplog.records
+    )
+
+
+def test_persist_failure_no_quarantine_event_when_not_tripped(monkeypatch, caplog):
+    _patch_settings(monkeypatch)
+    mdb = MagicMock()
+    mdb.record_mcp_discovery_failure.return_value = {
+        "consecutive_failures": 2,
+        "backoff_seconds": 120.0,
+        "quarantined": False,
+        "newly_quarantined": False,
+    }
+    monkeypatch.setattr(mcp_discovery_engine, "db", mdb)
+
+    error = DiscoveryError(DiscoveryErrorCode.CONNECT_ERROR, "flaky")
+    with caplog.at_level("WARNING"):
+        mcp_discovery_engine._persist_failure("job-1", _endpoint(_EP1), error, _NOW)
+
+    assert not any("mcp endpoint quarantined" in r.message for r in caplog.records)

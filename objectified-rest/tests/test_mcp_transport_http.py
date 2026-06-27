@@ -22,6 +22,7 @@ from app.mcp_client.transport_http import (
     McpAuthRequiredError,
     McpHttpStatusError,
     McpProtocolError,
+    McpRateLimitedError,
     McpSessionExpiredError,
     McpSsrfError,
     McpTransportError,
@@ -300,6 +301,30 @@ async def test_401_without_www_authenticate_header():
     with pytest.raises(McpAuthRequiredError) as exc:
         await transport.request("x")
     assert exc.value.www_authenticate is None
+
+
+async def test_429_raises_rate_limited_with_retry_after():
+    handler = RecordingHandler(
+        {"tools/list": lambda req, body: httpx.Response(429, text="slow down", headers={"Retry-After": "120"})}
+    )
+    transport = make_transport(handler)
+
+    with pytest.raises(McpRateLimitedError) as exc:
+        await transport.request("tools/list")
+    # The dedicated 429 error is still an HTTP status error and parses the Retry-After delay.
+    assert isinstance(exc.value, McpHttpStatusError)
+    assert exc.value.status_code == 429
+    assert exc.value.retry_after == 120
+    assert "slow down" in exc.value.body
+
+
+async def test_429_without_retry_after_header():
+    handler = RecordingHandler({"x": lambda req, body: httpx.Response(429)})
+    transport = make_transport(handler)
+
+    with pytest.raises(McpRateLimitedError) as exc:
+        await transport.request("x")
+    assert exc.value.retry_after is None
 
 
 async def test_202_to_a_request_is_a_protocol_error():
