@@ -5,6 +5,24 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.2] - 2026-06-26
+
+### Changed
+- **Canonical surface fingerprint — semantic projection (#3668, V2-MCP-18.1 / MCAT-4.1)** — the MCP
+  `surface_fingerprint` (`DiscoverySurface.fingerprint`) is now computed over a documented *semantic
+  projection* of the surface rather than the verbatim wire entries. Only the fields that define the
+  server's offering feed the hash: per item, the allow-list in `FINGERPRINT_FIELDS` (tool
+  name/title/description/inputSchema/outputSchema/annotations; resource & template
+  name/title/description/uri(or uriTemplate)/mimeType/annotations; prompt name/title/description/
+  arguments) and, at the surface level, `protocolVersion`, `serverInfo` (name/title/version),
+  `capabilities`, and `instructions`. Volatile and vendor-specific data is excluded so it can never
+  flip the fingerprint: the reserved `_meta` block is stripped *recursively* at every depth (including
+  inside `inputSchema`, prompt `arguments`, and `capabilities`), and a resource's volatile `size` hint
+  and any unknown extension keys fall outside the allow-list. Result: an identical offering yields an
+  identical fingerprint across runs and hosts, while a single semantically meaningful change (e.g. a
+  tool description edit) flips it. The verbatim wire entry is still retained per item (`raw`) for
+  storage/round-trip; only the fingerprint narrows to the semantic fields. No DB or API surface change.
+
 ## [1.8.1] - 2026-06-26
 
 ### Added

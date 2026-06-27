@@ -17,12 +17,16 @@ Three problems motivate a normalization step rather than passing raw blobs aroun
    union of every promoted column, mirroring the ``odb.mcp_capability_items`` table.
 2. **Map ordering is not significant but byte-stability matters.** JSON objects are
    unordered maps, so the same logical server can return ``{"name":…,"title":…}`` or
-   ``{"title":…,"name":…}``. Change detection (MCAT-4.1) compares *fingerprints*, so
+   ``{"title":…,"name":…}``. Change detection (V2-MCP-18.1) compares *fingerprints*, so
    two byte-different-but-logically-identical surfaces must normalize to the same
    bytes. :meth:`DiscoverySurface.canonical_json` sorts object keys recursively
    (``sort_keys=True``) while preserving the server's *list* order (carried as each
    item's ``ordinal``), so map reordering is invisible to the fingerprint but a real
-   reordering of items is not.
+   reordering of items is not. The fingerprint is computed over a *semantic
+   projection* of the surface (:data:`FINGERPRINT_FIELDS`), not the verbatim wire:
+   only the fields that define the server's offering are hashed, and volatile
+   metadata (the reserved ``_meta`` block, a resource's ``size`` hint, vendor
+   extension keys) is excluded so it never flips ``surface_fingerprint``.
 3. **The surface must round-trip to and from the normalized store.** Each item maps
    cleanly to one ``mcp_capability_items`` row (:meth:`CapabilityItem.to_row` /
    :meth:`CapabilityItem.from_row`) and the verbatim wire entry is preserved per item
@@ -58,6 +62,58 @@ ITEM_TYPES: Tuple[str, ...] = (
     ITEM_TYPE_RESOURCE,
     ITEM_TYPE_RESOURCE_TEMPLATE,
     ITEM_TYPE_PROMPT,
+)
+
+# ---------------------------------------------------------------------------
+# Surface fingerprint (V2-MCP-18.1): the documented, semantically meaningful
+# field list. Only these fields define "did the server's offering change?"; a
+# fingerprint computed over them is identical for identical offerings across
+# runs and hosts, yet flips when any one of them changes (e.g. a single tool
+# description edit).
+# ---------------------------------------------------------------------------
+
+# The reserved MCP metadata key. Per the spec, ``_meta`` is the escape hatch every
+# object may carry for implementation-specific, non-semantic data (progress tokens,
+# trace ids, cursors, …). It is volatile by design, so it is stripped *recursively*
+# from every value before fingerprinting and therefore never flips the fingerprint.
+RESERVED_META_KEY = "_meta"
+
+# Per capability kind, the wire field names that feed the fingerprint, in canonical
+# emission order. Anything not listed here is excluded from the fingerprint: a
+# resource's volatile ``size`` byte-count hint, any vendor extension keys, and the
+# reserved ``_meta`` block. ``mimeType`` (resources/templates) and ``arguments``
+# (prompts) have no promoted column and are read back from the verbatim ``raw`` entry;
+# the rest come from the promoted, version-normalized attributes.
+FINGERPRINT_FIELDS: Dict[str, Tuple[str, ...]] = {
+    ITEM_TYPE_TOOL: (
+        "name",
+        "title",
+        "description",
+        "inputSchema",
+        "outputSchema",
+        "annotations",
+    ),
+    ITEM_TYPE_RESOURCE: ("name", "title", "description", "uri", "mimeType", "annotations"),
+    ITEM_TYPE_RESOURCE_TEMPLATE: (
+        "name",
+        "title",
+        "description",
+        "uriTemplate",
+        "mimeType",
+        "annotations",
+    ),
+    ITEM_TYPE_PROMPT: ("name", "title", "description", "arguments"),
+}
+
+# The surface-level (non-item) fields that feed the fingerprint, for documentation
+# and parity with :meth:`DiscoverySurface.canonical_dict`: the negotiated
+# ``protocolVersion``; the server identity ``serverInfo`` (``name``/``title``/
+# ``version``); the declared ``capabilities`` object; and free-text ``instructions``.
+FINGERPRINT_SURFACE_FIELDS: Tuple[str, ...] = (
+    "protocolVersion",
+    "serverInfo",
+    "capabilities",
+    "instructions",
 )
 
 
@@ -167,6 +223,39 @@ class CapabilityItem:
             description=_optional_str(payload.get("description")),
             raw=dict(payload),
         )
+
+    # -- Fingerprint projection (semantically meaningful fields only) -------
+
+    def fingerprint_projection(self) -> Dict[str, Any]:
+        """Return only this item's fingerprint-relevant fields (V2-MCP-18.1).
+
+        The result is the kind-specific allow-list named in
+        :data:`FINGERPRINT_FIELDS` and nothing else, so volatile or vendor-specific
+        wire fields (a resource's ``size`` hint, the reserved ``_meta`` block,
+        unknown extension keys) never influence the surface fingerprint. Promoted,
+        version-normalized attributes supply most fields; ``mimeType`` and
+        ``arguments`` — which have no promoted column — are read from :attr:`raw`.
+        The reserved ``_meta`` key is stripped *recursively* from every included
+        value (e.g. inside ``inputSchema`` or a prompt ``argument``).
+
+        Returns:
+            A JSON-ready dict whose keys are exactly ``FINGERPRINT_FIELDS[item_type]``
+            (wire spelling, e.g. ``inputSchema``); absent fields are ``None``.
+        """
+        source: Dict[str, Any] = {
+            "name": self.name,
+            "title": self.title,
+            "description": self.description,
+            "inputSchema": self.input_schema,
+            "outputSchema": self.output_schema,
+            "annotations": self.annotations,
+            "uri": self.uri,
+            "uriTemplate": self.uri_template,
+            # No promoted column — recovered from the verbatim wire entry.
+            "mimeType": _optional_str(self.raw.get("mimeType")),
+            "arguments": self.raw.get("arguments"),
+        }
+        return {field_name: _strip_meta(source[field_name]) for field_name in FINGERPRINT_FIELDS[self.item_type]}
 
     # -- DB row mapping (item <-> mcp_capability_items row) -----------------
 
@@ -307,13 +396,23 @@ class DiscoverySurface:
     # -- Canonical serialization / fingerprint ------------------------------
 
     def canonical_dict(self) -> Dict[str, Any]:
-        """Return the normalized surface as a plain, JSON-ready dict.
+        """Return the surface's *semantic projection* as a plain, JSON-ready dict.
 
-        Each item is represented by its verbatim :attr:`~CapabilityItem.raw` wire
-        entry so no field is lost; list order is the server's discovery order.
-        Object-key ordering is *not* fixed here — it is canonicalized by
-        :meth:`canonical_json` via ``sort_keys`` — so this dict alone is not
-        byte-stable; use :meth:`canonical_json` for comparison/fingerprinting.
+        This is the input to the surface fingerprint (V2-MCP-18.1): the surface-level
+        identity fields (:data:`FINGERPRINT_SURFACE_FIELDS` — ``protocolVersion``,
+        ``serverInfo``, ``capabilities``, ``instructions``) plus each item's
+        :meth:`~CapabilityItem.fingerprint_projection` (its allow-listed semantic
+        fields only). Volatile and vendor-specific wire fields — the reserved
+        ``_meta`` block (stripped recursively, including from ``capabilities``), a
+        resource's ``size`` hint, unknown extension keys — are excluded, so they
+        cannot affect the fingerprint.
+
+        List order is the server's discovery order. Object-key ordering is *not*
+        fixed here — it is canonicalized by :meth:`canonical_json` via ``sort_keys`` —
+        so this dict alone is not byte-stable; use :meth:`canonical_json` for
+        comparison/fingerprinting. The verbatim wire entry of each item remains
+        available on :attr:`~CapabilityItem.raw` for storage/round-trip; only the
+        fingerprint deliberately narrows to the semantic fields.
         """
         return {
             "protocolVersion": self.protocol_version,
@@ -322,20 +421,22 @@ class DiscoverySurface:
                 "title": self.server_info.title,
                 "version": self.server_info.version,
             },
-            "capabilities": self.capabilities,
+            "capabilities": _strip_meta(self.capabilities),
             "instructions": self.instructions,
-            "tools": [item.raw for item in self.tools],
-            "resources": [item.raw for item in self.resources],
-            "resourceTemplates": [item.raw for item in self.resource_templates],
-            "prompts": [item.raw for item in self.prompts],
+            "tools": [item.fingerprint_projection() for item in self.tools],
+            "resources": [item.fingerprint_projection() for item in self.resources],
+            "resourceTemplates": [item.fingerprint_projection() for item in self.resource_templates],
+            "prompts": [item.fingerprint_projection() for item in self.prompts],
         }
 
     def canonical_json(self) -> str:
-        """Serialize the surface to byte-stable canonical JSON.
+        """Serialize the semantic projection to byte-stable canonical JSON.
 
         Object keys are sorted recursively, so two surfaces that differ only in
         wire map ordering serialize to identical strings; list order (the server's
         item ordering) is preserved. Compact separators keep the output minimal.
+        Because the source is :meth:`canonical_dict` (the semantic projection),
+        volatile fields are already excluded.
         """
         return json.dumps(
             self.canonical_dict(),
@@ -345,11 +446,16 @@ class DiscoverySurface:
         )
 
     def fingerprint(self) -> str:
-        """Return a stable SHA-256 hex digest of :meth:`canonical_json`.
+        """Return the stable SHA-256 ``surface_fingerprint`` (V2-MCP-18.1).
 
-        Equal fingerprints mean two discoveries produced the same logical surface
-        (the ``surface_fingerprint`` recorded on ``mcp_endpoint_versions``); a
-        change in any promoted or raw field changes the digest.
+        The digest is taken over :meth:`canonical_json` — the byte-stable canonical
+        form of the surface's *semantic projection*. Equal fingerprints mean two
+        discoveries produced the same logical offering (identical across runs and
+        hosts); a change to any semantically meaningful field — a tool description,
+        an input schema, an added prompt argument, the server version — flips it,
+        while a change confined to a volatile field (``_meta``, a resource ``size``
+        hint, a vendor extension) does not. Recorded as ``surface_fingerprint`` on
+        ``mcp_endpoint_versions``.
         """
         return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
@@ -444,6 +550,33 @@ class DiscoverySurface:
 def _normalize(raw_items: Sequence[Mapping[str, Any]], parser: Any) -> Tuple[CapabilityItem, ...]:
     """Apply ``parser`` to each raw wire entry, assigning zero-based ordinals."""
     return tuple(parser(item, ordinal) for ordinal, item in enumerate(raw_items))
+
+
+def _strip_meta(value: Any) -> Any:
+    """Recursively drop the reserved :data:`RESERVED_META_KEY` (``_meta``) from ``value``.
+
+    Used to exclude the MCP metadata escape hatch from the fingerprint wherever it
+    may appear — at the top level of a wire object, nested inside an ``inputSchema``,
+    inside a prompt ``argument``, or inside ``capabilities``. Mappings are rebuilt as
+    plain ``dict`` (so the result is JSON-serializable) with the ``_meta`` key removed
+    and every remaining value recursed into; lists/tuples are recursed element-wise;
+    scalars (and ``None``) are returned unchanged.
+
+    Args:
+        value: Any JSON-shaped value (``dict``/``list``/scalar/``None``).
+
+    Returns:
+        ``value`` with every ``_meta`` key removed at every depth.
+    """
+    if isinstance(value, Mapping):
+        return {
+            key: _strip_meta(val)
+            for key, val in value.items()
+            if key != RESERVED_META_KEY
+        }
+    if isinstance(value, (list, tuple)):
+        return [_strip_meta(item) for item in value]
+    return value
 
 
 def _name(payload: Mapping[str, Any]) -> str:
