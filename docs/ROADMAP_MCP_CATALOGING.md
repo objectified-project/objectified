@@ -413,7 +413,7 @@ sequenceDiagram
 - **Dependencies / Parallelism.** After 2.2. Blocks 2.4.
 - **Technical Stack.** Python.
 
-### MCAT-2.4 — Capability-surface normalization  ·  **#3660**
+### MCAT-2.4 — Capability-surface normalization  ·  **#3660**  ·  ✅ Done (objectified-rest 1.6.4)
 - **Problem.** Field sets differ across protocol versions; downstream diff/lint/store need a stable shape.
 - **Solution / Scope.** Define a canonical `DiscoverySurface` dataclass (serverInfo, capabilities, instructions, tools[], resources[], resourceTemplates[], prompts[]) with version-tolerant parsing (absent `title`/`outputSchema` on 2025-03-26 → null), deterministic ordering, and a clean mapping to `mcp_capability_items`. Preserve `raw` per item.
 - **Acceptance Criteria.** Same logical server yields a byte-stable normalized surface regardless of map ordering; round-trips to/from DB rows.
