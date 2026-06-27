@@ -463,7 +463,7 @@ Tenant-facing CRUD + the async discovery job lifecycle (mirrors `spec_import` en
 - **Dependencies / Parallelism.** After 1.1, 3.3. Blocks UI/CLI.
 - **Technical Stack.** FastAPI, psycopg3.
 
-### MCAT-3.2 — Manual discovery trigger + async job  ·  **#3664**
+### MCAT-3.2 — Manual discovery trigger + async job  ·  **#3664**  ·  ✅ Done (objectified-rest 1.7.0)
 - **Problem.** Registering an endpoint must be followed by an actual discovery run.
 - **Solution / Scope.** `POST /mcp/endpoints/{id}/discover` creates a `mcp_discovery_jobs` row (`trigger='manual'`), runs the Epic-2 client (loading credentials via Epic-6), normalizes (2.4), fingerprints/diffs (Epic-4), and persists a version when changed (or v1 on first run). Mirror the submit→poll pattern of `spec_import_engine.py`.
 - **Acceptance Criteria.** First discover creates version 1; job transitions queued→running→completed/failed; result references `version_id`; concurrent discover on same endpoint is de-duplicated.

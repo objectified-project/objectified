@@ -3621,3 +3621,90 @@ def mcp_endpoint_out_from_row(row: Dict[str, Any]) -> McpEndpointOut:
         created_at=_ts(row.get("created_at")),
         updated_at=_ts(row.get("updated_at")),
     )
+
+
+# ===========================================================================
+# MCP Catalog — manual discovery trigger & async jobs (V2-MCP-17.2 / MCAT-3.2)
+# ===========================================================================
+
+# Terminal + in-flight states a discovery job can report, mirroring the
+# ``mcp_discovery_jobs.state`` CHECK constraint (V130).
+MCP_DISCOVERY_JOB_STATES = frozenset({"queued", "running", "completed", "failed"})
+
+
+class McpDiscoveryJobOut(BaseModel):
+    """Wire representation of one ``mcp_discovery_jobs`` row (snake_case keys).
+
+    ``result`` is the job's JSONB payload — on a successful run it carries
+    ``version_id`` / ``version_seq`` / ``changed`` so a poller can locate the
+    snapshot the run produced; on failure it carries the classified discovery
+    error. ``error`` is the short human-readable failure summary, if any.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    endpoint_id: str
+    tenant_id: str
+    state: str
+    trigger: str
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    error: Optional[str] = None
+    result: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[str] = None
+
+
+class McpDiscoveryJobResponse(BaseModel):
+    """Response envelope for a single discovery job (trigger + poll)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    # True when an already-active job was returned instead of starting a new one
+    # (concurrent discover on the same endpoint is de-duplicated). Absent on reads.
+    deduplicated: Optional[bool] = None
+    job: McpDiscoveryJobOut
+
+
+class McpDiscoveryJobListResponse(BaseModel):
+    """Response envelope listing an endpoint's discovery jobs (newest first)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    jobs: List[McpDiscoveryJobOut]
+
+
+def mcp_discovery_job_out_from_row(row: Dict[str, Any]) -> McpDiscoveryJobOut:
+    """Project an ``odb.mcp_discovery_jobs`` row onto the wire model.
+
+    Timestamps and UUIDs are normalized to strings, and a missing/None ``result``
+    becomes an empty object so the field always serializes as a JSON object.
+    """
+
+    def _ts(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return str(value)
+
+    def _s(value: Any) -> Optional[str]:
+        return str(value) if value is not None else None
+
+    result = row.get("result")
+    if not isinstance(result, dict):
+        result = {}
+    return McpDiscoveryJobOut(
+        id=str(row["id"]),
+        endpoint_id=str(row["endpoint_id"]),
+        tenant_id=str(row["tenant_id"]),
+        state=str(row["state"]),
+        trigger=str(row["trigger"]),
+        started_at=_ts(row.get("started_at")),
+        finished_at=_ts(row.get("finished_at")),
+        error=_s(row.get("error")),
+        result=result,
+        created_at=_ts(row.get("created_at")),
+    )

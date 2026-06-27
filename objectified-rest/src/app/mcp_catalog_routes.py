@@ -27,11 +27,15 @@ from psycopg2 import errors as pg_errors
 
 from .auth import get_authenticated_user_id, validate_authentication
 from .database import db
+from .mcp_discovery_engine import trigger_discovery
 from .models import (
+    McpDiscoveryJobListResponse,
+    McpDiscoveryJobResponse,
     McpEndpointCreate,
     McpEndpointListResponse,
     McpEndpointResponse,
     McpEndpointUpdate,
+    mcp_discovery_job_out_from_row,
     mcp_endpoint_out_from_row,
 )
 
@@ -203,3 +207,84 @@ async def update_mcp_endpoint(
     if not updated:
         raise HTTPException(status_code=404, detail="MCP endpoint not found")
     return McpEndpointResponse(success=True, endpoint=mcp_endpoint_out_from_row(updated))
+
+
+# ===========================================================================
+# Manual discovery trigger & async jobs (V2-MCP-17.2 / MCAT-3.2, #3664)
+# ===========================================================================
+
+
+@mcp_endpoints_router.post(
+    "/{tenant_slug}/endpoints/{endpoint_id}/discover",
+    response_model=McpDiscoveryJobResponse,
+    status_code=202,
+)
+async def discover_mcp_endpoint(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpDiscoveryJobResponse:
+    """Kick off a discovery run for an endpoint and return its job (submit→poll).
+
+    Creates a ``manual`` discovery job and starts the run out of band: the MCP client
+    connects, handshakes, paginates the capability listings, normalizes them, and persists a
+    new version when the surface changed (version 1 on first run). Poll the returned job's
+    ``GET .../discover/{job_id}`` for the terminal state and the produced ``version_id``.
+
+    Concurrent discover requests on the same endpoint are de-duplicated: when a run is already
+    queued/running, that existing job is returned (with ``deduplicated=True``) and no second
+    run starts. Returns ``404`` when the endpoint is not the caller's tenant's.
+    """
+    _ = tenant_slug
+    tenant_id = str(auth_data["tenant_id"])
+    endpoint = db.get_mcp_endpoint(tenant_id, str(endpoint_id))
+    if not endpoint:
+        raise HTTPException(status_code=404, detail="MCP endpoint not found")
+
+    job, deduplicated = await trigger_discovery(tenant_id, endpoint)
+    return McpDiscoveryJobResponse(
+        success=True,
+        deduplicated=deduplicated,
+        job=mcp_discovery_job_out_from_row(job),
+    )
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/endpoints/{endpoint_id}/discover",
+    response_model=McpDiscoveryJobListResponse,
+)
+async def list_mcp_discovery_jobs(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpDiscoveryJobListResponse:
+    """List an endpoint's discovery jobs, newest first; 404 when not the tenant's endpoint."""
+    _ = tenant_slug
+    tenant_id = str(auth_data["tenant_id"])
+    endpoint = db.get_mcp_endpoint(tenant_id, str(endpoint_id))
+    if not endpoint:
+        raise HTTPException(status_code=404, detail="MCP endpoint not found")
+    rows = db.list_mcp_discovery_jobs(tenant_id, str(endpoint_id))
+    return McpDiscoveryJobListResponse(
+        success=True,
+        jobs=[mcp_discovery_job_out_from_row(r) for r in rows],
+    )
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/endpoints/{endpoint_id}/discover/{job_id}",
+    response_model=McpDiscoveryJobResponse,
+)
+async def get_mcp_discovery_job(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    job_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpDiscoveryJobResponse:
+    """Poll one discovery job's state/result; 404 when it is not this tenant+endpoint's job."""
+    _ = tenant_slug
+    tenant_id = str(auth_data["tenant_id"])
+    job = db.get_mcp_discovery_job(tenant_id, str(job_id))
+    if not job or str(job.get("endpoint_id")) != str(endpoint_id):
+        raise HTTPException(status_code=404, detail="discovery job not found")
+    return McpDiscoveryJobResponse(success=True, job=mcp_discovery_job_out_from_row(job))
