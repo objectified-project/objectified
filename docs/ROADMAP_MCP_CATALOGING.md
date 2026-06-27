@@ -515,7 +515,7 @@ flowchart LR
 | 4.4 | Date/time version tagging | auto-tag each version with discovery timestamp label | mcp-catalog,versions,mvp | Y | Y | S | objectified-rest,objectified-db |
 | 4.5 | Change-report & compare API | version history + diff vs previous **+ compare any two versions** | mcp-catalog,rest,version-control | Y | Y | S | objectified-rest |
 
-### MCAT-4.1 — Canonical surface fingerprint  ·  **#3668**
+### MCAT-4.1 — Canonical surface fingerprint  ·  **#3668**  ·  ✅ Done (objectified-rest 1.8.2)
 - **Problem.** Need a deterministic signal for "did the server's offering change?"
 - **Solution / Scope.** Serialize the normalized surface to canonical JSON (sorted keys, stable item ordering, excluding volatile fields), SHA-256 → `surface_fingerprint`. Choose which fields are semantically meaningful (tool name/description/inputSchema/outputSchema/annotations; resource uri/mimeType; prompt args; serverInfo.version; instructions; protocolVersion). Research note: no official etag exists — diffing is our responsibility ([schema.ts](https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/schema/2025-06-18/schema.ts)).
 - **Acceptance Criteria.** Identical offerings → identical fingerprint across runs/hosts; a single tool-description change flips it; documented field list.

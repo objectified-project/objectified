@@ -8,6 +8,11 @@ of each item kind (absent ``title``/``outputSchema`` on 2025-03-26 → ``None``)
 byte-stable canonical serialization that is invariant to wire map ordering but
 sensitive to list ordering, and the lossless round-trip to and from
 ``mcp_capability_items`` rows.
+
+Also covers the canonical surface fingerprint (V2-MCP-18.1, #3668): the semantic
+projection that feeds ``surface_fingerprint`` — identical across runs/hosts for an
+identical offering, flipped by any semantically meaningful change, and unaffected by
+volatile fields (the reserved ``_meta`` block, a resource ``size`` hint, vendor keys).
 """
 
 from __future__ import annotations
@@ -18,6 +23,7 @@ from typing import Any, Dict
 from app.mcp_client.discovery import DiscoveryListings
 from app.mcp_client.handshake import InitializeResult, ServerInfo
 from app.mcp_client.normalize import (
+    FINGERPRINT_FIELDS,
     ITEM_TYPE_PROMPT,
     ITEM_TYPE_RESOURCE,
     ITEM_TYPE_RESOURCE_TEMPLATE,
@@ -238,6 +244,149 @@ def test_fingerprint_is_sha256_hex() -> None:
     fp = DiscoverySurface.from_discovery(_initialize(), _listings()).fingerprint()
     assert len(fp) == 64
     assert all(c in "0123456789abcdef" for c in fp)
+
+
+# ===========================================================================
+# Canonical surface fingerprint — semantic projection (V2-MCP-18.1, #3668)
+#
+# The fingerprint must be identical for identical *offerings* across runs and
+# hosts, flip on any semantically meaningful change, and ignore volatile fields.
+# ===========================================================================
+
+
+def test_fingerprint_projection_keys_match_documented_field_list() -> None:
+    # Each kind's projection exposes exactly the documented allow-list, in order.
+    tool = CapabilityItem.from_tool(_tool("a"), 0)
+    resource = CapabilityItem.from_resource(_resource("r"), 0)
+    template = CapabilityItem.from_resource_template(_resource_template("t"), 0)
+    prompt = CapabilityItem.from_prompt(_prompt("p"), 0)
+    assert tuple(tool.fingerprint_projection()) == FINGERPRINT_FIELDS[ITEM_TYPE_TOOL]
+    assert tuple(resource.fingerprint_projection()) == FINGERPRINT_FIELDS[ITEM_TYPE_RESOURCE]
+    assert tuple(template.fingerprint_projection()) == FINGERPRINT_FIELDS[ITEM_TYPE_RESOURCE_TEMPLATE]
+    assert tuple(prompt.fingerprint_projection()) == FINGERPRINT_FIELDS[ITEM_TYPE_PROMPT]
+
+
+def test_fingerprint_projection_recovers_non_promoted_fields_from_raw() -> None:
+    # mimeType (resource) and arguments (prompt) have no promoted column.
+    resource = CapabilityItem.from_resource(_resource("r"), 0)
+    prompt = CapabilityItem.from_prompt(_prompt("p"), 0)
+    assert resource.fingerprint_projection()["mimeType"] == "text/plain"
+    assert prompt.fingerprint_projection()["arguments"] == [{"name": "topic", "required": True}]
+
+
+def test_meta_block_is_excluded_from_fingerprint() -> None:
+    # The reserved _meta escape hatch must never flip the fingerprint, at any depth.
+    plain = _tool("a")
+    noisy = _tool("a")
+    noisy["_meta"] = {"progressToken": 7}
+    noisy["inputSchema"] = {**noisy["inputSchema"], "_meta": {"trace": "xyz"}}
+    init = _initialize()
+    s1 = DiscoverySurface.from_discovery(init, _listings(tools=[plain]))
+    s2 = DiscoverySurface.from_discovery(init, _listings(tools=[noisy]))
+    assert s1.fingerprint() == s2.fingerprint()
+    # And _meta really is gone from the canonical projection.
+    assert "_meta" not in s2.canonical_dict()["tools"][0]
+    assert "_meta" not in s2.canonical_dict()["tools"][0]["inputSchema"]
+
+
+def test_meta_in_capabilities_is_excluded() -> None:
+    s1 = DiscoverySurface.from_discovery(_initialize(capabilities={"tools": {}}), _listings())
+    s2 = DiscoverySurface.from_discovery(
+        _initialize(capabilities={"tools": {"_meta": {"x": 1}}}), _listings()
+    )
+    assert s1.fingerprint() == s2.fingerprint()
+
+
+def test_volatile_and_vendor_fields_are_excluded() -> None:
+    # A resource's volatile ``size`` hint and an unknown vendor key are not in the
+    # allow-list, so changing them does not change the fingerprint.
+    base = _resource("r")
+    noisy = {**base, "size": 4096, "x-vendor-cache": "deadbeef"}
+    init = _initialize()
+    s1 = DiscoverySurface.from_discovery(init, _listings(resources=[base]))
+    s2 = DiscoverySurface.from_discovery(init, _listings(resources=[noisy]))
+    assert s1.fingerprint() == s2.fingerprint()
+
+
+def test_identical_offering_same_fingerprint_across_hosts() -> None:
+    # Two hosts return the same logical offering but with shuffled object keys and
+    # different volatile metadata — the fingerprint must agree.
+    host_a = {
+        "name": "search",
+        "title": "Search",
+        "description": "find things",
+        "inputSchema": {"type": "object", "properties": {"q": {"type": "string"}}},
+    }
+    host_b = {
+        "_meta": {"progressToken": "abc"},
+        "inputSchema": {"properties": {"q": {"type": "string"}}, "type": "object"},
+        "description": "find things",
+        "title": "Search",
+        "name": "search",
+    }
+    init = _initialize()
+    a = DiscoverySurface.from_discovery(init, _listings(tools=[host_a]))
+    b = DiscoverySurface.from_discovery(init, _listings(tools=[host_b]))
+    assert a.fingerprint() == b.fingerprint()
+
+
+def test_single_tool_description_change_flips_fingerprint() -> None:
+    init = _initialize()
+    base = _tool("a")
+    changed = {**base, "description": "a description (revised)"}
+    s1 = DiscoverySurface.from_discovery(init, _listings(tools=[base]))
+    s2 = DiscoverySurface.from_discovery(init, _listings(tools=[changed]))
+    assert s1.fingerprint() != s2.fingerprint()
+
+
+def test_semantic_field_changes_flip_fingerprint() -> None:
+    # Each documented semantic field, when changed, must flip the fingerprint.
+    init = _initialize()
+    base = DiscoverySurface.from_discovery(
+        init,
+        _listings(
+            tools=[_tool("a")],
+            resources=[_resource("r")],
+            resource_templates=[_resource_template("t")],
+            prompts=[_prompt("p")],
+        ),
+    )
+    base_fp = base.fingerprint()
+
+    def fp_with(**overrides: Any) -> str:
+        return DiscoverySurface.from_discovery(
+            overrides.get("init", init),
+            _listings(
+                tools=[overrides.get("tool", _tool("a"))],
+                resources=[overrides.get("resource", _resource("r"))],
+                resource_templates=[overrides.get("template", _resource_template("t"))],
+                prompts=[overrides.get("prompt", _prompt("p"))],
+            ),
+        ).fingerprint()
+
+    # Tool inputSchema / outputSchema / annotations.
+    assert fp_with(tool={**_tool("a"), "inputSchema": {"type": "string"}}) != base_fp
+    assert fp_with(tool={**_tool("a"), "outputSchema": {"type": "array"}}) != base_fp
+    assert fp_with(tool={**_tool("a"), "annotations": {"readOnlyHint": False}}) != base_fp
+    # Resource uri / mimeType.
+    assert fp_with(resource={**_resource("r"), "uri": "file:///other.txt"}) != base_fp
+    assert fp_with(resource={**_resource("r"), "mimeType": "application/json"}) != base_fp
+    # Resource-template uriTemplate.
+    assert fp_with(template={**_resource_template("t"), "uriTemplate": "file:///{x}"}) != base_fp
+    # Prompt arguments.
+    assert fp_with(prompt={**_prompt("p"), "arguments": [{"name": "topic", "required": False}]}) != base_fp
+    # Surface-level: protocolVersion / serverInfo.version / instructions.
+    assert fp_with(init=_initialize(version="2025-03-26")) != base_fp
+    assert fp_with(init=_initialize(server_info=ServerInfo(name="srv", title="Srv", version="2.0"))) != base_fp
+    assert fp_with(init=_initialize(instructions="be terse")) != base_fp
+
+
+def test_fingerprint_is_deterministic_across_runs() -> None:
+    surface = DiscoverySurface.from_discovery(
+        _initialize(),
+        _listings(tools=[_tool("a")], prompts=[_prompt("p")]),
+    )
+    assert surface.fingerprint() == surface.fingerprint()
 
 
 # ===========================================================================
