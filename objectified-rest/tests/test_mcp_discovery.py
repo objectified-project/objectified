@@ -25,7 +25,25 @@ from app.mcp_client.discovery import (
     discover_listings,
     paginate,
 )
+from app.mcp_client.resilience import BudgetExceededError, TimeBudget
 from app.mcp_client.transport_http import StreamableHttpTransport
+
+
+class FakeClock:
+    """A deterministic monotonic clock returning scripted timestamps in order.
+
+    Once the script is exhausted the final value repeats, so a budget can be made
+    to look already-spent on every check after construction.
+    """
+
+    def __init__(self, times: List[float]) -> None:
+        self._times = list(times)
+        self._index = 0
+
+    def __call__(self) -> float:
+        value = self._times[min(self._index, len(self._times) - 1)]
+        self._index += 1
+        return value
 
 ENDPOINT = "https://mcp.example.com/mcp"
 
@@ -386,3 +404,54 @@ async def test_discover_propagates_pagination_guard():
 
 def test_default_page_limit_is_sane():
     assert DEFAULT_PAGE_LIMIT >= 100
+
+
+# ===========================================================================
+# Time-budget enforcement
+# ===========================================================================
+
+
+async def test_paginate_aborts_when_budget_already_spent():
+    handler = ListHandler({"tools/list": [page("tools", [{"name": "t1"}])]})
+    # init reads t=0; the first per-page check reads t=10 > 1s budget → spent.
+    budget = TimeBudget(1.0, clock=FakeClock([0.0, 10.0]))
+
+    async with make_transport(handler) as transport:
+        with pytest.raises(BudgetExceededError):
+            await paginate(transport, "tools/list", "tools", budget=budget)
+
+    # The guard tripped before any request left the client.
+    assert handler.methods_called() == []
+
+
+async def test_discover_listings_aborts_when_budget_spent():
+    handler = ListHandler({"tools/list": [page("tools", [{"name": "t1"}])]})
+    budget = TimeBudget(1.0, clock=FakeClock([0.0, 10.0]))
+
+    async with make_transport(handler) as transport:
+        with pytest.raises(BudgetExceededError):
+            await discover_listings(transport, {"tools": {}}, budget=budget)
+
+    assert handler.methods_called() == []
+
+
+async def test_discover_listings_completes_within_generous_budget():
+    handler = ListHandler(
+        {
+            "tools/list": [page("tools", [{"name": "t1"}], next_cursor="c1"), page("tools", [{"name": "t2"}])],
+        }
+    )
+    # A clock that never advances: the budget is never spent.
+    budget = TimeBudget(60.0, clock=FakeClock([0.0]))
+
+    async with make_transport(handler) as transport:
+        result = await discover_listings(transport, {"tools": {}}, budget=budget)
+
+    assert result.tools == [{"name": "t1"}, {"name": "t2"}]
+
+
+async def test_paginate_without_budget_is_unaffected():
+    handler = ListHandler({"tools/list": [page("tools", [{"name": "t1"}])]})
+    async with make_transport(handler) as transport:
+        items = await paginate(transport, "tools/list", "tools", budget=None)
+    assert items == [{"name": "t1"}]

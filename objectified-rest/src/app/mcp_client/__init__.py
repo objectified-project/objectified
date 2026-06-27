@@ -10,6 +10,8 @@ Modules:
     handshake: The ``initialize`` opening handshake and protocol-version negotiation.
     discovery: Paginated ``*/list`` discovery of the declared capability surface.
     normalize: Canonical, version-tolerant ``DiscoverySurface`` + DB row mapping.
+    resilience: Time-budget and private-address primitives for safe remote runs.
+    errors: Stable error taxonomy persisted on ``mcp_discovery_jobs.error``.
 """
 
 from .discovery import (
@@ -21,6 +23,11 @@ from .discovery import (
     McpPaginationError,
     discover_listings,
     paginate,
+)
+from .errors import (
+    DiscoveryError,
+    DiscoveryErrorCode,
+    classify_exception,
 )
 from .handshake import (
     DEFAULT_CLIENT_CAPABILITIES,
@@ -41,13 +48,22 @@ from .normalize import (
     CapabilityItem,
     DiscoverySurface,
 )
+from .resilience import (
+    DEFAULT_PER_CALL_TIMEOUT,
+    DEFAULT_TOTAL_BUDGET,
+    BudgetExceededError,
+    TimeBudget,
+    private_address_reason,
+)
 from .transport_http import (
     DEFAULT_PROTOCOL_VERSION,
     JsonRpcError,
     JsonRpcResponse,
+    McpAuthRequiredError,
     McpHttpStatusError,
     McpProtocolError,
     McpSessionExpiredError,
+    McpSsrfError,
     McpTransportError,
     StreamableHttpTransport,
 )
@@ -56,7 +72,9 @@ __all__ = [
     "DEFAULT_CLIENT_CAPABILITIES",
     "DEFAULT_CLIENT_INFO",
     "DEFAULT_PAGE_LIMIT",
+    "DEFAULT_PER_CALL_TIMEOUT",
     "DEFAULT_PROTOCOL_VERSION",
+    "DEFAULT_TOTAL_BUDGET",
     "INVALID_PARAMS_CODE",
     "ITEM_TYPES",
     "ITEM_TYPE_PROMPT",
@@ -65,23 +83,31 @@ __all__ = [
     "ITEM_TYPE_TOOL",
     "LIST_METHODS",
     "SUPPORTED_PROTOCOL_VERSIONS",
+    "BudgetExceededError",
     "CapabilityItem",
+    "DiscoveryError",
+    "DiscoveryErrorCode",
     "DiscoveryListings",
     "DiscoverySurface",
     "InitializeResult",
     "JsonRpcError",
     "JsonRpcResponse",
     "ListMethod",
+    "McpAuthRequiredError",
     "McpDiscoveryError",
     "McpHttpStatusError",
     "McpPaginationError",
     "McpProtocolError",
     "McpSessionExpiredError",
+    "McpSsrfError",
     "McpTransportError",
     "McpVersionNegotiationError",
     "ServerInfo",
     "StreamableHttpTransport",
+    "TimeBudget",
+    "classify_exception",
     "discover_listings",
     "initialize_session",
     "paginate",
+    "private_address_reason",
 ]
