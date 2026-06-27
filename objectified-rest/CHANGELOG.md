@@ -5,6 +5,28 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.3] - 2026-06-26
+
+### Added
+- **MCP surface diff engine (#3669, V2-MCP-18.2 / MCAT-4.2)** — a pure
+  `app.mcp_client.diff.diff_surfaces(base, target)` that compares **any two** normalized
+  `DiscoverySurface` objects and returns a structured `SurfaceDiff`: every capability item
+  (tool/resource/resource_template/prompt) **added**, **removed**, or **modified**, plus
+  server-metadata changes (`protocol_version`, `server_name/title/version`, `instructions`,
+  `capabilities`). Items are keyed by `(item_type, name)`, so a rename reads as remove + add and
+  an in-place edit reads as a single modify carrying a per-field `FieldChange` breakdown
+  (`description`, `inputSchema`/`outputSchema`, `annotations`, prompt `arguments`, resource
+  `uri`/`mimeType`, …) with before/after detail. The comparison runs over each surface's *semantic
+  projection* — exactly the fields that feed the surface fingerprint (#3668) — so volatile/vendor
+  fields (the reserved `_meta` block, a resource `size` hint, unknown extension keys) never produce
+  phantom changes and identical surfaces yield an empty diff with `fingerprint_unchanged` true.
+  Output is deterministic (changes ordered server-first, then by kind and name) and maps one-to-one
+  onto `mcp_version_changes` rows via `SurfaceDiff.to_change_rows(version_id)`, with `counts`
+  aggregating added/removed/modified. Diffing arbitrary versions directly (not chaining adjacent
+  step-diffs) keeps non-adjacent `vX → vY` comparisons exact. Feeds version-creation (MCAT-4.3) and
+  the on-demand compare API (MCAT-4.5). New module `src/app/mcp_client/diff.py`; new tests
+  `tests/test_mcp_diff.py`.
+
 ## [1.8.2] - 2026-06-26
 
 ### Changed
