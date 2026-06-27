@@ -8919,6 +8919,197 @@ class Database:
             conn.rollback()
             raise e
 
+    # -----------------------------------------------------------------------
+    # MCP Catalog — endpoint registration & management (MCAT-3.1, #3663)
+    # -----------------------------------------------------------------------
+
+    # The columns returned to the API for every endpoint read/write. Kept as one
+    # constant so list/get/insert/update all project the same shape.
+    _MCP_ENDPOINT_COLUMNS = (
+        "id, tenant_id, name, slug, endpoint_url, transport, description, category, "
+        "visibility, published, enabled, discovery_cadence_seconds, last_discovered_at, "
+        "last_discovery_status, current_version_id, created_at, updated_at"
+    )
+
+    def list_mcp_endpoints(self, tenant_id: str) -> List[Dict[str, Any]]:
+        """List a tenant's live catalog endpoints, newest first (MCAT-3.1)."""
+        q = f"""
+            SELECT {self._MCP_ENDPOINT_COLUMNS}
+            FROM odb.mcp_endpoints
+            WHERE tenant_id = %s::uuid AND deleted_at IS NULL
+            ORDER BY created_at DESC
+        """
+        return self.execute_query(q, (tenant_id,))
+
+    def get_mcp_endpoint(self, tenant_id: str, endpoint_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch one live catalog endpoint scoped to ``tenant_id`` (MCAT-3.1).
+
+        Scoping by ``tenant_id`` is what makes a cross-tenant id read as "not
+        found" (the route turns ``None`` into a 404), so an endpoint never leaks
+        to another tenant.
+        """
+        q = f"""
+            SELECT {self._MCP_ENDPOINT_COLUMNS}
+            FROM odb.mcp_endpoints
+            WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
+            LIMIT 1
+        """
+        rows = self.execute_query(q, (endpoint_id, tenant_id))
+        return dict(rows[0]) if rows else None
+
+    def _next_available_mcp_slug(self, cursor, tenant_id: str, base_slug: str) -> str:
+        """Pick a tenant-unique slug derived from ``base_slug``.
+
+        Returns ``base_slug`` when free, otherwise the first free ``base_slug-N``
+        (N starting at 2). Collision detection considers *all* rows for the tenant
+        — including soft-deleted ones — because the ``(tenant_id, slug)`` unique
+        constraint (V126) counts deleted rows too, so reusing a deleted endpoint's
+        slug would still violate it. Runs on the caller's cursor inside the insert
+        transaction so the check and the insert see a consistent snapshot.
+        """
+        cursor.execute(
+            """
+            SELECT slug FROM odb.mcp_endpoints
+            WHERE tenant_id = %s::uuid AND (slug = %s OR slug LIKE %s)
+            """,
+            (tenant_id, base_slug, f"{base_slug}-%"),
+        )
+        taken = {str(r["slug"]) for r in cursor.fetchall()}
+        if base_slug not in taken:
+            return base_slug
+        suffix = 2
+        while f"{base_slug}-{suffix}" in taken:
+            suffix += 1
+        return f"{base_slug}-{suffix}"
+
+    def insert_mcp_endpoint(
+        self,
+        *,
+        tenant_id: str,
+        creator_id: str,
+        name: str,
+        base_slug: str,
+        endpoint_url: str,
+        transport: str,
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        visibility: str = "private",
+        discovery_cadence_seconds: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Insert a catalog endpoint, resolving a tenant-unique slug (MCAT-3.1).
+
+        Args:
+            tenant_id: Owning tenant.
+            creator_id: User registering the endpoint (``creator_id`` is NOT NULL).
+            name: Friendly display name.
+            base_slug: Already-slugified candidate; uniquified per tenant here.
+            endpoint_url: The MCP server URL (or stdio command target).
+            transport: One of ``streamable_http`` / ``sse`` / ``stdio``.
+            description: Optional free-text description.
+            category: Optional catalog category.
+            visibility: ``private`` (default) or ``public``.
+            discovery_cadence_seconds: Optional positive re-discovery cadence.
+
+        Returns:
+            The inserted row projected onto :attr:`_MCP_ENDPOINT_COLUMNS`.
+        """
+        q = f"""
+            INSERT INTO odb.mcp_endpoints (
+                tenant_id, creator_id, name, slug, endpoint_url, transport,
+                description, category, visibility, discovery_cadence_seconds
+            ) VALUES (
+                %s::uuid, %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s
+            )
+            RETURNING {self._MCP_ENDPOINT_COLUMNS}
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                slug = self._next_available_mcp_slug(cursor, tenant_id, base_slug)
+                cursor.execute(
+                    q,
+                    (
+                        tenant_id,
+                        creator_id,
+                        name,
+                        slug,
+                        endpoint_url,
+                        transport,
+                        description,
+                        category,
+                        visibility,
+                        discovery_cadence_seconds,
+                    ),
+                )
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row)
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    # Columns a PATCH may update, mapped to whether they need a cast in SQL.
+    _MCP_ENDPOINT_UPDATABLE = (
+        "name",
+        "endpoint_url",
+        "transport",
+        "description",
+        "category",
+        "visibility",
+        "published",
+        "enabled",
+        "discovery_cadence_seconds",
+    )
+
+    def update_mcp_endpoint(
+        self,
+        tenant_id: str,
+        endpoint_id: str,
+        fields: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Apply a partial update to a live catalog endpoint (MCAT-3.1).
+
+        Only the keys present in ``fields`` (restricted to
+        :attr:`_MCP_ENDPOINT_UPDATABLE`) are written; ``updated_at`` is always
+        bumped. The update is scoped to ``tenant_id`` so a cross-tenant id matches
+        no row.
+
+        Args:
+            tenant_id: Owning tenant (scopes the update for isolation).
+            endpoint_id: The endpoint to patch.
+            fields: Column → value map of changes to apply.
+
+        Returns:
+            The updated row, or ``None`` when no live endpoint matched the tenant
+            + id (the route maps this to a 404). When ``fields`` is empty the row
+            is returned unchanged.
+        """
+        updates = {k: v for k, v in fields.items() if k in self._MCP_ENDPOINT_UPDATABLE}
+        if not updates:
+            return self.get_mcp_endpoint(tenant_id, endpoint_id)
+
+        set_clauses = [f"{col} = %s" for col in updates]
+        set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+        params: List[Any] = list(updates.values())
+        params.extend([endpoint_id, tenant_id])
+
+        q = f"""
+            UPDATE odb.mcp_endpoints
+            SET {", ".join(set_clauses)}
+            WHERE id = %s::uuid AND tenant_id = %s::uuid AND deleted_at IS NULL
+            RETURNING {self._MCP_ENDPOINT_COLUMNS}
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(q, tuple(params))
+                row = cursor.fetchone()
+                conn.commit()
+                return dict(row) if row else None
+        except Exception as e:
+            conn.rollback()
+            raise e
+
     def upsert_repository_import_spec(
         self,
         tenant_id: str,

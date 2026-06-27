@@ -1,0 +1,421 @@
+"""API + DB tests for MCP Catalog endpoint CRUD (V2-MCP-17.1 / MCAT-3.1, #3663).
+
+Covers the tenant-scoped ``/v1/mcp/{tenant_slug}/endpoints`` routes — list, get,
+create, patch — plus the slug auto-derivation/uniqueness and partial-update
+helpers in the DB layer, and the request/response model validation.
+"""
+
+from datetime import datetime, timezone
+from unittest.mock import patch
+
+import pytest
+from fastapi.testclient import TestClient
+from psycopg2 import errors as pg_errors
+
+from app.auth import validate_authentication
+from app.database import Database
+from app.main import app
+from app.models import (
+    McpEndpointCreate,
+    McpEndpointUpdate,
+    mcp_endpoint_out_from_row,
+)
+
+client = TestClient(app)
+
+# Auth payloads as produced by ``validate_authentication`` (token tenant, not URL slug).
+_JWT_T1 = {"tenant_id": "t1", "user_id": "user-1", "auth_method": "jwt"}
+_APIKEY_NO_USER = {"tenant_id": "t1", "auth_method": "api_key"}
+
+_NOW = datetime(2026, 6, 26, 12, 0, 0, tzinfo=timezone.utc)
+
+_ENDPOINT_ROW = {
+    "id": "ep-1",
+    "tenant_id": "t1",
+    "name": "Acme Weather",
+    "slug": "acme-weather",
+    "endpoint_url": "https://mcp.acme.example/sse",
+    "transport": "streamable_http",
+    "description": "Weather tools",
+    "category": "weather",
+    "visibility": "private",
+    "published": False,
+    "enabled": True,
+    "discovery_cadence_seconds": 3600,
+    "last_discovered_at": _NOW,
+    "last_discovery_status": "ok",
+    "current_version_id": None,
+    "created_at": _NOW,
+    "updated_at": _NOW,
+}
+
+
+@pytest.fixture(autouse=True)
+def _default_auth():
+    """Default every test to an authenticated JWT caller in tenant ``t1``."""
+    app.dependency_overrides[validate_authentication] = lambda: _JWT_T1
+    yield
+    app.dependency_overrides.pop(validate_authentication, None)
+
+
+# ===========================================================================
+# LIST
+# ===========================================================================
+
+
+def test_list_endpoints_ok():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.list_mcp_endpoints.return_value = [_ENDPOINT_ROW]
+        r = client.get("/v1/mcp/acme/endpoints")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True
+    assert len(body["endpoints"]) == 1
+    ep = body["endpoints"][0]
+    assert ep["slug"] == "acme-weather"
+    assert ep["transport"] == "streamable_http"
+    assert ep["discovery_cadence_seconds"] == 3600
+    assert ep["last_discovered_at"].startswith("2026-06-26")
+
+
+def test_list_endpoints_scoped_to_token_tenant():
+    """DB is queried with the token's tenant_id, never the URL slug."""
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.list_mcp_endpoints.return_value = []
+        client.get("/v1/mcp/some-other-slug/endpoints")
+        mdb.list_mcp_endpoints.assert_called_once_with("t1")
+
+
+def test_list_endpoints_requires_authentication():
+    app.dependency_overrides.pop(validate_authentication, None)
+    r = client.get("/v1/mcp/acme/endpoints")
+    assert r.status_code == 401
+
+
+# ===========================================================================
+# GET
+# ===========================================================================
+
+
+def test_get_endpoint_ok():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.get_mcp_endpoint.return_value = _ENDPOINT_ROW
+        r = client.get(f"/v1/mcp/acme/endpoints/{'a' * 8}-0000-0000-0000-000000000000")
+    assert r.status_code == 200
+    assert r.json()["endpoint"]["id"] == "ep-1"
+
+
+def test_get_endpoint_cross_tenant_404():
+    """A row owned by another tenant is scoped out by the DB layer → 404."""
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.get_mcp_endpoint.return_value = None
+        r = client.get("/v1/mcp/acme/endpoints/11111111-1111-1111-1111-111111111111")
+    assert r.status_code == 404
+
+
+def test_get_endpoint_rejects_non_uuid():
+    """Path is typed ``uuid.UUID`` so a non-UUID id is a 422, not a DB hit."""
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.get("/v1/mcp/acme/endpoints/not-a-uuid")
+    assert r.status_code == 422
+    mdb.get_mcp_endpoint.assert_not_called()
+
+
+# ===========================================================================
+# CREATE
+# ===========================================================================
+
+
+def test_create_endpoint_ok_derives_slug():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.insert_mcp_endpoint.return_value = _ENDPOINT_ROW
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={
+                "name": "Acme Weather!",
+                "endpointUrl": "https://mcp.acme.example/sse",
+                "transport": "streamable_http",
+            },
+        )
+    assert r.status_code == 201
+    kwargs = mdb.insert_mcp_endpoint.call_args.kwargs
+    assert kwargs["tenant_id"] == "t1"
+    assert kwargs["creator_id"] == "user-1"
+    # Punctuation collapses to a single hyphen and is trimmed.
+    assert kwargs["base_slug"] == "acme-weather"
+    assert kwargs["endpoint_url"] == "https://mcp.acme.example/sse"
+
+
+def test_create_endpoint_honors_explicit_slug():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.insert_mcp_endpoint.return_value = _ENDPOINT_ROW
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={
+                "name": "Acme Weather",
+                "endpoint_url": "https://mcp.acme.example/sse",
+                "slug": "My Custom Slug",
+            },
+        )
+    assert r.status_code == 201
+    assert mdb.insert_mcp_endpoint.call_args.kwargs["base_slug"] == "my-custom-slug"
+
+
+def test_create_endpoint_defaults_transport_and_visibility():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.insert_mcp_endpoint.return_value = _ENDPOINT_ROW
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={"name": "Acme", "endpoint_url": "https://x.example"},
+        )
+    assert r.status_code == 201
+    kwargs = mdb.insert_mcp_endpoint.call_args.kwargs
+    assert kwargs["transport"] == "streamable_http"
+    assert kwargs["visibility"] == "private"
+
+
+def test_create_endpoint_invalid_transport_422():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={"name": "X", "endpoint_url": "https://x", "transport": "carrier-pigeon"},
+        )
+    assert r.status_code == 422
+    mdb.insert_mcp_endpoint.assert_not_called()
+
+
+def test_create_endpoint_invalid_visibility_422():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={"name": "X", "endpoint_url": "https://x", "visibility": "secret"},
+        )
+    assert r.status_code == 422
+    mdb.insert_mcp_endpoint.assert_not_called()
+
+
+def test_create_endpoint_missing_name_422():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.post("/v1/mcp/acme/endpoints", json={"endpoint_url": "https://x"})
+    assert r.status_code == 422
+    mdb.insert_mcp_endpoint.assert_not_called()
+
+
+def test_create_endpoint_nonpositive_cadence_422():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={"name": "X", "endpoint_url": "https://x", "discoveryCadenceSeconds": 0},
+        )
+    assert r.status_code == 422
+    mdb.insert_mcp_endpoint.assert_not_called()
+
+
+def test_create_endpoint_slug_conflict_409():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.insert_mcp_endpoint.side_effect = pg_errors.UniqueViolation("dup")
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={"name": "Acme", "endpoint_url": "https://x"},
+        )
+    assert r.status_code == 409
+
+
+def test_create_endpoint_requires_resolvable_actor_403():
+    """An API-key caller with no resolvable user cannot be attributed → 403."""
+    app.dependency_overrides[validate_authentication] = lambda: _APIKEY_NO_USER
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.post(
+            "/v1/mcp/acme/endpoints",
+            json={"name": "Acme", "endpoint_url": "https://x"},
+        )
+    assert r.status_code == 403
+    mdb.insert_mcp_endpoint.assert_not_called()
+
+
+def test_create_endpoint_requires_authentication():
+    app.dependency_overrides.pop(validate_authentication, None)
+    r = client.post("/v1/mcp/acme/endpoints", json={"name": "X", "endpoint_url": "https://x"})
+    assert r.status_code == 401
+
+
+# ===========================================================================
+# PATCH
+# ===========================================================================
+
+
+def test_patch_endpoint_ok_applies_only_present_fields():
+    updated = {**_ENDPOINT_ROW, "enabled": False, "name": "Renamed"}
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.update_mcp_endpoint.return_value = updated
+        r = client.patch(
+            "/v1/mcp/acme/endpoints/11111111-1111-1111-1111-111111111111",
+            json={"enabled": False, "name": "Renamed"},
+        )
+    assert r.status_code == 200
+    args = mdb.update_mcp_endpoint.call_args.args
+    assert args[0] == "t1"  # tenant from token
+    assert args[1] == "11111111-1111-1111-1111-111111111111"
+    fields = args[2]
+    assert fields == {"enabled": False, "name": "Renamed"}
+
+
+def test_patch_endpoint_blank_description_becomes_null():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.update_mcp_endpoint.return_value = _ENDPOINT_ROW
+        client.patch(
+            "/v1/mcp/acme/endpoints/11111111-1111-1111-1111-111111111111",
+            json={"description": "   "},
+        )
+    assert mdb.update_mcp_endpoint.call_args.args[2] == {"description": None}
+
+
+def test_patch_endpoint_cross_tenant_404():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.update_mcp_endpoint.return_value = None
+        r = client.patch(
+            "/v1/mcp/acme/endpoints/11111111-1111-1111-1111-111111111111",
+            json={"enabled": True},
+        )
+    assert r.status_code == 404
+
+
+def test_patch_endpoint_invalid_transport_422():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        r = client.patch(
+            "/v1/mcp/acme/endpoints/11111111-1111-1111-1111-111111111111",
+            json={"transport": "telepathy"},
+        )
+    assert r.status_code == 422
+    mdb.update_mcp_endpoint.assert_not_called()
+
+
+def test_patch_endpoint_empty_body_is_noop():
+    with patch("app.mcp_catalog_routes.db") as mdb:
+        mdb.update_mcp_endpoint.return_value = _ENDPOINT_ROW
+        r = client.patch(
+            "/v1/mcp/acme/endpoints/11111111-1111-1111-1111-111111111111",
+            json={},
+        )
+    assert r.status_code == 200
+    assert mdb.update_mcp_endpoint.call_args.args[2] == {}
+
+
+# ===========================================================================
+# Model validation
+# ===========================================================================
+
+
+def test_model_create_camelcase_and_snake_case():
+    m1 = McpEndpointCreate(name="A", endpointUrl="https://x", discoveryCadenceSeconds=10)
+    m2 = McpEndpointCreate(name="A", endpoint_url="https://x", discovery_cadence_seconds=10)
+    assert m1.endpoint_url == m2.endpoint_url == "https://x"
+    assert m1.discovery_cadence_seconds == 10
+
+
+def test_model_update_has_any_field():
+    assert McpEndpointUpdate().has_any_field() is False
+    assert McpEndpointUpdate(enabled=False).has_any_field() is True
+
+
+def test_mcp_endpoint_out_from_row_normalizes_types():
+    out = mcp_endpoint_out_from_row(_ENDPOINT_ROW)
+    assert out.id == "ep-1"
+    assert out.last_discovered_at.startswith("2026-06-26")
+    assert out.current_version_id is None
+    assert out.published is False
+
+
+# ===========================================================================
+# DB layer: slug uniqueness + partial update
+# ===========================================================================
+
+
+class _FakeCursor:
+    """Minimal cursor double: records statements and serves canned fetch results."""
+
+    def __init__(self, fetchall_rows=None, fetchone_row=None):
+        self._fetchall_rows = fetchall_rows or []
+        self._fetchone_row = fetchone_row
+        self.executed = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, params))
+
+    def fetchall(self):
+        return self._fetchall_rows
+
+    def fetchone(self):
+        return self._fetchone_row
+
+
+def test_next_available_slug_free():
+    db = Database()
+    cur = _FakeCursor(fetchall_rows=[])
+    assert db._next_available_mcp_slug(cur, "t1", "acme") == "acme"
+
+
+def test_next_available_slug_increments_past_collisions():
+    db = Database()
+    cur = _FakeCursor(fetchall_rows=[{"slug": "acme"}, {"slug": "acme-2"}])
+    assert db._next_available_mcp_slug(cur, "t1", "acme") == "acme-3"
+
+
+def test_next_available_slug_queries_all_rows_including_deleted():
+    """Collision detection must not filter deleted_at (unique constraint counts them)."""
+    db = Database()
+    cur = _FakeCursor(fetchall_rows=[])
+    db._next_available_mcp_slug(cur, "t1", "acme")
+    sql, params = cur.executed[0]
+    assert "deleted_at" not in sql
+    assert params == ("t1", "acme", "acme-%")
+
+
+class _FakeConn:
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self.committed = False
+        self.rolled_back = False
+
+    def cursor(self):
+        return self._cursor
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        self.rolled_back = True
+
+
+def test_update_mcp_endpoint_filters_unknown_fields(monkeypatch):
+    cur = _FakeCursor(fetchone_row=dict(_ENDPOINT_ROW))
+    conn = _FakeConn(cur)
+    db = Database()
+    monkeypatch.setattr(db, "connect", lambda: conn)
+    db.update_mcp_endpoint("t1", "ep-1", {"enabled": False, "bogus": "x"})
+    sql, params = cur.executed[0]
+    assert "enabled = %s" in sql
+    assert "bogus" not in sql
+    # params: [enabled, endpoint_id, tenant_id]
+    assert params == (False, "ep-1", "t1")
+    assert conn.committed is True
+
+
+def test_update_mcp_endpoint_empty_fields_returns_current(monkeypatch):
+    db = Database()
+    monkeypatch.setattr(db, "get_mcp_endpoint", lambda t, e: {"sentinel": True})
+    assert db.update_mcp_endpoint("t1", "ep-1", {}) == {"sentinel": True}
+
+
+def test_update_mcp_endpoint_missing_row_returns_none(monkeypatch):
+    cur = _FakeCursor(fetchone_row=None)
+    conn = _FakeConn(cur)
+    db = Database()
+    monkeypatch.setattr(db, "connect", lambda: conn)
+    assert db.update_mcp_endpoint("t1", "ep-1", {"enabled": True}) is None
