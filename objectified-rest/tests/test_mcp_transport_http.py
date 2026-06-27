@@ -19,9 +19,11 @@ from app.mcp_client.transport_http import (
     PROTOCOL_VERSION_HEADER,
     SESSION_ID_HEADER,
     JsonRpcResponse,
+    McpAuthRequiredError,
     McpHttpStatusError,
     McpProtocolError,
     McpSessionExpiredError,
+    McpSsrfError,
     McpTransportError,
     StreamableHttpTransport,
 )
@@ -272,6 +274,34 @@ async def test_404_without_session_raises_plain_http_status_error():
     assert exc.value.status_code == 404
 
 
+async def test_401_raises_auth_required_with_www_authenticate():
+    handler = RecordingHandler(
+        {
+            "tools/list": lambda req, body: httpx.Response(
+                401, text="auth", headers={"WWW-Authenticate": 'Bearer resource_metadata="https://as/.well-known"'}
+            )
+        }
+    )
+    transport = make_transport(handler)
+
+    with pytest.raises(McpAuthRequiredError) as exc:
+        await transport.request("tools/list")
+    # The dedicated 401 error preserves the challenge and is still an HTTP status error.
+    assert isinstance(exc.value, McpHttpStatusError)
+    assert exc.value.status_code == 401
+    assert exc.value.www_authenticate == 'Bearer resource_metadata="https://as/.well-known"'
+    assert "auth" in exc.value.body
+
+
+async def test_401_without_www_authenticate_header():
+    handler = RecordingHandler({"x": lambda req, body: httpx.Response(401)})
+    transport = make_transport(handler)
+
+    with pytest.raises(McpAuthRequiredError) as exc:
+        await transport.request("x")
+    assert exc.value.www_authenticate is None
+
+
 async def test_202_to_a_request_is_a_protocol_error():
     # 202 is only valid when the body had no request needing an answer.
     handler = RecordingHandler({"x": lambda req, body: httpx.Response(202)})
@@ -506,6 +536,48 @@ def test_plain_http_public_host_allowed_with_opt_in():
 def test_unsupported_scheme_is_rejected():
     with pytest.raises(McpTransportError, match="scheme"):
         StreamableHttpTransport("ftp://mcp.example.com/mcp")
+
+
+# ===========================================================================
+# SSRF guard (private-address ranges)
+# ===========================================================================
+
+
+@pytest.mark.parametrize(
+    "url, reason",
+    [
+        ("https://10.0.0.5/mcp", "private"),
+        ("https://192.168.1.10:8443/mcp", "private"),
+        ("https://172.16.4.4/mcp", "private"),
+        ("https://169.254.169.254/mcp", "link-local"),  # cloud metadata endpoint
+        ("https://[fd00::1]/mcp", "private"),  # IPv6 unique-local
+        ("https://[::ffff:10.0.0.1]/mcp", "private"),  # IPv4-mapped IPv6 smuggling
+    ],
+)
+def test_private_ip_endpoint_is_blocked(url, reason):
+    with pytest.raises(McpSsrfError) as exc:
+        StreamableHttpTransport(url)
+    assert exc.value.reason == reason
+    # SSRF is a transport error so broad except clauses still catch it.
+    assert isinstance(exc.value, McpTransportError)
+
+
+def test_private_ip_endpoint_allowed_with_opt_in():
+    t = StreamableHttpTransport("https://10.0.0.5/mcp", allow_private_network=True)
+    assert t.url == "https://10.0.0.5/mcp"
+
+
+def test_loopback_ip_is_exempt_from_ssrf_guard():
+    # Loopback is the local reference-server case; never an SSRF block.
+    for url in ("http://127.0.0.1:9000/mcp", "http://[::1]:9000/mcp"):
+        t = StreamableHttpTransport(url)
+        assert t.url == url
+
+
+def test_public_ip_and_hostname_endpoints_pass_ssrf_guard():
+    # A public IP literal and an ordinary hostname (no DNS resolution here) are fine.
+    assert StreamableHttpTransport("https://8.8.8.8/mcp").url == "https://8.8.8.8/mcp"
+    assert StreamableHttpTransport("https://mcp.example.com/mcp").url == "https://mcp.example.com/mcp"
 
 
 def test_origin_includes_non_default_port():

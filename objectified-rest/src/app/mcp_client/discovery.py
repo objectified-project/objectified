@@ -44,6 +44,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
+from .resilience import TimeBudget
 from .transport_http import McpProtocolError, StreamableHttpTransport
 
 # Hard cap on pages fetched from a single list endpoint before the loop gives up.
@@ -171,6 +172,7 @@ async def discover_listings(
     capabilities: Mapping[str, Any],
     *,
     page_limit: int = DEFAULT_PAGE_LIMIT,
+    budget: Optional[TimeBudget] = None,
 ) -> DiscoveryListings:
     """Enumerate every declared capability list, fully paged, over ``transport``.
 
@@ -189,6 +191,9 @@ async def discover_listings(
         capabilities: The server's declared capabilities object from ``initialize``.
         page_limit: Max pages fetched per endpoint before
             :class:`McpPaginationError`; defaults to :data:`DEFAULT_PAGE_LIMIT`.
+        budget: Optional :class:`~app.mcp_client.resilience.TimeBudget` bounding
+            the whole enumeration; checked before each endpoint and between pages
+            so a slow server cannot exceed the job's total wall-clock budget.
 
     Returns:
         A :class:`DiscoveryListings` with one raw-item list per endpoint plus the
@@ -198,17 +203,20 @@ async def discover_listings(
         McpDiscoveryError: a declared endpoint returned a JSON-RPC error.
         McpPaginationError: an endpoint's cursor loop cycled or exceeded
             ``page_limit``.
+        BudgetExceededError: the total time budget was exhausted mid-enumeration.
         McpTransportError: any underlying transport/protocol failure.
     """
     collected: Dict[str, List[Dict[str, Any]]] = {}
     skipped: List[str] = []
 
     for spec in LIST_METHODS:
+        if budget is not None:
+            budget.check()
         if not _is_declared(capabilities, spec.capability):
             skipped.append(spec.method)
             continue
         collected[spec.method] = await paginate(
-            transport, spec.method, spec.items_key, page_limit=page_limit
+            transport, spec.method, spec.items_key, page_limit=page_limit, budget=budget
         )
 
     return DiscoveryListings(
@@ -227,6 +235,7 @@ async def paginate(
     *,
     params: Optional[Mapping[str, Any]] = None,
     page_limit: int = DEFAULT_PAGE_LIMIT,
+    budget: Optional[TimeBudget] = None,
 ) -> List[Dict[str, Any]]:
     """Fetch and concatenate every page of a cursor-paginated list method.
 
@@ -246,6 +255,10 @@ async def paginate(
         items_key: The result key holding the page's item array (e.g. ``"tools"``).
         params: Extra params merged into every page request (cursor excluded).
         page_limit: Max pages before aborting; defaults to :data:`DEFAULT_PAGE_LIMIT`.
+        budget: Optional :class:`~app.mcp_client.resilience.TimeBudget`; checked
+            before each page so a slow-drip server cannot run past the job's total
+            wall-clock budget even while every individual request stays under the
+            per-call timeout.
 
     Returns:
         The raw items from every page, in server order.
@@ -253,6 +266,7 @@ async def paginate(
     Raises:
         McpDiscoveryError: the server returned a JSON-RPC error for the method.
         McpPaginationError: the cursor cycled or ``page_limit`` was exceeded.
+        BudgetExceededError: the total time budget was exhausted mid-pagination.
     """
     items: List[Dict[str, Any]] = []
     seen_cursors: set[str] = set()
@@ -260,6 +274,8 @@ async def paginate(
     base_params = dict(params) if params else {}
 
     for page in range(1, page_limit + 1):
+        if budget is not None:
+            budget.check()
         request_params = dict(base_params)
         if cursor is not None:
             request_params["cursor"] = cursor

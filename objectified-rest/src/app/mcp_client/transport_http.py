@@ -50,6 +50,8 @@ from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Optional, Unio
 
 import httpx
 
+from .resilience import private_address_reason
+
 logger = logging.getLogger(__name__)
 
 # MCP protocol revision this client targets. Sent as the ``MCP-Protocol-Version``
@@ -85,6 +87,33 @@ class McpProtocolError(McpTransportError):
     """
 
 
+class McpSsrfError(McpTransportError):
+    """The endpoint URL points at a non-public network address (SSRF guard).
+
+    Raised during transport construction when the host is an IP literal in a
+    blocked range (RFC 1918 private, link-local, reserved, multicast, …). A
+    tenant-supplied discovery URL must not be able to make the worker reach
+    internal infrastructure; per the MCP
+    `security best practices <https://modelcontextprotocol.io/specification/2025-06-18/basic/security_best_practices>`_
+    such targets are refused unless the caller explicitly opts in
+    (``allow_private_network=True``) for a trusted local/lab endpoint.
+
+    Attributes:
+        host: The offending host component of the URL.
+        reason: The stable range classification that triggered the block (e.g.
+            ``"private"``, ``"link-local"``); see
+            :func:`app.mcp_client.resilience.private_address_reason`.
+    """
+
+    def __init__(self, host: str, reason: str) -> None:
+        self.host = host
+        self.reason = reason
+        super().__init__(
+            f"refusing MCP endpoint host {host!r}: {reason} address ranges are "
+            "blocked (SSRF guard); pass allow_private_network=True for a trusted endpoint"
+        )
+
+
 class McpHttpStatusError(McpTransportError):
     """The server returned an HTTP status the transport treats as a failure.
 
@@ -113,6 +142,28 @@ class McpSessionExpiredError(McpHttpStatusError):
             404,
             body,
             message=f"MCP session '{session_id}' has expired; re-initialization required",
+        )
+
+
+class McpAuthRequiredError(McpHttpStatusError):
+    """The server returned ``401 Unauthorized``, requesting authentication.
+
+    The MCP authorization flow advertises *how* to authenticate via the
+    ``WWW-Authenticate`` response header (e.g. an OAuth resource-metadata URL).
+    The transport surfaces ``401`` as this dedicated error — separate from a
+    generic :class:`McpHttpStatusError` — so the discovery taxonomy can record a
+    stable "auth required" outcome and preserve the challenge for the operator.
+
+    Attributes:
+        www_authenticate: The verbatim ``WWW-Authenticate`` header value, or
+            ``None`` if the server omitted it.
+    """
+
+    def __init__(self, body: str = "", www_authenticate: Optional[str] = None) -> None:
+        self.www_authenticate = www_authenticate
+        challenge = f" ({www_authenticate})" if www_authenticate else ""
+        super().__init__(
+            401, body, message=f"MCP server requires authentication (HTTP 401){challenge}"
         )
 
 
@@ -208,6 +259,10 @@ class StreamableHttpTransport:
         allow_insecure_http: Permit ``http://`` to non-loopback hosts. Defaults to
             ``False``; loopback ``http://`` (local reference servers) is always
             allowed regardless of this flag.
+        allow_private_network: Permit endpoints whose host is an IP literal in a
+            non-public range (RFC 1918 private, link-local, reserved, …). Defaults
+            to ``False`` (the SSRF guard blocks them); loopback is always allowed
+            regardless of this flag for local reference servers.
         headers: Extra static headers merged into every request.
     """
 
@@ -217,6 +272,7 @@ class StreamableHttpTransport:
     client: Optional[httpx.AsyncClient] = None
     timeout: float = 30.0
     allow_insecure_http: bool = False
+    allow_private_network: bool = False
     headers: Dict[str, str] = field(default_factory=dict)
 
     # --- internal state (not constructor arguments) ------------------------
@@ -228,6 +284,7 @@ class StreamableHttpTransport:
     def __post_init__(self) -> None:
         parsed = httpx.URL(self.url)
         self._enforce_transport_security(parsed)
+        self._guard_ssrf(parsed)
         if self.origin is None:
             # scheme://host[:port] — no path/query, matching browser Origin semantics.
             self.origin = _origin_of(parsed)
@@ -423,14 +480,18 @@ class StreamableHttpTransport:
     async def _raise_for_status(self, response: httpx.Response) -> None:
         """Translate spec-relevant error statuses into transport exceptions.
 
-        ``404`` with an active session means the session expired (clears it and
-        raises :class:`McpSessionExpiredError`); ``400``/``405`` and any other
-        ``>= 400`` status raise :class:`McpHttpStatusError`. ``2xx`` is a no-op.
+        ``401`` raises :class:`McpAuthRequiredError`, preserving the
+        ``WWW-Authenticate`` challenge; ``404`` with an active session means the
+        session expired (clears it and raises :class:`McpSessionExpiredError`);
+        ``400``/``405`` and any other ``>= 400`` status raise
+        :class:`McpHttpStatusError`. ``2xx`` is a no-op.
         """
         status = response.status_code
         if status < 400:
             return
         body = await self._safe_body(response)
+        if status == 401:
+            raise McpAuthRequiredError(body, response.headers.get("WWW-Authenticate"))
         if status == 404 and self._session_id is not None:
             expired = self._session_id
             self._session_id = None
@@ -563,6 +624,25 @@ class StreamableHttpTransport:
             f"refusing plaintext http:// to non-loopback host '{parsed.host}'; "
             "use https:// or pass allow_insecure_http=True"
         )
+
+    def _guard_ssrf(self, parsed: httpx.URL) -> None:
+        """Reject an endpoint whose host is an IP literal in a non-public range.
+
+        The SSRF guard stops a tenant-supplied URL from steering the discovery
+        worker at internal infrastructure (cloud metadata, private services).
+        Loopback is exempt — it is the local reference-server case the transport
+        already permits over plain HTTP — and any other private/link-local/
+        reserved/multicast literal is refused unless ``allow_private_network`` is
+        set for a trusted endpoint. Hostnames are not resolved here (no DNS in the
+        constructor); a caller guarding against DNS rebinding resolves first and
+        passes IP literals through :func:`app.mcp_client.resilience.private_address_reason`.
+        """
+        host = parsed.host
+        if _is_loopback_host(host) or self.allow_private_network:
+            return
+        reason = private_address_reason(host)
+        if reason is not None:
+            raise McpSsrfError(host, reason)
 
 
 # ===========================================================================

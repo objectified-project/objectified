@@ -427,7 +427,7 @@ sequenceDiagram
 - **Dependencies / Parallelism.** After 2.1. **v2.** Parallel with 2.4/2.6.
 - **Technical Stack.** Python, SSE.
 
-### MCAT-2.6 — Discovery error taxonomy & resilience  ·  **#3662**
+### MCAT-2.6 — Discovery error taxonomy & resilience  ·  **#3662**  ·  ✅ Done (objectified-rest 1.6.5)
 - **Problem.** Remote discovery fails in many ways; results must be trustworthy and diagnosable.
 - **Solution / Scope.** Define typed errors (connect timeout, TLS, auth-required `401` + `WWW-Authenticate`, JSON-RPC error, version mismatch, partial-page failure). Enforce per-call timeouts, total budget, SSRF guard (block private IP ranges per [security best practices](https://modelcontextprotocol.io/specification/2025-06-18/basic/security_best_practices)). Surface structured failures to the job record.
 - **Acceptance Criteria.** Each failure mode maps to a stable error code stored on `mcp_discovery_jobs.error`; SSRF to private ranges blocked; partial discovery never silently recorded as complete.
