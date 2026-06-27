@@ -5,6 +5,35 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.3] - 2026-06-26
+
+### Added
+- **MCP discovery list methods + pagination (#3659, V2-MCP-16.3)** — the capability-enumeration layer
+  of the MCP discovery client (`app/mcp_client/discovery.py`), sitting on top of the `initialize`
+  handshake. `discover_listings()` walks `tools/list`, `resources/list`, `resources/templates/list`
+  (result key `resourceTemplates`), and `prompts/list`, returning a `DiscoveryListings` of raw items
+  per category. Each endpoint is queried **only** when the server declared its owning capability in
+  `initialize` (the single `resources` capability gates both resource endpoints); undeclared endpoints
+  are skipped and reported in `DiscoveryListings.skipped`. The lower-level `paginate()` helper follows
+  the opaque `cursor`/`nextCursor` loop to exhaustion, accumulating every page. Because the cursor is
+  server-supplied, the loop is guarded against non-terminating servers two ways — a repeated cursor (a
+  cycle) and exceeding `DEFAULT_PAGE_LIMIT` pages both raise `McpPaginationError`; a declared endpoint
+  that returns a JSON-RPC error raises `McpDiscoveryError`. Covered by mocked-httpx unit tests plus an
+  integration test that pages a real multi-page loopback stub and confirms undeclared capabilities are
+  never requested.
+
+## [1.6.2] - 2026-06-26
+
+### Added
+- **MCP initialize handshake + version negotiation (#3658, V2-MCP-16.2)** — the lifecycle layer on top
+  of the Streamable HTTP transport (`app/mcp_client/handshake.py`). `initialize_session()` sends
+  `initialize` with our `protocolVersion`, `capabilities`, and `clientInfo`; parses `serverInfo`,
+  `capabilities`, and `instructions`; and negotiates the protocol version (echo, result-level fallback,
+  `-32602` fallback-and-retry, disconnect on unsupported). The negotiated version is recorded on the
+  transport (pinning `MCP-Protocol-Version` on later requests) and returned on `InitializeResult`,
+  after which `notifications/initialized` completes the handshake. Covered by mocked-httpx unit tests
+  plus an integration test negotiating against real loopback stub servers for both supported revisions.
+
 ## [1.6.1] - 2026-06-26
 
 ### Added
