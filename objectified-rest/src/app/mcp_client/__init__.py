@@ -10,10 +10,21 @@ Modules:
     handshake: The ``initialize`` opening handshake and protocol-version negotiation.
     discovery: Paginated ``*/list`` discovery of the declared capability surface.
     normalize: Canonical, version-tolerant ``DiscoverySurface`` + DB row mapping.
+    diff: Structured ``diff_surfaces`` over two surfaces (added/removed/modified).
     resilience: Time-budget and private-address primitives for safe remote runs.
     errors: Stable error taxonomy persisted on ``mcp_discovery_jobs.error``.
 """
 
+from .diff import (
+    CHANGE_ADDED,
+    CHANGE_MODIFIED,
+    CHANGE_REMOVED,
+    ITEM_TYPE_SERVER,
+    FieldChange,
+    ItemChange,
+    SurfaceDiff,
+    diff_surfaces,
+)
 from .discovery import (
     DEFAULT_PAGE_LIMIT,
     LIST_METHODS,
@@ -69,6 +80,9 @@ from .transport_http import (
 )
 
 __all__ = [
+    "CHANGE_ADDED",
+    "CHANGE_MODIFIED",
+    "CHANGE_REMOVED",
     "DEFAULT_CLIENT_CAPABILITIES",
     "DEFAULT_CLIENT_INFO",
     "DEFAULT_PAGE_LIMIT",
@@ -80,6 +94,7 @@ __all__ = [
     "ITEM_TYPE_PROMPT",
     "ITEM_TYPE_RESOURCE",
     "ITEM_TYPE_RESOURCE_TEMPLATE",
+    "ITEM_TYPE_SERVER",
     "ITEM_TYPE_TOOL",
     "LIST_METHODS",
     "SUPPORTED_PROTOCOL_VERSIONS",
@@ -89,7 +104,9 @@ __all__ = [
     "DiscoveryErrorCode",
     "DiscoveryListings",
     "DiscoverySurface",
+    "FieldChange",
     "InitializeResult",
+    "ItemChange",
     "JsonRpcError",
     "JsonRpcResponse",
     "ListMethod",
@@ -104,8 +121,10 @@ __all__ = [
     "McpVersionNegotiationError",
     "ServerInfo",
     "StreamableHttpTransport",
+    "SurfaceDiff",
     "TimeBudget",
     "classify_exception",
+    "diff_surfaces",
     "discover_listings",
     "initialize_session",
     "paginate",

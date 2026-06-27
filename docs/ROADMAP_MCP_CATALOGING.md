@@ -522,7 +522,7 @@ flowchart LR
 - **Dependencies / Parallelism.** After 2.4. Blocks 4.2/4.3.
 - **Technical Stack.** Python, `hashlib`.
 
-### MCAT-4.2 — Surface diff engine  ·  **#3669**
+### MCAT-4.2 — Surface diff engine  ·  **#3669**  ·  ✅ Done (objectified-rest 1.8.3)
 - **Problem.** A new version must report *what* changed — and (per mockup review) users must be able to diff **any two versions on demand**, not only consecutive ones.
 - **Solution / Scope.** A pure `diff_surfaces(base, target)` that compares **two arbitrary normalized surfaces** and returns structured changes: tools/resources/prompts added/removed, and per-item field-level `modified` (description, schema, annotations, server metadata) with before/after detail and counts. Used in two ways: (a) `previous → new` to persist `mcp_version_changes` at version-creation time (4.3), and (b) on-demand `vX → vY` for the compare API (4.5). Diffing arbitrary versions directly (not chaining adjacent steps) keeps it exact; deterministic, stable item keys.
 - **Acceptance Criteria.** Correctly classifies add/remove/modify on fixtures for both adjacent and non-adjacent pairs; identical surfaces → empty diff + "fingerprint unchanged"; modified entries include before/after; stable ordering.
