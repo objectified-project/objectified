@@ -3994,3 +3994,292 @@ def mcp_discovery_job_status_from_row(
         result=result,
         status_path=status_path,
     )
+
+
+# ===========================================================================
+# MCP Catalog — version history, change report & compare (V2-MCP-18.5 / MCAT-4.5)
+# ===========================================================================
+#
+# Wire models for the four read surfaces that let a UI/CLI render an endpoint's
+# version timeline (``…/versions``), one version's full surface (``…/versions/{vid}``),
+# the stored ``previous → this`` diff a version introduced (``…/versions/{vid}/changes``),
+# and an on-demand diff between any two versions (``…/versions/compare``). The compare
+# result is computed by the canonical surface diff engine (MCAT-4.2), so a live compare
+# of two adjacent versions matches that newer version's stored change record exactly.
+
+
+def _mcp_ts(value: Any) -> Optional[str]:
+    """Normalize a timestamp column to an ISO-8601 string (or None)."""
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def _mcp_str(value: Any) -> Optional[str]:
+    """Stringify a value, preserving None."""
+    return str(value) if value is not None else None
+
+
+def _mcp_int(value: Any) -> Optional[int]:
+    """Coerce a numeric column to int, preserving None (e.g. an unscored snapshot)."""
+    return int(value) if value is not None else None
+
+
+class McpVersionChangeCounts(BaseModel):
+    """Per-direction tally of surface changes (a version's diff, or a compare result).
+
+    ``total`` is always ``added + removed + modified`` — the three diff directions the
+    ``mcp_version_changes.change_type`` CHECK constraint admits.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    added: int = 0
+    removed: int = 0
+    modified: int = 0
+    total: int = 0
+
+
+def mcp_change_counts(added: int, removed: int, modified: int) -> McpVersionChangeCounts:
+    """Build a :class:`McpVersionChangeCounts`, deriving ``total`` from the three parts."""
+    return McpVersionChangeCounts(
+        added=int(added),
+        removed=int(removed),
+        modified=int(modified),
+        total=int(added) + int(removed) + int(modified),
+    )
+
+
+def _mcp_change_counts_from_row(row: Dict[str, Any]) -> McpVersionChangeCounts:
+    """Build change counts from a version row's ``*_count`` aggregate columns."""
+    return mcp_change_counts(
+        row.get("added_count") or 0,
+        row.get("removed_count") or 0,
+        row.get("modified_count") or 0,
+    )
+
+
+class McpEndpointVersionSummary(BaseModel):
+    """One row of an endpoint's version history (the timeline / "what changed when" view).
+
+    Carries the snapshot's sequence and human-readable date/time ``version_tag``, its server
+    identity and ``surface_fingerprint``, the quality ``score`` / ``grade`` (NULL until the
+    snapshot is scored), and the per-direction ``change_counts`` it introduced relative to the
+    prior version. ``is_current`` flags the snapshot the endpoint's ``current_version_id``
+    points at.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    endpoint_id: str
+    version_seq: int
+    version_tag: Optional[str] = None
+    protocol_version: Optional[str] = None
+    server_name: Optional[str] = None
+    server_title: Optional[str] = None
+    server_version: Optional[str] = None
+    surface_fingerprint: Optional[str] = None
+    score: Optional[int] = None
+    grade: Optional[str] = None
+    scored_at: Optional[str] = None
+    change_counts: McpVersionChangeCounts
+    is_current: bool = False
+    discovered_at: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class McpCapabilityItemOut(BaseModel):
+    """One normalized capability item (tool/resource/resource_template/prompt) of a surface."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    item_type: str
+    name: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    input_schema: Optional[Dict[str, Any]] = None
+    output_schema: Optional[Dict[str, Any]] = None
+    annotations: Optional[Dict[str, Any]] = None
+    uri: Optional[str] = None
+    uri_template: Optional[str] = None
+    ordinal: int = 0
+
+
+class McpEndpointVersionDetail(McpEndpointVersionSummary):
+    """A version snapshot's full surface: summary identity + declared capabilities + items.
+
+    Extends :class:`McpEndpointVersionSummary` with the heavier fields the list view omits —
+    the server ``instructions``, the declared ``capabilities`` toggle blob, and every
+    normalized capability ``items`` entry in deterministic (kind, ordinal) order.
+    """
+
+    instructions: Optional[str] = None
+    capabilities: Optional[Dict[str, Any]] = None
+    items: List[McpCapabilityItemOut] = Field(default_factory=list)
+
+
+class McpEndpointVersionListResponse(BaseModel):
+    """Response envelope for an endpoint's version history (newest first)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    versions: List[McpEndpointVersionSummary]
+
+
+class McpEndpointVersionResponse(BaseModel):
+    """Response envelope for a single version's full surface."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    version: McpEndpointVersionDetail
+
+
+class McpVersionChangeOut(BaseModel):
+    """One add / remove / modify entry — a stored change row or a computed compare entry.
+
+    Mirrors an ``mcp_version_changes`` row (and the dicts produced by the diff engine's
+    :meth:`SurfaceDiff.to_change_rows`): ``detail`` carries the before/after payload (a
+    removal has ``before``, an addition ``after``, a modification both plus a per-field
+    ``fields`` breakdown for capability items).
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    change_type: str
+    item_type: str
+    item_name: str
+    detail: Dict[str, Any] = Field(default_factory=dict)
+
+
+class McpVersionChangesResponse(BaseModel):
+    """Response envelope for a version's stored ``previous → this`` change report."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    version_id: str
+    version_seq: int
+    counts: McpVersionChangeCounts
+    changes: List[McpVersionChangeOut]
+
+
+class McpVersionRef(BaseModel):
+    """Lightweight reference to one side of a compare (identity, no full surface)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    version_seq: int
+    version_tag: Optional[str] = None
+    surface_fingerprint: Optional[str] = None
+
+
+class McpVersionCompareResponse(BaseModel):
+    """On-demand structured diff between any two versions, normalized older→newer.
+
+    ``base``/``target`` are returned in chronological order regardless of the order they were
+    requested, so ``added``/``removed`` always read relative to the older surface.
+    ``fingerprint_changed`` is ``False`` exactly when the two surfaces are semantically
+    identical (equal fingerprints) — including ``base == target``, which yields an empty diff.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool = True
+    base: McpVersionRef
+    target: McpVersionRef
+    fingerprint_changed: bool
+    counts: McpVersionChangeCounts
+    changes: List[McpVersionChangeOut]
+
+
+def mcp_version_summary_from_row(
+    row: Dict[str, Any], current_version_id: Optional[str] = None
+) -> McpEndpointVersionSummary:
+    """Project a version-history row (with score + ``*_count`` aggregates) onto the wire model.
+
+    Args:
+        row: A row from :meth:`Database.list_mcp_endpoint_versions` /
+            :meth:`Database.get_mcp_endpoint_version`.
+        current_version_id: The owning endpoint's ``current_version_id`` (to set
+            ``is_current``); omitted when not known.
+
+    Returns:
+        The :class:`McpEndpointVersionSummary` for the row.
+    """
+    version_id = str(row["id"])
+    return McpEndpointVersionSummary(
+        id=version_id,
+        endpoint_id=str(row["endpoint_id"]),
+        version_seq=int(row["version_seq"]),
+        version_tag=_mcp_str(row.get("version_tag")),
+        protocol_version=_mcp_str(row.get("protocol_version")),
+        server_name=_mcp_str(row.get("server_name")),
+        server_title=_mcp_str(row.get("server_title")),
+        server_version=_mcp_str(row.get("server_version")),
+        surface_fingerprint=_mcp_str(row.get("surface_fingerprint")),
+        score=_mcp_int(row.get("score")),
+        grade=_mcp_str(row.get("grade")),
+        scored_at=_mcp_ts(row.get("scored_at")),
+        change_counts=_mcp_change_counts_from_row(row),
+        is_current=current_version_id is not None
+        and str(current_version_id) == version_id,
+        discovered_at=_mcp_ts(row.get("discovered_at")),
+        created_at=_mcp_ts(row.get("created_at")),
+    )
+
+
+def mcp_capability_item_out_from_row(row: Dict[str, Any]) -> McpCapabilityItemOut:
+    """Project an ``odb.mcp_capability_items`` row onto the wire model."""
+
+    def _obj(value: Any) -> Optional[Dict[str, Any]]:
+        return value if isinstance(value, dict) else None
+
+    return McpCapabilityItemOut(
+        item_type=str(row["item_type"]),
+        name=str(row["name"]),
+        title=_mcp_str(row.get("title")),
+        description=_mcp_str(row.get("description")),
+        input_schema=_obj(row.get("input_schema")),
+        output_schema=_obj(row.get("output_schema")),
+        annotations=_obj(row.get("annotations")),
+        uri=_mcp_str(row.get("uri")),
+        uri_template=_mcp_str(row.get("uri_template")),
+        ordinal=int(row.get("ordinal") or 0),
+    )
+
+
+def mcp_version_detail_from_row(
+    row: Dict[str, Any],
+    item_rows: List[Dict[str, Any]],
+    current_version_id: Optional[str] = None,
+) -> McpEndpointVersionDetail:
+    """Project a version row + its capability items onto the full-surface wire model."""
+    summary = mcp_version_summary_from_row(row, current_version_id)
+    capabilities = row.get("capabilities")
+    return McpEndpointVersionDetail(
+        **summary.model_dump(),
+        instructions=_mcp_str(row.get("instructions")),
+        capabilities=capabilities if isinstance(capabilities, dict) else None,
+        items=[mcp_capability_item_out_from_row(r) for r in item_rows],
+    )
+
+
+def mcp_version_change_out_from_row(row: Dict[str, Any]) -> McpVersionChangeOut:
+    """Project a change record onto the wire model.
+
+    Accepts both a persisted ``mcp_version_changes`` row and a dict produced by the diff
+    engine's :meth:`SurfaceDiff.to_change_rows` (the keys are identical).
+    """
+    detail = row.get("detail")
+    return McpVersionChangeOut(
+        change_type=str(row["change_type"]),
+        item_type=str(row["item_type"]),
+        item_name=str(row["item_name"]),
+        detail=detail if isinstance(detail, dict) else {},
+    )

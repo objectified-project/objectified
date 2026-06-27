@@ -50,7 +50,7 @@ from .mcp_client import (
     discover_listings,
     initialize_session,
 )
-from .mcp_client.diff import ITEM_TYPE_SERVER
+from .mcp_client.diff import ITEM_TYPE_SERVER, SurfaceDiff
 from .mcp_client.resilience import TimeBudget
 from .mcp_credentials import load_endpoint_auth_headers
 
@@ -111,23 +111,23 @@ async def _invoke_discovery(
 # ---------------------------------------------------------------------------
 
 
-def _reconstruct_previous_surface(
+def reconstruct_surface(
     version_row: Dict[str, Any], capability_rows: List[Dict[str, Any]]
 ) -> DiscoverySurface:
-    """Rebuild the prior version's :class:`DiscoverySurface` from its persisted rows.
+    """Rebuild a version's :class:`DiscoverySurface` from its persisted rows.
 
-    The diff engine compares two normalized surfaces, but the previous version lives in
-    the store as a ``mcp_endpoint_versions`` row (the surface-level identity fields) plus
-    its ``mcp_capability_items`` children. This pairs them back into a surface so the
-    ``previous → new`` diff is computed by the *same* engine that powers the on-demand
-    compare API (MCAT-4.5), keeping a single source of truth for "what changed".
+    The diff engine compares two normalized surfaces, but a stored version lives in the
+    store as a ``mcp_endpoint_versions`` row (the surface-level identity fields) plus its
+    ``mcp_capability_items`` children. This pairs them back into a surface so both the
+    ``previous → new`` version-creation diff and the on-demand compare API (MCAT-4.5)
+    are computed by the *same* engine, keeping a single source of truth for "what changed".
 
     Args:
-        version_row: The prior snapshot's ``mcp_endpoint_versions`` row.
+        version_row: The snapshot's ``mcp_endpoint_versions`` row.
         capability_rows: That snapshot's ``mcp_capability_items`` rows.
 
     Returns:
-        The reconstructed prior :class:`DiscoverySurface`.
+        The reconstructed :class:`DiscoverySurface`.
     """
     return DiscoverySurface.from_rows(
         capability_rows,
@@ -140,6 +140,34 @@ def _reconstruct_previous_surface(
         capabilities=version_row.get("capabilities") or {},
         instructions=version_row.get("instructions"),
     )
+
+
+def compare_endpoint_versions(
+    base_version: Dict[str, Any], target_version: Dict[str, Any]
+) -> SurfaceDiff:
+    """Compute the on-demand structured diff between two stored version snapshots (MCAT-4.5).
+
+    Reconstructs each snapshot's surface from its persisted rows (loading the
+    ``mcp_capability_items`` children for both) and runs the canonical
+    :func:`app.mcp_client.diff.diff_surfaces` engine over them. Because the engine compares
+    the two surfaces *directly* — not by chaining adjacent step-diffs — the result is exact
+    for any pair, adjacent or arbitrarily distant. The caller is responsible for normalizing
+    the argument order (older→newer) so "added"/"removed" read in the natural direction.
+
+    Args:
+        base_version: The earlier / "from" ``mcp_endpoint_versions`` row.
+        target_version: The later / "to" ``mcp_endpoint_versions`` row.
+
+    Returns:
+        The :class:`SurfaceDiff` between the two surfaces; empty when they are identical.
+    """
+    base_surface = reconstruct_surface(
+        base_version, db.get_mcp_capability_items(str(base_version["id"]))
+    )
+    target_surface = reconstruct_surface(
+        target_version, db.get_mcp_capability_items(str(target_version["id"]))
+    )
+    return diff_surfaces(base_surface, target_surface)
 
 
 def compute_version_change_rows(
@@ -173,7 +201,7 @@ def compute_version_change_rows(
         base = DiscoverySurface()
     else:
         previous_items = db.get_mcp_capability_items(str(previous["id"]))
-        base = _reconstruct_previous_surface(previous, previous_items)
+        base = reconstruct_surface(previous, previous_items)
 
     rows = diff_surfaces(base, surface).to_change_rows(None)
     if previous is None:

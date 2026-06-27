@@ -22,12 +22,12 @@ import re
 import uuid
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg2 import errors as pg_errors
 
 from .auth import get_authenticated_user_id, validate_authentication
 from .database import db
-from .mcp_discovery_engine import trigger_discovery
+from .mcp_discovery_engine import compare_endpoint_versions, trigger_discovery
 from .models import (
     McpDiscoveryJobListResponse,
     McpDiscoveryJobResponse,
@@ -38,9 +38,18 @@ from .models import (
     McpEndpointListResponse,
     McpEndpointResponse,
     McpEndpointUpdate,
+    McpEndpointVersionListResponse,
+    McpEndpointVersionResponse,
+    McpVersionChangesResponse,
+    McpVersionCompareResponse,
+    McpVersionRef,
+    mcp_change_counts,
     mcp_discovery_job_out_from_row,
     mcp_discovery_job_status_from_row,
     mcp_endpoint_out_from_row,
+    mcp_version_change_out_from_row,
+    mcp_version_detail_from_row,
+    mcp_version_summary_from_row,
 )
 
 _logger = logging.getLogger(__name__)
@@ -386,4 +395,194 @@ async def get_mcp_endpoint_job(
     return McpDiscoveryJobStatusResponse(
         success=True,
         job=mcp_discovery_job_status_from_row(job, tenant_slug),
+    )
+
+
+# ===========================================================================
+# Version history, change report & compare (V2-MCP-18.5 / MCAT-4.5, #3672)
+# ===========================================================================
+#
+# Read surfaces a UI/CLI uses to render an endpoint's version timeline, one version's full
+# surface, the stored ``previous → this`` diff a version introduced, and an on-demand diff
+# between any two versions. Every route first re-validates the endpoint against the caller's
+# token tenant (``db.get_mcp_endpoint``), so a cross-tenant id reads as ``404`` before any
+# version is touched; the version reads are then scoped to that endpoint, so a version id
+# belonging to a different endpoint also reads as ``404``.
+#
+# Route ordering note: the literal ``…/versions/compare`` route is declared *before* the
+# parametrized ``…/versions/{version_id}`` route so "compare" is never captured as a version
+# id (which would 422 against the ``uuid.UUID`` path type).
+
+
+def _require_tenant_endpoint(
+    auth_data: Dict[str, Any], endpoint_id: uuid.UUID
+) -> Dict[str, Any]:
+    """Load an endpoint scoped to the caller's token tenant, or raise ``404``.
+
+    Shared guard for the version routes: the URL ``tenant_slug`` is informational; the
+    caller's ``tenant_id`` from the validated token is what scopes the lookup.
+    """
+    tenant_id = str(auth_data["tenant_id"])
+    endpoint = db.get_mcp_endpoint(tenant_id, str(endpoint_id))
+    if not endpoint:
+        raise HTTPException(status_code=404, detail="MCP endpoint not found")
+    return endpoint
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/endpoints/{endpoint_id}/versions",
+    response_model=McpEndpointVersionListResponse,
+)
+async def list_mcp_endpoint_versions(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpEndpointVersionListResponse:
+    """List an endpoint's version history newest-first (seq, date tag, score, change counts).
+
+    Each entry carries the snapshot's sequence and human-readable ``version_tag``, its server
+    identity and fingerprint, the quality score/grade (when scored), and the per-direction
+    tally of changes it introduced. ``is_current`` marks the snapshot the endpoint currently
+    points at. 404 when the endpoint is not the caller's tenant's.
+    """
+    _ = tenant_slug
+    endpoint = _require_tenant_endpoint(auth_data, endpoint_id)
+    current_version_id = endpoint.get("current_version_id")
+    rows = db.list_mcp_endpoint_versions(str(endpoint_id))
+    return McpEndpointVersionListResponse(
+        success=True,
+        versions=[mcp_version_summary_from_row(r, current_version_id) for r in rows],
+    )
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/endpoints/{endpoint_id}/versions/compare",
+    response_model=McpVersionCompareResponse,
+)
+async def compare_mcp_endpoint_versions(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    base: uuid.UUID = Query(..., description="The base (from) version id."),
+    target: uuid.UUID = Query(..., description="The target (to) version id."),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpVersionCompareResponse:
+    """Compute an on-demand structured diff between any two of an endpoint's versions.
+
+    Works for *any* base/target pair — adjacent or arbitrarily distant — because the surfaces
+    are diffed directly (MCAT-4.2), not by chaining adjacent step-diffs. The order is
+    normalized to older→newer (by ``version_seq``) regardless of which id was passed as
+    ``base``, so ``added``/``removed`` always read relative to the older surface. The same
+    version on both sides yields an empty diff with ``fingerprint_changed = False``. 404 when
+    the endpoint — or either version under it — is not the caller's tenant's.
+    """
+    _ = tenant_slug
+    _require_tenant_endpoint(auth_data, endpoint_id)
+
+    base_version = db.get_mcp_endpoint_version(str(endpoint_id), str(base))
+    target_version = db.get_mcp_endpoint_version(str(endpoint_id), str(target))
+    if base_version is None or target_version is None:
+        raise HTTPException(status_code=404, detail="MCP endpoint version not found")
+
+    # Normalize to chronological order so "added"/"removed" read older→newer.
+    if int(base_version["version_seq"]) > int(target_version["version_seq"]):
+        base_version, target_version = target_version, base_version
+
+    base_ref = McpVersionRef(
+        id=str(base_version["id"]),
+        version_seq=int(base_version["version_seq"]),
+        version_tag=base_version.get("version_tag"),
+        surface_fingerprint=base_version.get("surface_fingerprint"),
+    )
+    target_ref = McpVersionRef(
+        id=str(target_version["id"]),
+        version_seq=int(target_version["version_seq"]),
+        version_tag=target_version.get("version_tag"),
+        surface_fingerprint=target_version.get("surface_fingerprint"),
+    )
+
+    if str(base_version["id"]) == str(target_version["id"]):
+        # Same version on both sides — nothing to diff (avoids needless surface reads).
+        return McpVersionCompareResponse(
+            success=True,
+            base=base_ref,
+            target=target_ref,
+            fingerprint_changed=False,
+            counts=mcp_change_counts(0, 0, 0),
+            changes=[],
+        )
+
+    diff = compare_endpoint_versions(base_version, target_version)
+    counts = diff.counts
+    return McpVersionCompareResponse(
+        success=True,
+        base=base_ref,
+        target=target_ref,
+        fingerprint_changed=not diff.fingerprint_unchanged,
+        counts=mcp_change_counts(counts["added"], counts["removed"], counts["modified"]),
+        changes=[mcp_version_change_out_from_row(r) for r in diff.to_change_rows(None)],
+    )
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/endpoints/{endpoint_id}/versions/{version_id}",
+    response_model=McpEndpointVersionResponse,
+)
+async def get_mcp_endpoint_version(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    version_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpEndpointVersionResponse:
+    """Fetch one version snapshot's full surface (identity, capabilities, and items).
+
+    Returns the server identity, declared capabilities, instructions, score/grade, change
+    counts, and every normalized capability item of the snapshot. 404 when the endpoint — or
+    the version under it — is not the caller's tenant's.
+    """
+    _ = tenant_slug
+    endpoint = _require_tenant_endpoint(auth_data, endpoint_id)
+    version = db.get_mcp_endpoint_version(str(endpoint_id), str(version_id))
+    if version is None:
+        raise HTTPException(status_code=404, detail="MCP endpoint version not found")
+    items = db.get_mcp_capability_items(str(version_id))
+    return McpEndpointVersionResponse(
+        success=True,
+        version=mcp_version_detail_from_row(
+            version, items, endpoint.get("current_version_id")
+        ),
+    )
+
+
+@mcp_endpoints_router.get(
+    "/{tenant_slug}/endpoints/{endpoint_id}/versions/{version_id}/changes",
+    response_model=McpVersionChangesResponse,
+)
+async def get_mcp_endpoint_version_changes(
+    tenant_slug: str,
+    endpoint_id: uuid.UUID,
+    version_id: uuid.UUID,
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> McpVersionChangesResponse:
+    """Return a version's stored ``previous → this`` change report (the diff it introduced).
+
+    Empty for the first version (which introduces no diff). The changes are in the same stable
+    order an on-demand compare of the same pair produces. 404 when the endpoint — or the
+    version under it — is not the caller's tenant's.
+    """
+    _ = tenant_slug
+    _require_tenant_endpoint(auth_data, endpoint_id)
+    version = db.get_mcp_endpoint_version(str(endpoint_id), str(version_id))
+    if version is None:
+        raise HTTPException(status_code=404, detail="MCP endpoint version not found")
+    change_rows = db.get_mcp_version_changes(str(version_id))
+    return McpVersionChangesResponse(
+        success=True,
+        version_id=str(version_id),
+        version_seq=int(version["version_seq"]),
+        counts=mcp_change_counts(
+            version.get("added_count") or 0,
+            version.get("removed_count") or 0,
+            version.get("modified_count") or 0,
+        ),
+        changes=[mcp_version_change_out_from_row(r) for r in change_rows],
     )

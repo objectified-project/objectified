@@ -9401,6 +9401,113 @@ class Database:
         """
         return self.execute_query(q, (version_id,))
 
+    # The per-change-type tally a version-history row carries, computed by joining the
+    # snapshot to its ``mcp_version_changes`` and counting each direction (plus a total).
+    # Defined once so the list and single-version reads stay byte-identical.
+    _MCP_VERSION_CHANGE_COUNTS = """
+        COUNT(c.id) FILTER (WHERE c.change_type = 'added')    AS added_count,
+        COUNT(c.id) FILTER (WHERE c.change_type = 'removed')  AS removed_count,
+        COUNT(c.id) FILTER (WHERE c.change_type = 'modified') AS modified_count,
+        COUNT(c.id)                                           AS total_count
+    """
+
+    def list_mcp_endpoint_versions(self, endpoint_id: str) -> List[Dict[str, Any]]:
+        """List an endpoint's version snapshots newest-first, with score and change counts.
+
+        Each row carries the snapshot's identity (``version_seq``, the human-readable
+        ``version_tag``, server/protocol identity, ``surface_fingerprint``, timings), its
+        quality ``score`` / ``grade`` from ``mcp_version_scores`` (NULL when not yet scored),
+        and the per-direction tally of ``mcp_version_changes`` it introduced — exactly the
+        fields a "version history" timeline renders. Ordered by ``version_seq`` descending so
+        the latest snapshot is first.
+
+        Args:
+            endpoint_id: Owning endpoint whose history to read (already tenant-validated by
+                the caller).
+
+        Returns:
+            One dict per snapshot, newest first; empty when the endpoint was never discovered.
+        """
+        q = f"""
+            SELECT v.id, v.endpoint_id, v.version_seq, v.version_tag, v.protocol_version,
+                   v.server_name, v.server_title, v.server_version, v.surface_fingerprint,
+                   v.discovered_at, v.created_at,
+                   s.score, s.grade, s.scored_at,
+                   {self._MCP_VERSION_CHANGE_COUNTS}
+            FROM odb.mcp_endpoint_versions v
+            LEFT JOIN odb.mcp_version_scores s ON s.version_id = v.id
+            LEFT JOIN odb.mcp_version_changes c ON c.version_id = v.id
+            WHERE v.endpoint_id = %s::uuid
+            GROUP BY v.id, s.score, s.grade, s.scored_at
+            ORDER BY v.version_seq DESC
+        """
+        return self.execute_query(q, (endpoint_id,))
+
+    def get_mcp_endpoint_version(
+        self, endpoint_id: str, version_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch one version snapshot scoped to its endpoint, with score and change counts.
+
+        Returns the full surface-identity columns (including ``instructions`` and the
+        declared ``capabilities`` blob, which the list view omits) plus the same score and
+        change-count aggregates as :meth:`list_mcp_endpoint_versions`. The ``endpoint_id``
+        predicate is the scoping guard: a version id belonging to another endpoint (and thus,
+        once the caller has tenant-validated the endpoint, another tenant) reads as ``None``.
+
+        Args:
+            endpoint_id: Owning endpoint the version must belong to.
+            version_id: The snapshot to fetch.
+
+        Returns:
+            The snapshot row, or ``None`` when no such version exists under this endpoint.
+        """
+        q = f"""
+            SELECT v.id, v.endpoint_id, v.version_seq, v.version_tag, v.protocol_version,
+                   v.server_name, v.server_title, v.server_version, v.instructions,
+                   v.capabilities, v.surface_fingerprint, v.discovered_at, v.created_at,
+                   s.score, s.grade, s.scored_at,
+                   {self._MCP_VERSION_CHANGE_COUNTS}
+            FROM odb.mcp_endpoint_versions v
+            LEFT JOIN odb.mcp_version_scores s ON s.version_id = v.id
+            LEFT JOIN odb.mcp_version_changes c ON c.version_id = v.id
+            WHERE v.endpoint_id = %s::uuid AND v.id = %s::uuid
+            GROUP BY v.id, s.score, s.grade, s.scored_at
+        """
+        rows = self.execute_query(q, (endpoint_id, version_id))
+        return dict(rows[0]) if rows else None
+
+    def get_mcp_version_changes(self, version_id: str) -> List[Dict[str, Any]]:
+        """Fetch the stored ``previous → this`` diff rows for a version, in stable order.
+
+        Returns the ``mcp_version_changes`` rows the snapshot introduced relative to the
+        version before it (empty for the first version, which introduces no diff). Ordered to
+        match the on-demand compare engine's emission order — server metadata first, then
+        tools, resources, resource templates, prompts, each by name — so the persisted change
+        report and a live compare of the same pair render identically.
+
+        Args:
+            version_id: The snapshot whose change records to read.
+
+        Returns:
+            One dict per change row, in stable order; empty when the version recorded no diff.
+        """
+        q = """
+            SELECT version_id, change_type, item_type, item_name, detail, created_at
+            FROM odb.mcp_version_changes
+            WHERE version_id = %s::uuid
+            ORDER BY
+                CASE item_type
+                    WHEN 'server' THEN 0
+                    WHEN 'tool' THEN 1
+                    WHEN 'resource' THEN 2
+                    WHEN 'resource_template' THEN 3
+                    WHEN 'prompt' THEN 4
+                    ELSE 5
+                END ASC,
+                item_name ASC
+        """
+        return self.execute_query(q, (version_id,))
+
     def _next_mcp_version_tag(self, cursor: Any, endpoint_id: str, base_tag: str) -> str:
         """Resolve a per-endpoint-unique date/time tag, disambiguating same-minute collisions.
 
