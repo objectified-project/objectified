@@ -1,17 +1,24 @@
 """Load an MCP endpoint's auth headers for a discovery run (Epic-6 seam).
 
-V2-MCP-17.2 (#3664) needs the discovery client to authenticate to an endpoint that requires
-credentials. Credentials live in ``odb.mcp_endpoint_credentials`` (V129) as ciphertext keyed
-by ``auth_type``; this module turns a stored credential into the HTTP headers the
-:class:`StreamableHttpTransport` attaches to every request.
+A discovery/test run against a protected MCP server must authenticate to it (V2-MCP-17.2, #3664).
+Credentials live in ``odb.mcp_endpoint_credentials`` (V129) as **ciphertext** keyed by
+``auth_type``; this module turns a stored credential into the HTTP headers the
+:class:`app.mcp_client.transport_http.StreamableHttpTransport` attaches to every request.
 
-The encrypting/decrypting half of the credential vault (Epic-6.x) is not yet wired into REST,
-so today only ``auth_type='none'`` (or no credential row at all) is fully supported — that
-yields no auth headers, which is correct for public/anonymous MCP servers. For an endpoint that
-stores ciphertext, this returns no headers and logs a warning rather than guessing at a secret
-it cannot decrypt; discovery then proceeds unauthenticated and surfaces the server's
-``AUTH_REQUIRED`` response through the normal error taxonomy. This keeps the call site stable:
-when decryption lands, only :func:`_headers_for_credential` changes.
+The work splits across two tickets that meet here:
+
+* **MCAT-6.1 (#3677)** — the *auth-type model*: how a **decrypted** payload becomes headers for
+  ``none``/``bearer``/``header`` (and ``oauth2``/``env``). That mapping lives in
+  :mod:`app.mcp_auth`; this module wires it to the credential store and to discovery.
+* **MCAT-6.2 (#3678)** — *encryption-at-rest*: sealing/unsealing ``encrypted_payload`` with an
+  app-managed key. Until it lands, :func:`decrypt_credential_payload` is the single seam that
+  returns ``None`` (no plaintext available), so a sealed credential yields no headers and
+  discovery proceeds unauthenticated — surfacing the server's ``AUTH_REQUIRED`` response through
+  the normal error taxonomy rather than guessing at a secret it cannot read. When 6.2 lands,
+  only :func:`decrypt_credential_payload` changes; the model and the call site stay put.
+
+The ``none`` auth type (or no credential row at all) is fully supported today: it yields no auth
+headers, which is exactly right for public/anonymous MCP servers.
 """
 
 from __future__ import annotations
@@ -20,38 +27,79 @@ import logging
 from typing import Any, Dict, Optional
 
 from .database import db
+from .mcp_auth import AUTH_TYPE_NONE, CredentialPayloadError, build_auth_headers
 
 logger = logging.getLogger(__name__)
 
-# Auth types whose headers we can produce without a decrypting key. ``none`` means the
-# endpoint is anonymous; everything else needs ciphertext we cannot yet read.
-_NO_SECRET_AUTH_TYPES = frozenset({"none"})
+
+def decrypt_credential_payload(credential: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Unseal a credential row's ``encrypted_payload`` into its plaintext dict (MCAT-6.2 seam).
+
+    This is the *only* place credential ciphertext is turned back into plaintext. The
+    encryption-at-rest implementation (MCAT-6.2, #3678) provides the body; until then there is no
+    decrypting key wired into REST, so this returns ``None`` to signal "no plaintext available".
+    A caller that gets ``None`` for a non-``none`` credential runs the request unauthenticated
+    rather than fabricating a header.
+
+    Args:
+        credential: An ``mcp_endpoint_credentials`` row (``auth_type``, ``encrypted_payload``,
+            ``key_version``, ``oauth_metadata``, …).
+
+    Returns:
+        The decrypted credential payload as a dict, or ``None`` when no plaintext can be produced
+        (decryption not yet wired, or the row carries no ciphertext).
+    """
+    return None
 
 
 def _headers_for_credential(credential: Optional[Dict[str, Any]]) -> Dict[str, str]:
-    """Map a stored credential row onto request headers (no decryption available yet).
+    """Map a stored credential row onto request headers via the auth-type model.
+
+    ``none`` (and a missing row) yields no headers without any decryption. For every other
+    ``auth_type`` the sealed payload is first unsealed through :func:`decrypt_credential_payload`;
+    when plaintext is available it is handed to :func:`app.mcp_auth.build_auth_headers`, which
+    produces the ``Authorization``/custom header (tokens only ever in headers, never in a URL).
+    When no plaintext is available — decryption not wired yet (MCAT-6.2) — discovery proceeds
+    unauthenticated.
 
     Args:
-        credential: An ``mcp_endpoint_credentials`` row, or ``None`` when the endpoint has
-            no credential configured.
+        credential: An ``mcp_endpoint_credentials`` row, or ``None`` when the endpoint has no
+            credential configured.
 
     Returns:
-        The auth headers to attach to discovery requests — empty for anonymous endpoints or
-        when a secret cannot be decrypted.
+        The auth headers to attach to discovery requests — empty for anonymous endpoints, a
+        malformed payload, or a secret that cannot be decrypted yet.
     """
     if credential is None:
         return {}
-    auth_type = str(credential.get("auth_type") or "none")
-    if auth_type in _NO_SECRET_AUTH_TYPES:
+    auth_type = str(credential.get("auth_type") or AUTH_TYPE_NONE)
+    if auth_type == AUTH_TYPE_NONE:
         return {}
-    # A secret is configured but the decrypting key path is not wired into REST yet; proceed
-    # unauthenticated rather than fabricate a header. (Epic-6 decryption hook goes here.)
-    logger.warning(
-        "MCP endpoint credential auth_type=%s cannot be decrypted yet; "
-        "running discovery without auth headers",
-        auth_type,
-    )
-    return {}
+
+    payload = decrypt_credential_payload(credential)
+    if payload is None:
+        # A secret is configured but no plaintext is available (the MCAT-6.2 decrypting key path
+        # is not wired into REST yet, or the row carries no ciphertext); proceed unauthenticated
+        # rather than fabricate a header.
+        logger.warning(
+            "MCP endpoint credential auth_type=%s has no decryptable payload; "
+            "running discovery without auth headers",
+            auth_type,
+        )
+        return {}
+
+    try:
+        return build_auth_headers(auth_type, payload)
+    except CredentialPayloadError:
+        # The stored payload does not match its auth_type (or would corrupt the header framing).
+        # Degrade to an unauthenticated run; the message is secret-free so it is safe to log.
+        logger.warning(
+            "MCP endpoint credential auth_type=%s payload is malformed; "
+            "running discovery without auth headers",
+            auth_type,
+            exc_info=True,
+        )
+        return {}
 
 
 def load_endpoint_auth_headers(endpoint_id: str) -> Dict[str, str]:
